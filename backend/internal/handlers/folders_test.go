@@ -153,6 +153,62 @@ func TestFoldersHandler_GetConversationFolders_RequiresConversationAccess(t *tes
 	require.Equal(t, http.StatusForbidden, res.Code, res.Body.String())
 }
 
+func TestFoldersHandler_GetFolderConversationsHidesStaleGroupMembership(t *testing.T) {
+	handler, userRepo, _, cleanup := setupFoldersHandlerTest(t)
+	defer cleanup()
+
+	formerMember := createFolderTestUser(t, userRepo, "folders_former_member")
+	owner := createFolderTestUser(t, userRepo, "folders_group_owner")
+	otherMember := createFolderTestUser(t, userRepo, "folders_group_other")
+
+	ctx := context.Background()
+	var groupID int
+	err := handler.pool.QueryRow(ctx, `
+		INSERT INTO conversations (conversation_type, is_group, group_name, created_by, last_message_at)
+		VALUES ('group', TRUE, 'Former members must not see this', $1, CURRENT_TIMESTAMP)
+		RETURNING id
+	`, owner.ID).Scan(&groupID)
+	require.NoError(t, err)
+	for _, participant := range []struct {
+		id   int
+		role string
+	}{{owner.ID, "owner"}, {formerMember.ID, "member"}, {otherMember.ID, "member"}} {
+		_, err = handler.pool.Exec(ctx, `
+			INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at)
+			VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+		`, groupID, participant.id, participant.role)
+		require.NoError(t, err)
+	}
+
+	var folderID int
+	err = handler.pool.QueryRow(ctx, `
+		INSERT INTO conversation_folders (user_id, name, position)
+		VALUES ($1, 'Stale group reference', 0)
+		RETURNING id
+	`, formerMember.ID).Scan(&folderID)
+	require.NoError(t, err)
+	_, err = handler.pool.Exec(ctx, `
+		INSERT INTO conversation_folder_members (folder_id, conversation_id) VALUES ($1, $2)
+	`, folderID, groupID)
+	require.NoError(t, err)
+	_, err = handler.pool.Exec(ctx, `
+		DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2
+	`, groupID, formerMember.ID)
+	require.NoError(t, err)
+
+	router := gin.New()
+	router.GET("/folders/:id/conversations", func(c *gin.Context) {
+		c.Set("user_id", formerMember.ID)
+		handler.GetFolderConversations(c)
+	})
+	request := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/folders/%d/conversations", folderID), nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.JSONEq(t, `{"conversations":[]}`, response.Body.String())
+}
+
 func TestFoldersHandler_ReorderFolders(t *testing.T) {
 	handler, userRepo, _, cleanup := setupFoldersHandlerTest(t)
 	defer cleanup()

@@ -54,9 +54,29 @@ func (s *AccountLockoutService) RecordFailure(ctx context.Context, identifier, i
 // exceeded the threshold independently, allowing IP-based lockout even when
 // different usernames are tried from the same source.
 //
-// Fix 3: The identifier and IP checks are performed as separate queries to
-// avoid the problematic ($2 <> '' AND ip_address = $2::inet) pattern that
-// causes a PostgreSQL ::inet cast error when ipAddress is an empty string.
+// The two checks are separate queries, and separate thresholds, on purpose.
+// Counting them together as one predicate:
+//
+//	identifier = $1 OR ($2 <> '' AND ip_address = $2::inet)
+//
+// sums unrelated evidence. Four failures against a target, plus four against
+// any other username from an address the target happens to share, reaches five
+// and locks the target out although neither axis was ever attacked at the
+// threshold. Shared addresses are ordinary -- office NAT, cafe wifi, mobile
+// carriers -- so that is a usable way to lock someone out of their account.
+// Independent counts make an attacker reach the threshold on an axis they
+// actually control.
+//
+// TestAccountLockoutService_IsLocked_CountsIdentifierAndIPIndependently pins
+// this and fails if the queries are merged.
+//
+// This comment previously justified the split by a PostgreSQL ::inet cast
+// error on an empty address. That does not reproduce through pgx, which binds
+// the parameter and short-circuits the AND, so the rationale is recorded here
+// as superseded rather than left to be disproved and acted on.
+//
+// Keep the SQL line indented. In running prose gofmt rewrites the two single
+// quotes into a typographic quote, which would misstate the predicate.
 func (s *AccountLockoutService) IsLocked(ctx context.Context, identifier string, ipAddress string) (bool, error) {
 	// Count identifier-based failures first.
 	const qIdentifier = `

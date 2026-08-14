@@ -4,15 +4,23 @@ import (
 	"context"
 	"testing"
 
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/testutil"
+	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPostgresEmailVerificationRepository_GenerateToken(t *testing.T) {
+func newEmailVerificationRepository(t *testing.T) (ports.EmailVerificationRepository, *testutil.TestDatabase) {
+	t.Helper()
+	require.NoError(t, utils.SetEncryptionKey("0123456789abcdef0123456789abcdef"))
 	db := testutil.NewTestDatabase(t)
-	repo := repository.NewPostgresEmailVerificationRepository(db.Pool)
+	return repository.NewPostgresEmailVerificationRepository(db.Pool), db
+}
+
+func TestPostgresEmailVerificationRepository_GenerateToken(t *testing.T) {
+	repo, db := newEmailVerificationRepository(t)
 	fx := testutil.NewFixtures(t, db)
 	ctx := context.Background()
 
@@ -25,13 +33,13 @@ func TestPostgresEmailVerificationRepository_GenerateToken(t *testing.T) {
 }
 
 func TestPostgresEmailVerificationRepository_GetByToken(t *testing.T) {
-	db := testutil.NewTestDatabase(t)
-	repo := repository.NewPostgresEmailVerificationRepository(db.Pool)
+	repo, db := newEmailVerificationRepository(t)
 	fx := testutil.NewFixtures(t, db)
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("ev_bytoken_u")
-	ev, _ := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	ev, err := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name    string
@@ -50,21 +58,20 @@ func TestPostgresEmailVerificationRepository_GetByToken(t *testing.T) {
 				assert.Nil(t, got)
 			} else {
 				require.NotNil(t, got)
-				assert.NotEqual(t, ev.Token, got.Token, "stored email verification tokens should remain hashed")
-				assert.Len(t, got.Token, 64)
+				assert.Empty(t, got.Token, "stored token digests must not leave the repository boundary")
 			}
 		})
 	}
 }
 
 func TestPostgresEmailVerificationRepository_IsValid(t *testing.T) {
-	db := testutil.NewTestDatabase(t)
-	repo := repository.NewPostgresEmailVerificationRepository(db.Pool)
+	repo, db := newEmailVerificationRepository(t)
 	fx := testutil.NewFixtures(t, db)
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("ev_valid_u")
-	ev, _ := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	ev, err := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	require.NoError(t, err)
 
 	valid, uid, purpose, err := repo.IsValid(ctx, ev.Token)
 	require.NoError(t, err)
@@ -74,13 +81,13 @@ func TestPostgresEmailVerificationRepository_IsValid(t *testing.T) {
 }
 
 func TestPostgresEmailVerificationRepository_GetPendingVerification(t *testing.T) {
-	db := testutil.NewTestDatabase(t)
-	repo := repository.NewPostgresEmailVerificationRepository(db.Pool)
+	repo, db := newEmailVerificationRepository(t)
 	fx := testutil.NewFixtures(t, db)
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("ev_pending_u")
-	_, _ = repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	_, err := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	require.NoError(t, err)
 
 	got, err := repo.GetPendingVerification(ctx, user.ID, "email_verification")
 	require.NoError(t, err)
@@ -89,15 +96,15 @@ func TestPostgresEmailVerificationRepository_GetPendingVerification(t *testing.T
 }
 
 func TestPostgresEmailVerificationRepository_InvalidateUserTokens(t *testing.T) {
-	db := testutil.NewTestDatabase(t)
-	repo := repository.NewPostgresEmailVerificationRepository(db.Pool)
+	repo, db := newEmailVerificationRepository(t)
 	fx := testutil.NewFixtures(t, db)
 	ctx := context.Background()
 
 	user := fx.CreateUniqueUser("ev_invalidate_u")
-	_, _ = repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	_, err := repo.GenerateToken(ctx, user.ID, "test@example.com", "email_verification")
+	require.NoError(t, err)
 
-	err := repo.InvalidateUserTokens(ctx, user.ID, "email_verification")
+	err = repo.InvalidateUserTokens(ctx, user.ID, "email_verification")
 	require.NoError(t, err)
 
 	// After invalidation, GetPendingVerification returns (nil, nil).

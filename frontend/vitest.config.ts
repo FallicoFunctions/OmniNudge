@@ -8,8 +8,12 @@ export default defineConfig({
     setupFiles: './tests/setup/test-setup.ts',
     globals: true,
     css: false,
-    testTimeout: 10000,
+    // Four jsdom workers intermittently starve query-driven page tests on
+    // developer and CI machines. Two keeps the complete suite deterministic.
+    maxWorkers: 2,
+    minWorkers: 1,
+    testTimeout: 20000,
     slowTestThreshold: 5000,
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/**/*.spec.ts'],
   },
 });

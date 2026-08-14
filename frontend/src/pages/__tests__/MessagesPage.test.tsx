@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MessagesPage from '../MessagesPage';
 import type { Conversation } from '../../types/messages';
@@ -334,8 +334,8 @@ describe('MessagesPage swipe archive gestures', () => {
 
     fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
 
-    const menuButton = await screen.findByRole('button', { name: 'Message options' });
-    fireEvent.click(menuButton);
+    const menuButtons = await screen.findAllByRole('button', { name: 'Message options' });
+    fireEvent.click(menuButtons[menuButtons.length - 1]);
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
 
     const input = screen.getByPlaceholderText('Type a message...');

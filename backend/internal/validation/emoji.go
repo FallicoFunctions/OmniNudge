@@ -16,19 +16,6 @@ const (
 
 // IsValidReactionEmoji returns true when input is a valid reaction emoji
 // payload according to backend business and safety rules.
-//
-// Accepts:
-// - Single emoji and common multi-rune emoji sequences (ZWJ, variation
-//   selectors, skin tone modifiers)
-//
-// Rejects:
-// - Empty / invalid UTF-8
-// - >10 Unicode code points
-// - >100 UTF-8 bytes
-// - ASCII-only content
-// - Control chars / whitespace-only separators
-// - Bidirectional override/isolate controls
-// - Unicode tag characters (can encode hidden payload)
 func IsValidReactionEmoji(s string) bool {
 	if len(s) == 0 || len(s) > MaxReactionEmojiBytes {
 		return false
@@ -42,10 +29,7 @@ func IsValidReactionEmoji(s string) bool {
 
 	hasNonASCII := false
 	for _, r := range s {
-		if r < 32 {
-			return false
-		}
-		if unicode.IsSpace(r) {
+		if r < 32 || unicode.IsSpace(r) {
 			return false
 		}
 		if (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {

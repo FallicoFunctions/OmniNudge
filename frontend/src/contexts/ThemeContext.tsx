@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { themeService } from '../services/themeService';
+import { hasBrowserSession } from '../services/authSession';
 import type { UserSettings, UserTheme } from '../types/theme';
 import {
   applyCSSVariables,
@@ -53,9 +54,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
 
   // Only fetch themes if user is authenticated
-  const isAuthenticated =
-    typeof window !== 'undefined' &&
-    Boolean(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
+  const isAuthenticated = typeof window !== 'undefined' && hasBrowserSession();
 
   const {
     data: themeLists,

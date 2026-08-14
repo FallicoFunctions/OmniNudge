@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,7 +15,14 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/openrouter"
+	"github.com/omninudge/backend/internal/services/runpod"
 	zlog "github.com/rs/zerolog/log"
+)
+
+const (
+	defaultWorkerConcurrency = 10
+	maxWorkerConcurrency     = 64
 )
 
 func main() {
@@ -45,6 +53,7 @@ func main() {
 
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
 	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
+	workerOmniChatUserRepo := models.NewUserRepository(db.Pool)
 
 	thumbnailService := services.NewThumbnailService()
 	emailService := services.NewEmailServiceFull(services.EmailServiceConfig{
@@ -116,20 +125,45 @@ func main() {
 		zlog.Warn().Msg("Virus scan disabled via VIRUS_SCAN_ENABLED=false")
 	}
 
-	// Create worker with concurrency
-	// Default: 10 concurrent workers, can be configured via WORKER_CONCURRENCY env var
-	concurrency := 10
-	if envConcurrency := os.Getenv("WORKER_CONCURRENCY"); envConcurrency != "" {
-		var parsed int
-		if _, err := fmt.Sscanf(envConcurrency, "%d", &parsed); err == nil && parsed > 0 {
-			concurrency = parsed
-		}
-	}
+	// Bound concurrency even when configured through the environment. A typo or
+	// hostile deployment setting must not start an unbounded number of workers
+	// and exhaust CPU, memory, database connections, or provider quotas.
+	concurrency := workerConcurrencyFromEnv(os.Getenv("WORKER_CONCURRENCY"))
 
 	worker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, concurrency)
 	queueClient := queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
 
 	// Register all job handlers
+	omniChatGenerationWorker := queue.NewOmniChatGenerationHandler(
+		models.NewOmniChatMediaRepository(db.Pool),
+		models.NewBotPersonaRepository(db.Pool),
+		storageService,
+		virusScanner,
+		runpod.NewClientWithTimeout(cfg.OmniChatMedia.RunPodAPIKey, cfg.OmniChatMedia.RunPodBaseURL, cfg.OmniChatMedia.RunPodRequestTimeoutSeconds),
+		cfg.OmniChatMedia,
+		cfg.VirusScan.FailClosed,
+	).SetMediaReferenceReader(mediaRepo).
+		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
+			SetAdminReader(workerOmniChatUserRepo))
+	// Character memory extraction. This is the only place the extraction model
+	// is called, which is what keeps a 20-second reasoning pass off the send
+	// path entirely.
+	workerBotConversationRepo := models.NewBotConversationRepository(db.Pool)
+	memoryExtractionModel := strings.TrimSpace(cfg.OpenRouter.StandardModel)
+	if memoryExtractionModel == "" {
+		memoryExtractionModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
+	}
+	omniChatMemoryService := services.NewOmniChatMemoryService(
+		models.NewOmniChatMemoryRepository(db.Pool),
+		models.NewBotMessageRepository(db.Pool),
+		workerBotConversationRepo,
+		models.NewBotPersonaRepository(db.Pool),
+		services.NewModelOmniChatMemoryExtractor(
+			openrouter.NewClient(cfg.OpenRouter.APIKey, memoryExtractionModel),
+		),
+	)
+
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
@@ -141,12 +175,14 @@ func main() {
 		MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 		WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
 		VideoTranscode:      queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle,
+		OmniChatGeneration:  omniChatGenerationWorker.Handle,
+		OmniChatMemory:      queue.NewOmniChatMemoryHandler(omniChatMemoryService, workerBotConversationRepo),
 	}
 
 	worker.RegisterAllHandlers(handlers)
 
 	zlog.Info().Int("concurrency", concurrency).Msg("Worker configured")
-	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode"}).Msg("Registered job handlers")
+	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode", "omnichat_generation", "omnichat_memory_extract"}).Msg("Registered job handlers")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -167,4 +203,20 @@ func main() {
 			zlog.Fatal().Err(err).Msg("Worker failed")
 		}
 	}
+}
+
+func workerConcurrencyFromEnv(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultWorkerConcurrency
+	}
+
+	concurrency, err := strconv.Atoi(raw)
+	if err != nil || concurrency < 1 {
+		return defaultWorkerConcurrency
+	}
+	if concurrency > maxWorkerConcurrency {
+		return maxWorkerConcurrency
+	}
+	return concurrency
 }

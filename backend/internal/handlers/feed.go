@@ -189,8 +189,8 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		}
 	} else {
 		// Unauthenticated or forcePopular: use simple popular feed (no subscriptions)
-		// For now, fall back to old approach for popular feed
-		// TODO: Could also implement interleaved for r/popular
+		// Popular feeds have no subscription ordering to preserve, so fetch both
+		// sources independently and merge them by the requested ranking below.
 		var hubPosts []*models.PlatformPost
 		var redditPosts []services.RedditPost
 

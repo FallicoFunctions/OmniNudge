@@ -1,0 +1,201 @@
+/* OmniChat theme — a fixed dark, character-card-forward look independent of
+   the rest of OmniNudge's theme (does not respond to the site's light/dark
+   toggle or accent theme selection). Same override pattern as the Altered
+   Carbon theme: redefine the shared --color-* tokens within a scoped class
+   so existing components that already reference var(--color-*) pick it up
+   without any component-level changes. */
+
+:root {
+  --oc-bg: #090a0f;
+  --oc-surface: #12131a;
+  --oc-surface-elevated: #1b1c25;
+  --oc-surface-hover: #20212b;
+  --oc-text-primary: #f7f7fb;
+  --oc-text-secondary: #b1b1bd;
+  --oc-text-muted: #777785;
+  --oc-border: #292a35;
+  --oc-border-hover: #40414f;
+  --oc-primary: #3b82f6;
+  --oc-primary-dark: #2563eb;
+  --oc-primary-light: #60a5fa;
+  --oc-accent: #60a5fa;
+  --oc-mint: #38bdf8;
+}
+
+.omnichat-theme {
+  --omnichat-safe-top: env(safe-area-inset-top, 0px);
+  --omnichat-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --omnichat-header-height: 72px;
+  --omnichat-header-offset: calc(var(--omnichat-header-height) + var(--omnichat-safe-top));
+  --color-primary: var(--oc-primary);
+  --color-primary-dark: var(--oc-primary-dark);
+  --color-primary-strong: var(--oc-primary-dark);
+  --color-primary-light: var(--oc-primary-light);
+  --color-background: var(--oc-bg);
+  --color-surface: var(--oc-surface);
+  --color-surface-elevated: var(--oc-surface-elevated);
+  --color-surface-hover: var(--oc-surface-hover);
+  --color-text-primary: var(--oc-text-primary);
+  --color-text-secondary: var(--oc-text-secondary);
+  --color-text-muted: var(--oc-text-muted);
+  --color-border: var(--oc-border);
+  --color-border-hover: var(--oc-border-hover);
+  background:
+    radial-gradient(circle at 72% -10%, rgba(59, 130, 246, 0.16), transparent 34rem),
+    radial-gradient(circle at 22% 36%, rgba(96, 165, 250, 0.07), transparent 28rem), var(--oc-bg);
+  color-scheme: dark;
+  isolation: isolate;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.omnichat-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.omnichat-safe-bottom {
+  padding-bottom: max(1rem, var(--omnichat-safe-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+.omnichat-theme ::selection {
+  background: rgba(59, 130, 246, 0.42);
+  color: white;
+}
+
+.omnichat-theme .omnichat-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  opacity: 0.025;
+}
+
+@keyframes omnichat-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes omnichat-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes omnichat-quick-chat-overlay-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes omnichat-quick-chat-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes omnichat-quick-chat-sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes omnichat-chat-avatar-arrival {
+  0% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.55);
+  }
+  55% {
+    box-shadow: 0 0 0 8px rgba(96, 165, 250, 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+  }
+}
+
+.omnichat-quick-chat-overlay-enter {
+  animation: omnichat-quick-chat-overlay-enter 180ms ease-out both;
+}
+
+.omnichat-quick-chat-dialog-enter {
+  animation: omnichat-quick-chat-dialog-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.omnichat-chat-avatar-arrival {
+  animation: omnichat-chat-avatar-arrival 620ms ease-out 120ms both;
+}
+
+html.omnichat-shared-transition::view-transition-old(root),
+html.omnichat-shared-transition::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(omnichat-persona-shared) {
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 120;
+}
+
+::view-transition-old(omnichat-persona-shared),
+::view-transition-new(omnichat-persona-shared) {
+  height: 100%;
+  object-fit: cover;
+  overflow: clip;
+  border-radius: 16px;
+}
+
+.omnichat-float {
+  animation: omnichat-float 7s ease-in-out infinite;
+}
+
+.omnichat-live-dot {
+  animation: omnichat-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omnichat-float,
+  .omnichat-live-dot,
+  .omnichat-quick-chat-overlay-enter,
+  .omnichat-quick-chat-dialog-enter,
+  .omnichat-chat-avatar-arrival {
+    animation: none;
+  }
+
+  ::view-transition-group(omnichat-persona-shared),
+  ::view-transition-old(omnichat-persona-shared),
+  ::view-transition-new(omnichat-persona-shared) {
+    animation-duration: 1ms;
+  }
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: no-preference) {
+  .omnichat-quick-chat-dialog-enter {
+    animation-name: omnichat-quick-chat-sheet-enter;
+    animation-duration: 360ms;
+  }
+}

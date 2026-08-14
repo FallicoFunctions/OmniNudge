@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,12 +22,22 @@ import (
 
 var dataExportTestCounter int64
 
+type stubDataExportQueue struct {
+	payloads []queue.DataExportPayload
+	err      error
+}
+
+func (s *stubDataExportQueue) EnqueueDataExport(_ context.Context, payload queue.DataExportPayload) error {
+	s.payloads = append(s.payloads, payload)
+	return s.err
+}
+
 func uniqueDataExportUsername(base string) string {
 	id := atomic.AddInt64(&dataExportTestCounter, 1)
 	return fmt.Sprintf("%s_dexport_%d_%d", base, time.Now().UnixNano(), id)
 }
 
-func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Database, int, func()) {
+func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Database, int, *stubDataExportQueue) {
 	t.Helper()
 	db, err := database.NewTest()
 	require.NoError(t, err)
@@ -47,10 +58,10 @@ func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Dat
 	}
 	require.NoError(t, userRepo.Create(ctx, user))
 
-	// nil queue — skips enqueue step; export is still inserted as pending.
-	handler := NewDataExportHandler(db.Pool, nil, nil, "test-master-key-32-chars-padded!!")
+	queueStub := &stubDataExportQueue{}
+	handler := NewDataExportHandler(db.Pool, queueStub, nil, "test-master-key-32-chars-padded!!")
 
-	return handler, db, user.ID, func() {}
+	return handler, db, user.ID, queueStub
 }
 
 func TestRequestDataExport_Success(t *testing.T) {
@@ -70,11 +81,61 @@ func TestRequestDataExport_Success(t *testing.T) {
 
 	handler.RequestDataExport(c)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusAccepted, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.NotEmpty(t, resp["export_id"])
 	assert.Equal(t, "pending", resp["status"])
+}
+
+func TestRequestDataExport_RejectsUnsupportedDataType(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{
+		"password":   "TestPassword123!",
+		"data_types": []string{"profile", "../../secrets"},
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestRequestDataExport_RejectsConcurrentRequest(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{
+		"password":   "TestPassword123!",
+		"data_types": []string{"profile"},
+	})
+
+	for attempt, expected := range []int{http.StatusAccepted, http.StatusTooManyRequests} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("user_id", userID)
+		handler.RequestDataExport(c)
+		assert.Equal(t, expected, w.Code, "attempt %d", attempt+1)
+	}
+}
+
+func TestRequestDataExport_FailsClosedWithoutQueue(t *testing.T) {
+	handler, _, userID, _ := setupDataExportHandlerTest(t)
+	handler.queue = nil
+	body, _ := json.Marshal(map[string]interface{}{"password": "TestPassword123!"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 }
 
 func TestRequestDataExport_WrongPassword(t *testing.T) {
@@ -230,4 +291,75 @@ func TestListExportRequests_WithRecords(t *testing.T) {
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, float64(3), resp["total"])
+}
+
+// The default set and the allowlist were once separate literals and drifted
+// apart: the settings page asked for "encryption_keys" while the allowlist did
+// not contain it, so every export request from the UI was rejected. They are
+// one list now, and this pins that.
+func TestRequestDataExport_AcceptsEveryAdvertisedDataType(t *testing.T) {
+	for _, dataType := range exportDataTypes {
+		t.Run(dataType, func(t *testing.T) {
+			handler, _, userID, _ := setupDataExportHandlerTest(t)
+			body, _ := json.Marshal(map[string]interface{}{
+				"password":   "TestPassword123!",
+				"data_types": []string{dataType},
+			})
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("user_id", userID)
+
+			handler.RequestDataExport(c)
+
+			assert.Equal(t, http.StatusAccepted, w.Code,
+				"%s is advertised but was rejected", dataType)
+		})
+	}
+}
+
+// Every advertised type must also have a case in the worker's switch. An
+// unhandled one fails the whole job with "unsupported data type", which would
+// take the user's other sections down with it.
+func TestExportDataTypesCoverOmniChat(t *testing.T) {
+	advertised := make(map[string]struct{}, len(exportDataTypes))
+	for _, dataType := range exportDataTypes {
+		advertised[dataType] = struct{}{}
+	}
+	for _, required := range []string{
+		"omnichat_conversations", "omnichat_personas", "omnichat_memory", "omnichat_media",
+	} {
+		_, ok := advertised[required]
+		assert.True(t, ok, "%s must be exportable", required)
+	}
+}
+
+// The default set is copied, not aliased: the request value travels on into the
+// job row and must not be able to mutate the package-level list.
+func TestRequestDataExport_DefaultDataTypesAreNotAliased(t *testing.T) {
+	handler, db, userID, _ := setupDataExportHandlerTest(t)
+	body, _ := json.Marshal(map[string]interface{}{"password": "TestPassword123!"})
+
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+
+	handler.RequestDataExport(c)
+	require.Equal(t, http.StatusAccepted, w.Code)
+
+	// The worker reads data_types from this row rather than from the queue
+	// payload, so the stored row is what has to carry the full default set.
+	var stored []string
+	require.NoError(t, db.Pool.QueryRow(context.Background(),
+		`SELECT data_types FROM data_export_requests WHERE user_id = $1`, userID).Scan(&stored))
+	require.Equal(t, exportDataTypes, stored)
+
+	original := exportDataTypes[0]
+	stored[0] = "mutated"
+	assert.Equal(t, original, exportDataTypes[0], "the package-level list must be immutable")
 }

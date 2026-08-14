@@ -125,11 +125,12 @@
     "notifications": "Notifications",
     "profile": "Profile",
     "admin": "Admin",
-    "hubs": "Hubs",
     "games": "Games",
+    "hubs": "Hubs",
     "search": "Search",
     "create": "Create",
-    "menu": "Menu"
+    "menu": "Menu",
+    "omnichat": "OmniChat"
   },
   "menu": {
     "profile": "Profile",
@@ -144,16 +145,20 @@
   },
   "gamesPage": {
     "eyebrow": "OmniGame",
-    "title": "OmniGame",
-    "description": "Browse multiplayer worlds built for OmniNudge.",
+    "title": "Games",
+    "description": "Step into dedicated multiplayer spaces built inside OmniNudge, starting with the first live room: OmniRave.",
     "availableNow": "Available now",
     "viewGame": "View game"
   },
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
     "play": "Play",
-    "starting": "Starting...",
-    "launchError": "Unable to start OmniRave right now."
+    "playing": "Entering OmniRave...",
+    "heroTitle": "Enter the room without any lobby shell.",
+    "heroBody": "Play should feel immediate: black-in, live crowd, stage lights, and the room already moving.",
+    "launchHint": "Signed-in players resume their account; everyone else enters as a guest.",
+    "highlightsTitle": "What makes the room feel real",
+    "launchError": "Unable to launch OmniRave right now."
   },
   "mainLayout": {
     "skipToMainContent": "Skip to main content",
@@ -209,6 +214,35 @@
     "memberCount_other": "{{formattedCount}} members",
     "pagination": {
       "page": "Page {{formattedPage}}"
+    }
+  },
+  "games": {
+    "omnirave": {
+      "summary": "A browser rave where one live crowd moves through three synchronized stages in the same world.",
+      "hero": "One world. Three stages. Shared pulse.",
+      "description": [
+        "OmniRave drops every player into the same authoritative venue, so the room feels alive the moment you arrive.",
+        "Guests spawn instantly at the Main Stage, while returning signed-in players come back through their saved return point with their loadout intact."
+      ],
+      "highlights": [
+        "Main Stage spawn for first-time and guest players",
+        "Saved return-point re-entry for signed-in regulars",
+        "Authoritative zone audio and world-state sync across every stage"
+      ],
+      "gallery": {
+        "0": {
+          "title": "Main Stage",
+          "caption": "The arrival point where the whole room first locks into the beat."
+        },
+        "1": {
+          "title": "The Underground",
+          "caption": "A darker floor built for harder cuts, denser lights, and late-night motion."
+        },
+        "2": {
+          "title": "P.L.U.R.R. Partay",
+          "caption": "A neon side room tuned for color, bounce, and euphoric spillover."
+        }
+      }
     }
   },
   "bugReportModal": {
@@ -1231,9 +1265,8 @@
     },
     "edit": {
       "title": "Edit profile",
-      "description": "Update your avatar URL, status text, and bio.",
-      "avatarUrlLabel": "Avatar URL",
-      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "description": "Update your avatar image, status text, and bio.",
+      "avatarUrlLabel": "Avatar Image",
       "avatarUploadButton": "Upload avatar image",
       "avatarUploading": "Uploading...",
       "avatarUploadHint": "PNG, JPG, GIF, or WebP up to 5MB. Auto-cropped to 200x200.",
@@ -1250,7 +1283,7 @@
         "bioTooLong": "Bio must be 500 characters or less.",
         "statusTooLong": "Status text must be 500 characters or less.",
         "locationTooLong": "Location must be 100 characters or less.",
-        "invalidAvatarUrl": "Avatar URL must start with http:// or https://",
+        "invalidAvatarUrl": "Avatar image must start with http:// or https://",
         "uploadFailed": "Failed to upload avatar: {{message}}",
         "saveFailed": "Failed to save profile: {{message}}"
       }
@@ -2305,6 +2338,14 @@
       "title": "Blocked Users",
       "description": "Manage people you have blocked. Blocked users cannot message you or start new conversations with you.",
       "manageButton": "Manage Blocked Users"
+    },
+    "omniChatLayout": {
+      "title": "OmniChat Layout",
+      "description": "Choose how OmniChat appears when you open it.",
+      "immersive": "Full Immersive View (Default)",
+      "immersiveHelp": "OmniChat takes over the screen with its own dark, book-like look and no site navigation bar.",
+      "sharedNav": "Keep Site Navigation",
+      "sharedNavHelp": "OmniChat still gets its own dark look, but the OmniNudge navigation bar stays visible above it."
     }
   },
   "blockedUsersPage": {
@@ -2397,6 +2438,7 @@
       "signingIn": "Signing in...",
       "creatingAccount": "Creating account...",
       "signIn": "Sign in",
+      "logout": "Log out",
       "signUp": "Sign up"
     },
     "switch": {
@@ -3453,7 +3495,9 @@
       "userManagement": "User Management",
       "hubModerators": "Hub Moderators",
       "banActivity": "Ban Activity",
-      "bugReports": "Bug Reports"
+      "bugReports": "Bug Reports",
+      "omnichatPersonas": "OmniChat Personas",
+      "responseFeedback": "Response Feedback"
     },
     "roles": {
       "user": "User",
@@ -3626,6 +3670,45 @@
         "noScreenshot": "No screenshot available."
       }
     },
+    "responseFeedback": {
+      "title": "OmniChat Response Feedback",
+      "subtitle": "Review reported replies and promote useful quality signals.",
+      "loading": "Loading response feedback...",
+      "loadError": "Unable to load response feedback.",
+      "updateError": "Unable to update the feedback status.",
+      "filters": "Response feedback filters",
+      "status": "Status",
+      "reason": "Reason",
+      "allStatuses": "All statuses",
+      "allReasons": "All reasons",
+      "count": "{{count}} reports",
+      "empty": "No response feedback found.",
+      "submitted": "Submitted",
+      "detail": "Report detail",
+      "note": "Reporter note",
+      "noNote": "No note provided.",
+      "responseSnapshot": "Response snapshot",
+      "priorUserSnapshot": "Prior user snapshot",
+      "sceneFacts": "Scene facts",
+      "unavailable": "Unavailable",
+      "actions": "Review actions",
+      "page": "Page {{page}}",
+      "statuses": {
+        "new": "New",
+        "reviewed": "Reviewed",
+        "promoted": "Promoted",
+        "dismissed": "Dismissed"
+      },
+      "reasons": {
+        "role_ownership": "Role or ownership",
+        "user_agency": "User agency",
+        "narration_format": "Narration or format",
+        "repetition_length": "Repetition or length",
+        "grammar_artifact": "Grammar or artifact",
+        "character_mismatch": "Character mismatch",
+        "other": "Other"
+      }
+    },
     "moderators": {
       "selectHub": "Select Hub",
       "selectHubPlaceholder": "-- Select a hub --",
@@ -3719,8 +3802,7 @@
     "minParticipants": "Add at least 2 other members.",
     "nameLabel": "Group Name",
     "namePlaceholder": "Enter a group name",
-    "avatarLabel": "Avatar URL (optional)",
-    "avatarPlaceholder": "https://example.com/avatar.png",
+    "avatarLabel": "Avatar Image (optional)",
     "descriptionLabel": "Description (optional)",
     "descriptionPlaceholder": "What is this group about?",
     "selectedCount": "{{count}} selected",
@@ -3914,6 +3996,416 @@
       "removed": "Friend removed",
       "declined": "Request declined",
       "topFriendsUpdated": "Top friends updated"
+    }
+  },
+  "omnichat": {
+    "galleryDelete": {
+      "action": "Delete creation",
+      "title": "Delete this creation?",
+      "description": "This permanently removes the file from your gallery and from chat attachments. This cannot be undone.",
+      "confirm": "Delete permanently",
+      "deleting": "Deleting...",
+      "sharedError": "Unpublish this creation from Explore before deleting it.",
+      "genericError": "This creation could not be deleted.",
+      "unpublishFirst": "Unpublish from Explore before deleting"
+    },
+    "groupManagement": {
+      "confirmDelete": "Delete this group and its entire transcript permanently?"
+    },
+    "commerce": {
+      "title": "Plans and OmniCredits",
+      "subtitle": "Your balance and every displayed offer come from the server.",
+      "wallet": "Wallet",
+      "balanceBreakdown": "{{purchased}} purchased · {{subscription}} subscription",
+      "plans": "Plans",
+      "choosePlan": "Choose {{plan}}",
+      "creditPacks": "Credit packs",
+      "creditName": "{{count}} OmniCredits",
+      "buyPack": "Buy {{pack}}",
+      "recentUsage": "Recent usage",
+      "noUsage": "No credit usage yet.",
+      "loading": "Loading purchase options…",
+      "redirecting": "Opening secure checkout…",
+      "notConfigured": "Purchase options are not configured yet.",
+      "offerNames": {
+        "plus": "Plus",
+        "premium": "Premium",
+        "unknown": "Subscription"
+      },
+      "period": {
+        "month": "month",
+        "days": "{{count}} days"
+      },
+      "features": {
+        "profiles": "More character profiles",
+        "media": "Included media credits",
+        "priority": "Priority generation"
+      },
+      "usage": {
+        "voice": "Voice call",
+        "image": "Image generation",
+        "video": "Video generation",
+        "other": "Credit adjustment"
+      },
+      "errors": {
+        "load": "Billing details could not be loaded.",
+        "secureCheckout": "A secure checkout could not be opened. Please try again."
+      }
+    },
+    "videoPaywall": {
+      "title": "Unlock {{feature}}",
+      "description": "Video requires OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
+      "viewOptions": "View plans and credits",
+      "features": {
+        "scene_video": "scene video",
+        "video_call": "video calls"
+      }
+    },
+    "categories": {
+      "all": "All",
+      "roleplay": "Roleplay",
+      "helper": "Helper",
+      "romance": "Romance",
+      "original": "Original",
+      "animeGame": "Anime & Game",
+      "fictionMedia": "Fiction & Media"
+    },
+    "discover": {
+      "featuredEyebrow": "Featured",
+      "featuredTitle": "Find your next story",
+      "allPersonas": "All personas",
+      "loading": "Loading personas...",
+      "loadError": "Unable to load personas.",
+      "startError": "Unable to start that chat. Try again.",
+      "empty": "No personas yet.",
+      "startingChat": "Starting chat...",
+      "continueChatting": "Continue Chatting",
+      "conversationsLoadError": "Unable to load your conversations.",
+      "heroEyebrow": "Featured world",
+      "heroTitle": "Step into a story that answers back.",
+      "heroDescription": "Meet vivid characters, shape the scene, and take every conversation somewhere unexpected.",
+      "enterPersona": "Enter {{name}}",
+      "searchCharacters": "Search characters",
+      "roulette": "Surprise me",
+      "rouletteShuffling": "Shuffling...",
+      "rouletteReveal": "Your next story is",
+      "spotlight": "Spotlight: {{name}}",
+      "continueEyebrow": "Pick up where you left off",
+      "viewChats": "View chats",
+      "createOrImport": "Create or Import Character",
+      "privateCollection": "Your private collection",
+      "myCharacters": "My Characters",
+      "manageStudio": "Manage Studio",
+      "exploreEyebrow": "Every genre. Your direction.",
+      "exploreTitle": "Explore characters",
+      "searchAll": "Search all",
+      "categoryAria": "Character categories"
+    },
+    "quickChat": {
+      "eyebrow": "Quick chat",
+      "title": "Meet {{name}}",
+      "close": "Close quick chat",
+      "description": "Their prepared opening appears instantly. Reply once to preview how the conversation feels; nothing is saved until you continue.",
+      "openingUnavailable": "This character needs a prepared opening message before quick chat can begin.",
+      "replyLabel": "Reply to {{name}}",
+      "placeholder": "Reply to {{name}}...",
+      "send": "Send reply",
+      "generating": "{{name}} is replying...",
+      "generationFailed": "That preview reply did not come through. Your message is still here.",
+      "retry": "Try again",
+      "oneReplyHint": "Previewing one response before opening the full chat...",
+      "continue": "Continue chatting",
+      "openingChat": "Opening chat...",
+      "continueFailed": "The chat could not be opened. Try again.",
+      "resumeExisting": "Resume your existing chat instead"
+    },
+    "responseReport": {
+      "title": "Report a response",
+      "description": "Choose what went wrong. Your feedback helps improve future replies.",
+      "close": "Close response report",
+      "reasonLabel": "What went wrong?",
+      "reasons": {
+        "role_ownership": "It confused who did or owned something",
+        "user_agency": "It removed my choices or acted for me",
+        "narration_format": "The narration or format was wrong",
+        "repetition_length": "It was repetitive or the wrong length",
+        "grammar_artifact": "It had grammar issues or generation artifacts",
+        "character_mismatch": "It did not match the character",
+        "other": "Other issue"
+      },
+      "noteLabel": "Optional note",
+      "notePlaceholder": "Tell us what would have been better",
+      "cancel": "Cancel",
+      "sending": "Sending…",
+      "submit": "Submit report"
+    },
+    "chat": {
+      "invalidConversation": "This conversation could not be found.",
+      "back": "Back to Discover",
+      "loadingPersona": "Loading...",
+      "nsfwTag": "18+",
+      "signInPrompt": "Sign in to save your chat",
+      "noPersonaSelected": "Select a persona from Discover to start chatting",
+      "personaNotFound": "This persona could not be found.",
+      "loading": "Loading conversation...",
+      "loadError": "Unable to load this conversation.",
+      "inputPlaceholder": "Say or do something...",
+      "send": "Send message",
+      "rateLimited": "You're moving too fast — please wait a moment before sending another message.",
+      "allowanceRemaining": "{{remaining}} of {{limit}} free replies available · rolling 24 hours",
+      "allowanceEmpty": "No free replies available.",
+      "allowanceNext": "Next reply returns {{time}}.",
+      "allowanceGuestCta": "Sign up for 250 replies",
+      "allowanceUpgradeCta": "Upgrade for unlimited replies",
+      "regenerateResponse": "Regenerate response",
+      "reportResponse": "Report response",
+      "reportResponseThanks": "Thanks. This response was added to the quality review queue.",
+      "reportResponseFailed": "The response report could not be saved. Please try again.",
+      "regenerationFailed": "Couldn't regenerate this response. The original was kept.",
+      "editResponse": "Edit response",
+      "saveEdit": "Save",
+      "cancelEdit": "Cancel",
+      "editLearningHint": "Future replies in this chat will use your edited version.",
+      "editFailed": "Couldn't save this edit. Your draft was kept.",
+      "settings": "Chat settings",
+      "settingsName": "Name",
+      "settingsAge": "Age",
+      "settingsGender": "Gender",
+      "settingsGenderM": "Male",
+      "settingsGenderF": "Female",
+      "settingsGenderT": "Transgender",
+      "settingsGenderA": "Androgynous",
+      "settingsGenderN": "Prefer not to say",
+      "settingsSave": "Save settings",
+      "settingsSaved": "Settings saved",
+      "settingsSaveError": "Failed to save settings",
+      "viewCharacterForm": "Open character form",
+      "viewCharacterFormDescription": "View the bot's full persona definition in a modal.",
+      "newChat": "New chat",
+      "newChatConfirm": "Start a new conversation?",
+      "forkChat": "Fork this chat",
+      "forkChatDesc": "Create a copy of this conversation with all messages",
+      "history": "Chat history",
+      "historyEmpty": "No other conversations with this character",
+      "historyLoadError": "Failed to load chat history",
+      "historyDeleteError": "Failed to delete chat history",
+      "emptyWorkspace": "No active chat yet",
+      "profile": "Profile",
+      "gallery": "Gallery",
+      "showProfileImage": "Show profile image",
+      "showProfileVideo": "Show profile video",
+      "mediaOnlyPreview": "Sent a photo"
+    },
+    "exitToSite": "Exit to OmniNudge",
+    "header": {
+      "defaults": "Defaults",
+      "defaultsDescription": "Set the name, age, and profile details OmniChat should use by default.",
+      "saveDefaults": "Save defaults"
+    },
+    "sidebar": {
+      "discover": "Discover",
+      "search": "Search",
+      "chat": "Chat",
+      "groups": "Groups",
+      "create": "Create",
+      "explore": "Explore",
+      "characters": "Characters",
+      "studio": "Studio",
+      "searchPlaceholder": "Search personas...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
+      "noResults": "No results found",
+      "collapse": "Collapse sidebar",
+      "expand": "Expand sidebar",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "signInToViewConversations": "Sign in to view your conversations",
+      "signInToViewChat": "Sign in to view your chat list",
+      "noConversations": "No conversations yet"
+    },
+    "conversationsPage": {
+      "title": "Chat",
+      "searchPlaceholder": "Search for a profile...",
+      "filters": {
+        "all": "All",
+        "unread": "Unread",
+        "favorites": "Favorites"
+      },
+      "empty": "No conversations yet. Start chatting with a persona!",
+      "lastMessage": "Last message",
+      "noMessages": "No messages yet"
+    },
+    "studio": {
+      "loadingStudio": "Loading studio...",
+      "eyebrow": "OmniChat Studio",
+      "title": "Your Characters",
+      "description": "Create native OmniChat personas or import existing character cards. Personal characters remain private until publishing ships.",
+      "creatorOnly": "Creator-only",
+      "loadingPersonas": "Loading your personas...",
+      "loadPersonasError": "Failed to load your personas.",
+      "loadingDefinition": "Loading persona definition...",
+      "openingMessageRequired": "Add an opening message or at least one alternate greeting.",
+      "import": {
+        "title": "Import Character Card",
+        "importing": "Importing...",
+        "uploadCta": "Upload .png or .json"
+      },
+      "editor": {
+        "newCharacter": "New Character",
+        "editCharacter": "Edit Character"
+      },
+      "voice": {
+        "title": "Character voice",
+        "description": "Choose one of 12 locally generated voices for spoken messages and calls.",
+        "localBadge": "Free · local",
+        "label": "Character voice",
+        "browserFallback": "Browser/device fallback",
+        "femaleGroup": "Female voices",
+        "maleGroup": "Male voices",
+        "preview": "Preview voice",
+        "previewing": "Generating preview...",
+        "previewError": "Voice preview is unavailable.",
+        "unavailable": "Start Voicebox on this Mac to use or preview server voices.",
+        "cloningEnabled": "Custom voice cloning is enabled.",
+        "cloningDisabled": "Custom voice cloning is coming later.",
+        "cloningSafety": "Voice uploads stay disabled until consent, retention, deletion, and abuse protections are ready."
+      },
+      "actions": {
+        "openChat": "Open Chat",
+        "exportJson": "Export JSON",
+        "delete": "Delete",
+        "saving": "Saving...",
+        "createCharacter": "Create Character",
+        "saveChanges": "Save Changes",
+        "backToDiscover": "Back to discover"
+      },
+      "fields": {
+        "name": "Name",
+        "category": "Category",
+        "description": "Description",
+        "visibility": "Visibility",
+        "visibilityPrivate": "Private to you",
+        "personality": "Personality",
+        "scenario": "Scenario",
+        "openingMessage": "Opening Message",
+        "openingMessageHelp": "Shown immediately when someone opens Quick Chat. If left blank during import, the first alternate greeting is used.",
+        "exampleDialogue": "Example Dialogue",
+        "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: I have an idea.\n{{charMarker}}: Let's hear it.",
+        "exampleDialogueHelp": "Use {{charMarker}} for the character and {{userMarker}} for the user. Add <START> between separate example conversations.",
+        "responseStyle": "Response Style",
+        "systemPrompt": "System Prompt Override",
+        "systemPromptPlaceholder": "Leave empty to use OmniChat's structured character prompt.",
+        "postHistoryInstructions": "Post-History Instructions",
+        "alternateGreetings": "Alternate Greetings",
+        "alternateGreetingsPlaceholder": "One greeting per line",
+        "tags": "Tags",
+        "tagsPlaceholder": "comma, separated, tags",
+        "creatorName": "Creator Name",
+        "characterVersion": "Character Version",
+        "creatorNotes": "Creator Notes",
+        "avatarUrl": "Avatar Image",
+        "previewVideoUrl": "Preview Video",
+        "galleryUrls": "Gallery Images",
+        "galleryUrlsPlaceholder": "One uploaded image per line",
+        "characterBookJson": "Character Book JSON",
+        "extensionsJson": "Extensions JSON",
+        "galleryUrlsHelp": "Add up to 4 photos. Use the same face in every one — these teach the image generator what your character looks like, and mismatched faces produce inconsistent results. Vary the expression, lighting and angle, and include at least one with a neutral, closed-mouth expression. Only the face is used, so full-body shots add nothing beyond the face they contain."
+      },
+      "responseStyles": {
+        "inherit": {
+          "label": "Use OmniChat default",
+          "description": "Follows OmniChat's current global conversation style."
+        },
+        "natural_dialogue": {
+          "label": "Natural dialogue",
+          "description": "Direct, varied conversation without automatic validation or a forced question at the end."
+        },
+        "lean_narrative": {
+          "label": "Lean narrative / game",
+          "description": "Concise narration that ends with a playable situation, decision, or useful prompt."
+        },
+        "professional": {
+          "label": "Professional",
+          "description": "Warm and precise, with a focused question only when it genuinely helps."
+        },
+        "character_only": {
+          "label": "Character instructions only",
+          "description": "Applies no OmniChat response-style layer. Useful for imported cards with their own style."
+        }
+      },
+      "uploadingField": "Uploading {{field}}...",
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Delete this character from your private OmniChat studio.",
+        "delete": "Delete Character"
+      },
+      "deleteModal": {
+        "title": "Delete character?",
+        "description": "This will remove the selected character from your private OmniChat studio.",
+        "descriptionNamed": "This will remove {{name}} from your private OmniChat studio.",
+        "confirm": "Delete Character"
+      },
+      "discardModal": {
+        "title": "Discard unsaved changes?",
+        "description": "You have unsaved edits in this character form. Leaving now will discard them.",
+        "confirm": "Discard Changes"
+      }
+    },
+    "personaDetails": {
+      "title": "Character Form",
+      "loading": "Loading character form...",
+      "loadError": "Unable to load the full character form.",
+      "noAvatar": "No avatar",
+      "fields": {
+        "name": "Name",
+        "category": "Category",
+        "description": "Description",
+        "visibility": "Visibility",
+        "nsfw": "NSFW",
+        "personality": "Personality",
+        "scenario": "Scenario",
+        "openingMessage": "Opening Message",
+        "exampleDialogue": "Example Dialogue",
+        "systemPrompt": "System Prompt Override",
+        "postHistoryInstructions": "Post-History Instructions",
+        "alternateGreetings": "Alternate Greetings",
+        "tags": "Tags",
+        "creatorName": "Creator Name",
+        "characterVersion": "Character Version",
+        "creatorNotes": "Creator Notes",
+        "avatarUrl": "Avatar Image",
+        "previewVideoUrl": "Preview Video",
+        "galleryUrls": "Gallery Images",
+        "characterBookJson": "Character Book JSON",
+        "extensionsJson": "Extensions JSON"
+      },
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Delete this character and remove it from your private persona library.",
+        "delete": "Delete Character",
+        "confirmDelete": "Confirm Delete",
+        "deleteError": "Unable to delete this character."
+      }
+    },
+    "memories": {
+      "title": "What {{name}} remembers",
+      "close": "Close memories",
+      "description": "These are things {{name}} took away from your conversation, in her own words. She wrote them, not you, so if any of it is wrong you can remove it.",
+      "loading": "Loading memories",
+      "loadError": "Could not load memories. Please try again.",
+      "empty": "{{name}} hasn't formed any memories from this conversation yet. They build up as you talk.",
+      "recordedAt": "Remembered {{date}}",
+      "forgetLabel": "Forget: {{title}}",
+      "forgetFailed": "Could not forget that memory. Please try again.",
+      "entryDescription": "See and correct what she has concluded about you",
+      "confirmForget": "Forget",
+      "truncated": "Showing the {{shown}} most recent of {{total}} memories.",
+      "cancelForgetLabel": "Keep: {{title}}",
+      "confirmForgetLabel": "Confirm forgetting: {{title}}",
+      "sharedHeading": "With you",
+      "sharedEmpty": "Nothing from this conversation yet.",
+      "ownLifeHeading": "{{name}}'s own life",
+      "ownLifeDescription": "Things {{name}} did away from this conversation. They belong to her, not to you, so they cannot be removed here."
     }
   }
 }

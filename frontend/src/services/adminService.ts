@@ -5,7 +5,14 @@ import type {
   HubModerator,
   UpdateRoleRequest,
   BanHistoryItem,
+  AdminOmniChatPersona,
+  AdminOmniChatResponseFeedback,
+  AdminOmniChatResponseFeedbackStatus,
+  AdminOmniChatResponseFeedbackDetail,
+  AdminOmniChatPublicationReport,
+  AdminOmniChatPublicationReportStatus,
 } from '../types/admin';
+import type { OmniChatPersonaVoice } from '../types/omnichat';
 
 export const adminService = {
   // ===== USER MANAGEMENT =====
@@ -205,5 +212,101 @@ export const adminService = {
     }>;
   }> {
     return api.get('/admin/retention/history');
+  },
+
+  // ===== OMNICHAT PERSONAS =====
+
+  async listOmniChatPersonas(): Promise<AdminOmniChatPersona[]> {
+    const response = await api.get<{ personas: AdminOmniChatPersona[] }>(
+      '/admin/omnichat/personas'
+    );
+    return response.personas;
+  },
+
+  async updateOmniChatPersonaMedia(
+    personaId: number,
+    data: { avatar_url?: string; preview_video_url?: string; gallery_urls?: string[] }
+  ): Promise<AdminOmniChatPersona> {
+    const response = await api.put<{ persona: AdminOmniChatPersona }>(
+      `/admin/omnichat/personas/${personaId}`,
+      data
+    );
+    return response.persona;
+  },
+
+  async listOmniChatPersonaVoices(): Promise<OmniChatPersonaVoice[]> {
+    const response = await api.get<{ voices: OmniChatPersonaVoice[] }>(
+      '/admin/omnichat/persona-voices'
+    );
+    return response.voices ?? [];
+  },
+
+  async updateOmniChatPersonaVoice(
+    personaId: number,
+    presetId: string
+  ): Promise<OmniChatPersonaVoice> {
+    const response = await api.put<{ voice: OmniChatPersonaVoice }>(
+      `/admin/omnichat/personas/${personaId}/voice`,
+      { preset_id: presetId }
+    );
+    return response.voice;
+  },
+
+  async listOmniChatResponseFeedback(
+    status?: AdminOmniChatResponseFeedbackStatus,
+    reason?: string,
+    limit = 25,
+    offset = 0
+  ): Promise<{ feedback: AdminOmniChatResponseFeedback[]; total: number }> {
+    const params = new URLSearchParams({
+      limit: String(Math.min(Math.max(limit, 1), 100)),
+      offset: String(Math.max(offset, 0)),
+    });
+    if (status) params.set('status', status);
+    if (reason) params.set('reason', reason);
+    return api.get<{ feedback: AdminOmniChatResponseFeedback[]; total: number }>(
+      `/admin/omnichat/response-feedback?${params.toString()}`
+    );
+  },
+
+  async updateOmniChatResponseFeedbackStatus(
+    id: string,
+    status: AdminOmniChatResponseFeedbackStatus
+  ): Promise<{ feedback: AdminOmniChatResponseFeedbackDetail }> {
+    return api.patch<{ feedback: AdminOmniChatResponseFeedbackDetail }>(
+      `/admin/omnichat/response-feedback/${encodeURIComponent(id)}/status`,
+      { status }
+    );
+  },
+
+  async getOmniChatResponseFeedback(
+    id: string
+  ): Promise<{ feedback: AdminOmniChatResponseFeedbackDetail }> {
+    return api.get<{ feedback: AdminOmniChatResponseFeedbackDetail }>(
+      `/admin/omnichat/response-feedback/${encodeURIComponent(id)}`
+    );
+  },
+
+  async listOmniChatPublicationReports(
+    status: AdminOmniChatPublicationReportStatus = 'open',
+    limit = 100
+  ): Promise<AdminOmniChatPublicationReport[]> {
+    const params = new URLSearchParams({
+      status,
+      limit: String(Math.min(Math.max(limit, 1), 200)),
+    });
+    const response = await api.get<{ reports: AdminOmniChatPublicationReport[] }>(
+      `/admin/omnichat/publication-reports?${params.toString()}`
+    );
+    return response.reports ?? [];
+  },
+
+  async resolveOmniChatPublicationReport(
+    id: string,
+    resolution: 'removed' | 'dismissed'
+  ): Promise<void> {
+    await api.patch(`/admin/omnichat/publication-reports/${encodeURIComponent(id)}`, {
+      resolution,
+    });
   },
 };

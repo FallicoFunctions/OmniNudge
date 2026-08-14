@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
 import { userSettingsService } from '../services/userSettingsService';
+import { hasBrowserSession } from '../services/authSession';
 
 const hasAuthToken = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
+  return hasBrowserSession();
 };
 
 interface SettingsContextType {
@@ -393,7 +394,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setQuietHoursEnabledState(settings.quiet_hours_enabled ?? false);
         setQuietHoursStartMinutesState(settings.quiet_hours_start_minutes ?? 1320);
         setQuietHoursEndMinutesState(settings.quiet_hours_end_minutes ?? 420);
-        setQuietHoursTimezoneState(settings.quiet_hours_timezone ?? quietHoursTimezone);
+        setQuietHoursTimezoneState((current) => settings.quiet_hours_timezone ?? current);
         setBatchNotificationsState(settings.batch_notifications ?? true);
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);

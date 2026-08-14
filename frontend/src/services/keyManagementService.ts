@@ -45,16 +45,6 @@ async function loadPrivateKeyFromIDB(): Promise<CryptoKey | null> {
   });
 }
 
-async function clearPrivateKeyFromIDB(): Promise<void> {
-  const db = await openKeyDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(IDB_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
 /**
  * Initialize encryption keys for current user.
  * Generates new keys if they don't exist.
@@ -208,20 +198,4 @@ export async function getUserPublicKey(
     console.error('Failed to import public key:', error);
     return null;
   }
-}
-
-/**
- * Clear all keys (explicit "forget this device" action).
- */
-export function clearKeys(): void {
-  localStorage.removeItem(PRIVATE_KEY_STORAGE_KEY);
-  localStorage.removeItem(PUBLIC_KEY_STORAGE_KEY);
-  clearPrivateKeyFromIDB().catch(() => {});
-
-  const keys = Object.keys(localStorage);
-  keys.forEach((key) => {
-    if (key.startsWith(PUBLIC_KEY_CACHE_PREFIX)) {
-      localStorage.removeItem(key);
-    }
-  });
 }

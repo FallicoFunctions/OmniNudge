@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- coturn's time-limited REST credential protocol requires HMAC-SHA1.
 	"encoding/base64"
 	"fmt"
 	"log"

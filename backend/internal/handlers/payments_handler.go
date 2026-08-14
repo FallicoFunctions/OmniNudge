@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
@@ -75,7 +77,10 @@ type submitRequest struct {
 // @Failure  409 {object} map[string]any "TXID already submitted"
 // @Router   /payments/crypto/submit [post]
 func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
-	userID := c.GetInt("userID")
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req submitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -163,13 +168,8 @@ func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
 	}
 
 	if result.Confirmed {
-		now := c.Request.Context().Value("now") // nil in production — that's fine
-		_ = now
-		if err := h.payRepo.UpdateStatus(c.Request.Context(), id, models.StatusConfirmed, result.Confirmations, nil); err != nil {
-			log.Printf("[payments] confirm status update failed: %v", err)
-		}
-		if err := h.planSvc.Upgrade(c.Request.Context(), userID, req.PlanMonths); err != nil {
-			log.Printf("[payments] plan upgrade failed for user %d: %v", userID, err)
+		if _, err := h.payRepo.ConfirmAndApplyPlan(c.Request.Context(), id, result.Confirmations, time.Now()); err != nil {
+			log.Printf("[payments] atomic payment entitlement failed for user %d: %v", userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "payment confirmed but plan upgrade failed, contact support"})
 			return
 		}
@@ -201,6 +201,10 @@ func (h *PaymentsHandler) SubmitCryptoPayment(c *gin.Context) {
 // @Failure  404   {object} map[string]any
 // @Router   /payments/crypto/{txid}/status [get]
 func (h *PaymentsHandler) GetPaymentStatus(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 	txid := c.Param("txid")
 	coin := strings.ToUpper(c.Query("coin"))
 	if coin == "" {
@@ -215,6 +219,12 @@ func (h *PaymentsHandler) GetPaymentStatus(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch payment"})
+		return
+	}
+	if payment.UserID != userID {
+		// TXIDs are not a capability.  Hide the record so callers cannot use
+		// the endpoint to enumerate another account's payment history.
+		c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 		return
 	}
 

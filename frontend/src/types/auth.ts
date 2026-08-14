@@ -7,7 +7,7 @@ export interface User {
   role: 'user' | 'moderator' | 'admin';
   created_at: string;
   public_key?: string;
-  plan?: 'free' | 'paid';
+  plan?: 'free' | 'plus' | 'premium';
   plan_expires_at?: string | null;
 }
 
@@ -27,6 +27,5 @@ export interface RegisterRequest {
 }
 
 export interface AuthResponse {
-  token: string;
   user: User;
 }

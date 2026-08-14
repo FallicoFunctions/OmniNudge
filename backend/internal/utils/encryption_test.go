@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"testing"
 )
 
@@ -126,6 +128,29 @@ func TestSetEncryptionKeyFormats(t *testing.T) {
 				t.Errorf("Encryption key length = %d, want 32", len(encryptionKey))
 			}
 		})
+	}
+}
+
+func TestEmailLookupHashNormalizesAndKeysEmail(t *testing.T) {
+	if err := SetEncryptionKey("0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := EmailLookupHash("  User@Example.COM ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := EmailLookupHash("user@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatalf("normalized hashes differ: %q != %q", first, second)
+	}
+	if len(first) != 64 {
+		t.Fatalf("hash length = %d, want 64", len(first))
+	}
+	if first == fmt.Sprintf("%x", sha256.Sum256([]byte("user@example.com"))) {
+		t.Fatal("blind index must be keyed, not a raw email digest")
 	}
 }
 

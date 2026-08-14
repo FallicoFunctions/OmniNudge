@@ -520,13 +520,21 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 		// Check slow mode (skip for admins/owners)
 		var userRole string
-		h.pool.QueryRow(c.Request.Context(), `
+		roleErr := h.pool.QueryRow(c.Request.Context(), `
 			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
-		`, req.ConversationID, userID).Scan(&userRole) //nolint:errcheck // role lookup failure defaults to no exemption; non-fatal
+		`, req.ConversationID, userID).Scan(&userRole)
+		if roleErr != nil && !errors.Is(roleErr, pgx.ErrNoRows) {
+			RespondError(c, http.StatusServiceUnavailable, "Message permissions are temporarily unavailable")
+			return
+		}
 
 		if userRole != "admin" && userRole != "owner" {
 			var slowMode int
-			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode) //nolint:errcheck // slow-mode lookup failure defaults to 0 (no slow mode); non-fatal
+			slowModeErr := h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
+			if slowModeErr != nil {
+				RespondError(c, http.StatusServiceUnavailable, "Message permissions are temporarily unavailable")
+				return
+			}
 			if slowMode > 0 && h.cache != nil {
 				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID)
 				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {
@@ -547,7 +555,8 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	// For mod_mail conversations, verify participation differently
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -572,7 +581,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
 		recipientID = userID
-	} else if conversationType == "group" {
+	case "group":
 		// Group conversations use conversation_participants; User1ID/User2ID are NULL for groups.
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
@@ -591,7 +600,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// Group messages have no single recipient; use sender to satisfy schema.
 		recipientID = userID
-	} else {
+	default:
 		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
 		if err != nil {
@@ -737,6 +746,54 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		c.Writer.Header().Add("X-Warning", "Message sent without encryption. Ensure users have encryption keys set up.")
 	}
 
+	// Media references are identifiers, not capabilities. Resolve them through
+	// an owner-scoped query and derive all storage metadata server-side so a
+	// sender cannot attach another user's upload or spoof its URL/type/size.
+	if hasMedia {
+		var (
+			mediaID    int
+			storageURL string
+			fileType   string
+			fileSize   int64
+			scanStatus string
+		)
+		if req.MediaFileID != nil {
+			if *req.MediaFileID <= 0 {
+				RespondError(c, http.StatusBadRequest, "Invalid media file ID")
+				return
+			}
+			err = h.pool.QueryRow(c.Request.Context(), `
+				SELECT id, storage_url, file_type, file_size, scan_status
+				FROM media_files
+				WHERE id = $1 AND user_id = $2
+			`, *req.MediaFileID, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+		} else {
+			mediaURL := strings.TrimSpace(*req.MediaURL)
+			err = h.pool.QueryRow(c.Request.Context(), `
+				SELECT id, storage_url, file_type, file_size, scan_status
+				FROM media_files
+				WHERE storage_url = $1 AND user_id = $2
+			`, mediaURL, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+		}
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				RespondError(c, http.StatusNotFound, "Media file not found")
+			} else {
+				RespondError(c, http.StatusInternalServerError, "Failed to validate media file")
+			}
+			return
+		}
+		if scanStatus != models.MediaScanStatusClean {
+			RespondError(c, http.StatusLocked, "Media file is not available until security scanning completes")
+			return
+		}
+		mediaSize := int(fileSize)
+		req.MediaFileID = &mediaID
+		req.MediaURL = &storageURL
+		req.MediaType = &fileType
+		req.MediaSize = &mediaSize
+	}
+
 	// Create message
 	message := &models.Message{
 		ConversationID:           req.ConversationID,
@@ -824,13 +881,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	if effectiveReplyTo != nil && message.ThreadRoot != nil && *message.ThreadRoot > 0 && h.notifService != nil {
-		go h.notifService.NotifyThreadReply(
-			context.Background(),
-			req.ConversationID,
-			*message.ThreadRoot,
-			message.ID,
-			message.SenderID,
-		)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.notifService.NotifyThreadReply(
+				ctx,
+				req.ConversationID,
+				*message.ThreadRoot,
+				message.ID,
+				message.SenderID,
+			)
+		}()
 	}
 
 	// Update conversation's last_message_at timestamp and re-add users if deleted
@@ -1064,7 +1125,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			}
 		}
 
-		targetRecipientID := original.RecipientID //nolint:ineffassign,staticcheck // always overwritten in dm and else branches below
+		var targetRecipientID int
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {
@@ -1127,7 +1188,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start forward transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	forwardedMessages := make([]*models.Message, 0, len(targetContexts))
 	forwardedMessageIDs := make([]int, 0, len(targetContexts))
@@ -1522,7 +1583,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start edit transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var conversationID int
 	var senderID int
@@ -1673,7 +1734,11 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 				}
 			}
 			if h.notifService != nil {
-				go h.notifService.NotifyMessageEdited(context.Background(), messageID, conversationID, userID, participantIDs)
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					h.notifService.NotifyMessageEdited(ctx, messageID, conversationID, userID, participantIDs)
+				}()
 			}
 		}
 	}
@@ -1847,7 +1912,8 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	}
 
 	// For mod_mail conversations, check conversation_participants table
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -1870,7 +1936,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				return
 			}
 		}
-	} else if conversationType == "group" {
+	case "group":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -1886,7 +1952,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
-	} else {
+	default:
 		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
@@ -2377,7 +2443,8 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	// Verify user is a participant based on conversation type
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -2400,7 +2467,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				return
 			}
 		}
-	} else if conversationType == "group" {
+	case "group":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -2416,7 +2483,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
-	} else {
+	default:
 		// For DM conversations, use the traditional method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS omnichat_conversation_scene_state_checkpoints;
+DROP TABLE IF EXISTS omnichat_conversation_scene_states;

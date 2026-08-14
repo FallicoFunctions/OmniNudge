@@ -28,13 +28,6 @@ export interface ICEServer {
 
 export type SignalType = 'offer' | 'answer' | 'candidate';
 
-export interface CallSignal {
-  call_id: number;
-  signal_type: SignalType;
-  sdp?: string;
-  candidate?: RTCIceCandidateInit;
-}
-
 export type CallManagerState =
   | 'idle'
   | 'ringing_outgoing'

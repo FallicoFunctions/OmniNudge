@@ -92,29 +92,3 @@ export function ServerErrorPage({ onRetry }: { onRetry?: () => void }) {
     />
   );
 }
-
-// Network Error Page
-export function NetworkErrorPage({ onRetry }: { onRetry?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <ErrorPage
-      title={t('errorPages.networkError.title')}
-      message={t('errors.networkError')}
-      showHomeButton={false}
-      onRetry={onRetry}
-    />
-  );
-}
-
-// Maintenance Page
-export function MaintenancePage() {
-  const { t } = useTranslation();
-  return (
-    <ErrorPage
-      title={t('errorPages.maintenance.title')}
-      message={t('errorPages.maintenance.message')}
-      showHomeButton={false}
-      showRefreshButton={true}
-    />
-  );
-}

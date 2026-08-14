@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
 import { flushSync } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { FlairBadge } from './FlairBadge';
 import {
   getDisplayDomain,
@@ -784,16 +784,10 @@ export function RedditPostCard({
           instance.attachMedia(videoEl);
           if (mounted) {
             hlsInstance = instance;
-            if (instance.on) {
-              // Access Events from the real Hls.js library
-              const HlsEvents = (Hls as unknown as { Events?: { MANIFEST_PARSED: string } }).Events;
-              if (HlsEvents) {
-                instance.on(HlsEvents.MANIFEST_PARSED, () => {
-                  debugLog('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
-                  attemptAutoplay();
-                });
-              }
-            }
+            instance.on(Hls.Events.MANIFEST_PARSED, () => {
+              debugLog('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
+              attemptAutoplay();
+            });
           } else {
             instance.destroy();
           }

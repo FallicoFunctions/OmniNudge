@@ -3,11 +3,15 @@ package utils
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 var (
@@ -41,6 +45,21 @@ func SetEncryptionKey(key string) error {
 	}
 	encryptionKey = keyBytes
 	return nil
+}
+
+// EmailLookupHash returns a keyed, normalized blind index for equality
+// lookups without exposing plaintext email addresses in the database.
+func EmailLookupHash(email string) (string, error) {
+	if len(encryptionKey) == 0 {
+		return "", ErrEncryptionKeyNotSet
+	}
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	if normalized == "" {
+		return "", nil
+	}
+	mac := hmac.New(sha256.New, encryptionKey)
+	_, _ = mac.Write([]byte(normalized))
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 // EncryptEmail encrypts an email address using AES-256-GCM

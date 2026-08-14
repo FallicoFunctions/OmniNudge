@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -151,6 +151,46 @@ func TestStartSlideshow_AlreadyActive(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 	assert.Contains(t, response["error"], "already active")
+}
+
+func TestStartSlideshow_RejectsAnotherUsersMedia(t *testing.T) {
+	handler, db, userID, _, convID, cleanup := setupSlideshowHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	mediaOwner := &models.User{Username: uniqueSlideshowUsername("media_owner"), PasswordHash: "test_hash"}
+	require.NoError(t, userRepo.Create(ctx, mediaOwner))
+	mediaRepo := models.NewMediaFileRepository(db.Pool)
+	foreignMedia := &models.MediaFile{
+		UserID:           mediaOwner.ID,
+		Filename:         "private.png",
+		OriginalFilename: "private.png",
+		FileType:         "image/png",
+		FileSize:         1,
+		StorageURL:       "/uploads/private-slideshow.png",
+		StoragePath:      "uploads/private-slideshow.png",
+	}
+	require.NoError(t, mediaRepo.Create(ctx, foreignMedia))
+
+	router := gin.New()
+	router.POST("/conversations/:id/slideshow", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.StartSlideshow(c)
+	})
+	body, _ := json.Marshal(map[string]interface{}{
+		"slideshow_type": "personal",
+		"media_file_ids": []int{foreignMedia.ID},
+	})
+	request := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/conversations/%d/slideshow", convID), bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+	var sessionCount int
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM slideshow_sessions WHERE conversation_id = $1`, convID).Scan(&sessionCount))
+	assert.Zero(t, sessionCount)
 }
 
 func TestGetSlideshow(t *testing.T) {

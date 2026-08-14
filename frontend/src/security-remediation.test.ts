@@ -61,4 +61,18 @@ describe('security remediation static checks', () => {
     expect(read('src/pages/SubredditPage.tsx')).toContain('DOMPurify.sanitize');
     expect(read('src/pages/RedditWikiPage.tsx')).toContain('DOMPurify.sanitize');
   });
+
+  it('ends analytics sessions with the shared CSRF-aware keepalive request', () => {
+    const source = read('src/services/analyticsService.ts');
+    expect(source).toContain('enabled: false');
+    expect(source).toContain('authenticatedFetch');
+    expect(source).toContain('keepalive: true');
+    expect(source).not.toContain('sendBeacon');
+  });
+
+  it('uses the CSRF-aware request wrapper for voice uploads', () => {
+    const source = read('src/services/voiceMessagesService.ts');
+    expect(source).toContain('authenticatedFetch');
+    expect(source).not.toMatch(/\bfetch\s*\(/);
+  });
 });

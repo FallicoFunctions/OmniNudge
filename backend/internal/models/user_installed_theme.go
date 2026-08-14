@@ -159,7 +159,7 @@ func (r *UserInstalledThemeRepository) SetActive(ctx context.Context, userID, th
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Deactivate all themes for this user
 	_, err = tx.Exec(ctx, `UPDATE user_installed_themes SET is_active = false WHERE user_id = $1`, userID)

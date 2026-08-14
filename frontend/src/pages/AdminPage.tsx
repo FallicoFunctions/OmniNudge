@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router';
 import { adminService } from '../services/adminService';
+import { api } from '../lib/api';
 import { bugReportService } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
@@ -12,6 +13,9 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
 import { useTranslation } from 'react-i18next';
+import AdminPersonasTab from '../components/admin/AdminPersonasTab';
+import OmniChatResponseFeedbackTab from '../components/admin/OmniChatResponseFeedbackTab';
+import OmniChatPublicationReportsTab from '../components/admin/OmniChatPublicationReportsTab';
 
 type TabType =
   | 'stats'
@@ -20,18 +24,19 @@ type TabType =
   | 'ban-activity'
   | 'bug-reports'
   | 'analytics'
-  | 'retention';
+  | 'retention'
+  | 'personas'
+  | 'response-feedback'
+  | 'publication-reports';
 
 export default function AdminPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('stats');
 
   // Check if user is admin
   if (!user || user.role !== 'admin') {
-    navigate('/');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -43,7 +48,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="border-b border-[var(--color-border)] mb-6">
-        <nav className="flex space-x-8">
+        <nav className="flex flex-wrap gap-x-8 gap-y-2 pb-2">
           <button
             onClick={() => setActiveTab('stats')}
             className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
@@ -95,6 +100,36 @@ export default function AdminPage() {
             {t('adminPage.tabs.bugReports')}
           </button>
           <button
+            onClick={() => setActiveTab('personas')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'personas'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            {t('adminPage.tabs.omnichatPersonas')}
+          </button>
+          <button
+            onClick={() => setActiveTab('response-feedback')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'response-feedback'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            {t('adminPage.tabs.responseFeedback')}
+          </button>
+          <button
+            onClick={() => setActiveTab('publication-reports')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'publication-reports'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Explore Reports
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
               activeTab === 'analytics'
@@ -128,6 +163,9 @@ export default function AdminPage() {
       {activeTab === 'moderators' && <ModeratorsTab />}
       {activeTab === 'ban-activity' && <BanActivityTab />}
       {activeTab === 'bug-reports' && <BugReportsTab />}
+      {activeTab === 'personas' && <AdminPersonasTab />}
+      {activeTab === 'response-feedback' && <OmniChatResponseFeedbackTab />}
+      {activeTab === 'publication-reports' && <OmniChatPublicationReportsTab />}
       {activeTab === 'analytics' && <AnalyticsTab />}
       {activeTab === 'retention' && <RetentionTab />}
     </div>
@@ -1507,7 +1545,7 @@ function BugReportsTab() {
                                 <a
                                   href={resolveMediaUrl(report.screenshot_url)}
                                   target="_blank"
-                                  rel="noreferrer"
+                                  rel="noopener noreferrer"
                                   className="block"
                                 >
                                   <img
@@ -1566,8 +1604,7 @@ function ModeratorsTab() {
   const { data: hubsData } = useQuery({
     queryKey: ['allHubs'],
     queryFn: async () => {
-      const response = await fetch('/api/v1/hubs?limit=1000&offset=0');
-      const data = await response.json();
+      const data = await api.get<{ hubs?: Hub[] }>('/hubs?limit=1000&offset=0');
       return data.hubs || [];
     },
   });

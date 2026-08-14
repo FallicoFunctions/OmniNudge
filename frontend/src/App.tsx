@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import i18n from './i18n/config';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -36,6 +36,18 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const OmniChatDiscoverPage = lazy(() => import('./pages/OmniChatDiscoverPage'));
+const OmniChatConversationsPage = lazy(() => import('./pages/OmniChatConversationsPage'));
+const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
+const OmniChatStudioPage = lazy(() => import('./pages/OmniChatStudioPage'));
+const OmniChatCreatePage = lazy(() => import('./pages/OmniChatCreatePage'));
+const OmniChatExplorePage = lazy(() => import('./pages/OmniChatExplorePage'));
+const OmniChatPublicationPage = lazy(() =>
+  import('./pages/OmniChatExplorePage').then((module) => ({
+    default: module.OmniChatPublicationPage,
+  }))
+);
+const OmniChatGroupsPage = lazy(() => import('./pages/OmniChatGroupsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
@@ -53,6 +65,8 @@ const LoadingStatesShowcasePage = lazy(() => import('./pages/LoadingStatesShowca
 const DonatePage = lazy(() => import('./pages/DonatePage'));
 const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage'));
 const OAuthChooseUsernamePage = lazy(() => import('./pages/OAuthChooseUsernamePage'));
+const GamesPage = lazy(() => import('./pages/GamesPage'));
+const GameDetailPage = lazy(() => import('./pages/GameDetailPage'));
 
 // Initialize analytics on app load
 function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
@@ -156,6 +170,8 @@ function App() {
                             />
                             <Route path="/search" element={<SearchResultsPage />} />
                             <Route path="/hubs" element={<HubsAndSubsPage />} />
+                            <Route path="/games" element={<GamesPage />} />
+                            <Route path="/games/omnirave" element={<GameDetailPage />} />
                             <Route path="/about" element={<AboutPage />} />
                             <Route path="/donate" element={<DonatePage />} />
                             <Route path="/terms" element={<TermsPage />} />
@@ -164,7 +180,10 @@ function App() {
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             <Route path="/auth/callback" element={<OAuthCallbackPage />} />
-                            <Route path="/auth/choose-username" element={<OAuthChooseUsernamePage />} />
+                            <Route
+                              path="/auth/choose-username"
+                              element={<OAuthChooseUsernamePage />}
+                            />
                             {import.meta.env.DEV && (
                               <Route
                                 path="/dev/loading-states"
@@ -218,6 +237,38 @@ function App() {
                               element={
                                 <ProtectedRoute>
                                   <MessagesPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route path="/omnichat" element={<OmniChatDiscoverPage />} />
+                            <Route path="/omnichat/chat" element={<OmniChatConversationsPage />} />
+                            <Route path="/omnichat/c/:conversationId" element={<OmniChatPage />} />
+                            <Route
+                              path="/omnichat/studio"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatStudioPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/omnichat/create"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatCreatePage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route path="/omnichat/explore" element={<OmniChatExplorePage />} />
+                            <Route
+                              path="/omnichat/explore/:publicationId"
+                              element={<OmniChatPublicationPage />}
+                            />
+                            <Route
+                              path="/omnichat/groups"
+                              element={
+                                <ProtectedRoute>
+                                  <OmniChatGroupsPage />
                                 </ProtectedRoute>
                               }
                             />

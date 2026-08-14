@@ -106,48 +106,6 @@
                 }
             }
         },
-        "/account/cancel-deletion": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Account"
-                ],
-                "summary": "Cancel account deletion",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/account/delete": {
             "post": {
                 "security": [
@@ -174,42 +132,6 @@
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/account/deletion-status": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Account"
-                ],
-                "summary": "Get account deletion status",
-                "responses": {
-                    "200": {
-                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -361,38 +283,6 @@
                 }
             }
         },
-        "/admin/analytics/cohort": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Analytics"
-                ],
-                "summary": "Get user cohort retention",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Cohort date (YYYY-MM-DD)",
-                        "name": "cohort_date",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/analytics/dashboard": {
             "get": {
                 "security": [
@@ -404,167 +294,24 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Analytics"
+                    "Admin"
                 ],
                 "summary": "Get analytics dashboard",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Days to look back (default 30)",
-                        "name": "days",
-                        "in": "query"
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
-                    }
-                }
-            }
-        },
-        "/admin/analytics/devices": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Analytics"
-                ],
-                "summary": "Get device breakdown",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Days to look back (default 7)",
-                        "name": "days",
-                        "in": "query"
                     },
-                    {
-                        "type": "integer",
-                        "description": "Max results (default 10)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
-                    }
-                }
-            }
-        },
-        "/admin/analytics/events/{event_name}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Analytics"
-                ],
-                "summary": "Get event statistics",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Event name",
-                        "name": "event_name",
-                        "in": "path",
-                        "required": true
                     },
-                    {
-                        "type": "integer",
-                        "description": "Days to look back",
-                        "name": "days",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/analytics/funnel": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Analytics"
-                ],
-                "summary": "Get funnel analysis",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Days to look back",
-                        "name": "days",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/analytics/geo": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Analytics"
-                ],
-                "summary": "Get geographic breakdown",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Days to look back (default 7)",
-                        "name": "days",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Max results (default 10)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -583,12 +330,18 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Analytics"
+                    "Admin"
                 ],
-                "summary": "Refresh analytics materialized views",
+                "summary": "Refresh analytics views",
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -1789,7 +1542,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Search by username or email",
+                        "description": "Search by username",
                         "name": "search",
                         "in": "query"
                     }
@@ -2275,17 +2028,6 @@
                     "Analytics"
                 ],
                 "summary": "Track analytics event",
-                "parameters": [
-                    {
-                        "description": "Event payload",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2295,6 +2037,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -2502,7 +2250,8 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_omninudge_backend_internal_models.User"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "401": {
@@ -2784,6 +2533,42 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/ws-token": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Generate WebSocket token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -4810,9 +4595,9 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Groups"
+                    "Conversations"
                 ],
-                "summary": "Get group settings",
+                "summary": "Get chat settings",
                 "parameters": [
                     {
                         "type": "integer",
@@ -4826,7 +4611,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/gin.H"
+                            "$ref": "#/definitions/internal_handlers.chatSettingsResponse"
                         }
                     },
                     "401": {
@@ -4862,9 +4647,9 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Groups"
+                    "Conversations"
                 ],
-                "summary": "Update group settings",
+                "summary": "Update chat settings",
                 "parameters": [
                     {
                         "type": "integer",
@@ -6507,6 +6292,115 @@
                 }
             }
         },
+        "/groups/{id}/settings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Groups"
+                ],
+                "summary": "Get group settings",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Groups"
+                ],
+                "summary": "Update group settings",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/groups/{id}/slow-mode": {
             "put": {
                 "security": [
@@ -6579,6 +6473,12 @@
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -7136,6 +7036,381 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-design": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Get active AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-design/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Deactivate the active AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-design/generate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Generate AI hub page design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Prompt payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-designs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "List AI hub designs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-designs/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Update an AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Design ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Delete an AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Design ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-designs/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Activate an AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Design ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/hubs/{name}/ai-designs/{id}/copy": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hubs"
+                ],
+                "summary": "Duplicate an AI hub design",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hub name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Design ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -7736,357 +8011,6 @@
                 }
             }
         },
-        "/hubs/{name}/theme": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Get active hub theme",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/hubs/{name}/themes": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Get all hub themes",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Create hub theme",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Theme payload",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/hubs/{name}/themes/preview": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Preview hub theme CSS",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Theme CSS payload",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/hubs/{name}/themes/{id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Update hub theme",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Theme ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Theme payload",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Delete hub theme",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Theme ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/hubs/{name}/themes/{id}/activate": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Hubs"
-                ],
-                "summary": "Activate hub theme",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Hub name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Theme ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/hubs/{name}/unsubscribe": {
             "delete": {
                 "security": [
@@ -8233,58 +8157,6 @@
                 }
             }
         },
-        "/jobs/{queue}/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jobs"
-                ],
-                "summary": "Get job status",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Queue name",
-                        "name": "queue",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Job ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/logs/frontend": {
             "post": {
                 "consumes": [
@@ -8317,6 +8189,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -8365,6 +8243,186 @@
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/media/confirm-upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Called after the client finishes the presigned PUT to S3. Records the upload\nin the database, updates storage quota, and queues a mandatory security scan.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Confirm completed S3 upload",
+                "parameters": [
+                    {
+                        "description": "Upload confirmation",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.confirmUploadRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.confirmUploadResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid, expired, or mismatched upload reservation",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "501": {
+                        "description": "Private S3 staging bucket not configured",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/media/encode-audio": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Encode audio",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Raw audio file",
+                        "name": "audio",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/media/presigned-url": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reserves quota and returns a constrained PUT URL for a private staging bucket.\nThe caller must confirm with upload_id; only clean scans are promoted to public storage.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Get S3 presigned upload URL",
+                "parameters": [
+                    {
+                        "description": "Upload metadata",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.presignedURLRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.presignedURLResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or file size out of range",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "413": {
+                        "description": "File size exceeds maximum allowed",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported content type",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "501": {
+                        "description": "Private S3 staging bucket not configured",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -10805,152 +10863,6 @@
                 }
             }
         },
-        "/mod/reports": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Moderation"
-                ],
-                "summary": "List moderation reports",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by status (open, resolved, dismissed)",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Filter by hub ID",
-                        "name": "hub_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Max results",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Pagination offset",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/github_com_omninudge_backend_internal_models.Report"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/mod/reports/{id}/status": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Moderation"
-                ],
-                "summary": "Update report status",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Report ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "New status",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_handlers.UpdateReportStatusRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/notifications": {
             "get": {
                 "security": [
@@ -11187,6 +11099,111 @@
                 }
             }
         },
+        "/payments/crypto/submit": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Submit a crypto payment for plan upgrade",
+                "parameters": [
+                    {
+                        "description": "Payment details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.submitRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmed — plan upgraded",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "202": {
+                        "description": "Pending confirmations",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "402": {
+                        "description": "Amount insufficient",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "TXID already submitted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/payments/crypto/{txid}/status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Get status of a submitted crypto payment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "txid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Coin ticker (BTC, ETH, CAH)",
+                        "name": "coin",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/posts": {
             "post": {
                 "security": [
@@ -11273,31 +11290,6 @@
                         "in": "query"
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
-        "/posts/user/:username": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Posts"
-                ],
-                "summary": "Get user posts (internal)",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -13473,68 +13465,6 @@
                 }
             }
         },
-        "/reports": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Moderation"
-                ],
-                "summary": "Create moderation report",
-                "parameters": [
-                    {
-                        "description": "Report details",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_handlers.CreateReportRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_omninudge_backend_internal_models.Report"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/gin.H"
-                        }
-                    }
-                }
-            }
-        },
         "/search/comments": {
             "get": {
                 "produces": [
@@ -15340,6 +15270,331 @@
                 }
             }
         },
+        "/users/me/banner": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Upload banner",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/friends": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "List friends",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/friends/requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "List friend requests",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Send friend request",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/friends/requests/{username}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Decline or cancel friend request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username of the other user",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/friends/requests/{username}/accept": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Accept friend request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username of request sender",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/friends/{username}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Remove friend",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username to unfriend",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/users/me/group-invites": {
             "get": {
                 "security": [
@@ -15710,6 +15965,101 @@
                 }
             }
         },
+        "/users/me/top-friends": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Set top friends",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/wall/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get pending wall posts",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.PendingWallPostsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/users/status": {
             "get": {
                 "produces": [
@@ -15842,6 +16192,136 @@
                 }
             }
         },
+        "/users/{username}/friends": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get user friends",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.UserFriendsResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{username}/friendship": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Get friendship status with a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username to check",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{username}/mutual-friends": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Friends"
+                ],
+                "summary": "Get mutual friends with a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username to compare",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/users/{username}/posts": {
             "get": {
                 "produces": [
@@ -15900,7 +16380,7 @@
                 }
             }
         },
-        "/users/{username}/status": {
+        "/users/{username}/top-friends": {
             "get": {
                 "produces": [
                     "application/json"
@@ -15908,7 +16388,7 @@
                 "tags": [
                     "Users"
                 ],
-                "summary": "Get single user online status",
+                "summary": "Get top friends",
                 "parameters": [
                     {
                         "type": "string",
@@ -15919,8 +16399,151 @@
                     }
                 ],
                 "responses": {
-                    "501": {
-                        "description": "Not Implemented",
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.TopFriendsResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{username}/wall": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get profile wall posts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.WallPostsResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Create a wall post",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Wall post",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.CreateWallPostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPost"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -15957,6 +16580,478 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Delete a wall post",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Approve a pending wall post",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}/comments": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get wall post comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.WallPostCommentsResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Comment on a wall post",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Comment",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.CreateWallPostCommentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPostComment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}/comments/{commentId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Delete a wall post comment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}/comments/{commentId}/reaction": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Like or dislike a wall post comment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reaction",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SetWallPostReactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.WallPostReactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/wall-posts/{id}/reaction": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Like or dislike a wall post",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wall post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reaction",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.SetWallPostReactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.WallPostReactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/gin.H"
                         }
@@ -16038,9 +17133,6 @@
                 },
                 "page_url": {
                     "type": "string"
-                },
-                "rating": {
-                    "type": "integer"
                 },
                 "screenshot_url": {
                     "type": "string"
@@ -16186,7 +17278,11 @@
                 },
                 "user1_auto_delete_after": {
                     "description": "Phase 2 features",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/time.Duration"
+                        }
+                    ]
                 },
                 "user1_id": {
                     "description": "NULL for mod_mail and group",
@@ -16204,7 +17300,7 @@
                     ]
                 },
                 "user2_auto_delete_after": {
-                    "type": "string"
+                    "$ref": "#/definitions/time.Duration"
                 },
                 "user2_id": {
                     "description": "NULL for mod_mail and group",
@@ -16249,6 +17345,23 @@
                     "$ref": "#/definitions/github_com_omninudge_backend_internal_models.RollbackTrigger"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_omninudge_backend_internal_models.FriendEntry": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "friends_since": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -16466,6 +17579,10 @@
             "properties": {
                 "conversation_id": {
                     "type": "integer"
+                },
+                "delete_at": {
+                    "description": "Auto-delete timestamp; NULL means never",
+                    "type": "string"
                 },
                 "deleted_for_recipient": {
                     "type": "boolean"
@@ -16725,6 +17842,15 @@
                     "description": "Status",
                     "type": "boolean"
                 },
+                "link_preview_description": {
+                    "type": "string"
+                },
+                "link_preview_site_name": {
+                    "type": "string"
+                },
+                "link_preview_title": {
+                    "type": "string"
+                },
                 "media_type": {
                     "type": "string"
                 },
@@ -16871,6 +17997,17 @@
                 }
             }
         },
+        "github_com_omninudge_backend_internal_models.ReactionType": {
+            "type": "string",
+            "enum": [
+                "like",
+                "dislike"
+            ],
+            "x-enum-varnames": [
+                "ReactionLike",
+                "ReactionDislike"
+            ]
+        },
         "github_com_omninudge_backend_internal_models.RedditPostComment": {
             "type": "object",
             "properties": {
@@ -16951,39 +18088,6 @@
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_omninudge_backend_internal_models.Report": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "reason": {
-                    "type": "string"
-                },
-                "reporter_id": {
-                    "type": "integer"
-                },
-                "resolved_at": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "target_id": {
-                    "type": "integer"
-                },
-                "target_type": {
-                    "description": "post, comment, user, message",
                     "type": "string"
                 }
             }
@@ -17077,6 +18181,14 @@
                 "nsfw": {
                     "type": "boolean"
                 },
+                "plan": {
+                    "description": "Subscription plan",
+                    "type": "string"
+                },
+                "plan_expires_at": {
+                    "description": "nil for free tier",
+                    "type": "string"
+                },
                 "public_key": {
                     "description": "E2E encryption",
                     "type": "string"
@@ -17134,6 +18246,14 @@
                 "daily_digest": {
                     "type": "boolean"
                 },
+                "default_auto_delete_after": {
+                    "description": "Auto-delete: nil means Never (default)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/time.Duration"
+                        }
+                    ]
+                },
                 "default_omni_posts_only": {
                     "type": "boolean"
                 },
@@ -17171,6 +18291,16 @@
                 },
                 "notify_removed_saved_posts": {
                     "type": "boolean"
+                },
+                "omnichat_default_user_age": {
+                    "type": "string"
+                },
+                "omnichat_default_user_gender": {
+                    "type": "string"
+                },
+                "omnichat_default_user_name": {
+                    "description": "OmniChat global identity defaults for new conversations.",
+                    "type": "string"
                 },
                 "profile_visibility": {
                     "type": "string"
@@ -17234,6 +18364,123 @@
                     "type": "boolean"
                 },
                 "user_id": {
+                    "type": "integer"
+                },
+                "wall_post_permission": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_omninudge_backend_internal_models.WallPost": {
+            "type": "object",
+            "properties": {
+                "author_avatar_url": {
+                    "type": "string"
+                },
+                "author_id": {
+                    "type": "integer"
+                },
+                "author_username": {
+                    "type": "string"
+                },
+                "body": {
+                    "type": "string"
+                },
+                "comment_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dislike_count": {
+                    "type": "integer"
+                },
+                "disliked_by_viewer": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "liked_by_viewer": {
+                    "type": "boolean"
+                },
+                "media": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPostMedia"
+                    }
+                },
+                "profile_user_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_omninudge_backend_internal_models.WallPostComment": {
+            "type": "object",
+            "properties": {
+                "author_avatar_url": {
+                    "type": "string"
+                },
+                "author_id": {
+                    "type": "integer"
+                },
+                "author_username": {
+                    "type": "string"
+                },
+                "body": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dislike_count": {
+                    "type": "integer"
+                },
+                "disliked_by_viewer": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "liked_by_viewer": {
+                    "type": "boolean"
+                },
+                "wall_post_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_omninudge_backend_internal_models.WallPostMedia": {
+            "type": "object",
+            "properties": {
+                "duration": {
+                    "type": "integer"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "media_type": {
+                    "type": "string"
+                },
+                "thumbnail_url": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "width": {
                     "type": "integer"
                 }
             }
@@ -17346,9 +18593,6 @@
                 "page_url": {
                     "type": "string"
                 },
-                "rating": {
-                    "type": "integer"
-                },
                 "screenshot_url": {
                     "type": "string"
                 }
@@ -17362,6 +18606,7 @@
             "properties": {
                 "body": {
                     "type": "string",
+                    "maxLength": 10000,
                     "minLength": 1
                 },
                 "parent_comment_id": {
@@ -17471,25 +18716,31 @@
                 }
             }
         },
-        "internal_handlers.CreateReportRequest": {
+        "internal_handlers.CreateWallPostCommentRequest": {
             "type": "object",
             "required": [
-                "target_id",
-                "target_type"
+                "body"
             ],
             "properties": {
-                "description": {
-                    "type": "string"
+                "body": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "minLength": 1
+                }
+            }
+        },
+        "internal_handlers.CreateWallPostRequest": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "maxLength": 2000
                 },
-                "reason": {
-                    "type": "string"
-                },
-                "target_id": {
-                    "type": "integer"
-                },
-                "target_type": {
-                    "description": "post, comment, user, message",
-                    "type": "string"
+                "media": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPostMedia"
+                    }
                 }
             }
         },
@@ -17540,12 +18791,6 @@
                 },
                 "timestamp": {
                     "type": "string"
-                },
-                "user_agent": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
                 }
             }
         },
@@ -17583,6 +18828,64 @@
                 }
             }
         },
+        "internal_handlers.PendingWallPostsResponse": {
+            "type": "object",
+            "properties": {
+                "posts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPost"
+                    }
+                }
+            }
+        },
+        "internal_handlers.SetWallPostReactionRequest": {
+            "type": "object",
+            "required": [
+                "reaction"
+            ],
+            "properties": {
+                "reaction": {
+                    "enum": [
+                        "like",
+                        "dislike"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_omninudge_backend_internal_models.ReactionType"
+                        }
+                    ]
+                }
+            }
+        },
+        "internal_handlers.TopFriendPreview": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.TopFriendsResponse": {
+            "type": "object",
+            "properties": {
+                "best_friend": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "friends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handlers.TopFriendPreview"
+                    }
+                }
+            }
+        },
         "internal_handlers.UpdateBugReportRequest": {
             "type": "object",
             "required": [
@@ -17605,6 +18908,7 @@
             "properties": {
                 "body": {
                     "type": "string",
+                    "maxLength": 10000,
                     "minLength": 1
                 }
             }
@@ -17664,15 +18968,14 @@
                 }
             }
         },
-        "internal_handlers.UpdateReportStatusRequest": {
+        "internal_handlers.UserFriendsResponse": {
             "type": "object",
-            "required": [
-                "status"
-            ],
             "properties": {
-                "status": {
-                    "description": "open, approved, rejected, no_action (+ legacy)",
-                    "type": "string"
+                "friends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.FriendEntry"
+                    }
                 }
             }
         },
@@ -17680,6 +18983,9 @@
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "type": "string"
+                },
+                "banner_url": {
                     "type": "string"
                 },
                 "bio": {
@@ -17695,6 +19001,9 @@
                     "type": "integer"
                 },
                 "last_seen": {
+                    "type": "string"
+                },
+                "location": {
                     "type": "string"
                 },
                 "moderated_hubs": {
@@ -17728,6 +19037,136 @@
                         0,
                         1
                     ]
+                }
+            }
+        },
+        "internal_handlers.WallPostCommentsResponse": {
+            "type": "object",
+            "properties": {
+                "comments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPostComment"
+                    }
+                }
+            }
+        },
+        "internal_handlers.WallPostReactionResponse": {
+            "type": "object",
+            "properties": {
+                "dislike_count": {
+                    "type": "integer"
+                },
+                "disliked": {
+                    "type": "boolean"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "liked": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_handlers.WallPostsResponse": {
+            "type": "object",
+            "properties": {
+                "can_post": {
+                    "type": "boolean"
+                },
+                "friend_count": {
+                    "type": "integer"
+                },
+                "own_post_count": {
+                    "type": "integer"
+                },
+                "photo_count": {
+                    "type": "integer"
+                },
+                "posts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_omninudge_backend_internal_models.WallPost"
+                    }
+                },
+                "reply_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handlers.chatSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "auto_delete_after_seconds": {
+                    "description": "AutoDeleteAfterSeconds is the per-chat override in whole seconds.\nnil means no per-chat override is set (conversation inherits global default).\n0 would mean \"never\" but is never returned — nil is used instead.",
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handlers.confirmUploadRequest": {
+            "type": "object",
+            "required": [
+                "upload_id"
+            ],
+            "properties": {
+                "upload_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.confirmUploadResponse": {
+            "type": "object",
+            "properties": {
+                "media_id": {
+                    "type": "integer"
+                },
+                "scan_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.presignedURLRequest": {
+            "type": "object",
+            "required": [
+                "checksum_sha256",
+                "content_type",
+                "file_size",
+                "filename"
+            ],
+            "properties": {
+                "checksum_sha256": {
+                    "type": "string"
+                },
+                "content_type": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "filename": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.presignedURLResponse": {
+            "type": "object",
+            "properties": {
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer"
+                },
+                "required_headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "upload_id": {
+                    "type": "string"
+                },
+                "upload_url": {
+                    "type": "string"
                 }
             }
         },
@@ -17765,6 +19204,49 @@
                     ]
                 }
             }
+        },
+        "internal_handlers.submitRequest": {
+            "type": "object",
+            "required": [
+                "coin",
+                "plan_months",
+                "txid"
+            ],
+            "properties": {
+                "coin": {
+                    "type": "string"
+                },
+                "plan_months": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "txid": {
+                    "type": "string"
+                }
+            }
+        },
+        "time.Duration": {
+            "type": "integer",
+            "enum": [
+                -9223372036854775808,
+                9223372036854775807,
+                1,
+                1000,
+                1000000,
+                1000000000,
+                60000000000,
+                3600000000000
+            ],
+            "x-enum-varnames": [
+                "minDuration",
+                "maxDuration",
+                "Nanosecond",
+                "Microsecond",
+                "Millisecond",
+                "Second",
+                "Minute",
+                "Hour"
+            ]
         }
     },
     "securityDefinitions": {

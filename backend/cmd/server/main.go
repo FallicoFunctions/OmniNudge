@@ -20,6 +20,7 @@ import (
 	nethttppprof "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,8 +32,6 @@ import (
 	"github.com/omninudge/backend/internal/audit"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
-	"github.com/omninudge/backend/internal/domain/events"
-	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/jobs"
 	"github.com/omninudge/backend/internal/models"
@@ -41,7 +40,13 @@ import (
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/services/elevenlabs"
 	linkpreviewsvc "github.com/omninudge/backend/internal/services/linkpreview"
+	"github.com/omninudge/backend/internal/services/liveavatar"
+	"github.com/omninudge/backend/internal/services/openrouter"
+	"github.com/omninudge/backend/internal/services/runpod"
+	"github.com/omninudge/backend/internal/services/speech"
+	"github.com/omninudge/backend/internal/services/voicebox"
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -55,7 +60,10 @@ import (
 )
 
 // serviceName is the OTel / log service identifier — single source of truth.
-const serviceName = "omninudge-api"
+const (
+	serviceName         = "omninudge-api"
+	omniChatPersonaPath = "/omnichat/personas/:id"
+)
 
 // appVersion is set at build time via:
 //
@@ -126,6 +134,15 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewPostgresUserRepository(db.Pool)
+	backfillCtx, backfillCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	backfilledEmails, err := userRepo.BackfillEmailLookupHashes(backfillCtx)
+	backfillCancel()
+	if err != nil {
+		zlog.Fatal().Err(err).Msg("Failed to backfill email lookup hashes")
+	}
+	if backfilledEmails > 0 {
+		zlog.Info().Int("users", backfilledEmails).Msg("Backfilled email lookup hashes")
+	}
 	userSettingsRepo := repository.NewPostgresUserSettingsRepository(db.Pool)
 	postRepo := repository.NewPostgresPlatformPostRepository(db.Pool)
 	commentRepo := repository.NewPostgresPostCommentRepository(db.Pool)
@@ -176,19 +193,6 @@ func main() {
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	// Initialize domain event bus and register event handlers.
-	// Log events in non-production environments so they can be inspected via
-	// GetEventLog in tests and staging. In production the log is disabled to
-	// prevent the slice growing without bound.
-	eventBus := events.NewEventBus(cfg.AppEnv != "production")
-	userEventHandlers := eventhandlers.NewUserEventHandlers()
-	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
-	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)
-	eventBus.Subscribe("UserUnbanned", userEventHandlers.OnUserUnbanned)
-	eventBus.Subscribe("UserDeleted", userEventHandlers.OnUserDeleted)
-	eventBus.Subscribe("PasswordChanged", userEventHandlers.OnPasswordChanged)
-	zlog.Info().Msg("Domain event bus initialized")
-
 	// Initialize services
 	if cfg.Turnstile.Secret == "" {
 		zlog.Warn().Msg("Turnstile.Secret is not configured — CAPTCHA validation is disabled")
@@ -199,6 +203,8 @@ func main() {
 		cfg.Turnstile.Secret,
 	)
 	authService.SetUserRepository(userRepo)
+	authSessionService := services.NewAuthSessionService(db.Pool, authService)
+	authService.SetSessionService(authSessionService)
 
 	// Redis is optional in dev. If it's configured but unreachable, fall back to in-memory cache and disable the job queue
 	// (otherwise Asynq will spam errors and unrelated endpoints can fail).
@@ -364,7 +370,7 @@ func main() {
 	var virusScanner services.VirusScanner
 
 	// Initialize scrubber service (P0-017)
-	scrubberService := services.NewScrubberService(db.Pool, storageService)
+	scrubberService := services.NewScrubberService(db.Pool, storageService).SetVoiceStorage(voiceStorage)
 
 	// Initialize email service (P0-036)
 	// Provider selection order: SendGrid > Mailgun > SMTP > stub (logs only).
@@ -409,6 +415,19 @@ func main() {
 		}
 
 		// Register job handlers
+		workerOmniChatUserRepo := models.NewUserRepository(db.Pool)
+		omniChatGenerationWorker := queue.NewOmniChatGenerationHandler(
+			models.NewOmniChatMediaRepository(db.Pool),
+			models.NewBotPersonaRepository(db.Pool),
+			storageService,
+			virusScanner,
+			runpod.NewClientWithTimeout(cfg.OmniChatMedia.RunPodAPIKey, cfg.OmniChatMedia.RunPodBaseURL, cfg.OmniChatMedia.RunPodRequestTimeoutSeconds),
+			cfg.OmniChatMedia,
+			cfg.VirusScan.FailClosed,
+		).SetMediaReferenceReader(mediaRepo).
+			SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+			SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
+				SetAdminReader(workerOmniChatUserRepo))
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
@@ -425,6 +444,7 @@ func main() {
 				}
 				return queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle
 			}(),
+			OmniChatGeneration: omniChatGenerationWorker.Handle,
 		})
 
 		// Start worker in background
@@ -496,7 +516,21 @@ func main() {
 	go accountCleanupWorker.Start(workerCtx)
 
 	// Start data retention worker (P0-034: automated data deletion per retention policy)
-	retentionWorker := workers.NewRetentionWorker(db.Pool, scrubberService, storageService, cfg.Retention)
+	liveVideoClient := liveavatar.NewClient(liveavatar.Config{
+		LiveKitURL: cfg.LiveKit.URL, LiveKitAPIKey: cfg.LiveKit.APIKey, LiveKitAPISecret: cfg.LiveKit.APISecret,
+		RoomPrefix: cfg.LiveKit.RoomPrefix, TokenTTL: time.Duration(cfg.LiveKit.TokenTTLSecond) * time.Second,
+		RunPodPodAPIKey: cfg.OmniChatMedia.RunPodAPIKey, RunPodPodAPIURL: cfg.OmniChatMedia.RunPodPodAPIURL,
+		AvatarImage: cfg.OmniChatMedia.RunPodAvatarImage, AvatarGPUTypeID: cfg.OmniChatMedia.RunPodAvatarGPUTypeID,
+		AvatarGPUCount: cfg.OmniChatMedia.RunPodAvatarGPUCount, AvatarDiskGB: cfg.OmniChatMedia.RunPodAvatarDiskGB,
+		AvatarVolumeGB: cfg.OmniChatMedia.RunPodAvatarVolumeGB, AvatarVCPU: cfg.OmniChatMedia.RunPodAvatarVCPU,
+		AvatarMemoryGB: cfg.OmniChatMedia.RunPodAvatarMemoryGB, NetworkVolumeID: cfg.OmniChatMedia.RunPodNetworkVolumeID,
+		VolumeMountPath: cfg.OmniChatMedia.RunPodAvatarVolumeMountPath, AvatarPorts: cfg.OmniChatMedia.RunPodAvatarPorts,
+		InputHosts:       cfg.OmniChatMedia.RunPodInputHosts,
+		WorkerBackendURL: cfg.OmniChatMedia.RunPodWorkerBackendURL,
+	})
+	retentionWorker := workers.NewRetentionWorker(db.Pool, scrubberService, storageService, cfg.Retention).
+		SetVoiceStorage(voiceStorage).
+		SetLiveCallEnder(liveVideoClient)
 	go retentionWorker.Start(workerCtx)
 
 	// Crypto payment services
@@ -510,15 +544,22 @@ func main() {
 	planSvc := services.NewPlanService(models.NewUserRepository(db.Pool))
 	cryptoPaymentRepo := models.NewCryptoPaymentRepository(db.Pool)
 
-	go workers.NewCryptoPaymentWorker(cryptoPaymentRepo, planSvc, cryptoVerifySvc).Start(workerCtx)
+	go workers.NewCryptoPaymentWorker(cryptoPaymentRepo, cryptoVerifySvc).Start(workerCtx)
 	go workers.NewPlanExpiryWorker(planSvc).Start(workerCtx)
 
 	// Initialize repositories for email verification
 	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService, cfg.AppEnv)
-	oauthHandler := handlers.NewOAuthHandler(authService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
+	// Use nil lockoutService in dev to bypass brute-force protection locally
+	var devLockoutService *services.AccountLockoutService
+	if cfg.AppEnv == "development" {
+		devLockoutService = nil
+	} else {
+		devLockoutService = lockoutService
+	}
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, devLockoutService, authSessionService, cfg.AppEnv)
+	oauthHandler := handlers.NewOAuthHandler(authSessionService, userRepo, db.Pool, cfg.FrontendURL, cfg.OAuth.BackendURL, cfg.OAuth.GoogleClientID, cfg.OAuth.GoogleClientSecret, cfg.OAuth.DiscordClientID, cfg.OAuth.DiscordClientSecret, cfg.OAuth.GitHubClientID, cfg.OAuth.GitHubClientSecret, cfg.OAuth.SteamAPIKey, cfg.AppEnv)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo, autoDeleteSvc)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	postsHandler.SetLinkPreviewService(linkpreviewsvc.NewService(nil, storageService, virusScanner))
@@ -540,7 +581,8 @@ func main() {
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
 	}
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed, cfg.VirusScan.Enabled)
+	mediaHandler.SetPresignedUploadRepository(mediaRepo)
 	// Inject storage service so all uploads go through the configured backend.
 	mediaHandler.SetStorageService(storageService)
 	// Also inject S3 service when S3 storage backend is active so presigned URL
@@ -559,7 +601,7 @@ func main() {
 		postRepo,
 		commentRepo,
 	)
-	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
+	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool).SetPlanService(planSvc)
 	// Create authorizer for WebSocket message authorization (P0-008b)
 	wsAuthorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, wsAuthorizer, userSettingsRepo)
@@ -569,7 +611,7 @@ func main() {
 	friendsHandler := handlers.NewFriendsHandler(userFriendshipRepo, userRepo, userSettingsRepo, hub, db.Pool)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
-	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
+	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads", storageService)
 	userStatusHandler := handlers.NewUserStatusHandler(hub, db.Pool)
 	presenceStore := services.NewPresenceStore(10 * time.Minute)
 	subredditPresenceHandler := handlers.NewSubredditPresenceHandler(presenceStore)
@@ -591,8 +633,11 @@ func main() {
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo, userRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
-	jobsHandler := handlers.NewJobsHandler(queueClient)
-	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
+	audioEncoderHandler := handlers.NewAudioEncoderHandler(
+		mediaRepo,
+		userSettingsRepo,
+		queueClient,
+	).SetStorageService(storageService)
 	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
@@ -610,10 +655,177 @@ func main() {
 		cfg.Gemini.APIKey, cfg.Gemini.Model,
 	)
 
+	// OmniChat: AI chat bot personas, backed by OpenRouter.
+	zlog.Info().
+		Bool("openrouter_key_set", cfg.OpenRouter.APIKey != "").
+		Str("moderation_model", cfg.OpenRouter.Model).
+		Str("standard_model", cfg.OpenRouter.StandardModel).
+		Bool("standard_fallback_set", cfg.OpenRouter.StandardFallback != "").
+		Bool("plus_model_set", cfg.OpenRouter.PlusModel != "").
+		Bool("premium_quick_model_set", cfg.OpenRouter.PremiumQuickModel != "").
+		Bool("premium_deep_model_set", cfg.OpenRouter.PremiumDeepModel != "").
+		Bool("ultra_fast_model_set", cfg.OpenRouter.UltraFastModel != "").
+		Msg("OmniChat config")
+	botPersonaRepo := models.NewBotPersonaRepository(db.Pool)
+	botConversationRepo := models.NewBotConversationRepository(db.Pool)
+	omniChatModelPreferenceRepo := models.NewOmniChatModelPreferenceRepository(db.Pool)
+	botMessageRepo := models.NewBotMessageRepository(db.Pool)
+	omniChatMediaRepo := models.NewOmniChatMediaRepository(db.Pool)
+	omniChatSocialRepo := models.NewOmniChatSocialRepository(db.Pool)
+	omniChatGroupRepo := models.NewOmniChatGroupRepository(db.Pool)
+	omniChatVoiceRepo := models.NewOmniChatVoiceRepository(db.Pool)
+	omniChatResponseFeedbackRepo := models.NewOmniChatResponseFeedbackRepository(db.Pool)
+	omniChatSceneStateRepo := models.NewOmniChatConversationSceneStateRepository(db.Pool)
+	omniCreditsRepo := models.NewOmniCreditsRepository(db.Pool)
+	omniChatUserRepo := models.NewUserRepository(db.Pool)
+	// One rule for every surface that can produce adult content, so chat and
+	// media generation cannot disagree about what an account is entitled to.
+	omniChatContentEntitlement := services.NewOmniChatContentEntitlement(omniChatUserRepo)
+	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, omniChatUserRepo).SetAdminReader(omniChatUserRepo)
+	omniChatBillingOffers, billingOffersErr := services.ParseOmniChatBillingOffers(cfg.OmniChatBillingOffersJSON)
+	if billingOffersErr != nil {
+		zlog.Fatal().Err(billingOffersErr).Msg("Invalid OmniChat billing offer configuration")
+	}
+	if err := omniChatBilling.ConfigureOffers(omniChatBillingOffers); err != nil {
+		zlog.Fatal().Err(err).Msg("Invalid OmniChat billing offers")
+	}
+	openrouterClient := openrouter.NewClient(cfg.OpenRouter.APIKey, cfg.OpenRouter.Model)
+	omniChatModelRoutes := map[services.OmniChatModelProfileKey]string{
+		services.OmniChatModelProfileStandard:     cfg.OpenRouter.StandardModel,
+		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
+		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
+		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
+		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
+	}
+	if err := services.ValidateConfiguredOmniChatModelRoutes(omniChatModelRoutes, cfg.OpenRouter.StandardFallback); err != nil {
+		zlog.Fatal().Err(err).Msg("Invalid OmniChat model route configuration")
+	}
+	omniChatModelRouter := services.NewConfiguredProfiledOmniChatModelRouter(
+		omniChatUserRepo,
+		omniChatModelPreferenceRepo,
+		cfg.OpenRouter.APIKey,
+		omniChatModelRoutes,
+		cfg.OpenRouter.StandardFallback,
+	).SetAdminReader(omniChatUserRepo)
+	omniChatModelSelectionService := services.NewOmniChatModelSelectionService(
+		omniChatUserRepo, omniChatModelPreferenceRepo,
+	).SetAdminReader(omniChatUserRepo)
+	omniChatAllowanceCache := cache
+	if cfg.AppEnv == "production" && !redisAvailable {
+		// A process-local allowance can be reset by restarting or bypassed by
+		// reaching another replica. Provider-cost enforcement must therefore
+		// fail closed in production until shared Redis storage is healthy.
+		omniChatAllowanceCache = services.NoopCache{}
+		zlog.Error().Msg("OmniChat free allowance disabled: Redis is required in production")
+	}
+	omniChatAllowance := services.NewOmniChatAllowance(
+		omniChatAllowanceCache,
+		omniChatUserRepo,
+	).SetBilling(omniChatBilling).SetAdminReader(omniChatUserRepo)
+	standardSceneModel := strings.TrimSpace(cfg.OpenRouter.StandardModel)
+	if standardSceneModel == "" {
+		standardSceneModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
+	}
+	omniChatSceneStateExtractor := services.NewModelConversationSceneStateExtractor(
+		openrouter.NewClient(cfg.OpenRouter.APIKey, standardSceneModel),
+	)
+	omniChatSceneStateCoordinator := services.NewConversationSceneStateCoordinator(
+		omniChatSceneStateRepo,
+		omniChatSceneStateExtractor,
+	)
+	// Extraction runs in the worker, so the standard model is only ever called
+	// off the request path. Recall itself makes no model call at all.
+	omniChatMemoryRepo := models.NewOmniChatMemoryRepository(db.Pool)
+	omniChatMemoryService := services.NewOmniChatMemoryService(
+		omniChatMemoryRepo,
+		botMessageRepo,
+		botConversationRepo,
+		botPersonaRepo,
+		services.NewModelOmniChatMemoryExtractor(
+			openrouter.NewClient(cfg.OpenRouter.APIKey, standardSceneModel),
+		),
+	)
+	chatbotService := services.NewChatbotService(
+		db.Pool,
+		botPersonaRepo,
+		botConversationRepo,
+		botMessageRepo,
+		openrouterClient,
+		hub,
+		omniChatModelRouter,
+	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
+		SetBilling(omniChatBilling).
+		SetContentEntitlement(omniChatContentEntitlement)
+	// A nil queue means no worker will ever extract, so the persona recalls what
+	// it already knows and learns nothing new. That degrades cleanly rather than
+	// moving a 20-second model call onto the send path.
+	if queueClient != nil {
+		chatbotService.SetMemory(omniChatMemoryService, queueClient)
+	} else {
+		chatbotService.SetMemory(omniChatMemoryService, nil)
+	}
+	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
+	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
+		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
+	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
+	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
+	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
+	omniChatBillingHandler := handlers.NewOmniChatBillingHandler(omniChatBilling, nil)
+	var omniChatGenerationEnqueuer services.OmniChatGenerationEnqueuer
+	if queueClient != nil {
+		omniChatGenerationEnqueuer = queueClient
+	}
+	omniChatGenerationService := services.NewOmniChatGenerationService(
+		botPersonaRepo, botConversationRepo, omniChatMediaRepo,
+		omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
+	).SetBilling(omniChatBilling).SetMessageWriter(botMessageRepo).SetConversationWriter(botConversationRepo).
+		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient)).
+		SetContentEntitlement(omniChatContentEntitlement)
+	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
+		SetBilling(omniChatBilling).
+		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
+	omniChatSocialService := services.NewOmniChatSocialService(
+		omniChatSocialRepo,
+		services.NewOpenRouterOmniChatModerator(openrouterClient),
+	)
+	omniChatSocialHandler := handlers.NewOmniChatSocialHandler(omniChatSocialService, omniChatSocialRepo, storageService)
+	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub, omniChatModelRouter)
+	omniChatGroupHandler := handlers.NewOmniChatGroupHandler(omniChatGroupService, omniChatGroupRepo, omniChatAllowance)
+	voiceProviders := map[string]speech.Synthesizer{
+		"elevenlabs": elevenlabs.NewClient(cfg.OmniChatVoice.ElevenLabsAPIKey, cfg.OmniChatVoice.ElevenLabsBaseURL, cfg.OmniChatVoice.ElevenLabsEnableLogging),
+	}
+	voiceboxAvailable := false
+	if cfg.OmniChatVoice.VoiceboxEnabled {
+		voiceboxClient, voiceboxErr := voicebox.NewClient(cfg.OmniChatVoice.VoiceboxBaseURL, time.Duration(cfg.OmniChatVoice.VoiceboxTimeoutSeconds)*time.Second)
+		if voiceboxErr != nil {
+			zlog.Error().Err(voiceboxErr).Msg("Voicebox configuration rejected")
+		} else {
+			voiceProviders["voicebox"] = voiceboxClient
+			voiceboxAvailable = true
+		}
+	}
+	omniChatVoiceService := services.NewOmniChatVoiceService(
+		omniChatVoiceRepo,
+		voiceStorage,
+		voiceProviders,
+		map[string]string{"elevenlabs": cfg.OmniChatVoice.DefaultModel, "voicebox": "kokoro"},
+	).SetBilling(omniChatBilling)
+	omniChatVoiceHandler := handlers.NewOmniChatVoiceHandler(
+		omniChatVoiceRepo, omniChatVoiceService, voiceStorage,
+		liveVideoClient,
+	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled).
+		SetBilling(omniChatBilling)
+	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
+	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
+	omniChatMessageRateLimiter := middleware.OmniChatRateLimiter(cache)
+	omniChatSocialRateLimiter := middleware.OmniChatSocialRateLimiter(cache)
+	omniChatVoiceRateLimiter := middleware.OmniChatVoiceRateLimiter(cache)
+	omniChatCallRateLimiter := middleware.OmniChatCallRateLimiter(cache)
+
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
 	reactionRateLimiter := middleware.ReactionRateLimiter()
-	friendRequestRateLimiter := middleware.FriendRequestRateLimiter()
+	friendRequestRateLimiter := middleware.FriendRequestRateLimiterRedis(cache)
 
 	// Rate limiters hoisted so they are accessible at graceful shutdown.
 	themeCreationLimiter := middleware.ThemeCreationRateLimiter()
@@ -626,6 +838,9 @@ func main() {
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
 	passwordResetRateLimiter := middleware.PasswordResetRateLimiter(cache)
+	analyticsRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:analytics").FailClosed()
+	bugReportRateLimiter := middleware.NewRedisRateLimiter(cache, 5, time.Hour, "rate:bug_reports").FailClosed()
+	presenceRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:presence").FailClosed()
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
@@ -656,6 +871,13 @@ func main() {
 	//                   ctx.Done() will be cancelled automatically
 	// 12. Metrics     — measures handler latency last so compression is included
 	router := gin.New()
+	// Gin otherwise trusts proxy headers from every source, allowing anonymous
+	// clients to spoof ClientIP and rotate IP-keyed provider rate limits. The
+	// secure default is no trusted proxies; deployments behind a load balancer
+	// must explicitly allowlist its IP or CIDR via TRUSTED_PROXIES.
+	if err := router.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		zlog.Fatal().Err(err).Msg("Invalid TRUSTED_PROXIES configuration")
+	}
 	router.Use(middleware.Recovery())
 	router.Use(observability.SentryMiddleware())
 	router.Use(middleware.RequestID())
@@ -680,9 +902,13 @@ func main() {
 	router.Use(middleware.Timeout(30 * time.Second))
 	router.Use(monitoring.MetricsMiddleware())
 
-	// Serve uploads through scan-aware gate (fail-closed for media files)
-	router.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
-	router.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
+	// Serve uploads through a scan- and ownership-aware gateway. Public avatar
+	// and banner paths remain anonymous; all tracked media and voice recordings
+	// are authorized by their dedicated authenticated handlers.
+	uploads := router.Group("")
+	uploads.Use(middleware.AuthOptional(authService))
+	uploads.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
+	uploads.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
 
 	// Health check — used by load balancers and uptime monitors.
 	// Version is intentionally omitted to avoid exposing the exact commit hash publicly.
@@ -825,8 +1051,13 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			// Username/password authentication — 5 attempts per 15 min per IP
-			auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
-			auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
+			if cfg.AppEnv == "development" {
+				auth.POST("/register", authHandler.Register)
+				auth.POST("/login", authHandler.Login)
+			} else {
+				auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
+				auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
+			}
 
 			// Password reset — 3 requests per hour per IP
 			auth.POST("/forgot-password", passwordResetRateLimiter.Middleware(), authHandler.ForgotPassword)
@@ -840,7 +1071,8 @@ func main() {
 			// Social / OAuth login
 			auth.GET("/oauth/:provider", oauthHandler.Initiate)
 			auth.GET("/oauth/:provider/callback", oauthHandler.Callback)
-			auth.POST("/oauth/complete", oauthHandler.CompleteSignup)
+			auth.POST("/oauth/complete", authRateLimiter.Middleware(), oauthHandler.CompleteSignup)
+			auth.POST("/refresh", authRateLimiter.Middleware(), authHandler.Refresh)
 		}
 
 		// Combined feed routes (optional auth)
@@ -926,7 +1158,7 @@ func main() {
 			hubs.GET("/:name/wiki", hubWikiHandler.GetHubWikiPage)
 			hubs.GET("/:name/wiki/:pagePath", hubWikiHandler.GetHubWikiPage)
 			hubs.GET("/:name/active-users", hubPresenceHandler.GetHubActiveUsers)
-			hubs.POST("/:name/active-users/ping", hubPresenceHandler.PingHubPresence)
+			hubs.POST("/:name/active-users/ping", presenceRateLimiter.Middleware(), hubPresenceHandler.PingHubPresence)
 
 			// Hub settings (public can view some, moderators see all)
 			hubs.GET("/:name/settings", hubSettingsHandler.GetHubSettings)
@@ -952,7 +1184,7 @@ func main() {
 			subreddits.GET("/:name/posts", postsHandler.GetSubredditPosts)
 			subreddits.GET("/:name/subscription", subscriptionsHandler.CheckSubredditSubscription)
 			subreddits.GET("/:name/active-users", subredditPresenceHandler.GetSubredditActiveUsers)
-			subreddits.POST("/:name/active-users/ping", subredditPresenceHandler.PingSubredditPresence)
+			subreddits.POST("/:name/active-users/ping", presenceRateLimiter.Middleware(), subredditPresenceHandler.PingSubredditPresence)
 		}
 
 		// Public user profile routes
@@ -989,13 +1221,14 @@ func main() {
 		bugReports := api.Group("/bug-reports")
 		bugReports.Use(middleware.AuthOptional(authService))
 		{
-			bugReports.POST("", bugReportsHandler.CreateBugReport)   // Anyone can report bugs
-			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
+			bugReports.POST("", bugReportRateLimiter.Middleware(), bugReportsHandler.CreateBugReport) // Anyone can report bugs
+			bugReports.GET("/known", bugReportsHandler.GetKnownBugs)                                  // Public list of known bugs
 		}
 
 		// Analytics routes (P0-027: track events, optional auth for user context)
 		analytics := api.Group("/analytics")
 		analytics.Use(middleware.AuthOptional(authService))
+		analytics.Use(analyticsRateLimiter.Middleware())
 		{
 			analytics.POST("/track", analyticsHandler.TrackEvent)
 			analytics.POST("/session/start", analyticsHandler.StartSession)
@@ -1003,10 +1236,17 @@ func main() {
 			analytics.POST("/identify", analyticsHandler.Identify)
 		}
 
-		// Job status routes (P0-002: job status queryable via API)
-		jobs := api.Group("/jobs")
+		// OmniChat public routes (no auth required)
+		omniChatPublic := api.Group("/omnichat")
+		omniChatPublic.Use(middleware.AuthOptional(authService))
 		{
-			jobs.GET("/:queue/:id", jobsHandler.GetJobStatus)
+			omniChatPublic.GET("/personas", omniChatHandler.ListPersonas)
+			omniChatPublic.GET("/allowance", omniChatHandler.GetAllowance)
+			omniChatPublic.POST("/preview/messages", omniChatMessageRateLimiter.Middleware(), omniChatHandler.PreviewSendMessage)
+			omniChatPublic.GET("/explore", omniChatSocialHandler.ListExplore)
+			omniChatPublic.GET("/explore/:id", omniChatSocialHandler.GetPublication)
+			omniChatPublic.GET("/explore/:id/comments", omniChatSocialHandler.ListComments)
+			omniChatPublic.GET("/explore/media/:asset_id/content", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaContent)
 		}
 
 		// Protected routes (auth required)
@@ -1017,6 +1257,8 @@ func main() {
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
 			protected.POST("/auth/ws-token", authHandler.GenerateWSToken)
+			protected.GET("/auth/sessions", authHandler.ListSessions)
+			protected.DELETE("/auth/sessions/:session_id", authHandler.RevokeSession)
 			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
 			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)
@@ -1033,8 +1275,6 @@ func main() {
 
 			// Account deletion (P0-017: GDPR right to erasure)
 			protected.POST("/account/delete", accountDeletionHandler.RequestAccountDeletion)
-			protected.POST("/account/cancel-deletion", accountDeletionHandler.CancelAccountDeletion)
-			protected.GET("/account/deletion-status", accountDeletionHandler.GetAccountDeletionStatus)
 
 			// GDPR Data Export (P0-016: GDPR right to data portability)
 			protected.POST("/account/export", dataExportHandler.RequestDataExport)
@@ -1153,6 +1393,86 @@ func main() {
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
 			protected.GET("/conversations/:id/settings", conversationsHandler.GetChatSettings)
 			protected.PATCH("/conversations/:id/settings", conversationsHandler.UpdateChatSettings)
+
+			// OmniChat: AI chat bot personas and conversations
+			protected.GET("/omnichat/my-personas", omniChatHandler.ListMyPersonas)
+			protected.POST("/omnichat/personas", omniChatHandler.CreatePersona)
+			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
+			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
+			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)
+			protected.DELETE(omniChatPersonaPath, omniChatHandler.DeletePersona)
+			protected.GET(omniChatPersonaPath+"/export", omniChatHandler.ExportPersonaJSON)
+			protected.DELETE(omniChatPersonaPath+"/conversations", omniChatHandler.DeletePersonaConversations)
+			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
+			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
+			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
+			protected.GET("/omnichat/model-selection", omniChatHandler.GetModelSelection)
+			protected.PUT("/omnichat/model-selection", omniChatHandler.SetModelSelection)
+			protected.PUT("/omnichat/conversations/:id/settings", omniChatHandler.UpdateConversationSettings)
+			protected.POST("/omnichat/conversations/:id/fork", omniChatHandler.ForkConversation)
+			protected.DELETE("/omnichat/conversations/:id", omniChatHandler.DeleteConversation)
+			protected.POST("/omnichat/conversations/:id/messages", omniChatMessageRateLimiter.Middleware(), omniChatHandler.SendMessage)
+			protected.POST("/omnichat/conversations/:id/media-command", omniChatMediaRateLimiter.Middleware(), omniChatMediaHandler.CreateConversationMediaCommand)
+			protected.POST("/omnichat/conversations/:id/messages/:message_id/regenerate", omniChatMessageRateLimiter.Middleware(), omniChatHandler.RegenerateMessage)
+			protected.PATCH("/omnichat/conversations/:id/messages/:message_id", omniChatHandler.EditAssistantMessage)
+			protected.POST("/omnichat/conversations/:id/messages/:message_id/feedback", omniChatSocialRateLimiter.Middleware(), omniChatResponseFeedbackHandler.Submit)
+			protected.GET("/omnichat/billing/catalog", omniChatBillingHandler.Catalog)
+			protected.GET("/omnichat/billing/wallet", omniChatBillingHandler.Wallet)
+			protected.GET("/omnichat/billing/usage", omniChatBillingHandler.Usage)
+			protected.GET("/omnichat/billing/video-entitlement", omniChatBillingHandler.VideoEntitlement)
+			protected.POST("/omnichat/billing/checkout", omniChatBillingHandler.CreateCheckout)
+			// Reading is unmetered; forgetting is a write and shares the social
+			// limiter so a scripted client cannot churn status updates.
+			protected.GET("/omnichat/conversations/:id/memories", omniChatMemoryHandler.ListConversationMemories)
+			protected.DELETE("/omnichat/memories/:id", omniChatSocialRateLimiter.Middleware(), omniChatMemoryHandler.ForgetMemory)
+			protected.GET("/omnichat/conversations/:id/scene", omniChatMediaHandler.GetConversationScene)
+			protected.PUT("/omnichat/conversations/:id/scene", omniChatMediaHandler.UpdateConversationScene)
+			protected.POST("/omnichat/generations", omniChatMediaRateLimiter.Middleware(), omniChatMediaHandler.CreateGeneration)
+			protected.GET("/omnichat/generations", omniChatMediaHandler.ListGenerations)
+			protected.GET("/omnichat/generations/:id", omniChatMediaHandler.GetGeneration)
+			protected.DELETE("/omnichat/generations/:id", omniChatMediaHandler.CancelGeneration)
+			protected.GET("/omnichat/gallery", omniChatMediaHandler.ListGallery)
+			protected.GET("/omnichat/media/:id", omniChatMediaHandler.GetAsset)
+			protected.GET("/omnichat/media/:id/content", omniChatMediaHandler.GetAssetContent)
+			protected.DELETE("/omnichat/media/:id", omniChatMediaHandler.DeleteAsset)
+			protected.POST("/omnichat/explore/publish/media", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishAsset)
+			protected.POST("/omnichat/explore/publish/chat", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishChat)
+			protected.PUT("/omnichat/explore/:id/like", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.SetLike)
+			protected.PUT("/omnichat/explore/:id/bookmark", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.SetBookmark)
+			protected.GET("/omnichat/explore/bookmarks", omniChatSocialHandler.ListBookmarks)
+			protected.POST("/omnichat/explore/:id/comments", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.AddComment)
+			protected.DELETE("/omnichat/explore/comments/:comment_id", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.DeleteComment)
+			protected.POST("/omnichat/explore/:id/share", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.RecordShare)
+			protected.PUT("/omnichat/explore/users/:user_id/follow", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.SetFollow)
+			protected.POST("/omnichat/explore/:id/continue", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.ContinueChat)
+			protected.POST("/omnichat/explore/:id/report", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.Report)
+			protected.DELETE("/omnichat/explore/:id", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.RemovePublication)
+			protected.POST("/omnichat/groups", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.CreateGroup)
+			protected.GET("/omnichat/groups", omniChatGroupHandler.ListGroups)
+			protected.GET("/omnichat/groups/:group_id", omniChatGroupHandler.GetGroup)
+			protected.PATCH("/omnichat/groups/:group_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.UpdateGroup)
+			protected.DELETE("/omnichat/groups/:group_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.DeleteGroup)
+			protected.POST("/omnichat/groups/:group_id/archive", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.ArchiveGroup)
+			protected.DELETE("/omnichat/groups/:group_id/members/me", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.LeaveGroup)
+			protected.PATCH("/omnichat/groups/:group_id/members/:user_id/role", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.SetMemberRole)
+			protected.DELETE("/omnichat/groups/:group_id/members/:user_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.RemoveMember)
+			protected.POST("/omnichat/groups/:group_id/members/:user_id/transfer", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.TransferOwnership)
+			protected.GET("/omnichat/groups/:group_id/messages", omniChatGroupHandler.ListMessages)
+			protected.POST("/omnichat/groups/:group_id/messages", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.SendMessage)
+			protected.POST("/omnichat/groups/:group_id/invites", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.CreateInvite)
+			protected.GET("/omnichat/groups/:group_id/invites", omniChatGroupHandler.ListInvites)
+			protected.DELETE("/omnichat/groups/:group_id/invites/:invite_id", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.RevokeInvite)
+			protected.POST("/omnichat/groups/join", omniChatSocialRateLimiter.Middleware(), omniChatGroupHandler.AcceptInvite)
+			protected.GET("/omnichat/voice-presets", omniChatVoiceHandler.ListVoicePresets)
+			protected.POST("/omnichat/voice-presets/:preset_id/preview", omniChatVoiceRateLimiter.Middleware(), omniChatVoiceHandler.PreviewVoicePreset)
+			protected.GET(omniChatPersonaPath+"/voice", omniChatVoiceHandler.GetPersonaVoice)
+			protected.PUT(omniChatPersonaPath+"/voice", omniChatVoiceHandler.UpdatePersonaVoice)
+			protected.GET("/omnichat/conversations/:id/messages/:message_id/speech", omniChatVoiceRateLimiter.Middleware(), omniChatVoiceHandler.GetMessageSpeech)
+			protected.POST("/omnichat/conversations/:id/calls", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.StartCall)
+			protected.DELETE("/omnichat/calls/:call_id", omniChatVoiceHandler.EndCall)
+			protected.POST("/omnichat/calls/:call_id/token", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.RefreshCallToken)
+			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
+
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)
 			protected.PATCH("/folders/:id", foldersHandler.UpdateFolder)
@@ -1392,6 +1712,7 @@ func main() {
 				// User management
 				admin.GET("/users", adminHandler.ListUsers)
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
+				admin.POST("/users/:id/plan", adminHandler.SetUserPlan)
 				admin.POST("/users/:id/ban", adminHandler.BanUser)
 				admin.POST("/users/:id/shadow-ban", adminHandler.ShadowBanUser)
 				admin.POST("/users/:id/unban", adminHandler.UnbanUser)
@@ -1410,6 +1731,14 @@ func main() {
 				// Bug report management
 				admin.GET("/bug-reports", bugReportsHandler.GetBugReports)
 				admin.PUT("/bug-reports/:id", bugReportsHandler.UpdateBugReport)
+
+				// OmniChat response-quality review. The handler returns only stored
+				// feedback snapshots, never persona prompts or provider settings.
+				admin.GET("/omnichat/response-feedback", adminOmniChatResponseFeedbackHandler.List)
+				admin.GET("/omnichat/response-feedback/:id", adminOmniChatResponseFeedbackHandler.Get)
+				admin.PATCH("/omnichat/response-feedback/:id/status", adminOmniChatResponseFeedbackHandler.Transition)
+				admin.GET("/omnichat/publication-reports", omniChatSocialHandler.ListReports)
+				admin.PATCH("/omnichat/publication-reports/:report_id", omniChatSocialHandler.ResolveReport)
 
 				// Known bugs management
 				admin.POST("/known-bugs", bugReportsHandler.CreateKnownBug)
@@ -1435,6 +1764,12 @@ func main() {
 				admin.GET("/retention/policy", dataRetentionHandler.GetRetentionPolicy)
 				admin.PUT("/retention/policy/:data_type", dataRetentionHandler.UpdateRetentionPolicy)
 				admin.GET("/retention/history", dataRetentionHandler.GetRetentionHistory)
+
+				// OmniChat persona media management
+				admin.GET("/omnichat/personas", adminPersonaHandler.ListPersonas)
+				admin.GET("/omnichat/persona-voices", adminPersonaHandler.ListPersonaVoices)
+				admin.PUT("/omnichat/personas/:id", adminPersonaHandler.UpdatePersonaMedia)
+				admin.PUT("/omnichat/personas/:id/voice", adminPersonaHandler.UpdatePersonaVoice)
 			}
 
 			// WebSocket endpoint for real-time messaging
@@ -1519,7 +1854,7 @@ func main() {
 
 	// Give outstanding requests 30 seconds to complete (draining window).
 	shutdownStart := time.Now()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
@@ -1546,7 +1881,6 @@ func main() {
 	// workerCancel() are deferred and fire on return from main() — after this
 	// block. Do not move these Stop() calls into defers without careful ordering.
 	reactionRateLimiter.Stop()
-	friendRequestRateLimiter.Stop()
 	themeCreationLimiter.Stop()
 	themePreviewLimiter.Stop()
 	generalLimiter.Stop()
@@ -1562,19 +1896,3 @@ func main() {
 
 	zlog.Info().Msg("Server exited")
 }
-
-// asynqmonDashboard is a swaggo documentation stub for the Asynqmon queue
-// monitoring dashboard. The actual handler is wired inline in main() because
-// asynqmon provides a net/http handler that cannot be expressed as a named
-// gin HandlerFunc. This stub exists solely so swag init can generate the
-// OpenAPI entry for the route.
-//
-// @Summary      Queue monitoring dashboard
-// @Description  Asynqmon web UI — view and manage background job queues (active, pending, scheduled, retry, dead). Requires Redis to be available.
-// @Tags         Admin
-// @Security     BearerAuth
-// @Produce      html
-// @Success      200  "HTML dashboard"
-// @Failure      401  {object}  response.ErrorResponse  "Unauthorized — ASYNQMON_TOKEN required in production"
-// @Router       /admin/queues [get]
-func asynqmonDashboard() {} //nolint:unused

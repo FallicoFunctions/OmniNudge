@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hubAIDesignerService, type DesignVersion } from '../services/hubAIDesignerService';
 import { useAuth } from '../contexts/AuthContext';

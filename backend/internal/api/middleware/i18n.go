@@ -53,11 +53,3 @@ func I18nMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// GetLanguage retrieves the detected language from the context
-func GetLanguage(c *gin.Context) string {
-	if lang, exists := c.Get(ContextLanguageKey); exists {
-		return lang.(string)
-	}
-	return DefaultLanguage
-}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { hubsService, type CreateHubRequest } from '../services/hubsService';
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { FieldError, FormError } from '../components/common/ErrorStates';
 import { FormField } from '../components/forms/FormField';
+import { getSafeInternalPath } from '../utils/navigation';
 
 export default function CreateHubPage() {
   const { t } = useTranslation();
@@ -397,8 +398,9 @@ export default function CreateHubPage() {
             type="button"
             onClick={() => {
               const state = location.state as { returnTo?: string } | null;
-              if (state?.returnTo) {
-                navigate(state.returnTo);
+              const returnTo = getSafeInternalPath(state?.returnTo, '');
+              if (returnTo) {
+                navigate(returnTo);
               } else {
                 navigate(-1);
               }

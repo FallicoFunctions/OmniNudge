@@ -58,11 +58,6 @@ func WithFailedLoginInterval(d time.Duration) func(*CleanupJob) {
 	return func(j *CleanupJob) { j.failedLoginInterval = d }
 }
 
-// WithAuditLogInterval overrides the interval between audit-log purge runs.
-func WithAuditLogInterval(d time.Duration) func(*CleanupJob) {
-	return func(j *CleanupJob) { j.auditLogInterval = d }
-}
-
 // WithAutoDeleteSweep enables the expired-message purge and sets the repositories
 // and hub needed to delete messages and broadcast WS events.
 func WithAutoDeleteSweep(msgRepo expiredMsgRepo, convRepo expiredConvRepo, hub *websocket.Hub) func(*CleanupJob) {
@@ -71,11 +66,6 @@ func WithAutoDeleteSweep(msgRepo expiredMsgRepo, convRepo expiredConvRepo, hub *
 		j.convRepo = convRepo
 		j.hub = hub
 	}
-}
-
-// WithAutoDeleteInterval overrides how often the expired-message sweep runs (default 1 minute).
-func WithAutoDeleteInterval(d time.Duration) func(*CleanupJob) {
-	return func(j *CleanupJob) { j.autoDeleteInterval = d }
 }
 
 // NewCleanupJob creates a CleanupJob with sensible defaults.

@@ -154,8 +154,18 @@ func TestSendMessage_Text(t *testing.T) {
 }
 
 func TestSendMessage_WithMedia(t *testing.T) {
-	handler, _, user1ID, _, convID, _, cleanup := setupMessagesHandlerTest(t)
+	handler, db, user1ID, _, convID, _, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
+
+	mediaURL := "/uploads/test.jpg"
+	mediaType := "image/jpeg"
+	mediaSize := int64(12345)
+	media := &models.MediaFile{
+		UserID: user1ID, Filename: "test.jpg", OriginalFilename: "test.jpg",
+		FileType: mediaType, FileSize: mediaSize, StorageURL: mediaURL,
+		StoragePath: "uploads/test.jpg", ScanStatus: models.MediaScanStatusClean,
+	}
+	require.NoError(t, models.NewMediaFileRepository(db.Pool).Create(context.Background(), media))
 
 	router := gin.Default()
 	router.POST("/messages", func(c *gin.Context) {
@@ -163,17 +173,14 @@ func TestSendMessage_WithMedia(t *testing.T) {
 		handler.SendMessage(c)
 	})
 
-	mediaURL := "/uploads/test.jpg"
-	mediaType := "image/jpeg"
-	mediaSize := 12345
-
 	body := map[string]interface{}{
 		"conversation_id":    convID,
 		"encrypted_content":  "base64encodedimage",
 		"message_type":       "image",
-		"media_url":          mediaURL,
-		"media_type":         mediaType,
-		"media_size":         mediaSize,
+		"media_file_id":      media.ID,
+		"media_url":          "/uploads/spoofed.jpg",
+		"media_type":         "application/pdf",
+		"media_size":         1,
 		"encryption_version": "v1",
 	}
 	bodyJSON, _ := json.Marshal(body)
@@ -190,9 +197,39 @@ func TestSendMessage_WithMedia(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "image", response["message_type"])
+	assert.Equal(t, float64(media.ID), response["media_file_id"])
 	assert.Equal(t, mediaURL, response["media_url"])
 	assert.Equal(t, mediaType, response["media_type"])
 	assert.Equal(t, float64(mediaSize), response["media_size"])
+}
+
+func TestSendMessage_RejectsMediaOwnedByAnotherUser(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	foreignMedia := &models.MediaFile{
+		UserID: user2ID, Filename: "private.jpg", OriginalFilename: "private.jpg",
+		FileType: "image/jpeg", FileSize: 42, StorageURL: "/uploads/private.jpg",
+		StoragePath: "uploads/private.jpg", ScanStatus: models.MediaScanStatusClean,
+	}
+	require.NoError(t, models.NewMediaFileRepository(db.Pool).Create(context.Background(), foreignMedia))
+
+	router := gin.New()
+	router.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.SendMessage(c)
+	})
+	body, err := json.Marshal(map[string]interface{}{
+		"conversation_id": convID, "message_type": "image",
+		"media_file_id": foreignMedia.ID, "encryption_version": "v1",
+	})
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodPost, "/messages", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusNotFound, response.Code, response.Body.String())
 }
 
 func TestSendMessage_InvalidMessageType(t *testing.T) {

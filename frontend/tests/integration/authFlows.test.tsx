@@ -85,10 +85,9 @@ describe('Auth flows', () => {
     sessionStorage.clear();
   });
 
-  it('TestLogin_Success: successful login stores token and sets user', async () => {
+  it('TestLogin_Success: successful cookie login sets user', async () => {
     mockApi.get.mockResolvedValue(null); // initial /auth/me
     mockApi.post.mockResolvedValueOnce({
-      token: 'tok_abc123',
       user: makeUser(),
     });
 
@@ -98,7 +97,10 @@ describe('Auth flows', () => {
       await result.current.login({ username: 'testuser', password: 'correct' });
     });
 
-    expect(mockApi.post).toHaveBeenCalledWith('/auth/login', expect.objectContaining({ username: 'testuser' }));
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/auth/login',
+      expect.objectContaining({ username: 'testuser' })
+    );
     expect(result.current.user).not.toBeNull();
     expect(result.current.isAuthenticated).toBe(true);
   });
@@ -110,7 +112,9 @@ describe('Auth flows', () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
-      await expect(result.current.login({ username: 'testuser', password: 'wrong' })).rejects.toThrow();
+      await expect(
+        result.current.login({ username: 'testuser', password: 'wrong' })
+      ).rejects.toThrow();
     });
 
     expect(result.current.user).toBeNull();
@@ -119,21 +123,25 @@ describe('Auth flows', () => {
 
   it('TestLogin_RateLimited: 429 response propagates as thrown error', async () => {
     mockApi.get.mockResolvedValue(null);
-    mockApi.post.mockRejectedValueOnce(Object.assign(new Error('Too Many Requests'), { status: 429 }));
+    mockApi.post.mockRejectedValueOnce(
+      Object.assign(new Error('Too Many Requests'), { status: 429 })
+    );
 
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
-      await expect(result.current.login({ username: 'testuser', password: 'pass' })).rejects.toThrow();
+      await expect(
+        result.current.login({ username: 'testuser', password: 'pass' })
+      ).rejects.toThrow();
     });
 
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it('TestRegister_Success: successful register stores token and sets user', async () => {
+  it('TestRegister_Success: successful registration establishes a session and sets user', async () => {
     mockApi.get.mockResolvedValue(null);
     mockApi.post
-      .mockResolvedValueOnce({ token: 'tok_new', user: makeUser({ username: 'newuser' }) }) // register
+      .mockResolvedValueOnce({ user: makeUser({ username: 'newuser' }) }) // register
       .mockResolvedValue({}); // key sync calls
 
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -148,7 +156,10 @@ describe('Auth flows', () => {
       });
     });
 
-    expect(mockApi.post).toHaveBeenCalledWith('/auth/register', expect.objectContaining({ username: 'newuser' }));
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/auth/register',
+      expect.objectContaining({ username: 'newuser' })
+    );
     expect(result.current.user?.username).toBe('newuser');
   });
 
@@ -177,7 +188,7 @@ describe('Auth flows', () => {
     mockApi.get.mockResolvedValue(null);
     mockApi.request.mockResolvedValue({});
     mockApi.post
-      .mockResolvedValueOnce({ token: 'tok_abc', user: makeUser() }) // login
+      .mockResolvedValueOnce({ user: makeUser() }) // login
       .mockResolvedValue({}); // logout endpoint
 
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -198,7 +209,6 @@ describe('Auth flows', () => {
     });
     expect(mockApi.request).toHaveBeenCalledWith('/auth/logout', {
       method: 'POST',
-      headers: { Authorization: 'Bearer tok_abc' },
     });
   });
 });

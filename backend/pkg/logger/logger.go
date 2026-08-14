@@ -15,8 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type contextKey struct{}
-
 // Initialize sets up the global zerolog logger and bridges it to slog.
 // env should be "development", "staging", or "production".
 func Initialize(env, version, service string) {
@@ -42,33 +40,6 @@ func Initialize(env, version, service string) {
 
 	// Bridge zerolog into slog so existing slog calls also emit JSON.
 	slog.SetDefault(slog.New(newZerologHandler(logger)))
-}
-
-// FromContext extracts the zerolog logger stored in ctx, or returns the global logger.
-func FromContext(ctx context.Context) zerolog.Logger {
-	if l, ok := ctx.Value(contextKey{}).(zerolog.Logger); ok {
-		return l
-	}
-	return log.Logger
-}
-
-// WithContext stores logger l in ctx and returns the new context.
-func WithContext(ctx context.Context, l zerolog.Logger) context.Context {
-	return context.WithValue(ctx, contextKey{}, l)
-}
-
-// WithRequestContext enriches a logger with HTTP request fields and returns a
-// child logger and updated context.
-func WithRequestContext(ctx context.Context, requestID, traceID, spanID, userID, method, path string) (context.Context, zerolog.Logger) {
-	l := FromContext(ctx).With().
-		Str("request_id", requestID).
-		Str("trace_id", traceID).
-		Str("span_id", spanID).
-		Str("user_id", userID).
-		Str("method", method).
-		Str("path", path).
-		Logger()
-	return WithContext(ctx, l), l
 }
 
 // ---- PII / injection protection -----------------------------------------------

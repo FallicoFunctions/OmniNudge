@@ -57,6 +57,9 @@ function escapeHtml(value: string): string {
 function escapeAttribute(value: string): string {
   try {
     const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return '#';
+    }
     return escapeHtml(url.toString());
   } catch {
     return '#';

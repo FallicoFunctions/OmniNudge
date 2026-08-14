@@ -85,6 +85,9 @@ type updateSettingsRequest struct {
 	QuietHoursEndMinutes         *int    `json:"quiet_hours_end_minutes"`
 	QuietHoursTimezone           *string `json:"quiet_hours_timezone"`
 	BatchNotifications           *bool   `json:"batch_notifications"`
+	OmniChatDefaultUserName      *string `json:"omnichat_default_user_name"`
+	OmniChatDefaultUserAge       *string `json:"omnichat_default_user_age"`
+	OmniChatDefaultUserGender    *string `json:"omnichat_default_user_gender"`
 
 	// Notification preferences
 	NotifyCommentReplies   *bool `json:"notify_comment_replies"`
@@ -315,6 +318,31 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.BatchNotifications != nil {
 		settings.BatchNotifications = *req.BatchNotifications
 	}
+	if req.OmniChatDefaultUserName != nil || req.OmniChatDefaultUserAge != nil || req.OmniChatDefaultUserGender != nil {
+		candidate := &models.ConversationSettings{
+			UserName:   settings.OmniChatDefaultUserName,
+			UserAge:    settings.OmniChatDefaultUserAge,
+			UserGender: settings.OmniChatDefaultUserGender,
+		}
+		if req.OmniChatDefaultUserName != nil {
+			candidate.UserName = *req.OmniChatDefaultUserName
+		}
+		if req.OmniChatDefaultUserAge != nil {
+			candidate.UserAge = *req.OmniChatDefaultUserAge
+		}
+		if req.OmniChatDefaultUserGender != nil {
+			candidate.UserGender = *req.OmniChatDefaultUserGender
+		}
+
+		normalized, err := normalizeConversationSettings(candidate)
+		if err != nil {
+			RespondError(c, http.StatusBadRequest, "Invalid OmniChat default identity")
+			return
+		}
+		settings.OmniChatDefaultUserName = normalized.UserName
+		settings.OmniChatDefaultUserAge = normalized.UserAge
+		settings.OmniChatDefaultUserGender = normalized.UserGender
+	}
 
 	// Update notification preferences
 	if req.NotifyCommentReplies != nil {
@@ -362,7 +390,6 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updated)
 }
-
 
 func (h *SettingsHandler) getUserID(c *gin.Context) (int, bool) {
 	return middleware.GetAuthenticatedUserID(c)

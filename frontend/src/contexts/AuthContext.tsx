@@ -16,13 +16,15 @@ import {
 } from '../services/keySyncService';
 import { exportKeyPair } from '../utils/encryption';
 import { analyticsService } from '../services/analyticsService';
+import { clearOmniChatDefaults } from '../utils/omnichatDefaults';
+import { clearAllGuestMessages } from '../utils/omnichatGuestStorage';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
-  loginWithToken: (token: string) => Promise<void>;
+  completeOAuthLogin: () => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
@@ -35,9 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const clearAuthState = () => {
+    // Remove credentials left by versions that predate HttpOnly cookie auth.
     localStorage.removeItem('auth_token');
     sessionStorage.removeItem('auth_token');
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
+    clearOmniChatDefaults('authenticated');
+    clearAllGuestMessages();
     setUser(null);
   };
 
@@ -95,6 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user is already authenticated on mount — cookie is sent automatically
   useEffect(() => {
+    // Remove credentials created by older builds. Browser authentication is now
+    // entirely cookie-backed and no bearer token belongs in web storage.
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
     api
       .get<User>('/auth/me')
       .then((userData) => {
@@ -113,13 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginRequest) => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
-    if (credentials.keep_logged_in) {
-      localStorage.setItem('auth_token', response.token);
-      sessionStorage.removeItem('auth_token');
-    } else {
-      sessionStorage.setItem('auth_token', response.token);
-      localStorage.removeItem('auth_token');
-    }
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -132,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Initialize encryption keys with password for cross-browser sync (non-blocking)
-    // Small delay to ensure token is fully persisted in storage
+    // Run after React has committed the authenticated user state.
     setTimeout(() => {
       initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch(
         (err) => {
@@ -144,8 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: RegisterRequest) => {
     const response = await api.post<AuthResponse>('/auth/register', data);
-    localStorage.setItem('auth_token', response.token);
-    sessionStorage.removeItem('auth_token');
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -172,22 +172,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // This allows users to access their encrypted messages across sessions
     // Keys should only be cleared if the user explicitly requests to "forget this device"
 
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    // Clear auth state synchronously so that any in-flight or subsequent API
+    // calls use the logged-out UI state immediately.
+    clearAuthState();
 
-    void api
-      .request('/auth/logout', { method: 'POST', headers })
-      .catch(() => {
-        // Ignore errors on logout
-      })
-      .finally(() => {
-        clearAuthState();
-      });
+    void api.request('/auth/logout', { method: 'POST' }).catch(() => {
+      // Ignore errors on logout
+    });
   };
 
-  const loginWithToken = async (token: string) => {
-    localStorage.setItem('auth_token', token);
-    sessionStorage.removeItem('auth_token');
+  const completeOAuthLogin = async () => {
     const userData = await api.get<User>('/auth/me');
     setUser(userData);
     persistOmniFeedStateForUser(userData.id, resolveDefaultOmniFeedState());
@@ -211,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
-        loginWithToken,
+        completeOAuthLogin,
         logout,
         isAuthenticated: !!user,
         refreshUser,

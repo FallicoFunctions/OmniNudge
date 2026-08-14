@@ -3,9 +3,11 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -24,6 +26,8 @@ const (
 	JobTypeContentModeration   JobType = "content_moderation" // P0-043
 	JobTypeMessageReencrypt    JobType = "message_reencrypt"
 	JobTypeVideoTranscode      JobType = "video_transcode"
+	JobTypeOmniChatGeneration  JobType = "omnichat_generation"
+	JobTypeOmniChatMemory      JobType = "omnichat_memory_extract"
 )
 
 // QueueClient wraps the Asynq client for enqueuing jobs
@@ -47,6 +51,60 @@ type ThumbnailGenerationEnqueuer interface {
 type MediaJobEnqueuer interface {
 	VirusScanEnqueuer
 	ThumbnailGenerationEnqueuer
+}
+
+type OmniChatGenerationPayload struct {
+	JobID string `json:"job_id"`
+}
+
+func (q *QueueClient) EnqueueOmniChatGeneration(ctx context.Context, jobID uuid.UUID) error {
+	_, err := q.EnqueueJob(ctx, JobTypeOmniChatGeneration, OmniChatGenerationPayload{JobID: jobID.String()},
+		asynq.Queue("default"),
+		asynq.MaxRetry(3),
+		asynq.Timeout(20*time.Minute),
+		asynq.Retention(24*time.Hour),
+		asynq.Unique(30*time.Minute),
+	)
+	return err
+}
+
+type OmniChatMemoryPayload struct {
+	ConversationID int `json:"conversation_id"`
+}
+
+// OmniChatMemoryEnqueuer queues character-memory extraction for a conversation.
+type OmniChatMemoryEnqueuer interface {
+	EnqueueOmniChatMemory(ctx context.Context, conversationID int) error
+}
+
+// EnqueueOmniChatMemory schedules memory extraction for a conversation.
+//
+// The payload carries only the conversation id: transcripts and prompts are
+// read from the database by the worker and never travel through Redis, the
+// same rule the generation queue follows.
+//
+// Unique() is doing real work here rather than merely deduplicating retries. A
+// user sending five quick turns should produce one extraction over the whole
+// delta, not five overlapping ones, so the uniqueness window is the debounce.
+//
+// It must also outlast Timeout. If the lock expired mid-run, a new message
+// could start a second extraction of the same turns while the first was still
+// working. The repository's watermark guard makes that outcome safe, but the
+// ordering here is what makes it rare.
+func (q *QueueClient) EnqueueOmniChatMemory(ctx context.Context, conversationID int) error {
+	_, err := q.EnqueueJob(ctx, JobTypeOmniChatMemory, OmniChatMemoryPayload{ConversationID: conversationID},
+		asynq.Queue("low"),
+		asynq.MaxRetry(3),
+		asynq.Timeout(2*time.Minute),
+		asynq.Retention(1*time.Hour),
+		asynq.Unique(5*time.Minute),
+	)
+	// A conversation already awaiting extraction is the debounce working, not a
+	// failure: the queued job will cover this turn too when it runs.
+	if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil
+	}
+	return err
 }
 
 // NewQueueClient creates a new queue client for enqueuing jobs
@@ -158,7 +216,7 @@ func (q *QueueClient) GetJobInfo(queue string, jobID string) (*asynq.TaskInfo, e
 		Addr:     q.redisAddr,
 		Password: q.redisPass,
 	})
-	defer inspector.Close()
+	defer func() { _ = inspector.Close() }()
 
 	return inspector.GetTaskInfo(queue, jobID)
 }
@@ -227,10 +285,13 @@ type EmailAttachment struct {
 
 // DataExportPayload for GDPR data export jobs
 type DataExportPayload struct {
-	UserID         int      `json:"user_id"`
+	// ExportID is an opaque server-generated reference. The worker loads the
+	// owner and requested fields from the database instead of trusting Redis
+	// task payload data for an authorization-sensitive export.
 	ExportID       string   `json:"export_id"`
-	DataTypes      []string `json:"data_types"` // e.g., ["messages", "files", "calls"]
-	IncludeDeleted bool     `json:"include_deleted"`
+	UserID         int      `json:"-"`
+	DataTypes      []string `json:"-"`
+	IncludeDeleted bool     `json:"-"`
 }
 
 // ContentModerationPayload for content moderation jobs
@@ -334,8 +395,15 @@ func (q *QueueClient) EnqueueEmail(ctx context.Context, to []string, subject, bo
 
 // EnqueueDataExport enqueues a GDPR data export job
 func (q *QueueClient) EnqueueDataExport(ctx context.Context, payload DataExportPayload) error {
-	// Low priority, can be slow
-	_, err := q.EnqueueJobWithPriority(ctx, JobTypeDataExport, payload, 0)
+	// Low priority and a deterministic task ID prevent duplicate export workers
+	// from running concurrently for the same request.
+	_, err := q.EnqueueJob(ctx, JobTypeDataExport, payload,
+		asynq.Queue("low"),
+		asynq.TaskID("data-export:"+payload.ExportID),
+		asynq.MaxRetry(3),
+		asynq.Timeout(30*time.Minute),
+		asynq.Retention(24*time.Hour),
+	)
 	return err
 }
 

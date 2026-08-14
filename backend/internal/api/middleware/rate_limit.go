@@ -224,15 +224,3 @@ func GeneralAPIRateLimiter() *RateLimiter {
 func ReactionRateLimiter() *RateLimiter {
 	return NewRateLimiter(rate.Limit(1.0), 10)
 }
-
-// FriendRequestRateLimiter creates a rate limiter for friend request sends.
-// Allows 20 requests per hour with a burst of 5 to absorb brief flurries while
-// blocking spam campaigns targeting many different users.
-//
-// TODO: migrate to Redis-backed sliding-window counter (see AuthRateLimiter) so
-// the limit is enforced globally across all backend instances under horizontal
-// scale. The current in-memory bucket is per-process and is bypassed trivially
-// when multiple instances sit behind a load balancer.
-func FriendRequestRateLimiter() *RateLimiter {
-	return NewRateLimiter(rate.Limit(20.0/3600.0), 5)
-}

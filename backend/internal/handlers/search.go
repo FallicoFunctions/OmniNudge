@@ -829,9 +829,10 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	limitArg := nextArg
 	offsetArg := nextArg + 1
 	orderClause := "ORDER BY (" + rankExpr + ") DESC, m.sent_at DESC, m.id DESC"
-	if sort == "new" {
+	switch sort {
+	case "new":
 		orderClause = "ORDER BY m.sent_at DESC, m.id DESC"
-	} else if sort == "old" {
+	case "old":
 		orderClause = "ORDER BY m.sent_at ASC, m.id ASC"
 	}
 	querySQL := `

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
@@ -13,6 +13,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
 import { userSettingsService } from '../services/userSettingsService';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useOmniChatLayoutMode } from '../hooks/useOmniChatLayoutMode';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import type { AutoDeleteDuration } from '../types/messages';
 import { secondsToDuration, durationToSeconds, isDurationNever } from '../types/messages';
@@ -27,6 +28,7 @@ import {
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const { mode: omniChatLayoutMode, setMode: setOmniChatLayoutMode } = useOmniChatLayoutMode();
   const {
     useRelativeTime,
     setUseRelativeTime,
@@ -1111,6 +1113,73 @@ export default function SettingsPage() {
 
           <Panel as="section">
             <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.omniChatLayout.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.omniChatLayout.description')}
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label
+                htmlFor="omnichat-layout-immersive"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  omniChatLayoutMode === 'immersive'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.omniChatLayout.immersive')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.omniChatLayout.immersiveHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="omnichat-layout-immersive"
+                    type="radio"
+                    name="omnichat-layout-mode"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={omniChatLayoutMode === 'immersive'}
+                    onChange={() => setOmniChatLayoutMode('immersive')}
+                  />
+                </div>
+              </label>
+
+              <label
+                htmlFor="omnichat-layout-shared-nav"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  omniChatLayoutMode === 'shared-nav'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.omniChatLayout.sharedNav')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.omniChatLayout.sharedNavHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="omnichat-layout-shared-nav"
+                    type="radio"
+                    name="omnichat-layout-mode"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={omniChatLayoutMode === 'shared-nav'}
+                    onChange={() => setOmniChatLayoutMode('shared-nav')}
+                  />
+                </div>
+              </label>
+            </div>
+          </Panel>
+
+          <Panel as="section">
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
               {t('settings.savedItems.title')}
             </h2>
             <p className="text-sm text-[var(--color-text-secondary)]">
@@ -1906,6 +1975,11 @@ export default function SettingsPage() {
                     try {
                       const response = await accountService.requestDataExport({
                         password: exportPassword,
+                        // Omitting data_types would let the server pick the full
+                        // set, but sending it explicitly keeps the request
+                        // self-describing. Any value here must exist in
+                        // exportDataTypes in backend/internal/handlers/data_export.go,
+                        // which rejects an unknown type outright.
                         data_types: [
                           'profile',
                           'messages',
@@ -1916,6 +1990,10 @@ export default function SettingsPage() {
                           'hubs',
                           'settings',
                           'encryption_keys',
+                          'omnichat_conversations',
+                          'omnichat_personas',
+                          'omnichat_memory',
+                          'omnichat_media',
                         ],
                         include_deleted: false,
                       });

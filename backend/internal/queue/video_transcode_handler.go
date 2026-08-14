@@ -17,6 +17,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // hlsSegmentDuration is the target HLS segment length in seconds.
@@ -84,7 +85,7 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return fmt.Errorf("video_transcode: create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download input from storage to a local temp file.
 	inputExt := filepath.Ext(payload.InputKey)
@@ -96,19 +97,30 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return fmt.Errorf("video_transcode: download input %q: %w", payload.InputKey, err)
 	}
+	// #nosec G304 -- inputTmp is constructed inside the private directory returned by os.MkdirTemp.
 	inputFile, createErr := os.Create(inputTmp)
 	if createErr != nil {
-		rc.Close()
+		if closeErr := rc.Close(); closeErr != nil {
+			return errors.Join(
+				fmt.Errorf("video_transcode: create input tmp: %w", createErr),
+				fmt.Errorf("video_transcode: close downloaded input: %w", closeErr),
+			)
+		}
 		return fmt.Errorf("video_transcode: create input tmp: %w", createErr)
 	}
 	// Cap download at 10 GB to prevent a corrupted or malicious storage entry
 	// from exhausting disk space on the worker.
 	const maxInputBytes = 10 * 1024 * 1024 * 1024
 	written, copyErr := io.Copy(inputFile, io.LimitReader(rc, maxInputBytes+1))
-	inputFile.Close()
-	rc.Close()
+	closeErr := closeVideoTranscodeInput(inputFile, rc)
 	if copyErr != nil {
+		if closeErr != nil {
+			return errors.Join(fmt.Errorf("video_transcode: write input tmp: %w", copyErr), closeErr)
+		}
 		return fmt.Errorf("video_transcode: write input tmp: %w", copyErr)
+	}
+	if closeErr != nil {
+		return closeErr
 	}
 	if written > maxInputBytes {
 		return fmt.Errorf("video_transcode: input file exceeds size cap (%d bytes): %w", maxInputBytes, asynq.SkipRetry)
@@ -124,23 +136,23 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	// -c:v libx264 -preset fast -crf 23 — reasonable quality/speed trade-off
 	// -c:a aac -b:a 128k
 	args := []string{
-		"-y",                     // overwrite output without prompting
-		"-i", inputPath,          // input file
-		"-c:v", "libx264",        // video codec
-		"-preset", "fast",        // encoding speed preset
-		"-crf", "23",             // constant rate factor (quality)
-		"-c:a", "aac",            // audio codec
-		"-b:a", "128k",           // audio bitrate
+		"-y",            // overwrite output without prompting
+		"-i", inputPath, // input file
+		"-c:v", "libx264", // video codec
+		"-preset", "fast", // encoding speed preset
+		"-crf", "23", // constant rate factor (quality)
+		"-c:a", "aac", // audio codec
+		"-b:a", "128k", // audio bitrate
 		"-hls_time", hlsSegmentDuration, // segment duration in seconds
-		"-hls_list_size", "0",    // keep all segments
+		"-hls_list_size", "0", // keep all segments
 		"-hls_segment_filename", filepath.Join(tmpDir, "seg_%03d.ts"),
-		"-f", "hls",              // output format
+		"-f", "hls", // output format
 		outputPlaylist,
 	}
 
-	//nolint:gosec // inputPath comes from internal job payload, validated above.
+	// #nosec G204 -- ffmpeg is fixed; validated/server-created paths are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
-	output, err := cmd.CombinedOutput()
+	output, err := utils.RunCommandWithOutputLimit(cmd, 64*1024)
 	if err != nil {
 		var execErr *exec.Error
 		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
@@ -157,12 +169,24 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 		Msg("video_transcode: ffmpeg completed successfully")
 
 	// COR-3: Walk tmpDir and upload every HLS segment/playlist to storage.
+	outputRoot, err := os.OpenRoot(tmpDir)
+	if err != nil {
+		return fmt.Errorf("video_transcode: open HLS output root: %w", err)
+	}
+	defer func() { _ = outputRoot.Close() }()
+
 	uploadCount := 0
-	uploadErr := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	uploadErr := filepath.WalkDir(tmpDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
 			return err
 		}
-		relPath, _ := filepath.Rel(tmpDir, path)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("video_transcode: refuse symlink output %q", path)
+		}
+		relPath, relErr := filepath.Rel(tmpDir, path)
+		if relErr != nil {
+			return fmt.Errorf("video_transcode: resolve output path: %w", relErr)
+		}
 		destKey := payload.OutputKey + "/" + relPath
 
 		// Determine content type by file extension.
@@ -171,14 +195,20 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 			contentType = "application/x-mpegURL"
 		}
 
-		f, err := os.Open(path)
+		f, err := outputRoot.Open(relPath)
 		if err != nil {
 			return fmt.Errorf("open segment %q: %w", relPath, err)
 		}
 		_, uploadErr := h.storageService.Upload(ctx, destKey, f, contentType)
-		f.Close()
+		closeErr := f.Close()
 		if uploadErr != nil {
+			if closeErr != nil {
+				return errors.Join(fmt.Errorf("upload segment %q: %w", destKey, uploadErr), fmt.Errorf("close segment %q: %w", relPath, closeErr))
+			}
 			return fmt.Errorf("upload segment %q: %w", destKey, uploadErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close segment %q: %w", relPath, closeErr)
 		}
 		uploadCount++
 		return nil
@@ -212,4 +242,19 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 		Msg("video_transcode: media record updated")
 
 	return nil
+}
+
+func closeVideoTranscodeInput(inputFile *os.File, source io.Closer) error {
+	var errs []error
+	if inputFile != nil {
+		if err := inputFile.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("video_transcode: close input tmp: %w", err))
+		}
+	}
+	if source != nil {
+		if err := source.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("video_transcode: close downloaded input: %w", err))
+		}
+	}
+	return errors.Join(errs...)
 }

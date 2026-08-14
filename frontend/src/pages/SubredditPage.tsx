@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { redditService } from '../services/redditService';

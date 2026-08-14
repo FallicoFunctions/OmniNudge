@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awscredentials "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/omninudge/backend/internal/config"
 )
 
@@ -29,6 +31,22 @@ type StorageService interface {
 	GetObjectSize(ctx context.Context, key string) (int64, error)
 }
 
+type ObjectMetadata struct {
+	Size           int64
+	ContentType    string
+	ChecksumSHA256 string
+}
+
+type ObjectMetadataStorage interface {
+	GetObjectMetadata(ctx context.Context, key string) (*ObjectMetadata, error)
+}
+
+// ObjectCopyStorage is implemented by remote backends that can promote a
+// scanned object from a non-public staging prefix into its serving prefix.
+type ObjectCopyStorage interface {
+	CopyObject(ctx context.Context, sourceKey, destinationKey string) (string, error)
+}
+
 // LocalStorageService implements StorageService using local filesystem
 type LocalStorageService struct {
 	baseDir string
@@ -36,36 +54,144 @@ type LocalStorageService struct {
 }
 
 func NewLocalStorageService(baseDir string, baseURL string) (*LocalStorageService, error) {
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0o750); err != nil {
 		return nil, fmt.Errorf("local storage: create base directory: %w", err)
 	}
+	canonicalBase, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("local storage: resolve base directory: %w", err)
+	}
+	canonicalBase, err = filepath.Abs(canonicalBase)
+	if err != nil {
+		return nil, fmt.Errorf("local storage: canonicalize base directory: %w", err)
+	}
 	return &LocalStorageService{
-		baseDir: baseDir,
+		baseDir: canonicalBase,
 		baseURL: baseURL,
 	}, nil
 }
 
+func (s *LocalStorageService) resolveKey(key string) (string, error) {
+	if key == "" || strings.ContainsRune(key, '\x00') {
+		return "", fmt.Errorf("local storage: invalid key")
+	}
+	nativeKey := filepath.FromSlash(key)
+	if filepath.IsAbs(nativeKey) {
+		return "", fmt.Errorf("local storage: absolute key is not allowed")
+	}
+	for _, part := range strings.FieldsFunc(nativeKey, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return "", fmt.Errorf("local storage: parent traversal is not allowed")
+		}
+	}
+	cleanKey := filepath.Clean(nativeKey)
+	if cleanKey == "." || cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local storage: invalid key")
+	}
+	path := filepath.Join(s.baseDir, cleanKey)
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local storage: key escapes configured root")
+	}
+	return path, nil
+}
+
+func (s *LocalStorageService) rejectSymlinkPath(path string, includeLeaf bool) error {
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil {
+		return fmt.Errorf("local storage: resolve relative path: %w", err)
+	}
+	parts := strings.Split(relative, string(filepath.Separator))
+	if !includeLeaf && len(parts) > 0 {
+		parts = parts[:len(parts)-1]
+	}
+	current := s.baseDir
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, statErr := os.Lstat(current)
+		if os.IsNotExist(statErr) {
+			return nil
+		}
+		if statErr != nil {
+			return fmt.Errorf("local storage: inspect path: %w", statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("local storage: symbolic links are not allowed")
+		}
+	}
+	return nil
+}
+
+func (s *LocalStorageService) escapedKey(key string) (string, error) {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(s.baseDir, path)
+	if err != nil {
+		return "", fmt.Errorf("local storage: resolve URL key: %w", err)
+	}
+	parts := strings.Split(filepath.ToSlash(relative), "/")
+	for index, part := range parts {
+		parts[index] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/"), nil
+}
+
 func (s *LocalStorageService) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
-	path := filepath.Join(s.baseDir, key)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return "", err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", fmt.Errorf("local storage: mkdir for %q: %w", key, err)
 	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		return "", fmt.Errorf("local storage: create %q: %w", key, err)
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return "", err
 	}
-	defer f.Close()
 
-	if _, err := io.Copy(f, body); err != nil {
+	tempFile, err := os.CreateTemp(filepath.Dir(path), ".omnichat-upload-*")
+	if err != nil {
+		return "", fmt.Errorf("local storage: create temporary object for %q: %w", key, err)
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+	}()
+
+	if _, err := io.Copy(tempFile, body); err != nil {
 		return "", fmt.Errorf("local storage: write %q: %w", key, err)
 	}
+	if err := tempFile.Sync(); err != nil {
+		return "", fmt.Errorf("local storage: sync %q: %w", key, err)
+	}
+	if err := tempFile.Close(); err != nil {
+		return "", fmt.Errorf("local storage: close %q: %w", key, err)
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return "", fmt.Errorf("local storage: publish %q: %w", key, err)
+	}
 
-	return fmt.Sprintf("%s/%s", s.baseURL, key), nil
+	return s.PublicURL(key), nil
 }
 
 func (s *LocalStorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
-	f, err := os.Open(filepath.Join(s.baseDir, key))
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return nil, err
+	}
+	// #nosec G304 -- resolveKey confines the key to canonical baseDir and rejectSymlinkPath rejects every symlink component.
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("local storage: open %q: %w", key, err)
 	}
@@ -73,7 +199,17 @@ func (s *LocalStorageService) Download(ctx context.Context, key string) (io.Read
 }
 
 func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
-	if err := os.Remove(filepath.Join(s.baseDir, key)); err != nil {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("local storage: delete %q: %w", key, err)
 	}
 	return nil
@@ -85,14 +221,28 @@ func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
 // it must never be relied upon for access control in any environment.
 // Use S3StorageService for real pre-signed URL enforcement.
 func (s *LocalStorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
-	return fmt.Sprintf("%s/%s?expires=%d", s.baseURL, key, time.Now().Add(expires).Unix()), nil
+	escapedKey, err := s.escapedKey(key)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/%s?expires=%d", strings.TrimRight(s.baseURL, "/"), escapedKey, time.Now().Add(expires).Unix()), nil
 }
 
 func (s *LocalStorageService) List(ctx context.Context, prefix string) ([]string, error) {
 	var keys []string
-	searchDir := filepath.Join(s.baseDir, prefix)
+	searchDir := s.baseDir
+	var err error
+	if prefix != "" {
+		searchDir, err = s.resolveKey(prefix)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := s.rejectSymlinkPath(searchDir, true); err != nil {
+		return nil, err
+	}
 
-	err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -113,16 +263,35 @@ func (s *LocalStorageService) GeneratePresignedPutURL(ctx context.Context, key, 
 }
 
 func (s *LocalStorageService) PublicURL(key string) string {
-	return fmt.Sprintf("%s/%s", s.baseURL, key)
+	escapedKey, err := s.escapedKey(key)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", strings.TrimRight(s.baseURL, "/"), escapedKey)
 }
 
 // GetObjectSize returns the size of the file at key on the local filesystem.
 func (s *LocalStorageService) GetObjectSize(ctx context.Context, key string) (int64, error) {
-	info, err := os.Stat(filepath.Join(s.baseDir, key))
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return 0, err
+	}
+	info, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("local storage: stat %q: %w", key, err)
 	}
 	return info.Size(), nil
+}
+
+func (s *LocalStorageService) GetObjectMetadata(ctx context.Context, key string) (*ObjectMetadata, error) {
+	size, err := s.GetObjectSize(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return &ObjectMetadata{Size: size}, nil
 }
 
 // S3StorageService implements StorageService using AWS S3 (or any S3-compatible provider).
@@ -130,6 +299,7 @@ type S3StorageService struct {
 	client        *s3.Client
 	presignClient *s3.PresignClient
 	bucket        string
+	stagingBucket string
 	region        string
 	cloudfrontURL string
 	// cb protects outbound S3 calls; opens after 3 consecutive failures,
@@ -185,6 +355,7 @@ func NewS3StorageService(cfg *config.Config) (*S3StorageService, error) {
 		client:        client,
 		presignClient: presignClient,
 		bucket:        cfg.Storage.S3Bucket,
+		stagingBucket: cfg.Storage.S3StagingBucket,
 		region:        cfg.Storage.S3Region,
 		cloudfrontURL: strings.TrimRight(cfg.Storage.CloudFrontURL, "/"),
 		cb:            NewCircuitBreaker("s3", 3, 30*time.Second),
@@ -194,20 +365,42 @@ func NewS3StorageService(cfg *config.Config) (*S3StorageService, error) {
 // PublicURL returns the CDN URL when CloudFront is configured, otherwise falls
 // back to the canonical S3 virtual-hosted URL.
 func (s *S3StorageService) PublicURL(key string) string {
+	if strings.HasPrefix(key, "pending-uploads/") {
+		return ""
+	}
 	if s.cloudfrontURL != "" {
 		return s.cloudfrontURL + "/" + key
 	}
 	return "https://" + s.bucket + ".s3." + s.region + ".amazonaws.com/" + key
 }
 
+func (s *S3StorageService) SupportsQuarantinedDirectUploads() bool {
+	staging := strings.TrimSpace(s.stagingBucket)
+	return staging != "" && staging != strings.TrimSpace(s.bucket)
+}
+
+func (s *S3StorageService) bucketForKey(key string) (string, error) {
+	if strings.HasPrefix(key, "pending-uploads/") {
+		if !s.SupportsQuarantinedDirectUploads() {
+			return "", fmt.Errorf("s3: S3_STAGING_BUCKET must be configured and distinct from S3_BUCKET")
+		}
+		return s.stagingBucket, nil
+	}
+	return s.bucket, nil
+}
+
 func (s *S3StorageService) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return "", err
+	}
 	var publicURL string
-	err := s.cb.Do(func() error {
+	err = s.cb.Do(func() error {
 		if contentType == "" {
 			contentType = "application/octet-stream"
 		}
 		_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      &s.bucket,
+			Bucket:      &bucket,
 			Key:         &key,
 			Body:        body,
 			ContentType: &contentType,
@@ -222,10 +415,14 @@ func (s *S3StorageService) Upload(ctx context.Context, key string, body io.Reade
 }
 
 func (s *S3StorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return nil, err
+	}
 	var rc io.ReadCloser
-	err := s.cb.Do(func() error {
+	err = s.cb.Do(func() error {
 		out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: &s.bucket,
+			Bucket: &bucket,
 			Key:    &key,
 		})
 		if err != nil {
@@ -238,8 +435,12 @@ func (s *S3StorageService) Download(ctx context.Context, key string) (io.ReadClo
 }
 
 func (s *S3StorageService) Delete(ctx context.Context, key string) error {
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: &s.bucket,
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: &bucket,
 		Key:    &key,
 	})
 	if err != nil {
@@ -248,10 +449,34 @@ func (s *S3StorageService) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+func (s *S3StorageService) CopyObject(ctx context.Context, sourceKey, destinationKey string) (string, error) {
+	sourceBucket, err := s.bucketForKey(sourceKey)
+	if err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(destinationKey, "pending-uploads/") {
+		return "", fmt.Errorf("s3: refusing to publish into staging prefix")
+	}
+	copySource := url.PathEscape(sourceBucket + "/" + sourceKey)
+	_, err = s.client.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket:     &s.bucket,
+		Key:        &destinationKey,
+		CopySource: &copySource,
+	})
+	if err != nil {
+		return "", fmt.Errorf("s3: copy %q to %q: %w", sourceKey, destinationKey, err)
+	}
+	return s.PublicURL(destinationKey), nil
+}
+
 // GetSignedURL generates a presigned GET URL that expires after the given duration.
 func (s *S3StorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return "", err
+	}
 	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: &s.bucket,
+		Bucket: &bucket,
 		Key:    &key,
 	}, s3.WithPresignExpires(expires))
 	if err != nil {
@@ -262,8 +487,12 @@ func (s *S3StorageService) GetSignedURL(ctx context.Context, key string, expires
 
 // GeneratePresignedPutURL generates a presigned PUT URL for direct client uploads.
 func (s *S3StorageService) GeneratePresignedPutURL(ctx context.Context, key, contentType string, expires time.Duration) (string, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return "", err
+	}
 	req, err := s.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:      &s.bucket,
+		Bucket:      &bucket,
 		Key:         &key,
 		ContentType: &contentType,
 	}, s3.WithPresignExpires(expires))
@@ -273,10 +502,43 @@ func (s *S3StorageService) GeneratePresignedPutURL(ctx context.Context, key, con
 	return req.URL, nil
 }
 
+// GeneratePresignedPutURLWithConstraints signs the declared length, MIME type,
+// and SHA-256 checksum. S3 rejects a PUT whose signed headers do not match.
+func (s *S3StorageService) GeneratePresignedPutURLWithConstraints(
+	ctx context.Context,
+	key, contentType string,
+	contentLength int64,
+	checksumSHA256 string,
+	expires time.Duration,
+) (string, error) {
+	if !strings.HasPrefix(key, "pending-uploads/") {
+		return "", fmt.Errorf("s3: constrained browser uploads must use the staging prefix")
+	}
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return "", err
+	}
+	req, err := s.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:         &bucket,
+		Key:            &key,
+		ContentType:    &contentType,
+		ContentLength:  &contentLength,
+		ChecksumSHA256: &checksumSHA256,
+	}, s3.WithPresignExpires(expires))
+	if err != nil {
+		return "", fmt.Errorf("s3: constrained presign PUT %q: %w", key, err)
+	}
+	return req.URL, nil
+}
+
 func (s *S3StorageService) List(ctx context.Context, prefix string) ([]string, error) {
+	bucket, err := s.bucketForKey(prefix)
+	if err != nil {
+		return nil, err
+	}
 	var keys []string
 	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: &s.bucket,
+		Bucket: &bucket,
 		Prefix: &prefix,
 	})
 	for paginator.HasMorePages() {
@@ -295,8 +557,12 @@ func (s *S3StorageService) List(ctx context.Context, prefix string) ([]string, e
 
 // GetObjectSize returns the actual size of the S3 object by calling HeadObject.
 func (s *S3StorageService) GetObjectSize(ctx context.Context, key string) (int64, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return 0, err
+	}
 	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: &s.bucket,
+		Bucket: &bucket,
 		Key:    &key,
 	})
 	if err != nil {
@@ -308,6 +574,34 @@ func (s *S3StorageService) GetObjectSize(ctx context.Context, key string) (int64
 	return *out.ContentLength, nil
 }
 
+func (s *S3StorageService) GetObjectMetadata(ctx context.Context, key string) (*ObjectMetadata, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket:       &bucket,
+		Key:          &key,
+		ChecksumMode: s3types.ChecksumModeEnabled,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("s3: head object %q: %w", key, err)
+	}
+	if out.ContentLength == nil {
+		return nil, fmt.Errorf("s3: head object %q returned nil ContentLength", key)
+	}
+	metadata := &ObjectMetadata{Size: *out.ContentLength}
+	if out.ContentType != nil {
+		metadata.ContentType = strings.TrimSpace(strings.SplitN(*out.ContentType, ";", 2)[0])
+	}
+	if out.ChecksumSHA256 != nil {
+		metadata.ChecksumSHA256 = *out.ChecksumSHA256
+	}
+	return metadata, nil
+}
+
 // Compile-time interface satisfaction checks.
 var _ StorageService = (*LocalStorageService)(nil)
 var _ StorageService = (*S3StorageService)(nil)
+var _ ObjectMetadataStorage = (*S3StorageService)(nil)
+var _ ObjectCopyStorage = (*S3StorageService)(nil)

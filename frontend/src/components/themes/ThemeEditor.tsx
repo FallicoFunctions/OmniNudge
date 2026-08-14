@@ -325,7 +325,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setInfoErrors({});
     setError(null);
     return true;
-  }, [themeDescription, themeName, setError, setInfoErrors]);
+  }, [themeDescription, themeName, setError, setInfoErrors, t]);
 
   const validateVariableSet = useCallback((): Record<string, string> | null => {
     const result = cssVariablesSchema.safeParse(cssVariables);
@@ -364,7 +364,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setCssVariables(sanitizedEntries);
     setError(null);
     return sanitizedEntries;
-  }, [cssVariables, setCssVariables, setError, setVariableErrors, validateVariableValue]);
+  }, [cssVariables, setCssVariables, setError, setVariableErrors, t, validateVariableValue]);
 
   const validateStep = () => {
     const stepId = steps[currentStep].id;

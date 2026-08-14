@@ -15,20 +15,17 @@ const cryptoPaymentPollInterval = 2 * time.Minute
 // confirms them once they reach the required block confirmation threshold.
 // On confirmation it upgrades the user's plan automatically.
 type CryptoPaymentWorker struct {
-	payRepo     *models.CryptoPaymentRepository
-	planSvc     *services.PlanService
-	verifier    services.CryptoVerifier
+	payRepo  *models.CryptoPaymentRepository
+	verifier services.CryptoVerifier
 }
 
 // NewCryptoPaymentWorker creates a CryptoPaymentWorker.
 func NewCryptoPaymentWorker(
 	payRepo *models.CryptoPaymentRepository,
-	planSvc *services.PlanService,
 	verifier services.CryptoVerifier,
 ) *CryptoPaymentWorker {
 	return &CryptoPaymentWorker{
 		payRepo:  payRepo,
-		planSvc:  planSvc,
 		verifier: verifier,
 	}
 }
@@ -92,16 +89,12 @@ func (w *CryptoPaymentWorker) checkPayment(ctx context.Context, payment *models.
 		return
 	}
 
-	now := time.Now()
-	if err := w.payRepo.UpdateStatus(ctx, payment.ID, models.StatusConfirmed, result.Confirmations, &now); err != nil {
-		log.Printf("[crypto-worker] payment %d confirm status error: %v", payment.ID, err)
+	applied, err := w.payRepo.ConfirmAndApplyPlan(ctx, payment.ID, result.Confirmations, time.Now())
+	if err != nil {
+		log.Printf("[crypto-worker] payment %d atomic entitlement error for user %d: %v", payment.ID, payment.UserID, err)
 		return
 	}
-
-	if err := w.planSvc.Upgrade(ctx, payment.UserID, payment.PlanMonths); err != nil {
-		log.Printf("[crypto-worker] payment %d plan upgrade failed for user %d: %v", payment.ID, payment.UserID, err)
-		return
+	if applied {
+		log.Printf("[crypto-worker] payment %d confirmed — user %d upgraded for %d month(s)", payment.ID, payment.UserID, payment.PlanMonths)
 	}
-
-	log.Printf("[crypto-worker] payment %d confirmed — user %d upgraded for %d month(s)", payment.ID, payment.UserID, payment.PlanMonths)
 }

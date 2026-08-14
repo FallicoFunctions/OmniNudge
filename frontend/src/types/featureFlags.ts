@@ -17,13 +17,6 @@ export interface RollbackTrigger {
   window_seconds: number;
 }
 
-export interface FeatureFlagOverride {
-  key: string;
-  user_id: number;
-  enabled: boolean;
-  created_at: string;
-}
-
 export interface FeatureFlagAudit {
   id: number;
   flag_key: string;
@@ -33,15 +26,4 @@ export interface FeatureFlagAudit {
   old_value?: unknown;
   new_value?: unknown;
   changed_at: string;
-}
-
-export interface FeatureFlagStatus {
-  [key: string]: boolean;
-}
-
-export interface FeatureFlagUpdateEvent {
-  type: 'feature_flag_updated';
-  key: string;
-  enabled: boolean;
-  percentage?: number;
 }

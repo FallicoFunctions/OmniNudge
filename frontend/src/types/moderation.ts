@@ -42,21 +42,6 @@ export interface UpdateRemovalReasonRequest {
   message: string;
 }
 
-export interface RemovedContent {
-  id: number;
-  content_type: 'post' | 'comment';
-  content_id: number;
-  hub_id?: number;
-  removed_by: number;
-  removal_reason_id?: number;
-  custom_reason?: string;
-  mod_note?: string;
-  removed_at: string;
-  removed_by_name?: string;
-  reason_title?: string;
-  reason_message?: string;
-}
-
 export interface RemoveContentRequest {
   removal_reason_id?: number;
   custom_reason?: string;

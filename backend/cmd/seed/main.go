@@ -196,6 +196,7 @@ func resetSeedData(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 func seedData(ctx context.Context, pool *pgxpool.Pool, userCount int) error {
+	// #nosec G404 -- this command creates non-secret development fixtures; its random values never protect security state.
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// --- 1. Hash password once ---

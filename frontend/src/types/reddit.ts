@@ -193,11 +193,6 @@ export interface RedditSubredditModerator {
   mod_permissions?: string[];
 }
 
-export interface SubredditModeratorsResponse {
-  moderators: RedditSubredditModerator[];
-  warning?: string;
-}
-
 export interface RedditWikiRevisionAuthorData {
   name?: string;
   display_name_prefixed?: string;

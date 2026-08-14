@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/omninudge/backend/internal/services"
@@ -47,7 +48,7 @@ func resolveMediaSource(ctx context.Context, localPath, remoteKey string, storag
 	if err != nil {
 		return "", nil, fmt.Errorf("download source %q from storage: %w", remoteKey, err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	tempFile, err := os.CreateTemp("", "omnimedia-*")
 	if err != nil {
@@ -55,7 +56,9 @@ func resolveMediaSource(ctx context.Context, localPath, remoteKey string, storag
 	}
 
 	cleanup := func() {
-		tempFile.Close()
+		if closeErr := tempFile.Close(); closeErr != nil {
+			log.Printf("close temp media source: %v", closeErr)
+		}
 		_ = os.Remove(tempFile.Name())
 	}
 

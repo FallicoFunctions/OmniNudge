@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,14 +12,25 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/utils"
 	zlog "github.com/rs/zerolog/log"
 )
+
+// adminPlanWriter grants and revokes paid plans. It is a narrow interface
+// rather than an addition to ports.UserRepository because only this handler
+// needs it, and plan changes carry entitlement side effects that belong in the
+// plan service rather than in a repository method every caller can reach.
+type adminPlanWriter interface {
+	UpgradeToPlan(ctx context.Context, userID int, plan string, months int) error
+	Downgrade(ctx context.Context, userID int) error
+}
 
 // AdminHandler handles admin-level actions
 type AdminHandler struct {
 	userRepo   ports.UserRepository
 	hubModRepo ports.HubModeratorRepository
 	pool       *pgxpool.Pool
+	plans      adminPlanWriter
 }
 
 // NewAdminHandler creates a new admin handler
@@ -28,6 +40,13 @@ func NewAdminHandler(userRepo ports.UserRepository, hubModRepo ports.HubModerato
 		hubModRepo: hubModRepo,
 		pool:       pool,
 	}
+}
+
+// SetPlanService enables the plan-grant endpoint. Left unset, SetUserPlan
+// reports the feature as unavailable rather than failing obscurely.
+func (h *AdminHandler) SetPlanService(plans adminPlanWriter) *AdminHandler {
+	h.plans = plans
+	return h
 }
 
 // PromoteUser promotes or changes a user's role.
@@ -78,6 +97,85 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).Str("new_role", req.Role).Msg("Admin promoted user role")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated", "user_id": targetID, "role": req.Role})
+}
+
+// SetUserPlan grants or revokes a paid plan.
+//
+// This is currently the only way an account can reach premium: the crypto
+// payment path hardcodes plus and records no tier, and the checkout path has
+// no provider adapter. Until one of those is finished, entitlements that
+// depend on premium -- explicit chat and explicit image generation -- are
+// otherwise unreachable and therefore untestable.
+//
+// @Summary      Set a user's subscription plan
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/plan [post]
+func (h *AdminHandler) SetUserPlan(c *gin.Context) {
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	if h.plans == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Plan management is not configured")
+		return
+	}
+
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	var req struct {
+		Plan   string `json:"plan" binding:"required"`
+		Months int    `json:"months"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	if req.Plan == models.PlanFree {
+		if err := h.plans.Downgrade(c.Request.Context(), targetID); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to update plan")
+			return
+		}
+		zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).
+			Str("new_plan", req.Plan).Msg("Admin set user plan")
+		c.JSON(http.StatusOK, gin.H{"message": "Plan updated", "user_id": targetID, "plan": req.Plan})
+		return
+	}
+
+	if req.Plan != models.PlanPlus && req.Plan != models.PlanPremium {
+		RespondError(c, http.StatusBadRequest, "Invalid plan. Use free, plus, or premium.")
+		return
+	}
+	months := req.Months
+	if months == 0 {
+		months = 1
+	}
+	if months < 1 || months > 24 {
+		RespondError(c, http.StatusBadRequest, "Months must be between 1 and 24")
+		return
+	}
+	if err := h.plans.UpgradeToPlan(c.Request.Context(), targetID, req.Plan, months); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update plan")
+		return
+	}
+	zlog.Info().Int("admin_id", adminID).Int("target_user_id", targetID).
+		Str("new_plan", req.Plan).Int("months", months).Msg("Admin set user plan")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Plan updated", "user_id": targetID, "plan": req.Plan, "months": months,
+	})
 }
 
 // BanUser bans a user from the platform.
@@ -360,7 +458,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 // @Produce      json
 // @Param        limit   query  int     false  "Page size (default 20)"
 // @Param        offset  query  int     false  "Offset"
-// @Param        search  query  string  false  "Search by username or email"
+// @Param        search  query  string  false  "Search by username"
 // @Success      200  {object}  gin.H
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
@@ -397,7 +495,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	// Build query dynamically with proper parameterization
 	baseQuery := `
-		SELECT id, username, email, role, created_at, last_seen, bio, avatar_url,
+		SELECT id, username, email, email_encrypted, role, created_at, last_seen, bio, avatar_url,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by
 		FROM users
 		WHERE 1=1
@@ -408,7 +506,11 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	paramCount := 1
 
 	if search != "" {
-		conditions = append(conditions, "(username ILIKE $"+strconv.Itoa(paramCount)+" OR email ILIKE $"+strconv.Itoa(paramCount)+")")
+		// Email is encrypted with randomized encryption, so SQL cannot search it
+		// safely.  Searching ciphertext is both incorrect and can leak its
+		// structure through matching behavior; use username search until a
+		// dedicated keyed email-search index is introduced.
+		conditions = append(conditions, "username ILIKE $"+strconv.Itoa(paramCount))
 		args = append(args, "%"+search+"%")
 		paramCount++
 	}
@@ -466,21 +568,22 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	defer rows.Close()
 
 	type userRow struct {
-		ID            int
-		Username      string
-		Email         *string
-		Role          string
-		CreatedAt     time.Time
-		LastSeen      *time.Time
-		Bio           *string
-		AvatarURL     *string
-		ShadowBanned  bool
-		Banned        bool
-		Deleted       bool
-		BanReason     *string
-		ShowBanReason bool
-		BannedAt      *time.Time
-		BannedBy      *int
+		ID             int
+		Username       string
+		EncryptedEmail *string
+		EmailEncrypted bool
+		Role           string
+		CreatedAt      time.Time
+		LastSeen       *time.Time
+		Bio            *string
+		AvatarURL      *string
+		ShadowBanned   bool
+		Banned         bool
+		Deleted        bool
+		BanReason      *string
+		ShowBanReason  bool
+		BannedAt       *time.Time
+		BannedBy       *int
 	}
 	type UserResponse struct {
 		ID            int     `json:"id"`
@@ -503,7 +606,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	users := []UserResponse{}
 	for rows.Next() {
 		var row userRow
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
+		if err := rows.Scan(&row.ID, &row.Username, &row.EncryptedEmail, &row.EmailEncrypted, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
 			&row.ShadowBanned, &row.Banned, &row.Deleted, &row.BanReason, &row.ShowBanReason, &row.BannedAt, &row.BannedBy); err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to scan user")
 			return
@@ -518,10 +621,24 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 			formatted := row.BannedAt.Format(time.RFC3339)
 			bannedAtStr = &formatted
 		}
+		var email *string
+		if row.EncryptedEmail != nil {
+			if row.EmailEncrypted {
+				decrypted, decryptErr := utils.DecryptEmail(*row.EncryptedEmail)
+				if decryptErr != nil {
+					zlog.Warn().Err(decryptErr).Int("user_id", row.ID).Msg("Admin user listing could not decrypt email")
+				} else {
+					email = &decrypted
+				}
+			} else {
+				// Preserve support for legacy rows created before email encryption.
+				email = row.EncryptedEmail
+			}
+		}
 		users = append(users, UserResponse{
 			ID:            row.ID,
 			Username:      row.Username,
-			Email:         row.Email,
+			Email:         email,
 			Role:          row.Role,
 			CreatedAt:     row.CreatedAt.Format(time.RFC3339),
 			LastSeenAt:    lastSeenStr,
@@ -570,14 +687,14 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 // @Router       /admin/stats [get]
 func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 	type Stats struct {
-		TotalUsers               int     `json:"total_users"`
-		TotalPosts               int     `json:"total_posts"`
-		TotalComments            int     `json:"total_comments"`
-		TotalHubs                int     `json:"total_hubs"`
-		TotalConversations       int     `json:"total_conversations"`
-		TotalMessages            int     `json:"total_messages"`
-		AdminCount               int     `json:"admin_count"`
-		ModeratorCount           int     `json:"moderator_count"`
+		TotalUsers         int `json:"total_users"`
+		TotalPosts         int `json:"total_posts"`
+		TotalComments      int `json:"total_comments"`
+		TotalHubs          int `json:"total_hubs"`
+		TotalConversations int `json:"total_conversations"`
+		TotalMessages      int `json:"total_messages"`
+		AdminCount         int `json:"admin_count"`
+		ModeratorCount     int `json:"moderator_count"`
 	}
 
 	stats := Stats{}

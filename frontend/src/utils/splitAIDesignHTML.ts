@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export type SlotId = 'hub-feed' | 'hub-join' | 'hub-create' | 'hub-mod' | 'hub-content';
 
 export interface DesignSlot {
@@ -34,6 +36,148 @@ const SAFE_SLOT_ATTR_NAMES = new Set([
   'aria-labelledby',
   'aria-describedby',
 ]);
+
+const SAFE_DESIGN_TAGS = [
+  'a',
+  'article',
+  'aside',
+  'b',
+  'blockquote',
+  'br',
+  'button',
+  'code',
+  'div',
+  'em',
+  'figcaption',
+  'figure',
+  'footer',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'hr',
+  'img',
+  'li',
+  'main',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'section',
+  'small',
+  'span',
+  'strong',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'tr',
+  'ul',
+];
+
+const SAFE_DESIGN_ATTRS = [
+  'alt',
+  'aria-describedby',
+  'aria-label',
+  'aria-labelledby',
+  'class',
+  'colspan',
+  'dir',
+  'height',
+  'href',
+  'id',
+  'lang',
+  'role',
+  'rowspan',
+  'src',
+  'style',
+  'title',
+  'width',
+];
+
+const UNSAFE_CSS = /(?:@import\b|url\s*\(|expression\s*\(|-moz-binding\b|behavior\s*:)/i;
+
+function sanitizeCss(css: string): string {
+  // Hub designs may style their own layout, but remote CSS resources and legacy
+  // executable CSS features can leak user data or execute in vulnerable engines.
+  return UNSAFE_CSS.test(css) ? '' : css;
+}
+
+function sanitizeDesignUrl(value: string, allowHash = false): string | null {
+  const candidate = value.trim();
+  if (!candidate || candidate.includes('\\') || candidate.startsWith('//')) {
+    return null;
+  }
+  if (allowHash && candidate.startsWith('#')) {
+    return candidate;
+  }
+
+  try {
+    const parsed = new URL(candidate, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeDesignMarkup(markup: string): string {
+  const sanitized = DOMPurify.sanitize(markup, {
+    ALLOWED_TAGS: SAFE_DESIGN_TAGS,
+    ALLOWED_ATTR: SAFE_DESIGN_ATTRS,
+    ALLOW_DATA_ATTR: true,
+    ALLOW_ARIA_ATTR: true,
+  });
+  const template = document.createElement('template');
+  template.innerHTML = sanitized;
+
+  template.content.querySelectorAll<HTMLElement>('*').forEach((element) => {
+    const style = element.getAttribute('style');
+    if (style) {
+      const safeStyle = sanitizeCss(style);
+      if (safeStyle) {
+        element.setAttribute('style', safeStyle);
+      } else {
+        element.removeAttribute('style');
+      }
+    }
+
+    if (element.tagName.toLowerCase() === 'a') {
+      const href = element.getAttribute('href');
+      const safeHref = href ? sanitizeDesignUrl(href, true) : null;
+      if (!safeHref) {
+        element.removeAttribute('href');
+        return;
+      }
+      element.setAttribute('href', safeHref);
+      const targetUrl = new URL(safeHref, window.location.origin);
+      if (targetUrl.origin !== window.location.origin) {
+        element.setAttribute('target', '_blank');
+        element.setAttribute('rel', 'noopener noreferrer');
+      }
+      return;
+    }
+
+    if (element.tagName.toLowerCase() === 'img') {
+      const src = element.getAttribute('src');
+      const safeSrc = src ? sanitizeDesignUrl(src) : null;
+      if (safeSrc) {
+        element.setAttribute('src', safeSrc);
+      } else {
+        element.removeAttribute('src');
+      }
+    }
+  });
+
+  return template.innerHTML;
+}
 
 function isSafeSlotAttribute(attributeName: string): boolean {
   if (attributeName.startsWith('data-')) {
@@ -92,11 +236,18 @@ export function splitAIDesignHTML(html: string): SplitDesignResult {
     };
   }
 
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const styleContent = Array.from(doc.querySelectorAll('style'))
-    .map((styleNode) => styleNode.textContent ?? '')
-    .join('\n');
-  doc.querySelectorAll('style').forEach((styleNode) => styleNode.remove());
+  const sourceDoc = new DOMParser().parseFromString(html, 'text/html');
+  const styleContent = sanitizeCss(
+    Array.from(sourceDoc.querySelectorAll('style'))
+      .map((styleNode) => styleNode.textContent ?? '')
+      .join('\n')
+  );
+  sourceDoc.querySelectorAll('style').forEach((styleNode) => styleNode.remove());
+
+  const doc = new DOMParser().parseFromString(
+    sanitizeDesignMarkup(sourceDoc.body.innerHTML),
+    'text/html'
+  );
 
   const slotsByMarker = new Map<string, DesignSlot>();
   for (const id of SLOT_IDS) {

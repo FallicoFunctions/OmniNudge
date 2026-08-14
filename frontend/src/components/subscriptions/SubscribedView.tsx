@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { subscriptionService } from '../../services/subscriptionService';
 import { useSettings } from '../../contexts/SettingsContext';
 import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';

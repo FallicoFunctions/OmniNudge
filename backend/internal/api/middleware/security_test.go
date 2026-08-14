@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestSecurityHeaders_ProductionCSPDisallowsUnsafeEval(t *testing.T) {
+func TestSecurityHeaders_ProductionCSPDisallowsUnsafeScriptExecution(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -27,8 +27,19 @@ func TestSecurityHeaders_ProductionCSPDisallowsUnsafeEval(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	csp := w.Header().Get("Content-Security-Policy")
-	if strings.Contains(csp, "'unsafe-eval'") {
-		t.Fatalf("production CSP must not allow unsafe-eval, got %q", csp)
+	var scriptDirective string
+	for _, directive := range strings.Split(csp, ";") {
+		directive = strings.TrimSpace(directive)
+		if strings.HasPrefix(directive, "script-src ") {
+			scriptDirective = directive
+			break
+		}
+	}
+	if scriptDirective != "script-src 'self'" {
+		t.Fatalf("production scripts must be restricted to same-origin bundles, got %q", scriptDirective)
+	}
+	if got := w.Header().Get("X-XSS-Protection"); got != "0" {
+		t.Fatalf("deprecated browser XSS auditor must be disabled, got %q", got)
 	}
 }
 
@@ -48,6 +59,27 @@ func TestSecurityHeaders_DevelopmentCSPAllowsUnsafeEvalForTooling(t *testing.T) 
 	csp := w.Header().Get("Content-Security-Policy")
 	if !strings.Contains(csp, "'unsafe-eval'") {
 		t.Fatalf("development CSP should allow unsafe-eval for tooling, got %q", csp)
+	}
+}
+
+func TestSecurityHeaders_AllowsFirstPartyLiveKitMedia(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(SecurityHeaders())
+	router.GET("/", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	csp := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "frame-src 'self'") {
+		t.Fatalf("CSP must keep live-call frames first-party, got %q", csp)
+	}
+	permissions := w.Header().Get("Permissions-Policy")
+	if !strings.Contains(permissions, "camera=(self)") {
+		t.Fatalf("Permissions-Policy must allow first-party camera capture, got %q", permissions)
+	}
+	if !strings.Contains(permissions, "microphone=(self)") {
+		t.Fatalf("Permissions-Policy must allow first-party microphone capture, got %q", permissions)
 	}
 }
 

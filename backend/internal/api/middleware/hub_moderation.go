@@ -22,6 +22,14 @@ func RequireHubModeratorOrAdmin(
 	accessRequestRepo ports.HubAccessRequestRepository,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// AuthRequired normally sets this value, but never panic if middleware is
+		// reused incorrectly or another middleware corrupts the context.
+		userID, ok := GetAuthenticatedUserID(c)
+		if !ok {
+			c.Abort()
+			return
+		}
+
 		hubID, err := resolveHubIDForModeration(c, hubRepo, postRepo, commentRepo, removalReasonRepo, accessRequestRepo)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -45,14 +53,7 @@ func RequireHubModeratorOrAdmin(
 			return
 		}
 
-		userIDVal, exists := c.Get("user_id")
-		if !exists {
-			apiresponse.WriteError(c, http.StatusUnauthorized, "Unauthorized")
-			c.Abort()
-			return
-		}
-
-		isMod, err := hubModRepo.IsModerator(c.Request.Context(), hubID, userIDVal.(int))
+		isMod, err := hubModRepo.IsModerator(c.Request.Context(), hubID, userID)
 		if err != nil {
 			apiresponse.WriteError(c, http.StatusInternalServerError, "Failed to verify moderator permissions")
 			c.Abort()

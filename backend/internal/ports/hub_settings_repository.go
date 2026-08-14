@@ -17,5 +17,4 @@ type HubSettingsRepository interface {
 	UpdateModeratorRole(ctx context.Context, hubID int, targetUserID int, newRole domain.ModeratorRole) error
 	AddModerator(ctx context.Context, hubID int, userID int, role domain.ModeratorRole) error
 	RemoveModerator(ctx context.Context, hubID int, userID int) error
-	IsModerator(ctx context.Context, hubID, userID int) (bool, error)
 }

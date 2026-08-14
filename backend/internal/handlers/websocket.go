@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"log"
 	"net/http"
 	"net/url"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	ws "github.com/gorilla/websocket"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/websocket"
 )
 
@@ -20,6 +20,7 @@ var allowedDevPorts = map[string]struct{}{
 	"5174": {},
 	"5175": {},
 	"5176": {},
+	"5177": {},
 	"8080": {},
 }
 
@@ -35,26 +36,48 @@ var upgrader = ws.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
-			return true
+			// Browsers always send Origin for a cross-site WebSocket upgrade.
+			// Keep origin-less tooling usable only against the explicit local
+			// development listener; production hosts must fail closed.
+			return isAllowedWebSocketDevelopmentHost(r.Host)
 		}
 
 		parsed, err := url.Parse(origin)
-		if err != nil {
+		if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+			(parsed.Path != "" && parsed.Path != "/") {
 			return false
 		}
 
 		host := strings.ToLower(parsed.Hostname())
 		if _, ok := allowedProdHosts[host]; ok {
-			return true
+			return parsed.Scheme == "https" && (parsed.Port() == "" || parsed.Port() == "443")
 		}
-		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		if isWebSocketDevelopmentHost(host) {
 			if _, ok := allowedDevPorts[parsed.Port()]; ok {
-				return true
+				return parsed.Scheme == "http"
 			}
 		}
 
 		return false
 	},
+}
+
+func isWebSocketDevelopmentHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedWebSocketDevelopmentHost(host string) bool {
+	parsed, err := url.Parse("//" + strings.TrimSpace(host))
+	if err != nil || parsed.User != nil || !isWebSocketDevelopmentHost(parsed.Hostname()) {
+		return false
+	}
+	_, ok := allowedDevPorts[parsed.Port()]
+	return ok
 }
 
 // WebSocketHandler handles WebSocket connections

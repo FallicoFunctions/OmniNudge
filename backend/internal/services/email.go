@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -58,21 +59,6 @@ type EmailServiceConfig struct {
 	FromAddress    string
 	FromName       string
 	FrontendURL    string
-}
-
-// NewEmailService creates a new email service with the given configuration.
-// For backward compatibility with existing call sites the original 6-parameter
-// signature is preserved via NewEmailServiceLegacy.
-func NewEmailService(host, port, user, password, fromAddress, fromName string) *EmailService {
-	return &EmailService{
-		smtpHost:     host,
-		smtpPort:     port,
-		smtpUser:     user,
-		smtpPassword: password,
-		fromAddress:  fromAddress,
-		fromName:     fromName,
-		cb:           NewCircuitBreaker("email", 5, 60*time.Second),
-	}
 }
 
 // NewEmailServiceFull creates an EmailService with full provider configuration.
@@ -178,11 +164,11 @@ func (s *EmailService) sendViaSendGrid(to []string, subject, body, htmlBody stri
 	if err != nil {
 		return fmt.Errorf("email: sendgrid request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// SendGrid returns 202 Accepted on success.
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		return fmt.Errorf("email: sendgrid error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
@@ -211,7 +197,9 @@ func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody st
 	if htmlBody != "" {
 		_ = writer.WriteField("html", htmlBody)
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("email: close mailgun multipart body: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, &buf)
 	if err != nil {
@@ -224,10 +212,10 @@ func (s *EmailService) sendViaMailgunAPI(to []string, subject, body, htmlBody st
 	if err != nil {
 		return fmt.Errorf("email: mailgun request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		return fmt.Errorf("email: mailgun error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -268,7 +256,7 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 	if err != nil {
 		return fmt.Errorf("email: tls dial: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client, err := smtp.NewClient(conn, s.smtpHost)
 	if err != nil {
@@ -296,7 +284,12 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 	}
 
 	if _, err = writer.Write([]byte(message)); err != nil {
-		writer.Close()
+		if closeErr := writer.Close(); closeErr != nil {
+			return errors.Join(
+				fmt.Errorf("email: smtp write message: %w", err),
+				fmt.Errorf("email: smtp close after write failure: %w", closeErr),
+			)
+		}
 		return fmt.Errorf("email: smtp write message: %w", err)
 	}
 
@@ -312,29 +305,29 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, message string, 
 func (s *EmailService) buildMessage(from string, to []string, subject, body, htmlBody string) string {
 	var msg strings.Builder
 
-	msg.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
-	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	_, _ = fmt.Fprintf(&msg, "From: %s\r\n", from)
+	_, _ = fmt.Fprintf(&msg, "To: %s\r\n", strings.Join(to, ", "))
+	_, _ = fmt.Fprintf(&msg, "Subject: %s\r\n", subject)
 	msg.WriteString("MIME-Version: 1.0\r\n")
 
 	if htmlBody != "" {
 		boundary := "boundary-omninudge-email"
-		msg.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
+		_, _ = fmt.Fprintf(&msg, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary)
 		msg.WriteString("\r\n")
 
-		msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+		_, _ = fmt.Fprintf(&msg, "--%s\r\n", boundary)
 		msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")
 		msg.WriteString(body)
 		msg.WriteString("\r\n\r\n")
 
-		msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+		_, _ = fmt.Fprintf(&msg, "--%s\r\n", boundary)
 		msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")
 		msg.WriteString(htmlBody)
 		msg.WriteString("\r\n\r\n")
 
-		msg.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+		_, _ = fmt.Fprintf(&msg, "--%s--\r\n", boundary)
 	} else {
 		msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
 		msg.WriteString("\r\n")

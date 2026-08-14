@@ -5,19 +5,19 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/omninudge/backend/internal/models"
-	"github.com/omninudge/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/websocket"
 )
 
 // SlideshowHandler handles HTTP requests for slideshow coordination
 type SlideshowHandler struct {
-	pool         *pgxpool.Pool
-	slideshowRepo ports.SlideshowRepository
+	pool             *pgxpool.Pool
+	slideshowRepo    ports.SlideshowRepository
 	conversationRepo ports.ConversationRepository
-	hub          *websocket.Hub
+	hub              *websocket.Hub
 }
 
 // NewSlideshowHandler creates a new slideshow handler
@@ -28,10 +28,10 @@ func NewSlideshowHandler(
 	hub *websocket.Hub,
 ) *SlideshowHandler {
 	return &SlideshowHandler{
-		pool:         pool,
-		slideshowRepo: slideshowRepo,
+		pool:             pool,
+		slideshowRepo:    slideshowRepo,
 		conversationRepo: conversationRepo,
-		hub:          hub,
+		hub:              hub,
 	}
 }
 
@@ -84,12 +84,12 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 
 	// Parse request body
 	var req struct {
-		SlideshowType       string   `json:"slideshow_type" binding:"required"`
-		Subreddit           *string  `json:"subreddit"`
-		RedditSort          *string  `json:"reddit_sort"`
-		MediaFileIDs        []int    `json:"media_file_ids"`
-		AutoAdvance         bool     `json:"auto_advance"`
-		AutoAdvanceInterval int      `json:"auto_advance_interval"`
+		SlideshowType       string  `json:"slideshow_type" binding:"required"`
+		Subreddit           *string `json:"subreddit"`
+		RedditSort          *string `json:"reddit_sort"`
+		MediaFileIDs        []int   `json:"media_file_ids"`
+		AutoAdvance         bool    `json:"auto_advance"`
+		AutoAdvanceInterval int     `json:"auto_advance_interval"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,10 +114,49 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "At least one media file is required for personal slideshows")
 		return
 	}
+	if req.SlideshowType == "personal" {
+		if len(req.MediaFileIDs) > 100 {
+			RespondError(c, http.StatusBadRequest, "A slideshow can contain at most 100 media files")
+			return
+		}
+		// Media IDs are sequential and are not capabilities.  A slideshow can
+		// expose every selected asset to the other conversation participant, so
+		// all assets must belong to the controller.
+		var ownedMediaCount int
+		err := h.pool.QueryRow(c.Request.Context(), `
+			SELECT COUNT(DISTINCT id)
+			FROM media_files
+			WHERE user_id = $1 AND id = ANY($2) AND scan_status = 'clean'
+		`, userID, req.MediaFileIDs).Scan(&ownedMediaCount)
+		if err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to validate slideshow media")
+			return
+		}
+		seenMediaIDs := make(map[int]struct{}, len(req.MediaFileIDs))
+		for _, mediaID := range req.MediaFileIDs {
+			if mediaID <= 0 {
+				RespondError(c, http.StatusBadRequest, "Invalid media file ID")
+				return
+			}
+			seenMediaIDs[mediaID] = struct{}{}
+		}
+		if ownedMediaCount != len(seenMediaIDs) {
+			RespondError(c, http.StatusForbidden, "You can only use your own media files in a slideshow")
+			return
+		}
+		if len(seenMediaIDs) != len(req.MediaFileIDs) {
+			RespondError(c, http.StatusBadRequest, "Media file IDs must be unique")
+			return
+		}
+	}
 
 	// Set defaults
 	if req.AutoAdvanceInterval == 0 {
 		req.AutoAdvanceInterval = 5
+	}
+	if req.AutoAdvanceInterval < 1 || req.AutoAdvanceInterval > 3600 {
+		RespondError(c, http.StatusBadRequest, "Auto-advance interval must be between 1 and 3600 seconds")
+		return
 	}
 	if req.RedditSort == nil && req.SlideshowType == "reddit" {
 		defaultSort := "hot"
@@ -151,6 +190,8 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	// For personal slideshows, add media items
 	if req.SlideshowType == "personal" {
 		if err := h.slideshowRepo.AddMediaItems(c.Request.Context(), session.ID, req.MediaFileIDs); err != nil {
+			// Avoid leaving an empty active session that permanently blocks retry.
+			_ = h.slideshowRepo.Delete(c.Request.Context(), session.ID)
 			RespondError(c, http.StatusInternalServerError, "Failed to add media items")
 			return
 		}
@@ -165,16 +206,16 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	}
 
 	h.hub.BroadcastToUsers(userIDs, "slideshow_started", gin.H{
-		"conversation_id":        conversationID,
-		"slideshow_id":           session.ID,
-		"slideshow_type":         session.SlideshowType,
-		"subreddit":              session.Subreddit,
-		"reddit_sort":            session.RedditSort,
-		"current_index":          session.CurrentIndex,
-		"total_items":            session.TotalItems,
-		"controller_user_id":     session.ControllerUserID,
-		"auto_advance":           session.AutoAdvance,
-		"auto_advance_interval":  session.AutoAdvanceInterval,
+		"conversation_id":       conversationID,
+		"slideshow_id":          session.ID,
+		"slideshow_type":        session.SlideshowType,
+		"subreddit":             session.Subreddit,
+		"reddit_sort":           session.RedditSort,
+		"current_index":         session.CurrentIndex,
+		"total_items":           session.TotalItems,
+		"controller_user_id":    session.ControllerUserID,
+		"auto_advance":          session.AutoAdvance,
+		"auto_advance_interval": session.AutoAdvanceInterval,
 	})
 
 	c.JSON(http.StatusCreated, session)
@@ -257,9 +298,9 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 		userIDs = append(userIDs, *conversation.User2ID)
 	}
 	h.hub.BroadcastToUsers(userIDs, "slideshow_navigate", gin.H{
-		"slideshow_id":   sessionID,
-		"current_index":  req.Index,
-		"controller_id":  userID,
+		"slideshow_id":  sessionID,
+		"current_index": req.Index,
+		"controller_id": userID,
 	})
 
 	c.JSON(http.StatusOK, gin.H{
@@ -335,8 +376,8 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 		userIDs = append(userIDs, *conversation.User2ID)
 	}
 	h.hub.BroadcastToUsers(userIDs, "slideshow_control_transferred", gin.H{
-		"slideshow_id":          sessionID,
-		"new_controller_id":     newControllerID,
+		"slideshow_id":           sessionID,
+		"new_controller_id":      newControllerID,
 		"previous_controller_id": userID,
 	})
 

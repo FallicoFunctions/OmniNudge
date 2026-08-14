@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 )
 
 type authResp struct {
@@ -51,9 +53,14 @@ func TestAuthRegisterLoginMe(t *testing.T) {
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
+	// Browser authentication is cookie-backed: registering and logging in set
+	// httpOnly session cookies and return only the user. There is no token in
+	// the body to read, and asking for one is how this test used to pass
+	// against an older auth model.
 	var reg authResp
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &reg))
-	require.NotEmpty(t, reg.Token)
+	require.NotNil(t, reg.User)
+	require.NotEmpty(t, sessionCookies(w), "registering should establish a session")
 
 	// Login
 	loginBody := []byte(`{"username":"alice","password":"password123"}`)
@@ -63,13 +70,38 @@ func TestAuthRegisterLoginMe(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	var login authResp
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &login))
-	require.NotEmpty(t, login.Token)
+	require.NotNil(t, login.User)
 
-	// Me
+	cookies := sessionCookies(w)
+	require.NotEmpty(t, cookies, "logging in should establish a session")
+
+	// Me, carrying the session the way a browser would.
 	req, _ = http.NewRequest("GET", "/api/v1/auth/me", nil)
-	req.Header.Set("Authorization", "Bearer "+login.Token)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, w.Code)
+
+	// And without it, the same request is refused -- otherwise the assertion
+	// above would pass just as well against an endpoint that never checked.
+	req, _ = http.NewRequest("GET", "/api/v1/auth/me", nil)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// sessionCookies returns the browser session cookies a response established.
+func sessionCookies(w *httptest.ResponseRecorder) []*http.Cookie {
+	var out []*http.Cookie
+	for _, cookie := range w.Result().Cookies() {
+		switch cookie.Name {
+		case services.AccessTokenCookieName, services.RefreshTokenCookieName, services.CSRFTokenCookieName:
+			if cookie.Value != "" {
+				out = append(out, cookie)
+			}
+		}
+	}
+	return out
 }
 
 func TestHubCreation(t *testing.T) {

@@ -48,7 +48,7 @@ func (s *Service) Extract(ctx context.Context, rawURL string) (*PreviewMetadata,
 	if err != nil {
 		return nil, err
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	meta, err := s.parseHTML(parsedURL.String(), body)
 	if err != nil {
@@ -78,7 +78,7 @@ func (s *Service) fetchHTML(ctx context.Context, rawURL string) (io.ReadCloser, 
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("unexpected html status: %d", resp.StatusCode)
 	}
 
@@ -86,7 +86,7 @@ func (s *Service) fetchHTML(ctx context.Context, rawURL string) (io.ReadCloser, 
 	if contentType != "" &&
 		!strings.Contains(contentType, "text/html") &&
 		!strings.Contains(contentType, "application/xhtml+xml") {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("unsupported content type: %s", contentType)
 	}
 

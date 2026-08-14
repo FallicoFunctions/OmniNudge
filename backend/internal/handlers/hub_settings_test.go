@@ -224,3 +224,20 @@ func TestAddHubModerator_NonModForbidden(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
+
+func TestUpdateModeratorRole_RejectsUnsupportedRole(t *testing.T) {
+	f := setupHubSettingsHandlerTest(t)
+	defer f.cleanup()
+	require.NoError(t, f.settingsRepo.AddModerator(context.Background(), f.hubID, f.nonModID, models.ModeratorRoleModerator))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.PATCH("/hubs/:name/moderators/:user_id", mockAuthMiddleware(f.ownerID), f.handler.UpdateModeratorRole)
+	body := []byte(`{"role":"invalid"}`)
+	request := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/hubs/%s/moderators/%d", f.hubName, f.nonModID), bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+}
