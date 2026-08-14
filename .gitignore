@@ -119,3 +119,7 @@ frontend/playwright-report/
 frontend/test-results/
 __pycache__/
 *.py[cod]
+
+# Per-worktree local configuration: each worktree describes its own role,
+# so a tracked copy would overwrite every other worktree with one of them.
+tasks.json
