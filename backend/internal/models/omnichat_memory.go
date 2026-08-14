@@ -703,9 +703,69 @@ func (r *OmniChatMemoryRepository) MarkRetrieved(ctx context.Context, episodeIDs
 	return nil
 }
 
-// ListForConversation returns the memories derived from one conversation that
-// the character can still draw on, newest first, along with how many there are
-// in total.
+// listForConversationQuery reads both tiers a conversation can show: what the
+// character took from this conversation, and the life it led away from it.
+//
+// The self tier is joined through the conversation's persona because a
+// self-tier row names no conversation -- the tier check forbids it -- so there
+// is no column on the episode that could reach it from a conversation id. The
+// conversation is matched on its owner as well as its id, which is what keeps a
+// guessed id from reading as somebody else's conversation; the relational
+// branch is scoped the same way it always was, by owner, and there is no value
+// of $2 that admits a second user's rows.
+//
+// Each branch carries its own limit and its own count(*) OVER (), so a user
+// with a long history cannot spend the whole page budget and leave the
+// character's own life invisible, and each tier can report a truncation of its
+// own. count(*) OVER () is evaluated before LIMIT, so it reports the full
+// match either way.
+//
+// Ordering puts the shared history first and each tier newest-first. A caller
+// that groups the two does not depend on this, but one that does not still
+// gets a stable, readable list rather than an interleaving.
+const listForConversationQuery = `
+WITH conversation AS (
+    SELECT persona_id
+    FROM bot_conversations
+    WHERE id = $1 AND user_id = $2
+),
+shared AS (
+    SELECT id, persona_id, source_message_id, title, summary, recorded_at,
+           salience, distinctiveness, emotional_valence,
+           false AS is_self, count(*) OVER () AS tier_total
+    FROM omnichat_memory_episodes
+    WHERE conversation_id = $1 AND owner_user_id = $2 AND status = 'active'
+    ORDER BY recorded_at DESC
+    LIMIT $3
+),
+own_life AS (
+    SELECT ep.id, ep.persona_id, ep.source_message_id, ep.title, ep.summary,
+           ep.recorded_at, ep.salience, ep.distinctiveness, ep.emotional_valence,
+           true AS is_self, count(*) OVER () AS tier_total
+    FROM omnichat_memory_episodes ep
+    JOIN conversation c ON c.persona_id = ep.persona_id
+    WHERE ep.owner_user_id IS NULL AND ep.status = 'active'
+    ORDER BY ep.recorded_at DESC
+    LIMIT $3
+)
+SELECT * FROM shared
+UNION ALL
+SELECT * FROM own_life
+ORDER BY is_self, recorded_at DESC
+`
+
+// ListForConversation returns the memories a conversation can show, newest
+// first within each tier, along with how many there are in total.
+//
+// Two tiers come back, and each episode says which one it is in through
+// IsSelf: the caller's own history with the character, and the character's
+// self tier, which belongs to nobody and which every user of that character
+// shares. The second is the same tier recall already draws on, so a character
+// can say it wandered the main stage and the person it said that to can now go
+// and find it. Nothing about recall changes here.
+//
+// A user-owned character has no self tier -- nothing writes one for it -- so
+// this returns exactly what it always did for those, without a special case.
 //
 // Only active memories are returned. Filtering here rather than in the caller
 // matters: the limit is applied by the database, so leaving hidden rows in the
@@ -713,9 +773,9 @@ func (r *OmniChatMemoryRepository) MarkRetrieved(ctx context.Context, episodeIDs
 // on memories that no longer do anything, pushing live ones out of the only
 // surface for correcting them.
 //
-// The total counts every active memory, not just this page, so a caller can
-// tell the difference between "that is all of them" and "that is the first
-// hundred".
+// The total counts every active memory in both tiers, not just this page, so a
+// caller can tell the difference between "that is all of them" and "that is the
+// first hundred".
 func (r *OmniChatMemoryRepository) ListForConversation(
 	ctx context.Context,
 	conversationID, ownerUserID, limit int,
@@ -723,46 +783,49 @@ func (r *OmniChatMemoryRepository) ListForConversation(
 	if conversationID < 1 || ownerUserID < 1 || limit < 1 {
 		return nil, 0, errors.New("omnichat memory: owned conversation and positive limit are required")
 	}
-	// count(*) OVER () is evaluated before LIMIT, so it reports the full match.
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, persona_id, source_message_id, title, summary, recorded_at,
-		       salience, distinctiveness, emotional_valence, count(*) OVER () AS total
-		FROM omnichat_memory_episodes
-		WHERE conversation_id = $1 AND owner_user_id = $2 AND status = 'active'
-		ORDER BY recorded_at DESC
-		LIMIT $3
-	`, conversationID, ownerUserID, limit)
+	rows, err := r.pool.Query(ctx, listForConversationQuery, conversationID, ownerUserID, limit)
 	if err != nil {
 		return nil, 0, fmt.Errorf("omnichat memory: list conversation memories: %w", err)
 	}
 	defer rows.Close()
 
 	episodes := make([]*OmniChatMemoryEpisode, 0, limit)
-	total := 0
+	// Each tier reports its own total on every one of its rows, so they are
+	// taken per tier and added rather than summed across rows.
+	tierTotals := map[bool]int{}
 	for rows.Next() {
 		var (
 			episode         OmniChatMemoryEpisode
 			sourceMessageID *int
+			tierTotal       int
 		)
 		if err := rows.Scan(
 			&episode.ID, &episode.PersonaID, &sourceMessageID, &episode.Title, &episode.Summary,
 			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
-			&episode.EmotionalValence, &total,
+			&episode.EmotionalValence, &episode.IsSelf, &tierTotal,
 		); err != nil {
 			return nil, 0, fmt.Errorf("omnichat memory: scan conversation memory: %w", err)
 		}
 		if sourceMessageID != nil {
 			episode.SourceMessageID = *sourceMessageID
 		}
-		episode.ConversationID = conversationID
-		episode.OwnerUserID = ownerUserID
+		if episode.IsSelf {
+			// A self-tier episode is owned by nobody and comes from no
+			// conversation. Saying so explicitly keeps the caller's scoping
+			// values from being restated onto a row they do not describe.
+			episode.OwnerUserID = OmniChatMemoryTierSelf
+		} else {
+			episode.ConversationID = conversationID
+			episode.OwnerUserID = ownerUserID
+		}
 		episode.Status = OmniChatMemoryStatusActive
+		tierTotals[episode.IsSelf] = tierTotal
 		episodes = append(episodes, &episode)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("omnichat memory: iterate conversation memories: %w", err)
 	}
-	return episodes, total, nil
+	return episodes, tierTotals[false] + tierTotals[true], nil
 }
 
 // OmniChatMemoryRoot is an original account offered to extraction as something
@@ -809,6 +872,10 @@ func (r *OmniChatMemoryRepository) RecentRoots(ctx context.Context, personaID, o
 
 // HideOwned is the user's correction path: it withdraws a memory from recall
 // without destroying the record of what was extracted or where it came from.
+//
+// Owned is the whole of it. A self-tier row has no owner, and no id equals
+// NULL, so the character's own life falls outside this by the same clause that
+// keeps one user out of another's -- it is not a rule stated twice.
 func (r *OmniChatMemoryRepository) HideOwned(ctx context.Context, episodeID int64, ownerUserID int) error {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE omnichat_memory_episodes

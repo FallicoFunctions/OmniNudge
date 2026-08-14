@@ -4401,7 +4401,11 @@
       "confirmForget": "نسيان",
       "truncated": "عرض أحدث {{shown}} من أصل {{total}} ذكرى.",
       "cancelForgetLabel": "الإبقاء على: {{title}}",
-      "confirmForgetLabel": "تأكيد نسيان: {{title}}"
+      "confirmForgetLabel": "تأكيد نسيان: {{title}}",
+      "sharedHeading": "معك",
+      "sharedEmpty": "لا شيء من هذه المحادثة حتى الآن.",
+      "ownLifeHeading": "حياة {{name}} الخاصة",
+      "ownLifeDescription": "أشياء فعلتها {{name}} بعيدًا عن هذه المحادثة. إنها ملكها هي لا ملكك، لذا لا يمكن حذفها هنا."
     }
   }
 }

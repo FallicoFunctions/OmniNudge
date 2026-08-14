@@ -489,6 +489,7 @@ func TestOmniChatMemoryListForConversation(t *testing.T) {
 	require.NotNil(t, got[0].EmotionalValence)
 	require.InDelta(t, -0.4, *got[0].EmotionalValence, 0.001)
 	require.False(t, got[0].RecordedAt.IsZero())
+	require.False(t, got[0].IsSelf, "a memory from this conversation is shared history, not the character's own")
 
 	// Scoped to the owner, like every other read in this repository.
 	got, _, err = repo.ListForConversation(ctx, conversationID, fixture.otherID, 20)
@@ -497,6 +498,128 @@ func TestOmniChatMemoryListForConversation(t *testing.T) {
 
 	_, _, err = repo.ListForConversation(ctx, conversationID, fixture.userID, 0)
 	require.Error(t, err, "an unbounded read must be rejected")
+}
+
+// The listing shows both tiers, because the character speaks from both. It can
+// say it wandered a world the listener was never in, and this is the only place
+// that claim can be checked.
+//
+// The second half is the rule the tier boundary rests on: widening the read to
+// reach rows with no owner must not have widened it to reach rows with a
+// different one.
+func TestOmniChatMemoryListForConversationShowsTheCharactersOwnLife(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "listself")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	messageID := insertMessage(t, pool, conversationID, "user", "I lost my passport in Barcelona.")
+	require.NoError(t, repo.RecordExtraction(ctx, conversationID, fixture.userID, 0, messageID, []OmniChatMemoryEpisode{{
+		PersonaID:       fixture.personaID,
+		OwnerUserID:     fixture.userID,
+		ConversationID:  conversationID,
+		SourceMessageID: messageID,
+		Title:           "Lost passport in Barcelona",
+		Summary:         "He had to visit the consulate on day two.",
+		Salience:        0.8,
+		Distinctiveness: 0.7,
+	}}))
+
+	selfID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the main stage in OmniRave",
+		Summary:   "Spent most of the set near the front and left before the encore.",
+	})
+	require.NoError(t, err)
+
+	// Another user's relational memory, on the same persona and pointed at this
+	// very conversation. Only a direct write can produce it, which is the point:
+	// the query must refuse it on ownership, not on being unreachable.
+	var intruderID int64
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO omnichat_memory_episodes
+			(persona_id, owner_user_id, conversation_id, title, summary)
+		VALUES ($1, $2, $3, 'Someone else''s evening', 'Told to her by somebody else.')
+		RETURNING id
+	`, fixture.personaID, fixture.otherID, conversationID).Scan(&intruderID))
+
+	got, total, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 20)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	require.Equal(t, 2, total, "the total counts both tiers")
+
+	// Shared history first, then the character's own.
+	require.False(t, got[0].IsSelf)
+	require.Equal(t, "Lost passport in Barcelona", got[0].Title)
+
+	require.True(t, got[1].IsSelf, "a world event belongs to the character alone")
+	require.Equal(t, selfID, got[1].ID)
+	require.Equal(t, "Wandered the main stage in OmniRave", got[1].Title)
+	require.Equal(t, OmniChatMemoryTierSelf, got[1].OwnerUserID, "a self-tier memory is owned by nobody")
+	require.Zero(t, got[1].ConversationID, "a self-tier memory comes from no conversation")
+
+	for _, episode := range got {
+		require.NotEqual(t, intruderID, episode.ID, "another user's memory must never be listed")
+	}
+
+	// And it is not the reader's to take away, by the clause that already keeps
+	// one user out of another's memories.
+	require.Error(t, repo.HideOwned(ctx, selfID, fixture.userID),
+		"the character's own life cannot be forgotten by a user")
+}
+
+// A character that belongs to a user has no self tier at all, so its listing is
+// exactly what it always was. Asserted because the surface built on top of this
+// must show no heading and no empty section for those characters, and that only
+// holds if nothing comes back to hang one on.
+func TestOmniChatMemoryListForConversationUserOwnedCharacterHasNoSelfTier(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "listowned")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	ownedPersonaID := seedOwnedPersona(t, pool, "listowned", fixture.userID, "private")
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, ownedPersonaID).Scan(&conversationID))
+
+	messageID := insertMessage(t, pool, conversationID, "user", "I only tell you this.")
+	require.NoError(t, repo.RecordExtraction(ctx, conversationID, fixture.userID, 0, messageID, []OmniChatMemoryEpisode{{
+		PersonaID:       ownedPersonaID,
+		OwnerUserID:     fixture.userID,
+		ConversationID:  conversationID,
+		SourceMessageID: messageID,
+		Title:           "Kept to himself",
+		Summary:         "Said he tells this character things he tells nobody.",
+		Salience:        0.6,
+		Distinctiveness: 0.6,
+	}}))
+
+	// A world event for another character must not bleed across: the self tier
+	// is joined through this conversation's persona, not shown to everyone.
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the main stage in OmniRave",
+		Summary:   "A different character's evening entirely.",
+	})
+	require.NoError(t, err)
+
+	got, total, err := repo.ListForConversation(ctx, conversationID, fixture.userID, 20)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, 1, total)
+	require.False(t, got[0].IsSelf, "a private character has no life of its own to show")
 }
 
 // Entity identity is per (persona, tier, name). Two users naming the same place

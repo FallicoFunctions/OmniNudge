@@ -471,6 +471,12 @@ export interface OmniChatMemory {
   persona_id: number;
   conversation_id: number;
   source_message_id?: number;
+  /**
+   * True for the character's own life: something it did away from this
+   * conversation, shared by everyone who talks to it and owned by nobody. It
+   * has no provenance in your turns, and it is not yours to forget.
+   */
+  is_self: boolean;
   title: string;
   summary: string;
   salience: number;

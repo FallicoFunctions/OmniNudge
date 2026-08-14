@@ -4401,7 +4401,11 @@
       "confirmForget": "Olvidar",
       "truncated": "Mostrando los {{shown}} recuerdos más recientes de {{total}}.",
       "cancelForgetLabel": "Conservar: {{title}}",
-      "confirmForgetLabel": "Confirmar el olvido de: {{title}}"
+      "confirmForgetLabel": "Confirmar el olvido de: {{title}}",
+      "sharedHeading": "Contigo",
+      "sharedEmpty": "Aún no hay nada de esta conversación.",
+      "ownLifeHeading": "La vida propia de {{name}}",
+      "ownLifeDescription": "Cosas que {{name}} hizo fuera de esta conversación. Son suyas, no tuyas, así que no se pueden eliminar aquí."
     }
   }
 }

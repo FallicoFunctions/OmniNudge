@@ -43,10 +43,16 @@ func NewOmniChatMemoryHandler(memory *models.OmniChatMemoryRepository) *OmniChat
 // entitled to see the provenance of claims made about them, so it is restated
 // here explicitly, for this endpoint only.
 type omniChatMemoryResponse struct {
-	ID               int64     `json:"id"`
-	PersonaID        int       `json:"persona_id"`
-	ConversationID   int       `json:"conversation_id"`
-	SourceMessageID  int       `json:"source_message_id,omitempty"`
+	ID              int64 `json:"id"`
+	PersonaID       int   `json:"persona_id"`
+	ConversationID  int   `json:"conversation_id"`
+	SourceMessageID int   `json:"source_message_id,omitempty"`
+	// IsSelf marks a memory as the character's own rather than a shared one.
+	// A client has to be able to tell them apart for two reasons: presenting
+	// the character's life as though the reader were there would be a lie, and
+	// a self-tier memory is not the reader's to forget, so no correction
+	// control belongs on it.
+	IsSelf           bool      `json:"is_self"`
 	Title            string    `json:"title"`
 	Summary          string    `json:"summary"`
 	Salience         float64   `json:"salience"`
@@ -56,7 +62,15 @@ type omniChatMemoryResponse struct {
 }
 
 // ListConversationMemories returns what the character took away from one
-// conversation.
+// conversation, and the life it led away from it.
+//
+// Both tiers are shown because the character already draws on both when it
+// speaks. It can tell someone it wandered the main stage of a world they were
+// never in, and until this listing carried the self tier there was nowhere to
+// go and check. The self tier belongs to nobody and every user of that
+// character can already recall it, so surfacing it discloses nothing; each
+// entry says which tier it is in so the two are never presented as the same
+// kind of thing.
 //
 // @Summary      List character memories for a conversation
 // @Tags         OmniChat
@@ -101,6 +115,7 @@ func (h *OmniChatMemoryHandler) ListConversationMemories(c *gin.Context) {
 			PersonaID:        episode.PersonaID,
 			ConversationID:   episode.ConversationID,
 			SourceMessageID:  episode.SourceMessageID,
+			IsSelf:           episode.IsSelf,
 			Title:            episode.Title,
 			Summary:          episode.Summary,
 			Salience:         episode.Salience,
@@ -152,7 +167,9 @@ func (h *OmniChatMemoryHandler) ForgetMemory(c *gin.Context) {
 	}
 
 	// HideOwned matches on owner as well as id, so another user's memory is
-	// indistinguishable from one that does not exist.
+	// indistinguishable from one that does not exist. A self-tier memory is
+	// owned by nobody, and no owner id equals NULL, so it is refused by the
+	// same clause: the character's own life is not the reader's to take away.
 	if err := h.memory.HideOwned(c.Request.Context(), episodeID, userID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			RespondError(c, http.StatusNotFound, "Memory not found")
