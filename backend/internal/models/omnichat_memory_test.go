@@ -980,8 +980,8 @@ func TestOmniChatMemoryWorldEventIsGlobalWhileRelationalMemoryStaysPrivate(t *te
 		"What the user admitted about the Moon Circuit",
 		"The user said they had never told anyone they cried watching the Moon Circuit final.", 0.9, 0.9)
 
-	// The self tier is the character's own life. Whoever is talking to it, the
-	// tier holds the same thing, because it is keyed to nobody.
+	// The self tier is the character's own life. A resident recalling for itself
+	// reaches its own history and nothing anybody told it in private.
 	selfRecall, err := repo.Recall(ctx, fixture.personaID, OmniChatMemoryTierSelf,
 		"how did the Moon Circuit go?", weights, 6)
 	require.NoError(t, err)
@@ -991,17 +991,139 @@ func TestOmniChatMemoryWorldEventIsGlobalWhileRelationalMemoryStaysPrivate(t *te
 	require.NotEqual(t, confidence, selfRecall[0].ID,
 		"nothing a person said in private may reach the tier everyone reads")
 
-	// And each user's own tier still holds only their own history.
+	// The person who told it something private gets that back, and the
+	// character's own life alongside it.
 	mine, err := repo.Recall(ctx, fixture.personaID, fixture.userID,
 		"how did the Moon Circuit go?", weights, 6)
 	require.NoError(t, err)
-	require.Len(t, mine, 1)
-	require.Equal(t, confidence, mine[0].ID)
+	require.ElementsMatch(t, []int64{confidence, worldEventID}, recalledIDs(mine))
 
+	// And the other user gets the character's life without the confidence. This
+	// is the leak case under the widened query: self-tier rows are present, and
+	// they change nothing about whose relational memory is reachable.
 	theirs, err := repo.Recall(ctx, fixture.personaID, fixture.otherID,
 		"how did the Moon Circuit go?", weights, 6)
 	require.NoError(t, err)
-	require.Empty(t, theirs, "another user must never see the first user's relational memory")
+	require.Equal(t, []int64{worldEventID}, recalledIDs(theirs),
+		"another user must never see the first user's relational memory")
+}
+
+func recalledIDs(episodes []*OmniChatMemoryEpisode) []int64 {
+	ids := make([]int64, 0, len(episodes))
+	for _, episode := range episodes {
+		ids = append(ids, episode.ID)
+	}
+	return ids
+}
+
+// TestOmniChatMemoryRecallGivesAResidentsLifeToEveryPlayer is the acceptance
+// test for persona-as-player: what a character does in a world becomes part of
+// who it is for everyone who talks to it.
+//
+// She spent a season racing. The person recalling here has never mentioned
+// racing to her -- their whole history together is a sourdough starter and a
+// wedding in Leeds -- and asks anyway. She races now, so she has something to
+// say. Nothing was copied into that person's memory to make this happen: the
+// self tier belongs to nobody and is read by everybody.
+func TestOmniChatMemoryRecallGivesAResidentsLifeToEveryPlayer(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "racesnow")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+	weights := DefaultOmniChatMemoryRecallWeights()
+
+	// A season in the world, reported by the world.
+	worldEventID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Came third at the Moon Circuit",
+		Summary:   "Held the inside line through the last chicane and finished the race third.",
+	})
+	require.NoError(t, err)
+
+	// A player whose history with her has nothing to do with any of that.
+	insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"The sourdough starter", "He named his sourdough starter after his grandmother.", 0.8, 0.7)
+	insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"His sister's wedding", "He was dreading the toast at his sister's wedding in Leeds.", 0.8, 0.7)
+
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID, "do you race?", weights, 6)
+	require.NoError(t, err)
+	require.Equal(t, []int64{worldEventID}, recalledIDs(got),
+		"a player who has never discussed racing with her still finds that she races now")
+	require.Equal(t, OmniChatMemoryTierSelf, got[0].OwnerUserID,
+		"and it comes back marked as her own life, not as something they did together")
+}
+
+// A private character has no self tier to read, so nothing about it changes.
+// The widened predicate is only ever a second branch over rows that, for a
+// user's own character, do not exist.
+func TestOmniChatMemoryRecallIsUnchangedForAPrivateCharacter(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "privaterecall")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+	weights := DefaultOmniChatMemoryRecallWeights()
+
+	ownedPersonaID := seedOwnedPersona(t, pool, "privaterecall", fixture.userID)
+
+	// The world would refuse to write this character a self tier, and does.
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: ownedPersonaID,
+		Title:     "Came third at the Moon Circuit",
+		Summary:   "A private character was never there to finish the race at all.",
+	})
+	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
+
+	ours := insertEpisode(t, pool, ownedPersonaID, fixture.userID,
+		"The race we watched", "We watched the Moon Circuit race final together on his sofa.", 0.8, 0.8)
+
+	got, err := repo.Recall(ctx, ownedPersonaID, fixture.userID, "do you race?", weights, 6)
+	require.NoError(t, err)
+	require.Equal(t, []int64{ours}, recalledIDs(got),
+		"a private character's recall is its owner's relationship with it and nothing else")
+	require.Equal(t, fixture.userID, got[0].OwnerUserID)
+
+	var selfTierRows int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id IS NULL`,
+		ownedPersonaID).Scan(&selfTierRows))
+	require.Zero(t, selfTierRows, "a user's own character has no self tier at all")
+}
+
+// Reading both tiers must not become a thumb on the scale for either. A world
+// event competes on salience, distinctiveness and text match like anything
+// else: it arrives unscored at the neutral midpoint, so a memory that mattered
+// more still comes first.
+func TestOmniChatMemoryRecallGivesTheSelfTierNoRankingAdvantage(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "notierbonus")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+	weights := DefaultOmniChatMemoryRecallWeights()
+
+	worldEventID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "A race at the Moon Circuit",
+		Summary:   "Finished the race mid-pack and went home.",
+	})
+	require.NoError(t, err)
+
+	memorable := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"The race he crashed out of",
+		"He crashed out of the race on the last lap and broke his wrist.", 0.98, 0.97)
+
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID, "tell me about the race", weights, 6)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []int64{memorable, worldEventID}, recalledIDs(got),
+		"both tiers are candidates for the same cue")
+	require.Equal(t, memorable, got[0].ID,
+		"the more salient memory still wins, so no tier bonus crept into the score")
 }
 
 // A world event is untrusted text like any other: the world is a service, but
