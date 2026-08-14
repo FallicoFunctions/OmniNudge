@@ -129,6 +129,8 @@ func newAdmissionRouter(t *testing.T) (*gin.Engine, *services.AuthService) {
 		authService,
 		service.NewAdmissionService(personas, repository.NewInMemoryProfileRepository(), authService),
 		admissionAuth,
+		nil,
+		nil,
 		[]string{"127.0.0.1/32", "::1/128"},
 	)
 

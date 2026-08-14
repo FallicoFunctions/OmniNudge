@@ -33,6 +33,12 @@ func main() {
 	// than degrading into a world that anything can walk into.
 	var personas repository.PersonaRepository = repository.NewInMemoryPersonaRepository()
 	var mediaState = omniraveworld.NewMediaState()
+	// Character memory needs a real database; there is no in-memory stand-in
+	// and there should not be one. Without it nothing is recordable, and the
+	// world-event endpoint says so rather than accepting reports and dropping
+	// them, which would leave the world believing a character remembers
+	// something it does not.
+	var characterMemory *services.OmniChatMemoryService
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		db, err := database.New(databaseURL)
 		if err != nil {
@@ -53,6 +59,12 @@ func main() {
 		profiles = repository.NewPostgresProfileRepository(db.Pool)
 		sanctions = repository.NewPostgresSanctionRepository(db.Pool)
 		personas = repository.NewPostgresPersonaRepository(db.Pool)
+		// Only the store is supplied. Extraction, conversations and the model
+		// client belong to chat, and this service reaches none of them: the
+		// world writes self-tier memory and does nothing else with it.
+		characterMemory = services.NewOmniChatMemoryService(
+			models.NewOmniChatMemoryRepository(db.Pool), nil, nil, nil, nil,
+		)
 
 		playlists, err := loadStagePlaylists(context.Background(), omniraveplaylist.NewPostgresStagePlaylistRepository(db.Pool))
 		if err != nil {
@@ -97,11 +109,29 @@ func main() {
 		log.Println("omnigame-api: PERSONA_ADMISSION_SECRET unset, persona admission is disabled")
 	}
 
+	// Optional on the same terms as the admission secret, and separate from it
+	// on purpose: admitting a character to a world and writing that
+	// character's own memory are different powers, and a deployment may well
+	// grant one without the other. Unset leaves worldEvents nil and the
+	// middleware answers every report with 503 -- unconfigured, not unguarded.
+	var worldEvents *services.WorldEventAuth
+	if secret := os.Getenv("WORLD_EVENT_SECRET"); secret != "" {
+		worldEventAuth, worldEventErr := services.NewWorldEventAuth(secret, jwtSecret)
+		if worldEventErr != nil {
+			log.Fatal(worldEventErr)
+		}
+		worldEvents = worldEventAuth
+	} else {
+		log.Println("omnigame-api: WORLD_EVENT_SECRET unset, world events are disabled")
+	}
+
 	router := omnigameapi.NewRouter(
 		sessionService,
 		authService,
 		admissionService,
 		personaAdmission,
+		worldEvents,
+		characterMemory,
 		trustedProxiesFromEnv(),
 	)
 	addr := ":" + port
