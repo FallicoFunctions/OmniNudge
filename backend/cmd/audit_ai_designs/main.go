@@ -110,11 +110,12 @@ func resolveDatabaseURL() string {
 }
 
 func loadDotEnv(path string) {
+	// #nosec G304 -- path is an operator-supplied local CLI argument, not remote input.
 	file, err := os.Open(path)
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	keys := make([]string, 0)

@@ -30,6 +30,7 @@ func (f *Fixtures) CreateUser(username string) *models.User {
 	ctx := context.Background()
 
 	repo := models.NewUserRepository(f.db.Pool)
+	// #nosec G101 -- this unmistakably fake hash exists only in a test fixture helper.
 	user := &models.User{
 		Username:     username,
 		PasswordHash: "test_hash_not_real",

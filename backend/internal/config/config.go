@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -12,27 +13,32 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server        ServerConfig
-	Database      DatabaseConfig
-	Reddit        RedditConfig
-	JWT           JWTConfig
-	Redis         RedisConfig
-	Media         MediaConfig
-	VirusScan     VirusScanConfig
-	Encryption    EncryptionConfig
-	Turnstile     TurnstileConfig
-	Firebase      FirebaseConfig
-	SMTP          SMTPConfig
-	Retention     RetentionConfig
-	Storage       StorageConfig
-	FrontendURL   string
-	AppEnv        string
-	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
-	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
-	TURN          TURNConfig
-	Gemini        GeminiConfig
-	Crypto        CryptoConfig
-	OAuth         OAuthConfig
+	Server                    ServerConfig
+	Database                  DatabaseConfig
+	Reddit                    RedditConfig
+	JWT                       JWTConfig
+	Redis                     RedisConfig
+	Media                     MediaConfig
+	VirusScan                 VirusScanConfig
+	Encryption                EncryptionConfig
+	Turnstile                 TurnstileConfig
+	Firebase                  FirebaseConfig
+	SMTP                      SMTPConfig
+	Retention                 RetentionConfig
+	Storage                   StorageConfig
+	FrontendURL               string
+	AppEnv                    string
+	MetricsToken              string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
+	AsynqmonToken             string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
+	TURN                      TURNConfig
+	Gemini                    GeminiConfig
+	OpenRouter                OpenRouterConfig
+	OmniChatMedia             OmniChatMediaConfig
+	OmniChatVoice             OmniChatVoiceConfig
+	LiveKit                   LiveKitConfig
+	OmniChatBillingOffersJSON string
+	Crypto                    CryptoConfig
+	OAuth                     OAuthConfig
 }
 
 // OAuthConfig holds client credentials for social login providers.
@@ -63,6 +69,77 @@ type GeminiConfig struct {
 	Model  string // GEMINI_MODEL — defaults to gemini-2.5-flash
 }
 
+// OpenRouterConfig holds OpenRouter API configuration for OmniChat bot personas.
+// When APIKey is empty the generate endpoint returns a 503.
+type OpenRouterConfig struct {
+	APIKey            string // OPENROUTER_API_KEY
+	Model             string // OPENROUTER_MODEL — fixed low-cost model for moderation and legacy callers
+	StandardModel     string // OMNICHAT_MODEL_STANDARD_PRIMARY
+	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
+	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
+	PremiumQuickModel string // OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY
+	PremiumDeepModel  string // OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY
+	UltraFastModel    string // OMNICHAT_MODEL_ULTRA_FAST_PRIMARY
+}
+
+// OmniChatMediaConfig keeps generative-media credentials server-side and
+// makes worker endpoint choices deploy-time configuration rather than UI
+// concerns. RunPod endpoints are owned by the deployment and expose the
+// stable OmniChat media-worker contract consumed by the queue.
+type OmniChatMediaConfig struct {
+	Provider                    string
+	RunPodAPIKey                string
+	RunPodBaseURL               string
+	RunPodImageEndpointID       string
+	// RunPodNSFWImageEndpointID serves accounts entitled to explicit content.
+	// Every explicit pixel is produced by the image phase -- a video is only an
+	// animation of a still that already exists -- so this one split covers both
+	// media kinds and no separate NSFW video endpoint is needed. Empty falls
+	// back to the standard image endpoint.
+	RunPodNSFWImageEndpointID   string
+	RunPodVideoEndpointID       string
+	RunPodInputHosts            []string
+	RunPodOutputHosts           []string
+	RunPodPodAPIURL             string
+	RunPodNetworkVolumeID       string
+	RunPodAvatarImage           string
+	RunPodAvatarGPUTypeID       string
+	RunPodAvatarGPUCount        int
+	RunPodAvatarDiskGB          int
+	RunPodAvatarVolumeGB        int
+	RunPodAvatarVCPU            int
+	RunPodAvatarMemoryGB        int
+	RunPodAvatarVolumeMountPath string
+	RunPodAvatarPorts           []string
+	RunPodWorkerBackendURL      string
+	RunPodRequestTimeoutSeconds int
+	MaxImageBytes               int64
+	MaxVideoBytes               int64
+	PollIntervalSeconds         int
+}
+
+type OmniChatVoiceConfig struct {
+	ElevenLabsAPIKey        string
+	ElevenLabsBaseURL       string
+	ElevenLabsEnableLogging bool
+	DefaultModel            string
+	VoiceboxEnabled         bool
+	VoiceboxBaseURL         string
+	VoiceboxTimeoutSeconds  int
+	VoiceCloningEnabled     bool
+}
+
+// LiveKitConfig contains only server-side room-signing credentials. The API
+// returns short-lived participant tokens; the secret never reaches a browser
+// or a GPU worker.
+type LiveKitConfig struct {
+	URL            string
+	APIKey         string
+	APISecret      string
+	RoomPrefix     string
+	TokenTTLSecond int
+}
+
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
 type TURNConfig struct {
 	Host    string // e.g. "77.42.47.79" or "turn.omninudge.com"
@@ -78,10 +155,13 @@ type StorageConfig struct {
 	StorageBackend string
 
 	// S3 credentials and bucket settings
-	S3Bucket    string
-	S3Region    string
-	S3AccessKey string
-	S3SecretKey string
+	S3Bucket string
+	// S3StagingBucket is a separate private bucket for unscanned browser uploads.
+	// Direct presigned uploads remain disabled when it is not configured.
+	S3StagingBucket string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretKey     string
 	// S3Endpoint is optional; set for S3-compatible providers (e.g. MinIO)
 	S3Endpoint string
 	// S3PathStyle enables path-style S3 addressing (required for MinIO/Ceph; set false for Cloudflare R2)
@@ -112,8 +192,9 @@ type JWTConfig struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Port string
-	Host string
+	Port           string
+	Host           string
+	TrustedProxies []string
 }
 
 // DatabaseConfig holds database connection configuration
@@ -200,8 +281,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Host: getEnv("SERVER_HOST", "localhost"),
+			Port:           getEnv("SERVER_PORT", "8080"),
+			Host:           getEnv("SERVER_HOST", "localhost"),
+			TrustedProxies: getEnvAsStringList("TRUSTED_PROXIES"),
 		},
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),
@@ -261,14 +343,15 @@ func Load() (*Config, error) {
 			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
 		Storage: StorageConfig{
-			StorageBackend: getEnv("STORAGE_BACKEND", "local"),
-			S3Bucket:       getEnv("S3_BUCKET", ""),
-			S3Region:       getEnv("S3_REGION", "us-east-1"),
-			S3AccessKey:    getEnv("S3_ACCESS_KEY", ""),
-			S3SecretKey:    getEnv("S3_SECRET_KEY", ""),
-			S3Endpoint:     getEnv("S3_ENDPOINT", ""),
-			S3PathStyle:    getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
-			CloudFrontURL:  getEnv("CLOUDFRONT_URL", ""),
+			StorageBackend:  getEnv("STORAGE_BACKEND", "local"),
+			S3Bucket:        getEnv("S3_BUCKET", ""),
+			S3StagingBucket: getEnv("S3_STAGING_BUCKET", ""),
+			S3Region:        getEnv("S3_REGION", "us-east-1"),
+			S3AccessKey:     getEnv("S3_ACCESS_KEY", ""),
+			S3SecretKey:     getEnv("S3_SECRET_KEY", ""),
+			S3Endpoint:      getEnv("S3_ENDPOINT", ""),
+			S3PathStyle:     getEnvAsBool("S3_PATH_STYLE", true), // true for MinIO/Ceph, false for R2
+			CloudFrontURL:   getEnv("CLOUDFRONT_URL", ""),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:      getEnv("APP_ENV", "development"),
@@ -289,6 +372,63 @@ func Load() (*Config, error) {
 			APIKey: getEnv("GEMINI_API_KEY", ""),
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
 		},
+		OpenRouter: OpenRouterConfig{
+			APIKey:            getEnv("OPENROUTER_API_KEY", ""),
+			Model:             getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
+			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.1-flash-lite"),
+			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "mistralai/mistral-large-2512"),
+			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "mistralai/mistral-large-2512"),
+			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "anthropic/claude-sonnet-5"),
+			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "anthropic/claude-sonnet-5"),
+			UltraFastModel:    getEnv("OMNICHAT_MODEL_ULTRA_FAST_PRIMARY", "anthropic/claude-opus-4.8"),
+		},
+		OmniChatMedia: OmniChatMediaConfig{
+			Provider:                    getEnv("OMNICHAT_MEDIA_PROVIDER", "runpod"),
+			RunPodAPIKey:                getEnv("RUNPOD_API_KEY", ""),
+			RunPodBaseURL:               getEnv("RUNPOD_BASE_URL", "https://api.runpod.ai/v2"),
+			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
+			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),
+			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
+			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
+			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
+			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),
+			RunPodNetworkVolumeID:       getEnv("RUNPOD_NETWORK_VOLUME_ID", ""),
+			RunPodAvatarImage:           getEnv("RUNPOD_AVATAR_IMAGE", ""),
+			RunPodAvatarGPUTypeID:       getEnv("RUNPOD_AVATAR_GPU_TYPE_ID", ""),
+			RunPodAvatarGPUCount:        getEnvAsPositiveInt("RUNPOD_AVATAR_GPU_COUNT", 1),
+			RunPodAvatarDiskGB:          getEnvAsPositiveInt("RUNPOD_AVATAR_CONTAINER_DISK_GB", 40),
+			RunPodAvatarVolumeGB:        getEnvAsPositiveInt("RUNPOD_AVATAR_VOLUME_GB", 0),
+			RunPodAvatarVCPU:            getEnvAsPositiveInt("RUNPOD_AVATAR_VCPU", 4),
+			RunPodAvatarMemoryGB:        getEnvAsPositiveInt("RUNPOD_AVATAR_MEMORY_GB", 16),
+			RunPodAvatarVolumeMountPath: getEnv("RUNPOD_AVATAR_VOLUME_MOUNT_PATH", "/models"),
+			RunPodAvatarPorts:           getEnvAsStringList("RUNPOD_AVATAR_PORTS"),
+			RunPodWorkerBackendURL:      getEnv("RUNPOD_WORKER_BACKEND_URL", ""),
+			// Bounds the whole job, and a video job is now two provider renders
+			// back to back: an SDXL still, then 121 Wan frames. 900s covered a
+			// single image and would time out the second phase mid-render.
+			RunPodRequestTimeoutSeconds: getEnvAsPositiveInt("RUNPOD_REQUEST_TIMEOUT_SECONDS", 1800),
+			MaxImageBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_IMAGE_BYTES", 25*1024*1024),
+			MaxVideoBytes:               getEnvAsPositiveInt64("OMNICHAT_MAX_VIDEO_BYTES", 200*1024*1024),
+			PollIntervalSeconds:         getEnvAsPositiveInt("RUNPOD_MEDIA_POLL_SECONDS", 2),
+		},
+		OmniChatVoice: OmniChatVoiceConfig{
+			ElevenLabsAPIKey:        getEnv("ELEVENLABS_API_KEY", ""),
+			ElevenLabsBaseURL:       getEnv("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io"),
+			ElevenLabsEnableLogging: getEnvAsBool("ELEVENLABS_ENABLE_LOGGING", false),
+			DefaultModel:            getEnv("ELEVENLABS_TTS_MODEL", "eleven_multilingual_v2"),
+			VoiceboxEnabled:         getEnvAsBool("VOICEBOX_ENABLED", true),
+			VoiceboxBaseURL:         getEnv("VOICEBOX_BASE_URL", "http://127.0.0.1:17493"),
+			VoiceboxTimeoutSeconds:  getEnvAsPositiveInt("VOICEBOX_TIMEOUT_SECONDS", 120),
+			VoiceCloningEnabled:     getEnvAsBool("OMNICHAT_VOICE_CLONING_ENABLED", false),
+		},
+		LiveKit: LiveKitConfig{
+			URL:            getEnv("LIVEKIT_URL", ""),
+			APIKey:         getEnv("LIVEKIT_API_KEY", ""),
+			APISecret:      getEnv("LIVEKIT_API_SECRET", ""),
+			RoomPrefix:     getEnv("LIVEKIT_ROOM_PREFIX", "omnichat"),
+			TokenTTLSecond: getEnvAsPositiveInt("LIVEKIT_TOKEN_TTL_SECONDS", 600),
+		},
+		OmniChatBillingOffersJSON: getEnv("OMNICHAT_BILLING_OFFERS_JSON", ""),
 		OAuth: OAuthConfig{
 			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
 			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
@@ -300,8 +440,52 @@ func Load() (*Config, error) {
 			BackendURL:          getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 	}
+	// RunPod workers return signed URLs from the same private object store that
+	// the API uses for application-owned media. Trust that deployment-owned
+	// HTTPS origin automatically so a Cloudflare R2/MinIO endpoint cannot be
+	// accidentally omitted from RUNPOD_OUTPUT_HOSTS. Explicit environment
+	// entries remain supported for a separate worker output origin or CDN.
+	cfg.OmniChatMedia.RunPodOutputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodOutputHosts,
+		cfg.Storage.S3Endpoint,
+	)
+	cfg.OmniChatMedia.RunPodOutputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodOutputHosts,
+		cfg.Storage.CloudFrontURL,
+	)
+	// Image-to-video workers fetch signed source images from the same storage
+	// endpoint. The worker has its own explicit allow-list, while this list is
+	// used by the API-side URL validator and must cover the same deployment
+	// origins.
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.Storage.S3Endpoint,
+	)
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.Storage.CloudFrontURL,
+	)
+	cfg.OmniChatMedia.RunPodInputHosts = appendHTTPSOriginHost(
+		cfg.OmniChatMedia.RunPodInputHosts,
+		cfg.OmniChatMedia.RunPodWorkerBackendURL,
+	)
 
 	return cfg, nil
+}
+
+func appendHTTPSOriginHost(hosts []string, rawOrigin string) []string {
+	parsed, err := url.Parse(strings.TrimSpace(rawOrigin))
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return hosts
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	for _, candidate := range hosts {
+		if strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(candidate), "."), host) {
+			return hosts
+		}
+	}
+	return append(hosts, host)
 }
 
 // DatabaseURL returns the PostgreSQL connection string
@@ -373,4 +557,41 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvAsPositiveInt(key string, defaultValue int) int {
+	value := getEnvAsInt(key, defaultValue)
+	if value <= 0 {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsPositiveInt64(key string, defaultValue int64) int64 {
+	value := getEnvAsInt64(key, defaultValue)
+	if value <= 0 {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsStringList(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+	values := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		values = append(values, item)
+	}
+	return values
 }

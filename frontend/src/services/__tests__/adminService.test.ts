@@ -7,6 +7,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
   },
 }));
@@ -206,6 +207,96 @@ describe('adminService - Ban System', () => {
       vi.mocked(api.get).mockRejectedValue(mockError);
 
       await expect(adminService.getBanHistory(123)).rejects.toThrow('Unauthorized');
+    });
+  });
+
+  describe('persona media management', () => {
+    it('fetches admin personas', async () => {
+      const mockResponse = {
+        personas: [
+          {
+            id: 9,
+            slug: 'narrator',
+            name: 'Narrator',
+            category: 'roleplay',
+            preview_video_url: '/uploads/narrator-preview.mp4',
+          },
+        ],
+      };
+
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
+
+      const result = await adminService.listOmniChatPersonas();
+
+      expect(api.get).toHaveBeenCalledWith('/admin/omnichat/personas');
+      expect(result).toEqual(mockResponse.personas);
+    });
+
+    it('updates persona avatar and preview media', async () => {
+      const mockResponse = {
+        persona: {
+          id: 9,
+          avatar_url: '/uploads/narrator-avatar.png',
+          preview_video_url: '/uploads/narrator-preview.mp4',
+        },
+      };
+
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
+
+      const result = await adminService.updateOmniChatPersonaMedia(9, {
+        avatar_url: '/uploads/narrator-avatar.png',
+        preview_video_url: '/uploads/narrator-preview.mp4',
+      });
+
+      expect(api.put).toHaveBeenCalledWith('/admin/omnichat/personas/9', {
+        avatar_url: '/uploads/narrator-avatar.png',
+        preview_video_url: '/uploads/narrator-preview.mp4',
+      });
+      expect(result).toEqual(mockResponse.persona);
+    });
+
+    it('fetches all persona voices in one admin request', async () => {
+      const voices = [
+        {
+          persona_id: 9,
+          provider: 'voicebox' as const,
+          voice_id: 'af_bella',
+          voice_name: 'Bella',
+          model_id: 'kokoro',
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0,
+          speed: 1,
+          pitch: 1,
+          active: true,
+        },
+      ];
+      vi.mocked(api.get).mockResolvedValue({ voices });
+
+      await expect(adminService.listOmniChatPersonaVoices()).resolves.toEqual(voices);
+      expect(api.get).toHaveBeenCalledWith('/admin/omnichat/persona-voices');
+    });
+
+    it('assigns a server-owned voice preset to a persona', async () => {
+      const voice = {
+        persona_id: 9,
+        provider: 'voicebox' as const,
+        voice_id: 'af_bella',
+        voice_name: 'Bella',
+        model_id: 'kokoro',
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0,
+        speed: 1,
+        pitch: 1,
+        active: true,
+      };
+      vi.mocked(api.put).mockResolvedValue({ voice });
+
+      await expect(adminService.updateOmniChatPersonaVoice(9, 'af_bella')).resolves.toEqual(voice);
+      expect(api.put).toHaveBeenCalledWith('/admin/omnichat/personas/9/voice', {
+        preset_id: 'af_bella',
+      });
     });
   });
 });

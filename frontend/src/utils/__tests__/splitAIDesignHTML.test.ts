@@ -108,4 +108,24 @@ describe('splitAIDesignHTML', () => {
     expect(result.slotsByMarker.size).toBe(0);
     expect(result.htmlWithoutStyles).toContain('<p>No slots</p>');
   });
+
+  it('removes executable markup, unsafe URLs, and resource-loading CSS', () => {
+    const result = splitAIDesignHTML(`
+      <style>@import url(https://attacker.example/style.css); .x { background: url(https://attacker.example/pixel) }</style>
+      <div class="hub-custom-page" onclick="alert(1)">
+        <script>alert(1)</script>
+        <iframe src="https://attacker.example"></iframe>
+        <a href="javascript:alert(1)" target="_blank">Bad link</a>
+        <img src="javascript:alert(1)" onerror="alert(1)" />
+        <div id="hub-feed" style="background:url(https://attacker.example/pixel)"></div>
+      </div>
+    `);
+
+    expect(result.styleContent).toBe('');
+    expect(result.htmlWithoutStyles).not.toContain('<script');
+    expect(result.htmlWithoutStyles).not.toContain('<iframe');
+    expect(result.htmlWithoutStyles).not.toContain('onclick');
+    expect(result.htmlWithoutStyles).not.toContain('javascript:');
+    expect(result.htmlWithoutStyles).not.toContain('background:url');
+  });
 });

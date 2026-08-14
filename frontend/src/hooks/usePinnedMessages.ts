@@ -14,6 +14,8 @@ const toPinnedSet = (messages: Message[]): Set<number> => {
   return new Set(messages.map((message) => message.id));
 };
 
+const EMPTY_PINNED_MESSAGES: Message[] = [];
+
 const sortPinnedMessages = (messages: Message[]): Message[] => {
   return [...messages].sort((a, b) => {
     const pinnedAtA = a.pinned_at ? Date.parse(a.pinned_at) : 0;
@@ -71,7 +73,7 @@ export function usePinnedMessages({
     refetchOnWindowFocus: false,
   });
 
-  const pinnedMessages = pinnedQuery.data?.pinned_messages ?? [];
+  const pinnedMessages = pinnedQuery.data?.pinned_messages ?? EMPTY_PINNED_MESSAGES;
   const pinnedMessageIds = useMemo(() => toPinnedSet(pinnedMessages), [pinnedMessages]);
 
   const isPinned = useCallback(

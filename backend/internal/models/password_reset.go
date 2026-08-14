@@ -17,7 +17,7 @@ import (
 type PasswordReset struct {
 	ID        int        `json:"id"`
 	UserID    int        `json:"user_id"`
-	Token     string     `json:"token"`
+	Token     string     `json:"-"`
 	ExpiresAt time.Time  `json:"expires_at"`
 	UsedAt    *time.Time `json:"used_at"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -93,21 +93,12 @@ func (r *PasswordResetRepository) GetByToken(ctx context.Context, token string) 
 		&reset.CreatedAt,
 	)
 	if err == pgx.ErrNoRows {
-		err = r.db.QueryRow(ctx, query, token).Scan(
-			&reset.ID,
-			&reset.UserID,
-			&reset.Token,
-			&reset.ExpiresAt,
-			&reset.UsedAt,
-			&reset.CreatedAt,
-		)
-	}
-	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("password reset token not found: %w", err)
 	}
+	reset.Token = ""
 
 	return reset, nil
 }
@@ -117,10 +108,10 @@ func (r *PasswordResetRepository) MarkAsUsed(ctx context.Context, token string) 
 	query := `
 		UPDATE password_resets
 		SET used_at = NOW()
-		WHERE token IN ($1, $2) AND used_at IS NULL
+		WHERE token = $1 AND used_at IS NULL
 	`
 
-	result, err := r.db.Exec(ctx, query, hashPasswordResetToken(token), token)
+	result, err := r.db.Exec(ctx, query, hashPasswordResetToken(token))
 	if err != nil {
 		return fmt.Errorf("failed to mark token as used: %w", err)
 	}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,12 +18,14 @@ import { HamburgerMenu } from '../components/navigation/HamburgerMenu';
 import { AccountMenu } from '../components/navigation/AccountMenu';
 import { ConnectionStatusIndicator } from '../components/common/ConnectionStatusIndicator';
 import { useNotificationSound } from '../hooks/useNotificationSound';
+import { useOmniChatLayoutMode } from '../hooks/useOmniChatLayoutMode';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MobileTabBar } from '../components/mobile/MobileTabBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastContainer } from '../components/error';
 import { dismissToast, useToasts } from '../hooks/useToast';
 import { UpgradeModal } from '../components/payments/UpgradeModal';
+import { getSafeInternalPath } from '../utils/navigation';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -35,8 +37,10 @@ const prefetchRoutes = {
   about: () => import('../pages/AboutPage'),
   createHub: () => import('../pages/CreateHubPage'),
   createPost: () => import('../pages/CreatePostPage'),
+  games: () => import('../pages/GamesPage'),
   hubs: () => import('../pages/HubsAndSubsPage'),
   messages: () => import('../pages/MessagesPage'),
+  omnichat: () => import('../pages/OmniChatDiscoverPage'),
   settings: () => import('../pages/SettingsPage'),
   themes: () => import('../pages/ThemesPage'),
   admin: () => import('../pages/AdminPage'),
@@ -45,6 +49,7 @@ const prefetchRoutes = {
 
 // Captured at module load so components don't call Date.now() during render
 const MODULE_LOAD_TIME = Date.now();
+const ABOUT_MODAL_STORAGE_KEY = 'omninudge_about_modal_dismissed';
 
 export default function MainLayout() {
   const { t } = useTranslation();
@@ -63,9 +68,13 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      !location.pathname.startsWith('/omnichat') &&
+      localStorage.getItem(ABOUT_MODAL_STORAGE_KEY) !== 'true'
+  );
   const [dontShowAgain, setDontShowAgain] = useState(false);
-  const aboutModalStorageKey = 'omninudge_about_modal_dismissed';
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -75,6 +84,11 @@ export default function MainLayout() {
   useNotificationSound();
 
   const isAIPreview = /^\/h\/[^/]+\/ai-design\/preview\//.test(location.pathname);
+  const { mode: omniChatLayoutMode } = useOmniChatLayoutMode();
+  const isOmniChatImmersive =
+    location.pathname.startsWith('/omnichat') && omniChatLayoutMode === 'immersive';
+  const isOmniChatRoute = location.pathname.startsWith('/omnichat');
+  const hideNav = isAIPreview || isOmniChatImmersive || isOmniChatRoute;
 
   // Determine if slim mode
   const isSlimMode =
@@ -175,7 +189,8 @@ export default function MainLayout() {
       ) {
         setAuthModal(detail.mode);
         if (detail.redirectTo) {
-          setPendingRedirect({ to: detail.redirectTo, state: detail.redirectState });
+          const redirectTo = getSafeInternalPath(detail.redirectTo, '');
+          setPendingRedirect(redirectTo ? { to: redirectTo, state: detail.redirectState } : null);
         } else {
           setPendingRedirect(null);
         }
@@ -192,11 +207,15 @@ export default function MainLayout() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
+    if (isOmniChatRoute) {
+      setShowAboutModal(false);
+      return;
+    }
+    const dismissed = localStorage.getItem(ABOUT_MODAL_STORAGE_KEY) === 'true';
     if (!dismissed) {
       setShowAboutModal(true);
     }
-  }, [aboutModalStorageKey]);
+  }, [isOmniChatRoute]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -210,7 +229,7 @@ export default function MainLayout() {
 
       {/* Navigation Bar */}
       <nav
-        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${isAIPreview ? ' hidden' : ''}`}
+        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${hideNav ? ' hidden' : ''}`}
         style={{ height: isSlimMode ? '36px' : '64px' }}
       >
         <div className="mx-auto max-w-7xl px-4 h-full">
@@ -256,6 +275,21 @@ export default function MainLayout() {
                     >
                       {t('menu.hubs')}
                     </button>
+                    <Link
+                      to="/games"
+                      onMouseEnter={() => prefetchRoutes.games()}
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      {t('nav.games')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/omnichat')}
+                      onMouseEnter={() => prefetchRoutes.omnichat()}
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      {t('nav.omnichat')}
+                    </button>
                   </div>
 
                   {/* Divider */}
@@ -300,6 +334,10 @@ export default function MainLayout() {
                         {
                           label: t('menu.hubs'),
                           to: '/hubs',
+                        },
+                        {
+                          label: t('nav.omnichat'),
+                          to: '/omnichat',
                         },
                         {
                           label: t('menu.about'),
@@ -467,14 +505,15 @@ export default function MainLayout() {
 
       {/* Plan expiry warning banner */}
       {(() => {
-        if (user?.plan !== 'paid' || !user.plan_expires_at) return null;
+        if ((user?.plan !== 'plus' && user?.plan !== 'premium') || !user.plan_expires_at)
+          return null;
         const daysLeft = Math.ceil(
           (new Date(user.plan_expires_at).getTime() - MODULE_LOAD_TIME) / (1000 * 60 * 60 * 24)
         );
         if (daysLeft > 3 || daysLeft <= 0) return null;
         return (
           <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
-            Your paid plan expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}.{' '}
+            Your {user.plan} plan expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}.{' '}
             <button
               type="button"
               onClick={() => setShowUpgradeModal(true)}
@@ -494,8 +533,8 @@ export default function MainLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile tab bar - only shows on mobile (<768px), not on AI preview */}
-      {isMobile && !isAIPreview && (
+      {/* Mobile tab bar - only shows on mobile (<768px), not on AI preview or immersive OmniChat */}
+      {isMobile && !hideNav && (
         <ErrorBoundary
           fallback={
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
@@ -509,10 +548,10 @@ export default function MainLayout() {
         </ErrorBoundary>
       )}
 
-      {showAboutModal && (
+      {showAboutModal && !isOmniChatRoute && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
-            <div className="max-h-[70vh] overflow-y-auto pr-2">
+            <div className="h-[70vh] overflow-y-auto pr-2">
               <Suspense
                 fallback={
                   <div className="py-6">
@@ -537,7 +576,7 @@ export default function MainLayout() {
                 type="button"
                 onClick={() => {
                   if (dontShowAgain) {
-                    localStorage.setItem(aboutModalStorageKey, 'true');
+                    localStorage.setItem(ABOUT_MODAL_STORAGE_KEY, 'true');
                   }
                   setShowAboutModal(false);
                 }}

@@ -6,7 +6,8 @@ import { mediaService } from '../../services/mediaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import { API_BASE_URL, getStoredAuthToken } from '../../lib/api';
+import { API_BASE_URL } from '../../lib/api';
+import { authenticatedFetch } from '../../services/authSession';
 import {
   decryptMessage,
   encryptFile,
@@ -153,10 +154,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
           return;
         }
 
-        const token = getStoredAuthToken();
-        const response = await fetch(originalUrl, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await authenticatedFetch(originalUrl);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -218,6 +216,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
     message.sender_media_encryption_key,
     message.media_encryption_iv,
     isOwnMessage,
+    t,
   ]);
 
   return mediaSrc;
@@ -263,7 +262,7 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
                 alt={t('messages.media.fallbackText')}
                 className="max-w-full rounded cursor-pointer"
                 style={{ maxHeight: '300px' }}
-                onClick={() => window.open(mediaSrc, '_blank')}
+                onClick={() => window.open(mediaSrc, '_blank', 'noopener,noreferrer')}
               />
             )}
             {messageType === 'video' && (

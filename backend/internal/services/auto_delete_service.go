@@ -61,12 +61,6 @@ func NewAutoDeleteService(
 	}
 }
 
-// GetEffectiveSetting returns the effective auto-delete duration for userID in conversationID.
-// Per-chat override takes priority over the global setting; nil means Never.
-func (s *AutoDeleteService) GetEffectiveSetting(ctx context.Context, userID, conversationID int) (*time.Duration, error) {
-	return s.convRepo.GetEffectiveAutoDelete(ctx, userID, conversationID)
-}
-
 // GetRawChatSetting returns only the per-chat override for userID in conversationID,
 // with NO fallback to the global setting. Returns nil when no override is set,
 // letting the caller distinguish "no override" from "override equals global default".

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,9 +13,12 @@ func CacheControl() gin.HandlerFunc {
 
 		// Determine cache strategy by path
 		if strings.HasPrefix(path, "/uploads/") {
-			// Static files: cache for 7 days
-			c.Header("Cache-Control", "public, max-age=604800, immutable")
-			c.Header("Expires", time.Now().Add(7*24*time.Hour).Format(time.RFC1123))
+			// Uploads are private by default. The ownership-aware upload handler
+			// opts only untracked public profile assets into shared caching after
+			// it has resolved the path.
+			c.Header("Cache-Control", "private, no-store")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
 		} else if strings.HasPrefix(path, "/api/") {
 			// API responses: no cache (or short cache for specific endpoints)
 			if strings.HasPrefix(path, "/api/v1/users/") && c.Request.Method == "GET" {

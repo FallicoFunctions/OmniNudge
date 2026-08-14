@@ -344,7 +344,7 @@ Tests use separate `omninudge_test` database to avoid polluting development data
 
 ```bash
 export TEST_DATABASE_URL="postgres://user@localhost:5432/omninudge_test?sslmode=disable"
-go test ./...
+go test -p 1 ./...
 ```
 
 ## Future ML Integration

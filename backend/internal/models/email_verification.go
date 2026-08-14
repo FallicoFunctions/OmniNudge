@@ -11,18 +11,20 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // EmailVerification represents an email verification token
 type EmailVerification struct {
-	ID         int        `json:"id"`
-	UserID     int        `json:"user_id"`
-	Email      string     `json:"email"`
-	Token      string     `json:"token"`
-	Purpose    string     `json:"purpose"` // 'registration', 'update_email'
-	ExpiresAt  time.Time  `json:"expires_at"`
-	VerifiedAt *time.Time `json:"verified_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID             int        `json:"id"`
+	UserID         int        `json:"user_id"`
+	Email          string     `json:"email"`
+	EmailEncrypted bool       `json:"-"`
+	Token          string     `json:"-"`
+	Purpose        string     `json:"purpose"` // 'registration', 'update_email'
+	ExpiresAt      time.Time  `json:"expires_at"`
+	VerifiedAt     *time.Time `json:"verified_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // EmailVerificationRepository handles email verification operations
@@ -49,6 +51,10 @@ func (r *EmailVerificationRepository) GenerateToken(ctx context.Context, userID 
 	}
 	rawToken := base64.URLEncoding.EncodeToString(tokenBytes)
 	storedToken := hashEmailVerificationToken(rawToken)
+	storedEmail, err := utils.EncryptEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt verification email: %w", err)
+	}
 
 	// Token expires in 24 hours
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -63,12 +69,12 @@ func (r *EmailVerificationRepository) GenerateToken(ctx context.Context, userID 
 	}
 
 	query := `
-		INSERT INTO email_verifications (user_id, email, token, purpose, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO email_verifications (user_id, email, email_encrypted, token, purpose, expires_at)
+		VALUES ($1, $2, TRUE, $3, $4, $5)
 		RETURNING id, created_at
 	`
 
-	err := r.pool.QueryRow(ctx, query, userID, email, storedToken, purpose, expiresAt).Scan(
+	err = r.pool.QueryRow(ctx, query, userID, storedEmail, storedToken, purpose, expiresAt).Scan(
 		&verification.ID,
 		&verification.CreatedAt,
 	)
@@ -87,14 +93,15 @@ func (r *EmailVerificationRepository) Verify(ctx context.Context, token string) 
 	query := `
 		UPDATE email_verifications
 		SET verified_at = $1
-		WHERE token IN ($2, $3) AND verified_at IS NULL AND expires_at > $1
-		RETURNING id, user_id, email, token, purpose, expires_at, verified_at, created_at
+		WHERE token = $2 AND verified_at IS NULL AND expires_at > $1
+		RETURNING id, user_id, email, email_encrypted, token, purpose, expires_at, verified_at, created_at
 	`
 
-	err := r.pool.QueryRow(ctx, query, now, hashEmailVerificationToken(token), token).Scan(
+	err := r.pool.QueryRow(ctx, query, now, hashEmailVerificationToken(token)).Scan(
 		&verification.ID,
 		&verification.UserID,
 		&verification.Email,
+		&verification.EmailEncrypted,
 		&verification.Token,
 		&verification.Purpose,
 		&verification.ExpiresAt,
@@ -103,6 +110,9 @@ func (r *EmailVerificationRepository) Verify(ctx context.Context, token string) 
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid or expired verification token: %w", err)
+	}
+	if err := decryptVerificationEmail(verification); err != nil {
+		return nil, err
 	}
 
 	return verification, nil
@@ -121,9 +131,6 @@ func (r *EmailVerificationRepository) IsValid(ctx context.Context, token string)
 	`
 
 	err := r.pool.QueryRow(ctx, query, hashEmailVerificationToken(token)).Scan(&userID, &purpose, &expiresAt)
-	if err == pgx.ErrNoRows {
-		err = r.pool.QueryRow(ctx, query, token).Scan(&userID, &purpose, &expiresAt)
-	}
 	if err != nil {
 		return false, 0, "", err
 	}
@@ -152,7 +159,7 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 	verification := &EmailVerification{}
 
 	query := `
-		SELECT id, user_id, email, token, purpose, expires_at, verified_at, created_at
+		SELECT id, user_id, email, email_encrypted, token, purpose, expires_at, verified_at, created_at
 		FROM email_verifications
 		WHERE token = $1
 	`
@@ -161,6 +168,7 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 		&verification.ID,
 		&verification.UserID,
 		&verification.Email,
+		&verification.EmailEncrypted,
 		&verification.Token,
 		&verification.Purpose,
 		&verification.ExpiresAt,
@@ -168,21 +176,12 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 		&verification.CreatedAt,
 	)
 	if err == pgx.ErrNoRows {
-		err = r.pool.QueryRow(ctx, query, token).Scan(
-			&verification.ID,
-			&verification.UserID,
-			&verification.Email,
-			&verification.Token,
-			&verification.Purpose,
-			&verification.ExpiresAt,
-			&verification.VerifiedAt,
-			&verification.CreatedAt,
-		)
-	}
-	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := decryptVerificationEmail(verification); err != nil {
 		return nil, err
 	}
 
@@ -194,7 +193,7 @@ func (r *EmailVerificationRepository) GetPendingVerification(ctx context.Context
 	verification := &EmailVerification{}
 
 	query := `
-		SELECT id, user_id, email, token, purpose, expires_at, verified_at, created_at
+		SELECT id, user_id, email, email_encrypted, token, purpose, expires_at, verified_at, created_at
 		FROM email_verifications
 		WHERE user_id = $1 AND purpose = $2 AND verified_at IS NULL
 		ORDER BY created_at DESC
@@ -205,6 +204,7 @@ func (r *EmailVerificationRepository) GetPendingVerification(ctx context.Context
 		&verification.ID,
 		&verification.UserID,
 		&verification.Email,
+		&verification.EmailEncrypted,
 		&verification.Token,
 		&verification.Purpose,
 		&verification.ExpiresAt,
@@ -217,6 +217,29 @@ func (r *EmailVerificationRepository) GetPendingVerification(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
+	if err := decryptVerificationEmail(verification); err != nil {
+		return nil, err
+	}
 
 	return verification, nil
+}
+
+func decryptVerificationEmail(verification *EmailVerification) error {
+	if verification == nil {
+		return nil
+	}
+	// Read paths scan the stored digest only because PostgreSQL RETURNING/SELECT
+	// must match a stable shape. Never retain that internal credential material
+	// on the domain object.
+	verification.Token = ""
+	if !verification.EmailEncrypted || verification.Email == "" {
+		return nil
+	}
+	decrypted, err := utils.DecryptEmail(verification.Email)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt verification email: %w", err)
+	}
+	verification.Email = decrypted
+	verification.EmailEncrypted = false
+	return nil
 }

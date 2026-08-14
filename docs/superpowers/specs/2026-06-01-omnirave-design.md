@@ -62,6 +62,37 @@ Responsibilities of the runtime surface:
 
 This runtime is part of the product, but it is not bundled into the existing OmniNudge SPA as a normal route-level React page.
 
+### 2.3 Launch And Session Bootstrap
+
+The launch handshake must be explicit.
+
+Signed-in launch flow:
+1. player clicks launch from OmniNudge
+2. OmniNudge requests a short-lived OmniRave launch token from `omnigame-platform-api`
+3. the player is redirected to `play.omninudge.com/omnirave` with a one-time launch handoff
+4. the OmniRave runtime exchanges that launch handoff for an active game session
+5. the game session returns:
+   - account-backed identity
+   - saved loadout
+   - saved return point if valid
+   - current moderation/session status
+   - world connection details
+
+Guest launch flow:
+1. player clicks guest launch from OmniNudge or from the OmniRave detail surface
+2. `omnigame-platform-api` creates a guest session bootstrap
+3. the player is redirected to `play.omninudge.com/omnirave`
+4. the OmniRave runtime exchanges the guest bootstrap for an active guest game session
+5. the game session returns:
+   - auto-generated guest username
+   - temporary loadout state
+   - current moderation/session status
+   - world connection details
+
+Required implementation rule:
+- the browser must not depend on sharing OmniNudge auth cookies directly with the realtime world socket
+- OmniRave runtime authentication must use explicit short-lived launch/session tokens owned by the game platform
+
 ---
 
 ## 3. World Design
@@ -85,17 +116,17 @@ The world contains three persistent media zones:
 - outdoor
 - primary arrival/social anchor
 - largest congregation area
-- synchronized curated DJ concert video playlist
+- synchronized curated DJ audio setlist
 
 2. `techno_room`
 - indoor warehouse / dark room
 - darker lighting and industrial mood
-- synchronized curated techno-focused DJ concert video playlist
+- synchronized curated techno-focused DJ audio setlist
 
 3. `neon_room`
 - indoor classic rave room
 - brighter neon lighting and classic rave feel
-- synchronized curated DJ concert video playlist
+- synchronized curated DJ audio setlist
 
 Players can move freely between these spaces in the same world session.
 
@@ -124,7 +155,7 @@ If a player launches OmniRave while authenticated with OmniNudge:
 - OmniRave data is saved to that account
 
 Saved account-backed data includes:
-- persistent username association
+- account-linked identity association
 - saved loadout
 - saved last valid return position
 - moderation state relevant to OmniRave
@@ -140,6 +171,7 @@ Guest behavior:
 - guest gets full customization access
 - guest can chat equally with signed-in users
 - guest data is not persisted after session end
+- guest moderation sanctions may still be persisted separately from guest profile data
 
 ### 4.3 Username Rules
 
@@ -154,6 +186,21 @@ Moderation still applies to:
 - chat messages
 - abuse/spam behavior
 - mute/kick/ban style actions if introduced
+
+### 4.4 Guest Moderation And Sanctions
+
+Guest profile data is not saved, but guest moderation enforcement must still be durable enough to matter during v1.
+
+Required behavior:
+- guest mutes/bans are not tied to a saved guest profile
+- guest sanctions are enforced through server-owned session and network identifiers
+- reconnecting as a fresh guest must not automatically clear an active sanction
+
+V1 sanction model:
+- signed-in users: sanctions attach to OmniNudge account identity
+- guests: sanctions attach to durable-enough server-side guest enforcement records, such as IP-based and session bootstrap identifiers
+
+This is not a strong anti-abuse guarantee against determined evasion, but it is required so “equal chat access” does not become “zero-cost guest abuse.”
 
 ---
 
@@ -252,21 +299,21 @@ That zone-change event is the trigger for stage media switching.
 
 ## 7. Stage Media Model
 
-### 7.1 Video-First Stage Design
+### 7.1 Audio-First Stage Design
 
-Stages are not audio-only zones.
+Stage music is the core of each zone, and the game serves the audio itself.
 
 Each stage has:
-- a visible video screen / concert display
-- a curated playlist of YouTube concert videos
-- a synchronized playback timeline
+- a curated setlist of self-hosted audio files served by the game
+- a server-owned synchronized playback timeline
+- a stage presentation (lighting/visuals) driven by that timeline
 
 ### 7.2 Global Sync Per Zone
 
 Each stage has one authoritative playback state shared by all players currently in that zone.
 
 Per-zone state includes:
-- active YouTube video id
+- active audio track id
 - playlist index
 - server-owned playhead reference
 - started-at timestamp or equivalent timing anchor
@@ -284,7 +331,7 @@ Rules:
 - a player hears only the stage for their current server-confirmed zone
 - there is no blended crossfade between zones
 - leaving one zone immediately cuts that zone’s media
-- entering another zone immediately switches to that zone’s current synchronized video/audio
+- entering another zone immediately switches to that zone’s current synchronized audio
 
 To avoid flicker at exact border edges, the server may use a small internal hysteresis buffer, but the user-facing behavior must still feel like a hard zone boundary.
 
@@ -299,8 +346,20 @@ Players cannot:
 
 The owner/admin control surface is responsible for:
 - setting playlist order
-- choosing which YouTube videos are in each stage setlist
+- choosing which audio tracks are in each stage setlist
 - optionally skipping/forcing tracks later through an admin tool
+
+### 7.5 Mobile Media Unlock
+
+Because OmniRave v1 supports mobile and uses synchronized self-hosted stage audio playback, the runtime must include an explicit media unlock step before world entry.
+
+Required behavior:
+- the player must perform an interaction such as tapping `Enter OmniRave` before stage audio is expected to work
+- that interaction unlocks mobile browser media playback for the session
+- the client may preload or initialize muted stage players after unlock
+- when the server confirms the player’s active zone, the correct stage stream becomes the only audible stream
+
+Failure to define this step would make mobile stage playback unreliable, especially on Safari-class browsers.
 
 ---
 
@@ -353,6 +412,7 @@ Required logical systems:
 - persistent OmniRave profile/loadout storage
 - reconnect/session metadata
 - stage playlist metadata reads
+- sanction/bootstrap enforcement for guest and signed-in sessions
 
 3. `omnirave-world`
 - authoritative multiplayer world runtime

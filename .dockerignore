@@ -1,0 +1,12 @@
+.git
+.gitignore
+**/.env
+**/.env.*
+**/__pycache__/
+*.py[cod]
+*.so
+node_modules/
+frontend/node_modules/
+backend/tmp/
+tmp/
+*.log

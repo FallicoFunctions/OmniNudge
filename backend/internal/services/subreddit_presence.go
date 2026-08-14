@@ -7,9 +7,9 @@ import (
 )
 
 type PresenceStore struct {
-	ttl       time.Duration
-	mu        sync.RWMutex
-	lastSeen  map[string]map[string]time.Time
+	ttl      time.Duration
+	mu       sync.RWMutex
+	lastSeen map[string]map[string]time.Time
 }
 
 func NewPresenceStore(ttl time.Duration) *PresenceStore {
@@ -41,21 +41,6 @@ func (p *PresenceStore) Touch(subreddit string, key string) int {
 	p.lastSeen[normalized][key] = now
 	p.pruneLocked(normalized, now)
 
-	return len(p.lastSeen[normalized])
-}
-
-func (p *PresenceStore) CountActive(subreddit string) int {
-	if subreddit == "" {
-		return 0
-	}
-
-	normalized := strings.ToLower(subreddit)
-	now := time.Now()
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.pruneLocked(normalized, now)
 	return len(p.lastSeen[normalized])
 }
 

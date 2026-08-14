@@ -1,15 +1,13 @@
 # Docker Compose for OmniNudge Monitoring Stack
 # Includes: Prometheus, Grafana, Node Exporter, Postgres Exporter, Redis Exporter
 
-version: '3.8'
-
 services:
   # Prometheus - Metrics collection and storage
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
     container_name: omninudge-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
@@ -26,13 +24,13 @@ services:
 
   # Grafana - Metrics visualization
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.1.1@sha256:1c1bd67c54c5fcf6e759897852b5a584191bd6796e8d328a5ace457799801261
     container_name: omninudge-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin # Change in production!
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:?set a non-default Grafana admin password}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana-data:/var/lib/grafana
@@ -45,10 +43,10 @@ services:
 
   # Node Exporter - System metrics (CPU, memory, disk, network)
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
     container_name: omninudge-node-exporter
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
@@ -64,26 +62,26 @@ services:
 
   # Postgres Exporter - Database metrics
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
+    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
     container_name: omninudge-postgres-exporter
     ports:
-      - "9187:9187"
+      - "127.0.0.1:9187:9187"
     environment:
-      # Update these to match your PostgreSQL credentials
-      - DATA_SOURCE_NAME=postgresql://postgres:password@host.docker.internal:5432/omninudge?sslmode=disable
+      # Set a least-privilege monitoring DSN in the environment; do not embed
+      # database credentials in this compose file.
+      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_DSN:?set the PostgreSQL exporter DSN}
     restart: unless-stopped
     networks:
       - monitoring
 
   # Redis Exporter - Cache metrics
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.87.0@sha256:9ca6f929a8abc518d78158757922444f1cf807661a2238f44b28c3cd08a1b652
     container_name: omninudge-redis-exporter
     ports:
-      - "9121:9121"
+      - "127.0.0.1:9121:9121"
     environment:
-      # Update if Redis has password or different host
-      - REDIS_ADDR=host.docker.internal:6379
+      - REDIS_ADDR=${REDIS_EXPORTER_ADDR:-redis://host.docker.internal:6379}
     restart: unless-stopped
     networks:
       - monitoring

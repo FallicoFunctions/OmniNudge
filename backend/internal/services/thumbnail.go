@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/disintegration/imaging"
+	"github.com/omninudge/backend/internal/utils"
+	_ "golang.org/x/image/webp"
 )
 
 const (
@@ -264,11 +266,12 @@ func (s *ThumbnailService) GenerateVideoThumbnailSecure(sourcePath string, timeo
 
 // GetImageDimensions returns the width and height of an image
 func (s *ThumbnailService) GetImageDimensions(imagePath string) (width int, height int, err error) {
+	// #nosec G304 -- imagePath is a server-created upload/thumbnail path supplied by internal media services.
 	file, err := os.Open(imagePath)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to open image: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	config, _, err := image.DecodeConfig(file)
 	if err != nil {
@@ -323,7 +326,6 @@ func mimeTypeFromExtension(path string) string {
 func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
 	scaleSteps := []float64{1.0, 0.85, 0.7, 0.55, 0.45, 0.35, 0.25}
 	qualities := []int{80, 70, 60, 50, 40, 30, 25, 20}
-	var lastErr error
 	for _, scale := range scaleSteps {
 		scaled := img
 		if scale < 1.0 {
@@ -340,27 +342,21 @@ func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
 		}
 		for _, quality := range qualities {
 			if err := imaging.Save(scaled, path, imaging.JPEGQuality(quality)); err != nil {
-				lastErr = err //nolint:ineffassign,staticcheck // always overwritten by the generic error after all quality attempts
-				continue
+				return fmt.Errorf("save thumbnail: %w", err)
 			}
 			if maxBytes <= 0 {
 				return nil
 			}
 			info, err := os.Stat(path)
 			if err != nil {
-				lastErr = err //nolint:ineffassign,staticcheck // always overwritten by the generic error after all quality attempts
-				continue
+				return fmt.Errorf("stat thumbnail: %w", err)
 			}
 			if info.Size() <= maxBytes {
 				return nil
 			}
 		}
-		lastErr = fmt.Errorf("thumbnail exceeds max size %d bytes after quality/scale passes", maxBytes)
 	}
-	if lastErr != nil {
-		return lastErr
-	}
-	return nil
+	return fmt.Errorf("thumbnail exceeds max size %d bytes after quality/scale passes", maxBytes)
 }
 
 func optimizeJPEGFile(path string, maxBytes int64) error {
@@ -372,8 +368,12 @@ func optimizeJPEGFile(path string, maxBytes int64) error {
 }
 
 func defaultCommandRunner(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if name != "ffmpeg" && name != "ffprobe" {
+		return nil, fmt.Errorf("unsupported thumbnail command %q", name)
+	}
+	// #nosec G204 -- the executable is allowlisted above and arguments are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, name, args...)
-	return cmd.CombinedOutput()
+	return utils.RunCommandWithOutputLimit(cmd, 64*1024)
 }
 
 // calculateThumbnailDimensions calculates thumbnail dimensions while maintaining aspect ratio

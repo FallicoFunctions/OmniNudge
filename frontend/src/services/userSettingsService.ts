@@ -42,6 +42,9 @@ export type UpdateUserSettingsRequest = Partial<
     | 'notify_comment_milestone'
     | 'notify_comment_velocity'
     | 'daily_digest'
+    | 'omnichat_default_user_name'
+    | 'omnichat_default_user_age'
+    | 'omnichat_default_user_gender'
   >
 > & {
   // Total seconds for the global auto-delete duration. 0 means "never".

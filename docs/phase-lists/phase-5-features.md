@@ -192,7 +192,7 @@ const payout = await stripe.transfers.create({
 **Option C: WebRTC → CDN Hybrid (Best)**
 - *Pros:* Low latency (~3 seconds), scalable, creator-friendly
 - *Cons:* More complex setup
-- *Services:* Agora, Daily.co, LiveKit
+- *Service:* Self-hosted LiveKit
 
 **Recommendation:** Start with Mux or AWS IVS (proven, scalable), add low-latency later if needed.
 

@@ -252,3 +252,52 @@ func TestAccountLockoutService_Reset(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+// Identifier and IP failures are counted independently and each must reach the
+// threshold on its own. Summing them into one count instead -- the single-query
+// form IsLocked deliberately avoids -- would let an attacker lock someone out
+// of their account without ever attacking it at threshold: fail a few logins
+// against the target, fail a few more against any unrelated username from an
+// address the target shares, and the combined total trips the limit. Shared
+// addresses are ordinary (office NAT, cafe wifi, mobile carriers), so this is
+// reachable rather than theoretical.
+//
+// The comment in IsLocked once justified the split by a PostgreSQL cast error
+// on an empty address, which does not reproduce through pgx. This test is the
+// reason the split has to stay, so that disproving the old rationale does not
+// invite merging the queries back together.
+func TestAccountLockoutService_IsLocked_CountsIdentifierAndIPIndependently(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	svc := services.NewAccountLockoutService(db.Pool)
+	ctx := context.Background()
+
+	target := uniqueIdentifier("lockout_target")
+	unrelated := uniqueIdentifier("lockout_unrelated")
+	const sharedIP = "203.0.113.44"
+	const targetIP = "198.51.100.7"
+
+	// Neither axis reaches five: four against the target, four against a
+	// different account from the address the target is about to log in from.
+	for i := 0; i < 4; i++ {
+		require.NoError(t, svc.RecordFailure(ctx, target, targetIP))
+		require.NoError(t, svc.RecordFailure(ctx, unrelated, sharedIP))
+	}
+
+	locked, err := svc.IsLocked(ctx, target, sharedIP)
+	require.NoError(t, err)
+	assert.False(t, locked,
+		"eight failures split four and four across two unrelated axes must not lock; "+
+			"a combined count would, and that is a denial of service against the target")
+
+	// Each axis still locks on its own once it genuinely reaches the threshold.
+	require.NoError(t, svc.RecordFailure(ctx, target, targetIP))
+	locked, err = svc.IsLocked(ctx, target, sharedIP)
+	require.NoError(t, err)
+	assert.True(t, locked, "five failures against the identifier must lock it")
+
+	fresh := uniqueIdentifier("lockout_fresh")
+	require.NoError(t, svc.RecordFailure(ctx, unrelated, sharedIP))
+	locked, err = svc.IsLocked(ctx, fresh, sharedIP)
+	require.NoError(t, err)
+	assert.True(t, locked, "five failures from one address must lock it whatever username is tried")
+}

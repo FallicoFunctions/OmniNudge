@@ -57,7 +57,7 @@ func (r *RedditPostCommentRepository) Create(ctx context.Context, comment *Reddi
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Insert comment with score of 1 (auto-upvoted)
 	query := `
@@ -229,7 +229,7 @@ func (r *RedditPostCommentRepository) Delete(ctx context.Context, id int) error 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var childCount int
 	err = tx.QueryRow(ctx, `
@@ -280,7 +280,7 @@ func (r *RedditPostCommentRepository) SetVote(ctx context.Context, commentID, us
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Get current vote if exists
 	var currentVote int

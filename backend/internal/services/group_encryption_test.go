@@ -183,7 +183,7 @@ func getTestDB(t *testing.T) *sql.DB {
 
 func TestGroupEncryptionService_CreateGroupKey(t *testing.T) {
 	db := getTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewGroupEncryptionService(db)
 
@@ -208,7 +208,7 @@ func TestGroupEncryptionService_CreateGroupKey(t *testing.T) {
 
 func TestGroupEncryptionService_RotateGroupKey(t *testing.T) {
 	db := getTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewGroupEncryptionService(db)
 

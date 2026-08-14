@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	testBTCWallet = "31yyvq2asepMEJLqtuka7oSoVCRrnoeG2K"
-	testETHWallet = "0xc308f275a03bad6c3ba3b75e2d024d258cba586f"
+	testBTCWallet   = "31yyvq2asepMEJLqtuka7oSoVCRrnoeG2K"
+	testETHWallet   = "0xc308f275a03bad6c3ba3b75e2d024d258cba586f"
 	testCAHContract = "0x8e0e57dcb1ce8d9091df38ec1bfc3b224529754a"
 )
 

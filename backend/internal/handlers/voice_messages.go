@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -124,7 +124,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "No audio file provided")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate file size against client-supplied header as an early DDoS guard.
 	// Authoritative size check is done after writing (below).
@@ -158,13 +158,18 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		return
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	limited := io.LimitReader(file, maxVoiceFileSize+1)
 	written, err := io.Copy(tmpFile, limited)
-	tmpFile.Close()
+	closeErr := tmpFile.Close()
 	if err != nil {
 		log.Printf("voice upload: write temp file: %v", err)
+		RespondError(c, http.StatusInternalServerError, "Internal error")
+		return
+	}
+	if closeErr != nil {
+		log.Printf("voice upload: close temp file: %v", closeErr)
 		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
@@ -177,14 +182,25 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	// Detect MIME type from actual file bytes — never trust the client-supplied
 	// Content-Type header alone; it can be forged to bypass the audio-only check.
 	sniffBuf := make([]byte, 512)
+	// #nosec G304 -- tmpPath is returned by os.CreateTemp in this handler.
 	sniffFile, err := os.Open(tmpPath)
 	if err != nil {
 		log.Printf("voice upload: open for sniff: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	n, _ := sniffFile.Read(sniffBuf)
-	sniffFile.Close()
+	n, readErr := sniffFile.Read(sniffBuf)
+	closeErr = sniffFile.Close()
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		log.Printf("voice upload: read for sniff: %v", readErr)
+		RespondError(c, http.StatusInternalServerError, "Internal error")
+		return
+	}
+	if closeErr != nil {
+		log.Printf("voice upload: close sniff file: %v", closeErr)
+		RespondError(c, http.StatusInternalServerError, "Internal error")
+		return
+	}
 
 	detectedMIME := http.DetectContentType(sniffBuf[:n])
 	// Use the detected MIME; fall back to the client header only when the
@@ -226,13 +242,14 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	storageKey := fmt.Sprintf("voice/%d/%d/%s.%s", userID, messageID, uuid.NewString(), ext)
 
 	// Upload to storage.
+	// #nosec G304 -- tmpPath is returned by os.CreateTemp in this handler.
 	f, err := os.Open(tmpPath)
 	if err != nil {
 		log.Printf("voice upload: open temp file for upload: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f, mimeType); err != nil {
 		log.Printf("voice upload: storage upload failed: %v", err)
@@ -333,13 +350,6 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 		return
 	}
 
-	signedURL, err := h.storage.GetSignedURL(c.Request.Context(), storageKey, time.Hour)
-	if err != nil {
-		log.Printf("voice get: signed URL: %v", err)
-		RespondError(c, http.StatusInternalServerError, "Failed to generate download URL")
-		return
-	}
-
 	var waveformData interface{}
 	if waveformRaw != nil {
 		waveformData = json.RawMessage(*waveformRaw)
@@ -351,9 +361,13 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 		"duration_seconds": durationSeconds,
 		"waveform_data":    waveformData,
 		"transcription":    transcription,
-		"signed_url":       signedURL,
-		"mime_type":        mimeType,
-		"file_size":        fileSize,
+		// Do not return a storage-provider pre-signed URL. It is a bearer
+		// credential that remains usable after a member leaves a conversation.
+		// The authenticated download endpoint rechecks conversation membership
+		// on every request.
+		"signed_url": fmt.Sprintf("/voice/%d/download", id),
+		"mime_type":  mimeType,
+		"file_size":  fileSize,
 	})
 }
 
@@ -380,10 +394,11 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		return
 	}
 
-	var storageKey string
+	var storageKey, mimeType string
+	var fileSize int64
 	var hasAccess bool
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT vm.storage_key,
+		SELECT vm.storage_key, vm.mime_type, vm.file_size,
 		       EXISTS(
 		           SELECT 1
 		           FROM conversation_participants cp
@@ -393,7 +408,7 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		       ) AS has_access
 		FROM voice_messages vm
 		WHERE vm.id = $1
-	`, voiceID, userID).Scan(&storageKey, &hasAccess)
+	`, voiceID, userID).Scan(&storageKey, &mimeType, &fileSize, &hasAccess)
 	if err != nil {
 		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
@@ -403,12 +418,30 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		return
 	}
 
-	signedURL, err := h.storage.GetSignedURL(c.Request.Context(), storageKey, time.Hour)
-	if err != nil {
-		log.Printf("voice download: signed URL: %v", err)
-		RespondError(c, http.StatusInternalServerError, "Failed to generate download URL")
+	if fileSize <= 0 || fileSize > maxVoiceFileSize {
+		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
 	}
-
-	c.Redirect(http.StatusFound, signedURL)
+	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), storageKey)
+	if err != nil {
+		log.Printf("voice download: object metadata: %v", err)
+		RespondError(c, http.StatusNotFound, "Voice message not found")
+		return
+	}
+	if objectSize != fileSize {
+		RespondError(c, http.StatusNotFound, "Voice message not found")
+		return
+	}
+	reader, err := h.storage.Download(c.Request.Context(), storageKey)
+	if err != nil {
+		log.Printf("voice download: object download: %v", err)
+		RespondError(c, http.StatusNotFound, "Voice message not found")
+		return
+	}
+	defer func() { _ = reader.Close() }()
+	c.Header("Content-Type", mimeType)
+	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
 }

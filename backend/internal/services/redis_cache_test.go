@@ -5,10 +5,44 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResilientRedisCache_RollingWindowLifecycle(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	cache := NewResilientRedisCacheWithClient(client)
+	ctx := context.Background()
+	now := time.Date(2026, time.July, 22, 15, 0, 0, 0, time.UTC)
+	key := "test:rolling:lifecycle"
+
+	reserved, err := cache.ReserveRollingWindow(ctx, key, []string{"first", "second"}, now, 24*time.Hour, 2)
+	require.NoError(t, err)
+	require.True(t, reserved.Allowed)
+	require.Equal(t, 2, reserved.Used)
+	require.NotNil(t, reserved.OldestAt)
+	assert.Equal(t, now, *reserved.OldestAt)
+
+	denied, err := cache.ReserveRollingWindow(ctx, key, []string{"third"}, now.Add(time.Hour), 24*time.Hour, 2)
+	require.NoError(t, err)
+	assert.False(t, denied.Allowed)
+	assert.Equal(t, 2, denied.Used)
+
+	require.NoError(t, cache.ReleaseRollingWindow(ctx, key, []string{"first"}))
+	inspected, err := cache.InspectRollingWindow(ctx, key, now.Add(time.Hour), 24*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 1, inspected.Used)
+
+	expired, err := cache.InspectRollingWindow(ctx, key, now.Add(24*time.Hour+time.Nanosecond), 24*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 0, expired.Used)
+	assert.Nil(t, expired.OldestAt)
+}
 
 // These tests require a real Redis at localhost:6379.
 // They are skipped when Redis is not reachable.

@@ -1007,7 +1007,7 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var existingIsUpvote bool
 	err = tx.QueryRow(ctx, "SELECT is_upvote FROM post_votes WHERE post_id = $1 AND user_id = $2", postID, userID).Scan(&existingIsUpvote)

@@ -1,0 +1,210 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import OmniChatConversationsPage from '../OmniChatConversationsPage';
+
+const { mockListConversations, mockListPersonas, mockGetGuestPersonaIds } = vi.hoisted(() => {
+  const mockGetGuestPersonaIds = vi.fn<() => number[]>(() => []);
+  return {
+    mockListConversations: vi.fn(),
+    mockListPersonas: vi.fn(),
+    mockGetGuestPersonaIds,
+  };
+});
+
+let mockIsAuthenticated = true;
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    user: mockIsAuthenticated ? { id: 1, username: 'tester', plan: 'free' } : null,
+  }),
+}));
+
+vi.mock('../../hooks/useOmniChatLayoutMode', () => ({
+  useOmniChatLayoutMode: () => ({ mode: 'immersive' }),
+}));
+
+vi.mock('../../components/omnichat/OmniChatSidebar', () => ({
+  default: ({ onTabChange }: { onTabChange: (tab: 'discover' | 'search' | 'chat') => void }) => (
+    <div data-testid="omnichat-sidebar">
+      <button type="button" onClick={() => onTabChange('search')}>
+        Sidebar Search
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../../components/omnichat/PersonaAvatar', () => ({
+  default: () => <div data-testid="persona-avatar" />,
+}));
+
+vi.mock('../../utils/omnichatGuestStorage', () => ({
+  clearGuestMessages: vi.fn(),
+  getGuestPersonaIds: () => mockGetGuestPersonaIds(),
+  loadGuestMessages: vi.fn(() => []),
+  saveGuestMessages: vi.fn(),
+}));
+
+vi.mock('../../services/omnichatService', () => ({
+  omnichatService: {
+    listPersonas: (...args: unknown[]) => mockListPersonas(...args),
+    listConversations: (...args: unknown[]) => mockListConversations(...args),
+    getModelSelection: vi.fn().mockResolvedValue({
+      account_tier: 'free',
+      default_model_key: 'standard',
+      effective_model_key: 'standard',
+    }),
+    getAllowance: vi.fn().mockResolvedValue({
+      tier: 'paid',
+      allowed: true,
+      unlimited: true,
+    }),
+    getBillingCatalog: vi.fn(),
+    getBillingWallet: vi.fn(),
+    getBillingUsage: vi.fn(),
+    createBillingCheckout: vi.fn(),
+  },
+  omnichatQueryKeys: {
+    personas: () => ['omnichat', 'personas'],
+    conversations: ['omnichat', 'conversations'],
+    conversation: (id: number) => ['omnichat', 'conversation', id],
+    generation: (id: string) => ['omnichat', 'generation', id],
+    generations: ['omnichat', 'generations'],
+    gallery: () => ['omnichat', 'gallery', 'all'],
+    modelSelection: (id: number) => ['omnichat', 'model-selection', id],
+    allowance: (authenticated: boolean) => ['omnichat', 'allowance', authenticated],
+    billingCatalog: ['omnichat', 'billing', 'catalog'],
+    billingWallet: ['omnichat', 'billing', 'wallet'],
+    billingUsage: () => ['omnichat', 'billing', 'usage', 50],
+  },
+}));
+
+function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  function LocationProbe() {
+    const location = useLocation();
+    return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
+  }
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/omnichat/chat']}>
+        <Routes>
+          <Route path="/omnichat/chat" element={<OmniChatConversationsPage />} />
+          <Route path="/omnichat" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+describe('OmniChatConversationsPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsAuthenticated = true;
+    mockListPersonas.mockResolvedValue([]);
+  });
+
+  it('labels the page as Chat and renders the visible filter pills', async () => {
+    mockListConversations.mockResolvedValueOnce([]);
+
+    renderPage();
+
+    expect(await screen.findByText('Chat')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No conversations yet. Start chatting with a persona!')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unread' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Favorites' })).toBeInTheDocument();
+  });
+
+  it('shows the latest message as the row subtitle', async () => {
+    const persona = {
+      id: 9,
+      slug: 'narrator',
+      name: 'Narrator',
+      description: 'A terse, old-school text-adventure narrator.',
+      category: 'roleplay',
+      avatar_url: undefined,
+      is_nsfw: false,
+      is_active: true,
+      created_at: '2026-07-01T10:00:00Z',
+      updated_at: '2026-07-01T10:00:00Z',
+    };
+    mockListPersonas.mockResolvedValueOnce([persona]);
+    mockListConversations.mockResolvedValueOnce([
+      {
+        id: 42,
+        user_id: 1,
+        persona_id: 9,
+        title: 'Campfire Thread',
+        last_message_preview: 'Hello?',
+        created_at: '2026-07-02T10:00:00Z',
+        last_message_at: '2026-07-02T10:15:00Z',
+        persona,
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('Campfire Thread')).toBeInTheDocument();
+    expect(screen.getByText('Hello?')).toBeInTheDocument();
+  });
+
+  it('opens the search overlay from the sidebar search action', async () => {
+    mockListConversations.mockResolvedValueOnce([]);
+    mockListPersonas.mockResolvedValueOnce([
+      {
+        id: 9,
+        slug: 'narrator',
+        name: 'Narrator',
+        description: 'A terse, old-school text-adventure narrator.',
+        category: 'roleplay',
+        avatar_url: undefined,
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-01T10:00:00Z',
+        updated_at: '2026-07-01T10:00:00Z',
+      },
+    ]);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sidebar Search' }));
+
+    expect(await screen.findByPlaceholderText('Search personas...')).toBeInTheDocument();
+  });
+
+  it('shows a guest chat directory instead of a sign-in blocker', async () => {
+    mockIsAuthenticated = false;
+    mockGetGuestPersonaIds.mockReturnValue([9]);
+    mockListPersonas.mockResolvedValueOnce([
+      {
+        id: 9,
+        slug: 'narrator',
+        name: 'Narrator',
+        description: 'A terse, old-school text-adventure narrator.',
+        category: 'roleplay',
+        avatar_url: undefined,
+        is_nsfw: false,
+        is_active: true,
+        created_at: '2026-07-01T10:00:00Z',
+        updated_at: '2026-07-01T10:00:00Z',
+      },
+    ]);
+    mockListConversations.mockResolvedValueOnce([]);
+
+    renderPage();
+
+    expect(await screen.findByText('Narrator')).toBeInTheDocument();
+    expect(screen.queryByText('Sign in to view your chat list')).not.toBeInTheDocument();
+  });
+});

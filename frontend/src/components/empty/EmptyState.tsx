@@ -1,19 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Inbox,
-  Search,
-  AlertCircle,
-  Lock,
-  MessageSquare,
-  Users,
-  FileText,
-  Image,
-  Bell,
-  type LucideIcon,
-} from 'lucide-react';
+import { Inbox, Search, AlertCircle, Lock, MessageSquare, type LucideIcon } from 'lucide-react';
 
-export type EmptyStateIllustrationVariant =
+type EmptyStateIllustrationVariant =
   | 'noData'
   | 'noResults'
   | 'error'
@@ -44,7 +33,7 @@ interface EmptyStateProps {
   children?: ReactNode;
 }
 
-export function EmptyStateIllustration({
+function EmptyStateIllustration({
   variant,
   className = '',
 }: {
@@ -428,18 +417,6 @@ export function EmptySearchResults({ query }: { query?: string }) {
   );
 }
 
-export function EmptyNotifications() {
-  const { t } = useTranslation();
-  return (
-    <EmptyState
-      icon={Bell}
-      illustration="notifications"
-      title={t('emptyStates.notifications.title')}
-      description={t('emptyStates.notifications.description')}
-    />
-  );
-}
-
 export function EmptyConversations({ onCreate }: { onCreate?: () => void }) {
   const { t } = useTranslation();
   return (
@@ -452,51 +429,6 @@ export function EmptyConversations({ onCreate }: { onCreate?: () => void }) {
         onCreate
           ? { label: t('emptyStates.conversations.actions.start'), onClick: onCreate }
           : undefined
-      }
-    />
-  );
-}
-
-export function EmptyPosts({ onCreate }: { onCreate?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <EmptyState
-      icon={FileText}
-      illustration="posts"
-      title={t('emptyStates.posts.title')}
-      description={t('emptyStates.posts.description')}
-      action={
-        onCreate ? { label: t('emptyStates.posts.actions.create'), onClick: onCreate } : undefined
-      }
-    />
-  );
-}
-
-export function EmptyGallery({ onUpload }: { onUpload?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <EmptyState
-      icon={Image}
-      illustration="media"
-      title={t('emptyStates.gallery.title')}
-      description={t('emptyStates.gallery.description')}
-      action={
-        onUpload ? { label: t('emptyStates.gallery.actions.upload'), onClick: onUpload } : undefined
-      }
-    />
-  );
-}
-
-export function EmptyMembers({ onInvite }: { onInvite?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <EmptyState
-      icon={Users}
-      illustration="members"
-      title={t('emptyStates.members.title')}
-      description={t('emptyStates.members.description')}
-      action={
-        onInvite ? { label: t('emptyStates.members.actions.invite'), onClick: onInvite } : undefined
       }
     />
   );

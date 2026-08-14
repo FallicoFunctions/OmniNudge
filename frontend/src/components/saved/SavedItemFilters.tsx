@@ -82,5 +82,3 @@ export function SavedItemFilters({
     </div>
   );
 }
-
-export default SavedItemFilters;

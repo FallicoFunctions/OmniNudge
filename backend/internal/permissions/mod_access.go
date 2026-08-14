@@ -27,26 +27,13 @@ func RequireHubModeratorOrAdmin(c *gin.Context, hubID int, hubModRepo ports.HubM
 	if IsAdminContext(c) {
 		return true, nil
 	}
-	userID, exists := c.Get("user_id")
-	if !exists {
+	userID, ok := c.Get("user_id")
+	if !ok {
 		return false, errors.New("missing user_id")
 	}
-	return hubModRepo.IsModerator(c.Request.Context(), hubID, userID.(int))
-}
-
-func RequireHubModeratorOrAdminByName(
-	c *gin.Context,
-	hubName string,
-	hubRepo ports.HubRepository,
-	hubModRepo ports.HubModeratorRepository,
-) (int, bool, error) {
-	hub, err := hubRepo.GetByName(c.Request.Context(), hubName)
-	if err != nil {
-		return 0, false, err
+	uid, ok := userID.(int)
+	if !ok {
+		return false, errors.New("invalid user_id")
 	}
-	if hub == nil {
-		return 0, false, nil
-	}
-	ok, err := RequireHubModeratorOrAdmin(c, hub.ID, hubModRepo)
-	return hub.ID, ok, err
+	return hubModRepo.IsModerator(c.Request.Context(), hubID, uid)
 }

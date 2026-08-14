@@ -155,3 +155,35 @@ func TestPostgresMediaFileRepository_MarkScanStatus(t *testing.T) {
 	err = repo.MarkScanInfected(ctx, mf.ID, errMsg)
 	require.NoError(t, err)
 }
+
+func TestPostgresMediaFileRepository_IsMediaPubliclyAccessible(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	repo := repository.NewPostgresMediaFileRepository(db.Pool)
+	fx := testutil.NewFixtures(t, db)
+	ctx := context.Background()
+
+	owner := fx.CreateUniqueUser("mf_public_persona_u")
+	mf := mediaFile(owner.ID)
+	mf.Filename = "sadie.png"
+	mf.OriginalFilename = "sadie.png"
+	mf.FileType = "image/png"
+	mf.StorageURL = "https://cdn.omninudge.com/sadie.png"
+	mf.StoragePath = "uploads/sadie.png"
+	mf.StorageObjectKey = "sadie.png"
+	require.NoError(t, repo.Create(ctx, mf))
+	require.NoError(t, repo.MarkScanClean(ctx, mf.ID))
+
+	var personaID int
+	err := db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, description, category, visibility, source_format, system_prompt, is_nsfw, is_active)
+		VALUES ('adapter-public-persona', 'Adapter Public Persona', 'test persona', 'original', 'public', 'native', 'test prompt', FALSE, TRUE)
+		RETURNING id
+	`).Scan(&personaID)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `UPDATE bot_personas SET avatar_url=$1 WHERE id=$2`, "/uploads/sadie.png", personaID)
+	require.NoError(t, err)
+
+	allowed, err := repo.IsMediaPubliclyAccessible(ctx, mf.ID)
+	require.NoError(t, err)
+	assert.True(t, allowed)
+}

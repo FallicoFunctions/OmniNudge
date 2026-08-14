@@ -2,6 +2,8 @@
  * Client-side logger with backend shipping
  * Ships WARN and ERROR logs to backend for aggregation
  */
+import { API_BASE_URL } from '../lib/api';
+import { authenticatedFetch } from '../services/authSession';
 
 enum LogLevel {
   DEBUG = 'debug',
@@ -75,9 +77,8 @@ class Logger {
       level: LogLevel.WARN,
       message,
       context,
-      user_id: this.getUserId(),
       session_id: this.sessionId,
-      page_url: window.location.href,
+      page_url: `${window.location.origin}${window.location.pathname}`,
       user_agent: navigator.userAgent,
     };
 
@@ -94,9 +95,8 @@ class Logger {
       level: LogLevel.ERROR,
       message,
       context,
-      user_id: this.getUserId(),
       session_id: this.sessionId,
-      page_url: window.location.href,
+      page_url: `${window.location.origin}${window.location.pathname}`,
       user_agent: navigator.userAgent,
     };
 
@@ -120,13 +120,14 @@ class Logger {
     this.logCounts.set(key, count + 1);
 
     try {
-      const response = await fetch('/api/v1/logs/frontend', {
+      const response = await authenticatedFetch(`${API_BASE_URL}/logs/frontend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(entry),
-        // Don't include auth token - allow unauthenticated error reporting
+        // authenticatedFetch omits credentials for non-API destinations and
+        // attaches the session-bound CSRF token for this mutation when present.
       });
 
       if (!response.ok) {
@@ -139,25 +140,12 @@ class Logger {
   }
 
   /**
-   * Get user ID from localStorage
-   */
-  private getUserId(): string | undefined {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (!userStr) return undefined;
-
-      const user = JSON.parse(userStr);
-      return user?.id;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
    * Generate unique session ID
    */
   private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   }
 }
 

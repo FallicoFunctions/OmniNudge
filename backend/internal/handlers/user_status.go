@@ -25,22 +25,6 @@ func NewUserStatusHandler(hub HubInterface, pool *pgxpool.Pool) *UserStatusHandl
 	}
 }
 
-// GetUserStatus handles GET /api/v1/users/:username/status.
-// @Summary      Get single user online status
-// @Tags         Users
-// @Produce      json
-// @Param        username  path      string  true  "Username"
-// @Success      501       {object}  gin.H
-// @Router       /users/{username}/status [get]
-func (h *UserStatusHandler) GetUserStatus(c *gin.Context) {
-	// For this endpoint, we need to convert username to user ID
-	// This would require a user repository lookup
-	// For now, we'll implement the bulk status check which is more useful
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "Use /api/v1/users/status endpoint with user_ids parameter instead",
-	})
-}
-
 // GetUsersStatus handles GET /api/v1/users/status?user_ids=1,2,3.
 // @Summary      Get multiple users online status
 // @Tags         Users

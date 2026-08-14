@@ -17,7 +17,7 @@ export default defineConfig({
   },
   plugins: [react()],
   resolve: {
-    dedupe: ['react', 'react-dom', 'react-router-dom'],
+    dedupe: ['react', 'react-dom', 'react-router'],
   },
   server: {
     port: 5176,
@@ -32,12 +32,17 @@ export default defineConfig({
     },
   },
   build: {
+    // hls.js is an intentionally isolated, lazy-loaded playback runtime. Its
+    // current minified chunk is ~522 kB (~161 kB gzip), so keep the warning
+    // threshold just above that known boundary while preserving alerts for
+    // unexpected growth elsewhere.
+    chunkSizeWarningLimit: 550,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('/node_modules/react/') ||
               id.includes('/node_modules/react-dom/') ||
-              id.includes('/node_modules/react-router-dom/')) {
+              id.includes('/node_modules/react-router/')) {
             return 'react-vendor';
           }
 

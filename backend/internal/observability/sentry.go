@@ -5,7 +5,6 @@
 package observability
 
 import (
-	"context"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -36,19 +35,6 @@ func InitSentry(dsn, env, version string) {
 // FlushSentry flushes buffered events to Sentry. Call this during graceful shutdown.
 func FlushSentry() {
 	sentry.Flush(2 * time.Second)
-}
-
-// CaptureError sends err to Sentry enriched with request context when available.
-// It is a no-op when Sentry is not configured.
-func CaptureError(ctx context.Context, err error) {
-	if err == nil {
-		return
-	}
-	hub := sentry.GetHubFromContext(ctx)
-	if hub == nil {
-		hub = sentry.CurrentHub()
-	}
-	hub.CaptureException(err)
 }
 
 // SentryMiddleware returns a Gin middleware that:

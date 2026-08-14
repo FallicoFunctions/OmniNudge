@@ -213,7 +213,7 @@ func findPlayableFromRedditInfo(client *http.Client, raw string) (string, string
 	if err != nil {
 		return "", ""
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", ""
@@ -270,13 +270,13 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("thumbnail fetch status %d", resp.StatusCode)
 	}
 
-	if err := os.MkdirAll("uploads", 0o755); err != nil {
+	if err := os.MkdirAll("uploads", 0o750); err != nil {
 		return "", err
 	}
 
@@ -287,11 +287,12 @@ func downloadAndStoreThumbnail(client *http.Client, rawURL string) (string, erro
 	filename := fmt.Sprintf("thumb_%d%s", time.Now().UnixNano(), ext)
 	storagePath := filepath.Join("uploads", filename)
 
+	// #nosec G304 -- storagePath is built from a fixed uploads root and the database's validated media ID/extension.
 	out, err := os.Create(storagePath)
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
 		_ = os.Remove(storagePath)
@@ -313,7 +314,7 @@ func urlOK(client *http.Client, target string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent
 }

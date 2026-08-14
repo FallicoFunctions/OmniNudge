@@ -11,10 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CSRF is mitigated by the JWT Authorization header pattern — cross-origin
-// requests cannot set custom Authorization headers without CORS permission. If
-// cookie-based auth is ever introduced, implement double-submit cookie CSRF
-// protection at that time.
+// Browser sessions use a session-bound double-submit CSRF token. Legacy bearer
+// requests remain protected by the browser's cross-origin header restrictions
+// and the production CORS allowlist.
 
 // SecurityHeaders adds security headers to all responses
 // Implements OWASP security best practices
@@ -22,23 +21,24 @@ func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scriptSrc := "'self' 'unsafe-inline' 'unsafe-eval'"
 		if os.Getenv("APP_ENV") == "production" {
-			scriptSrc = "'self' 'unsafe-inline'"
+			scriptSrc = "'self'"
 		}
 		// Content Security Policy (CSP)
 		// Prevents XSS attacks by controlling resource loading
 		csp := []string{
-			"default-src 'self'",                // Only load from same origin by default
-			"script-src " + scriptSrc,           // Allow eval only outside production for development tooling
-			"style-src 'self' 'unsafe-inline'",  // Allow styles (unsafe-inline needed for styled-components)
-			"img-src 'self' data: blob: https:", // Allow images from self, data URLs, blobs, HTTPS
-			"font-src 'self' data:",             // Allow fonts from self and data URLs
-			"connect-src 'self' ws: wss:",       // Allow WebSocket connections
-			"media-src 'self' blob:",            // Allow media from self and blobs
-			"object-src 'none'",                 // Block plugins (Flash, etc.)
-			"frame-ancestors 'none'",            // Prevent clickjacking
-			"base-uri 'self'",                   // Restrict <base> tag
-			"form-action 'self'",                // Only submit forms to same origin
-			"upgrade-insecure-requests",         // Upgrade HTTP to HTTPS
+			"default-src 'self'",                                   // Only load from same origin by default
+			"script-src " + scriptSrc,                              // Allow eval only outside production for development tooling
+			"style-src 'self' 'unsafe-inline'",                     // Allow styles (unsafe-inline needed for styled-components)
+			"img-src 'self' data: blob: https:",                    // Allow images from self, data URLs, blobs, HTTPS
+			"font-src 'self' data:",                                // Allow fonts from self and data URLs
+			"connect-src 'self' ws: wss:",                          // Allow WebSocket connections
+			"media-src 'self' blob: https:",                        // Allow media from self, blobs, and HTTPS CDN redirects
+			"frame-src 'self'",                               // LiveKit uses the first-party client, not an embedded provider frame
+			"object-src 'none'",                                    // Block plugins (Flash, etc.)
+			"frame-ancestors 'none'",                               // Prevent clickjacking
+			"base-uri 'self'",                                      // Restrict <base> tag
+			"form-action 'self'",                                   // Only submit forms to same origin
+			"upgrade-insecure-requests",                            // Upgrade HTTP to HTTPS
 		}
 		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
@@ -50,9 +50,8 @@ func SecurityHeaders() gin.HandlerFunc {
 		// nosniff = browsers must respect Content-Type header
 		c.Header("X-Content-Type-Options", "nosniff")
 
-		// X-XSS-Protection: Enable browser XSS filter
-		// 1; mode=block = enable XSS filter and block page if attack detected
-		c.Header("X-XSS-Protection", "1; mode=block")
+		// Disable deprecated browser XSS auditors; CSP is the primary defense.
+		c.Header("X-XSS-Protection", "0")
 
 		// Strict-Transport-Security (HSTS): Force HTTPS
 		// max-age=31536000 = 1 year
@@ -67,44 +66,19 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Permissions-Policy: Control browser features
 		// Disable unnecessary features to reduce attack surface
 		permissions := []string{
-			"camera=(self)",     // Camera only for same origin
-			"microphone=(self)", // Microphone only for same origin (voice messages)
-			"geolocation=()",    // Disable geolocation
-			"payment=()",        // Disable payment API
-			"usb=()",            // Disable USB access
-			"magnetometer=()",   // Disable magnetometer
-			"gyroscope=()",      // Disable gyroscope
-			"accelerometer=()",  // Disable accelerometer
+			"camera=(self)",
+			"microphone=(self)",
+			"geolocation=()",   // Disable geolocation
+			"payment=()",       // Disable payment API
+			"usb=()",           // Disable USB access
+			"magnetometer=()",  // Disable magnetometer
+			"gyroscope=()",     // Disable gyroscope
+			"accelerometer=()", // Disable accelerometer
 		}
 		c.Header("Permissions-Policy", strings.Join(permissions, ", "))
 
 		c.Next()
 	}
-}
-
-// SanitizeInput sanitizes user input to prevent XSS attacks
-// This is a basic implementation - for production, use a library like bluemonday
-func SanitizeInput(input string) string {
-	// Remove common XSS patterns
-	replacements := map[string]string{
-		"<script":     "&lt;script",
-		"</script>":   "&lt;/script&gt;",
-		"javascript:": "",
-		"onerror=":    "",
-		"onload=":     "",
-		"onclick=":    "",
-		"<iframe":     "&lt;iframe",
-		"</iframe>":   "&lt;/iframe&gt;",
-	}
-
-	sanitized := input
-	for pattern, replacement := range replacements {
-		sanitized = strings.ReplaceAll(sanitized, pattern, replacement)
-		// Also check uppercase variants
-		sanitized = strings.ReplaceAll(sanitized, strings.ToUpper(pattern), replacement)
-	}
-
-	return sanitized
 }
 
 // ValidateMIMEType checks if a file's MIME type is allowed
@@ -336,7 +310,7 @@ func ValidateStrictDocumentStructure(filePath, filename, mimeType string, head [
 	if err != nil {
 		return fmt.Errorf("invalid .docx zip container: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	found := make(map[string]bool, len(reader.File))
 	for _, f := range reader.File {

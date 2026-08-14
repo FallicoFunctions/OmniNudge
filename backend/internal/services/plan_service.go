@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/omninudge/backend/internal/models"
 )
 
 // planPrices is the authoritative USD price per month per coin.
@@ -22,8 +24,10 @@ const PaymentSlippageTolerance = 0.97
 // UserPlanRepository is the subset of user repository methods needed by PlanService.
 type UserPlanRepository interface {
 	UpdatePlan(ctx context.Context, userID int, plan string, expiresAt *time.Time) error
+	ExtendPlan(ctx context.Context, userID int, plan string, months int) error
 	GetPlan(ctx context.Context, userID int) (string, *time.Time, error)
 	ListUsersWithExpiredPlans(ctx context.Context) ([]int, error)
+	DowngradeExpiredPlans(ctx context.Context) ([]int, error)
 }
 
 // PlanService manages user subscription state. It is the single authority
@@ -47,27 +51,22 @@ func (s *PlanService) PriceForCoin(coin string) (float64, error) {
 	return price, nil
 }
 
-// Upgrade grants the user `months` months of the paid plan. If the user
+// Upgrade grants the user `months` months of the Plus plan. If the user
 // already has an active plan, the new months are added to the existing expiry
 // so renewals before the deadline don't waste overlap time.
 func (s *PlanService) Upgrade(ctx context.Context, userID, months int) error {
-	_, currentExpiry, err := s.userRepo.GetPlan(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("get current plan before upgrade: %w", err)
+	return s.UpgradeToPlan(ctx, userID, models.PlanPlus, months)
+}
+
+func (s *PlanService) UpgradeToPlan(ctx context.Context, userID int, plan string, months int) error {
+	if plan != models.PlanPlus && plan != models.PlanPremium {
+		return fmt.Errorf("unsupported paid plan %q", plan)
 	}
-
-	var newExpiry time.Time
-	duration := time.Duration(months) * 30 * 24 * time.Hour
-
-	if currentExpiry != nil && currentExpiry.After(time.Now()) {
-		// Extend from current expiry, not from now
-		newExpiry = currentExpiry.Add(duration)
-	} else {
-		newExpiry = time.Now().Add(duration)
+	if userID <= 0 || months < 1 || months > 24 {
+		return fmt.Errorf("invalid plan upgrade")
 	}
-
-	if err := s.userRepo.UpdatePlan(ctx, userID, "paid", &newExpiry); err != nil {
-		return fmt.Errorf("upgrade user %d to paid: %w", userID, err)
+	if err := s.userRepo.ExtendPlan(ctx, userID, plan, months); err != nil {
+		return fmt.Errorf("upgrade user %d to %s: %w", userID, plan, err)
 	}
 	return nil
 }
@@ -81,7 +80,7 @@ func (s *PlanService) Downgrade(ctx context.Context, userID int) error {
 	return nil
 }
 
-// IsPaid returns true if the user currently has an active paid plan.
+// IsPaid returns true if the user currently has an active Plus or Premium plan.
 // On any error it conservatively returns false and logs.
 func (s *PlanService) IsPaid(ctx context.Context, userID int) bool {
 	plan, expiresAt, err := s.userRepo.GetPlan(ctx, userID)
@@ -89,10 +88,10 @@ func (s *PlanService) IsPaid(ctx context.Context, userID int) bool {
 		log.Printf("[plan] IsPaid check failed for user %d: %v", userID, err)
 		return false
 	}
-	if plan != "paid" {
+	if plan != models.PlanPlus && plan != models.PlanPremium {
 		return false
 	}
-	// Nil expiry on a paid plan shouldn't happen but treat as active
+	// Nil expiry on a subscribed plan represents a lifetime entitlement.
 	if expiresAt == nil {
 		return true
 	}
@@ -102,16 +101,12 @@ func (s *PlanService) IsPaid(ctx context.Context, userID int) bool {
 // DowngradeExpired finds all users with elapsed plan expiries and moves
 // them to the free tier. Called periodically by the plan expiry worker.
 func (s *PlanService) DowngradeExpired(ctx context.Context) error {
-	ids, err := s.userRepo.ListUsersWithExpiredPlans(ctx)
+	ids, err := s.userRepo.DowngradeExpiredPlans(ctx)
 	if err != nil {
 		return fmt.Errorf("list expired plans: %w", err)
 	}
 	for _, id := range ids {
-		if err := s.Downgrade(ctx, id); err != nil {
-			log.Printf("[plan] failed to downgrade expired user %d: %v", id, err)
-		} else {
-			log.Printf("[plan] downgraded expired plan for user %d", id)
-		}
+		log.Printf("[plan] downgraded expired plan for user %d", id)
 	}
 	return nil
 }

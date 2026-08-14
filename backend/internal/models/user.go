@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -46,7 +47,7 @@ type User struct {
 	BannedBy            *int       `json:"banned_by,omitempty"`
 
 	// Subscription plan
-	Plan          string     `json:"plan"`                     // "free" | "paid"
+	Plan          string     `json:"plan"`                      // "free" | "plus" | "premium"
 	PlanExpiresAt *time.Time `json:"plan_expires_at,omitempty"` // nil for free tier
 
 	// Timestamps
@@ -88,6 +89,42 @@ func (r *UserRepository) GetPool() *pgxpool.Pool {
 	return r.pool
 }
 
+// CancelPendingDeletion restores an account still inside its grace period and
+// returns the new token version. Incrementing the version again ensures tokens
+// issued before either lifecycle transition can never become valid later.
+func (r *UserRepository) CancelPendingDeletion(ctx context.Context, userID int) (int, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	var tokenVersion int
+	err = tx.QueryRow(ctx, `
+		UPDATE users
+		SET deleted_at = NULL,
+		    permanent_deletion_at = NULL,
+		    token_version = token_version + 1
+		WHERE id = $1
+		  AND deleted_at IS NOT NULL
+		  AND (permanent_deletion_at IS NULL OR permanent_deletion_at > NOW())
+		RETURNING token_version
+	`, userID).Scan(&tokenVersion)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO account_deletion_log (user_id, requested_at, reason)
+		VALUES ($1, NOW(), 'deletion_cancelled_on_login')
+	`, userID); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return tokenVersion, nil
+}
+
 // Create creates a new user with username/password
 func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	// Set normalized username for case-insensitive uniqueness
@@ -95,32 +132,41 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 
 	// Encrypt email if provided
 	var encryptedEmail *string
+	var emailLookupHash *string
 	var emailEncrypted bool
 	if user.Email != nil && *user.Email != "" {
-		encrypted, err := utils.EncryptEmail(*user.Email)
+		normalizedEmail := strings.ToLower(strings.TrimSpace(*user.Email))
+		encrypted, err := utils.EncryptEmail(normalizedEmail)
+		if err != nil {
+			return err
+		}
+		lookupHash, err := utils.EmailLookupHash(normalizedEmail)
 		if err != nil {
 			return err
 		}
 		encryptedEmail = &encrypted
+		emailLookupHash = &lookupHash
 		emailEncrypted = true
+		user.Email = &normalizedEmail
 	}
 
 	query := `
-		INSERT INTO users (username, username_normalized, email, email_encrypted, password_hash, avatar_url, bio, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, created_at, last_seen, role, nsfw, token_version
+		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
 		user.Username,
 		user.UsernameNormalized,
 		encryptedEmail,
+		emailLookupHash,
 		emailEncrypted,
 		user.PasswordHash,
 		user.AvatarURL,
 		user.Bio,
 		user.NSFW,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt)
 }
 
 // GetByID retrieves a user by their internal ID
@@ -130,7 +176,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	query := `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
 		FROM users WHERE id = $1
 	`
 
@@ -160,6 +206,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.LastSeen,
 		&user.LastAgentPostAt,
 		&user.LastAgentBrowseAt,
+		&user.Plan,
+		&user.PlanExpiresAt,
 	)
 
 	if err != nil {
@@ -305,7 +353,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, email_verified, password_hash, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
 }
@@ -340,6 +388,8 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.LastSeen,
 		&user.LastAgentPostAt,
 		&user.LastAgentBrowseAt,
+		&user.Plan,
+		&user.PlanExpiresAt,
 	)
 
 	if err != nil {
@@ -369,69 +419,114 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 	return user, nil
 }
 
-// GetByEmail retrieves a user by their email address
-// Note: Email is encrypted in database, so this requires decryption
-func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
-	// NOTE: Since AES-CFB encryption uses random IVs, we can't compare encrypted emails directly.
-	// Instead, we fetch all users and decrypt their emails to find a match.
-	// TODO: Add an email_hash column for efficient lookups.
+type userRowScanner interface {
+	Scan(dest ...any) error
+}
 
-	query := `
+func scanEmailLookupUser(row userRowScanner, user *User) error {
+	return row.Scan(
+		&user.ID,
+		&user.Username,
+		&user.EncryptedEmail,
+		&user.EmailEncrypted,
+		&user.EmailVerified,
+		&user.PublicKey,
+		&user.EncryptedPrivateKey,
+		&user.AvatarURL,
+		&user.Bio,
+		&user.Karma,
+		&user.Role,
+		&user.TokenVersion,
+		&user.ShadowBanned,
+		&user.Banned,
+		&user.Deleted,
+		&user.BanReason,
+		&user.ShowBanReason,
+		&user.BannedAt,
+		&user.BannedBy,
+		&user.CreatedAt,
+		&user.LastSeen,
+		&user.LastAgentPostAt,
+		&user.LastAgentBrowseAt,
+		&user.PasswordHash,
+		&user.Plan,
+		&user.PlanExpiresAt,
+	)
+}
+
+func decryptLookupEmail(user *User) (string, error) {
+	if user.EncryptedEmail == nil {
+		return "", nil
+	}
+	if !user.EmailEncrypted {
+		return *user.EncryptedEmail, nil
+	}
+	return utils.DecryptEmail(*user.EncryptedEmail)
+}
+
+// GetByEmail retrieves a user through a keyed blind index while keeping the
+// randomized encrypted address as the source of truth.
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	lookupHash, err := utils.EmailLookupHash(normalizedEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	const columns = `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at, password_hash
-		FROM users WHERE email IS NOT NULL AND deleted = false
+		       last_agent_post_at, last_agent_browse_at, password_hash, plan, plan_expires_at
 	`
+	user := &User{}
+	err = scanEmailLookupUser(r.pool.QueryRow(ctx, columns+`
+		FROM users
+		WHERE email_lookup_hash = $1 AND deleted = FALSE
+		LIMIT 1
+	`, lookupHash), user)
+	if err == nil {
+		decryptedEmail, decryptErr := decryptLookupEmail(user)
+		if decryptErr != nil {
+			return nil, decryptErr
+		}
+		if !strings.EqualFold(strings.TrimSpace(decryptedEmail), normalizedEmail) {
+			return nil, fmt.Errorf("email lookup index mismatch")
+		}
+		user.Email = &decryptedEmail
+		return user, nil
+	}
+	if err != pgx.ErrNoRows {
+		return nil, err
+	}
 
-	rows, err := r.pool.Query(ctx, query)
+	// Compatibility path for rows created before the blind-index migration.
+	// Successful matches are repaired immediately; startup also performs a full
+	// bounded backfill so this path disappears after upgrade.
+	rows, err := r.pool.Query(ctx, columns+`
+		FROM users
+		WHERE email IS NOT NULL AND email_lookup_hash IS NULL AND deleted = FALSE
+	`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		user := &User{}
-		err = rows.Scan(
-			&user.ID,
-			&user.Username,
-			&user.EncryptedEmail,
-			&user.EmailEncrypted,
-			&user.EmailVerified,
-			&user.PublicKey,
-			&user.EncryptedPrivateKey,
-			&user.AvatarURL,
-			&user.Bio,
-			&user.Karma,
-			&user.Role,
-			&user.TokenVersion,
-			&user.ShadowBanned,
-			&user.Banned,
-			&user.Deleted,
-			&user.BanReason,
-			&user.ShowBanReason,
-			&user.BannedAt,
-			&user.BannedBy,
-			&user.CreatedAt,
-			&user.LastSeen,
-			&user.LastAgentPostAt,
-			&user.LastAgentBrowseAt,
-			&user.PasswordHash,
-		)
-		if err != nil {
-			continue // Skip this user if scan fails
+		legacyUser := &User{}
+		if err := scanEmailLookupUser(rows, legacyUser); err != nil {
+			return nil, err
 		}
-
-		// Decrypt the stored email and compare
-		if user.EncryptedEmail != nil {
-			decryptedEmail, err := utils.DecryptEmail(*user.EncryptedEmail)
-			if err != nil {
-				continue // Skip if decryption fails
+		decryptedEmail, err := decryptLookupEmail(legacyUser)
+		if err != nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(decryptedEmail), normalizedEmail) {
+			rows.Close()
+			if _, err := r.pool.Exec(ctx, `UPDATE users SET email_lookup_hash = $1 WHERE id = $2`, lookupHash, legacyUser.ID); err != nil {
+				return nil, err
 			}
-			if decryptedEmail == email {
-				// Populate email field for API response
-				user.Email = &decryptedEmail
-				return user, nil // Found matching user
-			}
+			legacyUser.Email = &decryptedEmail
+			return legacyUser, nil
 		}
 	}
 
@@ -440,6 +535,65 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	}
 
 	return nil, fmt.Errorf("no rows in result set")
+}
+
+// BackfillEmailLookupHashes upgrades legacy encrypted rows after migration.
+func (r *UserRepository) BackfillEmailLookupHashes(ctx context.Context) (int, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, email, email_encrypted
+		FROM users
+		WHERE email IS NOT NULL AND email_lookup_hash IS NULL
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type update struct {
+		userID int
+		hash   string
+	}
+	updates := make([]update, 0)
+	for rows.Next() {
+		var userID int
+		var storedEmail string
+		var encrypted bool
+		if err := rows.Scan(&userID, &storedEmail, &encrypted); err != nil {
+			return 0, err
+		}
+		plaintext := storedEmail
+		if encrypted {
+			plaintext, err = utils.DecryptEmail(storedEmail)
+			if err != nil {
+				return 0, fmt.Errorf("decrypt email for user %d: %w", userID, err)
+			}
+		}
+		hash, err := utils.EmailLookupHash(plaintext)
+		if err != nil {
+			return 0, err
+		}
+		updates = append(updates, update{userID: userID, hash: hash})
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	rows.Close()
+
+	batch := &pgx.Batch{}
+	for _, item := range updates {
+		batch.Queue(`UPDATE users SET email_lookup_hash = $1 WHERE id = $2`, item.hash, item.userID)
+	}
+	results := r.pool.SendBatch(ctx, batch)
+	for range updates {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return 0, err
+		}
+	}
+	if err := results.Close(); err != nil {
+		return 0, err
+	}
+	return len(updates), nil
 }
 
 // UpdateLastSeen updates the last_seen timestamp for a user
@@ -535,7 +689,7 @@ func (r *UserRepository) ShadowBanUser(ctx context.Context, userID int, reason s
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -567,7 +721,7 @@ func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string,
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -600,7 +754,7 @@ func (r *UserRepository) UnbanUser(ctx context.Context, userID int, reason strin
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -632,7 +786,7 @@ func (r *UserRepository) SoftDeleteUser(ctx context.Context, userID int, reason 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -778,27 +932,42 @@ func (r *UserRepository) UpdateEncryptedPrivateKey(ctx context.Context, userID i
 // UpdateEmail updates a user's email address (encrypted)
 func (r *UserRepository) UpdateEmail(ctx context.Context, userID int, email *string) error {
 	var encryptedEmail *string
+	var emailLookupHash *string
 	var emailEncrypted bool
 
 	if email != nil && *email != "" {
-		encrypted, err := utils.EncryptEmail(*email)
+		normalizedEmail := strings.ToLower(strings.TrimSpace(*email))
+		encrypted, err := utils.EncryptEmail(normalizedEmail)
+		if err != nil {
+			return err
+		}
+		lookupHash, err := utils.EmailLookupHash(normalizedEmail)
 		if err != nil {
 			return err
 		}
 		encryptedEmail = &encrypted
+		emailLookupHash = &lookupHash
 		emailEncrypted = true
 	}
 
-	query := `UPDATE users SET email = $1, email_encrypted = $2 WHERE id = $3`
-	_, err := r.pool.Exec(ctx, query, encryptedEmail, emailEncrypted, userID)
+	query := `UPDATE users SET email = $1, email_lookup_hash = $2, email_encrypted = $3 WHERE id = $4`
+	_, err := r.pool.Exec(ctx, query, encryptedEmail, emailLookupHash, emailEncrypted, userID)
 	return err
 }
 
 // UpdateVerifiedEmail stores an already-encrypted email address and marks it as
-// verified in a single statement. The caller is responsible for encryption.
+// verified in a single statement.
 func (r *UserRepository) UpdateVerifiedEmail(ctx context.Context, userID int, encryptedEmail string) error {
-	query := `UPDATE users SET email = $1, email_verified = true, email_encrypted = true WHERE id = $2`
-	_, err := r.pool.Exec(ctx, query, encryptedEmail, userID)
+	email, err := utils.DecryptEmail(encryptedEmail)
+	if err != nil {
+		return err
+	}
+	lookupHash, err := utils.EmailLookupHash(email)
+	if err != nil {
+		return err
+	}
+	query := `UPDATE users SET email = $1, email_lookup_hash = $2, email_verified = true, email_encrypted = true WHERE id = $3`
+	_, err = r.pool.Exec(ctx, query, encryptedEmail, lookupHash, userID)
 	return err
 }
 
@@ -811,6 +980,70 @@ func (r *UserRepository) UpdatePlan(ctx context.Context, userID int, plan string
 		return fmt.Errorf("update user plan: %w", err)
 	}
 	return nil
+}
+
+// ExtendPlan atomically adds paid time from the later of the current expiry or
+// database time. A single SQL statement prevents concurrent renewals from
+// overwriting one another.
+func (r *UserRepository) ExtendPlan(ctx context.Context, userID int, plan string, months int) error {
+	if userID <= 0 || (plan != PlanPlus && plan != PlanPremium) || months < 1 || months > 24 {
+		return errors.New("invalid plan extension")
+	}
+	// Granting premium also switches the explicit-content preference on, in the
+	// same statement so a grant cannot half apply.
+	//
+	// nsfw defaults to false for every account, and explicit content requires
+	// both premium and that preference. Without this a subscriber pays and then
+	// finds chat clamped and images tame until they discover a settings toggle
+	// they have no reason to know exists -- the product silently withholding the
+	// thing they just bought.
+	//
+	// Scoped to the transition into premium, not every grant. In UPDATE ... SET
+	// the right-hand side sees the pre-update row, so `plan <> 'premium'` is
+	// true only when the account is arriving at the tier. A subscriber who
+	// deliberately switched the preference off therefore keeps that choice
+	// through renewals, and the assignment only ever turns it on.
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users
+		SET plan=$2::text,
+		    plan_expires_at=GREATEST(COALESCE(plan_expires_at, NOW()), NOW())
+		        + make_interval(days => $3 * 30),
+		    nsfw = nsfw OR ($2::text = 'premium' AND plan <> 'premium')
+		WHERE id=$1
+	`, userID, plan, months)
+	if err != nil {
+		return fmt.Errorf("extend user plan: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("user not found: %d", userID)
+	}
+	return nil
+}
+
+// DowngradeExpiredPlans atomically rechecks expiry in the UPDATE predicate so
+// a concurrent renewal cannot be overwritten by a stale list-then-write pass.
+func (r *UserRepository) DowngradeExpiredPlans(ctx context.Context) ([]int, error) {
+	rows, err := r.pool.Query(ctx, `
+		UPDATE users
+		SET plan='free', plan_expires_at=NULL
+		WHERE plan <> 'free'
+		  AND plan_expires_at IS NOT NULL
+		  AND plan_expires_at < NOW()
+		RETURNING id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("downgrade expired plans: %w", err)
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // GetPlan returns the user's current plan and its expiry time.
@@ -828,7 +1061,7 @@ func (r *UserRepository) GetPlan(ctx context.Context, userID int) (string, *time
 	return plan, expiresAt, nil
 }
 
-// ListUsersWithExpiredPlans returns IDs of paid users whose plan_expires_at
+// ListUsersWithExpiredPlans returns IDs of subscribed users whose plan_expires_at
 // is in the past. The expiry worker uses this to downgrade accounts.
 func (r *UserRepository) ListUsersWithExpiredPlans(ctx context.Context) ([]int, error) {
 	query := `

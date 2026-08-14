@@ -22,6 +22,7 @@ import type {
   WsReactionAddedPayload,
   WsReactionRemovedPayload,
 } from '../types/reactions';
+import type { BotConversationDetail, BotMessage, OmniChatGroupMessage } from '../types/omnichat';
 import { friendsQueryKeys } from '../services/friendsService';
 
 interface WebSocketMessage {
@@ -44,6 +45,7 @@ type FeatureFlagUpdatedPayload = { key: string; enabled: boolean; percentage?: n
 interface WebSocketContextType {
   // Connection state
   isConnected: boolean;
+  connectionState: 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
   // Send methods
   sendTypingIndicator: (conversationId: number, recipientId: number, isTyping: boolean) => void;
@@ -64,13 +66,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<
+    'idle' | 'connecting' | 'connected' | 'reconnecting'
+  >('idle');
   const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Map<number, Set<number>>>(new Map());
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const reconnectTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const reconnectAttemptsRef = useRef(0);
-  const isCleanupRef = useRef(false);
   const recentMessageIdsRef = useRef<Set<number>>(new Set());
+  const activeConnectionIdRef = useRef(0);
 
   // Send WebSocket message
   const sendMessage = useCallback((type: string, payload: unknown) => {
@@ -657,6 +662,111 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          case 'omnichat_token': {
+            // Streamed token from an in-progress OmniChat generation — the chat
+            // page owns its own streaming buffer, so just forward it as an event
+            // rather than writing every token into the query cache.
+            window.dispatchEvent(
+              new CustomEvent('omnichat-token', {
+                detail: data.payload as { conversation_id: number; token: string },
+              })
+            );
+            break;
+          }
+
+          case 'omnichat_message_complete': {
+            // Final assistant message for an OmniChat conversation — append it to
+            // the cached message list (if loaded) and let the chat page clear its
+            // streaming buffer via the forwarded event.
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                if (prev.messages.some((m) => m.id === message.id)) return prev;
+                return { ...prev, messages: [...prev.messages, message] };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            window.dispatchEvent(new CustomEvent('omnichat-message-complete', { detail: message }));
+            break;
+          }
+
+          case 'omnichat_group_message': {
+            const message = data.payload as OmniChatGroupMessage;
+            queryClient.setQueryData<InfiniteData<OmniChatGroupMessage[]> | undefined>(
+              ['omnichat', 'group-messages', message.group_id],
+              (previous) => {
+                if (!previous) return previous;
+                if (
+                  previous.pages.some((page) =>
+                    page.some((candidate) => candidate.id === message.id)
+                  )
+                ) {
+                  return previous;
+                }
+                const pages = [...previous.pages];
+                pages[0] = [...pages[0], message];
+                return { ...previous, pages };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'groups'] });
+            window.dispatchEvent(new CustomEvent('omnichat-group-message', { detail: message }));
+            break;
+          }
+
+          case 'omnichat_regeneration_token': {
+            window.dispatchEvent(
+              new CustomEvent('omnichat-regeneration-token', {
+                detail: data.payload as {
+                  conversation_id: number;
+                  message_id: number;
+                  token: string;
+                },
+              })
+            );
+            break;
+          }
+
+          case 'omnichat_message_regenerated': {
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((candidate) =>
+                    candidate.id === message.id ? message : candidate
+                  ),
+                };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            window.dispatchEvent(
+              new CustomEvent('omnichat-message-regenerated', { detail: message })
+            );
+            break;
+          }
+
+          case 'omnichat_message_edited': {
+            const message = data.payload as BotMessage;
+            queryClient.setQueryData<BotConversationDetail | undefined>(
+              ['omnichat', 'conversation', message.conversation_id],
+              (prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((candidate) =>
+                    candidate.id === message.id ? message : candidate
+                  ),
+                };
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['omnichat', 'conversations'] });
+            break;
+          }
+
           case 'friend_request': {
             // Someone sent us a friend request — invalidate so the badge and
             // incoming list update immediately without waiting for the 30s poll.
@@ -686,13 +796,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   // WebSocket connection management
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setIsConnected(false);
+      setConnectionState('idle');
+      return;
+    }
 
-    isCleanupRef.current = false;
+    let disposed = false;
     const typingTimeouts = typingTimeoutsRef.current;
 
     const connect = async () => {
       console.log('[WebSocket] Connecting...');
+      setConnectionState(reconnectAttemptsRef.current > 0 ? 'reconnecting' : 'connecting');
+      const connectionId = activeConnectionIdRef.current + 1;
+      activeConnectionIdRef.current = connectionId;
       let wsToken: string;
       try {
         const response = await api.post<{ ws_token: string }>('/auth/ws-token');
@@ -700,14 +817,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.warn('[WebSocket] Failed to fetch WebSocket token; skipping connect', error);
         setIsConnected(false);
-        if (!isCleanupRef.current) {
+        setConnectionState('reconnecting');
+        if (!disposed) {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
           reconnectTimerRef.current = setTimeout(connect, delay);
         }
         return;
       }
-      if (isCleanupRef.current) return;
+      if (disposed) return;
 
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -717,10 +835,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       const socket = new WebSocket(url.toString());
       wsRef.current = socket;
       let hasOpened = false;
+      const isStaleSocket = () =>
+        wsRef.current !== socket || activeConnectionIdRef.current !== connectionId;
 
       socket.onopen = () => {
+        if (isStaleSocket()) {
+          socket.close();
+          return;
+        }
         hasOpened = true;
         setIsConnected(true);
+        setConnectionState('connected');
         // Reset reconnection attempts on successful connection
         reconnectAttemptsRef.current = 0;
         console.log('[WebSocket] Connected successfully');
@@ -729,13 +854,24 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
       };
 
-      socket.onmessage = handleMessage;
+      socket.onmessage = (event) => {
+        if (isStaleSocket()) {
+          return;
+        }
+        handleMessage(event);
+      };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        if (isStaleSocket()) {
+          return;
+        }
         setIsConnected(false);
-        console.log('[WebSocket] Disconnected');
+        setConnectionState('reconnecting');
+        console.log(
+          `[WebSocket] Disconnected (code=${event.code}, clean=${event.wasClean}, reason=${event.reason || 'none'})`
+        );
 
-        if (isCleanupRef.current) return;
+        if (disposed) return;
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s.
         // Reconnect even if the socket never opened, so refreshed tokens can recover long-lived sessions.
         reconnectAttemptsRef.current += 1;
@@ -747,7 +883,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       };
 
       socket.onerror = (error) => {
-        if (!isCleanupRef.current) {
+        if (isStaleSocket()) {
+          return;
+        }
+        if (!disposed) {
           console.error('[WebSocket] Error:', error);
         }
       };
@@ -757,12 +896,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     return () => {
       console.log('[WebSocket] Cleaning up...');
-      isCleanupRef.current = true;
+      disposed = true;
+      setIsConnected(false);
+      setConnectionState('idle');
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
-      if (wsRef.current) {
-        wsRef.current.close();
+      const socket = wsRef.current;
+      wsRef.current = null;
+      activeConnectionIdRef.current += 1;
+      if (socket) {
+        socket.close();
       }
       // Clear all typing timeouts
       typingTimeouts.forEach(clearTimeout);
@@ -772,6 +916,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const value: WebSocketContextType = {
     isConnected,
+    connectionState,
     sendTypingIndicator,
     onlineUsers,
     isUserOnline,

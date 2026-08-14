@@ -228,7 +228,6 @@ Gold Tier (2,500 coins/month = $25):
 - No malware or phishing
 - No misleading/scam content
 - No hate speech or harassment
-- NSFW content allowed but must be tagged
 
 **DMCA Compliance:**
 - Copyright holder can submit takedown request

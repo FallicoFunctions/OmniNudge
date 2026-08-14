@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trans, useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
@@ -48,6 +48,7 @@ import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
 import { useFormat } from '../hooks/useFormat';
 import { buildRedditCommentEmbedHtml } from '../utils/redditEmbed';
+import { getSafeInternalPath } from '../utils/navigation';
 
 interface RedditComment {
   kind: string;
@@ -1532,7 +1533,10 @@ export default function RedditPostPage() {
     },
   });
 
-  const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
+  const originPathFromState = getSafeInternalPath(
+    (location.state as { originPath?: string } | undefined)?.originPath,
+    ''
+  );
 
   const redirectAfterHide = () => {
     if (stayOnPostAfterHide) {

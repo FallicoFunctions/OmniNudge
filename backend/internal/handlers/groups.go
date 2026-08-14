@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"time"
@@ -293,7 +293,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Create conversation
 	var conversationID int
@@ -757,7 +757,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
 // @Failure      500  {object}  gin.H
-// @Router       /conversations/{id}/settings [get]
+// @Router       /groups/{id}/settings [get]
 func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -803,7 +803,7 @@ func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
 // @Failure      500  {object}  gin.H
-// @Router       /conversations/{id}/settings [patch]
+// @Router       /groups/{id}/settings [put]
 func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1018,7 +1018,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at)
@@ -1244,7 +1244,7 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Demote current owner to admin
 	_, err = tx.Exec(ctx, `

@@ -279,7 +279,6 @@ Before manual review, themes automatically checked for:
 
 **Policy Compliance:**
 - [ ] No copyright infringement
-- [ ] No NSFW content (if not marked)
 - [ ] No political/religious symbols (unless disclosed)
 - [ ] Follows naming conventions
 - [ ] Appropriate pricing for quality
@@ -297,7 +296,6 @@ Common reasons for rejection:
 2. **Policy Violation** (25%)
    - Copyright infringement
    - Misleading screenshots
-   - NSFW content not marked
    - Spam submission
 
 3. **Technical Issues** (20%)
@@ -322,7 +320,7 @@ Common reasons for rejection:
 
 **User Reports:**
 - "Report Theme" button on theme page
-- Reasons: malicious, broken, copyright, spam, NSFW
+- Reasons: malicious, broken, copyright, spam
 - 3+ reports trigger review
 - 10+ reports auto-suspend theme pending review
 
@@ -815,7 +813,7 @@ CREATE TABLE marketplace_reports (
     item_id INTEGER NOT NULL REFERENCES marketplace_items(id) ON DELETE CASCADE,
     reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
 
-    reason VARCHAR(50) NOT NULL, -- 'malicious', 'broken', 'copyright', 'spam', 'nsfw'
+    reason VARCHAR(50) NOT NULL, -- 'malicious', 'broken', 'copyright', 'spam'
     details TEXT,
 
     -- Moderation

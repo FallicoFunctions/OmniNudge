@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { api } from '../lib/api';
+import { API_BASE_URL, api } from '../lib/api';
+import { authenticatedFetch } from './authSession';
 
 /**
  * P0-027: Analytics Service
@@ -34,6 +35,7 @@ export type EventName =
   | 'feature_rollout_evaluated'
   | 'user_properties_updated'
   | 'page_view'
+  | 'mobile_navigation'
   // Errors
   | 'error_occurred';
 
@@ -48,19 +50,19 @@ export interface AnalyticsConfig {
 
 class AnalyticsService {
   private config: AnalyticsConfig = {
-    enabled: true, // Default to true, respect user preferences elsewhere if needed
+    // Do not collect or transmit analytics until the app has explicitly
+    // initialized its production/privacy configuration.
+    enabled: false,
     debug: import.meta.env.DEV,
   };
 
-  private anonymousId: string;
-  private sessionId: string;
+  private anonymousId = '';
+  private sessionId = '';
   private activeFlags: string[] = [];
   private queue: Array<{ event: EventName; properties?: EventProperties }> = [];
   private isInitialized = false;
 
   constructor() {
-    this.anonymousId = this.getOrCreateAnonymousId();
-    this.sessionId = this.startNewSession();
     this.setupSessionListeners();
   }
 
@@ -77,6 +79,11 @@ class AnalyticsService {
         anonymousId: this.anonymousId,
         sessionId: this.sessionId,
       });
+    }
+
+    if (this.config.enabled && !this.sessionId) {
+      this.anonymousId = this.getOrCreateAnonymousId();
+      this.startNewSession();
     }
 
     // Flush queued events
@@ -169,6 +176,7 @@ class AnalyticsService {
    * We keep the anonymous ID but might want to rotate session
    */
   reset() {
+    if (!this.config.enabled || !this.isInitialized) return;
     if (this.config.debug) {
       console.log('[Analytics] Reset');
     }
@@ -208,7 +216,9 @@ class AnalyticsService {
   private startNewSession(): string {
     const id = uuidv4();
     this.sessionId = id;
-    this.startSessionBackend(id);
+    if (this.isInitialized && this.config.enabled) {
+      this.startSessionBackend(id);
+    }
     return id;
   }
 
@@ -237,6 +247,7 @@ class AnalyticsService {
     const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
     const checkSessionTimeout = () => {
+      if (!this.config.enabled || !this.isInitialized) return;
       const lastActiveStr = localStorage.getItem('omni_analytics_last_active');
       if (lastActiveStr) {
         const lastActive = parseInt(lastActiveStr, 10);
@@ -252,6 +263,7 @@ class AnalyticsService {
 
     // Handle visibility change to end/resume sessions
     document.addEventListener('visibilitychange', () => {
+      if (!this.config.enabled || !this.isInitialized) return;
       if (document.visibilityState === 'hidden') {
         this.endSessionBackend();
       } else {
@@ -262,6 +274,7 @@ class AnalyticsService {
 
     // Update activity on user interactions to keep session alive
     const updateActivity = () => {
+      if (!this.config.enabled || !this.isInitialized) return;
       this.updateActivityTimestamp();
     };
     // Debounce or just set it; localStorage is fast enough for low freq events
@@ -273,19 +286,21 @@ class AnalyticsService {
   }
 
   private endSessionBackend() {
-    // specific endpoint for ending session
-    // utilizing beacon if possible in future, but for now standard fetch/api
+    if (!this.config.enabled || !this.isInitialized || !this.sessionId) return;
     const data = { session_id: this.sessionId };
-    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-    const url = `${import.meta.env.VITE_API_URL || '/api/v1'}/analytics/session/end`;
-
-    // Use navigator.sendBeacon if available for reliable flush
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, blob);
-    } else {
-      // Fallback
-      api.post('/analytics/session/end', data).catch(() => {});
-    }
+    // Beacons cannot carry the session-bound CSRF header required by the API.
+    // keepalive retains unload reliability while authenticatedFetch keeps the
+    // request scoped to the API and adds CSRF protection for this mutation.
+    void authenticatedFetch(
+      `${API_BASE_URL}/analytics/session/end`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        keepalive: true,
+      },
+      false
+    ).catch(() => {});
   }
 }
 

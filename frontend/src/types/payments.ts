@@ -1,6 +1,5 @@
 export type Coin = 'BTC' | 'ETH' | 'CAH';
 export type PaymentStatus = 'pending' | 'confirmed' | 'failed' | 'insufficient';
-export type Plan = 'free' | 'paid';
 
 export interface CryptoPaymentStatusResponse {
   payment_id: number;

@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"crypto/subtle"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -14,8 +18,10 @@ import (
 func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenString string
+		cookieAuth := false
 
 		authHeader := c.GetHeader("Authorization")
+		isWebSocketUpgrade := strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
 		if authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
@@ -25,12 +31,16 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			}
 			tokenString = parts[1]
 		}
-
-		isWebSocketUpgrade := strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
-		// WebSocket upgrade requests cannot send custom headers from the browser.
-		// Allow the token via query param exclusively for WS upgrades.
+		// Browser WebSocket requests carry a dedicated five-minute token in the
+		// query because the API access cookie would otherwise mask it.
 		if tokenString == "" && isWebSocketUpgrade {
 			tokenString = c.Query("token")
+		}
+		if tokenString == "" {
+			if cookieToken, err := c.Cookie(services.AccessTokenCookieName); err == nil && cookieToken != "" {
+				tokenString = cookieToken
+				cookieAuth = true
+			}
 		}
 
 		if tokenString == "" {
@@ -50,13 +60,42 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if !isWebSocketUpgrade && claims.Use == "ws" {
+			apiresponse.WriteError(c, http.StatusUnauthorized, "WebSocket token cannot be used for HTTP requests")
+			c.Abort()
+			return
+		}
+		if cookieAuth && isStateChangingMethod(c.Request.Method) {
+			csrfCookie, cookieErr := c.Cookie(services.CSRFTokenCookieName)
+			csrfHeader := c.GetHeader("X-CSRF-Token")
+			if cookieErr != nil || csrfCookie == "" || csrfHeader == "" ||
+				subtle.ConstantTimeCompare([]byte(csrfCookie), []byte(csrfHeader)) != 1 ||
+				claims.SessionID == "" ||
+				authService.ValidateCSRF(c.Request.Context(), claims.SessionID, csrfHeader) != nil {
+				apiresponse.WriteError(c, http.StatusForbidden, "CSRF validation failed")
+				c.Abort()
+				return
+			}
+		}
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("session_id", claims.SessionID)
+		c.Set("auth_via_cookie", cookieAuth)
+		c.Set("token_version", claims.TokenVersion)
 
 		c.Next()
+	}
+}
+
+func isStateChangingMethod(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -67,7 +106,7 @@ func isValidWebSocketToken(claims *services.JWTClaims) bool {
 	if claims.ExpiresAt == nil || claims.IssuedAt == nil {
 		return false
 	}
-	return claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time) <= 5*time.Minute
+	return claims.ExpiresAt.Sub(claims.IssuedAt.Time) <= 5*time.Minute
 }
 
 // RequireRole enforces that a user has one of the allowed roles
@@ -96,40 +135,26 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 
 // CORS middleware for handling cross-origin requests
 func CORS() gin.HandlerFunc {
+	appEnv := os.Getenv("APP_ENV")
+	allowedOrigins := corsAllowedOrigins(appEnv, os.Getenv("FRONTEND_URL"))
+	allowedOriginSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		allowedOriginSet[origin] = struct{}{}
+	}
+	// The OmniRave runtime dev server is not on a fixed port, so development
+	// allows any loopback origin. Production does not: the branch this merged
+	// from applied the same check unconditionally, which would have handed
+	// Allow-Credentials to any loopback origin in production.
+	allowLoopbackDev := !strings.EqualFold(strings.TrimSpace(appEnv), "production")
+
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		// The allow-origin value is request-specific. Make shared caches keep
+		// responses for different browser origins separate.
+		c.Writer.Header().Add("Vary", "Origin")
 
-		// In production, restrict this to your frontend domain
-		allowedOrigins := []string{
-			"https://omninudge.com",
-			"https://www.omninudge.com",
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"http://localhost:5174",
-			"http://localhost:5175",
-			"http://localhost:5176",
-			"http://localhost:5177",
-			"http://localhost:5178",
-			"http://localhost:5179",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:5173",
-			"http://127.0.0.1:5174",
-			"http://127.0.0.1:5175",
-			"http://127.0.0.1:5176",
-			"http://127.0.0.1:5177",
-			"http://127.0.0.1:5178",
-			"http://127.0.0.1:5179",
-		}
-
-		allowed := false
-		for _, o := range allowedOrigins {
-			if origin == o {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
+		_, allowed := allowedOriginSet[origin]
+		if allowed || (allowLoopbackDev && isLoopbackDevOrigin(origin)) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
@@ -143,4 +168,70 @@ func CORS() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func corsAllowedOrigins(appEnv string, configuredOrigins ...string) []string {
+	production := []string{
+		"https://omninudge.com",
+		"https://www.omninudge.com",
+		// The OmniRave runtime is served from its own origin.
+		"https://play.omninudge.com",
+	}
+	isProduction := strings.EqualFold(strings.TrimSpace(appEnv), "production")
+	for _, configuredList := range configuredOrigins {
+		for _, rawOrigin := range strings.Split(configuredList, ",") {
+			parsed, err := url.Parse(strings.TrimSpace(rawOrigin))
+			if err != nil || parsed.Host == "" || parsed.User != nil ||
+				(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+				continue
+			}
+			if parsed.Scheme != "https" && (parsed.Scheme != "http" || isProduction) {
+				continue
+			}
+			production = append(production, parsed.Scheme+"://"+parsed.Host)
+		}
+	}
+	if isProduction {
+		return production
+	}
+
+	return append(production,
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://localhost:5175",
+		"http://localhost:5176",
+		"http://localhost:5177",
+		"http://localhost:5178",
+		"http://localhost:5179",
+		"http://127.0.0.1:3000",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:5174",
+		"http://127.0.0.1:5175",
+		"http://127.0.0.1:5176",
+		"http://127.0.0.1:5177",
+		"http://127.0.0.1:5178",
+		"http://127.0.0.1:5179",
+	)
+}
+
+// isLoopbackDevOrigin allows any loopback origin regardless of port, which the
+// fixed list above cannot: the OmniRave runtime dev server does not run on a
+// known port. CORS only consults this outside production.
+func isLoopbackDevOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

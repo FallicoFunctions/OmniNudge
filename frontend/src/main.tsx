@@ -2,10 +2,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
-import './i18n/config'; // Initialize i18n
+import { i18nReady } from './i18n/config';
 import App from './App.tsx';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './ErrorBoundary';
+import { getFirebaseMessagingWorkerRegistration } from './lib/firebaseMessagingWorker';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,43 +19,29 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  </StrictMode>
-);
+function renderApplication() {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <App />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </StrictMode>
+  );
+}
+
+void i18nReady
+  .catch((error: unknown) => {
+    console.error('Failed to initialize translations', error);
+  })
+  .then(() => renderApplication());
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // EMERGENCY FIX: Unregister all service workers and clear caches
-    // This fixes module import errors caused by stale service worker caches
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        registration.unregister();
-      });
-    });
-
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => caches.delete(name));
-      });
-    }
-
-    // Service worker registration temporarily disabled
-    // Will re-enable after fixing cache invalidation strategy
-
-    // Register Firebase Cloud Messaging service worker (still needed for notifications)
-    setTimeout(() => {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {
-        // Ignore registration errors to avoid blocking app load.
-      });
-    }, 2000); // Delay to ensure unregistration completes
+    void getFirebaseMessagingWorkerRegistration();
   });
 }
 

@@ -28,7 +28,7 @@ func writeNoisyJPEG(path string, width, height int) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return jpeg.Encode(f, img, &jpeg.Options{Quality: 95})
 }
 

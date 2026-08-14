@@ -25,6 +25,21 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 			return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 		}
+		if payload.ExportID == "" {
+			return fmt.Errorf("data export payload is missing export_id: %w", asynq.SkipRetry)
+		}
+
+		// Redis is a delivery mechanism, not an authorization source. Resolve all
+		// sensitive fields from the server-created request row.
+		if err := db.QueryRow(ctx, `
+			SELECT user_id, data_types, include_deleted
+			FROM data_export_requests
+			WHERE export_id = $1
+			  AND status IN ('pending', 'processing')
+			  AND expires_at > NOW()
+		`, payload.ExportID).Scan(&payload.UserID, &payload.DataTypes, &payload.IncludeDeleted); err != nil {
+			return fmt.Errorf("data export request is unavailable: %v: %w", err, asynq.SkipRetry)
+		}
 
 		zlog.Info().Int("user_id", payload.UserID).Str("export_id", payload.ExportID).Strs("types", payload.DataTypes).Msg("data_export: starting")
 
@@ -32,18 +47,18 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		_, err := db.Exec(ctx, `
 			UPDATE data_export_requests
 			SET status = 'processing'
-			WHERE export_id = $1
-		`, payload.ExportID)
+			WHERE export_id = $1 AND user_id = $2
+		`, payload.ExportID, payload.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to update status: %w", err)
 		}
 
 		// Create temporary directory for export
-		tempDir := filepath.Join(os.TempDir(), "omninudge_export_"+payload.ExportID)
-		if err := os.MkdirAll(tempDir, 0755); err != nil {
+		tempDir, err := os.MkdirTemp("", "omninudge-export-*")
+		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create temp dir: %v", err))
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		// 1. Fetch encrypted session keys for E2E decryption
 		// Map conversation_id -> list of keys (historic and current)
@@ -54,25 +69,30 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			JOIN group_encryption_keys gek ON esk.group_key_id = gek.id
 			WHERE esk.export_id = $1 AND esk.user_id = $2
 		`, payload.ExportID, payload.UserID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var convID int
-				var encryptedKey string
-				if err := rows.Scan(&convID, &encryptedKey); err == nil {
-					// Decrypt session key using system master key
-					rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
-					if err == nil {
-						sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
-					}
-				}
-			}
-			// Check for mid-iteration network or server errors. A partial read
-			// would silently truncate the session key list without this check.
-			if rowsErr := rows.Err(); rowsErr != nil {
-				zlog.Warn().Err(rowsErr).Str("export_id", payload.ExportID).Msg("data_export: partial read of session keys — some messages may be unreadable")
-			}
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to load export keys: %v", err))
 		}
+		for rows.Next() {
+			var convID int
+			var encryptedKey string
+			if err := rows.Scan(&convID, &encryptedKey); err != nil {
+				rows.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export key: %v", err))
+			}
+			// Decrypt session key using the system master key. A partial key set
+			// would produce an apparently successful but unreadable user export.
+			rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
+			if err != nil {
+				rows.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to decrypt export key: %v", err))
+			}
+			sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			rows.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export keys: %v", rowsErr))
+		}
+		rows.Close()
 
 		// 2. Export each data type to its own JSON file
 		for _, dataType := range payload.DataTypes {
@@ -98,9 +118,16 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 				data, err = exportSettingsData(ctx, db, payload.UserID)
 			case "encryption_keys":
 				data, err = exportEncryptionKeysData(ctx, db, payload.UserID)
+			case "omnichat_conversations":
+				data, err = exportOmniChatConversationsData(ctx, db, payload.UserID, payload.IncludeDeleted)
+			case "omnichat_personas":
+				data, err = exportOmniChatPersonasData(ctx, db, payload.UserID)
+			case "omnichat_memory":
+				data, err = exportOmniChatMemoryData(ctx, db, payload.UserID)
+			case "omnichat_media":
+				data, err = exportOmniChatMediaData(ctx, db, payload.UserID, payload.IncludeDeleted)
 			default:
-				zlog.Warn().Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: unknown data type, skipping")
-				continue
+				return updateExportFailed(ctx, db, payload.ExportID, "Export request contains an unsupported data type")
 			}
 
 			if err != nil {
@@ -110,57 +137,88 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 
 			// Save to JSON file
 			filePath := filepath.Join(tempDir, dataType+".json")
-			file, err := os.Create(filePath)
+			// #nosec G304 -- filePath combines a private os.MkdirTemp root with an allowlisted export data type.
+			file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 			if err != nil {
-				zlog.Warn().Err(err).Str("file_path", filePath).Str("export_id", payload.ExportID).Msg("data_export: failed to create temp file")
-				continue
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create export file: %v", err))
 			}
 
 			encoder := json.NewEncoder(file)
 			encoder.SetIndent("", "  ")
 			if err := encoder.Encode(data); err != nil {
-				zlog.Warn().Err(err).Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: failed to encode data type")
+				_ = file.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to encode export data: %v", err))
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close export file: %v", err))
+			}
 		}
 
 		// 3. Create ZIP archive
-		zipPath := filepath.Join(os.TempDir(), "export_"+payload.ExportID+".zip")
-		zipFile, err := os.Create(zipPath)
+		zipFile, err := os.CreateTemp("", "omninudge-export-*.zip")
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create ZIP: %v", err))
 		}
-		defer os.Remove(zipPath)
+		zipPath := zipFile.Name()
+		defer func() { _ = os.Remove(zipPath) }()
 
 		zipWriter := zip.NewWriter(zipFile)
-		files, _ := os.ReadDir(tempDir)
+		files, err := os.ReadDir(tempDir)
+		if err != nil {
+			_ = zipWriter.Close()
+			_ = zipFile.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export files: %v", err))
+		}
 		for _, f := range files {
 			fPath := filepath.Join(tempDir, f.Name())
+			// #nosec G304 -- fPath comes from entries enumerated inside the private export temp directory.
 			fileToZip, err := os.Open(fPath)
 			if err != nil {
-				continue
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export file: %v", err))
 			}
 
 			w, err := zipWriter.Create(f.Name())
 			if err != nil {
-				fileToZip.Close()
-				continue
+				_ = fileToZip.Close()
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to add ZIP entry: %v", err))
 			}
 
-			_, _ = io.Copy(w, fileToZip)
-			fileToZip.Close()
+			if _, err := io.Copy(w, fileToZip); err != nil {
+				_ = fileToZip.Close()
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to write ZIP entry: %v", err))
+			}
+			if err := fileToZip.Close(); err != nil {
+				_ = zipWriter.Close()
+				_ = zipFile.Close()
+				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close export source: %v", err))
+			}
 		}
-		zipWriter.Close()
-		zipFile.Close()
+		if err := zipWriter.Close(); err != nil {
+			_ = zipFile.Close()
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to finalize ZIP: %v", err))
+		}
+		if err := zipFile.Close(); err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to close ZIP: %v", err))
+		}
 
 		// 4. Upload to storage
+		// #nosec G304 -- zipPath is created by this worker inside its private export temp directory.
 		finalZip, err := os.Open(zipPath)
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to open ZIP for upload: %v", err))
 		}
-		defer finalZip.Close()
+		defer func() { _ = finalZip.Close() }()
 
-		fileInfo, _ := os.Stat(zipPath)
+		fileInfo, err := os.Stat(zipPath)
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to stat ZIP: %v", err))
+		}
 		fileSize := fileInfo.Size()
 
 		storageKey := fmt.Sprintf("exports/%d/%s.zip", payload.UserID, payload.ExportID)
@@ -194,8 +252,18 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 
 		// 7. Send email notification
+		var storedEmail *string
+		var emailEncrypted bool
 		var userEmail string
-		_ = db.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", payload.UserID).Scan(&userEmail)
+		if err := db.QueryRow(ctx, "SELECT email, email_encrypted FROM users WHERE id = $1", payload.UserID).Scan(&storedEmail, &emailEncrypted); err == nil && storedEmail != nil {
+			if emailEncrypted {
+				if decrypted, decryptErr := utils.DecryptEmail(*storedEmail); decryptErr == nil {
+					userEmail = decrypted
+				}
+			} else {
+				userEmail = *storedEmail
+			}
+		}
 
 		if userEmail != "" && email != nil {
 			subject := "Your OmniNudge Data Export is Ready"
@@ -234,17 +302,33 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 		CreatedAt time.Time `json:"created_at"`
 		LastSeen  time.Time `json:"last_seen"`
 	}
+	var storedEmail *string
+	var emailEncrypted bool
 
 	err := db.QueryRow(ctx, `
-		SELECT id, username, email, bio, avatar_url, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, bio, avatar_url, role, created_at, last_seen
 		FROM users
 		WHERE id = $1
 	`, userID).Scan(
-		&profile.ID, &profile.Username, &profile.Email,
+		&profile.ID, &profile.Username, &storedEmail, &emailEncrypted,
 		&profile.Bio, &profile.AvatarURL, &profile.Role, &profile.CreatedAt, &profile.LastSeen,
 	)
+	if err != nil {
+		return profile, err
+	}
+	if storedEmail != nil {
+		if emailEncrypted {
+			decrypted, decryptErr := utils.DecryptEmail(*storedEmail)
+			if decryptErr != nil {
+				return profile, decryptErr
+			}
+			profile.Email = &decrypted
+		} else {
+			profile.Email = storedEmail
+		}
+	}
 
-	return profile, err
+	return profile, nil
 }
 
 func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool, conversationKeys map[int][][]byte) (interface{}, error) {
@@ -358,6 +442,392 @@ func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeD
 	return map[string]interface{}{
 		"total": len(posts),
 		"posts": posts,
+	}, nil
+}
+
+// exportOmniChatConversationsData returns the user's chat history with AI
+// characters, messages nested under their conversation.
+//
+// One query, not one per conversation. The first version fetched conversations
+// and then looped fetching each one's messages, which is the N+1 the coding
+// standards forbid outright: a heavy user would have produced thousands of
+// round trips, and because the outer result set stays open until this function
+// returns, every one of them ran while a pool connection was still pinned.
+//
+// Both bounds matter. Nesting messages means the whole reply is assembled in
+// memory before it is encoded, so the row cap is what stops a long history from
+// exhausting the worker. A truncated export is reported through the counts
+// rather than passed off as complete.
+//
+// bot_messages has no user_id of its own -- a conversation owns its turns -- so
+// ownership comes from the conversation filter, and the LEFT JOIN keeps an
+// empty conversation in the export rather than dropping it.
+const (
+	omniChatExportMaxConversations = 2000
+	omniChatExportMaxMessageRows   = 200000
+)
+
+func exportOmniChatConversationsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+	archivedFilter := "AND archived_at IS NULL"
+	if includeDeleted {
+		archivedFilter = ""
+	}
+	query := fmt.Sprintf(`
+		WITH owned AS (
+			SELECT id, persona_id, title, created_at, last_message_at, archived_at,
+			       settings_user_name, settings_user_age, settings_user_gender
+			FROM bot_conversations
+			WHERE user_id = $1 %s
+			ORDER BY created_at DESC
+			LIMIT %d
+		)
+		SELECT c.id, c.persona_id, c.title, c.created_at, c.last_message_at, c.archived_at,
+		       c.settings_user_name, c.settings_user_age, c.settings_user_gender,
+		       m.id, m.role, m.content, m.failed, m.media_only, m.created_at
+		FROM owned c
+		LEFT JOIN bot_messages m ON m.conversation_id = c.id
+		ORDER BY c.created_at DESC, c.id, m.id
+		LIMIT %d
+	`, archivedFilter, omniChatExportMaxConversations, omniChatExportMaxMessageRows)
+
+	rows, err := db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Message struct {
+		ID        int       `json:"id"`
+		Role      string    `json:"role"`
+		Content   string    `json:"content"`
+		Failed    bool      `json:"failed,omitempty"`
+		MediaOnly bool      `json:"media_only,omitempty"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+	type Conversation struct {
+		ID            int        `json:"id"`
+		PersonaID     int        `json:"persona_id"`
+		Title         *string    `json:"title"`
+		CreatedAt     time.Time  `json:"created_at"`
+		LastMessageAt *time.Time `json:"last_message_at,omitempty"`
+		ArchivedAt    *time.Time `json:"archived_at,omitempty"`
+		UserName      *string    `json:"user_name,omitempty"`
+		UserAge       *string    `json:"user_age,omitempty"`
+		UserGender    *string    `json:"user_gender,omitempty"`
+		Messages      []Message  `json:"messages"`
+	}
+
+	conversations := []Conversation{}
+	byID := map[int]int{}
+	totalMessages := 0
+	// Rows are counted as scanned rather than derived afterwards. The join emits
+	// one row per message and one row for a conversation with none, so no
+	// arithmetic over the two totals reconstructs it exactly.
+	rowCount := 0
+
+	for rows.Next() {
+		var (
+			conversation Conversation
+			messageID    *int
+			role         *string
+			content      *string
+			failed       *bool
+			mediaOnly    *bool
+			messageAt    *time.Time
+		)
+		if err := rows.Scan(
+			&conversation.ID, &conversation.PersonaID, &conversation.Title,
+			&conversation.CreatedAt, &conversation.LastMessageAt, &conversation.ArchivedAt,
+			&conversation.UserName, &conversation.UserAge, &conversation.UserGender,
+			&messageID, &role, &content, &failed, &mediaOnly, &messageAt,
+		); err != nil {
+			return nil, err
+		}
+		rowCount++
+
+		index, seen := byID[conversation.ID]
+		if !seen {
+			conversation.Messages = []Message{}
+			conversations = append(conversations, conversation)
+			index = len(conversations) - 1
+			byID[conversation.ID] = index
+		}
+
+		// A NULL message id is the LEFT JOIN reporting a conversation with no
+		// turns, not a missing row.
+		if messageID == nil {
+			continue
+		}
+		message := Message{ID: *messageID}
+		if role != nil {
+			message.Role = *role
+		}
+		if content != nil {
+			message.Content = *content
+		}
+		if failed != nil {
+			message.Failed = *failed
+		}
+		if mediaOnly != nil {
+			message.MediaOnly = *mediaOnly
+		}
+		if messageAt != nil {
+			message.CreatedAt = *messageAt
+		}
+		conversations[index].Messages = append(conversations[index].Messages, message)
+		totalMessages++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":          len(conversations),
+		"total_messages": totalMessages,
+		// Either cap can bite: a user with more conversations than the first
+		// allows, or more history than the second.
+		"truncated": rowCount >= omniChatExportMaxMessageRows ||
+			len(conversations) >= omniChatExportMaxConversations,
+		"conversations": conversations,
+	}, nil
+}
+
+// exportOmniChatPersonasData returns the characters this user authored.
+//
+// Platform-owned personas are excluded: they have a NULL owner and are not the
+// user's data. The character-card fields are included in full because the user
+// wrote them, and portability means being able to take a character elsewhere.
+func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, slug, name, description, category, visibility, is_nsfw,
+		       system_prompt, personality, scenario, first_message, example_dialogue,
+		       post_history_instructions, alternate_greetings, creator_notes, tags,
+		       creator_name, character_version, created_at, updated_at
+		FROM bot_personas
+		WHERE owner_user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Persona struct {
+		ID                      int       `json:"id"`
+		Slug                    string    `json:"slug"`
+		Name                    string    `json:"name"`
+		Description             *string   `json:"description"`
+		Category                *string   `json:"category"`
+		Visibility              *string   `json:"visibility"`
+		IsNSFW                  bool      `json:"is_nsfw"`
+		SystemPrompt            *string   `json:"system_prompt"`
+		Personality             *string   `json:"personality"`
+		Scenario                *string   `json:"scenario"`
+		FirstMessage            *string   `json:"first_message"`
+		ExampleDialogue         *string   `json:"example_dialogue"`
+		PostHistoryInstructions *string   `json:"post_history_instructions"`
+		AlternateGreetings      []string  `json:"alternate_greetings,omitempty"`
+		CreatorNotes            *string   `json:"creator_notes"`
+		Tags                    []string  `json:"tags,omitempty"`
+		CreatorName             *string   `json:"creator_name"`
+		CharacterVersion        *string   `json:"character_version"`
+		CreatedAt               time.Time `json:"created_at"`
+		UpdatedAt               time.Time `json:"updated_at"`
+	}
+
+	personas := []Persona{}
+	for rows.Next() {
+		var persona Persona
+		if err := rows.Scan(
+			&persona.ID, &persona.Slug, &persona.Name, &persona.Description, &persona.Category,
+			&persona.Visibility, &persona.IsNSFW, &persona.SystemPrompt, &persona.Personality,
+			&persona.Scenario, &persona.FirstMessage, &persona.ExampleDialogue,
+			&persona.PostHistoryInstructions, &persona.AlternateGreetings, &persona.CreatorNotes,
+			&persona.Tags, &persona.CreatorName, &persona.CharacterVersion,
+			&persona.CreatedAt, &persona.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		personas = append(personas, persona)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":    len(personas),
+		"personas": personas,
+	}, nil
+}
+
+// exportOmniChatMemoryData returns what AI characters have inferred and stored
+// about this user.
+//
+// This is the section a subject-access request is really aimed at: unlike chat
+// history, these rows are the system's own claims about a person rather than
+// something they wrote. Provenance is therefore exported alongside the claim --
+// conversation and message ids, plus the salience and distinctiveness scores
+// that decide when a memory resurfaces -- so the record can be checked and
+// contested rather than merely read.
+//
+// Only the relational tier is exported. A NULL owner is persona-global memory
+// that belongs to no user, and the WHERE clause excludes it.
+//
+// Unlike the in-app review panel, this deliberately includes memories the user
+// has already forgotten. Hiding one withdraws it from recall but the row is
+// still stored data about them, so a subject-access request has to return it.
+// The two surfaces answer different questions and are meant to differ.
+func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, persona_id, conversation_id, source_message_id, title, summary,
+		       salience, distinctiveness, emotional_valence, status, recorded_at,
+		       retrieval_count, last_retrieved_at
+		FROM omnichat_memory_episodes
+		WHERE owner_user_id = $1
+		ORDER BY recorded_at DESC
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Episode struct {
+		ID               int64      `json:"id"`
+		PersonaID        int        `json:"persona_id"`
+		ConversationID   *int       `json:"conversation_id"`
+		SourceMessageID  *int       `json:"source_message_id"`
+		Title            string     `json:"title"`
+		Summary          string     `json:"summary"`
+		Salience         float64    `json:"salience"`
+		Distinctiveness  float64    `json:"distinctiveness"`
+		EmotionalValence *float64   `json:"emotional_valence"`
+		Status           string     `json:"status"`
+		RecordedAt       time.Time  `json:"recorded_at"`
+		RetrievalCount   int        `json:"retrieval_count"`
+		LastRetrievedAt  *time.Time `json:"last_retrieved_at,omitempty"`
+	}
+
+	episodes := []Episode{}
+	for rows.Next() {
+		var episode Episode
+		if err := rows.Scan(
+			&episode.ID, &episode.PersonaID, &episode.ConversationID, &episode.SourceMessageID,
+			&episode.Title, &episode.Summary, &episode.Salience, &episode.Distinctiveness,
+			&episode.EmotionalValence, &episode.Status, &episode.RecordedAt,
+			&episode.RetrievalCount, &episode.LastRetrievedAt,
+		); err != nil {
+			continue
+		}
+		episodes = append(episodes, episode)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	entityRows, err := db.Query(ctx, `
+		SELECT id, persona_id, canonical_name, kind, aliases, mention_count,
+		       first_seen_at, last_seen_at
+		FROM omnichat_memory_entities
+		WHERE owner_user_id = $1
+		ORDER BY mention_count DESC, canonical_name
+		LIMIT 10000
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer entityRows.Close()
+
+	type Entity struct {
+		ID            int64     `json:"id"`
+		PersonaID     int       `json:"persona_id"`
+		CanonicalName string    `json:"name"`
+		Kind          string    `json:"kind"`
+		Aliases       []string  `json:"aliases,omitempty"`
+		MentionCount  int       `json:"mention_count"`
+		FirstSeenAt   time.Time `json:"first_seen_at"`
+		LastSeenAt    time.Time `json:"last_seen_at"`
+	}
+
+	entities := []Entity{}
+	for entityRows.Next() {
+		var entity Entity
+		if err := entityRows.Scan(&entity.ID, &entity.PersonaID, &entity.CanonicalName,
+			&entity.Kind, &entity.Aliases, &entity.MentionCount,
+			&entity.FirstSeenAt, &entity.LastSeenAt); err != nil {
+			continue
+		}
+		entities = append(entities, entity)
+	}
+	if err := entityRows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":    len(episodes),
+		"episodes": episodes,
+		"entities": entities,
+	}, nil
+}
+
+// exportOmniChatMediaData returns the metadata for images and video generated
+// for this user.
+//
+// The bytes themselves are not inlined: a gallery can be large, and the export
+// archive is delivered by email. Storage keys are omitted deliberately -- they
+// are internal addressing, not user data, and a signed URL in a downloadable
+// file would outlive the export's own expiry.
+func exportOmniChatMediaData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+	query := `
+		SELECT id, persona_id, conversation_id, kind, visibility, prompt,
+		       width, height, duration_seconds, safety_status, created_at, deleted_at
+		FROM omnichat_media_assets
+		WHERE owner_user_id = $1
+	`
+	if !includeDeleted {
+		query += " AND deleted_at IS NULL"
+	}
+	query += " ORDER BY created_at DESC LIMIT 10000"
+
+	rows, err := db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type Asset struct {
+		ID              string     `json:"id"`
+		PersonaID       *int       `json:"persona_id"`
+		ConversationID  *int       `json:"conversation_id"`
+		Kind            string     `json:"kind"`
+		Visibility      string     `json:"visibility"`
+		Prompt          *string    `json:"prompt"`
+		Width           *int       `json:"width"`
+		Height          *int       `json:"height"`
+		DurationSeconds *int       `json:"duration_seconds,omitempty"`
+		SafetyStatus    string     `json:"safety_status"`
+		CreatedAt       time.Time  `json:"created_at"`
+		DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	}
+
+	assets := []Asset{}
+	for rows.Next() {
+		var asset Asset
+		if err := rows.Scan(&asset.ID, &asset.PersonaID, &asset.ConversationID, &asset.Kind,
+			&asset.Visibility, &asset.Prompt, &asset.Width, &asset.Height,
+			&asset.DurationSeconds, &asset.SafetyStatus, &asset.CreatedAt, &asset.DeletedAt); err != nil {
+			continue
+		}
+		assets = append(assets, asset)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"total":  len(assets),
+		"assets": assets,
 	}, nil
 }
 

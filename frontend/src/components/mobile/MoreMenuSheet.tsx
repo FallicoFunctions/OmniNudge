@@ -1,12 +1,22 @@
-import { useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { User, Settings, Grid3x3, Info, Shield, LogOut, LogIn, UserPlus } from 'lucide-react';
+import {
+  User,
+  Settings,
+  Grid3x3,
+  Info,
+  Shield,
+  LogOut,
+  LogIn,
+  UserPlus,
+  Gamepad2,
+} from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 import { ConfirmModal } from './ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { heavyHaptic } from '../../utils/haptics';
-import { trackEvent } from '../../utils/analytics';
+import { analyticsService } from '../../services/analyticsService';
 
 interface MoreMenuSheetProps {
   isOpen: boolean;
@@ -33,21 +43,24 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
   // Track sheet opens
   useEffect(() => {
     if (isOpen) {
-      trackEvent('MobileNavigation', 'OpenMoreMenu');
+      analyticsService.track('mobile_navigation', { action: 'OpenMoreMenu' });
     }
   }, [isOpen]);
 
-  const handleNavigate = (path: string, label: string) => {
-    trackEvent('MobileNavigation', 'MoreMenuClick', label);
-    navigate(path);
-    onClose();
-  };
+  const handleNavigate = useCallback(
+    (path: string, label: string) => {
+      analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label });
+      navigate(path);
+      onClose();
+    },
+    [navigate, onClose]
+  );
 
-  const handleLogoutClick = () => {
-    trackEvent('MobileNavigation', 'MoreMenuClick', 'Logout');
+  const handleLogoutClick = useCallback(() => {
+    analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label: 'Logout' });
     heavyHaptic(); // Stronger feedback for destructive action
     setShowLogoutConfirm(true);
-  };
+  }, []);
 
   const handleLogoutConfirm = () => {
     logout();
@@ -76,6 +89,14 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         testId: 'menu-hubs-button',
       },
       {
+        icon: Gamepad2,
+        label: t('menu.games'),
+        onClick: () => handleNavigate('/games', 'Games'),
+        show: true,
+        section: 'nav',
+        testId: 'menu-games-button',
+      },
+      {
         icon: Info,
         label: t('menu.about'),
         onClick: () => handleNavigate('/about', 'About'),
@@ -91,7 +112,10 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
           if (isAuthenticated) {
             handleNavigate('/settings', 'Settings');
           } else {
-            trackEvent('MobileNavigation', 'MoreMenuClick', 'Settings');
+            analyticsService.track('mobile_navigation', {
+              action: 'MoreMenuClick',
+              label: 'Settings',
+            });
             onClose();
             window.dispatchEvent(
               new CustomEvent('open-auth-modal', {
@@ -117,7 +141,7 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         icon: LogIn,
         label: t('common.login'),
         onClick: () => {
-          trackEvent('MobileNavigation', 'MoreMenuClick', 'Login');
+          analyticsService.track('mobile_navigation', { action: 'MoreMenuClick', label: 'Login' });
           onClose();
           window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
         },
@@ -129,7 +153,10 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         icon: UserPlus,
         label: t('common.register'),
         onClick: () => {
-          trackEvent('MobileNavigation', 'MoreMenuClick', 'Register');
+          analyticsService.track('mobile_navigation', {
+            action: 'MoreMenuClick',
+            label: 'Register',
+          });
           onClose();
           window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'signup' }));
         },
@@ -151,13 +178,13 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
   );
 
   // Group items by section
-  const sections = ['user', 'nav', 'settings', 'auth'];
+  const sections = useMemo(() => ['user', 'nav', 'settings', 'auth'], []);
   const groupedItems = useMemo(
     () =>
       sections
         .map((section) => items.filter((item) => item.section === section && item.show))
         .filter((group) => group.length > 0),
-    [items]
+    [items, sections]
   );
 
   return (

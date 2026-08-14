@@ -21,4 +21,9 @@ describe('normalizeUploadedMediaUrl', () => {
   it('falls back to storage path when storage URL is absent', () => {
     expect(normalizeUploadedMediaUrl(undefined, 'uploads/test.jpg')).toBe('/uploads/test.jpg');
   });
+
+  it('rejects protocol-relative and traversal-like upload locations', () => {
+    expect(normalizeUploadedMediaUrl('//attacker.example/image.png')).toBe('');
+    expect(normalizeUploadedMediaUrl(undefined, '../private.txt')).toBe('');
+  });
 });

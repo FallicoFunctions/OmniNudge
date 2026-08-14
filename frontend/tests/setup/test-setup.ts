@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom';
+import { act } from '@testing-library/react';
+import { notifyManager } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import i18n from 'i18next';
@@ -25,6 +27,12 @@ vi.mock('../../src/services/userSettingsService', () => ({
   },
 }));
 
+// React Query publishes async observer updates outside React events. Route
+// them through act so test assertions observe the same settled UI users do.
+notifyManager.setNotifyFunction((callback) => {
+  act(callback);
+});
+
 if (!i18n.isInitialized) {
   i18n.use(initReactI18next).init({
     lng: 'en',
@@ -37,6 +45,7 @@ if (!i18n.isInitialized) {
     interpolation: {
       escapeValue: false,
     },
+    showSupportNotice: false,
   });
 }
 
@@ -57,6 +66,14 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
   };
 }
 
+if (!URL.createObjectURL) {
+  URL.createObjectURL = vi.fn(() => 'blob:test-object-url');
+}
+
+if (!URL.revokeObjectURL) {
+  URL.revokeObjectURL = vi.fn();
+}
+
 if (!window.matchMedia) {
   window.matchMedia = vi.fn().mockImplementation((query) => ({
     matches: false,
@@ -74,3 +91,4 @@ if (!window.matchMedia) {
 // Tests should stub per-test when asserting behavior; this just prevents noisy stderr.
 window.alert = vi.fn();
 window.confirm = vi.fn(() => true);
+window.scrollTo = vi.fn();

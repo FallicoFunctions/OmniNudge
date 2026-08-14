@@ -125,11 +125,12 @@
     "notifications": "الإشعارات",
     "profile": "الملف الشخصي",
     "admin": "الإدارة",
-    "hubs": "المجموعات",
     "games": "الألعاب",
+    "hubs": "المجموعات",
     "search": "بحث",
     "create": "إنشاء",
-    "menu": "القائمة"
+    "menu": "القائمة",
+    "omnichat": "OmniChat"
   },
   "menu": {
     "profile": "الملف الشخصي",
@@ -144,16 +145,20 @@
   },
   "gamesPage": {
     "eyebrow": "OmniGame",
-    "title": "OmniGame",
-    "description": "تصفح عوالم متعددة اللاعبين مصممة لـ OmniNudge.",
+    "title": "الألعاب",
+    "description": "ادخل إلى مساحات متعددة اللاعبين مخصصة داخل OmniNudge، بدءًا من أول غرفة مباشرة: OmniRave.",
     "availableNow": "متاح الآن",
     "viewGame": "عرض اللعبة"
   },
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
     "play": "العب",
-    "starting": "جارٍ البدء...",
-    "launchError": "يتعذر بدء OmniRave الآن."
+    "playing": "جارٍ الدخول إلى OmniRave...",
+    "heroTitle": "ادخل إلى الغرفة من دون أي شاشة وسيطة.",
+    "heroBody": "يجب أن يكون الدخول فوريًا: انتقال إلى السواد، جمهور حي، أضواء المسرح، والغرفة تتحرك بالفعل.",
+    "launchHint": "يستأنف اللاعبون المسجلون الدخول بحساباتهم، ويدخل الآخرون كضيوف.",
+    "highlightsTitle": "ما الذي يجعل الغرفة تبدو حقيقية",
+    "launchError": "تعذر تشغيل OmniRave الآن."
   },
   "mainLayout": {
     "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
@@ -209,6 +214,35 @@
     "memberCount_other": "{{formattedCount}} أعضاء",
     "pagination": {
       "page": "الصفحة {{formattedPage}}"
+    }
+  },
+  "games": {
+    "omnirave": {
+      "summary": "حفلة ريف على المتصفح تتحرك فيها جماهير حية واحدة بين ثلاث منصات متزامنة داخل العالم نفسه.",
+      "hero": "عالم واحد. ثلاث منصات. نبض مشترك.",
+      "description": [
+        "يضع OmniRave كل لاعب داخل الموقع نفسه المعتمد، بحيث تشعر أن الغرفة حيّة منذ اللحظة التي تصل فيها.",
+        "يدخل الضيوف فورًا إلى المسرح الرئيسي، بينما يعود اللاعبون المسجّلون عبر نقطة العودة المحفوظة مع احتفاظهم بتجهيزاتهم."
+      ],
+      "highlights": [
+        "دخول إلى المسرح الرئيسي للضيوف واللاعبين الجدد",
+        "عودة عبر نقطة الرجوع المحفوظة للاعبين المسجّلين",
+        "صوت المناطق وحالة العالم متزامنان بشكل معتمد عبر كل منصة"
+      ],
+      "gallery": {
+        "0": {
+          "title": "المسرح الرئيسي",
+          "caption": "نقطة الوصول التي تمسك فيها الغرفة كلها بالإيقاع منذ اللحظة الأولى."
+        },
+        "1": {
+          "title": "ذا أندرغراوند",
+          "caption": "ساحة أغمق مصممة لنبضات أقسى، أضواء أكثف، وحركة تمتد حتى آخر الليل."
+        },
+        "2": {
+          "title": "P.L.U.R.R. Partay",
+          "caption": "غرفة جانبية نيون مضبوطة على اللون، والارتداد، والاندفاع النشِط."
+        }
+      }
     }
   },
   "bugReportModal": {
@@ -1231,9 +1265,8 @@
     },
     "edit": {
       "title": "تعديل الملف الشخصي",
-      "description": "حدّث رابط الصورة الشخصية ونص الحالة والنبذة.",
-      "avatarUrlLabel": "رابط الصورة الشخصية",
-      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "description": "حدّث الصورة الشخصية ونص الحالة والنبذة.",
+      "avatarUrlLabel": "الصورة الشخصية",
       "avatarUploadButton": "رفع صورة الملف الشخصي",
       "avatarUploading": "جارٍ الرفع...",
       "avatarUploadHint": "PNG أو JPG أو GIF أو WebP حتى 5MB. قص تلقائي إلى 200x200.",
@@ -1250,7 +1283,7 @@
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
         "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
         "locationTooLong": "يجب ألا يتجاوز الموقع 100 حرف.",
-        "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
+        "invalidAvatarUrl": "يجب أن تبدأ الصورة بـ http:// أو https://",
         "uploadFailed": "فشل رفع الصورة الشخصية: {{message}}",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
       }
@@ -2305,6 +2338,14 @@
       "title": "المستخدمون المحظورون",
       "description": "قم بإدارة الأشخاص الذين قمت بحظرهم. لا يمكن للمستخدمين المحظورين مراسلتك أو بدء محادثات جديدة معك.",
       "manageButton": "إدارة المستخدمين المحظورين"
+    },
+    "omniChatLayout": {
+      "title": "تخطيط OmniChat",
+      "description": "اختر كيفية ظهور OmniChat عند فتحه.",
+      "immersive": "عرض غامر بالكامل (افتراضي)",
+      "immersiveHelp": "يستحوذ OmniChat على الشاشة بالكامل بمظهره الداكن الخاص، دون شريط تنقل الموقع.",
+      "sharedNav": "الإبقاء على تنقل الموقع",
+      "sharedNavHelp": "يحتفظ OmniChat بمظهره الداكن الخاص، لكن يبقى شريط تنقل OmniNudge ظاهرًا أعلاه."
     }
   },
   "blockedUsersPage": {
@@ -2397,6 +2438,7 @@
       "signingIn": "جاري تسجيل الدخول...",
       "creatingAccount": "جاري إنشاء الحساب...",
       "signIn": "تسجيل الدخول",
+      "logout": "تسجيل الخروج",
       "signUp": "إنشاء حساب"
     },
     "switch": {
@@ -3453,7 +3495,9 @@
       "userManagement": "ادارة المستخدمين",
       "hubModerators": "مشرفو المحور",
       "banActivity": "نشاط الحظر",
-      "bugReports": "تقارير الاخطاء"
+      "bugReports": "تقارير الاخطاء",
+      "omnichatPersonas": "شخصيات OmniChat",
+      "responseFeedback": "ملاحظات الردود"
     },
     "roles": {
       "user": "مستخدم",
@@ -3626,6 +3670,45 @@
         "noScreenshot": "لا توجد لقطة شاشة."
       }
     },
+    "responseFeedback": {
+      "title": "ملاحظات ردود OmniChat",
+      "subtitle": "راجع الردود المُبلّغ عنها وروّج لإشارات الجودة المفيدة.",
+      "loading": "جارٍ تحميل ملاحظات الردود...",
+      "loadError": "تعذر تحميل ملاحظات الردود.",
+      "updateError": "تعذر تحديث حالة الملاحظة.",
+      "filters": "فلاتر ملاحظات الردود",
+      "status": "الحالة",
+      "reason": "السبب",
+      "allStatuses": "كل الحالات",
+      "allReasons": "كل الأسباب",
+      "count": "{{count}} بلاغ",
+      "empty": "لم يتم العثور على ملاحظات للردود.",
+      "submitted": "وقت الإرسال",
+      "detail": "تفاصيل البلاغ",
+      "note": "ملاحظة المُبلّغ",
+      "noNote": "لم تُقدَّم ملاحظة.",
+      "responseSnapshot": "لقطة الرد",
+      "priorUserSnapshot": "لقطة المستخدم السابقة",
+      "sceneFacts": "حقائق المشهد",
+      "unavailable": "غير متاح",
+      "actions": "إجراءات المراجعة",
+      "page": "الصفحة {{page}}",
+      "statuses": {
+        "new": "جديد",
+        "reviewed": "تمت المراجعة",
+        "promoted": "تمت الترقية",
+        "dismissed": "مرفوض"
+      },
+      "reasons": {
+        "role_ownership": "الدور أو الملكية",
+        "user_agency": "حرية المستخدم",
+        "narration_format": "السرد أو التنسيق",
+        "repetition_length": "التكرار أو الطول",
+        "grammar_artifact": "قواعد أو أثر",
+        "character_mismatch": "لا يطابق الشخصية",
+        "other": "أخرى"
+      }
+    },
     "moderators": {
       "selectHub": "اختر محورا",
       "selectHubPlaceholder": "-- اختر محورا --",
@@ -3719,8 +3802,7 @@
     "minParticipants": "أضف عضوين على الأقل.",
     "nameLabel": "اسم المجموعة",
     "namePlaceholder": "أدخل اسم المجموعة",
-    "avatarLabel": "رابط الصورة (اختياري)",
-    "avatarPlaceholder": "https://example.com/avatar.png",
+    "avatarLabel": "الصورة (اختياري)",
     "descriptionLabel": "الوصف (اختياري)",
     "descriptionPlaceholder": "عم ماذا تدور هذه المجموعة؟",
     "selectedCount": "{{count}} محدد",
@@ -3914,6 +3996,416 @@
       "removed": "تمت إزالة الصديق",
       "declined": "تم رفض الطلب",
       "topFriendsUpdated": "Top friends updated"
+    }
+  },
+  "omnichat": {
+    "galleryDelete": {
+      "action": "حذف الإنشاء",
+      "title": "حذف هذا الإنشاء؟",
+      "description": "سيؤدي هذا إلى حذف الملف نهائيًا من معرضك ومن مرفقات المحادثة. لا يمكن التراجع عن ذلك.",
+      "confirm": "حذف نهائي",
+      "deleting": "جارٍ الحذف...",
+      "sharedError": "ألغِ نشر هذا الإنشاء من الاستكشاف قبل حذفه.",
+      "genericError": "تعذر حذف هذا الإنشاء.",
+      "unpublishFirst": "ألغِ النشر من الاستكشاف قبل الحذف"
+    },
+    "groupManagement": {
+      "confirmDelete": "هل تريد حذف هذه المجموعة وسجل محادثتها بالكامل نهائيًا؟"
+    },
+    "commerce": {
+      "title": "الخطط وOmniCredits",
+      "subtitle": "يأتي رصيدك وكل عرض معروض من الخادم.",
+      "wallet": "المحفظة",
+      "balanceBreakdown": "{{purchased}} مشتراة · {{subscription}} من الاشتراك",
+      "plans": "الخطط",
+      "choosePlan": "اختر {{plan}}",
+      "creditPacks": "حزم الرصيد",
+      "creditName": "{{count}} OmniCredits",
+      "buyPack": "شراء {{pack}}",
+      "recentUsage": "الاستخدام الأخير",
+      "noUsage": "لا يوجد استخدام للرصيد بعد.",
+      "loading": "جارٍ تحميل خيارات الشراء…",
+      "redirecting": "جارٍ فتح الدفع الآمن…",
+      "notConfigured": "خيارات الشراء غير مهيأة بعد.",
+      "offerNames": {
+        "plus": "بلس",
+        "premium": "بريميوم",
+        "unknown": "اشتراك"
+      },
+      "period": {
+        "month": "شهر",
+        "days": "{{count}} يومًا"
+      },
+      "features": {
+        "profiles": "ملفات شخصيات أكثر",
+        "media": "رصيد وسائط مضمن",
+        "priority": "إنشاء بأولوية"
+      },
+      "usage": {
+        "voice": "مكالمة صوتية",
+        "image": "إنشاء صورة",
+        "video": "إنشاء فيديو",
+        "other": "تعديل الرصيد"
+      },
+      "errors": {
+        "load": "تعذر تحميل تفاصيل الفوترة.",
+        "secureCheckout": "تعذر فتح دفع آمن. حاول مرة أخرى."
+      }
+    },
+    "videoPaywall": {
+      "title": "فتح {{feature}}",
+      "description": "يتطلب الفيديو OmniCredits. قد تتضمن الخطة المؤهلة رصيدًا؛ ويتم تأكيد التوفر والتكلفة بأمان قبل الاستخدام.",
+      "viewOptions": "عرض الخطط والرصيد",
+      "features": {
+        "scene_video": "فيديو المشهد",
+        "video_call": "مكالمات الفيديو"
+      }
+    },
+    "categories": {
+      "all": "الكل",
+      "roleplay": "تقمص أدوار",
+      "helper": "مساعد",
+      "romance": "رومانسي",
+      "original": "أصلي",
+      "animeGame": "أنمي وألعاب",
+      "fictionMedia": "قصص وإعلام"
+    },
+    "discover": {
+      "featuredEyebrow": "مميز",
+      "featuredTitle": "ابحث عن قصتك التالية",
+      "allPersonas": "جميع الشخصيات",
+      "loading": "جارٍ تحميل الشخصيات...",
+      "loadError": "تعذّر تحميل الشخصيات.",
+      "startError": "تعذّر بدء هذه المحادثة. حاول مرة أخرى.",
+      "empty": "لا توجد شخصيات بعد.",
+      "startingChat": "جارٍ بدء المحادثة...",
+      "continueChatting": "متابعة المحادثة",
+      "conversationsLoadError": "تعذّر تحميل محادثاتك.",
+      "heroEyebrow": "عالم مميز",
+      "heroTitle": "ادخل قصةً تتفاعل معك.",
+      "heroDescription": "تعرّف إلى شخصيات نابضة بالحياة، وشكّل مجرى الأحداث، وخذ كل محادثة إلى وجهة غير متوقعة.",
+      "enterPersona": "ادخل عالم {{name}}",
+      "searchCharacters": "البحث عن الشخصيات",
+      "roulette": "فاجئني",
+      "rouletteShuffling": "جارٍ الاختيار...",
+      "rouletteReveal": "قصتك التالية هي",
+      "spotlight": "تحت الأضواء: {{name}}",
+      "continueEyebrow": "تابع من حيث توقفت",
+      "viewChats": "عرض المحادثات",
+      "createOrImport": "إنشاء شخصية أو استيرادها",
+      "privateCollection": "مجموعتك الخاصة",
+      "myCharacters": "شخصياتي",
+      "manageStudio": "إدارة الاستوديو",
+      "exploreEyebrow": "كل الأنواع. والاتجاه بيدك.",
+      "exploreTitle": "استكشف الشخصيات",
+      "searchAll": "بحث في الكل",
+      "categoryAria": "فئات الشخصيات"
+    },
+    "quickChat": {
+      "eyebrow": "محادثة سريعة",
+      "title": "تعرّف إلى {{name}}",
+      "close": "إغلاق المحادثة السريعة",
+      "description": "تظهر الرسالة الافتتاحية المُعدّة فورًا. رد مرة واحدة لتجربة المحادثة؛ لن يُحفظ شيء حتى تتابع.",
+      "openingUnavailable": "تحتاج هذه الشخصية إلى رسالة افتتاحية مُعدّة قبل بدء المحادثة السريعة.",
+      "replyLabel": "الرد على {{name}}",
+      "placeholder": "اكتب ردًا إلى {{name}}...",
+      "send": "إرسال الرد",
+      "generating": "{{name}} يرد الآن...",
+      "generationFailed": "لم يصل رد المعاينة. ما زالت رسالتك موجودة.",
+      "retry": "المحاولة مجددًا",
+      "oneReplyHint": "تجري معاينة رد واحد قبل فتح المحادثة الكاملة...",
+      "continue": "متابعة المحادثة",
+      "openingChat": "جارٍ فتح المحادثة...",
+      "continueFailed": "تعذّر فتح المحادثة. حاول مجددًا.",
+      "resumeExisting": "متابعة محادثتك الحالية بدلًا من ذلك"
+    },
+    "responseReport": {
+      "title": "الإبلاغ عن رد",
+      "description": "اختر الخطأ الذي حدث. تساعد ملاحظاتك في تحسين الردود المستقبلية.",
+      "close": "إغلاق بلاغ الرد",
+      "reasonLabel": "ما الخطأ الذي حدث؟",
+      "reasons": {
+        "role_ownership": "خلط بين من قام بالفعل أو يملك الشيء",
+        "user_agency": "ألغى خياراتي أو تصرف نيابةً عني",
+        "narration_format": "كان السرد أو التنسيق غير صحيح",
+        "repetition_length": "كان مكررًا أو بطول غير مناسب",
+        "grammar_artifact": "احتوى على أخطاء لغوية أو آثار توليد",
+        "character_mismatch": "لم يتوافق مع الشخصية",
+        "other": "مشكلة أخرى"
+      },
+      "noteLabel": "ملاحظة اختيارية",
+      "notePlaceholder": "أخبرنا بما كان يمكن أن يكون أفضل",
+      "cancel": "إلغاء",
+      "sending": "جارٍ الإرسال…",
+      "submit": "إرسال البلاغ"
+    },
+    "chat": {
+      "invalidConversation": "تعذّر العثور على هذه المحادثة.",
+      "back": "العودة إلى الاستكشاف",
+      "loadingPersona": "جارٍ التحميل...",
+      "nsfwTag": "+18",
+      "signInPrompt": "سجّل الدخول لحفظ محادثتك",
+      "newChat": "محادثة جديدة",
+      "settings": "إعدادات الدردشة",
+      "settingsName": "اسمك",
+      "settingsAge": "العمر",
+      "settingsGender": "النوع",
+      "settingsGenderM": "ذكر",
+      "settingsGenderF": "أنثى",
+      "settingsGenderT": "متحول جنسيًا",
+      "settingsGenderA": "مخنث",
+      "settingsGenderN": "أفضل عدم الإفصاح",
+      "settingsSave": "حفظ الإعدادات",
+      "settingsSaved": "تم حفظ الإعدادات",
+      "settingsSaveError": "تعذّر حفظ الإعدادات",
+      "viewCharacterForm": "فتح نموذج الشخصية",
+      "viewCharacterFormDescription": "عرض تعريف شخصية البوت الكامل في نافذة منبثقة.",
+      "noPersonaSelected": "اختر شخصية من اكتشف لبدء الدردشة",
+      "personaNotFound": "تعذّر العثور على هذه الشخصية.",
+      "loading": "جارٍ تحميل المحادثة...",
+      "loadError": "تعذّر تحميل هذه المحادثة.",
+      "inputPlaceholder": "قل أو افعل شيئًا...",
+      "send": "إرسال الرسالة",
+      "rateLimited": "أنت تتحرك بسرعة كبيرة — يُرجى الانتظار لحظة قبل إرسال رسالة أخرى.",
+      "allowanceRemaining": "{{remaining}} من أصل {{limit}} ردًا مجانيًا متاحًا · 24 ساعة متجددة",
+      "allowanceEmpty": "لا توجد ردود مجانية متاحة.",
+      "allowanceNext": "سيصبح ردك التالي متاحًا في {{time}}.",
+      "allowanceGuestCta": "سجّل للحصول على 250 ردًا",
+      "allowanceUpgradeCta": "رقِّ للحصول على ردود غير محدودة",
+      "regenerateResponse": "إعادة إنشاء الرد",
+      "reportResponse": "الإبلاغ عن الرد",
+      "reportResponseThanks": "شكرًا. أُضيف هذا الرد إلى قائمة مراجعة الجودة.",
+      "reportResponseFailed": "تعذّر حفظ بلاغ الرد. حاول مجددًا.",
+      "regenerationFailed": "تعذّرت إعادة إنشاء هذا الرد. تم الاحتفاظ بالرد الأصلي.",
+      "editResponse": "تعديل الرد",
+      "saveEdit": "حفظ",
+      "cancelEdit": "إلغاء",
+      "editLearningHint": "ستستخدم الردود اللاحقة في هذه المحادثة نسختك المعدّلة.",
+      "editFailed": "تعذّر حفظ التعديل. تم الاحتفاظ بمسودتك.",
+      "newChatConfirm": "بدء محادثة جديدة؟",
+      "forkChat": "تشعيب هذه المحادثة",
+      "forkChatDesc": "إنشاء نسخة من هذه المحادثة بكل الرسائل",
+      "history": "سجل المحادثة",
+      "historyEmpty": "لا توجد محادثات أخرى مع هذه الشخصية",
+      "historyLoadError": "تعذّر تحميل سجل المحادثة",
+      "historyDeleteError": "تعذّر حذف سجل المحادثة",
+      "emptyWorkspace": "لا توجد محادثة نشطة بعد",
+      "profile": "الملف الشخصي",
+      "gallery": "المعرض",
+      "showProfileImage": "عرض صورة الملف الشخصي",
+      "showProfileVideo": "عرض فيديو الملف الشخصي",
+      "mediaOnlyPreview": "أرسل صورة"
+    },
+    "exitToSite": "الخروج إلى OmniNudge",
+    "header": {
+      "defaults": "الإعدادات الافتراضية",
+      "defaultsDescription": "حدّد الاسم والعمر وتفاصيل الملف الشخصي التي يجب أن يستخدمها OmniChat افتراضيًا.",
+      "saveDefaults": "حفظ الإعدادات الافتراضية"
+    },
+    "sidebar": {
+      "discover": "اكتشف",
+      "search": "بحث",
+      "chat": "الدردشة",
+      "groups": "المجموعات",
+      "create": "إنشاء",
+      "explore": "استكشاف",
+      "characters": "الشخصيات",
+      "studio": "الاستوديو",
+      "searchPlaceholder": "البحث عن شخصيات...",
+      "clearSearch": "مسح البحث",
+      "closeSearch": "إغلاق البحث",
+      "noResults": "لم يتم العثور على نتائج",
+      "collapse": "طي الشريط الجانبي",
+      "expand": "توسيع الشريط الجانبي",
+      "openMenu": "فتح القائمة",
+      "closeMenu": "إغلاق القائمة",
+      "signInToViewConversations": "سجّل الدخول لعرض محادثاتك",
+      "signInToViewChat": "سجّل الدخول لعرض قائمة الدردشة",
+      "noConversations": "لا توجد محادثات بعد"
+    },
+    "conversationsPage": {
+      "title": "الدردشة",
+      "searchPlaceholder": "البحث عن ملف شخصي...",
+      "filters": {
+        "all": "الكل",
+        "unread": "غير مقروء",
+        "favorites": "المفضلة"
+      },
+      "empty": "لا توجد محادثات بعد. ابدأ الدردشة مع شخصية!",
+      "lastMessage": "آخر رسالة",
+      "noMessages": "لا توجد رسائل بعد"
+    },
+    "studio": {
+      "loadingStudio": "جارٍ تحميل الاستوديو...",
+      "eyebrow": "استوديو OmniChat",
+      "title": "شخصياتك",
+      "description": "أنشئ شخصيات OmniChat أصلية أو استورد بطاقات شخصيات موجودة. تبقى الشخصيات الشخصية خاصة حتى إطلاق النشر.",
+      "creatorOnly": "للمُنشئ فقط",
+      "loadingPersonas": "جارٍ تحميل شخصياتك...",
+      "loadPersonasError": "تعذّر تحميل شخصياتك.",
+      "loadingDefinition": "جارٍ تحميل تعريف الشخصية...",
+      "openingMessageRequired": "أضف رسالة افتتاحية أو تحية بديلة واحدة على الأقل.",
+      "import": {
+        "title": "استيراد بطاقة شخصية",
+        "importing": "جارٍ الاستيراد...",
+        "uploadCta": "رفع .png أو .json"
+      },
+      "editor": {
+        "newCharacter": "شخصية جديدة",
+        "editCharacter": "تعديل الشخصية"
+      },
+      "voice": {
+        "title": "صوت الشخصية",
+        "description": "اختر واحدًا من 12 صوتًا يتم إنشاؤها محليًا للرسائل المنطوقة والمكالمات.",
+        "localBadge": "مجاني · محلي",
+        "label": "صوت الشخصية",
+        "browserFallback": "صوت المتصفح أو الجهاز",
+        "femaleGroup": "أصوات نسائية",
+        "maleGroup": "أصوات رجالية",
+        "preview": "معاينة الصوت",
+        "previewing": "جارٍ إنشاء المعاينة...",
+        "previewError": "معاينة الصوت غير متاحة.",
+        "unavailable": "شغّل Voicebox على هذا الجهاز لاستخدام أصوات الخادم أو معاينتها.",
+        "cloningEnabled": "استنساخ الصوت المخصص مفعّل.",
+        "cloningDisabled": "استنساخ الصوت المخصص سيأتي لاحقًا.",
+        "cloningSafety": "تظل عمليات رفع الصوت معطلة حتى تجهز ضوابط الموافقة والاحتفاظ والحذف ومنع إساءة الاستخدام."
+      },
+      "actions": {
+        "openChat": "فتح الدردشة",
+        "exportJson": "تصدير JSON",
+        "delete": "حذف",
+        "saving": "جارٍ الحفظ...",
+        "createCharacter": "إنشاء شخصية",
+        "saveChanges": "حفظ التغييرات",
+        "backToDiscover": "العودة إلى الاستكشاف"
+      },
+      "fields": {
+        "name": "الاسم",
+        "category": "الفئة",
+        "description": "الوصف",
+        "visibility": "الظهور",
+        "visibilityPrivate": "خاص بك",
+        "personality": "الشخصية",
+        "scenario": "السيناريو",
+        "openingMessage": "رسالة البداية",
+        "openingMessageHelp": "تظهر فور فتح المحادثة السريعة. إذا تُركت فارغة أثناء الاستيراد، فستُستخدم أول تحية بديلة.",
+        "exampleDialogue": "حوار مثال",
+        "exampleDialoguePlaceholder": "<START>\n{{userMarker}}: لدي فكرة.\n{{charMarker}}: لنسمعها.",
+        "exampleDialogueHelp": "استخدم {{charMarker}} للشخصية و{{userMarker}} للمستخدم. أضف <START> بين محادثات الأمثلة المنفصلة.",
+        "responseStyle": "أسلوب الرد",
+        "systemPrompt": "تجاوز موجه النظام",
+        "systemPromptPlaceholder": "اتركه فارغًا لاستخدام موجه الشخصية المنظم في OmniChat.",
+        "postHistoryInstructions": "تعليمات ما بعد السجل",
+        "alternateGreetings": "تحيات بديلة",
+        "alternateGreetingsPlaceholder": "تحية واحدة في كل سطر",
+        "tags": "الوسوم",
+        "tagsPlaceholder": "وسوم، مفصولة، بفواصل",
+        "creatorName": "اسم المُنشئ",
+        "characterVersion": "إصدار الشخصية",
+        "creatorNotes": "ملاحظات المُنشئ",
+        "avatarUrl": "الصورة الشخصية",
+        "previewVideoUrl": "فيديو المعاينة",
+        "galleryUrls": "صور المعرض",
+        "galleryUrlsPlaceholder": "صورة مرفوعة واحدة في كل سطر",
+        "characterBookJson": "JSON كتاب الشخصية",
+        "extensionsJson": "JSON الإضافات",
+        "galleryUrlsHelp": "أضف ما يصل إلى 4 صور. استخدم الوجه نفسه في كل صورة — فهي تُعلّم مولّد الصور كيف يبدو شخصيتك، والوجوه غير المتطابقة تنتج نتائج غير متسقة. نوّع التعبير والإضاءة والزاوية، وأضف صورة واحدة على الأقل بتعبير محايد وفم مغلق. يُستخدم الوجه فقط، لذا لا تضيف صور الجسم الكامل أكثر من الوجه الذي تحتويه."
+      },
+      "responseStyles": {
+        "inherit": {
+          "label": "استخدام إعداد OmniChat",
+          "description": "يتبع أسلوب المحادثة العام الحالي في OmniChat."
+        },
+        "natural_dialogue": {
+          "label": "حوار طبيعي",
+          "description": "محادثة مباشرة ومتنوعة دون تأييد تلقائي أو سؤال مفروض في النهاية."
+        },
+        "lean_narrative": {
+          "label": "سرد / لعبة موجزة",
+          "description": "سرد موجز ينتهي بموقف قابل للعب أو قرار أو سؤال مفيد."
+        },
+        "professional": {
+          "label": "مهني",
+          "description": "دافئ ودقيق، مع سؤال مركز فقط عندما يكون مفيدًا حقًا."
+        },
+        "character_only": {
+          "label": "تعليمات الشخصية فقط",
+          "description": "لا يطبق طبقة أسلوب OmniChat. مناسب للبطاقات المستوردة ذات الأسلوب الخاص."
+        }
+      },
+      "uploadingField": "جارٍ رفع {{field}}...",
+      "dangerZone": {
+        "title": "منطقة الخطر",
+        "description": "احذف هذه الشخصية من استوديو OmniChat الخاص بك.",
+        "delete": "حذف الشخصية"
+      },
+      "deleteModal": {
+        "title": "حذف الشخصية؟",
+        "description": "سيؤدي هذا إلى إزالة الشخصية المحددة من استوديو OmniChat الخاص بك.",
+        "descriptionNamed": "سيؤدي هذا إلى إزالة {{name}} من استوديو OmniChat الخاص بك.",
+        "confirm": "حذف الشخصية"
+      },
+      "discardModal": {
+        "title": "تجاهل التغييرات غير المحفوظة؟",
+        "description": "لديك تعديلات غير محفوظة في نموذج الشخصية هذا. ستُفقد إذا غادرت الآن.",
+        "confirm": "تجاهل التغييرات"
+      }
+    },
+    "personaDetails": {
+      "title": "نموذج الشخصية",
+      "loading": "جارٍ تحميل نموذج الشخصية...",
+      "loadError": "تعذّر تحميل نموذج الشخصية الكامل.",
+      "noAvatar": "لا توجد صورة",
+      "fields": {
+        "name": "الاسم",
+        "category": "الفئة",
+        "description": "الوصف",
+        "visibility": "الظهور",
+        "nsfw": "NSFW",
+        "personality": "الشخصية",
+        "scenario": "السيناريو",
+        "openingMessage": "رسالة البداية",
+        "exampleDialogue": "حوار مثال",
+        "systemPrompt": "تجاوز موجه النظام",
+        "postHistoryInstructions": "تعليمات ما بعد السجل",
+        "alternateGreetings": "تحيات بديلة",
+        "tags": "الوسوم",
+        "creatorName": "اسم المُنشئ",
+        "characterVersion": "إصدار الشخصية",
+        "creatorNotes": "ملاحظات المُنشئ",
+        "avatarUrl": "الصورة الشخصية",
+        "previewVideoUrl": "فيديو المعاينة",
+        "galleryUrls": "صور المعرض",
+        "characterBookJson": "JSON كتاب الشخصية",
+        "extensionsJson": "JSON الإضافات"
+      },
+      "dangerZone": {
+        "title": "منطقة الخطر",
+        "description": "احذف هذه الشخصية وأزلها من مكتبة الشخصيات الخاصة بك.",
+        "delete": "حذف الشخصية",
+        "confirmDelete": "تأكيد الحذف",
+        "deleteError": "تعذّر حذف هذه الشخصية."
+      }
+    },
+    "memories": {
+      "title": "ما تتذكره {{name}}",
+      "close": "إغلاق الذكريات",
+      "description": "هذه أشياء استخلصتها {{name}} من محادثتكما، بكلماتها هي. هي من كتبتها وليس أنت، فإذا كان أي منها خاطئًا يمكنك حذفه.",
+      "loading": "جارٍ تحميل الذكريات",
+      "loadError": "تعذّر تحميل الذكريات. يرجى المحاولة مرة أخرى.",
+      "empty": "لم تكوّن {{name}} أي ذكريات من هذه المحادثة بعد. تتراكم كلما تحدثتما.",
+      "recordedAt": "تم تذكّره في {{date}}",
+      "forgetLabel": "نسيان: {{title}}",
+      "forgetFailed": "تعذّر نسيان تلك الذكرى. يرجى المحاولة مرة أخرى.",
+      "entryDescription": "اطّلع على ما استنتجته عنك وصحّحه",
+      "confirmForget": "نسيان",
+      "truncated": "عرض أحدث {{shown}} من أصل {{total}} ذكرى.",
+      "cancelForgetLabel": "الإبقاء على: {{title}}",
+      "confirmForgetLabel": "تأكيد نسيان: {{title}}",
+      "sharedHeading": "معك",
+      "sharedEmpty": "لا شيء من هذه المحادثة حتى الآن.",
+      "ownLifeHeading": "حياة {{name}} الخاصة",
+      "ownLifeDescription": "أشياء فعلتها {{name}} بعيدًا عن هذه المحادثة. إنها ملكها هي لا ملكك، لذا لا يمكن حذفها هنا."
     }
   }
 }

@@ -1,0 +1,669 @@
+package server
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
+	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
+	"github.com/omninudge/backend/internal/omniraveworld/world"
+	"github.com/omninudge/backend/internal/services"
+	"github.com/stretchr/testify/require"
+)
+
+func TestWSHandler_JoinAndMoveUpdatesActiveZone(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	var first map[string]any
+	require.NoError(t, conn.ReadJSON(&first))
+	require.Equal(t, "world_snapshot", first["type"])
+	require.Equal(t, "main_stage", first["activeZone"])
+	require.NotEmpty(t, first["zoneEvents"])
+
+	firstZoneEvents, ok := first["zoneEvents"].([]any)
+	require.True(t, ok)
+	require.Len(t, firstZoneEvents, 3)
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "move",
+		"moveTo": map[string]float64{
+			"x": 42,
+			"y": 0,
+			"z": 40,
+		},
+	}))
+
+	var second map[string]any
+	for i := 0; i < 60; i++ {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		require.NoError(t, conn.ReadJSON(&second))
+		require.Equal(t, "world_snapshot", second["type"])
+		if second["activeZone"] == "underground" {
+			break
+		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
+		require.NoError(t, conn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 42,
+				"y": 0,
+				"z": 40,
+			},
+		}))
+	}
+	require.Equal(t, "world_snapshot", second["type"])
+	require.Equal(t, "underground", second["activeZone"])
+	require.NotEmpty(t, second["zoneMedia"])
+	require.NotEmpty(t, second["zoneEvents"])
+}
+
+func TestWSHandler_BroadcastsPlayerMovementToOtherConnections(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
+	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = firstConn.Close() }()
+
+	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = secondConn.Close() }()
+
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+
+	var secondJoinSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
+
+	require.NoError(t, firstConn.WriteJSON(map[string]any{
+		"type": "move",
+		"moveTo": map[string]float64{
+			"x": 42,
+			"y": 0,
+			"z": 40,
+		},
+	}))
+
+	var secondSnapshot map[string]any
+	for i := 0; i < 60; i++ {
+		_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+		require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
+		require.Equal(t, "world_snapshot", secondSnapshot["type"])
+		if playerZoneForID(t, secondSnapshot, "guest-1") == "underground" {
+			break
+		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
+		require.NoError(t, firstConn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 42,
+				"y": 0,
+				"z": 40,
+			},
+		}))
+	}
+	require.Equal(t, "world_snapshot", secondSnapshot["type"])
+	require.Len(t, secondSnapshot["players"], 2)
+	require.Equal(t, "underground", playerZoneForID(t, secondSnapshot, "guest-1"))
+}
+
+func TestWSHandler_BroadcastSnapshotsUseSingleAuthoritativeEventInstant(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = firstConn.Close() }()
+
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+
+	boundary := time.Date(2026, 6, 4, 14, 59, 59, 0, time.UTC)
+	var nowCalls atomic.Int32
+	handler.setNow(func() time.Time {
+		if nowCalls.Add(1) == 1 {
+			return boundary
+		}
+		return boundary.Add(time.Second)
+	})
+
+	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = secondConn.Close() }()
+
+	var secondJoinSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
+	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+
+	var firstJoinBroadcast map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstJoinBroadcast))
+	require.Equal(t, int32(1), nowCalls.Load())
+	require.Equal(t, eventPhaseForZone(t, secondJoinSnapshot, "main_stage"), eventPhaseForZone(t, firstJoinBroadcast, "main_stage"))
+}
+
+func TestWSHandler_RespawnEventRebroadcastsSnapshot(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	var first map[string]any
+	require.NoError(t, conn.ReadJSON(&first))
+	require.Equal(t, "world_snapshot", first["type"])
+	require.Equal(t, "main_stage", first["activeZone"])
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "move",
+		"moveTo": map[string]float64{
+			"x": 44,
+			"y": 0,
+			"z": 40,
+		},
+	}))
+
+	var moved map[string]any
+	for i := 0; i < 60; i++ {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		require.NoError(t, conn.ReadJSON(&moved))
+		require.Equal(t, "world_snapshot", moved["type"])
+		if moved["activeZone"] == "underground" {
+			break
+		}
+		time.Sleep(60 * time.Millisecond) // stay under the server's inbound move rate limit
+		require.NoError(t, conn.WriteJSON(map[string]any{
+			"type": "move",
+			"moveTo": map[string]float64{
+				"x": 44,
+				"y": 0,
+				"z": 40,
+			},
+		}))
+	}
+	require.Equal(t, "world_snapshot", moved["type"])
+	require.Equal(t, "underground", moved["activeZone"])
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "respawn",
+	}))
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var respawned map[string]any
+	require.NoError(t, conn.ReadJSON(&respawned))
+	require.Equal(t, "world_snapshot", respawned["type"])
+	require.Equal(t, "underground", respawned["activeZone"])
+
+	players, ok := respawned["players"].([]any)
+	require.True(t, ok)
+	require.Len(t, players, 1)
+
+	player, ok := players[0].(map[string]any)
+	require.True(t, ok)
+	position, ok := player["position"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, 42.0, position["x"])
+	require.Equal(t, 36.0, position["z"])
+}
+
+func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
+	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = firstConn.Close() }()
+
+	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = secondConn.Close() }()
+
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+
+	var secondJoinSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
+
+	_ = firstConn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
+	var firstJoinBroadcast map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstJoinBroadcast))
+
+	require.NoError(t, firstConn.Close())
+
+	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+
+	var secondSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
+	require.Equal(t, "world_snapshot", secondSnapshot["type"])
+	require.Len(t, secondSnapshot["players"], 1)
+
+	players, ok := secondSnapshot["players"].([]any)
+	require.True(t, ok)
+	player, ok := players[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "guest-2", player["id"])
+}
+
+func TestWSHandler_BroadcastsChatMessagesToAllConnections(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
+	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = firstConn.Close() }()
+
+	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = secondConn.Close() }()
+
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+
+	var secondJoinSnapshot map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
+
+	require.NoError(t, firstConn.WriteJSON(map[string]any{
+		"type": "chat",
+		"body": "See you in the neon room",
+	}))
+
+	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+
+	var secondMessage map[string]any
+	require.NoError(t, secondConn.ReadJSON(&secondMessage))
+	require.Equal(t, "chat_message", secondMessage["type"])
+	require.Equal(t, "guest-1", secondMessage["playerId"])
+	require.Equal(t, "Guest-1", secondMessage["playerName"])
+	require.Equal(t, "See you in the neon room", secondMessage["body"])
+}
+
+// TestWSHandler_ConcurrentBroadcastsDoNotPanic exercises the scenario the
+// concurrent-WriteJSON bug fix targets: several players' read loops trigger
+// broadcasts (via move events) to every connection at roughly the same time.
+// Before the per-connection write mutex, gorilla/websocket panics if two
+// goroutines call WriteJSON on the same *websocket.Conn concurrently. Run
+// with -race to also confirm there is no data race on the connection map or
+// the shared clock.
+func TestWSHandler_ConcurrentBroadcastsDoNotPanic(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	const playerCount = 4
+	const movesPerPlayer = 10
+
+	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
+	conns := make([]*websocket.Conn, playerCount)
+	for i := 0; i < playerCount; i++ {
+		playerID := fmt.Sprintf("guest-%d", i)
+		conn, _, err := websocket.DefaultDialer.Dial(
+			baseURL+"?token="+newGuestWorldSessionToken(t, authService, playerID, playerID, nil),
+			worldDialHeader("https://play.omninudge.com"),
+		)
+		require.NoError(t, err)
+		defer func() { _ = conn.Close() }()
+		conns[i] = conn
+	}
+
+	var readers sync.WaitGroup
+	stop := make(chan struct{})
+	for _, conn := range conns {
+		readers.Add(1)
+		go func(conn *websocket.Conn) {
+			defer readers.Done()
+			for {
+				var msg map[string]any
+				_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+				if err := conn.ReadJSON(&msg); err != nil {
+					return
+				}
+				select {
+				case <-stop:
+					return
+				default:
+				}
+			}
+		}(conn)
+	}
+
+	var writers sync.WaitGroup
+	for i, conn := range conns {
+		writers.Add(1)
+		go func(conn *websocket.Conn, offset int) {
+			defer writers.Done()
+			for m := 0; m < movesPerPlayer; m++ {
+				_ = conn.WriteJSON(map[string]any{
+					"type": "move",
+					"moveTo": map[string]float64{
+						"x": float64(offset % 3),
+						"y": 0,
+						"z": -48 + float64(m%3),
+					},
+				})
+				time.Sleep(15 * time.Millisecond) // stay under the inbound rate limit
+			}
+		}(conn, i)
+	}
+
+	writers.Wait()
+	time.Sleep(200 * time.Millisecond) // let any in-flight broadcasts settle
+	close(stop)
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
+	readers.Wait()
+}
+
+func TestWSHandler_RejectsMissingOrInvalidWorldCredential(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	for _, tc := range []string{
+		buildWorldWSURL(testServer.URL, "", ""),
+		buildWorldWSURL(testServer.URL, "not-a-valid-world-token", ""),
+	} {
+		_, resp, err := websocket.DefaultDialer.Dial(tc, worldDialHeader("https://play.omninudge.com"))
+		require.Error(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	}
+}
+
+func TestWSHandler_RejectsUnexpectedOrigin(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	token := newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil)
+	_, resp, err := websocket.DefaultDialer.Dial(buildWorldWSURL(testServer.URL, token, ""), worldDialHeader("https://evil.example"))
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
+func TestWSHandler_IgnoresForgedQueryIdentityAndRestoresOnlyServerApprovedState(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	testServer := httptest.NewServer(New(worldState, mediaState, authService, []string{"https://play.omninudge.com"}))
+	defer testServer.Close()
+
+	returnPoint := &omnigamemodel.SavedPoint{X: 42, Y: 0, Z: 40}
+	token := newGuestWorldSessionToken(t, authService, "guest-authoritative", "Guest-Authoritative", returnPoint)
+	forged := "&player_id=forged-player&player_name=ForgedName&mode=account&return_x=-40&return_y=0&return_z=10"
+	conn, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(testServer.URL, token, forged), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	var snapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&snapshot))
+	require.Equal(t, "world_snapshot", snapshot["type"])
+	require.Equal(t, "guest-authoritative", snapshot["currentPlayerId"])
+	require.Equal(t, "underground", snapshot["activeZone"])
+
+	players, ok := snapshot["players"].([]any)
+	require.True(t, ok)
+	require.Len(t, players, 1)
+	player, ok := players[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "guest-authoritative", player["id"])
+	position := player["position"].(map[string]any)
+	require.Equal(t, 42.0, position["x"])
+	require.Equal(t, 40.0, position["z"])
+
+	require.NoError(t, conn.WriteJSON(map[string]any{
+		"type": "chat",
+		"body": "authoritative chat",
+	}))
+
+	_ = conn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+	var chatMessage map[string]any
+	require.NoError(t, conn.ReadJSON(&chatMessage))
+	require.Equal(t, "chat_message", chatMessage["type"])
+	require.Equal(t, "guest-authoritative", chatMessage["playerId"])
+	require.Equal(t, "Guest-Authoritative", chatMessage["playerName"])
+}
+
+func buildWorldWSURL(serverURL, token, extraQuery string) string {
+	baseURL := "ws" + serverURL[len("http"):] + "/ws"
+	if token == "" {
+		return baseURL
+	}
+	return baseURL + "?token=" + token + extraQuery
+}
+
+func worldDialHeader(origin string) http.Header {
+	header := http.Header{}
+	header.Set("Origin", origin)
+	return header
+}
+
+func newGuestWorldSessionToken(t *testing.T, authService *services.AuthService, playerID, playerName string, returnPoint *omnigamemodel.SavedPoint) string {
+	t.Helper()
+
+	token, err := authService.GenerateOmniRaveWorldJWT(services.OmniRaveWorldTokenInput{
+		PlayerID:    playerID,
+		PlayerName:  playerName,
+		Mode:        "guest",
+		ReturnPoint: returnPoint,
+	})
+	require.NoError(t, err)
+	return token
+}
+
+func playerZoneForID(t *testing.T, snapshot map[string]any, playerID string) string {
+	t.Helper()
+
+	players, ok := snapshot["players"].([]any)
+	require.True(t, ok)
+
+	for _, rawPlayer := range players {
+		player, playerOK := rawPlayer.(map[string]any)
+		require.True(t, playerOK)
+		if player["id"] == playerID {
+			zone, zoneOK := player["zone"].(string)
+			require.True(t, zoneOK)
+			return zone
+		}
+	}
+
+	t.Fatalf("player %s not found in snapshot", playerID)
+	return ""
+}
+
+func eventPhaseForZone(t *testing.T, snapshot map[string]any, zoneID string) string {
+	t.Helper()
+
+	rawEvents, ok := snapshot["zoneEvents"].([]any)
+	require.True(t, ok)
+
+	for _, rawEvent := range rawEvents {
+		event, eventOK := rawEvent.(map[string]any)
+		require.True(t, eventOK)
+		if event["zoneId"] == zoneID {
+			phase, phaseOK := event["phase"].(string)
+			require.True(t, phaseOK)
+			return phase
+		}
+	}
+
+	t.Fatalf("zone event %s not found in snapshot", zoneID)
+	return ""
+}
+
+func TestCurrentZoneMedia_CarriesArtistTitleAndDuration(t *testing.T) {
+	mediaState := world.NewMediaStateWithPlaylists(
+		[]world.StagePlaylist{
+			{
+				ZoneID: world.ZoneMainStage,
+				Entries: []world.PlaylistEntry{
+					{TrackID: "main-stage-set-01", Artist: "Fallico", Title: "Nick's Mix Vol. 13", Duration: 7827 * time.Second},
+				},
+			},
+		},
+		time.Unix(1000, 0),
+	)
+
+	zoneMedia := currentZoneMedia(mediaState, time.Unix(1060, 0))
+	require.NotEmpty(t, zoneMedia)
+
+	mainStage := zoneMedia[0]
+	require.Equal(t, world.ZoneMainStage, mainStage.ZoneID)
+	require.Equal(t, "main-stage-set-01", mainStage.TrackID)
+	require.Equal(t, "Fallico", mainStage.Artist)
+	require.Equal(t, "Nick's Mix Vol. 13", mainStage.Title)
+	require.Equal(t, int64(60), mainStage.PlayheadSeconds)
+	require.Equal(t, int64(7827), mainStage.DurationSeconds)
+}
+
+// TestZoneMediaState_WireFieldNames pins the JSON contract the Babylon runtime
+// HUD reads (artist/title/durationSeconds).
+func TestZoneMediaState_WireFieldNames(t *testing.T) {
+	encoded, err := json.Marshal(world.ZoneMediaState{
+		ZoneID:          world.ZoneMainStage,
+		TrackID:         "main-stage-set-01",
+		Artist:          "Fallico",
+		Title:           "Nick's Mix Vol. 13",
+		PlaylistIndex:   0,
+		PlayheadSeconds: 60,
+		DurationSeconds: 7827,
+	})
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.Equal(t, "Fallico", decoded["artist"])
+	require.Equal(t, "Nick's Mix Vol. 13", decoded["title"])
+	require.Equal(t, float64(7827), decoded["durationSeconds"])
+	require.Equal(t, float64(60), decoded["playheadSeconds"])
+	require.Equal(t, "main-stage-set-01", decoded["trackId"])
+}
+
+// TestMaybeAnnounceFireworks_ExactWordingAtFiveAndOneMinuteMarks pins sec
+// 5.1.1's global chat announcements: exact body text, sent to every connected
+// player, at :55 and :59 past the hour (5/1 minutes before the :00 show).
+func TestMaybeAnnounceFireworks_ExactWordingAtFiveAndOneMinuteMarks(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	fiveMinuteMark := time.Date(2026, 6, 4, 14, 55, 0, 0, time.UTC)
+	handler.setNow(func() time.Time { return fiveMinuteMark })
+	handler.maybeAnnounceFireworks()
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var fiveMinuteMessage map[string]any
+	require.NoError(t, conn.ReadJSON(&fiveMinuteMessage))
+	require.Equal(t, "chat_message", fiveMinuteMessage["type"])
+	require.Equal(t, world.SystemChatName, fiveMinuteMessage["playerName"])
+	require.Equal(t, "", fiveMinuteMessage["playerId"])
+	require.Equal(t, "Main Stage fireworks in 5 minutes", fiveMinuteMessage["body"])
+
+	// Same minute again: must NOT re-fire (dedupe latch).
+	handler.maybeAnnounceFireworks()
+
+	oneMinuteMark := time.Date(2026, 6, 4, 14, 59, 0, 0, time.UTC)
+	handler.setNow(func() time.Time { return oneMinuteMark })
+	handler.maybeAnnounceFireworks()
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var oneMinuteMessage map[string]any
+	require.NoError(t, conn.ReadJSON(&oneMinuteMessage))
+	require.Equal(t, "Main Stage fireworks in 1 minute", oneMinuteMessage["body"])
+
+	// No third message queued: confirms the 5-minute dedupe above held (the
+	// only two reads that succeeded are the 5-minute and 1-minute messages).
+	_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	var unexpected map[string]any
+	require.Error(t, conn.ReadJSON(&unexpected))
+}
+
+// TestMaybeAnnounceFireworks_RearmsAfterTheHour confirms the latch resets at
+// the top of the hour so next hour's 5-minute mark can fire again.
+func TestMaybeAnnounceFireworks_RearmsAfterTheHour(t *testing.T) {
+	worldState := world.NewWorld(world.DefaultConfig())
+	mediaState := world.NewMediaState()
+	authService := services.NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+	handler := NewWSHandler(worldState, mediaState, authService, []string{"https://play.omninudge.com"})
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	baseURL := "ws" + testServer.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 14, 59, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var firstHour map[string]any
+	require.NoError(t, conn.ReadJSON(&firstHour))
+	require.Equal(t, "Main Stage fireworks in 1 minute", firstHour["body"])
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+
+	handler.setNow(func() time.Time { return time.Date(2026, 6, 4, 15, 59, 0, 0, time.UTC) })
+	handler.maybeAnnounceFireworks()
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var secondHour map[string]any
+	require.NoError(t, conn.ReadJSON(&secondHour))
+	require.Equal(t, "Main Stage fireworks in 1 minute", secondHour["body"])
+}

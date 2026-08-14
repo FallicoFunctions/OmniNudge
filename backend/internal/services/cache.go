@@ -1,11 +1,9 @@
 package services
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
-	"io"
-	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,12 +18,48 @@ type Cache interface {
 	Set(ctx context.Context, key string, value string, ttl time.Duration) error
 }
 
+// AtomicCounter increments a fixed-window counter without a read/modify/write
+// race. Distributed rate limiting relies on this optional cache capability.
+type AtomicCounter interface {
+	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
+}
+
+// RollingWindowSnapshot is the atomic state of a per-subject rolling window.
+// OldestAt is nil when the window is empty.
+type RollingWindowSnapshot struct {
+	Allowed  bool
+	Used     int
+	OldestAt *time.Time
+}
+
+// RollingWindowStore atomically reserves and releases uniquely identified
+// events. It is used for provider-cost allowances where a fixed-window counter
+// would reset a user's entire balance at once and concurrent requests must not
+// overspend the limit.
+type RollingWindowStore interface {
+	ReserveRollingWindow(ctx context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error)
+	InspectRollingWindow(ctx context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error)
+	ReleaseRollingWindow(ctx context.Context, key string, memberIDs []string) error
+}
+
 // NoopCache is a no-op cache implementation
 type NoopCache struct{}
 
 func (NoopCache) Get(ctx context.Context, key string) (string, bool, error) { return "", false, nil }
 func (NoopCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
 	return nil
+}
+func (NoopCache) IncrementWithTTL(context.Context, string, time.Duration) (int64, error) {
+	return 1, nil
+}
+func (NoopCache) ReserveRollingWindow(context.Context, string, []string, time.Time, time.Duration, int) (RollingWindowSnapshot, error) {
+	return RollingWindowSnapshot{}, errors.New("rolling window storage is unavailable")
+}
+func (NoopCache) InspectRollingWindow(context.Context, string, time.Time, time.Duration) (RollingWindowSnapshot, error) {
+	return RollingWindowSnapshot{}, errors.New("rolling window storage is unavailable")
+}
+func (NoopCache) ReleaseRollingWindow(context.Context, string, []string) error {
+	return errors.New("rolling window storage is unavailable")
 }
 
 // defaultMemoryCacheMaxSize is the default maximum number of entries in a
@@ -37,15 +71,21 @@ const defaultMemoryCacheMaxSize = 10_000
 // Call Stop() to release the background cleanup goroutine when the cache is
 // no longer needed (e.g. during server shutdown or in tests).
 type MemoryCache struct {
-	data    map[string]*cacheEntry
-	maxSize int
-	mutex   sync.RWMutex
-	stopCh  chan struct{}
+	data           map[string]*cacheEntry
+	rollingWindows map[string]*rollingWindowEntry
+	maxSize        int
+	mutex          sync.RWMutex
+	stopCh         chan struct{}
 }
 
 type cacheEntry struct {
 	value      string
 	expiration time.Time
+}
+
+type rollingWindowEntry struct {
+	events map[string]time.Time
+	window time.Duration
 }
 
 // NewMemoryCache creates an in-memory cache with a default cap of 10,000 entries
@@ -63,9 +103,10 @@ func NewMemoryCacheWithMax(maxSize int) *MemoryCache {
 		maxSize = defaultMemoryCacheMaxSize
 	}
 	cache := &MemoryCache{
-		data:    make(map[string]*cacheEntry, maxSize),
-		maxSize: maxSize,
-		stopCh:  make(chan struct{}),
+		data:           make(map[string]*cacheEntry, maxSize),
+		rollingWindows: make(map[string]*rollingWindowEntry),
+		maxSize:        maxSize,
+		stopCh:         make(chan struct{}),
 	}
 	go cache.cleanup()
 	return cache
@@ -128,6 +169,136 @@ func (m *MemoryCache) Set(ctx context.Context, key string, value string, ttl tim
 	return nil
 }
 
+func (m *MemoryCache) IncrementWithTTL(_ context.Context, key string, ttl time.Duration) (int64, error) {
+	if ttl <= 0 {
+		return 0, fmt.Errorf("MemoryCache.IncrementWithTTL: ttl must be positive, got %v", ttl)
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	now := time.Now()
+	if entry, exists := m.data[key]; exists && now.Before(entry.expiration) {
+		count, err := strconv.ParseInt(entry.value, 10, 64)
+		if err != nil || count < 0 {
+			return 0, errors.New("memory cache counter contains an invalid value")
+		}
+		count++
+		m.data[key] = &cacheEntry{value: strconv.FormatInt(count, 10), expiration: entry.expiration}
+		return count, nil
+	}
+	if _, exists := m.data[key]; !exists && len(m.data) >= m.maxSize {
+		return 0, errors.New("memory cache is at capacity")
+	}
+	m.data[key] = &cacheEntry{value: "1", expiration: now.Add(ttl)}
+	return 1, nil
+}
+
+func (m *MemoryCache) ReserveRollingWindow(_ context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error) {
+	if key == "" || len(memberIDs) == 0 || window <= 0 || limit < 1 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window reservation")
+	}
+	if err := validateRollingMemberIDs(memberIDs); err != nil {
+		return RollingWindowSnapshot{}, err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		if len(m.data)+len(m.rollingWindows) >= m.maxSize {
+			return RollingWindowSnapshot{}, errors.New("memory cache is at capacity")
+		}
+		entry = &rollingWindowEntry{events: make(map[string]time.Time, len(memberIDs)), window: window}
+		m.rollingWindows[key] = entry
+	}
+	entry.window = window
+	events := entry.events
+	pruneRollingEvents(events, now.Add(-window))
+	if len(events)+len(memberIDs) > limit {
+		if len(events) == 0 {
+			delete(m.rollingWindows, key)
+		}
+		return rollingSnapshot(events, false), nil
+	}
+	for _, memberID := range memberIDs {
+		if _, exists := events[memberID]; exists {
+			return RollingWindowSnapshot{}, errors.New("duplicate rolling window member ID")
+		}
+		events[memberID] = now
+	}
+	return rollingSnapshot(events, true), nil
+}
+
+func validateRollingMemberIDs(memberIDs []string) error {
+	seen := make(map[string]struct{}, len(memberIDs))
+	for _, memberID := range memberIDs {
+		if memberID == "" {
+			return errors.New("rolling window member ID is required")
+		}
+		if _, exists := seen[memberID]; exists {
+			return errors.New("duplicate rolling window member ID")
+		}
+		seen[memberID] = struct{}{}
+	}
+	return nil
+}
+
+func (m *MemoryCache) InspectRollingWindow(_ context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error) {
+	if key == "" || window <= 0 {
+		return RollingWindowSnapshot{}, errors.New("invalid rolling window inspection")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		return RollingWindowSnapshot{Allowed: true}, nil
+	}
+	entry.window = window
+	events := entry.events
+	pruneRollingEvents(events, now.Add(-window))
+	if len(events) == 0 {
+		delete(m.rollingWindows, key)
+	}
+	return rollingSnapshot(events, true), nil
+}
+
+func (m *MemoryCache) ReleaseRollingWindow(_ context.Context, key string, memberIDs []string) error {
+	if key == "" {
+		return errors.New("rolling window key is required")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	entry := m.rollingWindows[key]
+	if entry == nil {
+		return nil
+	}
+	events := entry.events
+	for _, memberID := range memberIDs {
+		delete(events, memberID)
+	}
+	if len(events) == 0 {
+		delete(m.rollingWindows, key)
+	}
+	return nil
+}
+
+func pruneRollingEvents(events map[string]time.Time, cutoff time.Time) {
+	for memberID, occurredAt := range events {
+		if !occurredAt.After(cutoff) {
+			delete(events, memberID)
+		}
+	}
+}
+
+func rollingSnapshot(events map[string]time.Time, allowed bool) RollingWindowSnapshot {
+	var oldest *time.Time
+	for _, occurredAt := range events {
+		if oldest == nil || occurredAt.Before(*oldest) {
+			value := occurredAt
+			oldest = &value
+		}
+	}
+	return RollingWindowSnapshot{Allowed: allowed, Used: len(events), OldestAt: oldest}
+}
+
 // cleanup removes expired entries every minute until Stop() is called.
 func (m *MemoryCache) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
@@ -145,152 +316,14 @@ func (m *MemoryCache) cleanup() {
 					delete(m.data, key)
 				}
 			}
+			for key, entry := range m.rollingWindows {
+				pruneRollingEvents(entry.events, now.Add(-entry.window))
+				if len(entry.events) == 0 {
+					delete(m.rollingWindows, key)
+				}
+			}
 			m.mutex.Unlock()
 		}
-	}
-}
-
-// RedisCache is a lightweight Redis client using raw RESP for simple GET/SETEX.
-//
-// Deprecated: RedisCache opens a new TCP connection on every Get and Set call,
-// making it unsuitable for any non-trivial production load (connection setup
-// overhead + ephemeral port exhaustion). Use ResilientRedisCache instead,
-// which wraps go-redis with a connection pool, circuit breaker, and singleflight.
-// RedisCache is retained only for environments where go-redis cannot be imported.
-type RedisCache struct {
-	addr     string
-	password string
-	timeout  time.Duration
-}
-
-// NewRedisCache creates a Redis-backed cache.
-//
-// Deprecated: see RedisCache type comment. Use NewResilientRedisCache instead.
-func NewRedisCache(addr, password string, timeout time.Duration) *RedisCache {
-	return &RedisCache{
-		addr:     addr,
-		password: password,
-		timeout:  timeout,
-	}
-}
-
-func (r *RedisCache) dial(ctx context.Context) (net.Conn, error) {
-	// r.timeout serves as BOTH the dial deadline AND the per-operation deadline
-	// set on the connection after it is established. This means the total budget
-	// for a Get/Set call is up to 2×r.timeout (dial + op). Pass a timeout that
-	// is at most half of your desired end-to-end deadline.
-	dialer := &net.Dialer{Timeout: r.timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", r.addr)
-	if err != nil {
-		return nil, err
-	}
-	_ = conn.SetDeadline(time.Now().Add(r.timeout))
-
-	if r.password != "" {
-		if err := writeCommand(conn, "AUTH", r.password); err != nil {
-			conn.Close()
-			return nil, err
-		}
-		if _, _, err := readReply(conn); err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-
-	return conn, nil
-}
-
-// Get returns value and hit bool
-func (r *RedisCache) Get(ctx context.Context, key string) (string, bool, error) {
-	conn, err := r.dial(ctx)
-	if err != nil {
-		return "", false, err
-	}
-	defer conn.Close()
-
-	if err := writeCommand(conn, "GET", key); err != nil {
-		return "", false, err
-	}
-
-	resp, ok, err := readReply(conn)
-	if err != nil {
-		return "", false, err
-	}
-	return resp, ok, nil
-}
-
-// Set sets value with TTL using SETEX.
-// Returns an error if ttl is zero or negative — Redis SETEX requires a positive
-// integer TTL and would return an error anyway; failing early gives a clearer message.
-// Note: sub-second TTLs (e.g. 500ms) are truncated to whole seconds by SETEX.
-// If you need sub-second expiry, use the PSETEX command instead (not supported here).
-func (r *RedisCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
-	if ttl <= 0 {
-		return fmt.Errorf("RedisCache.Set: ttl must be positive, got %v", ttl)
-	}
-	seconds := int64(ttl.Seconds())
-	if seconds == 0 {
-		// ttl was positive but less than 1 second — truncation would produce 0,
-		// which Redis SETEX rejects. Round up to 1 second.
-		seconds = 1
-	}
-	conn, err := r.dial(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if err := writeCommand(conn, "SETEX", key, strconv.FormatInt(seconds, 10), value); err != nil {
-		return err
-	}
-	_, _, err = readReply(conn)
-	return err
-}
-
-func writeCommand(conn net.Conn, args ...string) error {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("*%d\r\n", len(args)))
-	for _, arg := range args {
-		b.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(arg), arg))
-	}
-	_, err := conn.Write([]byte(b.String()))
-	return err
-}
-
-// readReply handles simple string and bulk string
-func readReply(conn net.Conn) (string, bool, error) {
-	reader := bufio.NewReader(conn)
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return "", false, err
-	}
-	if len(line) == 0 {
-		return "", false, fmt.Errorf("empty redis reply")
-	}
-	switch line[0] {
-	case '+': // simple string
-		return strings.TrimSuffix(line[1:], "\r\n"), true, nil
-	case '$': // bulk string
-		sizeStr := strings.TrimSpace(line[1:])
-		size, err := strconv.Atoi(sizeStr)
-		if err != nil {
-			return "", false, err
-		}
-		if size < -1 {
-			return "", false, fmt.Errorf("invalid redis bulk string size: %d", size)
-		}
-		if size == -1 {
-			return "", false, nil // nil bulk — key does not exist
-		}
-		buf := make([]byte, size+2) // include CRLF
-		if _, err := io.ReadFull(reader, buf); err != nil {
-			return "", false, err
-		}
-		return string(buf[:size]), true, nil
-	case '-':
-		return "", false, fmt.Errorf("redis error: %s", strings.TrimSpace(line[1:]))
-	default:
-		return "", false, fmt.Errorf("unexpected redis reply: %s", line)
 	}
 }
 
@@ -339,4 +372,52 @@ func (ic *InstrumentedCache) Set(ctx context.Context, key string, value string, 
 		return err
 	}
 	return nil
+}
+
+func (ic *InstrumentedCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	counter, ok := ic.inner.(AtomicCounter)
+	if !ok {
+		return 0, errors.New("cache does not support atomic counters")
+	}
+	count, err := counter.IncrementWithTTL(ctx, key, ttl)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "increment").Inc()
+	}
+	return count, err
+}
+
+func (ic *InstrumentedCache) ReserveRollingWindow(ctx context.Context, key string, memberIDs []string, now time.Time, window time.Duration, limit int) (RollingWindowSnapshot, error) {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return RollingWindowSnapshot{}, errors.New("cache does not support rolling windows")
+	}
+	result, err := store.ReserveRollingWindow(ctx, key, memberIDs, now, window, limit)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_reserve").Inc()
+	}
+	return result, err
+}
+
+func (ic *InstrumentedCache) InspectRollingWindow(ctx context.Context, key string, now time.Time, window time.Duration) (RollingWindowSnapshot, error) {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return RollingWindowSnapshot{}, errors.New("cache does not support rolling windows")
+	}
+	result, err := store.InspectRollingWindow(ctx, key, now, window)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_inspect").Inc()
+	}
+	return result, err
+}
+
+func (ic *InstrumentedCache) ReleaseRollingWindow(ctx context.Context, key string, memberIDs []string) error {
+	store, ok := ic.inner.(RollingWindowStore)
+	if !ok {
+		return errors.New("cache does not support rolling windows")
+	}
+	err := store.ReleaseRollingWindow(ctx, key, memberIDs)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "rolling_release").Inc()
+	}
+	return err
 }

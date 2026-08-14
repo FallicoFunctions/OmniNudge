@@ -3,6 +3,7 @@ package middleware
 import (
 	"compress/gzip"
 	"io"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -23,7 +24,7 @@ var gzipWriterPool = sync.Pool{
 // Content-Type header inside WriteHeader, before any body bytes have been sent.
 func Compression() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
+		if !strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") || isWebSocketUpgrade(c.Request) {
 			c.Next()
 			return
 		}
@@ -43,13 +44,27 @@ func Compression() gin.HandlerFunc {
 
 		defer func() {
 			if !grw.bypass {
-				gz.Close()
+				_ = gz.Close()
 			}
 			gzipWriterPool.Put(gz)
 		}()
 
 		c.Next()
 	}
+}
+
+func isWebSocketUpgrade(r *http.Request) bool {
+	if !strings.EqualFold(strings.TrimSpace(r.Header.Get("Upgrade")), "websocket") {
+		return false
+	}
+
+	for _, token := range strings.Split(r.Header.Get("Connection"), ",") {
+		if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+			return true
+		}
+	}
+
+	return false
 }
 
 type gzipResponseWriter struct {
@@ -74,7 +89,7 @@ func (g *gzipResponseWriter) WriteHeader(code int) {
 // If WriteHeader was never explicitly called (rare but valid), we check Content-Type
 // here too so we don't accidentally compress the first write.
 func (g *gzipResponseWriter) Write(data []byte) (int, error) {
-	if !g.bypass && !g.ResponseWriter.Written() {
+	if !g.bypass && !g.Written() {
 		if shouldNotCompress(g.Header().Get("Content-Type")) {
 			g.Header().Del("Content-Encoding")
 			g.gz.Reset(io.Discard)

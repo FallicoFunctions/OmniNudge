@@ -21,8 +21,6 @@ definitions:
         type: integer
       page_url:
         type: string
-      rating:
-        type: integer
       screenshot_url:
         type: string
       status:
@@ -122,8 +120,9 @@ definitions:
         - $ref: '#/definitions/github_com_omninudge_backend_internal_models.User'
         description: Optional populated user info
       user1_auto_delete_after:
+        allOf:
+        - $ref: '#/definitions/time.Duration'
         description: Phase 2 features
-        type: string
       user1_id:
         description: NULL for mod_mail and group
         type: integer
@@ -134,7 +133,7 @@ definitions:
         - $ref: '#/definitions/github_com_omninudge_backend_internal_models.User'
         description: Optional populated user info
       user2_auto_delete_after:
-        type: string
+        $ref: '#/definitions/time.Duration'
       user2_id:
         description: NULL for mod_mail and group
         type: integer
@@ -165,6 +164,17 @@ definitions:
       rollback:
         $ref: '#/definitions/github_com_omninudge_backend_internal_models.RollbackTrigger'
       updated_at:
+        type: string
+    type: object
+  github_com_omninudge_backend_internal_models.FriendEntry:
+    properties:
+      avatar_url:
+        type: string
+      friends_since:
+        type: string
+      id:
+        type: integer
+      username:
         type: string
     type: object
   github_com_omninudge_backend_internal_models.GalleryImage:
@@ -311,6 +321,9 @@ definitions:
     properties:
       conversation_id:
         type: integer
+      delete_at:
+        description: Auto-delete timestamp; NULL means never
+        type: string
       deleted_for_recipient:
         type: boolean
       deleted_for_sender:
@@ -488,6 +501,12 @@ definitions:
       is_pinned:
         description: Status
         type: boolean
+      link_preview_description:
+        type: string
+      link_preview_site_name:
+        type: string
+      link_preview_title:
+        type: string
       media_type:
         type: string
       media_url:
@@ -590,6 +609,14 @@ definitions:
           type: string
         type: array
     type: object
+  github_com_omninudge_backend_internal_models.ReactionType:
+    enum:
+    - like
+    - dislike
+    type: string
+    x-enum-varnames:
+    - ReactionLike
+    - ReactionDislike
   github_com_omninudge_backend_internal_models.RedditPostComment:
     properties:
       content:
@@ -644,28 +671,6 @@ definitions:
       title:
         type: string
       updated_at:
-        type: string
-    type: object
-  github_com_omninudge_backend_internal_models.Report:
-    properties:
-      created_at:
-        type: string
-      description:
-        type: string
-      id:
-        type: integer
-      reason:
-        type: string
-      reporter_id:
-        type: integer
-      resolved_at:
-        type: string
-      status:
-        type: string
-      target_id:
-        type: integer
-      target_type:
-        description: post, comment, user, message
         type: string
     type: object
   github_com_omninudge_backend_internal_models.RollbackTrigger:
@@ -731,6 +736,12 @@ definitions:
         type: string
       nsfw:
         type: boolean
+      plan:
+        description: Subscription plan
+        type: string
+      plan_expires_at:
+        description: nil for free tier
+        type: string
       public_key:
         description: E2E encryption
         type: string
@@ -770,6 +781,10 @@ definitions:
         type: string
       daily_digest:
         type: boolean
+      default_auto_delete_after:
+        allOf:
+        - $ref: '#/definitions/time.Duration'
+        description: 'Auto-delete: nil means Never (default)'
       default_omni_posts_only:
         type: boolean
       font_size:
@@ -796,6 +811,13 @@ definitions:
         type: boolean
       notify_removed_saved_posts:
         type: boolean
+      omnichat_default_user_age:
+        type: string
+      omnichat_default_user_gender:
+        type: string
+      omnichat_default_user_name:
+        description: OmniChat global identity defaults for new conversations.
+        type: string
       profile_visibility:
         type: string
       quiet_hours_enabled:
@@ -838,6 +860,83 @@ definitions:
       use_relative_time:
         type: boolean
       user_id:
+        type: integer
+      wall_post_permission:
+        type: string
+    type: object
+  github_com_omninudge_backend_internal_models.WallPost:
+    properties:
+      author_avatar_url:
+        type: string
+      author_id:
+        type: integer
+      author_username:
+        type: string
+      body:
+        type: string
+      comment_count:
+        type: integer
+      created_at:
+        type: string
+      dislike_count:
+        type: integer
+      disliked_by_viewer:
+        type: boolean
+      id:
+        type: integer
+      like_count:
+        type: integer
+      liked_by_viewer:
+        type: boolean
+      media:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPostMedia'
+        type: array
+      profile_user_id:
+        type: integer
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_omninudge_backend_internal_models.WallPostComment:
+    properties:
+      author_avatar_url:
+        type: string
+      author_id:
+        type: integer
+      author_username:
+        type: string
+      body:
+        type: string
+      created_at:
+        type: string
+      dislike_count:
+        type: integer
+      disliked_by_viewer:
+        type: boolean
+      id:
+        type: integer
+      like_count:
+        type: integer
+      liked_by_viewer:
+        type: boolean
+      wall_post_id:
+        type: integer
+    type: object
+  github_com_omninudge_backend_internal_models.WallPostMedia:
+    properties:
+      duration:
+        type: integer
+      height:
+        type: integer
+      media_type:
+        type: string
+      thumbnail_url:
+        type: string
+      url:
+        type: string
+      width:
         type: integer
     type: object
   github_com_omninudge_backend_internal_services.LoginRequest:
@@ -909,8 +1008,6 @@ definitions:
         type: string
       page_url:
         type: string
-      rating:
-        type: integer
       screenshot_url:
         type: string
     required:
@@ -920,6 +1017,7 @@ definitions:
   internal_handlers.CreateCommentRequest:
     properties:
       body:
+        maxLength: 10000
         minLength: 1
         type: string
       parent_comment_id:
@@ -997,20 +1095,24 @@ definitions:
     required:
     - content
     type: object
-  internal_handlers.CreateReportRequest:
+  internal_handlers.CreateWallPostCommentRequest:
     properties:
-      description:
-        type: string
-      reason:
-        type: string
-      target_id:
-        type: integer
-      target_type:
-        description: post, comment, user, message
+      body:
+        maxLength: 2000
+        minLength: 1
         type: string
     required:
-    - target_id
-    - target_type
+    - body
+    type: object
+  internal_handlers.CreateWallPostRequest:
+    properties:
+      body:
+        maxLength: 2000
+        type: string
+      media:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPostMedia'
+        type: array
     type: object
   internal_handlers.CrosspostRequest:
     properties:
@@ -1044,10 +1146,6 @@ definitions:
         type: string
       timestamp:
         type: string
-      user_agent:
-        type: string
-      user_id:
-        type: string
     type: object
   internal_handlers.GetReactionsResponse:
     properties:
@@ -1079,6 +1177,42 @@ definitions:
       title:
         type: string
     type: object
+  internal_handlers.PendingWallPostsResponse:
+    properties:
+      posts:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPost'
+        type: array
+    type: object
+  internal_handlers.SetWallPostReactionRequest:
+    properties:
+      reaction:
+        allOf:
+        - $ref: '#/definitions/github_com_omninudge_backend_internal_models.ReactionType'
+        enum:
+        - like
+        - dislike
+    required:
+    - reaction
+    type: object
+  internal_handlers.TopFriendPreview:
+    properties:
+      avatar_url:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_handlers.TopFriendsResponse:
+    properties:
+      best_friend:
+        type: string
+      count:
+        type: integer
+      friends:
+        items:
+          $ref: '#/definitions/internal_handlers.TopFriendPreview'
+        type: array
+    type: object
   internal_handlers.UpdateBugReportRequest:
     properties:
       admin_notes:
@@ -1091,6 +1225,7 @@ definitions:
   internal_handlers.UpdateCommentRequest:
     properties:
       body:
+        maxLength: 10000
         minLength: 1
         type: string
     required:
@@ -1133,17 +1268,18 @@ definitions:
     required:
     - content
     type: object
-  internal_handlers.UpdateReportStatusRequest:
+  internal_handlers.UserFriendsResponse:
     properties:
-      status:
-        description: open, approved, rejected, no_action (+ legacy)
-        type: string
-    required:
-    - status
+      friends:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.FriendEntry'
+        type: array
     type: object
   internal_handlers.UserProfileResponse:
     properties:
       avatar_url:
+        type: string
+      banner_url:
         type: string
       bio:
         type: string
@@ -1154,6 +1290,8 @@ definitions:
       karma:
         type: integer
       last_seen:
+        type: string
+      location:
         type: string
       moderated_hubs:
         items:
@@ -1177,6 +1315,95 @@ definitions:
         type: integer
     required:
     - vote
+    type: object
+  internal_handlers.WallPostCommentsResponse:
+    properties:
+      comments:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPostComment'
+        type: array
+    type: object
+  internal_handlers.WallPostReactionResponse:
+    properties:
+      dislike_count:
+        type: integer
+      disliked:
+        type: boolean
+      like_count:
+        type: integer
+      liked:
+        type: boolean
+    type: object
+  internal_handlers.WallPostsResponse:
+    properties:
+      can_post:
+        type: boolean
+      friend_count:
+        type: integer
+      own_post_count:
+        type: integer
+      photo_count:
+        type: integer
+      posts:
+        items:
+          $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPost'
+        type: array
+      reply_count:
+        type: integer
+    type: object
+  internal_handlers.chatSettingsResponse:
+    properties:
+      auto_delete_after_seconds:
+        description: |-
+          AutoDeleteAfterSeconds is the per-chat override in whole seconds.
+          nil means no per-chat override is set (conversation inherits global default).
+          0 would mean "never" but is never returned — nil is used instead.
+        type: integer
+    type: object
+  internal_handlers.confirmUploadRequest:
+    properties:
+      upload_id:
+        type: string
+    required:
+    - upload_id
+    type: object
+  internal_handlers.confirmUploadResponse:
+    properties:
+      media_id:
+        type: integer
+      scan_status:
+        type: string
+    type: object
+  internal_handlers.presignedURLRequest:
+    properties:
+      checksum_sha256:
+        type: string
+      content_type:
+        type: string
+      file_size:
+        minimum: 1
+        type: integer
+      filename:
+        type: string
+    required:
+    - checksum_sha256
+    - content_type
+    - file_size
+    - filename
+    type: object
+  internal_handlers.presignedURLResponse:
+    properties:
+      expires_in:
+        description: seconds
+        type: integer
+      required_headers:
+        additionalProperties:
+          type: string
+        type: object
+      upload_id:
+        type: string
+      upload_url:
+        type: string
     type: object
   internal_handlers.signalRequest:
     properties:
@@ -1202,6 +1429,40 @@ definitions:
     required:
     - call_type
     type: object
+  internal_handlers.submitRequest:
+    properties:
+      coin:
+        type: string
+      plan_months:
+        minimum: 1
+        type: integer
+      txid:
+        type: string
+    required:
+    - coin
+    - plan_months
+    - txid
+    type: object
+  time.Duration:
+    enum:
+    - -9223372036854775808
+    - 9223372036854775807
+    - 1
+    - 1000
+    - 1000000
+    - 1000000000
+    - 60000000000
+    - 3600000000000
+    type: integer
+    x-enum-varnames:
+    - minDuration
+    - maxDuration
+    - Nanosecond
+    - Microsecond
+    - Millisecond
+    - Second
+    - Minute
+    - Hour
 host: localhost:8080
 info:
   contact:
@@ -1270,32 +1531,6 @@ paths:
       summary: Deny access request
       tags:
       - Moderation
-  /account/cancel-deletion:
-    post:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Cancel account deletion
-      tags:
-      - Account
   /account/delete:
     post:
       consumes:
@@ -1322,28 +1557,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Request account deletion
-      tags:
-      - Account
-  /account/deletion-status:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get account deletion status
       tags:
       - Account
   /account/export:
@@ -1428,13 +1641,8 @@ paths:
       summary: List export requests
       tags:
       - DataExport
-  /admin/analytics/cohort:
+  /admin/analytics/dashboard:
     get:
-      parameters:
-      - description: Cohort date (YYYY-MM-DD)
-        in: query
-        name: cohort_date
-        type: string
       produces:
       - application/json
       responses:
@@ -1442,119 +1650,19 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get user cohort retention
-      tags:
-      - Analytics
-  /admin/analytics/dashboard:
-    get:
-      parameters:
-      - description: Days to look back (default 30)
-        in: query
-        name: days
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
       summary: Get analytics dashboard
       tags:
-      - Analytics
-  /admin/analytics/devices:
-    get:
-      parameters:
-      - description: Days to look back (default 7)
-        in: query
-        name: days
-        type: integer
-      - description: Max results (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get device breakdown
-      tags:
-      - Analytics
-  /admin/analytics/events/{event_name}:
-    get:
-      parameters:
-      - description: Event name
-        in: path
-        name: event_name
-        required: true
-        type: string
-      - description: Days to look back
-        in: query
-        name: days
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get event statistics
-      tags:
-      - Analytics
-  /admin/analytics/funnel:
-    get:
-      parameters:
-      - description: Days to look back
-        in: query
-        name: days
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get funnel analysis
-      tags:
-      - Analytics
-  /admin/analytics/geo:
-    get:
-      parameters:
-      - description: Days to look back (default 7)
-        in: query
-        name: days
-        type: integer
-      - description: Max results (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get geographic breakdown
-      tags:
-      - Analytics
+      - Admin
   /admin/analytics/refresh:
     post:
       produces:
@@ -1564,15 +1672,19 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
-      summary: Refresh analytics materialized views
+      summary: Refresh analytics views
       tags:
-      - Analytics
+      - Admin
   /admin/ban-history:
     get:
       parameters:
@@ -2313,7 +2425,7 @@ paths:
         in: query
         name: offset
         type: integer
-      - description: Search by username or email
+      - description: Search by username
         in: query
         name: search
         type: string
@@ -2625,13 +2737,6 @@ paths:
     post:
       consumes:
       - application/json
-      parameters:
-      - description: Event payload
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
       produces:
       - application/json
       responses:
@@ -2641,6 +2746,10 @@ paths:
             $ref: '#/definitions/gin.H'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/gin.H'
       summary: Track analytics event
@@ -2768,7 +2877,8 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_omninudge_backend_internal_models.User'
+            additionalProperties: true
+            type: object
         "401":
           description: Unauthorized
           schema:
@@ -2957,6 +3067,28 @@ paths:
           schema:
             $ref: '#/definitions/gin.H'
       summary: Verify email address
+      tags:
+      - Auth
+  /auth/ws-token:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Generate WebSocket token
       tags:
       - Auth
   /bug-reports:
@@ -4172,7 +4304,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/gin.H'
+            $ref: '#/definitions/internal_handlers.chatSettingsResponse'
         "401":
           description: Unauthorized
           schema:
@@ -4187,9 +4319,9 @@ paths:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
-      summary: Get group settings
+      summary: Get chat settings
       tags:
-      - Groups
+      - Conversations
     patch:
       consumes:
       - application/json
@@ -4224,9 +4356,9 @@ paths:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
-      summary: Update group settings
+      summary: Update chat settings
       tags:
-      - Groups
+      - Conversations
   /conversations/{id}/slideshow:
     get:
       parameters:
@@ -5279,6 +5411,75 @@ paths:
       summary: Get group restrictions
       tags:
       - GroupAdmin
+  /groups/{id}/settings:
+    get:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get group settings
+      tags:
+      - Groups
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update group settings
+      tags:
+      - Groups
   /groups/{id}/slow-mode:
     put:
       consumes:
@@ -5357,6 +5558,10 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/gin.H'
       summary: Detailed health check
@@ -5584,6 +5789,243 @@ paths:
           schema:
             $ref: '#/definitions/gin.H'
       summary: Ping hub presence
+      tags:
+      - Hubs
+  /hubs/{name}/ai-design:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get active AI hub design
+      tags:
+      - Hubs
+  /hubs/{name}/ai-design/deactivate:
+    post:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Deactivate the active AI hub design
+      tags:
+      - Hubs
+  /hubs/{name}/ai-design/generate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Prompt payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Generate AI hub page design
+      tags:
+      - Hubs
+  /hubs/{name}/ai-designs:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: List AI hub designs
+      tags:
+      - Hubs
+  /hubs/{name}/ai-designs/{id}:
+    delete:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Design ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Delete an AI hub design
+      tags:
+      - Hubs
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Design ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update an AI hub design
+      tags:
+      - Hubs
+  /hubs/{name}/ai-designs/{id}/activate:
+    post:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Design ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Activate an AI hub design
+      tags:
+      - Hubs
+  /hubs/{name}/ai-designs/{id}/copy:
+    post:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Design ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Duplicate an AI hub design
       tags:
       - Hubs
   /hubs/{name}/crosspost:
@@ -5965,229 +6407,6 @@ paths:
       summary: Check hub subscription
       tags:
       - Subscriptions
-  /hubs/{name}/theme:
-    get:
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/gin.H'
-      summary: Get active hub theme
-      tags:
-      - Hubs
-  /hubs/{name}/themes:
-    get:
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get all hub themes
-      tags:
-      - Hubs
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: Theme payload
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Create hub theme
-      tags:
-      - Hubs
-  /hubs/{name}/themes/{id}:
-    delete:
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: Theme ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Delete hub theme
-      tags:
-      - Hubs
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: Theme ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Theme payload
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Update hub theme
-      tags:
-      - Hubs
-  /hubs/{name}/themes/{id}/activate:
-    post:
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: Theme ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Activate hub theme
-      tags:
-      - Hubs
-  /hubs/{name}/themes/preview:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Hub name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: Theme CSS payload
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Preview hub theme CSS
-      tags:
-      - Hubs
   /hubs/{name}/unsubscribe:
     delete:
       parameters:
@@ -6412,39 +6631,6 @@ paths:
       summary: Get trending hubs
       tags:
       - Hubs
-  /jobs/{queue}/{id}:
-    get:
-      parameters:
-      - description: Queue name
-        in: path
-        name: queue
-        required: true
-        type: string
-      - description: Job ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Get job status
-      tags:
-      - Jobs
   /logs/frontend:
     post:
       consumes:
@@ -6465,6 +6651,10 @@ paths:
             $ref: '#/definitions/gin.H'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/gin.H'
       summary: Submit frontend logs
@@ -6498,6 +6688,124 @@ paths:
       security:
       - BearerAuth: []
       summary: Batch upload media
+      tags:
+      - Media
+  /media/confirm-upload:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Called after the client finishes the presigned PUT to S3. Records the upload
+        in the database, updates storage quota, and queues a mandatory security scan.
+      parameters:
+      - description: Upload confirmation
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.confirmUploadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.confirmUploadResponse'
+        "400":
+          description: Invalid, expired, or mismatched upload reservation
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "501":
+          description: Private S3 staging bucket not configured
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Confirm completed S3 upload
+      tags:
+      - Media
+  /media/encode-audio:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Raw audio file
+        in: formData
+        name: audio
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Encode audio
+      tags:
+      - Media
+  /media/presigned-url:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Reserves quota and returns a constrained PUT URL for a private staging bucket.
+        The caller must confirm with upload_id; only clean scans are promoted to public storage.
+      parameters:
+      - description: Upload metadata
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.presignedURLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.presignedURLResponse'
+        "400":
+          description: Invalid request or file size out of range
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "413":
+          description: File size exceeds maximum allowed
+          schema:
+            $ref: '#/definitions/gin.H'
+        "415":
+          description: Unsupported content type
+          schema:
+            $ref: '#/definitions/gin.H'
+        "501":
+          description: Private S3 staging bucket not configured
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get S3 presigned upload URL
       tags:
       - Media
   /media/upload:
@@ -8042,99 +8350,6 @@ paths:
       summary: Update removal reason
       tags:
       - ModerationV2
-  /mod/reports:
-    get:
-      parameters:
-      - description: Filter by status (open, resolved, dismissed)
-        in: query
-        name: status
-        type: string
-      - description: Filter by hub ID
-        in: query
-        name: hub_id
-        type: integer
-      - description: Max results
-        in: query
-        name: limit
-        type: integer
-      - description: Pagination offset
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/github_com_omninudge_backend_internal_models.Report'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: List moderation reports
-      tags:
-      - Moderation
-  /mod/reports/{id}/status:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Report ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: New status
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handlers.UpdateReportStatusRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Update report status
-      tags:
-      - Moderation
   /notifications:
     get:
       parameters:
@@ -8282,6 +8497,77 @@ paths:
       summary: Get unread notification count
       tags:
       - Notifications
+  /payments/crypto/{txid}/status:
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: txid
+        required: true
+        type: string
+      - description: Coin ticker (BTC, ETH, CAH)
+        in: query
+        name: coin
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get status of a submitted crypto payment
+      tags:
+      - payments
+  /payments/crypto/submit:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Payment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.submitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Confirmed — plan upgraded
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Pending confirmations
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+        "402":
+          description: Amount insufficient
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: TXID already submitted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Submit a crypto payment for plan upgrade
+      tags:
+      - payments
   /posts:
     post:
       consumes:
@@ -8684,22 +8970,6 @@ paths:
           schema:
             $ref: '#/definitions/gin.H'
       summary: Get posts feed
-      tags:
-      - Posts
-  /posts/user/:username:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      summary: Get user posts (internal)
       tags:
       - Posts
   /reddit/api-comments/{commentId}/save:
@@ -9757,45 +10027,6 @@ paths:
       summary: Get Reddit wiki page
       tags:
       - Reddit
-  /reports:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Report details
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handlers.CreateReportRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/github_com_omninudge_backend_internal_models.Report'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/gin.H'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/gin.H'
-      security:
-      - BearerAuth: []
-      summary: Create moderation report
-      tags:
-      - Moderation
   /search/comments:
     get:
       parameters:
@@ -10723,6 +10954,88 @@ paths:
       summary: Get user comments
       tags:
       - Users
+  /users/{username}/friends:
+    get:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.UserFriendsResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get user friends
+      tags:
+      - Users
+  /users/{username}/friendship:
+    get:
+      parameters:
+      - description: Username to check
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get friendship status with a user
+      tags:
+      - Friends
+  /users/{username}/mutual-friends:
+    get:
+      parameters:
+      - description: Username to compare
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get mutual friends with a user
+      tags:
+      - Friends
   /users/{username}/posts:
     get:
       parameters:
@@ -10761,7 +11074,7 @@ paths:
       summary: Get user posts
       tags:
       - Users
-  /users/{username}/status:
+  /users/{username}/top-friends:
     get:
       parameters:
       - description: Username
@@ -10772,11 +11085,104 @@ paths:
       produces:
       - application/json
       responses:
-        "501":
-          description: Not Implemented
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.TopFriendsResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/gin.H'
-      summary: Get single user online status
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get top friends
+      tags:
+      - Users
+  /users/{username}/wall:
+    get:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Page size (default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.WallPostsResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get profile wall posts
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Wall post
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateWallPostRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPost'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Create a wall post
       tags:
       - Users
   /users/block:
@@ -11059,6 +11465,209 @@ paths:
       summary: Upload avatar
       tags:
       - Users
+  /users/me/banner:
+    post:
+      consumes:
+      - multipart/form-data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Upload banner
+      tags:
+      - Users
+  /users/me/friends:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: List friends
+      tags:
+      - Friends
+  /users/me/friends/{username}:
+    delete:
+      parameters:
+      - description: Username to unfriend
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Remove friend
+      tags:
+      - Friends
+  /users/me/friends/requests:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: List friend requests
+      tags:
+      - Friends
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Send friend request
+      tags:
+      - Friends
+  /users/me/friends/requests/{username}:
+    delete:
+      parameters:
+      - description: Username of the other user
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Decline or cancel friend request
+      tags:
+      - Friends
+  /users/me/friends/requests/{username}/accept:
+    put:
+      parameters:
+      - description: Username of request sender
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Accept friend request
+      tags:
+      - Friends
   /users/me/group-invites:
     get:
       produces:
@@ -11286,6 +11895,65 @@ paths:
       summary: Get subreddit subscriptions
       tags:
       - Subscriptions
+  /users/me/top-friends:
+    put:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Set top friends
+      tags:
+      - Users
+  /users/me/wall/pending:
+    get:
+      parameters:
+      - description: Page size (default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.PendingWallPostsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get pending wall posts
+      tags:
+      - Users
   /users/status:
     get:
       parameters:
@@ -11338,6 +12006,309 @@ paths:
       summary: Download voice message
       tags:
       - VoiceMessages
+  /wall-posts/{id}:
+    delete:
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Delete a wall post
+      tags:
+      - Users
+  /wall-posts/{id}/approve:
+    post:
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Approve a pending wall post
+      tags:
+      - Users
+  /wall-posts/{id}/comments:
+    get:
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page size (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.WallPostCommentsResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get wall post comments
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Comment
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateWallPostCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_omninudge_backend_internal_models.WallPostComment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Comment on a wall post
+      tags:
+      - Users
+  /wall-posts/{id}/comments/{commentId}:
+    delete:
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Delete a wall post comment
+      tags:
+      - Users
+  /wall-posts/{id}/comments/{commentId}/reaction:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      - description: Reaction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SetWallPostReactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.WallPostReactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Like or dislike a wall post comment
+      tags:
+      - Users
+  /wall-posts/{id}/reaction:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wall post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Reaction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SetWallPostReactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.WallPostReactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Like or dislike a wall post
+      tags:
+      - Users
   /ws:
     get:
       produces:

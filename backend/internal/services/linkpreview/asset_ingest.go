@@ -56,7 +56,7 @@ func (i *assetIngestor) StoreImage(ctx context.Context, imageURL string) (string
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("unexpected image status: %d", resp.StatusCode)
@@ -98,7 +98,7 @@ func (i *assetIngestor) scanImage(ctx context.Context, data []byte) error {
 		return err
 	}
 	tempPath := tempFile.Name()
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	if _, err := tempFile.Write(data); err != nil {
 		_ = tempFile.Close()

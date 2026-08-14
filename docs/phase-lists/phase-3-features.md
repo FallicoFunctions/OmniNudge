@@ -267,15 +267,14 @@
 ### Content Filtering
 
 **User Configurable Filters:**
-- Profanity filter (censor bad words)
-- NSFW content filter (blur images)
+- Optional language filter
 - Link filter (block all links)
 - Minimum account age (don't receive DMs from accounts < 7 days old)
 
 **Platform-Level Filters:**
 - Known malicious links blocked
 - Malware scanner for file uploads
-- Image content detection (detect NSFW, violence, etc.)
+- Image integrity and abuse-signal detection
 
 ### Profanity Filter
 
@@ -649,7 +648,6 @@
 **Content Moderation:**
 - AI detects toxic messages
 - AI detects spam
-- AI detects NSFW content
 - Flags for review or auto-hides
 
 **Voice Transcription:**

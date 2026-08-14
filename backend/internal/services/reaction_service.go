@@ -106,7 +106,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1::bigint)`, int64(messageID)); err != nil {
 		return nil, fmt.Errorf("acquire emoji cap lock: %w", err)
@@ -168,7 +168,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	// 5. Broadcast reaction_added to all other participants (non-blocking).
 	//    A bounded context prevents goroutine leaks on server shutdown.
 	go func() {
-		bctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+		bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), broadcastTimeout)
 		defer cancel()
 		s.broadcastReactionAdded(bctx, message.ConversationID, reaction, userID)
 	}()
@@ -176,7 +176,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	// 6. Notify the message author (non-blocking, skip self-reactions).
 	if message.SenderID != userID && s.notifService != nil {
 		go func() {
-			nctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+			nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), broadcastTimeout)
 			defer cancel()
 			s.notifService.NotifyMessageReaction(nctx, message, reaction)
 		}()
@@ -229,7 +229,7 @@ func (s *ReactionService) RemoveReaction(ctx context.Context, messageID, reactio
 
 	// 3. Broadcast reaction_removed (non-blocking).
 	go func() {
-		bctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+		bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), broadcastTimeout)
 		defer cancel()
 		s.broadcastReactionRemoved(bctx, message.ConversationID, reaction, userID)
 	}()

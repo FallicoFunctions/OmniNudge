@@ -290,7 +290,7 @@ func (r *WallPostRepository) setReaction(ctx context.Context, reactionTable, ent
 	if err != nil {
 		return false, false, 0, 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var existing string
 	hasExisting := true
@@ -365,7 +365,7 @@ func (r *WallPostRepository) CreateComment(ctx context.Context, comment *WallPos
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = tx.QueryRow(ctx, `
 		INSERT INTO wall_post_comments (wall_post_id, author_id, body)
@@ -457,7 +457,7 @@ func (r *WallPostRepository) DeleteComment(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var wallPostID int
 	err = tx.QueryRow(ctx, `

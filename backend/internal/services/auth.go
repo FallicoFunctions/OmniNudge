@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/models"
+	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/utils"
 )
@@ -29,6 +32,7 @@ type AuthService struct {
 	userAgent       string
 	turnstileSecret string
 	userRepo        ports.UserRepository
+	sessions        *AuthSessionService
 }
 
 // NewAuthService creates a new auth service
@@ -44,20 +48,31 @@ func (s *AuthService) SetUserRepository(userRepo ports.UserRepository) {
 	s.userRepo = userRepo
 }
 
+func (s *AuthService) SetSessionService(sessions *AuthSessionService) {
+	s.sessions = sessions
+}
+
+func (s *AuthService) UserRepository() ports.UserRepository {
+	return s.userRepo
+}
+
 // VerifyTurnstileToken verifies a Cloudflare Turnstile token
-func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
+func (s *AuthService) VerifyTurnstileToken(ctx context.Context, token, remoteIP string) error {
 	if s.turnstileSecret == "" {
 		// Skip verification if no secret is configured (for development)
 		return nil
 	}
 
 	// Prepare request to Cloudflare API
-	data := fmt.Sprintf("secret=%s&response=%s", s.turnstileSecret, token)
+	data := url.Values{
+		"secret":   {s.turnstileSecret},
+		"response": {token},
+	}
 	if remoteIP != "" {
-		data += fmt.Sprintf("&remoteip=%s", remoteIP)
+		data.Set("remoteip", remoteIP)
 	}
 
-	req, err := http.NewRequest("POST", "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("failed to create turnstile verification request: %w", err)
 	}
@@ -69,11 +84,14 @@ func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify turnstile token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("turnstile verification returned status %d", resp.StatusCode)
+	}
 
 	// Parse response
 	var turnstileResp TurnstileResponse
-	if err := json.NewDecoder(resp.Body).Decode(&turnstileResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&turnstileResp); err != nil {
 		return fmt.Errorf("failed to decode turnstile response: %w", err)
 	}
 
@@ -94,6 +112,33 @@ type JWTClaims struct {
 	Role         string `json:"role"`
 	TokenVersion int    `json:"token_version"`
 	Use          string `json:"use,omitempty"`
+	SessionID    string `json:"sid,omitempty"`
+	jwt.RegisteredClaims
+}
+
+type OmniRaveWorldTokenInput struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	SubjectKind  omnigamemodel.SubjectKind `json:"subject_kind,omitempty"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
+}
+
+type OmniRaveWorldJWTClaims struct {
+	UserID       *int                      `json:"user_id,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	TokenVersion int                       `json:"token_version,omitempty"`
+	SubjectKind  omnigamemodel.SubjectKind `json:"subject_kind,omitempty"`
+	Use          string                    `json:"use"`
+	PlayerID     string                    `json:"player_id"`
+	PlayerName   string                    `json:"player_name"`
+	Mode         string                    `json:"mode"`
+	Loadout      map[string]string         `json:"loadout,omitempty"`
+	ReturnPoint  *omnigamemodel.SavedPoint `json:"return_point,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -112,7 +157,7 @@ func (s *AuthService) GenerateJWTWithVersion(userID int, username, role string, 
 }
 
 func (s *AuthService) GenerateJWTWithExpiryAndVersion(userID int, username, role string, tokenVersion int, expiry time.Duration) (string, error) {
-	return s.generateJWT(userID, username, role, tokenVersion, expiry, "")
+	return s.generateJWT(userID, username, role, tokenVersion, expiry, "api")
 }
 
 // GenerateWebSocketJWT creates a short-lived token intended only for WebSocket upgrades.
@@ -120,15 +165,69 @@ func (s *AuthService) GenerateWebSocketJWT(userID int, username, role string, to
 	return s.generateJWT(userID, username, role, tokenVersion, 5*time.Minute, "ws")
 }
 
+func (s *AuthService) GenerateWebSocketJWTForSession(userID int, username, role string, tokenVersion int, sessionID string) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, 5*time.Minute, "ws", sessionID)
+}
+
+func (s *AuthService) GenerateJWTForSession(userID int, username, role string, tokenVersion int, sessionID string, expiry time.Duration) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, "", sessionID)
+}
+
+// GenerateGameSessionJWT creates a short-lived token intended for OmniGame runtime profile writes.
+func (s *AuthService) GenerateGameSessionJWT(userID int, username string) (string, error) {
+	return s.GenerateGameSessionJWTWithVersion(userID, username, 0)
+}
+
+func (s *AuthService) GenerateGameSessionJWTWithVersion(userID int, username string, tokenVersion int) (string, error) {
+	return s.generateJWT(userID, username, "user", tokenVersion, 30*time.Minute, "game")
+}
+
 func (s *AuthService) generateJWT(userID int, username, role string, tokenVersion int, expiry time.Duration, use string) (string, error) {
+	return s.generateJWTForSession(userID, username, role, tokenVersion, expiry, use, "")
+}
+
+func (s *AuthService) generateJWTForSession(userID int, username, role string, tokenVersion int, expiry time.Duration, use, sessionID string) (string, error) {
 	claims := JWTClaims{
 		UserID:       userID,
 		Username:     username,
 		Role:         role,
 		TokenVersion: tokenVersion,
 		Use:          use,
+		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "OmniNudge",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(s.jwtSecret)
+}
+
+func (s *AuthService) GenerateOmniRaveWorldJWT(input OmniRaveWorldTokenInput) (string, error) {
+	// Callers that predate the field leave it empty, so derive it here rather
+	// than issuing a token the world will refuse. Derivation cannot produce a
+	// persona -- see PlayerIdentity.ResolvedKind -- so an omission can only
+	// ever mean the account or guest it already meant.
+	subjectKind := input.SubjectKind
+	if !subjectKind.Valid() {
+		subjectKind = omnigamemodel.PlayerIdentity{UserID: input.UserID}.ResolvedKind()
+	}
+
+	claims := OmniRaveWorldJWTClaims{
+		UserID:       input.UserID,
+		Username:     input.Username,
+		TokenVersion: input.TokenVersion,
+		SubjectKind:  subjectKind,
+		Use:          "omnirave_world",
+		PlayerID:     input.PlayerID,
+		PlayerName:   input.PlayerName,
+		Mode:         input.Mode,
+		Loadout:      input.Loadout,
+		ReturnPoint:  input.ReturnPoint,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "OmniNudge",
 		},
@@ -145,23 +244,42 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 
 func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return s.jwtSecret, nil
-	})
+	}, jwt.WithIssuer("OmniNudge"), jwt.WithExpirationRequired(), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		return nil, err
 	}
 
 	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
-		if s.userRepo != nil {
+		// Browser access tokens are session-bound. Non-session tokens must be
+		// explicitly minted for a known use; this invalidates legacy browser
+		// JWTs that had neither a session identifier nor a use claim.
+		//
+		// "game" is on this list because OmniGame mints its own session token
+		// for runtime profile writes (GenerateGameSessionJWT) and those are not
+		// session-bound. Omitting it would leave every OmniGame profile write
+		// rejected here, which is how these two halves first disagreed when
+		// they were merged.
+		if claims.SessionID == "" && claims.Use != "api" && claims.Use != "ws" && claims.Use != "game" {
+			return nil, fmt.Errorf("token use is not permitted")
+		}
+		if claims.SessionID != "" {
+			if s.sessions == nil {
+				return nil, fmt.Errorf("session validation unavailable")
+			}
+			if err := s.sessions.Validate(ctx, claims.SessionID, claims.UserID, claims.TokenVersion, claims.Role); err != nil {
+				return nil, err
+			}
+		} else if s.userRepo != nil {
 			user, userErr := s.userRepo.GetByID(ctx, claims.UserID)
 			if userErr != nil {
 				return nil, userErr
 			}
-			if user == nil || user.TokenVersion != claims.TokenVersion || user.Banned || user.Deleted {
+			if user == nil || user.TokenVersion != claims.TokenVersion || user.Role != claims.Role || user.Banned || user.Deleted {
 				return nil, fmt.Errorf("invalid token")
 			}
 		}
@@ -169,6 +287,78 @@ func (s *AuthService) ValidateJWTContext(ctx context.Context, tokenString string
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func (s *AuthService) ValidateCSRF(ctx context.Context, sessionID, csrfToken string) error {
+	if s.sessions == nil {
+		return ErrInvalidAuthSession
+	}
+	return s.sessions.ValidateCSRF(ctx, sessionID, csrfToken)
+}
+
+func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, tokenString string) (*OmniRaveWorldJWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &OmniRaveWorldJWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.jwtSecret, nil
+	},
+		// The expiry has to be demanded, not merely checked when present.
+		// jwt/v5 reads a missing exp as "no expiry to fail", so without this a
+		// token carrying no exp at all would validate -- and the world now
+		// disconnects a session at its token's expiry, so a token without one
+		// would buy exactly the unbounded session that mechanism exists to
+		// prevent. GenerateOmniRaveWorldJWT always sets exp; this makes the
+		// five-minute life a property of what the world accepts rather than a
+		// habit of the one issuer that happens to mint them today.
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*OmniRaveWorldJWTClaims)
+	if !ok || !token.Valid || claims.Use != "omnirave_world" || claims.PlayerID == "" || claims.PlayerName == "" || claims.Mode == "" {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	// A kind this build does not recognise is refused rather than treated as
+	// some default. Defaulting is how a future issuer would admit a subject
+	// this build has no rules for -- a persona reaching a world that predates
+	// personas, say -- by the world quietly deciding it must be a guest.
+	//
+	// An absent kind is a different case: it means an issuer older than the
+	// field, and it is filled in the same way that issuer's tokens were always
+	// read. That can only ever yield account or guest, so omission cannot
+	// smuggle in a kind nobody stated.
+	if claims.SubjectKind == "" {
+		claims.SubjectKind = omnigamemodel.PlayerIdentity{UserID: claims.UserID}.ResolvedKind()
+	} else if !claims.SubjectKind.Valid() {
+		return nil, fmt.Errorf("invalid token: unrecognised subject kind")
+	}
+
+	if claims.UserID != nil {
+		if err := s.validateLiveUserState(ctx, *claims.UserID, claims.TokenVersion); err != nil {
+			return nil, err
+		}
+	}
+
+	return claims, nil
+}
+
+func (s *AuthService) validateLiveUserState(ctx context.Context, userID int, tokenVersion int) error {
+	if s.userRepo == nil {
+		return nil
+	}
+
+	user, userErr := s.userRepo.GetByID(ctx, userID)
+	if userErr != nil {
+		return userErr
+	}
+	if user == nil || user.TokenVersion != tokenVersion || user.Banned || user.Deleted {
+		return fmt.Errorf("invalid token")
+	}
+	return nil
 }
 
 // RegisterRequest represents the registration request payload
@@ -186,6 +376,36 @@ type LoginRequest struct {
 	Username     string `json:"username"`
 	Password     string `json:"password"`
 	KeepLoggedIn bool   `json:"keep_logged_in"`
+}
+
+// RestorePendingDeletionAfterAuthentication restores an account that is still
+// inside its deletion grace period after the user has proven ownership. It is
+// shared by password and OAuth authentication so OAuth-only accounts cannot be
+// stranded in an unrecoverable state.
+func RestorePendingDeletionAfterAuthentication(ctx context.Context, userRepo ports.UserRepository, user *models.User) error {
+	if user == nil || user.Banned || user.Deleted {
+		return errors.New("account unavailable")
+	}
+	if user.DeletedAt == nil {
+		return nil
+	}
+	if user.PermanentDeletionAt != nil && !time.Now().Before(*user.PermanentDeletionAt) {
+		return errors.New("account unavailable")
+	}
+	restorer, ok := userRepo.(interface {
+		CancelPendingDeletion(context.Context, int) (int, error)
+	})
+	if !ok {
+		return errors.New("account recovery unavailable")
+	}
+	newVersion, err := restorer.CancelPendingDeletion(ctx, user.ID)
+	if err != nil {
+		return fmt.Errorf("restore pending deletion: %w", err)
+	}
+	user.DeletedAt = nil
+	user.PermanentDeletionAt = nil
+	user.TokenVersion = newVersion
+	return nil
 }
 
 // Register creates a new user with username/password
@@ -218,7 +438,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 	}
 
 	// Verify Turnstile captcha token
-	if err := s.VerifyTurnstileToken(req.TurnstileToken, ""); err != nil {
+	if err := s.VerifyTurnstileToken(ctx, req.TurnstileToken, ""); err != nil {
 		return nil, "", fmt.Errorf("captcha verification failed: %w", err)
 	}
 
@@ -284,6 +504,15 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 	// Check password
 	if err := utils.CheckPassword(user.PasswordHash, req.Password); err != nil {
 		log.Printf("Login failed: password mismatch for user_id=%d username=%q", user.ID, user.Username)
+		return nil, "", errors.New("invalid username or password")
+	}
+
+	// A pending-deletion account cannot use ordinary authenticated routes, so a
+	// successful password login is the recovery action promised to the user.
+	// Restore it atomically before creating any session. Expired grace periods
+	// remain inaccessible and are handled by retention.
+	if restoreErr := RestorePendingDeletionAfterAuthentication(ctx, userRepo, user); restoreErr != nil {
+		log.Printf("Login recovery failed for user_id=%d: %v", user.ID, restoreErr)
 		return nil, "", errors.New("invalid username or password")
 	}
 

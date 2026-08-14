@@ -64,11 +64,6 @@ export const hydrateThemeFromStorage = (): StoredThemeSnapshot | null => {
   return snapshot;
 };
 
-export const clearStoredTheme = () => {
-  if (!isBrowser()) return;
-  window.localStorage.removeItem(THEME_STORAGE_KEY);
-};
-
 export const getThemeVariable = (
   theme: UserTheme | null | undefined,
   key: string,

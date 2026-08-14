@@ -118,20 +118,3 @@ export function CircularProgress({
     </div>
   );
 }
-
-// Progress animation styles for indeterminate progress
-export const progressAnimationStyles = `
-@keyframes progress {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(400%);
-  }
-}
-
-.animate-progress {
-  animation: progress 1.5s ease-in-out infinite;
-  width: 25%;
-}
-`;

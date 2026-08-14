@@ -942,7 +942,7 @@ func (h *HubAIDesignerHandler) callAIModel(ctx context.Context, systemText, user
 	if err != nil {
 		return "", fmt.Errorf("gemini api call: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB cap
 	if err != nil {
@@ -1348,7 +1348,7 @@ func (h *HubAIDesignerHandler) Activate(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	// Deactivate all designs for this hub.
 	if _, err := tx.Exec(c.Request.Context(),
@@ -1758,7 +1758,7 @@ func (h *HubAIDesignerHandler) SaveDesignVersion(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to save version")
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	var versionID int
 	err = tx.QueryRow(c.Request.Context(),
@@ -1908,7 +1908,7 @@ func (h *HubAIDesignerHandler) ChatDesign(c *gin.Context) {
 		RespondError(c, http.StatusBadGateway, "AI request failed")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	var geminiResp geminiResponse
 	if err := json.Unmarshal(respBytes, &geminiResp); err != nil {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -70,7 +71,7 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 	if err != nil {
 		return nil, fmt.Errorf("download audio: %w", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	// Save to temp file.
 	tmpFile, err := os.CreateTemp("", "waveform-*")
@@ -78,15 +79,20 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 		return nil, fmt.Errorf("create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := io.Copy(tmpFile, rc); err != nil {
-		tmpFile.Close()
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			return nil, errors.Join(fmt.Errorf("write temp file: %w", err), fmt.Errorf("close temp file: %w", closeErr))
+		}
 		return nil, fmt.Errorf("write temp file: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("close temp file: %w", err)
+	}
 
 	// Run ffmpeg to decode audio to raw PCM s16le mono at 8000 Hz.
+	// #nosec G204 -- ffmpeg is fixed and the server-created temp path is passed as a single argument, never through a shell.
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-i", tmpPath,
 		"-ac", "1",
@@ -108,11 +114,17 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 		return flat, nil
 	}
 
-	// Convert raw bytes to int16 samples.
+	// Convert raw bytes to signed samples without narrowing an untrusted
+	// unsigned integer. The explicit signed-domain calculation also makes the
+	// two's-complement representation independent of a wrapping conversion.
 	sampleCount := len(pcmData) / 2
-	samples := make([]int16, sampleCount)
+	samples := make([]int, sampleCount)
 	for i := 0; i < sampleCount; i++ {
-		samples[i] = int16(binary.LittleEndian.Uint16(pcmData[i*2 : i*2+2]))
+		sample := int(binary.LittleEndian.Uint16(pcmData[i*2 : i*2+2]))
+		if sample >= 1<<15 {
+			sample -= 1 << 16
+		}
+		samples[i] = sample
 	}
 
 	// Group samples into 100 chunks, take max abs value per chunk.
@@ -129,7 +141,7 @@ func (h *WaveformJobHandler) generateWaveform(ctx context.Context, storageKey st
 		if end > sampleCount {
 			end = sampleCount
 		}
-		var maxAbs int16
+		var maxAbs int
 		for _, s := range samples[start:end] {
 			abs := s
 			if abs < 0 {
