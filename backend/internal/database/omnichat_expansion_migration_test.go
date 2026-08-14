@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"181_omnirave_withdrawal_has_no_expiry",
 		"180_omnirave_persona_sanctions",
 		"179_omnirave_profiles_account_subject_matches_user",
 		"178_omnirave_profiles_by_subject",
@@ -247,6 +248,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"181_omnirave_withdrawal_has_no_expiry",
 		"180_omnirave_persona_sanctions",
 		"179_omnirave_profiles_account_subject_matches_user",
 		"178_omnirave_profiles_by_subject",
