@@ -5,13 +5,7 @@ type MockPersona = {
   slug: string;
   name: string;
   description?: string;
-  category:
-    | 'roleplay'
-    | 'helper'
-    | 'romance'
-    | 'original'
-    | 'anime_game'
-    | 'fiction_media';
+  category: 'roleplay' | 'helper' | 'romance' | 'original' | 'anime_game' | 'fiction_media';
   owner_user_id?: number;
   visibility?: 'public' | 'private' | 'unlisted';
   source_format?: string;
@@ -63,18 +57,28 @@ type MockMessage = {
   created_at: string;
 };
 
-const CORS_HEADERS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-credentials': 'true',
-  'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-  'access-control-allow-headers': 'Content-Type, Authorization',
-};
+// The app talks to the API cross-origin (page on 127.0.0.1:4173, API on
+// localhost:8080) and every request is credentialed — `withCredentials` on the
+// axios client, `credentials: 'include'` in authenticatedFetch — because auth
+// is cookie-backed. Chrome rejects a credentialed response whose
+// Access-Control-Allow-Origin is the wildcard, so the origin has to be echoed
+// back or the browser discards a response the route handler already fulfilled.
+function corsHeaders(route: Route): Record<string, string> {
+  const origin = route.request().headers()['origin'] ?? '*';
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'access-control-allow-headers': 'Content-Type, Authorization, X-CSRF-Token',
+    vary: 'Origin',
+  };
+}
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({
     status,
     headers: {
-      ...CORS_HEADERS,
+      ...corsHeaders(route),
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -172,7 +176,7 @@ async function installOmniChatApi(page: Page) {
     if (request.method() === 'OPTIONS') {
       await route.fulfill({
         status: 204,
-        headers: CORS_HEADERS,
+        headers: corsHeaders(route),
       });
       return;
     }
@@ -225,7 +229,9 @@ async function installOmniChatApi(page: Page) {
       const payload = JSON.parse(request.postData() ?? '{}') as Partial<MockPersona>;
       const persona: MockPersona = {
         id: state.nextPersonaId++,
-        slug: `u${authUser.id}-${String(payload.name ?? 'persona').toLowerCase().replace(/\s+/g, '-')}`,
+        slug: `u${authUser.id}-${String(payload.name ?? 'persona')
+          .toLowerCase()
+          .replace(/\s+/g, '-')}`,
         name: String(payload.name ?? 'Unnamed Persona'),
         description: payload.description ? String(payload.description) : '',
         category: (payload.category as MockPersona['category']) ?? 'original',
@@ -438,16 +444,18 @@ test.describe('OmniChat launch smoke', () => {
     await page.getByRole('button', { name: /create or import character/i }).click();
     await expect(page.locator('input[type="password"]').first()).toBeVisible();
 
+    // Signing in is entirely a server-side fact to this app: AuthContext drops
+    // any legacy `auth_token` from web storage on mount and derives
+    // `isAuthenticated` from whether GET /auth/me returned a user. Flipping the
+    // mock is therefore the whole of "the browser is now signed in", and the
+    // reload below is what makes AuthContext ask again.
     api.authenticate();
-    await page.evaluate(() => {
-      sessionStorage.setItem('auth_token', 'playwright-auth-token');
-    });
 
     await page.goto('/omnichat/studio');
     await page.getByRole('textbox', { name: /^Name$/ }).fill('Launch Wizard');
-    await page.getByRole('textbox', { name: /^Description$/ }).fill(
-      'Helps validate the launch path.'
-    );
+    await page
+      .getByRole('textbox', { name: /^Description$/ })
+      .fill('Helps validate the launch path.');
     await page.getByRole('textbox', { name: /^Personality$/ }).fill('Precise and concise.');
     await page
       .getByRole('textbox', { name: /^Opening Message$/ })
@@ -476,12 +484,11 @@ test.describe('OmniChat launch smoke', () => {
         name: 'hogwarts.png',
         mimeType: 'image/png',
         buffer: Buffer.from([
-          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49,
-          0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02,
-          0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44,
-          0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01,
-          0x00, 0x18, 0xdd, 0x8d, 0xb1, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
-          0xae, 0x42, 0x60, 0x82,
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+          0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+          0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8,
+          0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xdd, 0x8d, 0xb1, 0x00, 0x00, 0x00,
+          0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
         ]),
       });
 
@@ -492,7 +499,10 @@ test.describe('OmniChat launch smoke', () => {
     );
 
     await page.getByRole('button', { name: /^delete$/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /delete character/i }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /delete character/i })
+      .click();
 
     await expect(page.getByRole('heading', { name: 'Hogwarts Simulator' })).not.toBeVisible();
     await expect(page.getByRole('heading', { name: 'Launch Wizard' })).toBeVisible();

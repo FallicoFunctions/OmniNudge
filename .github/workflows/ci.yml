@@ -300,7 +300,12 @@ jobs:
       - name: Run Playwright E2E tests
         working-directory: frontend
         env:
-          VITE_API_BASE_URL: http://localhost:8080
+          # The app reads VITE_API_URL, not VITE_API_BASE_URL, and it wants the
+          # full API root including /api/v1 — the old name was never read, so
+          # the build silently fell back to this same default. Spelled out here
+          # because the mocked specs route on this exact origin and prefix, and
+          # the unmocked ones talk to the server started above on port 8080.
+          VITE_API_URL: http://localhost:8080/api/v1
         run: npx playwright test --project=chromium
 
       - name: Upload Playwright report
