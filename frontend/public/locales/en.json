@@ -4401,7 +4401,11 @@
       "confirmForget": "Forget",
       "truncated": "Showing the {{shown}} most recent of {{total}} memories.",
       "cancelForgetLabel": "Keep: {{title}}",
-      "confirmForgetLabel": "Confirm forgetting: {{title}}"
+      "confirmForgetLabel": "Confirm forgetting: {{title}}",
+      "sharedHeading": "With you",
+      "sharedEmpty": "Nothing from this conversation yet.",
+      "ownLifeHeading": "{{name}}'s own life",
+      "ownLifeDescription": "Things {{name}} did away from this conversation. They belong to her, not to you, so they cannot be removed here."
     }
   }
 }

@@ -40,6 +40,7 @@ function memory(overrides: Partial<OmniChatMemory> = {}): OmniChatMemory {
     persona_id: 5,
     conversation_id: 42,
     source_message_id: 7,
+    is_self: false,
     title: 'Lost passport in Barcelona',
     summary: 'He had to visit the consulate on day two.',
     salience: 0.8,
@@ -48,6 +49,19 @@ function memory(overrides: Partial<OmniChatMemory> = {}): OmniChatMemory {
     recorded_at: '2026-08-01T10:00:00Z',
     ...overrides,
   };
+}
+
+// The character's own life: no conversation, no source turn, owned by nobody.
+function selfMemory(overrides: Partial<OmniChatMemory> = {}): OmniChatMemory {
+  return memory({
+    id: 2,
+    conversation_id: 0,
+    source_message_id: undefined,
+    is_self: true,
+    title: 'Wandered the main stage in OmniRave',
+    summary: 'Spent most of the set near the front and left before the encore.',
+    ...overrides,
+  });
 }
 
 function renderModal(conversationId: number | null = 42) {
@@ -77,6 +91,66 @@ describe('MemoriesModal', () => {
 
     expect(await screen.findByText('Lost passport in Barcelona')).toBeInTheDocument();
     expect(screen.getByText('He had to visit the consulate on day two.')).toBeInTheDocument();
+  });
+
+  // The character's own life and the history it shares with the reader are not
+  // the same kind of claim, and a single list would say the reader was there.
+  it('separates the shared history from the character’s own life', async () => {
+    listConversationMemories.mockResolvedValue({
+      total: 2,
+      has_more: false,
+      memories: [memory(), selfMemory()],
+    });
+    renderModal();
+
+    expect(await screen.findByText('omnichat.memories.sharedHeading')).toBeInTheDocument();
+    expect(screen.getByText(/omnichat\.memories\.ownLifeHeading/)).toBeInTheDocument();
+    expect(screen.getByText('Lost passport in Barcelona')).toBeInTheDocument();
+    expect(screen.getByText('Wandered the main stage in OmniRave')).toBeInTheDocument();
+  });
+
+  // A self-tier memory belongs to nobody and the server refuses to hide it, so
+  // a control here could only ever fail. Exactly one forget control is offered:
+  // the one on the shared memory.
+  it('offers no way to forget the character’s own life', async () => {
+    listConversationMemories.mockResolvedValue({
+      total: 2,
+      has_more: false,
+      memories: [memory(), selfMemory()],
+    });
+    renderModal();
+
+    await screen.findByText('Wandered the main stage in OmniRave');
+    const forgetControls = screen.getAllByLabelText(/omnichat\.memories\.forgetLabel/);
+    expect(forgetControls).toHaveLength(1);
+    expect(forgetControls[0]).toHaveAccessibleName(/Lost passport in Barcelona/);
+  });
+
+  // A character that belongs to one user has no life of its own, so the panel
+  // must look exactly as it did before: one list, no headings over it.
+  it('shows no grouping for a character with no life of its own', async () => {
+    listConversationMemories.mockResolvedValue({ total: 1, has_more: false, memories: [memory()] });
+    renderModal();
+
+    await screen.findByText('Lost passport in Barcelona');
+    expect(screen.queryByText('omnichat.memories.sharedHeading')).not.toBeInTheDocument();
+    expect(screen.queryByText(/omnichat\.memories\.ownLifeHeading/)).not.toBeInTheDocument();
+  });
+
+  // A character can have lived somewhere without this conversation having
+  // produced anything yet. The shared group says so rather than vanishing,
+  // which would read as the two tiers being one list.
+  it('says the shared side is empty rather than dropping its heading', async () => {
+    listConversationMemories.mockResolvedValue({
+      total: 1,
+      has_more: false,
+      memories: [selfMemory()],
+    });
+    renderModal();
+
+    expect(await screen.findByText(/omnichat\.memories\.sharedEmpty/)).toBeInTheDocument();
+    expect(screen.getByText('Wandered the main stage in OmniRave')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/omnichat\.memories\.forgetLabel/)).not.toBeInTheDocument();
   });
 
   it('tells the user nothing has been remembered yet rather than showing an empty box', async () => {

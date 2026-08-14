@@ -130,6 +130,54 @@ func TestListConversationMemories_IsScopedToOwner(t *testing.T) {
 	require.Zero(t, resp.Total)
 }
 
+// The character's own life is listed alongside the shared history, flagged as
+// its own, and cannot be forgotten by the person reading it. The flag and the
+// refusal are asserted together because either alone is a broken surface: a
+// list that cannot tell the tiers apart presents a life the reader was not part
+// of as something they said, and a control that cannot succeed is worse than no
+// control at all.
+func TestListConversationMemories_ShowsTheCharactersOwnLifeButWillNotForgetIt(t *testing.T) {
+	fixture := setupOmniChatMemoryHandlerTest(t)
+	handler := NewOmniChatMemoryHandler(fixture.repo)
+
+	selfID, err := fixture.repo.RecordWorldEvent(context.Background(), models.OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the main stage in OmniRave",
+		Summary:   "Spent most of the set near the front and left before the encore.",
+	})
+	require.NoError(t, err)
+
+	w, c := memoryContext(http.MethodGet, "/omnichat/conversations/1/memories",
+		fixture.userID, fmt.Sprint(fixture.conversationID))
+	handler.ListConversationMemories(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Total    int `json:"total"`
+		Memories []struct {
+			ID     int64  `json:"id"`
+			IsSelf bool   `json:"is_self"`
+			Title  string `json:"title"`
+		} `json:"memories"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, 2, resp.Total)
+	require.Len(t, resp.Memories, 2)
+	require.False(t, resp.Memories[0].IsSelf)
+	require.Equal(t, "Lost passport in Barcelona", resp.Memories[0].Title)
+	require.True(t, resp.Memories[1].IsSelf)
+	require.Equal(t, selfID, resp.Memories[1].ID)
+
+	w, c = memoryContext(http.MethodDelete, "/omnichat/memories/1", fixture.userID, fmt.Sprint(selfID))
+	handler.ForgetMemory(c)
+	require.Equal(t, http.StatusNotFound, w.Code, "a memory with no owner is nobody's to forget")
+
+	var status string
+	require.NoError(t, fixture.pool.Pool.QueryRow(context.Background(),
+		`SELECT status FROM omnichat_memory_episodes WHERE id = $1`, selfID).Scan(&status))
+	require.Equal(t, "active", status)
+}
+
 func TestListConversationMemories_RejectsBadID(t *testing.T) {
 	fixture := setupOmniChatMemoryHandlerTest(t)
 	handler := NewOmniChatMemoryHandler(fixture.repo)
