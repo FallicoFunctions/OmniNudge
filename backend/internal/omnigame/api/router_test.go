@@ -28,7 +28,7 @@ func TestRouter_ProfileEndpointAcceptsGameSessionToken(t *testing.T) {
 		repository.NewInMemorySanctionRepository(),
 		authService,
 	)
-	router := NewRouter(sessionService, authService, nil, nil, []string{"127.0.0.1/32", "::1/128"})
+	router := NewRouter(sessionService, authService, nil, nil, nil, nil, []string{"127.0.0.1/32", "::1/128"})
 
 	token, err := authService.GenerateGameSessionJWT(42, "alice")
 	require.NoError(t, err)
@@ -135,7 +135,7 @@ func TestRouter_ProfileEndpointAcceptsSessionExchangeTokenAtCurrentLiveVersion(t
 	require.NoError(t, err)
 	require.NotEmpty(t, exchanged.SessionToken)
 
-	router := NewRouter(sessionService, authService, nil, nil, []string{"127.0.0.1/32", "::1/128"})
+	router := NewRouter(sessionService, authService, nil, nil, nil, nil, []string{"127.0.0.1/32", "::1/128"})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/omnigame/profile/omnirave", nil)
 	req.Header.Set("Authorization", "Bearer "+exchanged.SessionToken)
 	rec := httptest.NewRecorder()
@@ -159,7 +159,7 @@ func newProfileRouterWithLiveUsers(t *testing.T, db *testutil.TestDatabase) (*se
 		repository.NewInMemorySanctionRepository(),
 		authService,
 	)
-	router := NewRouter(sessionService, authService, nil, nil, []string{"127.0.0.1/32", "::1/128"})
+	router := NewRouter(sessionService, authService, nil, nil, nil, nil, []string{"127.0.0.1/32", "::1/128"})
 
 	return authService, router, userRepo, user
 }

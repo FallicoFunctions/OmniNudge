@@ -15,6 +15,8 @@ func NewRouter(
 	authService *services.AuthService,
 	admissionService *service.AdmissionService,
 	personaAdmission *services.PersonaAdmissionAuth,
+	worldEvents *services.WorldEventAuth,
+	characterMemory *services.OmniChatMemoryService,
 	trustedProxies []string,
 ) *gin.Engine {
 	router := gin.New()
@@ -44,6 +46,24 @@ func NewRouter(
 		"/api/v1/omnigame/admit/omnirave",
 		middleware.RequirePersonaAdmission(personaAdmission),
 		personaAdmissionHandler.AdmitOmniRave,
+	)
+
+	// Off router rather than v1 for the same reason admission is: v1 carries
+	// AuthOptional, and a browser identity must never be part of what writes a
+	// character's own memory. The self tier is read by everyone who talks to
+	// that character, so a user who could write it could put words in its
+	// mouth for every other user. RequireWorldEvent is the only credential
+	// this path accepts, and it is not the admission credential either.
+	//
+	// The world is named in the path deliberately, as it is for admission.
+	// OmniVerse reports different things about a different kind of presence,
+	// and a single generic /world-event endpoint would have to grow a mode
+	// switch deciding whose rules apply to a write into character memory.
+	worldEventHandler := handlers.NewWorldEventHandler(characterMemory)
+	router.POST(
+		"/api/v1/omnigame/world-event/omnirave",
+		middleware.RequireWorldEvent(worldEvents),
+		worldEventHandler.RecordOmniRave,
 	)
 
 	v1 := router.Group("/api/v1")
