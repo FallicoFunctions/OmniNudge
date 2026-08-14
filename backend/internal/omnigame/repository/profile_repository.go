@@ -44,7 +44,12 @@ func (r *InMemoryProfileRepository) GetProfile(ctx context.Context, userID int) 
 }
 
 func (r *InMemoryProfileRepository) UpsertProfileBySubject(_ context.Context, profile model.OmniRaveProfile) error {
-	subject := profile.ResolvedSubject()
+	// The subject is read as given rather than through ResolvedSubject. That
+	// fallback derives an account subject from UserID, which on a write turns a
+	// malformed persona reference into somebody else's row; see the postgres
+	// implementation for the full reasoning. Both must refuse identically or
+	// the tests that use this one stop meaning anything.
+	subject := profile.Subject
 	if !subject.Valid() {
 		return ErrInvalidResidentRef
 	}

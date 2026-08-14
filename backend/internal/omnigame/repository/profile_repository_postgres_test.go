@@ -199,7 +199,14 @@ func TestPostgresProfileRepository_RejectsInvalidResidentRef(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalidResidentRef)
 		require.Nil(t, profile)
 
-		err = repo.UpsertProfileBySubject(ctx, model.OmniRaveProfile{Subject: subject})
+		// UserID is set deliberately. With it left at zero every case fails on
+		// the ID > 0 half of Valid, so the kind half of the write path was
+		// never exercised -- and, worse, a write that derived its subject from
+		// UserID instead of reading the stated one would still have been
+		// refused here while silently redirecting in production. A user id the
+		// fallback could have latched onto is what makes this test able to
+		// tell the two behaviours apart.
+		err = repo.UpsertProfileBySubject(ctx, model.OmniRaveProfile{Subject: subject, UserID: 5})
 		require.ErrorIs(t, err, ErrInvalidResidentRef)
 	}
 }
