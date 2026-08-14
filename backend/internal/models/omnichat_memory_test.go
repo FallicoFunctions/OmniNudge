@@ -1345,6 +1345,165 @@ func TestOmniChatMemoryRecallGivesTheSelfTierNoRankingAdvantage(t *testing.T) {
 		"the more salient memory still wins, so no tier bonus crept into the score")
 }
 
+// The acceptance test for a character knowing it goes somewhere often.
+//
+// An agent files one memory per visit, so a resident left running racks up
+// hundreds of near-identical evenings. Every one of them is kept -- they really
+// happened, and a character that went a thousand times must not remember fifty
+// -- and recall collapses them to the most recent, with the count attached.
+func TestOmniChatMemoryRecordWorldEventLinksARepeatVisit(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "recurring")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	visit := func(summary string) int64 {
+		t.Helper()
+		id, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID: fixture.personaID,
+			Title:     "Wandered the main stage in OmniRave",
+			Summary:   summary,
+		})
+		require.NoError(t, err)
+		return id
+	}
+
+	first := visit("Was in OmniRave for 12m. Wandered the main stage for 11m.")
+	second := visit("Was in OmniRave for 40m. Wandered the main stage for 38m.")
+	newest := visit("Was in OmniRave for 9m. Wandered the main stage for 8m.")
+
+	// Every occurrence names the first, not the one before it, so the chain is
+	// one level deep however long it gets.
+	var firstLink *int64
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT recurs_episode_id FROM omnichat_memory_episodes WHERE id = $1`, first).Scan(&firstLink))
+	require.Nil(t, firstLink, "the first visit is a recurrence of nothing")
+	for _, later := range []int64{second, newest} {
+		var root int64
+		require.NoError(t, pool.QueryRow(ctx,
+			`SELECT recurs_episode_id FROM omnichat_memory_episodes WHERE id = $1`, later).Scan(&root))
+		require.Equal(t, first, root, "a repeat visit attaches to the first one")
+	}
+
+	// A different kind of visit is a different thing, not another instance.
+	elsewhere, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the Underground in OmniRave",
+		Summary:   "Was in OmniRave for 20m. Wandered the Underground for 19m.",
+	})
+	require.NoError(t, err)
+	var elsewhereLink *int64
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT recurs_episode_id FROM omnichat_memory_episodes WHERE id = $1`, elsewhere).Scan(&elsewhereLink))
+	require.Nil(t, elsewhereLink, "somewhere else is not the same thing again")
+
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID,
+		"do you go to the main stage?", DefaultOmniChatMemoryRecallWeights(), 6)
+	require.NoError(t, err)
+	require.Len(t, got, 1, "three visits to one place must occupy one slot, not three")
+	require.Equal(t, newest, got[0].ID, "and the one surfaced is the most recent")
+	require.Contains(t, got[0].Summary, "9m")
+	require.Equal(t, 3, got[0].Occurrences, "the character knows how many times it has been")
+
+	// Nothing was collapsed away: the record still holds every visit.
+	var stored int
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT count(*) FROM omnichat_memory_episodes
+		WHERE persona_id = $1 AND title = 'Wandered the main stage in OmniRave'
+	`, fixture.personaID).Scan(&stored))
+	require.Equal(t, 3, stored, "every visit is kept, not folded into a counter")
+}
+
+// Volume must not buy rank. A character that goes somewhere nightly would
+// otherwise have that place beat everything memorable it has ever done, purely
+// because there is more of it.
+func TestOmniChatMemoryRecallGivesALongRecurrenceChainNoRankingAdvantage(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "chainlength")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+	weights := DefaultOmniChatMemoryRecallWeights()
+
+	var newestVisit int64
+	for i := 0; i < 50; i++ {
+		id, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID: fixture.personaID,
+			Title:     "Wandered the main stage in OmniRave",
+			Summary:   "Stood near the front of the main stage and left before the encore.",
+		})
+		require.NoError(t, err)
+		newestVisit = id
+	}
+
+	// One night that was not like the others.
+	memorable := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"The night the main stage lost power",
+		"The main stage cut out mid-set and the whole crowd sang the rest of it.", 0.98, 0.97)
+
+	got, err := repo.Recall(ctx, fixture.personaID, fixture.userID, "tell me about the main stage", weights, 6)
+	require.NoError(t, err)
+	require.Equal(t, []int64{memorable, newestVisit}, recalledIDs(got),
+		"fifty visits are one candidate, and the distinctive night still comes first")
+	require.Equal(t, 50, got[1].Occurrences)
+	require.Equal(t, 1, got[0].Occurrences, "a memory that happened once says so")
+}
+
+// The tier boundary is the whole reason the memory design can hold both a
+// character's own life and one person's private history in one table. A
+// recurrence link that crossed it would be a path between the two, so it is
+// refused by the schema rather than by whichever caller remembers to check.
+func TestOmniChatMemoryRecurrenceCannotCrossTiers(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "recurtier")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	selfID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the main stage in OmniRave",
+		Summary:   "An evening nobody else was part of.",
+	})
+	require.NoError(t, err)
+	relationalID := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"We talked about the main stage", "He said he had never been.", 0.5, 0.5)
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, title, summary, recurs_episode_id)
+		VALUES ($1, $2, 'again', 'again', $3)
+	`, fixture.personaID, fixture.userID, selfID)
+	require.Error(t, err, "one person's memory must not be another instance of the character's own life")
+	require.Contains(t, err.Error(), "omnichat_memory_episodes_recurrence_stays_in_tier")
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, title, summary, recurs_episode_id)
+		VALUES ($1, NULL, 'again', 'again', $2)
+	`, fixture.personaID, relationalID)
+	require.Error(t, err, "and the character's own life must not continue somebody's private history")
+	require.Contains(t, err.Error(), "omnichat_memory_episodes_recurrence_stays_in_tier")
+
+	// A row cannot claim to be both a retelling and a recurrence either: those
+	// are contradictory accounts of what it is, and the collapse key would have
+	// no way to say which chain it belongs to.
+	_, err = pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, title, summary, recurs_episode_id, retells_episode_id)
+		VALUES ($1, NULL, 'again', 'again', $2, $2)
+	`, fixture.personaID, selfID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "omnichat_memory_episodes_retells_or_recurs")
+}
+
+// Chain length is recorded and surfaced before it is trusted to rank, exactly
+// as the retelling count is.
+func TestOmniChatMemoryRecurrenceWeightIsUnsetUntilMeasured(t *testing.T) {
+	require.Zero(t, DefaultOmniChatMemoryRecallWeights().Recurrence)
+}
+
 // A world event is untrusted text like any other: the world is a service, but
 // what it reports still arrives over the wire.
 func TestOmniChatMemoryRecordWorldEventBoundsItsText(t *testing.T) {
