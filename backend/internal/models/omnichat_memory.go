@@ -72,9 +72,16 @@ type OmniChatMemoryEpisode struct {
 	ID        int64 `json:"id"`
 	PersonaID int   `json:"-"`
 	// OwnerUserID is OmniChatMemoryTierSelf for persona-global memory.
-	OwnerUserID     int `json:"-"`
-	ConversationID  int `json:"-"`
-	SourceMessageID int `json:"-"`
+	OwnerUserID int `json:"-"`
+	// IsSelf says the same thing without relying on a sentinel that is also the
+	// field's zero value. Whether a memory belongs to the character alone
+	// decides how it is told -- shared history, or a life the listener was not
+	// part of -- and a construction path that simply forgot to set an owner
+	// would otherwise be claiming the strongest of the two. Populated by
+	// recall, which reads the tier from the row.
+	IsSelf          bool `json:"-"`
+	ConversationID  int  `json:"-"`
+	SourceMessageID int  `json:"-"`
 
 	Title   string `json:"title"`
 	Summary string `json:"summary"`
@@ -620,11 +627,13 @@ LIMIT $12
 // Recall returns the episodes a persona should surface for a cue, most
 // relevant first. Returning no rows is normal and means no memory block.
 //
-// The result mixes two tiers, and each episode carries the one it came from in
-// OwnerUserID: the caller's id for something the two of them did, the self
-// sentinel for something the character did in the world without them. A caller
+// The result mixes two tiers, and each episode carries the one it came from:
+// IsSelf for something the character did in the world without the caller, and
+// OwnerUserID set to the caller's id or the self sentinel to match. A caller
 // that renders these has to be able to tell the difference, or a character
-// recounts its own life as though the person it is talking to was there.
+// recounts its own life as though the person it is talking to was there --
+// which is why the flag is set from the tier the row is actually in rather
+// than inferred from an id that is zero when nobody filled it in.
 func (r *OmniChatMemoryRepository) Recall(
 	ctx context.Context,
 	personaID, ownerUserID int,
@@ -654,19 +663,18 @@ func (r *OmniChatMemoryRepository) Recall(
 	for rows.Next() {
 		var (
 			episode OmniChatMemoryEpisode
-			isSelf  bool
 			score   float64
 		)
 		if err := rows.Scan(
 			&episode.ID, &episode.Title, &episode.Summary,
 			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
-			&episode.Tellings, &isSelf, &score,
+			&episode.Tellings, &episode.IsSelf, &score,
 		); err != nil {
 			return nil, fmt.Errorf("omnichat memory: scan recalled episode: %w", err)
 		}
 		episode.PersonaID = personaID
 		episode.OwnerUserID = ownerUserID
-		if isSelf {
+		if episode.IsSelf {
 			episode.OwnerUserID = OmniChatMemoryTierSelf
 		}
 		episode.Status = OmniChatMemoryStatusActive

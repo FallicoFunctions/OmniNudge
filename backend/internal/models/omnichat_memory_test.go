@@ -1100,6 +1100,8 @@ func TestOmniChatMemoryRecallGivesAResidentsLifeToEveryPlayer(t *testing.T) {
 		"a player who has never discussed racing with her still finds that she races now")
 	require.Equal(t, OmniChatMemoryTierSelf, got[0].OwnerUserID,
 		"and it comes back marked as her own life, not as something they did together")
+	require.True(t, got[0].IsSelf,
+		"said outright rather than left to be inferred from an owner id of zero")
 }
 
 // A private character has no self tier to read, so nothing about it changes.
@@ -1132,6 +1134,7 @@ func TestOmniChatMemoryRecallIsUnchangedForAPrivateCharacter(t *testing.T) {
 	require.Equal(t, []int64{ours}, recalledIDs(got),
 		"a private character's recall is its owner's relationship with it and nothing else")
 	require.Equal(t, fixture.userID, got[0].OwnerUserID)
+	require.False(t, got[0].IsSelf, "nothing here belongs to the character alone")
 
 	var selfTierRows int
 	require.NoError(t, pool.QueryRow(ctx,

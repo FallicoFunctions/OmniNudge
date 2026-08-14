@@ -22,14 +22,17 @@ const personaAdmitLabel = "persona admission"
 // validation, matching the issuer the site tokens use.
 const personaAdmitIssuer = serviceCredentialIssuer
 
-// These are the same values every service credential reports, kept under the
-// names the admission path documents so a caller can still say what it means.
-// The messages they carry are prefixed with which credential failed.
+// This credential's own configuration failures. They wrap the shared values,
+// so errors.Is against ErrServiceCredentialSecretMissing still matches, but
+// they are distinct values: a world-event failure is not an admission failure,
+// and a caller can now say which one it got without reading the message.
 var (
-	ErrPersonaAdmitSecretMissing = ErrServiceCredentialSecretMissing
-	ErrPersonaAdmitSecretWeak    = ErrServiceCredentialSecretWeak
-	ErrPersonaAdmitSecretShared  = ErrServiceCredentialSecretShared
+	ErrPersonaAdmitSecretMissing = personaAdmitCredentialErrors.missing
+	ErrPersonaAdmitSecretWeak    = personaAdmitCredentialErrors.weak
+	ErrPersonaAdmitSecretShared  = personaAdmitCredentialErrors.shared
 )
+
+var personaAdmitCredentialErrors = newServiceCredentialErrors(personaAdmitLabel)
 
 // PersonaAdmitClaims is what the agent runtime presents to admit a persona.
 type PersonaAdmitClaims = ServiceCredentialClaims
@@ -53,6 +56,7 @@ type PersonaAdmissionAuth struct {
 func NewPersonaAdmissionAuth(secret string, siteJWTSecret string) (*PersonaAdmissionAuth, error) {
 	credential, err := newServiceCredential(
 		personaAdmitLabel, PersonaAdmitTokenUse, secret, siteJWTSecret, personaAdmitMaxTTL,
+		personaAdmitCredentialErrors,
 	)
 	if err != nil {
 		return nil, err

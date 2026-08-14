@@ -24,13 +24,17 @@ const worldEventMaxTTL = 5 * time.Minute
 // worldEventLabel prefixes every error this credential reports.
 const worldEventLabel = "world event"
 
-// These are the same values every service credential reports, kept under names
-// that say which credential a caller is talking about.
+// This credential's own configuration failures. They wrap the shared values,
+// so errors.Is against ErrServiceCredentialSecretMissing still matches, but
+// they are distinct values: an admission failure is not a world-event failure,
+// and a caller can now say which one it got without reading the message.
 var (
-	ErrWorldEventSecretMissing = ErrServiceCredentialSecretMissing
-	ErrWorldEventSecretWeak    = ErrServiceCredentialSecretWeak
-	ErrWorldEventSecretShared  = ErrServiceCredentialSecretShared
+	ErrWorldEventSecretMissing = worldEventCredentialErrors.missing
+	ErrWorldEventSecretWeak    = worldEventCredentialErrors.weak
+	ErrWorldEventSecretShared  = worldEventCredentialErrors.shared
 )
+
+var worldEventCredentialErrors = newServiceCredentialErrors(worldEventLabel)
 
 // WorldEventClaims is what the world presents to record something that
 // happened to a resident character.
@@ -53,6 +57,7 @@ type WorldEventAuth struct {
 func NewWorldEventAuth(secret string, siteJWTSecret string) (*WorldEventAuth, error) {
 	credential, err := newServiceCredential(
 		worldEventLabel, WorldEventTokenUse, secret, siteJWTSecret, worldEventMaxTTL,
+		worldEventCredentialErrors,
 	)
 	if err != nil {
 		return nil, err

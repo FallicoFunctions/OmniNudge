@@ -201,14 +201,26 @@ func TestNewPersonaAdmissionAuth_RefusesBadConfiguration(t *testing.T) {
 		secret string
 		site   string
 		want   error
+		// notWant is the world-event credential's value for the same kind of
+		// failure, which this row must not also satisfy. The two credentials
+		// once aliased one set of values, and every assertion here held just as
+		// well for the credential the test is not about.
+		notWant error
 	}{
-		{name: "missing", secret: "", site: testSiteSecret, want: ErrPersonaAdmitSecretMissing},
-		{name: "too short", secret: "short", site: testSiteSecret, want: ErrPersonaAdmitSecretWeak},
-		{name: "shared with the site", secret: testSiteSecret, site: testSiteSecret, want: ErrPersonaAdmitSecretShared},
+		{name: "missing", secret: "", site: testSiteSecret,
+			want: ErrPersonaAdmitSecretMissing, notWant: ErrWorldEventSecretMissing},
+		{name: "too short", secret: "short", site: testSiteSecret,
+			want: ErrPersonaAdmitSecretWeak, notWant: ErrWorldEventSecretWeak},
+		{name: "shared with the site", secret: testSiteSecret, site: testSiteSecret,
+			want: ErrPersonaAdmitSecretShared, notWant: ErrWorldEventSecretShared},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewPersonaAdmissionAuth(tc.secret, tc.site)
 			require.ErrorIs(t, err, tc.want)
+			require.NotErrorIs(t, err, tc.notWant,
+				"which credential failed must be something errors.Is can answer")
+			require.Contains(t, err.Error(), personaAdmitLabel,
+				"a startup failure must say which credential it was about")
 		})
 	}
 

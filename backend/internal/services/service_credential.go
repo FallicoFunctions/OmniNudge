@@ -17,11 +17,39 @@ const serviceCredentialIssuer = "OmniNudge"
 // an endpoint that can act as a character is worth failing the process over.
 const serviceCredentialMinSecretLen = 32
 
+// These name the kind of configuration failure, not which credential had it.
+// Each credential wraps them in its own values, so a caller can ask either
+// question: errors.Is against one of these matches any credential, and against
+// a credential's own value matches only that one.
 var (
 	ErrServiceCredentialSecretMissing = errors.New("secret is not configured")
 	ErrServiceCredentialSecretWeak    = fmt.Errorf("secret must be at least %d bytes", serviceCredentialMinSecretLen)
 	ErrServiceCredentialSecretShared  = errors.New("secret must differ from the site JWT secret")
 )
+
+// serviceCredentialErrors are one credential's own configuration failures.
+//
+// They are held rather than derived because errors.Is compares the leaf by
+// identity: the value returned from here has to be the very value the package
+// exports for that credential, or a caller asking "was it the world-event
+// secret?" gets no useful answer. Aliasing the shared values instead made both
+// credentials report literally the same errors, so which one failed survived
+// only as message text and errors.Is could not tell them apart at all.
+type serviceCredentialErrors struct {
+	missing error
+	weak    error
+	shared  error
+}
+
+// newServiceCredentialErrors builds one credential's set, each wrapping the
+// shared value for its kind so both questions still have an answer.
+func newServiceCredentialErrors(label string) serviceCredentialErrors {
+	return serviceCredentialErrors{
+		missing: fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretMissing),
+		weak:    fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretWeak),
+		shared:  fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretShared),
+	}
+}
 
 // ServiceCredentialClaims is what a server-side caller presents to act on a
 // character's behalf.
@@ -59,7 +87,11 @@ type ServiceCredentialClaims struct {
 type serviceCredential struct {
 	// label prefixes every error this credential reports, so a startup failure
 	// or a rejected token says which credential it was about.
-	label  string
+	label string
+	// errs are this credential's own configuration failures, so which
+	// credential failed is something errors.Is can answer and not only
+	// something the message says.
+	errs   serviceCredentialErrors
 	use    string
 	secret []byte
 	// maxTTL bounds how long a credential this service mints can live. It
@@ -72,19 +104,23 @@ type serviceCredential struct {
 // a privileged path quietly disabled, or with a secret shared with the site,
 // is worse than one that refuses to start: the first is discovered when the
 // path does not work, and the second is discovered by whoever exploits it.
-func newServiceCredential(label, use, secret, siteJWTSecret string, maxTTL time.Duration) (*serviceCredential, error) {
+func newServiceCredential(
+	label, use, secret, siteJWTSecret string,
+	maxTTL time.Duration,
+	errs serviceCredentialErrors,
+) (*serviceCredential, error) {
 	if secret == "" {
-		return nil, fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretMissing)
+		return nil, errs.missing
 	}
 	if len(secret) < serviceCredentialMinSecretLen {
-		return nil, fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretWeak)
+		return nil, errs.weak
 	}
 	// Constant time because this runs at startup with operator-supplied values;
 	// it costs nothing and avoids making the comparison itself a signal.
 	if siteJWTSecret != "" && subtle.ConstantTimeCompare([]byte(secret), []byte(siteJWTSecret)) == 1 {
-		return nil, fmt.Errorf("%s: %w", label, ErrServiceCredentialSecretShared)
+		return nil, errs.shared
 	}
-	return &serviceCredential{label: label, use: use, secret: []byte(secret), maxTTL: maxTTL}, nil
+	return &serviceCredential{label: label, errs: errs, use: use, secret: []byte(secret), maxTTL: maxTTL}, nil
 }
 
 // mint issues a credential about one persona. The token names the persona it
