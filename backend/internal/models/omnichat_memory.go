@@ -511,7 +511,22 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 	return episodeID, nil
 }
 
-// recallQuery ranks a persona's memories for one tier against a free-text cue.
+// recallQuery ranks a persona's memories against a free-text cue.
+//
+// Two tiers are visible at once: the caller's own relational memory, and the
+// character's self tier, which belongs to nobody and which every instance of
+// that character has lived. That is what makes a resident's life reach the
+// people who talk to it -- if it spends a season racing, everyone finds she
+// races now -- without anything being copied between users. The predicate is
+// what guarantees the other direction stays shut: it admits the caller's own
+// owner id and NULL, and there is no value of $2 that admits a second user's
+// rows. A resident recalling for itself passes NULL and the two branches
+// collapse onto the same tier, so its behaviour is unchanged.
+//
+// Self-tier rows are not weighted differently, and must not be. In-world memory
+// arrives on the same salience, distinctiveness and text-match terms as
+// everything else; a tier bonus would be a guess about how much being there
+// matters, which is exactly the guess the design refuses to make.
 //
 // Candidates are episodes that either share an entity named in the cue or match
 // it lexically; everything else is ignored so a long history stays bounded. The
@@ -541,7 +556,10 @@ seed_entities AS (
     SELECT e.id
     FROM omnichat_memory_entities e, params p
     WHERE e.persona_id = p.persona_id
-      AND e.owner_user_id IS NOT DISTINCT FROM $2::int
+      -- The same two tiers the episodes below draw from. The anchors have to
+      -- agree with the episodes or a self-tier memory would be visible while
+      -- the names that make it findable were not.
+      AND (e.owner_user_id IS NOT DISTINCT FROM $2::int OR e.owner_user_id IS NULL)
       AND position(lower(e.canonical_name) IN lower(p.cue)) > 0
     LIMIT 32
 ),
@@ -553,13 +571,14 @@ tellings AS (
            ep.salience,
            ep.distinctiveness,
            ep.retrieval_count,
+           ep.owner_user_id IS NULL AS is_self,
            count(DISTINCT se.id) AS matched_entities,
            COALESCE(ts_rank_cd(ep.search_vector, (SELECT tsq FROM cue_query)), 0) AS text_rank
     FROM omnichat_memory_episodes ep
     JOIN params p ON ep.persona_id = p.persona_id
     LEFT JOIN omnichat_memory_episode_entities ee ON ee.episode_id = ep.id
     LEFT JOIN seed_entities se ON se.id = ee.entity_id
-    WHERE ep.owner_user_id IS NOT DISTINCT FROM $2::int
+    WHERE (ep.owner_user_id IS NOT DISTINCT FROM $2::int OR ep.owner_user_id IS NULL)
       AND ep.status = 'active'
     GROUP BY ep.id
 ),
@@ -575,13 +594,13 @@ matched AS (
 ),
 current_telling AS (
     SELECT DISTINCT ON (t.root_id)
-           t.root_id, t.id, t.recorded_at, t.salience, t.distinctiveness, t.retrieval_count
+           t.root_id, t.id, t.recorded_at, t.salience, t.distinctiveness, t.retrieval_count, t.is_self
     FROM tellings t
     JOIN matched m ON m.root_id = t.root_id
     ORDER BY t.root_id, t.recorded_at DESC, t.id DESC
 )
 SELECT c.id, ep.title, ep.summary, c.recorded_at, c.salience, c.distinctiveness,
-       m.telling_count,
+       m.telling_count, c.is_self,
        (
            $4::float8 * LEAST(m.text_rank, 1.0)
          + $5::float8 * (m.matched_entities::float8 / (SELECT n FROM seed_count))
@@ -600,6 +619,12 @@ LIMIT $12
 
 // Recall returns the episodes a persona should surface for a cue, most
 // relevant first. Returning no rows is normal and means no memory block.
+//
+// The result mixes two tiers, and each episode carries the one it came from in
+// OwnerUserID: the caller's id for something the two of them did, the self
+// sentinel for something the character did in the world without them. A caller
+// that renders these has to be able to tell the difference, or a character
+// recounts its own life as though the person it is talking to was there.
 func (r *OmniChatMemoryRepository) Recall(
 	ctx context.Context,
 	personaID, ownerUserID int,
@@ -629,17 +654,21 @@ func (r *OmniChatMemoryRepository) Recall(
 	for rows.Next() {
 		var (
 			episode OmniChatMemoryEpisode
+			isSelf  bool
 			score   float64
 		)
 		if err := rows.Scan(
 			&episode.ID, &episode.Title, &episode.Summary,
 			&episode.RecordedAt, &episode.Salience, &episode.Distinctiveness,
-			&episode.Tellings, &score,
+			&episode.Tellings, &isSelf, &score,
 		); err != nil {
 			return nil, fmt.Errorf("omnichat memory: scan recalled episode: %w", err)
 		}
 		episode.PersonaID = personaID
 		episode.OwnerUserID = ownerUserID
+		if isSelf {
+			episode.OwnerUserID = OmniChatMemoryTierSelf
+		}
 		episode.Status = OmniChatMemoryStatusActive
 		episodes = append(episodes, &episode)
 	}
