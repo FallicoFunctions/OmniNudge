@@ -413,6 +413,104 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 	return nil
 }
 
+// OmniChatWorldEvent is one thing that happened to a resident character in a
+// world: a race it placed in, somebody it met at the main stage.
+//
+// It carries no owner and no conversation, and there is nowhere to put one.
+// That is the point: the shape of this type is what makes a world event
+// self-tier memory rather than something a caller has to remember to nullify.
+type OmniChatWorldEvent struct {
+	PersonaID int
+	Title     string
+	Summary   string
+}
+
+// A world event arrives with no extraction step behind it. Nothing has judged
+// how much it mattered or how unlike the character's routine it was, so both
+// scores take the neutral midpoint -- which is also the column default, and so
+// the value the schema already means by "unscored".
+//
+// Any other number would be a guess wearing the clothes of a measurement, and
+// the design asks in-world memory to arrive on the same terms as the retelling
+// count: recorded honestly, weighted once there is something to weight it
+// against. Until then, recency and the text of the event decide recall.
+const (
+	OmniChatWorldEventSalience        = 0.5
+	OmniChatWorldEventDistinctiveness = 0.5
+)
+
+// ErrOmniChatMemoryNotResident reports that a character may not hold self-tier
+// memory, and is the single answer to every reason why: no such persona, one
+// belonging to a user, a private one, a retired one.
+//
+// They are not distinguished on purpose, for the same reason admission does
+// not distinguish them: the caller holds a credential for one character and
+// must not be able to use the refusal to learn about others.
+var ErrOmniChatMemoryNotResident = errors.New("omnichat memory: persona is not a resident")
+
+// RecordWorldEvent stores a world event as a self-tier episode.
+//
+// Eligibility is decided by the INSERT itself rather than by a read the caller
+// makes first. Only a platform character is a resident, so only a platform
+// character has a self tier at all, and expressing that as the SELECT feeding
+// the insert makes it structural: there is no window between the check and the
+// write, and no second write path that could forget to make the check.
+//
+// owner_user_id and conversation_id are written as literal NULLs, not
+// parameters. A self-tier row naming a conversation is already impossible --
+// omnichat_memory_episodes_tier_check forbids it -- and the way to honour a
+// constraint like that is to have no code capable of attempting it.
+//
+// Entities are deliberately not recorded. The associative anchors that make a
+// memory findable from a weak cue come out of extraction, and a world event has
+// no extraction step; inventing anchors from the event text would put made-up
+// names in the persona's own history. Recall still reaches these episodes
+// lexically.
+func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event OmniChatWorldEvent) (int64, error) {
+	// The world is a service, but its text still arrives over the wire, so it
+	// is bounded exactly as an extracted episode is.
+	episode := OmniChatMemoryEpisode{
+		PersonaID:       event.PersonaID,
+		OwnerUserID:     OmniChatMemoryTierSelf,
+		Title:           event.Title,
+		Summary:         event.Summary,
+		Salience:        OmniChatWorldEventSalience,
+		Distinctiveness: OmniChatWorldEventDistinctiveness,
+	}
+	episode.Normalize()
+	if err := episode.Validate(); err != nil {
+		return 0, err
+	}
+
+	var episodeID int64
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO omnichat_memory_episodes (
+			persona_id, owner_user_id, conversation_id, source_message_id,
+			title, summary, salience, distinctiveness
+		)
+		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5
+		FROM bot_personas p
+		WHERE p.id = $1
+		  -- The same line admission draws, drawn again where the write happens.
+		  -- A character that belongs to a user is never a resident, so nothing
+		  -- ever writes it a self tier and it has none to read.
+		  AND p.owner_user_id IS NULL
+		  AND p.is_active
+		  AND p.visibility = 'public'
+		RETURNING id
+	`,
+		episode.PersonaID, episode.Title, episode.Summary,
+		episode.Salience, episode.Distinctiveness,
+	).Scan(&episodeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrOmniChatMemoryNotResident
+	}
+	if err != nil {
+		return 0, fmt.Errorf("omnichat memory: record world event: %w", err)
+	}
+	return episodeID, nil
+}
+
 // recallQuery ranks a persona's memories for one tier against a free-text cue.
 //
 // Candidates are episodes that either share an entity named in the cue or match

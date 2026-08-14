@@ -35,6 +35,16 @@ type fakeMemoryStore struct {
 	recallPersonaID int
 	knownRoots      []models.OmniChatMemoryRoot
 	knownRootsErr   error
+	worldEvents     []models.OmniChatWorldEvent
+	worldEventErr   error
+}
+
+func (f *fakeMemoryStore) RecordWorldEvent(_ context.Context, event models.OmniChatWorldEvent) (int64, error) {
+	if f.worldEventErr != nil {
+		return 0, f.worldEventErr
+	}
+	f.worldEvents = append(f.worldEvents, event)
+	return int64(len(f.worldEvents)), nil
 }
 
 func (f *fakeMemoryStore) GetWatermark(context.Context, int) (int, int, error) {
@@ -542,4 +552,39 @@ func TestExtractForConversationKeepsAnOfferedRetellingLink(t *testing.T) {
 	require.Equal(t, int64(11), store.recorded[0].RetellsEpisodeID)
 	require.Contains(t, store.recorded[0].Summary, "wedding cake",
 		"the telling keeps how it was told this time, not how it was first recorded")
+}
+
+// The service hands the world event straight to the store with no owner and no
+// conversation attached, and refuses before it gets there when there is no
+// character to attach it to.
+func TestRecordWorldEventFilesAnUnownedEpisode(t *testing.T) {
+	store := &fakeMemoryStore{}
+	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
+
+	episodeID, err := service.RecordWorldEvent(context.Background(), 7,
+		"Came third on the Moon Circuit", "Finished third in the final.")
+	require.NoError(t, err)
+	require.NotZero(t, episodeID)
+	require.Len(t, store.worldEvents, 1)
+	require.Equal(t, 7, store.worldEvents[0].PersonaID)
+	require.Equal(t, "Came third on the Moon Circuit", store.worldEvents[0].Title)
+}
+
+func TestRecordWorldEventRefusesWithoutAPersona(t *testing.T) {
+	store := &fakeMemoryStore{}
+	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
+
+	_, err := service.RecordWorldEvent(context.Background(), 0, "title", "summary")
+	require.Error(t, err)
+	require.Empty(t, store.worldEvents, "a refused world event must not reach the store")
+}
+
+// A refusal from the store is passed through as the sentinel, so the endpoint
+// can tell "not a resident" from a failure and answer accordingly.
+func TestRecordWorldEventSurfacesTheResidencyRefusal(t *testing.T) {
+	store := &fakeMemoryStore{worldEventErr: models.ErrOmniChatMemoryNotResident}
+	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
+
+	_, err := service.RecordWorldEvent(context.Background(), 7, "title", "summary")
+	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
 }

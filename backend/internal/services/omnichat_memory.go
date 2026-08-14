@@ -54,6 +54,7 @@ type omniChatMemoryStore interface {
 	RecordExtraction(ctx context.Context, conversationID, ownerUserID, fromMessageID, throughMessageID int, episodes []models.OmniChatMemoryEpisode) error
 	RecordExtractionFailure(ctx context.Context, conversationID, ownerUserID int) error
 	SkipTo(ctx context.Context, conversationID, ownerUserID, throughMessageID int) error
+	RecordWorldEvent(ctx context.Context, event models.OmniChatWorldEvent) (int64, error)
 	Recall(ctx context.Context, personaID, ownerUserID int, cue string, weights models.OmniChatMemoryRecallWeights, limit int) ([]*models.OmniChatMemoryEpisode, error)
 	MarkRetrieved(ctx context.Context, episodeIDs []int64) error
 	RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]models.OmniChatMemoryRoot, error)
@@ -289,6 +290,46 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 		Int("through_message_id", throughMessageID).
 		Msg("omnichat memory: extraction recorded")
 	return windowFilled, nil
+}
+
+// ErrOmniChatMemoryNotResident is re-exported so the world-facing handler can
+// recognise a refusal without reaching past the service into the repository.
+var ErrOmniChatMemoryNotResident = models.ErrOmniChatMemoryNotResident
+
+// RecordWorldEvent files something that happened to a resident character in a
+// world as a memory of its own.
+//
+// This is the privileged half of the memory boundary. Everything else here
+// writes what one person and one character did together, private to them;
+// this writes the character's own life, which every reader of that character
+// shares. Only the world calls it, service to service -- no user-facing path
+// reaches this method, and the one endpoint that does is authenticated by a
+// credential no browser can produce.
+//
+// Nothing crosses between the tiers. This does not promote a relational
+// memory; it writes a new self-tier row from what the world reports, so a
+// resident can never come to know something a person told a companion.
+func (s *OmniChatMemoryService) RecordWorldEvent(ctx context.Context, personaID int, title, summary string) (int64, error) {
+	if s == nil || s.store == nil {
+		return 0, ErrOmniChatMemoryUnavailable
+	}
+	if personaID < 1 {
+		return 0, errors.New("omnichat memory: world event requires a persona")
+	}
+
+	episodeID, err := s.store.RecordWorldEvent(ctx, models.OmniChatWorldEvent{
+		PersonaID: personaID,
+		Title:     title,
+		Summary:   summary,
+	})
+	if err != nil {
+		return 0, err
+	}
+	zlog.Debug().
+		Int("persona_id", personaID).
+		Int64("episode_id", episodeID).
+		Msg("omnichat memory: world event recorded to the self tier")
+	return episodeID, nil
 }
 
 // Recall returns the memories a persona should surface for the latest user
