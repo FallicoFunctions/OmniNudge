@@ -128,9 +128,16 @@ func newTestDeps(t *testing.T) *TestDeps {
 		cfg.Reddit.UserAgent,
 		cfg.Turnstile.Secret,
 	)
+	// Wired the way cmd/server wires it. Browser access tokens are
+	// session-bound, and ValidateJWTContext fails closed when it has no session
+	// service to check one against, so a nil here would leave every
+	// cookie-authenticated request in these tests failing for a reason that has
+	// nothing to do with what the test is asserting.
+	authSessionService := services.NewAuthSessionService(db.Pool, authService)
+	authService.SetSessionService(authSessionService)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, nil, nil, nil, "http://test-frontend", nil, nil, "")
+	authHandler := handlers.NewAuthHandler(authService, userRepo, nil, nil, nil, "http://test-frontend", nil, nil, authSessionService, "")
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
