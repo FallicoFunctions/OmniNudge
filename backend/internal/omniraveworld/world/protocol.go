@@ -5,7 +5,20 @@ type SessionMode string
 const (
 	SessionModeAccount SessionMode = "account"
 	SessionModeGuest   SessionMode = "guest"
+	SessionModePersona SessionMode = "persona"
 )
+
+// Valid reports whether this build knows what the mode means. The mode is
+// broadcast to every client in a snapshot, so a value the server does not
+// recognise is one it is asking every client to interpret on its behalf.
+func (m SessionMode) Valid() bool {
+	switch m {
+	case SessionModeAccount, SessionModeGuest, SessionModePersona:
+		return true
+	default:
+		return false
+	}
+}
 
 type Vec3 struct {
 	X float64 `json:"x"`
