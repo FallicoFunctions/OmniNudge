@@ -228,18 +228,39 @@ func TestNewWorldEventAuth_RefusesBadConfiguration(t *testing.T) {
 		secret string
 		site   string
 		want   error
+		// notWant is the admission credential's value for the same kind of
+		// failure. Naming it here is the point of the table: while the two
+		// credentials aliased one set of values, every row below asserted
+		// something equally true of the credential it is not about.
+		notWant error
 	}{
-		{name: "missing", secret: "", site: testSiteSecret, want: ErrWorldEventSecretMissing},
-		{name: "too short", secret: "short", site: testSiteSecret, want: ErrWorldEventSecretWeak},
-		{name: "shared with the site", secret: testSiteSecret, site: testSiteSecret, want: ErrWorldEventSecretShared},
+		{name: "missing", secret: "", site: testSiteSecret,
+			want: ErrWorldEventSecretMissing, notWant: ErrPersonaAdmitSecretMissing},
+		{name: "too short", secret: "short", site: testSiteSecret,
+			want: ErrWorldEventSecretWeak, notWant: ErrPersonaAdmitSecretWeak},
+		{name: "shared with the site", secret: testSiteSecret, site: testSiteSecret,
+			want: ErrWorldEventSecretShared, notWant: ErrPersonaAdmitSecretShared},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewWorldEventAuth(tc.secret, tc.site)
 			require.ErrorIs(t, err, tc.want)
+			require.NotErrorIs(t, err, tc.notWant,
+				"which credential failed must be something errors.Is can answer")
 			require.Contains(t, err.Error(), worldEventLabel,
 				"a startup failure must say which credential it was about")
 		})
 	}
+}
+
+// Which kind of failure it was is a separate question from which credential
+// had it, and both have to keep working: an operator wants to know a secret is
+// missing, and a caller wants to know which one.
+func TestServiceCredentialErrorsAnswerBothQuestions(t *testing.T) {
+	require.ErrorIs(t, ErrWorldEventSecretMissing, ErrServiceCredentialSecretMissing)
+	require.ErrorIs(t, ErrPersonaAdmitSecretMissing, ErrServiceCredentialSecretMissing)
+	require.NotErrorIs(t, ErrWorldEventSecretMissing, ErrPersonaAdmitSecretMissing)
+	require.NotErrorIs(t, ErrPersonaAdmitSecretWeak, ErrWorldEventSecretWeak)
+	require.NotErrorIs(t, ErrPersonaAdmitSecretShared, ErrWorldEventSecretShared)
 }
 
 func TestWorldEventAuth_CapsTokenLifetime(t *testing.T) {

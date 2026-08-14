@@ -251,7 +251,7 @@ func TestRenderRecalledMemoriesFramesMemoriesAsRecollections(t *testing.T) {
 // becomes a character insisting someone was somewhere they have never been.
 func TestRenderRecalledMemoriesSeparatesTheCharactersOwnLife(t *testing.T) {
 	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
-		{ID: 1, OwnerUserID: models.OmniChatMemoryTierSelf,
+		{ID: 1, IsSelf: true, OwnerUserID: models.OmniChatMemoryTierSelf,
 			Title: "Came third at the Moon Circuit", Summary: "Held the inside line through the last chicane."},
 		{ID: 2, OwnerUserID: 7,
 			Title: "The sourdough starter", Summary: "He named it after his grandmother."},
@@ -275,13 +275,27 @@ func TestRenderRecalledMemoriesSeparatesTheCharactersOwnLife(t *testing.T) {
 
 func TestRenderRecalledMemoriesOmitsTheSharedHeadingForAResidentsLifeAlone(t *testing.T) {
 	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
-		{ID: 1, OwnerUserID: models.OmniChatMemoryTierSelf,
+		{ID: 1, IsSelf: true, OwnerUserID: models.OmniChatMemoryTierSelf,
 			Title: "Came third at the Moon Circuit", Summary: "Finished third and stayed for the podium."},
 	})
 
 	require.Contains(t, block, omniChatMemorySelfHeading)
 	require.NotContains(t, block, omniChatMemorySharedHeading)
 	require.Contains(t, block, "Came third at the Moon Circuit")
+}
+
+// The heading is chosen by the tier flag, not by an owner id happening to be
+// zero. Zero is that field's zero value, so routing on it meant any future path
+// that built an episode without filling in the owner would have the character
+// insisting the person it is talking to was not there.
+func TestRenderRecalledMemoriesDoesNotTreatAMissingOwnerAsTheSelfTier(t *testing.T) {
+	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
+		{ID: 1, Title: "The sourdough starter", Summary: "He named it after his grandmother."},
+	})
+
+	require.Contains(t, block, omniChatMemorySharedHeading)
+	require.NotContains(t, block, omniChatMemorySelfHeading,
+		"an unfilled owner id must not promote a shared memory into the character's own life")
 }
 
 func TestRenderRecalledMemoriesRespectsRuneBudget(t *testing.T) {
@@ -458,7 +472,7 @@ func TestRecallMemoriesDoesNotStrengthenTheSelfTier(t *testing.T) {
 		users               = 5
 	)
 	store := &fakeMemoryStore{recallResult: []*models.OmniChatMemoryEpisode{
-		{ID: selfEpisodeID, OwnerUserID: models.OmniChatMemoryTierSelf,
+		{ID: selfEpisodeID, IsSelf: true, OwnerUserID: models.OmniChatMemoryTierSelf,
 			Title: "Came third at the Moon Circuit", Summary: "Finished third and stayed for the podium."},
 		{ID: relationalEpisodeID, OwnerUserID: 1,
 			Title: "The sourdough starter", Summary: "He named it after his grandmother."},

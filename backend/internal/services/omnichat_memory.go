@@ -372,7 +372,7 @@ func (s *OmniChatMemoryService) Recall(ctx context.Context, personaID, ownerUser
 	// target of every concurrent conversation with the persona.
 	ids := make([]int64, 0, len(episodes))
 	for _, episode := range episodes {
-		if episode == nil || episode.OwnerUserID == models.OmniChatMemoryTierSelf {
+		if episode == nil || episode.IsSelf {
 			continue
 		}
 		ids = append(ids, episode.ID)
@@ -422,7 +422,11 @@ func renderRecalledMemories(episodes []*models.OmniChatMemoryEpisode) string {
 		if episode == nil {
 			continue
 		}
-		if episode.OwnerUserID == models.OmniChatMemoryTierSelf {
+		// Routed on the tier the row is in, not on an owner id being zero.
+		// Zero is that field's zero value, so a construction path that forgot
+		// to fill it in would file a relational memory under the heading that
+		// tells the character the listener was never there.
+		if episode.IsSelf {
 			own = append(own, episode)
 			continue
 		}
