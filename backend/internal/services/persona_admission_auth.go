@@ -14,10 +14,18 @@ import (
 // the admission secret for some other purpose cannot be spent here.
 const PersonaAdmitTokenUse = "persona_admit"
 
-// personaAdmitMaxTTL bounds how long an admission credential can live. The
-// spec keeps world tokens short and renews them rather than issuing long-lived
-// ones; the credential used to obtain them should not outlive them by much.
+// personaAdmitMaxTTL bounds how long an admission credential this service
+// mints can live. The spec keeps world tokens short and renews them rather
+// than issuing long-lived ones; the credential used to obtain them should not
+// outlive them by much.
+//
+// This cap binds the issuer only. What binds every presenter is that Validate
+// requires an exp at all -- see the parse options there.
 const personaAdmitMaxTTL = 5 * time.Minute
+
+// personaAdmitIssuer is stamped on every credential and required on every
+// validation, matching the issuer the site tokens use.
+const personaAdmitIssuer = "OmniNudge"
 
 // personaAdmitMinSecretLen is enforced at construction. A short secret on an
 // endpoint that can admit an identity is worth failing the process over.
@@ -95,14 +103,20 @@ func (a *PersonaAdmissionAuth) Mint(personaID int64, ttl time.Duration) (string,
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "OmniNudge",
+			Issuer:    personaAdmitIssuer,
 		},
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(a.secret)
 }
 
 // Validate accepts only a credential this service minted, for this purpose,
-// that has not expired.
+// that carries an expiry and has not reached it.
+//
+// The expiry has to be demanded rather than merely checked when present.
+// jwt/v5 treats a missing exp as "no expiry to fail", so without
+// WithExpirationRequired a token forged with this secret and no exp claim at
+// all would be honoured forever, and the TTL cap above -- which lives in Mint
+// -- would bind only the honest issuer.
 func (a *PersonaAdmissionAuth) Validate(tokenString string) (*PersonaAdmitClaims, error) {
 	if a == nil {
 		return nil, ErrPersonaAdmitSecretMissing
@@ -121,6 +135,8 @@ func (a *PersonaAdmissionAuth) Validate(tokenString string) (*PersonaAdmitClaims
 			return a.secret, nil
 		},
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuer(personaAdmitIssuer),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("persona admission: %w", err)
