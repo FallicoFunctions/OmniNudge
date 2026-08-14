@@ -28,7 +28,13 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 }
 
 func (r *PostgresProfileRepository) UpsertProfileBySubject(ctx context.Context, profile model.OmniRaveProfile) error {
-	subject := profile.ResolvedSubject()
+	// Read as given, not through ResolvedSubject. That fallback derives an
+	// account subject from UserID, which is a safe thing to do when reading a
+	// profile written before the field existed and an unsafe one here: a
+	// caller passing {persona, 0} alongside UserID 5 would have its write
+	// silently redirected into user 5's row. A stated subject that does not
+	// parse is an error, never an instruction to guess a different resident.
+	subject := profile.Subject
 	if !subject.Valid() {
 		return ErrInvalidResidentRef
 	}
