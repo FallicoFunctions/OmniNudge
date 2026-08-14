@@ -85,6 +85,7 @@ func TestPersonaAdmissionAuth_RejectsWrongUse(t *testing.T) {
 				RegisteredClaims: jwt.RegisteredClaims{
 					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
 					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					Issuer:    personaAdmitIssuer,
 				},
 			}
 			signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testAdmitSecret))
@@ -105,6 +106,7 @@ func TestPersonaAdmissionAuth_RejectsExpired(t *testing.T) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Second)),
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-time.Hour)),
+			Issuer:    personaAdmitIssuer,
 		},
 	}
 	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testAdmitSecret))
@@ -112,6 +114,48 @@ func TestPersonaAdmissionAuth_RejectsExpired(t *testing.T) {
 
 	_, err = auth.Validate(signed)
 	require.Error(t, err, "an expired credential must not be honoured")
+}
+
+// A credential with no expiry at all must be refused, not treated as one that
+// cannot expire. The five-minute cap lives in Mint, so it binds only this
+// service; what binds anyone holding the secret is that validation demands an
+// exp. TestPersonaAdmissionAuth_RejectsExpired cannot catch this: it sends a
+// past exp, which fails a check this token never reaches.
+func TestPersonaAdmissionAuth_RejectsTokenWithoutExpiry(t *testing.T) {
+	auth := newTestAdmissionAuth(t)
+
+	claims := PersonaAdmitClaims{
+		PersonaID: 5,
+		Use:       PersonaAdmitTokenUse,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: personaAdmitIssuer,
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testAdmitSecret))
+	require.NoError(t, err)
+
+	_, err = auth.Validate(signed)
+	require.Error(t, err, "a credential with no expiry must not be honoured forever")
+}
+
+// The issuer is required as well, so a token minted with this secret by
+// something that is not this service does not admit anybody.
+func TestPersonaAdmissionAuth_RejectsForeignIssuer(t *testing.T) {
+	auth := newTestAdmissionAuth(t)
+
+	claims := PersonaAdmitClaims{
+		PersonaID: 5,
+		Use:       PersonaAdmitTokenUse,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			Issuer:    "somebody-else",
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testAdmitSecret))
+	require.NoError(t, err)
+
+	_, err = auth.Validate(signed)
+	require.Error(t, err)
 }
 
 // An unsigned token must not be accepted by claiming there is no algorithm.
