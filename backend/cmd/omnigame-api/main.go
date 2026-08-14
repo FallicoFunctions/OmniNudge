@@ -27,6 +27,11 @@ func main() {
 
 	var profiles repository.ProfileRepository = repository.NewInMemoryProfileRepository()
 	var sanctions repository.SanctionRepository = repository.NewInMemorySanctionRepository()
+	// An empty in-memory eligibility source admits nothing. Without a database
+	// there is no way to establish that a character is a platform character, and
+	// the safe reading of "cannot tell" is "no" -- admission fails closed rather
+	// than degrading into a world that anything can walk into.
+	var personas repository.PersonaRepository = repository.NewInMemoryPersonaRepository()
 	var mediaState = omniraveworld.NewMediaState()
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		db, err := database.New(databaseURL)
@@ -47,6 +52,7 @@ func main() {
 		authService.SetSessionService(services.NewAuthSessionService(db.Pool, authService))
 		profiles = repository.NewPostgresProfileRepository(db.Pool)
 		sanctions = repository.NewPostgresSanctionRepository(db.Pool)
+		personas = repository.NewPostgresPersonaRepository(db.Pool)
 
 		playlists, err := loadStagePlaylists(context.Background(), omniraveplaylist.NewPostgresStagePlaylistRepository(db.Pool))
 		if err != nil {
@@ -72,9 +78,30 @@ func main() {
 		authService,
 	)
 
+	admissionService := service.NewAdmissionService(personas, profiles, authService)
+
+	// Optional: a deployment that does not run the agent runtime has no reason
+	// to hold this secret. Leaving it unset leaves personaAdmission nil, and
+	// the middleware answers every admission with 503 -- unconfigured, not
+	// unguarded. A secret that is present but unusable is fatal instead, so a
+	// misconfigured admission secret is found at startup and not by whoever
+	// exploits it.
+	var personaAdmission *services.PersonaAdmissionAuth
+	if secret := os.Getenv("PERSONA_ADMISSION_SECRET"); secret != "" {
+		admissionAuth, admissionErr := services.NewPersonaAdmissionAuth(secret, jwtSecret)
+		if admissionErr != nil {
+			log.Fatal(admissionErr)
+		}
+		personaAdmission = admissionAuth
+	} else {
+		log.Println("omnigame-api: PERSONA_ADMISSION_SECRET unset, persona admission is disabled")
+	}
+
 	router := omnigameapi.NewRouter(
 		sessionService,
 		authService,
+		admissionService,
+		personaAdmission,
 		trustedProxiesFromEnv(),
 	)
 	addr := ":" + port
