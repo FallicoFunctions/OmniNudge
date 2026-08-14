@@ -458,7 +458,7 @@ func renderRecalledMemories(episodes []*models.OmniChatMemoryEpisode) string {
 		headingWritten := false
 		headingCost := utf8.RuneCountInString(heading) + 1
 		for _, episode := range group {
-			line := "- " + episode.Title + ": " + episode.Summary + "\n"
+			line := "- " + episode.Title + ": " + episode.Summary + occurrenceNote(episode) + "\n"
 			cost := utf8.RuneCountInString(line)
 			if !headingWritten {
 				cost += headingCost
@@ -481,6 +481,25 @@ func renderRecalledMemories(episodes []*models.OmniChatMemoryEpisode) string {
 	writeGroup(omniChatMemorySelfHeading, own)
 
 	return strings.TrimRight(builder.String(), "\n")
+}
+
+// occurrenceNote says how often this has happened, when it has happened more
+// than once.
+//
+// Recall surfaces one member of a recurrence chain, so without this the
+// character sees a single evening at the main stage and has no way to know it
+// has spent four hundred of them there. The count is the whole reason every
+// visit is kept rather than only the distinctive ones, and it is stated as a
+// number rather than as "often" because the model is better placed than this
+// function to decide whether four hundred is "most nights" or "a phase".
+//
+// The line stays a recollection, like the rest of the block: it reports what
+// the character did, and asks for nothing.
+func occurrenceNote(episode *models.OmniChatMemoryEpisode) string {
+	if episode.Occurrences < 2 {
+		return ""
+	}
+	return fmt.Sprintf(" (this has happened %d times; that was the most recent)", episode.Occurrences)
 }
 
 func truncateMemoryText(value string, maximum int) string {

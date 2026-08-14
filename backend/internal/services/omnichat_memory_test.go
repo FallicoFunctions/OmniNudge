@@ -298,6 +298,27 @@ func TestRenderRecalledMemoriesDoesNotTreatAMissingOwnerAsTheSelfTier(t *testing
 		"an unfilled owner id must not promote a shared memory into the character's own life")
 }
 
+// Keeping every visit is only worth anything if the character can tell how
+// many there were. Recall collapses four hundred evenings to one line, so
+// without the count that line says a character went to the main stage once.
+func TestRenderRecalledMemoriesSaysHowOftenSomethingHasHappened(t *testing.T) {
+	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
+		{ID: 1, IsSelf: true, OwnerUserID: models.OmniChatMemoryTierSelf,
+			Title: "Wandered the main stage in OmniRave", Summary: "Stood near the front and left before the encore.",
+			Occurrences: 412},
+		{ID: 2, IsSelf: true, OwnerUserID: models.OmniChatMemoryTierSelf,
+			Title: "Came third at the Moon Circuit", Summary: "Held the inside line through the last chicane.",
+			Occurrences: 1},
+	})
+
+	require.Contains(t, block, "this has happened 412 times",
+		"a character that goes somewhere most nights has to be able to say so")
+	require.Contains(t, block, "that was the most recent",
+		"the line surfaced is one evening out of the four hundred, not a summary of them")
+	require.NotContains(t, block, "happened 1 times",
+		"something that happened once is just a memory")
+}
+
 func TestRenderRecalledMemoriesRespectsRuneBudget(t *testing.T) {
 	episodes := make([]*models.OmniChatMemoryEpisode, 0, 6)
 	for i := 0; i < 6; i++ {
