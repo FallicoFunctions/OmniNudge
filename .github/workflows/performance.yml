@@ -2,9 +2,9 @@ name: Performance Budget Check
 
 on:
   pull_request:
-    branches: [main, master, develop, 'dev']
+    branches: [main, master, develop]
   push:
-    branches: [main, master, 'dev']
+    branches: [main, master]
 
 permissions:
   contents: read
