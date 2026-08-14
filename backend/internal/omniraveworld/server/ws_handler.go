@@ -120,7 +120,7 @@ func NewWSHandler(worldState *world.World, mediaState *world.MediaState, authSer
 }
 
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	clientSession, err := h.parsePlayerSession(r.Context(), r)
+	clientSession, sessionExpiry, err := h.parsePlayerSession(r.Context(), r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -135,7 +135,34 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	player := h.world.AddPlayer(clientSession)
 	cc := &clientConn{conn: conn}
 	h.registerConn(clientSession.PlayerID, cc)
+
+	// The world token is checked once, at this upgrade, and never again for as
+	// long as the socket stays open. Without this timer a five-minute
+	// credential buys a session of unbounded length: a connection opened at
+	// noon is still visible and still moving at two, having outlived its own
+	// proof of admission by an hour and fifty-five minutes.
+	//
+	// Ending the session at the token's own exp is what makes the door the
+	// only door. Reconnecting needs a fresh token, and minting one runs the
+	// eligibility question again, so a sanction, a withdrawal, or a
+	// deactivation takes hold within one token lifetime instead of never. It
+	// is not live revocation and is not meant to be -- it is the bound that
+	// the rest of the system was already written as though it had.
+	//
+	// Closing the connection is the whole mechanism: the read loop below
+	// observes the close, returns, and runs the deferred cleanup exactly once,
+	// whichever of the two happens first. disconnectConn is reused rather than
+	// duplicated for that reason -- it is already the "end this one session"
+	// path, and giving expiry its own teardown would mean two routes to keep
+	// in agreement.
+	expiryTimer := time.AfterFunc(time.Until(sessionExpiry), func() {
+		h.disconnectConn(clientSession.PlayerID, cc)
+	})
+
 	defer func() {
+		// Stop first: a client that leaves early must not leave a timer
+		// pending on a connection that no longer exists.
+		expiryTimer.Stop()
 		h.unregisterConn(clientSession.PlayerID, cc)
 		h.world.RemovePlayer(clientSession.PlayerID, player)
 		h.broadcastSnapshots()
@@ -465,19 +492,31 @@ func (h *WSHandler) currentZoneEvents(now time.Time) []world.ZoneEventState {
 // because a token the world cannot interpret is one it cannot admit.
 var errUnknownSessionMode = errors.New("unrecognised session mode")
 
-func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (world.PlayerSession, error) {
+// errSessionWithoutExpiry refuses a token that names no expiry. The validator
+// already demands one, so this cannot be reached through it; it is here
+// because the alternative to refusing is granting a session with no end, and
+// that is not a failure mode worth leaving one changed dependency away.
+var errSessionWithoutExpiry = errors.New("session token carries no expiry")
+
+// parsePlayerSession returns the session a token describes and the moment that
+// token stops being proof of anything. The caller ends the connection then.
+func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (world.PlayerSession, time.Time, error) {
 	if h.auth == nil {
-		return world.PlayerSession{}, http.ErrNoCookie
+		return world.PlayerSession{}, time.Time{}, http.ErrNoCookie
 	}
 
 	token := strings.TrimSpace(r.URL.Query().Get("token"))
 	if token == "" {
-		return world.PlayerSession{}, http.ErrNoCookie
+		return world.PlayerSession{}, time.Time{}, http.ErrNoCookie
 	}
 
 	claims, err := h.auth.ValidateOmniRaveWorldJWTContext(ctx, token)
 	if err != nil {
-		return world.PlayerSession{}, err
+		return world.PlayerSession{}, time.Time{}, err
+	}
+
+	if claims.ExpiresAt == nil {
+		return world.PlayerSession{}, time.Time{}, errSessionWithoutExpiry
 	}
 
 	// A mode this build does not recognise is refused rather than carried
@@ -489,7 +528,7 @@ func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (wo
 	// it is the unnamed fourth thing that has to be stopped.
 	mode := world.SessionMode(claims.Mode)
 	if !mode.Valid() {
-		return world.PlayerSession{}, errUnknownSessionMode
+		return world.PlayerSession{}, time.Time{}, errUnknownSessionMode
 	}
 
 	return world.PlayerSession{
@@ -498,7 +537,7 @@ func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (wo
 		Mode:        mode,
 		Loadout:     world.Loadout(claims.Loadout),
 		ReturnPoint: savedPointToVec3(claims.ReturnPoint),
-	}, nil
+	}, claims.ExpiresAt.Time, nil
 }
 
 func (h *WSHandler) isAllowedOrigin(r *http.Request) bool {

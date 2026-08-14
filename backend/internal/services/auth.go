@@ -302,7 +302,17 @@ func (s *AuthService) ValidateOmniRaveWorldJWTContext(ctx context.Context, token
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return s.jwtSecret, nil
-	})
+	},
+		// The expiry has to be demanded, not merely checked when present.
+		// jwt/v5 reads a missing exp as "no expiry to fail", so without this a
+		// token carrying no exp at all would validate -- and the world now
+		// disconnects a session at its token's expiry, so a token without one
+		// would buy exactly the unbounded session that mechanism exists to
+		// prevent. GenerateOmniRaveWorldJWT always sets exp; this makes the
+		// five-minute life a property of what the world accepts rather than a
+		// habit of the one issuer that happens to mint them today.
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/stretchr/testify/require"
 )
@@ -72,4 +73,47 @@ func TestAuthService_RejectsUnknownTokenUseWithoutASession(t *testing.T) {
 	_, err = authService.ValidateJWTContext(context.Background(), token)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "token use is not permitted")
+}
+
+// A world token with no exp at all must be refused rather than honoured
+// forever. jwt/v5 reads a missing exp as "no expiry to fail", and the world
+// now ends a live session at its token's expiry -- so a token without one
+// would be a session with no end, which is exactly the property that bound was
+// added to remove.
+func TestAuthService_RejectsOmniRaveWorldTokenWithoutAnExpiry(t *testing.T) {
+	authService := NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+
+	claims := OmniRaveWorldJWTClaims{
+		Use:        "omnirave_world",
+		PlayerID:   "guest-1",
+		PlayerName: "Guest-1",
+		Mode:       "guest",
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt: jwt.NewNumericDate(time.Now()),
+			Issuer:   "OmniNudge",
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("dev-secret"))
+	require.NoError(t, err)
+
+	_, err = authService.ValidateOmniRaveWorldJWTContext(context.Background(), token)
+	require.Error(t, err, "a world token with no expiry must not validate")
+}
+
+// The tokens the world actually issues carry one, and the world reads it to
+// decide when the session ends.
+func TestAuthService_OmniRaveWorldTokenCarriesItsFiveMinuteExpiry(t *testing.T) {
+	authService := NewAuthService("dev-secret", "OmniRaveWorld/1.0", "")
+
+	token, err := authService.GenerateOmniRaveWorldJWT(OmniRaveWorldTokenInput{
+		PlayerID:   "guest-1",
+		PlayerName: "Guest-1",
+		Mode:       "guest",
+	})
+	require.NoError(t, err)
+
+	claims, err := authService.ValidateOmniRaveWorldJWTContext(context.Background(), token)
+	require.NoError(t, err)
+	require.NotNil(t, claims.ExpiresAt, "the world reads this to end the session")
+	require.WithinDuration(t, time.Now().Add(5*time.Minute), claims.ExpiresAt.Time, time.Minute)
 }
