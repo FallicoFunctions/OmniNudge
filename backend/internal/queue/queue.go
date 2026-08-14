@@ -216,7 +216,7 @@ func (q *QueueClient) GetJobInfo(queue string, jobID string) (*asynq.TaskInfo, e
 		Addr:     q.redisAddr,
 		Password: q.redisPass,
 	})
-	defer inspector.Close()
+	defer func() { _ = inspector.Close() }()
 
 	return inspector.GetTaskInfo(queue, jobID)
 }

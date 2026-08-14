@@ -53,7 +53,7 @@ func (s *ClamAVScanner) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if err := writeNullTerminated(conn, "zPING"); err != nil {
 		return fmt.Errorf("clamav ping write failed: %w", err)
@@ -74,13 +74,13 @@ func (s *ClamAVScanner) ScanFile(ctx context.Context, filePath string) (VirusSca
 	if err != nil {
 		return VirusScanResult{}, fmt.Errorf("open file for scan: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	conn, err := s.dial(ctx)
 	if err != nil {
 		return VirusScanResult{}, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if err := writeNullTerminated(conn, "zINSTREAM"); err != nil {
 		return VirusScanResult{}, fmt.Errorf("clamav instream command failed: %w", err)

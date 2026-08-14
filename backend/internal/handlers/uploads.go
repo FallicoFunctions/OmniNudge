@@ -216,7 +216,7 @@ func (h *UploadsHandler) serveRemoteTrackedMedia(c *gin.Context, media *models.M
 		RespondError(c, http.StatusNotFound, "Media not found")
 		return true
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", media.FileType)
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, safeUploadResponseFilename(media.Filename)))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))

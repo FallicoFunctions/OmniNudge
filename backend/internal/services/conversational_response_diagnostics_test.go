@@ -95,7 +95,7 @@ func TestRunBlindBakeOffReportsPrivacySafeDraftOutcomesAndSeparatesHTTPRetries(t
 	qualityCase := newQualityCase("max-rosen.diagnostics", PersonaQualitySuiteBehavior, "max-rosen", "synthetic-private-prompt")
 	calls := 0
 	client := &telemetryBakeOffClient{}
-	client.stubChatCompletionClient.generate = func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	client.generate = func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
 		calls++
 		if calls == 1 {
 			return "Too short.", nil

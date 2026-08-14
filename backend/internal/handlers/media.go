@@ -143,7 +143,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "File is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if header.Size <= 0 {
 		RespondError(c, http.StatusBadRequest, "Empty file is not allowed")
 		return
@@ -190,7 +190,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to create file")
 		return
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	limited := io.LimitReader(file, maxUploadSize+1)
 	var sniff [512]byte
@@ -590,7 +590,7 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	uploadDir := filepath.Join("uploads", strconv.Itoa(userID))
 	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
@@ -610,7 +610,7 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, role
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	// Read and detect content type
 	var sniff [512]byte

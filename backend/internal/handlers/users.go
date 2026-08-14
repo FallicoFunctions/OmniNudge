@@ -782,7 +782,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 			return
 		}
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if header.Size <= 0 {
 		RespondError(c, http.StatusBadRequest, "Empty avatar file is not allowed")
@@ -812,7 +812,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to create avatar file")
 		return
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 	defer func() { _ = os.Remove(originalPath) }()
 
 	var thumbPath string
@@ -984,7 +984,7 @@ func (h *UsersHandler) UploadMyBanner(c *gin.Context) {
 			return
 		}
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if header.Size <= 0 {
 		RespondError(c, http.StatusBadRequest, "Empty banner file is not allowed")
@@ -1014,7 +1014,7 @@ func (h *UsersHandler) UploadMyBanner(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to create banner file")
 		return
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	persist := false
 	defer func() {

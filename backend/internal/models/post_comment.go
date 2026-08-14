@@ -504,7 +504,7 @@ func (r *PostCommentRepository) SoftDelete(ctx context.Context, commentID int) e
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var postID int
 	err = tx.QueryRow(ctx, "SELECT post_id FROM post_comments WHERE id = $1 FOR UPDATE", commentID).Scan(&postID)
@@ -555,7 +555,7 @@ func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var existingIsUpvote bool
 	err = tx.QueryRow(ctx, "SELECT is_upvote FROM comment_votes WHERE comment_id = $1 AND user_id = $2", commentID, userID).Scan(&existingIsUpvote)

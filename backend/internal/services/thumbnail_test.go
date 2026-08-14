@@ -37,7 +37,7 @@ func createTestImage(t *testing.T, width, height int) string {
 
 	file, err := os.Create(imagePath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	err = png.Encode(file, img)
 	require.NoError(t, err)
@@ -61,7 +61,7 @@ func createTestGIFImage(t *testing.T, width, height int) string {
 	imagePath := filepath.Join(tmpDir, "test_image.gif")
 	file, err := os.Create(imagePath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	err = gif.Encode(file, img, nil)
 	require.NoError(t, err)
 	return imagePath
@@ -91,7 +91,7 @@ func TestGenerateThumbnail(t *testing.T) {
 	assert.Equal(t, 225, height, "Thumbnail height should be 225")
 
 	// Cleanup
-	os.Remove(thumbnailPath)
+	_ = os.Remove(thumbnailPath)
 }
 
 func TestGenerateThumbnail_Portrait(t *testing.T) {
@@ -113,7 +113,7 @@ func TestGenerateThumbnail_Portrait(t *testing.T) {
 	assert.Equal(t, 300, height, "Thumbnail height should be 300")
 
 	// Cleanup
-	os.Remove(thumbnailPath)
+	_ = os.Remove(thumbnailPath)
 }
 
 func TestGenerateThumbnail_Square(t *testing.T) {
@@ -135,7 +135,7 @@ func TestGenerateThumbnail_Square(t *testing.T) {
 	assert.Equal(t, 300, height, "Thumbnail height should be 300")
 
 	// Cleanup
-	os.Remove(thumbnailPath)
+	_ = os.Remove(thumbnailPath)
 }
 
 func TestGenerateThumbnail_SmallImage(t *testing.T) {
@@ -160,7 +160,7 @@ func TestGenerateThumbnail_SmallImage(t *testing.T) {
 	assert.Equal(t, 300, height, "Thumbnail height should be upscaled to 300")
 
 	// Cleanup
-	os.Remove(thumbnailPath)
+	_ = os.Remove(thumbnailPath)
 }
 
 func TestGenerateThumbnail_NonExistentFile(t *testing.T) {
@@ -206,8 +206,8 @@ func TestGenerateSquareThumbnail(t *testing.T) {
 	assert.Equal(t, 200, width)
 	assert.Equal(t, 200, height)
 
-	os.Remove(imagePath)
-	os.Remove(thumbnailPath)
+	_ = os.Remove(imagePath)
+	_ = os.Remove(thumbnailPath)
 }
 
 func TestGenerateImageThumbnails(t *testing.T) {

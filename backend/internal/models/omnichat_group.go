@@ -101,7 +101,7 @@ func (r *OmniChatGroupRepository) CreateGroup(ctx context.Context, ownerUserID i
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	groupID := uuid.New()
 	_, err = tx.Exec(ctx, `INSERT INTO omnichat_groups (id,owner_user_id,name,description) VALUES ($1,$2,$3,$4)`, groupID, ownerUserID, name, description)
 	if err != nil {
@@ -294,7 +294,7 @@ func (r *OmniChatGroupRepository) AcceptInvite(ctx context.Context, tokenDigest 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var groupID uuid.UUID
 	var invitee *int
 	err = tx.QueryRow(ctx, `SELECT group_id,invitee_user_id FROM omnichat_group_invites WHERE token_digest=$1 AND revoked_at IS NULL AND expires_at>NOW() AND use_count<max_uses FOR UPDATE`, tokenDigest).Scan(&groupID, &invitee)
@@ -463,7 +463,7 @@ func (r *OmniChatGroupRepository) CreateMessageBatch(
 	if err != nil {
 		return nil, false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var lockedGroupID uuid.UUID
 	err = tx.QueryRow(ctx, `
 		SELECT g.id
@@ -784,7 +784,7 @@ func (r *OmniChatGroupRepository) TransferOwnership(ctx context.Context, groupID
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var targetRole string
 	err = tx.QueryRow(ctx, `
 		SELECT target.role

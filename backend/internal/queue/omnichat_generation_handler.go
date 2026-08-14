@@ -625,7 +625,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	if err != nil {
 		return nil, false, fmt.Errorf("open generated media for storage: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	// The extension is what keeps a video job's two artifacts apart: the same
 	// job id yields .png for the still and .mp4 for the clip. Do not collapse
 	// it into a fixed suffix.

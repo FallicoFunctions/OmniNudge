@@ -68,8 +68,8 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	}
 
 	rawPersona := strings.TrimSpace(getenv(envPersonaID))
-	switch {
-	case rawPersona == "":
+	switch rawPersona {
+	case "":
 		problems = append(problems, envPersonaID+" is not set (which character should live in the world?)")
 	default:
 		personaID, err := strconv.ParseInt(rawPersona, 10, 64)

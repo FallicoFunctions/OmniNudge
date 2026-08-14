@@ -33,7 +33,7 @@ func TestWSHandler_EndsSessionWhenItsTokenExpires(t *testing.T) {
 		worldDialHeader("https://play.omninudge.com"),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var joinSnapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&joinSnapshot))
@@ -69,7 +69,7 @@ func TestWSHandler_KeepsSessionWhoseTokenIsStillValid(t *testing.T) {
 		worldDialHeader("https://play.omninudge.com"),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var joinSnapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&joinSnapshot))

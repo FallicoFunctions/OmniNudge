@@ -510,7 +510,7 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Media not found")
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", fileType)
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, assetID, extension))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))

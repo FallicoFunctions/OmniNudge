@@ -109,7 +109,9 @@ func isValidCSSVariableName(name string) bool {
 	}
 	// CSS variable names should only contain lowercase letters, numbers, and hyphens
 	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+		isLower := char >= 'a' && char <= 'z'
+		isDigit := char >= '0' && char <= '9'
+		if !isLower && !isDigit && char != '-' {
 			return false
 		}
 	}

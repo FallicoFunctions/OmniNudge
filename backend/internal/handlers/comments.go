@@ -543,7 +543,7 @@ func (h *CommentsHandler) sendCommentDeletionModMail(comment *models.PostComment
 	if err != nil {
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Create mod mail conversation
 	var conversationID int

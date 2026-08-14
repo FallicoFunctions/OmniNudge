@@ -339,7 +339,7 @@ func (h *OAuthHandler) verifySteamCallback(r *http.Request) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("check_authentication request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
@@ -377,7 +377,7 @@ func (h *OAuthHandler) fetchSteamUserInfo(ctx context.Context, steamID string) (
 	if err != nil {
 		return nil, fmt.Errorf("GetPlayerSummaries: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var parsed struct {
 		Response struct {
@@ -536,7 +536,7 @@ func (h *OAuthHandler) fetchUserInfo(ctx context.Context, provider string, token
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := readOAuthResponse(resp, url)
 	if err != nil {
 		return nil, err
@@ -580,7 +580,7 @@ func (h *OAuthHandler) fetchGitHubUserInfo(ctx context.Context, token *oauth2.To
 	if err != nil {
 		return nil, fmt.Errorf("GET /user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := readOAuthResponse(resp, "GitHub /user")
 	if err != nil {
 		return nil, err
@@ -619,7 +619,7 @@ func (h *OAuthHandler) fetchGitHubPrimaryEmail(client *http.Client) (string, err
 	if err != nil {
 		return "", fmt.Errorf("GET /user/emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := readOAuthResponse(resp, "GitHub /user/emails")
 	if err != nil {
 		return "", err

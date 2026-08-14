@@ -58,7 +58,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create temp dir: %v", err))
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		// 1. Fetch encrypted session keys for E2E decryption
 		// Map conversation_id -> list of keys (historic and current)
@@ -160,7 +160,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create ZIP: %v", err))
 		}
 		zipPath := zipFile.Name()
-		defer os.Remove(zipPath)
+		defer func() { _ = os.Remove(zipPath) }()
 
 		zipWriter := zip.NewWriter(zipFile)
 		files, err := os.ReadDir(tempDir)
@@ -213,7 +213,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to open ZIP for upload: %v", err))
 		}
-		defer finalZip.Close()
+		defer func() { _ = finalZip.Close() }()
 
 		fileInfo, err := os.Stat(zipPath)
 		if err != nil {

@@ -89,7 +89,7 @@ func (g *gzipResponseWriter) WriteHeader(code int) {
 // If WriteHeader was never explicitly called (rare but valid), we check Content-Type
 // here too so we don't accidentally compress the first write.
 func (g *gzipResponseWriter) Write(data []byte) (int, error) {
-	if !g.bypass && !g.ResponseWriter.Written() {
+	if !g.bypass && !g.Written() {
 		if shouldNotCompress(g.Header().Get("Content-Type")) {
 			g.Header().Del("Content-Encoding")
 			g.gz.Reset(io.Discard)

@@ -25,11 +25,11 @@ func TestWSHandler_LoadoutEventPublishesAvatarToOtherConnections(t *testing.T) {
 	baseURL := "ws" + testServer.URL[len("http"):] + "/ws"
 	firstConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer firstConn.Close()
+	defer func() { _ = firstConn.Close() }()
 
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer secondConn.Close()
+	defer func() { _ = secondConn.Close() }()
 
 	var firstSnapshot map[string]any
 	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
@@ -75,7 +75,7 @@ func TestWSHandler_RejectedLoadoutLeavesExistingAvatarIntact(t *testing.T) {
 	wsURL := buildWorldWSURL(testServer.URL, newGuestWorldSessionToken(t, authService, "guest-1", "Guest-1", nil), "")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var joinSnapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&joinSnapshot))

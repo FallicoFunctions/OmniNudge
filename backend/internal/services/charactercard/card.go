@@ -246,7 +246,7 @@ func decodePNGTextChunk(chunkType string, chunkData []byte) ([]byte, bool, error
 		if err != nil {
 			return nil, false, err
 		}
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		decompressed, err := io.ReadAll(io.LimitReader(reader, 16<<20))
 		if err != nil {
 			return nil, false, err
@@ -289,7 +289,7 @@ func decodePNGTextChunk(chunkType string, chunkData []byte) ([]byte, bool, error
 			if err != nil {
 				return nil, false, err
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 			decompressed, err := io.ReadAll(io.LimitReader(reader, 16<<20))
 			if err != nil {
 				return nil, false, err

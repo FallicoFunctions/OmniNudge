@@ -106,7 +106,7 @@ func isValidWebSocketToken(claims *services.JWTClaims) bool {
 	if claims.ExpiresAt == nil || claims.IssuedAt == nil {
 		return false
 	}
-	return claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time) <= 5*time.Minute
+	return claims.ExpiresAt.Sub(claims.IssuedAt.Time) <= 5*time.Minute
 }
 
 // RequireRole enforces that a user has one of the allowed roles
@@ -185,7 +185,7 @@ func corsAllowedOrigins(appEnv string, configuredOrigins ...string) []string {
 				(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
 				continue
 			}
-			if parsed.Scheme != "https" && !(parsed.Scheme == "http" && !isProduction) {
+			if parsed.Scheme != "https" && (parsed.Scheme != "http" || isProduction) {
 				continue
 			}
 			production = append(production, parsed.Scheme+"://"+parsed.Host)

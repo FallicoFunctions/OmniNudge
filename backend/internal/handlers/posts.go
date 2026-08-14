@@ -866,7 +866,7 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 	if err != nil {
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Create mod mail conversation
 	var conversationID int

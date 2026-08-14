@@ -65,7 +65,7 @@ func (s *GroupEncryptionService) CreateGroupKey(
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Deactivate previous keys for this conversation
 	_, err = tx.Exec(`
@@ -139,7 +139,7 @@ func (s *GroupEncryptionService) AddMemberKey(
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Insert member key
 	_, err = tx.Exec(`

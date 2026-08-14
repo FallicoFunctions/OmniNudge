@@ -115,7 +115,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "No audio file provided")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	durationStr := c.PostForm("duration")
 	duration, _ := strconv.Atoi(durationStr)
@@ -134,7 +134,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Save uploaded WAV file
 	inputPath := filepath.Join(tempDir, "input.wav")

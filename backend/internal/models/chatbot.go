@@ -580,7 +580,7 @@ func (r *BotConversationRepository) CreateWithMessages(ctx context.Context, user
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	c, err := createConversationWithMessagesTx(ctx, tx, userID, personaID, title, settings, messages)
 	if err != nil {
 		return nil, err
@@ -599,7 +599,7 @@ func (r *BotConversationRepository) GetOrCreateActiveWithMessages(ctx context.Co
 	if err != nil {
 		return nil, false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(68423, $1)`, userID); err != nil {
 		return nil, false, err
 	}
@@ -847,7 +847,7 @@ func (r *BotConversationRepository) ForkConversation(ctx context.Context, userID
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Keep ownership enforcement at the data boundary. The handler has already
 	// loaded the conversation, but it can be archived between those operations.

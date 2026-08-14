@@ -48,7 +48,7 @@ func (s *Service) Extract(ctx context.Context, rawURL string) (*PreviewMetadata,
 	if err != nil {
 		return nil, err
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	meta, err := s.parseHTML(parsedURL.String(), body)
 	if err != nil {

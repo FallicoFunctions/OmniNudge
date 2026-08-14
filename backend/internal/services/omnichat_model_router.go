@@ -434,7 +434,7 @@ func (r *TieredOmniChatModelRouter) ResolveProfile(ctx context.Context, userID, 
 		return freeClient, standard
 	}
 
-	entitlement := OmniChatModelTierFree
+	var entitlement OmniChatModelTier
 	admin, err := isOmniChatAdmin(ctx, r.adminReader, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Msg("omnichat: administrator entitlement lookup failed; using free tier")

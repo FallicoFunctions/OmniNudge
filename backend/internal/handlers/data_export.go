@@ -472,7 +472,7 @@ func (h *DataExportHandler) DownloadExport(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Export file not found")
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zip\"", exportID))

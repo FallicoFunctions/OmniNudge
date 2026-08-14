@@ -46,7 +46,7 @@ func (s *ScrubberService) ScrubUser(ctx context.Context, userID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	log.Printf("[SCRUBBER] Starting permanent deletion for user_id=%d", userID)
 	if err := s.scrubOmniChatSpeech(ctx, tx, userID); err != nil {

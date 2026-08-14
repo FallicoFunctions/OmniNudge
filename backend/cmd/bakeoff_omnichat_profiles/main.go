@@ -564,7 +564,7 @@ func writePrivateAtomicFile(outputPath string, contents []byte, overwrite bool) 
 	if err != nil {
 		return fmt.Errorf("open report directory for sync: %w", err)
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	if err := directory.Sync(); err != nil {
 		return fmt.Errorf("sync report directory: %w", err)
 	}

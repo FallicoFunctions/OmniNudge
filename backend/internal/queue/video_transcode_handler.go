@@ -85,7 +85,7 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return fmt.Errorf("video_transcode: create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download input from storage to a local temp file.
 	inputExt := filepath.Ext(payload.InputKey)
@@ -173,7 +173,7 @@ func (h *VideoTranscodeHandler) Handle(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return fmt.Errorf("video_transcode: open HLS output root: %w", err)
 	}
-	defer outputRoot.Close()
+	defer func() { _ = outputRoot.Close() }()
 
 	uploadCount := 0
 	uploadErr := filepath.WalkDir(tmpDir, func(path string, entry os.DirEntry, err error) error {

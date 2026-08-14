@@ -497,7 +497,7 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -547,7 +547,7 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch front page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -580,7 +580,7 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch post info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
@@ -638,7 +638,7 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch comments: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -702,7 +702,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	if err != nil {
 		return nil, fmt.Errorf("failed to search: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -741,7 +741,7 @@ func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int,
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -809,7 +809,7 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit suggestions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -868,7 +868,7 @@ func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to search subreddits: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, nil, redditHTTPErrorFromResponse(resp)
@@ -945,7 +945,7 @@ func (r *RedditClient) GetUserListing(ctx context.Context, username, section, so
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user listing: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1009,7 +1009,7 @@ func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*Redd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1069,7 +1069,7 @@ func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch trophies: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1136,7 +1136,7 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch moderated subreddits: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1194,7 +1194,7 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit about: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1269,7 +1269,7 @@ func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit wiki page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1297,7 +1297,7 @@ func (r *RedditClient) GetWikiPage(ctx context.Context, pagePath string) (map[st
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch wiki page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
@@ -1342,7 +1342,7 @@ func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit,
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit wiki revisions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
 	}
@@ -1394,7 +1394,7 @@ func (r *RedditClient) GetSubredditWikiDiscussions(ctx context.Context, subreddi
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit wiki discussions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, redditHTTPErrorFromResponse(resp)
 	}

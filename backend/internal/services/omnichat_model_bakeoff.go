@@ -1378,10 +1378,7 @@ func omniChatBakeOffQualificationMatrixFailures(report OmniChatBakeOffReport, ga
 		failures = append(failures, "insufficient_repetitions")
 	}
 
-	candidateMatrixComplete := true
-	if gate.ExpectedCandidateCount > 0 && len(report.Candidates) != gate.ExpectedCandidateCount {
-		candidateMatrixComplete = false
-	}
+	candidateMatrixComplete := gate.ExpectedCandidateCount <= 0 || len(report.Candidates) == gate.ExpectedCandidateCount
 	seenCandidates := make(map[string]struct{}, len(report.Candidates))
 	for _, candidate := range report.Candidates {
 		if _, duplicate := seenCandidates[candidate.BlindID]; duplicate || strings.TrimSpace(candidate.BlindID) == "" {

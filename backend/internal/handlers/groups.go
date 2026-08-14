@@ -293,7 +293,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Create conversation
 	var conversationID int
@@ -1018,7 +1018,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at)
@@ -1244,7 +1244,7 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Demote current owner to admin
 	_, err = tx.Exec(ctx, `

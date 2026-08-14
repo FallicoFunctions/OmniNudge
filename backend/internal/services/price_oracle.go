@@ -71,7 +71,7 @@ func (s *PriceOracleService) GetUSDPrice(ctx context.Context, coin string) (floa
 	if err != nil {
 		return 0, fmt.Errorf("fetch price for %s: %w", coin, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("price API returned %d for %s", resp.StatusCode, coin)

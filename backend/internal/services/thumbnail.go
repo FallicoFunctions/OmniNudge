@@ -271,7 +271,7 @@ func (s *ThumbnailService) GetImageDimensions(imagePath string) (width int, heig
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to open image: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	config, _, err := image.DecodeConfig(file)
 	if err != nil {

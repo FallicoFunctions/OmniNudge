@@ -30,7 +30,7 @@ func TestWSHandler_AcceptsPersonaSessionMode(t *testing.T) {
 		worldDialHeader("https://play.omninudge.com"),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var snapshot map[string]any
 	require.NoError(t, conn.ReadJSON(&snapshot))
@@ -58,7 +58,7 @@ func TestWSHandler_RejectsUnknownSessionMode(t *testing.T) {
 		worldDialHeader("https://play.omninudge.com"),
 	)
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
 	require.Error(t, err)
 	require.NotNil(t, resp)

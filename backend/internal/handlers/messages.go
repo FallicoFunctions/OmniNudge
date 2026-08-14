@@ -555,7 +555,8 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	// For mod_mail conversations, verify participation differently
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -580,7 +581,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
 		recipientID = userID
-	} else if conversationType == "group" {
+	case "group":
 		// Group conversations use conversation_participants; User1ID/User2ID are NULL for groups.
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
@@ -599,7 +600,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 		// Group messages have no single recipient; use sender to satisfy schema.
 		recipientID = userID
-	} else {
+	default:
 		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
 		if err != nil {
@@ -1187,7 +1188,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start forward transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	forwardedMessages := make([]*models.Message, 0, len(targetContexts))
 	forwardedMessageIDs := make([]int, 0, len(targetContexts))
@@ -1582,7 +1583,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to start edit transaction")
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var conversationID int
 	var senderID int
@@ -1911,7 +1912,8 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	}
 
 	// For mod_mail conversations, check conversation_participants table
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -1934,7 +1936,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				return
 			}
 		}
-	} else if conversationType == "group" {
+	case "group":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -1950,7 +1952,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
-	} else {
+	default:
 		// For regular DM conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
@@ -2441,7 +2443,8 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	// Verify user is a participant based on conversation type
-	if conversationType == "mod_mail" {
+	switch conversationType {
+	case "mod_mail":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -2464,7 +2467,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				return
 			}
 		}
-	} else if conversationType == "group" {
+	case "group":
 		var isParticipant bool
 		err = h.pool.QueryRow(c.Request.Context(), `
 			SELECT EXISTS(
@@ -2480,7 +2483,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
-	} else {
+	default:
 		// For DM conversations, use the traditional method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {

@@ -689,7 +689,7 @@ func (r *UserRepository) ShadowBanUser(ctx context.Context, userID int, reason s
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -721,7 +721,7 @@ func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string,
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -754,7 +754,7 @@ func (r *UserRepository) UnbanUser(ctx context.Context, userID int, reason strin
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
@@ -786,7 +786,7 @@ func (r *UserRepository) SoftDeleteUser(ctx context.Context, userID int, reason 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update user
 	query := `
