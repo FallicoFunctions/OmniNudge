@@ -16,11 +16,15 @@
 -- action, for now SQL or admin only. What matters is that admission reads it.
 --
 -- There is deliberately no revocation channel for a character already in a
--- world. A world token lives five minutes, so a withdrawn character is out of
--- circulation within five minutes of the sanction landing, with no disconnect
--- mechanism at all. Recording that here is the point: it is the property that
--- makes this slice small, and anyone tempted to build live revocation should
--- know the door already closes on its own.
+-- world. A world token lives five minutes and the world ends a session at its
+-- token's expiry, so a withdrawn character is out of circulation within five
+-- minutes of the sanction landing: reconnecting needs a fresh token, and
+-- minting one asks the eligibility question again. Recording that here is the
+-- point -- it is the property that makes this slice small, and anyone tempted
+-- to build live revocation should know the door already closes on its own.
+-- (When this table was written the session bound did not exist and this
+-- comment claimed it anyway; the world now enforces it, in
+-- omniraveworld/server.ServeHTTP.)
 --
 -- The shape stays close to omnirave_guest_sanctions -- id, action, expires_at,
 -- created_at, NULL expiry meaning indefinite -- so the two read alike and a

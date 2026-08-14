@@ -30,8 +30,11 @@ package models
 // A sanction in force refuses it. A sanction with no expiry is indefinite,
 // which is what withdrawal is; one with an expiry lapses on its own and the
 // character is admissible again the moment it does, with nothing to run and no
-// state to clean up. A character already inside a world is not disconnected,
-// because a world token lives five minutes: the door closing is enough.
+// state to clean up. A character already inside a world is not disconnected by
+// the sanction itself: its session ends at its token's expiry, five minutes
+// out at most, and the token it needs to come back is only issued to a
+// character this predicate still admits. The door closing is enough because
+// the session cannot outlast the key.
 const AdmissiblePersonaPredicate = `
 	p.id = $1
 	  AND p.is_active
