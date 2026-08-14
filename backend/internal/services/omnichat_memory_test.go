@@ -415,8 +415,8 @@ func TestExtractForConversationAdvancesPastUnusableTurns(t *testing.T) {
 
 func TestRecallMemoriesStrengthensWhatItReturned(t *testing.T) {
 	store := &fakeMemoryStore{recallResult: []*models.OmniChatMemoryEpisode{
-		{ID: 7, Title: "One", Summary: "First."},
-		{ID: 9, Title: "Two", Summary: "Second."},
+		{ID: 7, OwnerUserID: 4, Title: "One", Summary: "First."},
+		{ID: 9, OwnerUserID: 4, Title: "Two", Summary: "Second."},
 	}}
 	service := NewOmniChatMemoryService(store, &fakeMemoryMessages{}, &fakeMemoryConversations{}, nil, nil)
 
@@ -431,6 +431,54 @@ func TestRecallMemoriesStrengthensWhatItReturned(t *testing.T) {
 		marked := store.marked()
 		return len(marked) == 2 && marked[0] == 7 && marked[1] == 9
 	}, 2*time.Second, 10*time.Millisecond, "recalled episodes must be strengthened")
+}
+
+func countMarks(marked []int64, id int64) int {
+	count := 0
+	for _, marked := range marked {
+		if marked == id {
+			count++
+		}
+	}
+	return count
+}
+
+// Strengthening is a per-relationship signal, and a self-tier row has no
+// relationship to be per. It is one row that every person talking to this
+// character recalls, so incrementing it on recall would count all of them into
+// one number that grows with how popular the character is, and pay it back as
+// a permanent ranking bonus that belongs to the tier rather than to the
+// memory. Recall reads both tiers on the same terms, so the counter that feeds
+// the score has to mean the same thing in both -- and the only way it can is
+// to stay unused for the tier where it would be global.
+func TestRecallMemoriesDoesNotStrengthenTheSelfTier(t *testing.T) {
+	const (
+		selfEpisodeID       = int64(7)
+		relationalEpisodeID = int64(9)
+		users               = 5
+	)
+	store := &fakeMemoryStore{recallResult: []*models.OmniChatMemoryEpisode{
+		{ID: selfEpisodeID, OwnerUserID: models.OmniChatMemoryTierSelf,
+			Title: "Came third at the Moon Circuit", Summary: "Finished third and stayed for the podium."},
+		{ID: relationalEpisodeID, OwnerUserID: 1,
+			Title: "The sourdough starter", Summary: "He named it after his grandmother."},
+	}}
+	service := NewOmniChatMemoryService(store, &fakeMemoryMessages{}, &fakeMemoryConversations{}, nil, nil)
+
+	// Several different people asking the same character about the same thing.
+	for user := 1; user <= users; user++ {
+		require.Len(t, service.Recall(context.Background(), 3, user, "do you race?"), 2)
+	}
+
+	// Strengthening is off the reply path, so it lands after Recall returns.
+	// Both ids would be marked in the same call, so once the relational one has
+	// been counted the self-tier one has been too, if it ever is.
+	require.Eventually(t, func() bool {
+		return countMarks(store.marked(), relationalEpisodeID) == users
+	}, 2*time.Second, 10*time.Millisecond, "a relational memory is still strengthened per recall")
+
+	require.Zero(t, countMarks(store.marked(), selfEpisodeID),
+		"a memory everyone shares must not gain a recall count nobody in particular earned")
 }
 
 // Losing a race is not an error the job should retry: the winning worker's
