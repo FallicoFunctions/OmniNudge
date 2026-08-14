@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -459,6 +460,11 @@ func (h *WSHandler) currentZoneEvents(now time.Time) []world.ZoneEventState {
 	return h.schedule.Snapshot(now)
 }
 
+// errUnknownSessionMode refuses a token whose mode this build has no meaning
+// for. It is answered as a 401 like every other failure to parse a session,
+// because a token the world cannot interpret is one it cannot admit.
+var errUnknownSessionMode = errors.New("unrecognised session mode")
+
 func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (world.PlayerSession, error) {
 	if h.auth == nil {
 		return world.PlayerSession{}, http.ErrNoCookie
@@ -474,10 +480,22 @@ func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (wo
 		return world.PlayerSession{}, err
 	}
 
+	// A mode this build does not recognise is refused rather than carried
+	// through. The mode reaches every connected client in the next snapshot,
+	// so accepting an unknown one means the server broadcasting a value it has
+	// no rules for and leaving each client to guess -- which is exactly what
+	// the JWT layer already refuses to do with an unrecognised subject kind.
+	// Persona is on the known list because a persona is a resident here now;
+	// it is the unnamed fourth thing that has to be stopped.
+	mode := world.SessionMode(claims.Mode)
+	if !mode.Valid() {
+		return world.PlayerSession{}, errUnknownSessionMode
+	}
+
 	return world.PlayerSession{
 		PlayerID:    claims.PlayerID,
 		PlayerName:  claims.PlayerName,
-		Mode:        world.SessionMode(claims.Mode),
+		Mode:        mode,
 		Loadout:     world.Loadout(claims.Loadout),
 		ReturnPoint: savedPointToVec3(claims.ReturnPoint),
 	}, nil
