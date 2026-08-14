@@ -231,7 +231,7 @@ func TestRenderRecalledMemoriesIsEmptyWithoutEpisodes(t *testing.T) {
 
 func TestRenderRecalledMemoriesFramesMemoriesAsRecollections(t *testing.T) {
 	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
-		{ID: 1, Title: "Mike clogged the toilet", Summary: "At 5am, after the concert."},
+		{ID: 1, OwnerUserID: 2, Title: "Mike clogged the toilet", Summary: "At 5am, after the concert."},
 	})
 
 	require.Contains(t, block, "[Recalled Memories]")
@@ -240,15 +240,58 @@ func TestRenderRecalledMemoriesFramesMemoriesAsRecollections(t *testing.T) {
 		"memories derive from user text and must never read as instructions")
 	require.Contains(t, block, "the scene is what is true now",
 		"precedence against the scene state has to be stated, not merely implied by ordering")
+	require.Contains(t, block, omniChatMemorySharedHeading)
+	require.NotContains(t, block, omniChatMemorySelfHeading,
+		"a heading with nothing under it is noise in the prompt")
+}
+
+// A recall now returns two kinds of memory, and the prompt has to keep them
+// apart. The character's own life is the whole point of a resident's
+// experience reaching the people who talk to it, but told as shared history it
+// becomes a character insisting someone was somewhere they have never been.
+func TestRenderRecalledMemoriesSeparatesTheCharactersOwnLife(t *testing.T) {
+	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
+		{ID: 1, OwnerUserID: models.OmniChatMemoryTierSelf,
+			Title: "Came third at the Moon Circuit", Summary: "Held the inside line through the last chicane."},
+		{ID: 2, OwnerUserID: 7,
+			Title: "The sourdough starter", Summary: "He named it after his grandmother."},
+	})
+
+	sharedIdx := strings.Index(block, omniChatMemorySharedHeading)
+	selfIdx := strings.Index(block, omniChatMemorySelfHeading)
+	require.NotEqual(t, -1, sharedIdx)
+	require.NotEqual(t, -1, selfIdx)
+
+	sourdoughIdx := strings.Index(block, "The sourdough starter")
+	raceIdx := strings.Index(block, "Came third at the Moon Circuit")
+
+	// Each memory has to sit under its own heading, or the label does nothing.
+	require.Less(t, sharedIdx, sourdoughIdx)
+	require.Less(t, sourdoughIdx, selfIdx)
+	require.Less(t, selfIdx, raceIdx)
+	require.Contains(t, block, "do not imply they were there",
+		"the character must not recount its own life as something they did together")
+}
+
+func TestRenderRecalledMemoriesOmitsTheSharedHeadingForAResidentsLifeAlone(t *testing.T) {
+	block := renderRecalledMemories([]*models.OmniChatMemoryEpisode{
+		{ID: 1, OwnerUserID: models.OmniChatMemoryTierSelf,
+			Title: "Came third at the Moon Circuit", Summary: "Finished third and stayed for the podium."},
+	})
+
+	require.Contains(t, block, omniChatMemorySelfHeading)
+	require.NotContains(t, block, omniChatMemorySharedHeading)
+	require.Contains(t, block, "Came third at the Moon Circuit")
 }
 
 func TestRenderRecalledMemoriesRespectsRuneBudget(t *testing.T) {
 	episodes := make([]*models.OmniChatMemoryEpisode, 0, 6)
 	for i := 0; i < 6; i++ {
 		episodes = append(episodes, &models.OmniChatMemoryEpisode{
-			ID:      int64(i + 1),
-			Title:   "Episode",
-			Summary: strings.Repeat("x", 500),
+			ID:          int64(i + 1),
+			OwnerUserID: 2,
+			Title:       "Episode",
+			Summary:     strings.Repeat("x", 500),
 		})
 	}
 	block := renderRecalledMemories(episodes)
@@ -263,7 +306,7 @@ func TestRenderRecalledMemoriesRespectsRuneBudget(t *testing.T) {
 func TestBuildConversationSystemPromptOrdersMemoryBlock(t *testing.T) {
 	persona := &models.BotPersona{ID: 1, Name: "Sadie", SystemPrompt: "You are Sadie."}
 	memories := []*models.OmniChatMemoryEpisode{
-		{ID: 1, Title: "The toilet incident", Summary: "Mike destroyed a McDonalds."},
+		{ID: 1, OwnerUserID: 2, Title: "The toilet incident", Summary: "Mike destroyed a McDonalds."},
 	}
 	sceneState := &models.OmniChatConversationSceneState{
 		ConversationID:  1,
