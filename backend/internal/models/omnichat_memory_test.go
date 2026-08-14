@@ -829,14 +829,19 @@ func TestOmniChatMemoryRetellingWeightIsUnsetUntilMeasured(t *testing.T) {
 
 // seedOwnedPersona creates a character that belongs to a user. It is never a
 // resident, so nothing may ever write it a self tier.
-func seedOwnedPersona(t *testing.T, pool *pgxpool.Pool, suffix string, ownerUserID int) int {
+//
+// Visibility is a parameter rather than a fixed 'private' because owned and
+// private is the easy case: two conditions refuse it and either one alone would
+// do. The case worth seeding is a published card -- owned, public and active --
+// where the ownership condition is the only thing standing.
+func seedOwnedPersona(t *testing.T, pool *pgxpool.Pool, suffix string, ownerUserID int, visibility string) int {
 	t.Helper()
 	var personaID int
 	require.NoError(t, pool.QueryRow(context.Background(), `
 		INSERT INTO bot_personas (slug, name, system_prompt, owner_user_id, visibility)
-		VALUES ($1, 'Private', 'You are private.', $2, 'private')
+		VALUES ($1, 'Someone''s own', 'You belong to one person.', $2, $3)
 		RETURNING id
-	`, "memtest-owned-"+suffix, ownerUserID).Scan(&personaID))
+	`, "memtest-owned-"+suffix, ownerUserID, visibility).Scan(&personaID))
 	return personaID
 }
 
@@ -893,7 +898,7 @@ func TestOmniChatMemoryRecordWorldEventRefusesUserOwnedCharacter(t *testing.T) {
 	repo := NewOmniChatMemoryRepository(pool)
 	ctx := context.Background()
 
-	ownedPersonaID := seedOwnedPersona(t, pool, "owned", fixture.userID)
+	ownedPersonaID := seedOwnedPersona(t, pool, "owned", fixture.userID, "private")
 
 	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
 		PersonaID: ownedPersonaID,
@@ -903,6 +908,47 @@ func TestOmniChatMemoryRecordWorldEventRefusesUserOwnedCharacter(t *testing.T) {
 	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
 
 	// Refusing is only half of it: nothing may be left behind.
+	var count int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, ownedPersonaID).Scan(&count))
+	require.Zero(t, count, "a refused world event must write nothing")
+}
+
+// The case the ownership condition is actually for: a character somebody made
+// and published. Owned, public and active is not an exotic state -- visibility
+// defaults to public, is_active defaults to true, and creating a character card
+// writes whatever visibility the user chose -- so it is what the predicate meets
+// in practice. Every other owned fixture here is private as well, which means
+// visibility refuses those on its own and the ownership condition could be
+// deleted without a single test noticing.
+func TestOmniChatMemoryRecordWorldEventRefusesAPublishedUserOwnedCharacter(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "ownedpublic")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	ownedPersonaID := seedOwnedPersona(t, pool, "ownedpublic", fixture.userID, "public")
+
+	// Asserted rather than assumed: if the column defaults ever moved, this
+	// fixture would quietly stop being the state under test.
+	var (
+		visibility string
+		isActive   bool
+	)
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT visibility, is_active FROM bot_personas WHERE id = $1`, ownedPersonaID).Scan(&visibility, &isActive))
+	require.Equal(t, "public", visibility)
+	require.True(t, isActive, "a published character is active, so only ownership refuses it")
+
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: ownedPersonaID,
+		Title:     "Came third on the Moon Circuit",
+		Summary:   "Publishing a character card does not put it in a world.",
+	})
+	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
+
 	var count int
 	require.NoError(t, pool.QueryRow(ctx,
 		`SELECT count(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, ownedPersonaID).Scan(&count))
@@ -1068,7 +1114,7 @@ func TestOmniChatMemoryRecallIsUnchangedForAPrivateCharacter(t *testing.T) {
 	ctx := context.Background()
 	weights := DefaultOmniChatMemoryRecallWeights()
 
-	ownedPersonaID := seedOwnedPersona(t, pool, "privaterecall", fixture.userID)
+	ownedPersonaID := seedOwnedPersona(t, pool, "privaterecall", fixture.userID, "private")
 
 	// The world would refuse to write this character a self tier, and does.
 	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
