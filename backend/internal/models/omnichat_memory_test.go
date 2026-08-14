@@ -826,3 +826,210 @@ func TestOmniChatMemoryRecallMatchesAnyTellingInTheChain(t *testing.T) {
 func TestOmniChatMemoryRetellingWeightIsUnsetUntilMeasured(t *testing.T) {
 	require.Zero(t, DefaultOmniChatMemoryRecallWeights().Retelling)
 }
+
+// seedOwnedPersona creates a character that belongs to a user. It is never a
+// resident, so nothing may ever write it a self tier.
+func seedOwnedPersona(t *testing.T, pool *pgxpool.Pool, suffix string, ownerUserID int) int {
+	t.Helper()
+	var personaID int
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		INSERT INTO bot_personas (slug, name, system_prompt, owner_user_id, visibility)
+		VALUES ($1, 'Private', 'You are private.', $2, 'private')
+		RETURNING id
+	`, "memtest-owned-"+suffix, ownerUserID).Scan(&personaID))
+	return personaID
+}
+
+// A world event belongs to the character, not to anybody, and it comes from no
+// conversation. Both halves are asserted against the row itself rather than
+// through the model, because the model could report whatever it was handed;
+// what has to be true is what is on disk, since that is what recall reads and
+// what the tier check constrains.
+func TestOmniChatMemoryRecordWorldEventWritesTheSelfTier(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "worldevent")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	episodeID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Came third on the Moon Circuit",
+		Summary:   "Held the inside line through the last chicane and finished third.",
+	})
+	require.NoError(t, err)
+	require.NotZero(t, episodeID)
+
+	var (
+		ownerUserID     *int
+		conversationID  *int
+		sourceMessageID *int
+		salience        float64
+		distinctiveness float64
+		status          string
+	)
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT owner_user_id, conversation_id, source_message_id, salience, distinctiveness, status
+		FROM omnichat_memory_episodes WHERE id = $1
+	`, episodeID).Scan(&ownerUserID, &conversationID, &sourceMessageID, &salience, &distinctiveness, &status))
+
+	require.Nil(t, ownerUserID, "a world event belongs to the character, not to a user")
+	require.Nil(t, conversationID, "a world event comes from no conversation")
+	require.Nil(t, sourceMessageID)
+	require.InDelta(t, OmniChatWorldEventSalience, salience, 0.001)
+	require.InDelta(t, OmniChatWorldEventDistinctiveness, distinctiveness, 0.001)
+	require.Equal(t, "active", status)
+}
+
+// Only platform characters have a self tier at all. A character that belongs
+// to a user is never a resident, so the write is refused outright rather than
+// filed somewhere safer.
+func TestOmniChatMemoryRecordWorldEventRefusesUserOwnedCharacter(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "owned")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	ownedPersonaID := seedOwnedPersona(t, pool, "owned", fixture.userID)
+
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: ownedPersonaID,
+		Title:     "Came third on the Moon Circuit",
+		Summary:   "A private character cannot have been there at all.",
+	})
+	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
+
+	// Refusing is only half of it: nothing may be left behind.
+	var count int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, ownedPersonaID).Scan(&count))
+	require.Zero(t, count, "a refused world event must write nothing")
+}
+
+// The same refusal covers every other reason a character is not a resident,
+// and reports none of them differently: the caller must not be able to read
+// the persona table through the shape of the error.
+func TestOmniChatMemoryRecordWorldEventRefusesNonResidents(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "nonresident")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	var privatePersonaID, retiredPersonaID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, system_prompt, visibility)
+		VALUES ('memtest-private-nonresident', 'Unlisted', 'x', 'private') RETURNING id
+	`).Scan(&privatePersonaID))
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, system_prompt, is_active)
+		VALUES ('memtest-retired-nonresident', 'Retired', 'x', FALSE) RETURNING id
+	`).Scan(&retiredPersonaID))
+
+	for name, personaID := range map[string]int{
+		"private":     privatePersonaID,
+		"retired":     retiredPersonaID,
+		"nonexistent": 9_000_017,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+				PersonaID: personaID,
+				Title:     "Came third on the Moon Circuit",
+				Summary:   "Not a resident, so not a memory.",
+			})
+			require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
+		})
+	}
+
+	// The platform character in the same fixture still works, so the refusals
+	// above are about eligibility and not about the write being broken.
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Came third on the Moon Circuit",
+		Summary:   "The resident's own race.",
+	})
+	require.NoError(t, err)
+}
+
+// The property the whole memory boundary exists to give: what a resident does
+// in a world is the character's own, so every person who talks to that
+// character finds it there, while what one person told it in private stays
+// with that person.
+func TestOmniChatMemoryWorldEventIsGlobalWhileRelationalMemoryStaysPrivate(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "global")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+	weights := DefaultOmniChatMemoryRecallWeights()
+
+	worldEventID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Came third on the Moon Circuit",
+		Summary:   "Finished third in the Moon Circuit final and stayed for the podium.",
+	})
+	require.NoError(t, err)
+
+	// One user's private confidence, mentioning the same race.
+	confidence := insertEpisode(t, pool, fixture.personaID, fixture.userID,
+		"What the user admitted about the Moon Circuit",
+		"The user said they had never told anyone they cried watching the Moon Circuit final.", 0.9, 0.9)
+
+	// The self tier is the character's own life. Whoever is talking to it, the
+	// tier holds the same thing, because it is keyed to nobody.
+	selfRecall, err := repo.Recall(ctx, fixture.personaID, OmniChatMemoryTierSelf,
+		"how did the Moon Circuit go?", weights, 6)
+	require.NoError(t, err)
+	require.Len(t, selfRecall, 1)
+	require.Equal(t, worldEventID, selfRecall[0].ID,
+		"a resident's world event is the character's own and is there for anyone")
+	require.NotEqual(t, confidence, selfRecall[0].ID,
+		"nothing a person said in private may reach the tier everyone reads")
+
+	// And each user's own tier still holds only their own history.
+	mine, err := repo.Recall(ctx, fixture.personaID, fixture.userID,
+		"how did the Moon Circuit go?", weights, 6)
+	require.NoError(t, err)
+	require.Len(t, mine, 1)
+	require.Equal(t, confidence, mine[0].ID)
+
+	theirs, err := repo.Recall(ctx, fixture.personaID, fixture.otherID,
+		"how did the Moon Circuit go?", weights, 6)
+	require.NoError(t, err)
+	require.Empty(t, theirs, "another user must never see the first user's relational memory")
+}
+
+// A world event is untrusted text like any other: the world is a service, but
+// what it reports still arrives over the wire.
+func TestOmniChatMemoryRecordWorldEventBoundsItsText(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "bounds")
+	repo := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	_, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "   ",
+		Summary:   "A race with no name.",
+	})
+	require.Error(t, err, "a world event with no title is not a memory")
+
+	episodeID, err := repo.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     strings.Repeat("x", omniChatMemoryMaxTitle+50),
+		Summary:   "An oversized title is clamped rather than refused.",
+	})
+	require.NoError(t, err)
+
+	var title string
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT title FROM omnichat_memory_episodes WHERE id = $1`, episodeID).Scan(&title))
+	require.Len(t, []rune(title), omniChatMemoryMaxTitle)
+}
