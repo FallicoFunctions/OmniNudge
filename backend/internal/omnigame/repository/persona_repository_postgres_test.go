@@ -230,6 +230,40 @@ func TestPostgresPersonaRepository_DeletingPersonaRemovesItsSanctions(t *testing
 	require.Zero(t, remaining)
 }
 
+// A withdrawal names no time it lapses, and the database refuses one that
+// tries to. The most natural way to write "withdraw this character, effective
+// now" is ('withdrawn', now()) -- and that row is inert on arrival, because
+// admission tests expires_at > now(). The character would stay admissible
+// while the table showed a withdrawal that read as in force, which is the same
+// hazard the action check exists for, one column over.
+func TestPostgresPersonaRepository_WithdrawalCannotCarryAnExpiry(t *testing.T) {
+	ctx := context.Background()
+	repo, pool := newPersonaRepositoryForTest(t)
+
+	personaID := insertPersonaForTest(t, ctx, pool, "expiring-withdrawal", "Withdrawn", nil, "public", true)
+
+	_, err := pool.Exec(ctx, `
+		INSERT INTO omnirave_persona_sanctions (persona_id, action, expires_at, reason)
+		VALUES ($1, 'withdrawn', now(), 'test')
+	`, personaID)
+	require.Error(t, err, "a withdrawal with an expiry does nothing and must not be writable")
+	require.Contains(t, err.Error(), "omnirave_persona_sanctions_withdrawn_indefinite_check")
+
+	// The character is still admissible, which is the point: the refused row
+	// would have looked like a sanction and acted like nothing.
+	admissible, err := repo.FindAdmissiblePersona(ctx, personaID)
+	require.NoError(t, err)
+	require.NotNil(t, admissible)
+
+	// A suspension is the sanction that names a time it lapses, and it keeps
+	// that ability untouched.
+	insertPersonaSanctionForTest(t, ctx, pool, personaID, "suspended", time.Hour)
+
+	suspended, err := repo.FindAdmissiblePersona(ctx, personaID)
+	require.NoError(t, err)
+	require.Nil(t, suspended)
+}
+
 // insertPersonaSanctionForTest writes a sanction. A zero expiresIn means no
 // expiry at all, which is the indefinite case, not "expires now".
 func insertPersonaSanctionForTest(
