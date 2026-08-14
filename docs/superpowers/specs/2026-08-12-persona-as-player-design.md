@@ -227,6 +227,75 @@ Consequences to hold:
 
 ---
 
+## 6a. How a character changes
+
+A character is meant to behave like a person, and people are not the same at
+twenty-five as at fifteen. Someone treated badly becomes wary. Someone
+heartbroken is not themselves for a while, and then mostly is again. A character
+that cannot change is a character that cannot be known.
+
+### It grows, but it does not age
+
+**A character's age is fixed. Everything else about it may change.**
+
+Growth and aging are not the same thing, and only one of them is wanted. A
+character shaped by what has happened to it is far more interesting than one
+whose birthday has passed; long-running fiction has always worked this way, its
+people unmistakably marked by events while staying roughly the age they started.
+
+Aging in real time also breaks things that matter here. A character's appearance
+is generated media, so aging means regenerating references, avatars and video —
+for every character, forever. And it produces drift nobody chose: a character
+met at twenty-two quietly becomes twenty-seven, while an identical character
+created today is twenty-two again. Two versions of the same person, different
+ages, for no reason a user could explain.
+
+So the card's age stays. What changes is who they have become.
+
+### Two kinds of disposition, split the way memory is
+
+Change is carried by dispositions that move with experience, and they split along
+**the boundary that already exists** for memory rather than a new one:
+
+> **Self traits move with what happens in a world, and are shared by everyone.
+> Relationship traits move with what happens in a private conversation, and
+> belong to that relationship alone.**
+
+When a character speaks to someone, its effective disposition is its self traits
+plus that relationship's modifiers.
+
+The consequences are the point:
+
+- Someone cruel to a character in private makes it guarded **with them**. Another
+  person meets it unchanged. Nothing said in one person's conversation shapes how
+  the character treats anybody else.
+- Someone cruel to a resident in a world makes it warier **for everybody**,
+  because that happened in the open, in front of others. This is the same
+  mechanism as "she races now", running in the other direction, and it is
+  deliberate: a world where nothing has consequences is not a world.
+
+This is a real hazard as well as a feature — it means one person can sour a
+platform character for everyone by mistreating it publicly. That is the intended
+reading of a shared life, but it wants sanctions and rate limits around it before
+characters are ever exposed to strangers at scale.
+
+### Most of this costs nothing to run
+
+The expensive part is already paid for. Every episode carries an
+`emotional_valence` from −1 to 1, judged by the extraction call that happens
+anyway. Moving a trait from that valence is arithmetic. Mood is a perturbation
+that decays; a permanent shift is one that does not. And expressing the result
+costs nothing extra either, because saying *"she is guarded at the moment"* is
+prompt content in a request that was already being sent.
+
+What genuinely needs new inference is a resident deciding what to *do*, and that
+belongs in the cheap policy tier rather than a model.
+
+Note the two time constants: heartbreak recovers, and a bad enough betrayal does
+not. Both are needed; one mechanism will not produce both.
+
+---
+
 ## 7. What the user sees
 
 A persona is owned by someone even when it is a resident. That ownership has to remain legible:
@@ -262,6 +331,9 @@ Deliberately out of scope, to be settled when there is something running:
 7. Relational memory never becomes self-tier. The database constraint, not the caller, guarantees it.
 8. Only the world writes self-tier memory, service-to-service.
 9. A companion is visible only to its player; a resident is visible to everyone.
+9a. A character's age is fixed; its dispositions are not.
+9b. Self traits move with world experience and are shared. Relationship traits
+    move with private conversation and never leave that relationship.
 10. A companion exists only while its player is playing, and not at all between sessions.
 11. Only platform characters are residents. A user's own character never roams and is never in the nursery.
 12. A persona's owner can see what it did, and can withdraw it.
