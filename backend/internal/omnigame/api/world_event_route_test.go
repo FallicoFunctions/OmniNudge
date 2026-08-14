@@ -163,6 +163,42 @@ func TestRouter_WorldEventRefusesUserOwnedCharacter(t *testing.T) {
 	require.Zero(t, count, "a refused world event must write nothing")
 }
 
+// And the same refusal for a character its owner published. This is the state
+// the ownership rule exists for and the one a user reaches without doing
+// anything unusual: a character card is created public and active by default.
+// The private fixture above cannot show the rule works, because visibility
+// refuses that row on its own.
+func TestRouter_WorldEventRefusesAPublishedUserOwnedCharacter(t *testing.T) {
+	router, pool, _ := newWorldEventRouter(t)
+	ctx := context.Background()
+
+	var ownerID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO users (username, username_normalized, password_hash)
+		VALUES ('world_event_publisher', 'world_event_publisher', 'x') RETURNING id
+	`).Scan(&ownerID))
+
+	var personaID int64
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, system_prompt, owner_user_id, visibility, is_active)
+		VALUES ('world-event-published', 'Published', 'x', $1, 'public', TRUE) RETURNING id
+	`, ownerID).Scan(&personaID))
+
+	rec := postWorldEvent(t,
+		router,
+		`{"title":"Came third on the Moon Circuit","summary":"A published card is still nobody's resident."}`,
+		func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		},
+	)
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+
+	var count int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, personaID).Scan(&count))
+	require.Zero(t, count, "a refused world event must write nothing")
+}
+
 // The impersonation case. A logged-in user's browser sends its site cookie
 // automatically, so if one could satisfy this route, any page could make a
 // signed-in user write into a character's own memory -- which every other user
