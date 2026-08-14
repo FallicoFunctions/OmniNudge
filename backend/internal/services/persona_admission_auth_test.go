@@ -187,7 +187,6 @@ func TestPersonaAdmissionAuth_TokenNamesItsPersona(t *testing.T) {
 	claims, err := auth.Validate(token)
 	require.NoError(t, err)
 	require.Equal(t, int64(101), claims.PersonaID)
-	require.NotEqual(t, int64(102), claims.PersonaID)
 
 	_, err = auth.Mint(0, time.Minute)
 	require.Error(t, err, "a credential that names no persona is meaningless")
