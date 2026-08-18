@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -381,7 +382,18 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 			return fmt.Errorf("omnichat memory: insert episode: %w", err)
 		}
 
-		for _, entity := range episode.Entities {
+		// Upsert entities in a stable order. Each one takes a row lock held to
+		// the end of the transaction, so two extractions for the same character
+		// that name the same people in opposite orders would otherwise wait on
+		// each other's locks and deadlock. Sorting gives every transaction the
+		// same acquisition order, which is what makes a cycle impossible rather
+		// than merely unlikely.
+		entities := append([]OmniChatMemoryEntityRef(nil), episode.Entities...)
+		sort.SliceStable(entities, func(i, j int) bool {
+			return strings.ToLower(entities[i].CanonicalName) < strings.ToLower(entities[j].CanonicalName)
+		})
+
+		for _, entity := range entities {
 			// A nil slice would marshal to NULL against a NOT NULL column.
 			// Callers are not required to have run Normalize first.
 			aliases := entity.Aliases
