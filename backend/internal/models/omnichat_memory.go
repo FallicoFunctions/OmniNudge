@@ -411,6 +411,17 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 				return fmt.Errorf("omnichat memory: link episode entity: %w", err)
 			}
 		}
+
+		// What happens to a character changes the character. This runs in the
+		// same transaction as the episode that caused it, so a disposition can
+		// never drift out of step with the memories behind it: either both land
+		// or neither does. The tier is the extraction's, so a private
+		// conversation moves only that relationship.
+		if episode.EmotionalValence != nil {
+			if err := applyEpisodeValenceTx(ctx, tx, episode.PersonaID, ownerUserID, *episode.EmotionalValence); err != nil {
+				return err
+			}
+		}
 	}
 
 	// The DO UPDATE ... WHERE is the concurrency guard: it matches only if the
