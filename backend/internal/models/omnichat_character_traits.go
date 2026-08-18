@@ -34,8 +34,16 @@ const (
 	omniChatTraitMoodGain = 0.5
 
 	// Trust and warmth are the slow constant. They move by a fiftieth of what
-	// mood does, so becoming guarded takes a pattern of bad experiences rather
-	// than one bad night.
+	// mood does, and only for episodes past the threshold, so what they filter
+	// out is ordinary conversation: nothing an unremarkable exchange produces
+	// touches them at all.
+	//
+	// One conversation can still leave a mark. An extraction yields at most
+	// four episodes and each applies on its own, so four of them at -0.9 -- a
+	// conversation that was cruel from end to end -- moves trust by -0.216 and
+	// renders as a little guarded. That is the intended reading and not a leak
+	// in the constants: someone was genuinely unkind, once, and the character
+	// is warier for it. What the threshold prevents is drift, not memory.
 	//
 	// Trust is asymmetric because it is asymmetric in people: it is lost faster
 	// than it is earned. Warmth is not -- liking someone and being put off them
