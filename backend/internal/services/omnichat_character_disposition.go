@@ -22,11 +22,11 @@ const omniChatDispositionDeadband = 0.2
 // overshoots the state is what turns a disposition into a caricature.
 const omniChatDispositionStrong = 0.6
 
-// omniChatTraitLoader reads one tier of a character's traits. The concrete
-// implementation is the repository; the interface is here so a conversation can
-// be built without a database.
+// omniChatTraitLoader reads both tiers of a character's traits at once. The
+// concrete implementation is the repository; the interface is here so a
+// conversation can be built without a database.
 type omniChatTraitLoader interface {
-	Load(ctx context.Context, personaID, ownerUserID int) (models.OmniChatCharacterTraits, error)
+	LoadForConversation(ctx context.Context, personaID, userID int) (self, relationship models.OmniChatCharacterTraits, err error)
 }
 
 // SetCharacterTraits wires the dispositions a character speaks from. Without
@@ -47,18 +47,15 @@ func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.Bo
 	if s == nil || s.traits == nil || persona == nil {
 		return models.OmniChatDisposition{}
 	}
-	self, err := s.traits.Load(ctx, persona.ID, models.OmniChatMemoryTierSelf)
+	// Both tiers in one read, keyed on the conversation's own user. That key is
+	// what keeps one person's history with the character out of everybody
+	// else's prompt; the single read is because this sits in front of the model
+	// call and a second round trip for a second row of the same table is time
+	// the person waits for nothing.
+	self, relationship, err := s.traits.LoadForConversation(ctx, persona.ID, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Int("persona_id", persona.ID).
-			Msg("omnichat traits: self tier unavailable, generating without disposition")
-		return models.OmniChatDisposition{}
-	}
-	// Keyed on the conversation's own user, always. This is what keeps one
-	// person's history with the character out of everybody else's prompt.
-	relationship, err := s.traits.Load(ctx, persona.ID, userID)
-	if err != nil {
-		zlog.Warn().Err(err).Int("persona_id", persona.ID).
-			Msg("omnichat traits: relationship tier unavailable, generating without disposition")
+			Msg("omnichat traits: unavailable, generating without disposition")
 		return models.OmniChatDisposition{}
 	}
 	return models.ComposeOmniChatDisposition(self, relationship, time.Now())

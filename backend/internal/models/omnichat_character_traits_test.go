@@ -332,3 +332,44 @@ func TestOmniChatRecordExtractionAppliesEachEpisodeInTheBatch(t *testing.T) {
 	require.InDelta(t, oneAtATime.Trust, traits.Trust, 1e-6)
 	require.InDelta(t, oneAtATime.Warmth, traits.Warmth, 1e-6)
 }
+
+// A conversation needs both tiers and reads them together. The tiers still
+// have to come back as themselves, and the scoping rule is unchanged: no other
+// relationship may ride along in the same result.
+func TestOmniChatCharacterTraitsLoadForConversationReadsBothTiers(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "traitpair")
+	repo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, OmniChatMemoryTierSelf, 0.9))
+	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.userID, -0.9))
+	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.otherID, -0.9))
+
+	self, relationship, err := repo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+
+	require.Equal(t, OmniChatMemoryTierSelf, self.OwnerUserID)
+	require.Greater(t, self.Trust, 0.0, "the self tier must not arrive as the relationship")
+	require.Equal(t, fixture.userID, relationship.OwnerUserID)
+	require.Less(t, relationship.Trust, 0.0)
+
+	// The other user has a row, and a strongly negative one, but reading this
+	// conversation cannot see it.
+	theirs, err := repo.Load(ctx, fixture.personaID, fixture.otherID)
+	require.NoError(t, err)
+	require.Less(t, theirs.Trust, 0.0)
+	require.NotEqual(t, fixture.otherID, relationship.OwnerUserID)
+
+	// Both halves of a pair that has never been written are the neutral row
+	// rather than an error, exactly as a single-tier read is.
+	stranger := seedMemoryFixture(t, pool, "traitpairnew")
+	self, relationship, err = repo.LoadForConversation(ctx, stranger.personaID, stranger.userID)
+	require.NoError(t, err)
+	require.Zero(t, self.Trust)
+	require.Zero(t, relationship.Trust)
+	require.Zero(t, self.Mood)
+	require.Zero(t, relationship.Mood)
+}
