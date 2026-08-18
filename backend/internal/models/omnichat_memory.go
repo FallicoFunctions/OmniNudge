@@ -357,6 +357,9 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	valences := make(map[int][]float64)
+	movedPersonas := make([]int, 0, 1)
+
 	for _, episode := range episodes {
 		if err := episode.Validate(); err != nil {
 			return err
@@ -412,15 +415,18 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 			}
 		}
 
-		// What happens to a character changes the character. This runs in the
-		// same transaction as the episode that caused it, so a disposition can
-		// never drift out of step with the memories behind it: either both land
-		// or neither does. The tier is the extraction's, so a private
-		// conversation moves only that relationship.
+		// What happens to a character changes the character, but the traits row
+		// is not taken here. It is a single row per relationship and this loop
+		// is holding a lock on every entity it has written, so touching it
+		// between two entities would leave a shared lock sitting in the middle
+		// of an order the transcript chose. The valences are collected and
+		// applied once, after everything else, so the lock order is always
+		// entities and then traits.
 		if episode.EmotionalValence != nil {
-			if err := applyEpisodeValenceTx(ctx, tx, episode.PersonaID, ownerUserID, *episode.EmotionalValence); err != nil {
-				return err
+			if _, seen := valences[episode.PersonaID]; !seen {
+				movedPersonas = append(movedPersonas, episode.PersonaID)
 			}
+			valences[episode.PersonaID] = append(valences[episode.PersonaID], *episode.EmotionalValence)
 		}
 	}
 
@@ -441,6 +447,17 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrOmniChatMemoryRaced
+	}
+
+	// The traits move last, and in the same transaction as the episodes that
+	// caused them, so a disposition can never drift out of step with the
+	// memories behind it: either both land or neither does. Every episode still
+	// applies on its own terms -- this is a batch, not a total. The tier is the
+	// extraction's, so a private conversation moves only that relationship.
+	for _, personaID := range movedPersonas {
+		if err := applyEpisodeValencesTx(ctx, tx, personaID, ownerUserID, valences[personaID]); err != nil {
+			return err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
