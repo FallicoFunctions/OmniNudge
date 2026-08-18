@@ -19,12 +19,15 @@ type stubTraitLoader struct {
 	asked   []int
 }
 
-func (s *stubTraitLoader) Load(_ context.Context, _, ownerUserID int) (models.OmniChatCharacterTraits, error) {
-	s.asked = append(s.asked, ownerUserID)
+// The stub serves the two tiers the same way the repository's one query does,
+// and records exactly which owners it was asked to match, so a read that ever
+// widened past the self tier and this conversation's own user would show up.
+func (s *stubTraitLoader) LoadForConversation(_ context.Context, _, userID int) (models.OmniChatCharacterTraits, models.OmniChatCharacterTraits, error) {
+	s.asked = append(s.asked, models.OmniChatMemoryTierSelf, userID)
 	if s.err != nil {
-		return models.OmniChatCharacterTraits{}, s.err
+		return models.OmniChatCharacterTraits{}, models.OmniChatCharacterTraits{}, s.err
 	}
-	return s.byOwner[ownerUserID], nil
+	return s.byOwner[models.OmniChatMemoryTierSelf], s.byOwner[userID], nil
 }
 
 func testPersona() *models.BotPersona {

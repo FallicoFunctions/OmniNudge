@@ -130,6 +130,60 @@ func (r *OmniChatCharacterTraitRepository) Load(ctx context.Context, personaID, 
 	return loadTraits(ctx, r.pool, personaID, ownerUserID)
 }
 
+// LoadForConversation reads both tiers a conversation speaks from: what the
+// character is like in itself, and what it is like with this one person.
+//
+// It is one round trip because it sits on the critical path of a generation,
+// in front of the model call, and two sequential single-row lookups for two
+// rows of the same table bought nothing but a second wait. The tiers are told
+// apart by the column that already distinguishes them -- the self tier is the
+// row with no owner -- so nothing is inferred from the order they come back in.
+//
+// A character nobody has met is not an error in either tier: the missing row is
+// the neutral one. Mood comes back as stored; call MoodAt to get the mood now.
+func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Context, personaID, userID int) (self, relationship OmniChatCharacterTraits, err error) {
+	self = OmniChatCharacterTraits{PersonaID: personaID, OwnerUserID: OmniChatMemoryTierSelf, MoodUpdatedAt: time.Now()}
+	relationship = OmniChatCharacterTraits{PersonaID: personaID, OwnerUserID: userID, MoodUpdatedAt: time.Now()}
+
+	// Still scoped to this persona and to these two tiers, which is the whole
+	// reason one user's private history cannot show up in another's prompt.
+	// A conversation with no user reads the self tier alone rather than
+	// widening the array to something that would match a relationship.
+	tiers := []int{OmniChatMemoryTierSelf}
+	if userID > 0 {
+		tiers = append(tiers, userID)
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT owner_user_id, mood, mood_updated_at, trust, warmth
+		FROM omnichat_character_traits
+		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = ANY($2)
+	`, personaID, tiers)
+	if err != nil {
+		return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var owner *int
+		var traits OmniChatCharacterTraits
+		if err := rows.Scan(&owner, &traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth); err != nil {
+			return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+		}
+		traits.PersonaID = personaID
+		if owner == nil {
+			traits.OwnerUserID = OmniChatMemoryTierSelf
+			self = traits
+			continue
+		}
+		traits.OwnerUserID = *owner
+		relationship = traits
+	}
+	if err := rows.Err(); err != nil {
+		return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+	}
+	return self, relationship, nil
+}
+
 // ApplyEpisodeValence moves a character's traits by one episode.
 //
 // The tier is the caller's: pass a user id for what happened in that person's
