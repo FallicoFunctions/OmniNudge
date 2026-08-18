@@ -143,7 +143,7 @@ func (r *OmniChatCharacterTraitRepository) ApplyEpisodeValence(ctx context.Conte
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := applyEpisodeValenceTx(ctx, tx, personaID, ownerUserID, valence); err != nil {
+	if err := applyEpisodeValencesTx(ctx, tx, personaID, ownerUserID, []float64{valence}); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -152,15 +152,31 @@ func (r *OmniChatCharacterTraitRepository) ApplyEpisodeValence(ctx context.Conte
 	return nil
 }
 
-// applyEpisodeValenceTx is the whole mechanism: take the row, move it in Go,
-// write it back. The arithmetic lives in Apply and nowhere else, so the decay
-// a reader sees and the decay a writer applies cannot drift apart.
-func applyEpisodeValenceTx(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUserID int, valence float64) error {
+// applyEpisodeValencesTx is the whole mechanism: take the row, move it in Go
+// once for every episode in the batch, write it back. The arithmetic lives in
+// Apply and nowhere else, so the decay a reader sees and the decay a writer
+// applies cannot drift apart.
+//
+// A whole extraction's episodes arrive together because of where this is
+// called from. The extraction's transaction is already holding a row lock on
+// every entity its episodes mentioned, and there is exactly one traits row per
+// relationship, so taking that row in the middle of the entity writes would
+// put a shared lock inside a sequence whose order is whatever the transcript
+// happened to name first: two extractions of the same character, mentioning
+// the same two places in opposite orders, could then wait on each other.
+// Taken once at the end, the order is always entities and then traits, and
+// there is no cycle to form.
+func applyEpisodeValencesTx(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUserID int, valences []float64) error {
+	if len(valences) == 0 {
+		return nil
+	}
 	if personaID < 1 {
 		return errors.New("omnichat traits: persona is required")
 	}
-	if valence < -1 || valence > 1 {
-		return errors.New("omnichat traits: emotional valence must be within -1..1")
+	for _, valence := range valences {
+		if valence < -1 || valence > 1 {
+			return errors.New("omnichat traits: emotional valence must be within -1..1")
+		}
 	}
 
 	// The insert is unconditional so the row exists to be locked, and DO UPDATE
@@ -181,8 +197,15 @@ func applyEpisodeValenceTx(ctx context.Context, q omniChatTraitQuerier, personaI
 		return err
 	}
 
+	// Each episode still lands on its own. Batching changes when the row is
+	// touched and nothing about what it ends up holding: the threshold, the
+	// asymmetry of trust and the clamp all still apply once per episode, and a
+	// batch is never collapsed into a sum or an average. They share one instant
+	// because they did in fact all arrive in the same extraction.
 	now := time.Now()
-	traits.Apply(valence, now)
+	for _, valence := range valences {
+		traits.Apply(valence, now)
+	}
 
 	if _, err := q.Exec(ctx, `
 		UPDATE omnichat_character_traits

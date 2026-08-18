@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -263,4 +264,71 @@ func TestOmniChatRecordExtractionTraitsRollBackWithTheEpisodes(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, traits.Mood, "a discarded extraction must not leave a mark on the character")
 	require.Zero(t, traits.Trust)
+}
+
+// The traits row is taken once, after every episode and entity in the
+// extraction has been written, so it can never sit in the middle of a lock
+// order the transcript chose. What that must not change is the result: every
+// episode still lands on its own, and a batch is not a sum or an average of
+// one.
+func TestOmniChatRecordExtractionAppliesEachEpisodeInTheBatch(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "traitbatch")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	const cruel = -0.9
+	batch := make([]OmniChatMemoryEpisode, 0, 4)
+	for i := 0; i < cap(batch); i++ {
+		batch = append(batch, OmniChatMemoryEpisode{
+			PersonaID:       fixture.personaID,
+			OwnerUserID:     fixture.userID,
+			ConversationID:  conversationID,
+			Title:           fmt.Sprintf("The %dth thing he said", i),
+			Summary:         "He meant every word of it.",
+			Salience:        0.9,
+			Distinctiveness: 0.8,
+			// Two places, named in this order, are what a second extraction
+			// mentioning them in the other order used to deadlock against.
+			Entities: []OmniChatMemoryEntityRef{
+				{CanonicalName: "Prague", Kind: OmniChatMemoryEntityPlace},
+				{CanonicalName: "Berlin", Kind: OmniChatMemoryEntityPlace},
+			},
+			EmotionalValence: floatPtr(cruel),
+		})
+	}
+	require.NoError(t, memories.RecordExtraction(ctx, conversationID, fixture.userID, 0, 9, batch))
+
+	traits, err := traitRepo.Load(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+
+	// Worked through by hand rather than recorded from a run. Mood takes half
+	// of each valence and clamps: -0.45, -0.9, then the floor twice over.
+	// Trust and warmth are past the threshold every time, so they take four
+	// steps of -0.9 * 0.06 and -0.9 * 0.04.
+	// The tolerance is the column's, not the arithmetic's: traits are stored
+	// as float4 and come back a few parts in ten million off what Go computed.
+	require.InDelta(t, -1, traits.Mood, 1e-6)
+	require.InDelta(t, -0.216, traits.Trust, 1e-6)
+	require.InDelta(t, -0.144, traits.Warmth, 1e-6)
+
+	// And the same batch applied one episode at a time -- which is what the
+	// extraction used to do, mid-transaction -- lands on exactly the same
+	// numbers.
+	for i := 0; i < len(batch); i++ {
+		require.NoError(t, traitRepo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.otherID, cruel))
+	}
+	oneAtATime, err := traitRepo.Load(ctx, fixture.personaID, fixture.otherID)
+	require.NoError(t, err)
+	require.InDelta(t, oneAtATime.Mood, traits.Mood, 1e-6)
+	require.InDelta(t, oneAtATime.Trust, traits.Trust, 1e-6)
+	require.InDelta(t, oneAtATime.Warmth, traits.Warmth, 1e-6)
 }
