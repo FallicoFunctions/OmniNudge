@@ -1,0 +1,178 @@
+package services
+
+import (
+	"context"
+	"math"
+	"strings"
+	"time"
+
+	zlog "github.com/rs/zerolog/log"
+
+	"github.com/omninudge/backend/internal/models"
+)
+
+// A trait has to have moved before it is worth saying anything about. Below
+// this the character is at rest, and a prompt that describes rest is a prompt
+// that invites the model to perform it -- so a fresh character produces no
+// block at all and behaves exactly as it did before traits existed.
+const omniChatDispositionDeadband = 0.2
+
+// Above this the wording is strong. It is still not operatic: one bad
+// conversation leaves a character low, not destroyed, and language that
+// overshoots the state is what turns a disposition into a caricature.
+const omniChatDispositionStrong = 0.6
+
+// omniChatTraitLoader reads one tier of a character's traits. The concrete
+// implementation is the repository; the interface is here so a conversation can
+// be built without a database.
+type omniChatTraitLoader interface {
+	Load(ctx context.Context, personaID, ownerUserID int) (models.OmniChatCharacterTraits, error)
+}
+
+// SetCharacterTraits wires the dispositions a character speaks from. Without
+// it the service behaves exactly as it did before they existed.
+func (s *ChatbotService) SetCharacterTraits(loader omniChatTraitLoader) *ChatbotService {
+	s.traits = loader
+	return s
+}
+
+// loadDisposition composes how the character is now: its own state plus its
+// history with this particular person.
+//
+// Traits colour a reply and are never a precondition for one, so a repository
+// that is missing or failing yields the neutral disposition -- which renders
+// nothing -- rather than an error. This is how recall degrades, for the same
+// reason.
+func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.BotPersona, userID int) models.OmniChatDisposition {
+	if s == nil || s.traits == nil || persona == nil {
+		return models.OmniChatDisposition{}
+	}
+	self, err := s.traits.Load(ctx, persona.ID, models.OmniChatMemoryTierSelf)
+	if err != nil {
+		zlog.Warn().Err(err).Int("persona_id", persona.ID).
+			Msg("omnichat traits: self tier unavailable, generating without disposition")
+		return models.OmniChatDisposition{}
+	}
+	// Keyed on the conversation's own user, always. This is what keeps one
+	// person's history with the character out of everybody else's prompt.
+	relationship, err := s.traits.Load(ctx, persona.ID, userID)
+	if err != nil {
+		zlog.Warn().Err(err).Int("persona_id", persona.ID).
+			Msg("omnichat traits: relationship tier unavailable, generating without disposition")
+		return models.OmniChatDisposition{}
+	}
+	return models.ComposeOmniChatDisposition(self, relationship, time.Now())
+}
+
+// renderCharacterDisposition writes the disposition as a note about how the
+// character is, in language rather than numbers.
+//
+// The framing is the point. A stat block tells a model to act out a value; a
+// note about how someone is lets it colour what they say. So this is presented
+// the way recalled memories are -- as the character's own state, explicitly not
+// an instruction -- and a character told it is guarded should sound guarded
+// rather than announce that it is.
+//
+// Nothing moves until a trait has left the deadband, so the block is absent far
+// more often than it is present, and that is the intended ratio.
+func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
+	mood := moodPhrase(disposition.Mood)
+	toward := make([]string, 0, 2)
+	if phrase := trustPhrase(disposition.Trust); phrase != "" {
+		toward = append(toward, phrase)
+	}
+	if phrase := warmthPhrase(disposition.Warmth); phrase != "" {
+		toward = append(toward, phrase)
+	}
+	if mood == "" && len(toward) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.WriteString("\n\n[How You Are Right Now]\n")
+	builder.WriteString("This is your own state, not an instruction. Let it colour how you speak; ")
+	builder.WriteString("do not announce it, perform it, or mention this note.\n")
+	if mood != "" {
+		builder.WriteString("You are " + mood + " at the moment.\n")
+	}
+	if len(toward) > 0 {
+		builder.WriteString("With this person you are " + joinClauses(toward) + ".\n")
+	}
+	return strings.TrimRight(builder.String(), "\n")
+}
+
+func moodPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "in high spirits"
+	case bandMildPositive:
+		return "in good spirits"
+	case bandMildNegative:
+		return "a little flat"
+	case bandStrongNegative:
+		return "low"
+	}
+	return ""
+}
+
+func trustPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "at ease with them and inclined to take them at their word"
+	case bandMildPositive:
+		return "fairly at ease"
+	case bandMildNegative:
+		return "a little guarded"
+	case bandStrongNegative:
+		return "guarded and slow to take them at their word"
+	}
+	return ""
+}
+
+func warmthPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "very fond of them"
+	case bandMildPositive:
+		return "fond of them"
+	case bandMildNegative:
+		return "a little cool toward them"
+	case bandStrongNegative:
+		return "cool toward them"
+	}
+	return ""
+}
+
+type traitBand int
+
+const (
+	bandRest traitBand = iota
+	bandMildPositive
+	bandStrongPositive
+	bandMildNegative
+	bandStrongNegative
+)
+
+func band(value float64) traitBand {
+	magnitude := math.Abs(value)
+	if magnitude < omniChatDispositionDeadband {
+		return bandRest
+	}
+	if value > 0 {
+		if magnitude >= omniChatDispositionStrong {
+			return bandStrongPositive
+		}
+		return bandMildPositive
+	}
+	if magnitude >= omniChatDispositionStrong {
+		return bandStrongNegative
+	}
+	return bandMildNegative
+}
+
+func joinClauses(clauses []string) string {
+	if len(clauses) == 1 {
+		return clauses[0]
+	}
+	return strings.Join(clauses[:len(clauses)-1], ", ") + ", and " + clauses[len(clauses)-1]
+}

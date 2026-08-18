@@ -115,6 +115,7 @@ type ChatbotService struct {
 	entitlement *OmniChatContentEntitlement
 	memory      omniChatMemoryRecaller
 	memoryQueue omniChatMemoryEnqueuer
+	traits      omniChatTraitLoader
 	hub         *websocket.Hub
 }
 
@@ -372,12 +373,13 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	// already present verbatim, so cueing on it would surface memories about
 	// whatever was discussed twenty turns ago rather than what was just asked.
 	memories := s.recallMemories(chatCtx, persona, userID, content)
+	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithMemory(persona, conv.Settings, history, sceneState, memories), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, memories, disposition), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -519,12 +521,13 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	// retry answers a different question than the one the user asked. The cue is
 	// the trailing user turn, which the guard above has already established.
 	memories := s.recallMemories(chatCtx, persona, userID, history[len(history)-1].Content)
+	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithMemory(persona, conv.Settings, history, sceneState, memories), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, memories, disposition), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -812,12 +815,6 @@ func buildConversationSystemPromptWithSceneState(
 	return buildConversationSystemPromptWithMemory(persona, settings, history, sceneState, nil)
 }
 
-// buildConversationSystemPromptWithMemory assembles the system prompt.
-//
-// Block order is load-bearing. Recalled memories sit below the conversation
-// trust boundary because they are derived from the user's own transcript and
-// are therefore no more trusted than it, and above the scene state because the
-// scene governs the present while memories only govern the past.
 func buildConversationSystemPromptWithMemory(
 	persona *models.BotPersona,
 	settings *models.ConversationSettings,
@@ -825,9 +822,35 @@ func buildConversationSystemPromptWithMemory(
 	sceneState *models.OmniChatConversationSceneState,
 	memories []*models.OmniChatMemoryEpisode,
 ) string {
+	return buildConversationSystemPromptWithDisposition(persona, settings, history, sceneState, memories, models.OmniChatDisposition{})
+}
+
+// buildConversationSystemPromptWithDisposition assembles the system prompt.
+//
+// Block order is load-bearing. Recalled memories sit below the conversation
+// trust boundary because they are derived from the user's own transcript and
+// are therefore no more trusted than it, and above the scene state because the
+// scene governs the present while memories only govern the past.
+//
+// The disposition follows the memories for both reasons at once. It is moved by
+// the valence of episodes extracted from this user's transcript, so it is no
+// more trusted than the transcript that produced it; and it says how the
+// character is rather than where it is, so the scene below still governs every
+// fact about the present. Reading it directly after what the character
+// remembers is also how it reads best: the history, and then what the history
+// has left it feeling.
+func buildConversationSystemPromptWithDisposition(
+	persona *models.BotPersona,
+	settings *models.ConversationSettings,
+	history []*models.BotMessage,
+	sceneState *models.OmniChatConversationSceneState,
+	memories []*models.OmniChatMemoryEpisode,
+	disposition models.OmniChatDisposition,
+) string {
 	base := buildCharacterPromptBase(persona, history)
 	base += conversationHistoryTrustBoundary
 	base += renderRecalledMemories(memories)
+	base += renderCharacterDisposition(disposition)
 	if settings != nil {
 		metadata := make([]string, 0, 3)
 		if settings.UserName != "" {
