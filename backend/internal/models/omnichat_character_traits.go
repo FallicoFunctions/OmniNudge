@@ -216,3 +216,30 @@ func loadTraits(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUse
 	}
 	return traits, nil
 }
+
+// OmniChatDisposition is how a character is with one person at one instant:
+// its own state and its history with them, added together.
+//
+// Mood here is already decayed to the instant it was composed for, so unlike
+// the stored traits this is a reading rather than a pair to be interpreted.
+type OmniChatDisposition struct {
+	Mood   float64
+	Trust  float64
+	Warmth float64
+}
+
+// ComposeOmniChatDisposition adds a character's own traits to the traits of
+// one relationship.
+//
+// Both halves are real and neither replaces the other: a character having a
+// bad week is having it with everyone, and being wary of one person does not
+// make it wary of the next. Adding is what makes both true at once, and the
+// clamp is what stops the two halves from summing past the scale the wording
+// can express.
+func ComposeOmniChatDisposition(self, relationship OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
+	return OmniChatDisposition{
+		Mood:   clampTrait(self.MoodAt(at) + relationship.MoodAt(at)),
+		Trust:  clampTrait(self.Trust + relationship.Trust),
+		Warmth: clampTrait(self.Warmth + relationship.Warmth),
+	}
+}
