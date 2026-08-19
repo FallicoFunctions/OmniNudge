@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 

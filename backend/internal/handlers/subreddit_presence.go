@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strings"
 
@@ -43,8 +43,8 @@ func (h *SubredditPresenceHandler) PingSubredditPresence(c *gin.Context) {
 	activeUsers := h.presence.Touch(subreddit, key)
 
 	c.JSON(http.StatusOK, gin.H{
-		"subreddit":       strings.ToLower(subreddit),
-		"active_users":    activeUsers,
+		"subreddit":      strings.ToLower(subreddit),
+		"active_users":   activeUsers,
 		"window_seconds": int(h.presence.TTL().Seconds()),
 	})
 }
@@ -72,8 +72,8 @@ func (h *SubredditPresenceHandler) GetSubredditActiveUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"subreddit":       strings.ToLower(subreddit),
-		"active_users":    activeUsers,
+		"subreddit":      strings.ToLower(subreddit),
+		"active_users":   activeUsers,
 		"window_seconds": int(h.presence.TTL().Seconds()),
 	})
 }

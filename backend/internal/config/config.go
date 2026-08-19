@@ -87,10 +87,10 @@ type OpenRouterConfig struct {
 // concerns. RunPod endpoints are owned by the deployment and expose the
 // stable OmniChat media-worker contract consumed by the queue.
 type OmniChatMediaConfig struct {
-	Provider                    string
-	RunPodAPIKey                string
-	RunPodBaseURL               string
-	RunPodImageEndpointID       string
+	Provider              string
+	RunPodAPIKey          string
+	RunPodBaseURL         string
+	RunPodImageEndpointID string
 	// RunPodNSFWImageEndpointID serves accounts entitled to explicit content.
 	// Every explicit pixel is produced by the image phase -- a video is only an
 	// animation of a still that already exists -- so this one split covers both

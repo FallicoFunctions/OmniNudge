@@ -62,7 +62,7 @@ type OmniChatSceneState struct {
 	Pose            string   `json:"pose,omitempty"`
 	Expression      string   `json:"expression,omitempty"`
 	Mood            string   `json:"mood,omitempty"`
-	CameraDirection string `json:"camera_direction,omitempty"`
+	CameraDirection string   `json:"camera_direction,omitempty"`
 	// ViewerPosition is where the user's body is in the scene. The image is shot
 	// from the user's point of view, so this decides what is in the foreground:
 	// a user lying on the bed must see the bed, not the character standing in

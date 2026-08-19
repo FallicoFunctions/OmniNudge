@@ -108,7 +108,7 @@ type OmniChatGenerationHandler struct {
 	// the real implementation refuses loopback addresses by design, which
 	// makes an in-process test server unusable. Nil means the real one.
 	downloadMedia func(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, additionalHosts ...string) (*generatedMediaDownload, func(), error)
-	billing          interface {
+	billing       interface {
 		CaptureOwned(context.Context, int, uuid.UUID) error
 		RefundOwned(context.Context, int, uuid.UUID) error
 	}

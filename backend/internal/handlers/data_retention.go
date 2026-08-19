@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"time"
 

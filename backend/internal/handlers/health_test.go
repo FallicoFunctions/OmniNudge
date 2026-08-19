@@ -34,10 +34,10 @@ func setupHealthHandlerTest(t *testing.T) (*HealthHandler, func()) {
 
 func TestHealthCheck(t *testing.T) {
 	testCases := []struct {
-		name               string
-		useNilDB           bool
-		expectedStatus     int
-		expectedHealthy    bool
+		name            string
+		useNilDB        bool
+		expectedStatus  int
+		expectedHealthy bool
 	}{
 		{
 			name:            "healthy with real db",

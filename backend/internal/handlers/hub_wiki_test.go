@@ -27,12 +27,12 @@ func uniqueHubWikiName(base string) string {
 }
 
 type hubWikiTestFixture struct {
-	handler   *HubWikiHandler
-	hubName   string
-	hubID     int
-	ownerID   int
-	nonModID  int
-	cleanup   func()
+	handler  *HubWikiHandler
+	hubName  string
+	hubID    int
+	ownerID  int
+	nonModID int
+	cleanup  func()
 }
 
 func setupHubWikiTest(t *testing.T) *hubWikiTestFixture {

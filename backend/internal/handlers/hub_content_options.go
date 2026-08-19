@@ -19,19 +19,19 @@ func mapContentOptions(option string) (allowText, allowLink, allowImage, allowVi
 
 func buildDefaultHubSettings(hubID int, privacyType string, allowText, allowLink, allowImage, allowVideo bool) *models.HubSettings {
 	return &models.HubSettings{
-		HubID:                hubID,
-		PrivacyType:          privacyType,
-		AllowTextPosts:       allowText,
-		AllowLinkPosts:       allowLink,
-		AllowImagePosts:      allowImage,
-		AllowVideoPosts:      allowVideo,
-		AllowPollPosts:       true,
-		AllowMediaInComments: true,
-		RequirePostFlair:     false,
-		SpamFilterStrength:   "medium",
+		HubID:                     hubID,
+		PrivacyType:               privacyType,
+		AllowTextPosts:            allowText,
+		AllowLinkPosts:            allowLink,
+		AllowImagePosts:           allowImage,
+		AllowVideoPosts:           allowVideo,
+		AllowPollPosts:            true,
+		AllowMediaInComments:      true,
+		RequirePostFlair:          false,
+		SpamFilterStrength:        "medium",
 		AccessRequestCooldownDays: 0,
-		AllowSpoilers:        true,
-		ShowThumbnails:       true,
-		EnableWiki:           false,
+		AllowSpoilers:             true,
+		ShowThumbnails:            true,
+		EnableWiki:                false,
 	}
 }

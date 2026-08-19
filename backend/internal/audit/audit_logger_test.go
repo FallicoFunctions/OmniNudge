@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestAuditLogger_Log(t *testing.T) {
 	db := testutil.NewTestDatabase(t)
 	logger := audit.NewAuditLogger(db.Pool)

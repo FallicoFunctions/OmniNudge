@@ -40,7 +40,7 @@ func (j *RefreshMaterializedViewsJob) Run(ctx context.Context) error {
 
 	// BUG-17: Allowlist check — only refresh known materialized views to prevent SQL injection.
 	allowed := map[string]bool{
-		"user_post_stats":   true,
+		"user_post_stats":    true,
 		"hub_activity_stats": true,
 	}
 

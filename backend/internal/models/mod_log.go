@@ -34,14 +34,14 @@ func (j *JSONB) Scan(value interface{}) error {
 }
 
 type ModLog struct {
-	ID           int       `json:"id"`
-	HubID        int       `json:"hub_id"`
-	ModeratorID  int       `json:"moderator_id"`
-	Action       string    `json:"action"`
-	TargetType   string    `json:"target_type,omitempty"`
-	TargetID     int       `json:"target_id,omitempty"`
-	Details      JSONB     `json:"details,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID          int       `json:"id"`
+	HubID       int       `json:"hub_id"`
+	ModeratorID int       `json:"moderator_id"`
+	Action      string    `json:"action"`
+	TargetType  string    `json:"target_type,omitempty"`
+	TargetID    int       `json:"target_id,omitempty"`
+	Details     JSONB     `json:"details,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 
 	// Populated fields
 	ModeratorName string `json:"moderator_name,omitempty"`

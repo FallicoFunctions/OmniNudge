@@ -27,13 +27,13 @@ func uniqueHubAccessName(base string) string {
 }
 
 type hubAccessTestFixture struct {
-	handler  *AccessRequestHandler
-	hubName  string
-	hubID    int
-	ownerID  int
-	userID   int
-	userID2  int
-	cleanup  func()
+	handler *AccessRequestHandler
+	hubName string
+	hubID   int
+	ownerID int
+	userID  int
+	userID2 int
+	cleanup func()
 }
 
 func setupHubAccessRequestTest(t *testing.T) *hubAccessTestFixture {

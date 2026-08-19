@@ -10,19 +10,19 @@ import (
 )
 
 type HubBan struct {
-	ID        int       `json:"id"`
-	HubID     int       `json:"hub_id"`
-	UserID    int       `json:"user_id"`
-	BannedBy  int       `json:"banned_by"`
-	Reason    string    `json:"reason"`
-	Note      string    `json:"note"` // Private mod note
-	BanType   string    `json:"ban_type"` // 'permanent' or 'temporary'
+	ID        int        `json:"id"`
+	HubID     int        `json:"hub_id"`
+	UserID    int        `json:"user_id"`
+	BannedBy  int        `json:"banned_by"`
+	Reason    string     `json:"reason"`
+	Note      string     `json:"note"`     // Private mod note
+	BanType   string     `json:"ban_type"` // 'permanent' or 'temporary'
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time  `json:"created_at"`
 
 	// Populated fields
-	Username       string `json:"username,omitempty"`
-	BannedByName   string `json:"banned_by_name,omitempty"`
+	Username     string `json:"username,omitempty"`
+	BannedByName string `json:"banned_by_name,omitempty"`
 }
 
 type HubBanRepository struct {
