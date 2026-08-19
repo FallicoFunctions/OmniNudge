@@ -36,5 +36,4 @@ const (
 	// user_themes.scope_type
 	ThemeScopeGlobal  = "global"
 	ThemeScopePerPage = "per_page"
-
 )

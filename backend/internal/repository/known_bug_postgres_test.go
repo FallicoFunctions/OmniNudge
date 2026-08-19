@@ -19,8 +19,8 @@ func TestPostgresKnownBugRepository_CreateAndGetAll(t *testing.T) {
 	bug := &domain.KnownBug{
 		Title:       "Known crash on login",
 		Description: "Users see a 500 on login",
-		Status:   "investigating",
-		Severity: "low",
+		Status:      "investigating",
+		Severity:    "low",
 	}
 
 	err := repo.Create(ctx, bug)

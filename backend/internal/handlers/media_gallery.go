@@ -22,15 +22,15 @@ func NewMediaGalleryHandler(pool *pgxpool.Pool) *MediaGalleryHandler {
 
 // MediaItem represents a media item in the gallery
 type MediaItem struct {
-	ID            int       `json:"id"`
-	MessageID     int       `json:"message_id"`
-	SenderID      int       `json:"sender_id"`
-	MessageType   string    `json:"message_type"`
-	MediaURL      string    `json:"media_url"`
-	MediaType     string    `json:"media_type"`
-	MediaSize     int       `json:"media_size"`
-	SentAt        time.Time `json:"created_at"` // JSON key kept as created_at for API compatibility
-	IsMine        bool      `json:"is_mine"`    // True if current user sent it
+	ID          int       `json:"id"`
+	MessageID   int       `json:"message_id"`
+	SenderID    int       `json:"sender_id"`
+	MessageType string    `json:"message_type"`
+	MediaURL    string    `json:"media_url"`
+	MediaType   string    `json:"media_type"`
+	MediaSize   int       `json:"media_size"`
+	SentAt      time.Time `json:"created_at"` // JSON key kept as created_at for API compatibility
+	IsMine      bool      `json:"is_mine"`    // True if current user sent it
 }
 
 // GetConversationMedia returns paginated media files for a conversation.

@@ -64,17 +64,17 @@ type RedditPostDetails struct {
 
 // SavedRedditAPIComment represents a saved Reddit API comment
 type SavedRedditAPIComment struct {
-	Subreddit        string    `json:"subreddit"`
-	RedditPostID     string    `json:"reddit_post_id"`
-	RedditCommentID  string    `json:"reddit_comment_id"`
-	PostTitle        *string   `json:"post_title,omitempty"`
-	PostAuthor       *string   `json:"post_author,omitempty"`
-	CommentAuthor    string    `json:"comment_author"`
-	CommentBody      string    `json:"comment_body"`
-	Score            int       `json:"score"`
-	CreatedUTC       *int64    `json:"created_utc,omitempty"`
-	ParentID         *string   `json:"parent_id,omitempty"`
-	SavedAt          time.Time `json:"saved_at"`
+	Subreddit       string    `json:"subreddit"`
+	RedditPostID    string    `json:"reddit_post_id"`
+	RedditCommentID string    `json:"reddit_comment_id"`
+	PostTitle       *string   `json:"post_title,omitempty"`
+	PostAuthor      *string   `json:"post_author,omitempty"`
+	CommentAuthor   string    `json:"comment_author"`
+	CommentBody     string    `json:"comment_body"`
+	Score           int       `json:"score"`
+	CreatedUTC      *int64    `json:"created_utc,omitempty"`
+	ParentID        *string   `json:"parent_id,omitempty"`
+	SavedAt         time.Time `json:"saved_at"`
 }
 
 // RedditAPICommentDetails contains the metadata we store for Reddit API comments

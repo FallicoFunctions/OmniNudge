@@ -32,15 +32,15 @@ type MessageReaction struct {
 
 // ReactionSummary aggregates all reactions of the same emoji on a message.
 type ReactionSummary struct {
-	Emoji        string   `json:"emoji"`
-	Count        int      `json:"count"`
-	UserIDs      []int    `json:"user_ids"`
-	Usernames    []string `json:"usernames"`
-	UserReacted  bool     `json:"user_reacted"`
+	Emoji       string   `json:"emoji"`
+	Count       int      `json:"count"`
+	UserIDs     []int    `json:"user_ids"`
+	Usernames   []string `json:"usernames"`
+	UserReacted bool     `json:"user_reacted"`
 	// MyReactionID is the ID of the requesting user's reaction for this emoji,
 	// or nil if the viewer has not reacted. Required by clients to call the
 	// DELETE /messages/{id}/reactions/{reaction_id} endpoint.
-	MyReactionID *int     `json:"my_reaction_id,omitempty"`
+	MyReactionID *int `json:"my_reaction_id,omitempty"`
 }
 
 // ReactionEvent is the typed WebSocket payload used for reaction events.

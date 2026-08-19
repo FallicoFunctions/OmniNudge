@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/domain"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresRedditPostRepository struct {

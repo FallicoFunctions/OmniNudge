@@ -93,4 +93,3 @@ func TestMessagePinningSchema_MaxTenPinnedPerConversation(t *testing.T) {
 	require.ErrorAs(t, err, &pgErr)
 	require.Equal(t, "messages_max_pinned_per_conversation", pgErr.ConstraintName)
 }
-

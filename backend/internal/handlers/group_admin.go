@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"log"
 	"net/http"
 	"strconv"
@@ -734,7 +734,7 @@ func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 	})
 
 	broadcastToGroup(ctx, h.pool, h.hub, convID, "group_slow_mode_updated", gin.H{
-		"conversation_id":  convID,
+		"conversation_id":   convID,
 		"slow_mode_seconds": req.Seconds,
 	})
 

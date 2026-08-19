@@ -10,20 +10,20 @@ import (
 
 // UserInstalledTheme tracks which users have installed which themes.
 type UserInstalledTheme struct {
-	ID                 int        `json:"id"`
-	UserID             int        `json:"user_id"`
-	ThemeID            int        `json:"theme_id"`
-	PurchasedAt        time.Time  `json:"purchased_at"`
-	PricePaid          int        `json:"price_paid"`
-	IsActive           bool       `json:"is_active"`
-	InstalledAt        time.Time  `json:"installed_at"`
-	LastUsedAt         *time.Time `json:"last_used_at,omitempty"`
-	InstalledVersion   *string    `json:"installed_version,omitempty"`
-	UpdateAvailable    bool       `json:"update_available"`
-	AutoUpdateEnabled  bool       `json:"auto_update_enabled"`
-	UserRating         *int       `json:"user_rating,omitempty"` // 1-5 stars
-	Review             *string    `json:"review,omitempty"`
-	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
+	ID                int        `json:"id"`
+	UserID            int        `json:"user_id"`
+	ThemeID           int        `json:"theme_id"`
+	PurchasedAt       time.Time  `json:"purchased_at"`
+	PricePaid         int        `json:"price_paid"`
+	IsActive          bool       `json:"is_active"`
+	InstalledAt       time.Time  `json:"installed_at"`
+	LastUsedAt        *time.Time `json:"last_used_at,omitempty"`
+	InstalledVersion  *string    `json:"installed_version,omitempty"`
+	UpdateAvailable   bool       `json:"update_available"`
+	AutoUpdateEnabled bool       `json:"auto_update_enabled"`
+	UserRating        *int       `json:"user_rating,omitempty"` // 1-5 stars
+	Review            *string    `json:"review,omitempty"`
+	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
 }
 
 // UserInstalledThemeRepository handles CRUD operations for user_installed_themes.

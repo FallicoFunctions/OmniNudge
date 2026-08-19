@@ -10,20 +10,20 @@ import (
 )
 
 type RemovedContent struct {
-	ID               int        `json:"id"`
-	ContentType      string     `json:"content_type"` // 'post' or 'comment'
-	ContentID        int        `json:"content_id"`
-	HubID            *int       `json:"hub_id,omitempty"`
-	RemovedBy        int        `json:"removed_by"`
-	RemovalReasonID  *int       `json:"removal_reason_id,omitempty"`
-	CustomReason     string     `json:"custom_reason,omitempty"`
-	ModNote          string     `json:"mod_note,omitempty"` // Private note for mod team
-	RemovedAt        time.Time  `json:"removed_at"`
+	ID              int       `json:"id"`
+	ContentType     string    `json:"content_type"` // 'post' or 'comment'
+	ContentID       int       `json:"content_id"`
+	HubID           *int      `json:"hub_id,omitempty"`
+	RemovedBy       int       `json:"removed_by"`
+	RemovalReasonID *int      `json:"removal_reason_id,omitempty"`
+	CustomReason    string    `json:"custom_reason,omitempty"`
+	ModNote         string    `json:"mod_note,omitempty"` // Private note for mod team
+	RemovedAt       time.Time `json:"removed_at"`
 
 	// Populated fields
-	RemovedByName    string     `json:"removed_by_name,omitempty"`
-	ReasonTitle      string     `json:"reason_title,omitempty"`
-	ReasonMessage    string     `json:"reason_message,omitempty"`
+	RemovedByName string `json:"removed_by_name,omitempty"`
+	ReasonTitle   string `json:"reason_title,omitempty"`
+	ReasonMessage string `json:"reason_message,omitempty"`
 }
 
 type RemovedContentRepository struct {

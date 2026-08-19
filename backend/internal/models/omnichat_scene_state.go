@@ -370,6 +370,7 @@ func scanCheckpointSceneState(scanner interface{ Scan(...any) error }) (*OmniCha
 	}
 	return s, nil
 }
+
 const omniChatSceneMaxAccessories = 8
 
 // optionalSceneText accepts an empty value but applies the same bounds and

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // NotificationsHandler handles notification-related HTTP requests

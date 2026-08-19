@@ -24,10 +24,10 @@ func TestPostgresRedditPostCommentRepository_CreateAndGetByID(t *testing.T) {
 	postID := fmt.Sprintf("post_%d", time.Now().UnixNano())
 
 	comment := &domain.RedditPostComment{
-		UserID:    user.ID,
-		Subreddit: subreddit,
+		UserID:       user.ID,
+		Subreddit:    subreddit,
 		RedditPostID: postID,
-		Content:   "Test comment",
+		Content:      "Test comment",
 	}
 
 	err := repo.Create(ctx, comment)

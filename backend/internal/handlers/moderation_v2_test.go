@@ -27,12 +27,12 @@ func uniqueModV2Name(base string) string {
 }
 
 type modV2TestFixture struct {
-	handler     *ModerationHandlerV2
-	db          *database.Database
-	modUserID   int
-	targetID    int
-	hubID       int
-	cleanup     func()
+	handler   *ModerationHandlerV2
+	db        *database.Database
+	modUserID int
+	targetID  int
+	hubID     int
+	cleanup   func()
 }
 
 func setupModV2HandlerTest(t *testing.T) *modV2TestFixture {

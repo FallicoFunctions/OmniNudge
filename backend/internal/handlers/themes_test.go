@@ -27,11 +27,11 @@ func uniqueThemesUsername(base string) string {
 }
 
 type themesTestFixture struct {
-	handler    *ThemesHandler
-	db         *database.Database
-	userID     int
-	otherID    int
-	cleanup    func()
+	handler *ThemesHandler
+	db      *database.Database
+	userID  int
+	otherID int
+	cleanup func()
 }
 
 func setupThemesHandlerTest(t *testing.T) *themesTestFixture {

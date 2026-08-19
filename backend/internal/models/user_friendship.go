@@ -32,9 +32,9 @@ func CanonicalUserPair(a, b int) (int, int) {
 
 // FriendEntry is a single accepted friend in a list.
 type FriendEntry struct {
-	UserID    int       `json:"id"`
-	Username  string    `json:"username"`
-	AvatarURL *string   `json:"avatar_url"`
+	UserID       int       `json:"id"`
+	Username     string    `json:"username"`
+	AvatarURL    *string   `json:"avatar_url"`
 	FriendsSince time.Time `json:"friends_since"`
 }
 
