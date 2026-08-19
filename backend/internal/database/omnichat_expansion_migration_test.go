@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"184_omnichat_persona_disposition_baseline",
 		"183_omnichat_character_traits",
 		"182_omnichat_memory_recurrences",
 		"181_omnirave_withdrawal_has_no_expiry",
@@ -250,6 +251,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"184_omnichat_persona_disposition_baseline",
 		"183_omnichat_character_traits",
 		"182_omnichat_memory_recurrences",
 		"181_omnirave_withdrawal_has_no_expiry",
