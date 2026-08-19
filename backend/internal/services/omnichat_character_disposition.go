@@ -22,11 +22,11 @@ const omniChatDispositionDeadband = 0.2
 // overshoots the state is what turns a disposition into a caricature.
 const omniChatDispositionStrong = 0.6
 
-// omniChatTraitLoader reads both tiers of a character's traits at once. The
-// concrete implementation is the repository; the interface is here so a
-// conversation can be built without a database.
+// omniChatTraitLoader reads a character's authored baseline and both tiers of
+// her traits at once. The concrete implementation is the repository; the
+// interface is here so a conversation can be built without a database.
 type omniChatTraitLoader interface {
-	LoadForConversation(ctx context.Context, personaID, userID int) (self, relationship models.OmniChatCharacterTraits, err error)
+	LoadForConversation(ctx context.Context, personaID, userID int) (baseline models.OmniChatDispositionBaseline, self, relationship models.OmniChatCharacterTraits, err error)
 }
 
 // SetCharacterTraits wires the dispositions a character speaks from. Without
@@ -36,8 +36,8 @@ func (s *ChatbotService) SetCharacterTraits(loader omniChatTraitLoader) *Chatbot
 	return s
 }
 
-// loadDisposition composes how the character is now: its own state plus its
-// history with this particular person.
+// loadDisposition composes how the character is now: who she was written as,
+// plus her own state, plus her history with this particular person.
 //
 // Traits colour a reply and are never a precondition for one, so a repository
 // that is missing or failing yields the neutral disposition -- which renders
@@ -52,13 +52,13 @@ func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.Bo
 	// else's prompt; the single read is because this sits in front of the model
 	// call and a second round trip for a second row of the same table is time
 	// the person waits for nothing.
-	self, relationship, err := s.traits.LoadForConversation(ctx, persona.ID, userID)
+	baseline, self, relationship, err := s.traits.LoadForConversation(ctx, persona.ID, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Int("persona_id", persona.ID).
 			Msg("omnichat traits: unavailable, generating without disposition")
 		return models.OmniChatDisposition{}
 	}
-	return models.ComposeOmniChatDisposition(self, relationship, time.Now())
+	return models.ComposeOmniChatDisposition(baseline, self, relationship, time.Now())
 }
 
 // renderCharacterDisposition writes the disposition as a note about how the
