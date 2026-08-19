@@ -18,6 +18,29 @@ import (
 // then carry into every conversation about itself.
 const minReportableSession = 30 * time.Second
 
+// namedCompanions is how many people a visit will name before it stops
+// counting them individually. A memory of an evening is not a guest list: past
+// a few names the character remembers that the place was busy, which is what
+// the tail is summarised as.
+const namedCompanions = 3
+
+// observedPlayer is somebody else the world said was there, as the snapshot
+// described them.
+type observedPlayer struct {
+	ID       string
+	Name     string
+	Position world.Vec3
+}
+
+// companion is one other person across the whole visit, counted by how many
+// snapshots they appeared in. The count is what decides which names a busy
+// evening keeps: somebody present all night is more of the memory than
+// somebody who crossed the room once.
+type companion struct {
+	name string
+	seen int
+}
+
 // itinerary is the record of one visit, built only from what the world said
 // happened.
 //
@@ -38,13 +61,13 @@ type itinerary struct {
 	lastZone   world.ZoneID
 	lastSeenAt time.Time
 	position   world.Vec3
-	distance   float64
 	zoneTime   map[world.ZoneID]time.Duration
 
 	// Who else was there, counted the same honest way as everything else here:
 	// out of the snapshots, never out of what this process hoped for. others is
-	// the latest reading, snapshots and withCompany are the whole visit.
+	// the latest reading, companions and the two counters are the whole visit.
 	others      []world.Vec3
+	companions  map[string]*companion
 	snapshots   int
 	withCompany int
 }
@@ -54,6 +77,7 @@ func newItinerary(playerName string, startedAt time.Time) *itinerary {
 		playerName: playerName,
 		startedAt:  startedAt,
 		zoneTime:   make(map[world.ZoneID]time.Duration),
+		companions: make(map[string]*companion),
 	}
 }
 
@@ -71,7 +95,6 @@ func (i *itinerary) observe(at time.Time, position world.Vec3, zone world.ZoneID
 		return
 	}
 
-	i.distance += distanceBetween(i.position, position)
 	// Time is credited to the zone the character was in for that interval, not
 	// the one it has just arrived in.
 	if elapsed := at.Sub(i.lastSeenAt); elapsed > 0 {
@@ -84,14 +107,29 @@ func (i *itinerary) observe(at time.Time, position world.Vec3, zone world.ZoneID
 
 // observeOthers records who else the world says was there in the same snapshot.
 // It is separate from observe because it answers a different question -- not
-// where the character was, but whether it was alone -- and the two are only
-// ever called together, for the same snapshot, once the character itself has
-// been found in it.
-func (i *itinerary) observeOthers(others []world.Vec3) {
+// where the character was, but who it was with -- and the two are only ever
+// called together, for the same snapshot, once the character itself has been
+// found in it.
+func (i *itinerary) observeOthers(others []observedPlayer) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	i.others = others
+	i.others = i.others[:0]
+	for _, other := range others {
+		i.others = append(i.others, other.Position)
+		known, ok := i.companions[other.ID]
+		if !ok {
+			known = &companion{}
+			i.companions[other.ID] = known
+		}
+		known.seen++
+		// A name can arrive late or not at all; the person is company either
+		// way, and is named only once the world has said what to call them.
+		if known.name == "" {
+			known.name = strings.TrimSpace(other.Name)
+		}
+	}
+
 	i.snapshots++
 	if len(others) > 0 {
 		i.withCompany++
@@ -126,6 +164,11 @@ func (i *itinerary) current() (world.Vec3, bool) {
 
 // report describes the visit as the character's own memory of it, and says
 // whether it is worth recording at all.
+//
+// The title stays the same phrase for the same kind of evening on purpose: the
+// memory store links recurrences by exact title within the self tier, so a
+// title that named the company would give every evening its own chain and the
+// character would never notice it had done this before.
 func (i *itinerary) report(endedAt time.Time) (title string, summary string, ok bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -159,11 +202,65 @@ func (i *itinerary) report(endedAt time.Time) (title string, summary string, ok 
 	if where := zoneBreakdown(zoneTime); where != "" {
 		sentences = append(sentences, where)
 	}
-	sentences = append(sentences, fmt.Sprintf(
-		"Walked about %.0f metres in that time, and was standing at x %.0f, z %.0f when the visit ended.",
-		i.distance, i.position.X, i.position.Z))
+	sentences = append(sentences, companySentence(i.companions))
 
 	return title, strings.Join(sentences, " "), true
+}
+
+// companySentence says who else was there, and says it flatly. These
+// characters walk near each other and nothing more, so the most it can claim
+// is presence: naming somebody is true, and anything about an evening spent
+// together would be a memory of a conversation that never happened.
+//
+// Every name in it came out of a snapshot the world sent. There is no path by
+// which somebody who was not there could be remembered as having been.
+func companySentence(companions map[string]*companion) string {
+	if len(companions) == 0 {
+		return "Had the place to itself."
+	}
+
+	ordered := make([]*companion, 0, len(companions))
+	for _, known := range companions {
+		ordered = append(ordered, known)
+	}
+	// Most-seen first, then by name, so the same evening always keeps the same
+	// names -- map order must not decide who a character remembers.
+	sort.Slice(ordered, func(a, b int) bool {
+		if ordered[a].seen != ordered[b].seen {
+			return ordered[a].seen > ordered[b].seen
+		}
+		return ordered[a].name < ordered[b].name
+	})
+
+	names := make([]string, 0, namedCompanions)
+	for _, known := range ordered {
+		if len(names) == namedCompanions {
+			break
+		}
+		if known.name != "" {
+			names = append(names, known.name)
+		}
+	}
+
+	rest := len(companions) - len(names)
+	if len(names) == 0 {
+		if rest == 1 {
+			return "Somebody else was around, going by no name the world knew."
+		}
+		return fmt.Sprintf("%d other people were around, going by no names the world knew.", rest)
+	}
+
+	listed := names[0]
+	if len(names) > 1 {
+		listed = strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+	}
+	if rest > 0 {
+		return fmt.Sprintf("%s were there too, along with %d others.", listed, rest)
+	}
+	if len(names) == 1 {
+		return listed + " was there too."
+	}
+	return listed + " were there too."
 }
 
 // zoneBreakdown says where the time went, in order, and nothing else. It is

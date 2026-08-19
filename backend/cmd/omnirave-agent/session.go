@@ -142,7 +142,7 @@ func (a *agent) readSnapshots(conn *websocket.Conn, playerID string, itin *itine
 			continue
 		}
 		var self *world.Player
-		others := make([]world.Vec3, 0, len(message.Players))
+		others := make([]observedPlayer, 0, len(message.Players))
 		for _, player := range message.Players {
 			if player == nil {
 				continue
@@ -151,7 +151,11 @@ func (a *agent) readSnapshots(conn *websocket.Conn, playerID string, itin *itine
 				self = player
 				continue
 			}
-			others = append(others, player.Position)
+			others = append(others, observedPlayer{
+				ID:       player.ID,
+				Name:     player.PlayerName,
+				Position: player.Position,
+			})
 		}
 		// A snapshot the character is not in is a snapshot about somewhere it
 		// is not, so neither its position nor the company is credited from it.

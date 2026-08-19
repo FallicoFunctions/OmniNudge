@@ -191,7 +191,7 @@ func TestCompanyAndSolitudeAreTheOnlyThingsFelt(t *testing.T) {
 }
 
 // The valence is built from snapshots and nothing else, on the same terms the
-// reported distance is: what the world did not confirm cannot reach it.
+// reported company is: what the world did not confirm cannot reach it.
 func TestFeelingComesFromConfirmedSnapshotsOnly(t *testing.T) {
 	start := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
 	itin := newItinerary("Nova", start)
