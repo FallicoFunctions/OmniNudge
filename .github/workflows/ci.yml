@@ -64,6 +64,20 @@ jobs:
         working-directory: backend
         run: go mod verify
 
+      - name: Check formatting
+        working-directory: backend
+        # gofmt rewrites nothing here; -l just lists files that are not
+        # formatted, and any output fails the step. Without this the tree drifts
+        # silently -- it had reached 46 unformatted files before anyone noticed,
+        # because vet and the linters do not look at formatting at all.
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
       - name: Run vet
         working-directory: backend
         run: go vet ./...
