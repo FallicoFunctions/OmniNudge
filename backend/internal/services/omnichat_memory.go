@@ -296,6 +296,12 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 // recognise a refusal without reaching past the service into the repository.
 var ErrOmniChatMemoryNotResident = models.ErrOmniChatMemoryNotResident
 
+// ErrOmniChatMemoryValenceOutOfRange is a caller sending a number that is not
+// a valence. It is refused rather than clamped: clamping would turn a bug in
+// the world into a real change in who a character is, and the character would
+// then carry it.
+var ErrOmniChatMemoryValenceOutOfRange = errors.New("omnichat memory: emotional valence must be within -1..1")
+
 // RecordWorldEvent files something that happened to a resident character in a
 // world as a memory of its own.
 //
@@ -309,18 +315,26 @@ var ErrOmniChatMemoryNotResident = models.ErrOmniChatMemoryNotResident
 // Nothing crosses between the tiers. This does not promote a relational
 // memory; it writes a new self-tier row from what the world reports, so a
 // resident can never come to know something a person told a companion.
-func (s *OmniChatMemoryService) RecordWorldEvent(ctx context.Context, personaID int, title, summary string) (int64, error) {
+// The valence is optional and stays optional. A resident that reported a
+// feeling about every uneventful evening would be inventing one, so nil is
+// both accepted and expected; when it is present it moves the character's own
+// disposition, which everyone who talks to that character then meets.
+func (s *OmniChatMemoryService) RecordWorldEvent(ctx context.Context, personaID int, title, summary string, emotionalValence *float64) (int64, error) {
 	if s == nil || s.store == nil {
 		return 0, ErrOmniChatMemoryUnavailable
 	}
 	if personaID < 1 {
 		return 0, errors.New("omnichat memory: world event requires a persona")
 	}
+	if emotionalValence != nil && (*emotionalValence < -1 || *emotionalValence > 1) {
+		return 0, ErrOmniChatMemoryValenceOutOfRange
+	}
 
 	episodeID, err := s.store.RecordWorldEvent(ctx, models.OmniChatWorldEvent{
-		PersonaID: personaID,
-		Title:     title,
-		Summary:   summary,
+		PersonaID:        personaID,
+		Title:            title,
+		Summary:          summary,
+		EmotionalValence: emotionalValence,
 	})
 	if err != nil {
 		return 0, err

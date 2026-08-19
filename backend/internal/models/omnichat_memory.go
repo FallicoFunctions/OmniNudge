@@ -488,6 +488,14 @@ type OmniChatWorldEvent struct {
 	PersonaID int
 	Title     string
 	Summary   string
+
+	// EmotionalValence is how the visit felt, from -1 to 1, and nil when the
+	// world has nothing honest to say about that. Nil is the ordinary case and
+	// must stay ordinary: most of what a resident does is uneventful, and a
+	// world that attached a number to every wander would be manufacturing a
+	// life out of arithmetic. A nil valence records the memory and leaves the
+	// character exactly as it was.
+	EmotionalValence *float64
 }
 
 // A world event arrives with no extraction step behind it. Nothing has judged
@@ -545,24 +553,44 @@ var ErrOmniChatMemoryNotResident = errors.New("omnichat memory: persona is not a
 // one, so a chain of a thousand visits still collapses with one COALESCE
 // instead of a recursive walk on the recall path. Their order is not lost;
 // recorded_at still has it.
+//
+// A valence, when the world supplies one, moves the character's self-tier
+// disposition by the same arithmetic an episode from a conversation moves a
+// relationship's: same threshold, same asymmetry, same clamp. Nothing about a
+// world event is weighted more heavily for having happened in a world, because
+// nothing has measured that it should be.
 func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event OmniChatWorldEvent) (int64, error) {
 	// The world is a service, but its text still arrives over the wire, so it
-	// is bounded exactly as an extracted episode is.
+	// is bounded exactly as an extracted episode is. Validate refuses a valence
+	// outside -1..1 rather than clamping it: a caller sending 4 has a bug, and
+	// silently recording it as 1 would let that bug move a character's
+	// disposition while looking like it worked.
 	episode := OmniChatMemoryEpisode{
-		PersonaID:       event.PersonaID,
-		OwnerUserID:     OmniChatMemoryTierSelf,
-		Title:           event.Title,
-		Summary:         event.Summary,
-		Salience:        OmniChatWorldEventSalience,
-		Distinctiveness: OmniChatWorldEventDistinctiveness,
+		PersonaID:        event.PersonaID,
+		OwnerUserID:      OmniChatMemoryTierSelf,
+		Title:            event.Title,
+		Summary:          event.Summary,
+		Salience:         OmniChatWorldEventSalience,
+		Distinctiveness:  OmniChatWorldEventDistinctiveness,
+		EmotionalValence: event.EmotionalValence,
 	}
 	episode.Normalize()
 	if err := episode.Validate(); err != nil {
 		return 0, err
 	}
 
+	// The episode and the disposition it moved land together or not at all,
+	// exactly as they do for an extraction. A character whose traits said it
+	// had a bad night with no memory of one -- or the reverse -- would be
+	// carrying a feeling it could not account for.
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("omnichat memory: begin world event: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var episodeID int64
-	err := r.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		WITH prior_occurrence AS (
 			-- The root of the chain this visit joins, or nothing if the
 			-- character has not done this before. Scoped to the self tier, so
@@ -579,9 +607,9 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 		)
 		INSERT INTO omnichat_memory_episodes (
 			persona_id, owner_user_id, conversation_id, source_message_id,
-			title, summary, salience, distinctiveness, recurs_episode_id
+			title, summary, salience, distinctiveness, emotional_valence, recurs_episode_id
 		)
-		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5, (SELECT root_id FROM prior_occurrence)
+		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5, $6, (SELECT root_id FROM prior_occurrence)
 		FROM bot_personas p
 		-- The same line admission draws, and now literally the same line: a
 		-- resident is exactly a character that would be admitted. A character
@@ -591,13 +619,36 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 		RETURNING id
 	`,
 		episode.PersonaID, episode.Title, episode.Summary,
-		episode.Salience, episode.Distinctiveness,
+		episode.Salience, episode.Distinctiveness, episode.EmotionalValence,
 	).Scan(&episodeID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrOmniChatMemoryNotResident
 	}
 	if err != nil {
 		return 0, fmt.Errorf("omnichat memory: record world event: %w", err)
+	}
+
+	// The self tier, and only the self tier. This happened in the open, in
+	// front of whoever else was there, so it is the character's own life
+	// rather than anything belonging to one person's conversation -- and the
+	// tier is a constant here rather than a parameter precisely so no caller
+	// can aim a world event at a relationship.
+	//
+	// Taken after the episode row and never before it, for the same reason the
+	// extraction takes it last: there is one traits row per tier, and touching
+	// it early would put a shared lock in front of writes whose order the
+	// caller chose.
+	if episode.EmotionalValence != nil {
+		if err := applyEpisodeValencesTx(
+			ctx, tx, episode.PersonaID, OmniChatMemoryTierSelf,
+			[]float64{*episode.EmotionalValence},
+		); err != nil {
+			return 0, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("omnichat memory: commit world event: %w", err)
 	}
 	return episodeID, nil
 }

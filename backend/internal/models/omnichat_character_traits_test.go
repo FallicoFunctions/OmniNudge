@@ -373,3 +373,145 @@ func TestOmniChatCharacterTraitsLoadForConversationReadsBothTiers(t *testing.T) 
 	require.Zero(t, self.Mood)
 	require.Zero(t, relationship.Mood)
 }
+
+// What happens to a resident in the open changes the resident, and it changes
+// it for everyone. This is the other direction of the same mechanism the
+// relationship tier runs in, and the tier is the whole difference.
+func TestOmniChatRecordWorldEventMovesTheSelfTier(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "worldvalence")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	_, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID:        fixture.personaID,
+		Title:            "Wandered the main stage in OmniRave",
+		Summary:          "Spent the whole night in a crowd and nobody left.",
+		EmotionalValence: floatPtr(0.9),
+	})
+	require.NoError(t, err)
+
+	self, err := traitRepo.Load(ctx, fixture.personaID, OmniChatMemoryTierSelf)
+	require.NoError(t, err)
+	require.Greater(t, self.Mood, 0.0, "a good night in the world must lift the character's own mood")
+	require.Greater(t, self.Trust, 0.0)
+	require.Greater(t, self.Warmth, 0.0)
+
+	// Nobody's relationship moved. This happened in a world, not in anyone's
+	// conversation, and there is no path by which it could reach one.
+	for _, ownerUserID := range []int{fixture.userID, fixture.otherID} {
+		relationship, err := traitRepo.Load(ctx, fixture.personaID, ownerUserID)
+		require.NoError(t, err)
+		require.Zero(t, relationship.Mood)
+		require.Zero(t, relationship.Trust)
+		require.Zero(t, relationship.Warmth)
+	}
+}
+
+// Most of what a resident does is uneventful, and an uneventful evening must
+// leave it exactly as it was. Otherwise every wander would be a small nudge and
+// a character would drift for reasons nothing could point at.
+func TestOmniChatRecordWorldEventWithoutValenceLeavesTraitsAlone(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "worldnovalence")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	episodeID, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID: fixture.personaID,
+		Title:     "Wandered the main stage in OmniRave",
+		Summary:   "Walked about 200 metres and saw nobody.",
+	})
+	require.NoError(t, err)
+	require.NotZero(t, episodeID, "the memory is still recorded; only the feeling is absent")
+
+	self, err := traitRepo.Load(ctx, fixture.personaID, OmniChatMemoryTierSelf)
+	require.NoError(t, err)
+	require.Zero(t, self.Mood)
+	require.Zero(t, self.Trust)
+	require.Zero(t, self.Warmth)
+
+	var storedValence *float64
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT emotional_valence FROM omnichat_memory_episodes WHERE id = $1`, episodeID).Scan(&storedValence))
+	require.Nil(t, storedValence, "a missing feeling is stored as missing, not as neutral")
+}
+
+// The end-to-end claim the design makes: a life lived in a world reaches every
+// conversation, without anything being copied between users.
+func TestOmniChatWorldEventReachesEveryUsersDisposition(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "worldcompose")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	// One person was cruel in private. That is theirs alone.
+	require.NoError(t, traitRepo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.userID, -0.9))
+
+	_, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID:        fixture.personaID,
+		Title:            "Wandered the main stage in OmniRave",
+		Summary:          "Was shouted off the stage in front of everyone.",
+		EmotionalValence: floatPtr(-0.9),
+	})
+	require.NoError(t, err)
+
+	now := time.Now()
+	cruelSelf, cruelRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+	kindSelf, kindRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.otherID)
+	require.NoError(t, err)
+
+	cruel := ComposeOmniChatDisposition(cruelSelf, cruelRelationship, now)
+	kind := ComposeOmniChatDisposition(kindSelf, kindRelationship, now)
+
+	// Everyone meets a warier character, including the person who was never
+	// unkind to it.
+	require.Less(t, kind.Trust, 0.0, "the world's mark is on the character for everyone")
+	require.Less(t, kind.Mood, 0.0)
+	require.Zero(t, kindRelationship.Trust, "and it did not become that person's history")
+
+	// The person who was cruel meets that plus what they did.
+	require.Less(t, cruel.Trust, kind.Trust)
+}
+
+// A valence outside the scale is a bug in the caller. Clamping it to the
+// boundary would move the character anyway and say nothing.
+func TestOmniChatRecordWorldEventRefusesValenceOutOfRange(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "worldbadvalence")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	for _, valence := range []float64{1.5, -4} {
+		_, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID:        fixture.personaID,
+			Title:            "Wandered the main stage in OmniRave",
+			Summary:          "Something impossible happened.",
+			EmotionalValence: floatPtr(valence),
+		})
+		require.ErrorContains(t, err, "emotional valence must be within -1..1")
+	}
+
+	var episodes int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, fixture.personaID).Scan(&episodes))
+	require.Zero(t, episodes, "a refused event is not half-recorded")
+
+	self, err := traitRepo.Load(ctx, fixture.personaID, OmniChatMemoryTierSelf)
+	require.NoError(t, err)
+	require.Zero(t, self.Mood)
+	require.Zero(t, self.Trust)
+}
