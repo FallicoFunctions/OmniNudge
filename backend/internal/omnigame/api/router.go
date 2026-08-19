@@ -66,6 +66,16 @@ func NewRouter(
 		worldEventHandler.RecordOmniRave,
 	)
 
+	// The read half of the same power, off router for the same reason: a
+	// character's own disposition is what a world wrote about it, and no
+	// browser identity may be part of asking for it. A resident reads this
+	// about itself before deciding whether to go out at all.
+	router.GET(
+		"/api/v1/omnigame/disposition/omnirave",
+		middleware.RequireWorldEvent(worldEvents),
+		worldEventHandler.ReadOmniRaveDisposition,
+	)
+
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.AuthOptional(authService))
 	launchHandler := handlers.NewLaunchHandler(

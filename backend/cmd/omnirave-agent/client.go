@@ -90,16 +90,63 @@ func (c *apiClient) admit(ctx context.Context) (*model.PersonaAdmission, error) 
 	return &admission, nil
 }
 
-// reportWorldEvent files what the character did as one of its own memories.
+// disposition asks who the character currently is. The agent holds no database
+// and the traits it moves by reporting are the traits it decides from, so
+// without this read the character could be marked by a world and never act on
+// it.
+//
+// The world-event credential is the right one: this is the read half of the
+// same power, and the character is named inside it rather than in the request,
+// so one credential can only ever ask about the character it was issued for.
+func (c *apiClient) disposition(ctx context.Context) (disposition, error) {
+	credential, err := c.worldEvents.Mint(c.cfg.PersonaID, credentialTTL)
+	if err != nil {
+		return disposition{}, fmt.Errorf("mint world-event credential: %w", err)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.cfg.DispositionURL(), nil)
+	if err != nil {
+		return disposition{}, err
+	}
+	request.Header.Set("Authorization", "Bearer "+credential)
+
+	response, err := c.http.Do(request)
+	if err != nil {
+		return disposition{}, fmt.Errorf("disposition request: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	if response.StatusCode != http.StatusOK {
+		return disposition{}, fmt.Errorf("disposition: unexpected %s: %s", response.Status, strings.TrimSpace(string(body)))
+	}
+
+	var self disposition
+	if err := json.Unmarshal(body, &self); err != nil {
+		return disposition{}, fmt.Errorf("disposition: unreadable response: %w", err)
+	}
+	return self, nil
+}
+
+// reportWorldEvent files what the character did as one of its own memories,
+// and how it felt about it when there is anything honest to say. A nil valence
+// is left out of the body entirely rather than sent as zero: the endpoint
+// distinguishes "nothing to say" from "it felt neutral", and this is the side
+// that has to keep them apart.
+//
 // The world-event credential is a different credential from the admission one
 // on purpose and is minted per call, so nothing long-lived is held.
-func (c *apiClient) reportWorldEvent(ctx context.Context, title, summary string) error {
+func (c *apiClient) reportWorldEvent(ctx context.Context, title, summary string, emotionalValence *float64) error {
 	credential, err := c.worldEvents.Mint(c.cfg.PersonaID, credentialTTL)
 	if err != nil {
 		return fmt.Errorf("mint world-event credential: %w", err)
 	}
 
-	payload, err := json.Marshal(map[string]string{"title": title, "summary": summary})
+	body := map[string]any{"title": title, "summary": summary}
+	if emotionalValence != nil {
+		body["emotionalValence"] = *emotionalValence
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
@@ -117,9 +164,9 @@ func (c *apiClient) reportWorldEvent(ctx context.Context, title, summary string)
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	answer, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 	if response.StatusCode != http.StatusCreated {
-		return fmt.Errorf("world event: unexpected %s: %s", response.Status, strings.TrimSpace(string(body)))
+		return fmt.Errorf("world event: unexpected %s: %s", response.Status, strings.TrimSpace(string(answer)))
 	}
 	return nil
 }

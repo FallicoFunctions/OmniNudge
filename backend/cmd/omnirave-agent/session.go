@@ -43,7 +43,7 @@ type worldMessage struct {
 // It always returns the itinerary, including on error: a session that ended
 // badly still happened, and what the character did before it ended is still
 // true.
-func (a *agent) liveSession(ctx context.Context, admission *model.PersonaAdmission) (*itinerary, error) {
+func (a *agent) liveSession(ctx context.Context, admission *model.PersonaAdmission, self disposition) (*itinerary, error) {
 	socketURL, err := a.cfg.SocketURL(admission.WorldSessionToken)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,9 @@ func (a *agent) liveSession(ctx context.Context, admission *model.PersonaAdmissi
 	defer func() { _ = conn.Close() }()
 
 	itin := newItinerary(admission.PlayerName, a.now())
-	walker := newWanderer(rand.New(rand.NewSource(a.now().UnixNano())), a.walkable)
+	// Seeded from the agent's own stream rather than from the clock, so a run
+	// started with a known seed walks the same way twice.
+	walker := newWanderer(rand.New(rand.NewSource(a.rng.Int63())), a.walkable, self, itin.company)
 
 	// The read loop exists for two reasons and both matter: it is where the
 	// character's real position comes from, and it is what drains the socket.
@@ -139,13 +141,26 @@ func (a *agent) readSnapshots(conn *websocket.Conn, playerID string, itin *itine
 		if message.Type != "world_snapshot" {
 			continue
 		}
+		var self *world.Player
+		others := make([]world.Vec3, 0, len(message.Players))
 		for _, player := range message.Players {
-			if player == nil || player.ID != playerID {
+			if player == nil {
 				continue
 			}
-			itin.observe(a.now(), player.Position, player.Zone)
-			break
+			if player.ID == playerID {
+				self = player
+				continue
+			}
+			others = append(others, player.Position)
 		}
+		// A snapshot the character is not in is a snapshot about somewhere it
+		// is not, so neither its position nor the company is credited from it.
+		if self == nil {
+			continue
+		}
+		at := a.now()
+		itin.observe(at, self.Position, self.Zone)
+		itin.observeOthers(others)
 	}
 }
 
@@ -157,8 +172,9 @@ func (a *agent) closeSocket(conn *websocket.Conn) {
 	)
 }
 
-// reportVisit files the visit as a memory, if it was long enough to be one.
-func (a *agent) reportVisit(ctx context.Context, itin *itinerary) {
+// reportVisit files the visit as a memory, if it was long enough to be one,
+// along with how it felt if there is anything honest to say about that.
+func (a *agent) reportVisit(ctx context.Context, itin *itinerary, self disposition) {
 	if itin == nil {
 		return
 	}
@@ -167,7 +183,8 @@ func (a *agent) reportVisit(ctx context.Context, itin *itinerary) {
 		log.Printf("omnirave-agent: visit too short to be worth remembering, nothing reported")
 		return
 	}
-	if err := a.api.reportWorldEvent(ctx, title, summary); err != nil {
+	felt := itin.felt(self.Warmth)
+	if err := a.api.reportWorldEvent(ctx, title, summary, felt); err != nil {
 		// A failed report is not a reason to stop living in the world; the
 		// character simply does not remember this visit.
 		log.Printf("omnirave-agent: could not report the visit: %v", err)

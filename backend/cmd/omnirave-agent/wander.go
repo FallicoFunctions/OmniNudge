@@ -41,6 +41,12 @@ type wanderer struct {
 	rng      *rand.Rand
 	walkable func(world.Vec3) bool
 	bounds   world.Bounds
+	self     disposition
+	// company reports where the world last said other people were standing. It
+	// is a function rather than a slice so the walker reads the latest snapshot
+	// at the moment it chooses, and so it can only ever see positions the world
+	// confirmed.
+	company func() []world.Vec3
 
 	target    world.Vec3
 	hasTarget bool
@@ -52,8 +58,11 @@ type wanderer struct {
 // the boundary the server checks against.
 var mainStageWander = world.Bounds{MinX: -60, MaxX: 60, MinZ: -86, MaxZ: 20}
 
-func newWanderer(rng *rand.Rand, walkable func(world.Vec3) bool) *wanderer {
-	return &wanderer{rng: rng, walkable: walkable, bounds: mainStageWander}
+// newWanderer builds a walker with a disposition and a view of where everyone
+// else is. A zero disposition and a nil company view give exactly the uniform
+// amble this had before either existed.
+func newWanderer(rng *rand.Rand, walkable func(world.Vec3) bool, self disposition, company func() []world.Vec3) *wanderer {
+	return &wanderer{rng: rng, walkable: walkable, bounds: mainStageWander, self: self, company: company}
 }
 
 // nextStep returns where to ask the world to move to, given where the world
@@ -72,7 +81,8 @@ func (w *wanderer) nextStep(from world.Vec3) (world.Vec3, bool) {
 		}
 		w.target = target
 		w.hasTarget = true
-		w.pause = minPauseFrames + w.rng.Intn(maxPauseFrames-minPauseFrames+1)
+		pause := float64(minPauseFrames+w.rng.Intn(maxPauseFrames-minPauseFrames+1)) * w.self.pauseScale()
+		w.pause = int(math.Round(pause))
 		return world.Vec3{}, false
 	}
 
@@ -82,7 +92,7 @@ func (w *wanderer) nextStep(from world.Vec3) (world.Vec3, bool) {
 	if length == 0 {
 		return world.Vec3{}, false
 	}
-	step := math.Min(stepMeters, length)
+	step := math.Min(stepMeters*w.self.stepScale(), length)
 	next := world.Vec3{
 		X: from.X + dx/length*step,
 		Y: from.Y,
@@ -99,10 +109,46 @@ func (w *wanderer) nextStep(from world.Vec3) (world.Vec3, bool) {
 }
 
 func (w *wanderer) chooseTarget() (world.Vec3, bool) {
+	// A warm character drifts towards where people already are. The draw is a
+	// preference, not a pursuit: it picks a spot near somebody and walks there
+	// the same way it walks anywhere, and if that spot is unwalkable it falls
+	// straight back to picking at random.
+	if w.rng.Float64() < w.self.approachChance() {
+		if target, ok := w.nearSomebody(); ok {
+			return target, true
+		}
+	}
+
 	for attempt := 0; attempt < targetAttempts; attempt++ {
 		candidate := world.Vec3{
 			X: w.bounds.MinX + w.rng.Float64()*(w.bounds.MaxX-w.bounds.MinX),
 			Z: w.bounds.MinZ + w.rng.Float64()*(w.bounds.MaxZ-w.bounds.MinZ),
+		}
+		if w.walkable(candidate) {
+			return candidate, true
+		}
+	}
+	return world.Vec3{}, false
+}
+
+// nearSomebody picks a point beside one of the people the world last reported.
+// Everything it uses came out of a server snapshot, so there is no way for it
+// to walk towards somebody who is not there.
+func (w *wanderer) nearSomebody() (world.Vec3, bool) {
+	if w.company == nil {
+		return world.Vec3{}, false
+	}
+	others := w.company()
+	if len(others) == 0 {
+		return world.Vec3{}, false
+	}
+
+	for attempt := 0; attempt < targetAttempts; attempt++ {
+		beside := others[w.rng.Intn(len(others))]
+		candidate := world.Vec3{
+			X: beside.X + (2*w.rng.Float64()-1)*approachSpread,
+			Y: beside.Y,
+			Z: beside.Z + (2*w.rng.Float64()-1)*approachSpread,
 		}
 		if w.walkable(candidate) {
 			return candidate, true

@@ -23,6 +23,10 @@ const (
 	envAdmissionSecret  = "PERSONA_ADMISSION_SECRET"
 	envWorldEventSecret = "WORLD_EVENT_SECRET"
 	envJWTSecret        = "JWT_SECRET"
+	// Optional. Set it and the character makes the same choices in the same
+	// order every run, which is what makes a reported behaviour reproducible
+	// instead of an anecdote. Unset means a fresh stream each start.
+	envSeed = "OMNIRAVE_AGENT_SEED"
 )
 
 const (
@@ -48,6 +52,10 @@ type Config struct {
 	AdmissionSecret  string
 	WorldEventSecret string
 	JWTSecret        string
+
+	// Seed is where the character's own randomness starts. Zero means seed it
+	// from the clock.
+	Seed int64
 }
 
 // LoadConfig reads the environment through getenv so this is testable without
@@ -77,6 +85,15 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 			problems = append(problems, envPersonaID+" must be a positive persona id, got "+strconv.Quote(rawPersona))
 		} else {
 			cfg.PersonaID = personaID
+		}
+	}
+
+	if rawSeed := strings.TrimSpace(getenv(envSeed)); rawSeed != "" {
+		seed, err := strconv.ParseInt(rawSeed, 10, 64)
+		if err != nil {
+			problems = append(problems, envSeed+" must be an integer, got "+strconv.Quote(rawSeed))
+		} else {
+			cfg.Seed = seed
 		}
 	}
 
@@ -115,6 +132,12 @@ func (c Config) AdmitURL() string {
 
 func (c Config) WorldEventURL() string {
 	return c.OmniGameAPIURL + "/api/v1/omnigame/world-event/omnirave"
+}
+
+// DispositionURL is where the character reads who it currently is, which is
+// the read half of the same self-tier power the world-event endpoint writes.
+func (c Config) DispositionURL() string {
+	return c.OmniGameAPIURL + "/api/v1/omnigame/disposition/omnirave"
 }
 
 // SocketURL puts the world token in the query string, which is where the

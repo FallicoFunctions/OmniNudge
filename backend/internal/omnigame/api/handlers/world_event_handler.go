@@ -105,3 +105,48 @@ func (h *WorldEventHandler) RecordOmniRave(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"episodeId": episodeID})
 }
+
+// ReadOmniRaveDisposition tells a resident who it currently is.
+//
+// The agent runtime holds no database, so without this it has no way to read
+// the traits its own reports have been moving, and the circuit stays open in
+// the direction that matters: a character could be marked by a world and still
+// never act on it. The self tier only, decayed to now.
+//
+// It is the world-event credential rather than the admission one because this
+// is the same power, read instead of written: what the world may write about a
+// character's own life, it may read back. Nothing about a relationship is
+// reachable here, and there is no parameter that could make it so.
+func (h *WorldEventHandler) ReadOmniRaveDisposition(c *gin.Context) {
+	value, ok := c.Get(middleware.WorldEventContextKey)
+	if !ok {
+		apiresponse.WriteError(c, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	personaID, ok := value.(int64)
+	if !ok || personaID <= 0 {
+		apiresponse.WriteError(c, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if h.memory == nil {
+		apiresponse.WriteError(c, http.StatusServiceUnavailable, "Character memory is unavailable")
+		return
+	}
+
+	disposition, err := h.memory.SelfDisposition(c.Request.Context(), int(personaID))
+	if err != nil {
+		if errors.Is(err, services.ErrOmniChatMemoryUnavailable) {
+			apiresponse.WriteError(c, http.StatusServiceUnavailable, "Character memory is unavailable")
+			return
+		}
+		apiresponse.WriteError(c, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"mood":   disposition.Mood,
+		"trust":  disposition.Trust,
+		"warmth": disposition.Warmth,
+	})
+}
