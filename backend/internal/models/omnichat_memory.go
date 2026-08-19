@@ -653,15 +653,36 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 	return episodeID, nil
 }
 
-// LoadSelfTraits reads the disposition a character carries in its own right --
-// the tier a world writes and everybody reads.
+// LoadSelfDisposition reads the two halves of who a character is in her own
+// right: the baseline her card was read into, and the self tier a world writes
+// and everybody shares.
+//
+// They come back apart rather than summed because the caller owns the instant
+// the mood is decayed to, and only the drift half decays.
 //
 // A character nobody has done anything to is the neutral row, not an error, on
-// the same terms as every other traits read. There is nothing to guard here:
-// only a resident's self tier is ever written, so a character that is not one
-// has a neutral row and reading it tells the caller nothing it did not know.
-func (r *OmniChatMemoryRepository) LoadSelfTraits(ctx context.Context, personaID int) (OmniChatCharacterTraits, error) {
-	return loadTraits(ctx, r.pool, personaID, OmniChatMemoryTierSelf)
+// the same terms as every other traits read, and a character nobody has derived
+// a baseline for is a zero baseline. There is nothing to guard here: only a
+// resident's self tier is ever written, so a character that is not one has a
+// neutral row and reading it tells the caller nothing it did not know.
+func (r *OmniChatMemoryRepository) LoadSelfDisposition(ctx context.Context, personaID int) (OmniChatCharacterTraits, OmniChatDispositionBaseline, error) {
+	traits, err := loadTraits(ctx, r.pool, personaID, OmniChatMemoryTierSelf)
+	if err != nil {
+		return OmniChatCharacterTraits{}, OmniChatDispositionBaseline{}, err
+	}
+	var mood, trust, warmth *float64
+	err = r.pool.QueryRow(ctx, `
+		SELECT baseline_mood, baseline_trust, baseline_warmth
+		FROM bot_personas
+		WHERE id = $1
+	`, personaID).Scan(&mood, &trust, &warmth)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return traits, OmniChatDispositionBaseline{}, nil
+	}
+	if err != nil {
+		return OmniChatCharacterTraits{}, OmniChatDispositionBaseline{}, fmt.Errorf("omnichat traits: load baseline for persona %d: %w", personaID, err)
+	}
+	return traits, dispositionBaseline(mood, trust, warmth), nil
 }
 
 // recallQuery ranks a persona's memories against a free-text cue.

@@ -73,10 +73,15 @@ type OmniChatCharacterTraits struct {
 	Warmth        float64   `json:"warmth"`
 }
 
-// MoodAt is the character's mood at a given instant: the stored value pulled
-// toward 0 by one half-life every OmniChatTraitMoodHalfLife. Exponential decay
+// MoodAt is the drift mood at a given instant: the stored value pulled toward 0
+// by one half-life every OmniChatTraitMoodHalfLife. Exponential decay
 // approaches 0 without ever crossing it, so a foul mood never becomes a good
 // one by being left alone.
+//
+// 0 here is not neutral, it is unmoved. This row holds what has happened to the
+// character, measured from wherever her card left her, and every reader adds
+// the baseline back on -- so a character written low settles at low rather than
+// at nothing, and the decay that produces it is still the one below.
 func (t OmniChatCharacterTraits) MoodAt(at time.Time) float64 {
 	elapsed := at.Sub(t.MoodUpdatedAt)
 	if elapsed <= 0 {
@@ -138,18 +143,26 @@ func (r *OmniChatCharacterTraitRepository) Load(ctx context.Context, personaID, 
 	return loadTraits(ctx, r.pool, personaID, ownerUserID)
 }
 
-// LoadForConversation reads both tiers a conversation speaks from: what the
-// character is like in itself, and what it is like with this one person.
+// LoadForConversation reads everything a conversation speaks from: who the
+// character was written as, what she is like in herself, and what she is like
+// with this one person.
 //
 // It is one round trip because it sits on the critical path of a generation,
-// in front of the model call, and two sequential single-row lookups for two
-// rows of the same table bought nothing but a second wait. The tiers are told
-// apart by the column that already distinguishes them -- the self tier is the
-// row with no owner -- so nothing is inferred from the order they come back in.
+// in front of the model call, and sequential single-row lookups bought nothing
+// but more waiting. The baseline comes from the persona row the tiers already
+// hang off, so the join costs nothing extra; driving the query from that row
+// rather than from the traits table is also what makes a character with no
+// traits at all still return her baseline.
+//
+// The tiers are told apart by the column that already distinguishes them --
+// the self tier is the row with no owner -- so nothing is inferred from the
+// order they come back in.
 //
 // A character nobody has met is not an error in either tier: the missing row is
-// the neutral one. Mood comes back as stored; call MoodAt to get the mood now.
-func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Context, personaID, userID int) (self, relationship OmniChatCharacterTraits, err error) {
+// the neutral one, and a persona nobody has derived a baseline for is neutral
+// in the same harmless way. Mood comes back as stored; call MoodAt to get the
+// mood now.
+func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Context, personaID, userID int) (baseline OmniChatDispositionBaseline, self, relationship OmniChatCharacterTraits, err error) {
 	self = OmniChatCharacterTraits{PersonaID: personaID, OwnerUserID: OmniChatMemoryTierSelf, MoodUpdatedAt: time.Now()}
 	relationship = OmniChatCharacterTraits{PersonaID: personaID, OwnerUserID: userID, MoodUpdatedAt: time.Now()}
 
@@ -162,22 +175,41 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		tiers = append(tiers, userID)
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT owner_user_id, mood, mood_updated_at, trust, warmth
-		FROM omnichat_character_traits
-		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = ANY($2)
+		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth,
+		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth
+		FROM bot_personas p
+		LEFT JOIN omnichat_character_traits t
+		  ON t.persona_id = p.id AND COALESCE(t.owner_user_id, 0) = ANY($2)
+		WHERE p.id = $1
 	`, personaID, tiers)
 	if err != nil {
-		return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+		return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
+		var baselineMood, baselineTrust, baselineWarmth *float64
 		var owner *int
-		var traits OmniChatCharacterTraits
-		if err := rows.Scan(&owner, &traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth); err != nil {
-			return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+		var mood, trust, warmth *float64
+		var moodUpdatedAt *time.Time
+		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth,
+			&owner, &mood, &moodUpdatedAt, &trust, &warmth); err != nil {
+			return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 		}
-		traits.PersonaID = personaID
+		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth)
+		// The outer join emits the persona row on its own when no tier
+		// matched, which is a character nobody has met rather than a row to
+		// read.
+		if mood == nil || moodUpdatedAt == nil || trust == nil || warmth == nil {
+			continue
+		}
+		traits := OmniChatCharacterTraits{
+			PersonaID:     personaID,
+			Mood:          *mood,
+			MoodUpdatedAt: *moodUpdatedAt,
+			Trust:         *trust,
+			Warmth:        *warmth,
+		}
 		if owner == nil {
 			traits.OwnerUserID = OmniChatMemoryTierSelf
 			self = traits
@@ -187,9 +219,25 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		relationship = traits
 	}
 	if err := rows.Err(); err != nil {
-		return OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
+		return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 	}
-	return self, relationship, nil
+	return baseline, self, relationship, nil
+}
+
+// dispositionBaseline reads the three nullable columns as one value. They are
+// written together and constrained all-or-nothing, so a single NULL among them
+// is a character nobody has derived yet -- neutral, and indistinguishable in
+// effect from how she behaved before baselines existed.
+func dispositionBaseline(mood, trust, warmth *float64) OmniChatDispositionBaseline {
+	if mood == nil || trust == nil || warmth == nil {
+		return OmniChatDispositionBaseline{}
+	}
+	return OmniChatDispositionBaseline{
+		Mood:    clampTrait(*mood),
+		Trust:   clampTrait(*trust),
+		Warmth:  clampTrait(*warmth),
+		Derived: true,
+	}
 }
 
 // ApplyEpisodeValence moves a character's traits by one episode.
@@ -313,29 +361,50 @@ type OmniChatDisposition struct {
 	Warmth float64
 }
 
-// DispositionAt is one tier read on its own, with the mood already decayed to
-// the instant asked for. It is what a resident reads about itself: there is no
-// second party in a world, so there is nothing to compose against.
-func (t OmniChatCharacterTraits) DispositionAt(at time.Time) OmniChatDisposition {
+// OmniChatDispositionBaseline is who a character was written to be: the resting
+// disposition her card implies, derived from it once and then left alone.
+//
+// It is deliberately not a traits row. Traits are what has happened to her, and
+// an authored trait is not something that happened -- keeping them apart is
+// what lets a baseline be re-derived from an edited card without erasing a
+// year of accumulated life, and what stops a reader of the traits row from
+// mistaking the author's intent for the character's history.
+//
+// Derived reports whether the card has actually been read yet. The zero value
+// is a character nobody has derived, and it composes to exactly the behaviour
+// that existed before baselines did.
+type OmniChatDispositionBaseline struct {
+	Mood    float64
+	Trust   float64
+	Warmth  float64
+	Derived bool
+}
+
+// ComposeOmniChatDisposition is how a character is with one person: who she was
+// written as, plus what has happened to her, plus what has happened between the
+// two of them.
+//
+// Every half is real and none replaces another: a character having a bad week
+// is having it with everyone, being wary of one person does not make her wary
+// of the next, and neither of those stops her being the guarded woman the card
+// described. Adding is what makes them all true at once, and the clamp is what
+// stops the sum running past the scale the wording can express.
+func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, relationship OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
 	return OmniChatDisposition{
-		Mood:   t.MoodAt(at),
-		Trust:  t.Trust,
-		Warmth: t.Warmth,
+		Mood:   clampTrait(baseline.Mood + self.MoodAt(at) + relationship.MoodAt(at)),
+		Trust:  clampTrait(baseline.Trust + self.Trust + relationship.Trust),
+		Warmth: clampTrait(baseline.Warmth + self.Warmth + relationship.Warmth),
 	}
 }
 
-// ComposeOmniChatDisposition adds a character's own traits to the traits of
-// one relationship.
-//
-// Both halves are real and neither replaces the other: a character having a
-// bad week is having it with everyone, and being wary of one person does not
-// make it wary of the next. Adding is what makes both true at once, and the
-// clamp is what stops the two halves from summing past the scale the wording
-// can express.
-func ComposeOmniChatDisposition(self, relationship OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
+// ComposeOmniChatSelfDisposition is the same sum with no second party: who a
+// character was written as plus what has happened to her in the open. It is
+// what a resident reads about itself, where there is nobody to be composed
+// against.
+func ComposeOmniChatSelfDisposition(baseline OmniChatDispositionBaseline, self OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
 	return OmniChatDisposition{
-		Mood:   clampTrait(self.MoodAt(at) + relationship.MoodAt(at)),
-		Trust:  clampTrait(self.Trust + relationship.Trust),
-		Warmth: clampTrait(self.Warmth + relationship.Warmth),
+		Mood:   clampTrait(baseline.Mood + self.MoodAt(at)),
+		Trust:  clampTrait(baseline.Trust + self.Trust),
+		Warmth: clampTrait(baseline.Warmth + self.Warmth),
 	}
 }

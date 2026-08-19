@@ -348,9 +348,10 @@ func TestOmniChatCharacterTraitsLoadForConversationReadsBothTiers(t *testing.T) 
 	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.userID, -0.9))
 	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.otherID, -0.9))
 
-	self, relationship, err := repo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
+	baseline, self, relationship, err := repo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
 	require.NoError(t, err)
 
+	require.False(t, baseline.Derived, "a persona nobody has derived carries no baseline")
 	require.Equal(t, OmniChatMemoryTierSelf, self.OwnerUserID)
 	require.Greater(t, self.Trust, 0.0, "the self tier must not arrive as the relationship")
 	require.Equal(t, fixture.userID, relationship.OwnerUserID)
@@ -366,7 +367,7 @@ func TestOmniChatCharacterTraitsLoadForConversationReadsBothTiers(t *testing.T) 
 	// Both halves of a pair that has never been written are the neutral row
 	// rather than an error, exactly as a single-tier read is.
 	stranger := seedMemoryFixture(t, pool, "traitpairnew")
-	self, relationship, err = repo.LoadForConversation(ctx, stranger.personaID, stranger.userID)
+	_, self, relationship, err = repo.LoadForConversation(ctx, stranger.personaID, stranger.userID)
 	require.NoError(t, err)
 	require.Zero(t, self.Trust)
 	require.Zero(t, relationship.Trust)
@@ -466,13 +467,13 @@ func TestOmniChatWorldEventReachesEveryUsersDisposition(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	cruelSelf, cruelRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
+	_, cruelSelf, cruelRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
 	require.NoError(t, err)
-	kindSelf, kindRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.otherID)
+	_, kindSelf, kindRelationship, err := traitRepo.LoadForConversation(ctx, fixture.personaID, fixture.otherID)
 	require.NoError(t, err)
 
-	cruel := ComposeOmniChatDisposition(cruelSelf, cruelRelationship, now)
-	kind := ComposeOmniChatDisposition(kindSelf, kindRelationship, now)
+	cruel := ComposeOmniChatDisposition(OmniChatDispositionBaseline{}, cruelSelf, cruelRelationship, now)
+	kind := ComposeOmniChatDisposition(OmniChatDispositionBaseline{}, kindSelf, kindRelationship, now)
 
 	// Everyone meets a warier character, including the person who was never
 	// unkind to it.

@@ -14,20 +14,21 @@ import (
 )
 
 type stubTraitLoader struct {
-	byOwner map[int]models.OmniChatCharacterTraits
-	err     error
-	asked   []int
+	baseline models.OmniChatDispositionBaseline
+	byOwner  map[int]models.OmniChatCharacterTraits
+	err      error
+	asked    []int
 }
 
 // The stub serves the two tiers the same way the repository's one query does,
 // and records exactly which owners it was asked to match, so a read that ever
 // widened past the self tier and this conversation's own user would show up.
-func (s *stubTraitLoader) LoadForConversation(_ context.Context, _, userID int) (models.OmniChatCharacterTraits, models.OmniChatCharacterTraits, error) {
+func (s *stubTraitLoader) LoadForConversation(_ context.Context, _, userID int) (models.OmniChatDispositionBaseline, models.OmniChatCharacterTraits, models.OmniChatCharacterTraits, error) {
 	s.asked = append(s.asked, models.OmniChatMemoryTierSelf, userID)
 	if s.err != nil {
-		return models.OmniChatCharacterTraits{}, models.OmniChatCharacterTraits{}, s.err
+		return models.OmniChatDispositionBaseline{}, models.OmniChatCharacterTraits{}, models.OmniChatCharacterTraits{}, s.err
 	}
-	return s.byOwner[models.OmniChatMemoryTierSelf], s.byOwner[userID], nil
+	return s.baseline, s.byOwner[models.OmniChatMemoryTierSelf], s.byOwner[userID], nil
 }
 
 func testPersona() *models.BotPersona {
@@ -84,7 +85,7 @@ func TestComposeDispositionAddsBothTiersAndClamps(t *testing.T) {
 	self := models.OmniChatCharacterTraits{Mood: -0.4, MoodUpdatedAt: now, Trust: -0.8, Warmth: 0.3}
 	relationship := models.OmniChatCharacterTraits{Mood: -0.3, MoodUpdatedAt: now, Trust: -0.5, Warmth: 0.2}
 
-	composed := models.ComposeOmniChatDisposition(self, relationship, now)
+	composed := models.ComposeOmniChatDisposition(models.OmniChatDispositionBaseline{}, self, relationship, now)
 
 	require.InDelta(t, -0.7, composed.Mood, 1e-9)
 	require.InDelta(t, -1, composed.Trust, 1e-9, "the sum must clamp to the scale the wording can express")
@@ -95,7 +96,7 @@ func TestComposeDispositionDecaysMoodToNow(t *testing.T) {
 	now := time.Now()
 	old := models.OmniChatCharacterTraits{Mood: -0.9, MoodUpdatedAt: now.Add(-30 * 24 * time.Hour)}
 
-	fresh := models.ComposeOmniChatDisposition(old, models.OmniChatCharacterTraits{MoodUpdatedAt: now}, now)
+	fresh := models.ComposeOmniChatDisposition(models.OmniChatDispositionBaseline{}, old, models.OmniChatCharacterTraits{MoodUpdatedAt: now}, now)
 
 	require.Less(t, fresh.Mood, 0.0)
 	require.Greater(t, fresh.Mood, -omniChatDispositionDeadband,

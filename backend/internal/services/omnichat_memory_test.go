@@ -38,11 +38,12 @@ type fakeMemoryStore struct {
 	worldEvents     []models.OmniChatWorldEvent
 	worldEventErr   error
 	selfTraits      models.OmniChatCharacterTraits
+	selfBaseline    models.OmniChatDispositionBaseline
 	selfTraitsErr   error
 }
 
-func (f *fakeMemoryStore) LoadSelfTraits(context.Context, int) (models.OmniChatCharacterTraits, error) {
-	return f.selfTraits, f.selfTraitsErr
+func (f *fakeMemoryStore) LoadSelfDisposition(context.Context, int) (models.OmniChatCharacterTraits, models.OmniChatDispositionBaseline, error) {
+	return f.selfTraits, f.selfBaseline, f.selfTraitsErr
 }
 
 func (f *fakeMemoryStore) RecordWorldEvent(_ context.Context, event models.OmniChatWorldEvent) (int64, error) {
