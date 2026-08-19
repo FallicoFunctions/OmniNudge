@@ -29,6 +29,12 @@ func NewWorldEventHandler(memory *services.OmniChatMemoryService) *WorldEventHan
 type worldEventRequest struct {
 	Title   string `json:"title"`
 	Summary string `json:"summary"`
+	// EmotionalValence is a pointer so that "the world had nothing to say
+	// about how this felt" and "the world said it felt neutral" are different
+	// requests rather than both arriving as zero. Omitting it is the ordinary
+	// case, and it must stay cheap to omit: a resident is not having a
+	// significant evening every evening.
+	EmotionalValence *float64 `json:"emotionalValence"`
 }
 
 // RecordOmniRave files what a resident did in OmniRave as one of its own
@@ -68,7 +74,18 @@ func (h *WorldEventHandler) RecordOmniRave(c *gin.Context) {
 		return
 	}
 
-	episodeID, err := h.memory.RecordWorldEvent(c.Request.Context(), int(personaID), request.Title, request.Summary)
+	// Out of range is refused, not clamped. A world reporting 4 is broken, and
+	// answering it with a stored 1 would move a character's disposition on the
+	// strength of a bug and tell nobody.
+	if request.EmotionalValence != nil && (*request.EmotionalValence < -1 || *request.EmotionalValence > 1) {
+		apiresponse.WriteError(c, http.StatusBadRequest, "Emotional valence must be within -1..1")
+		return
+	}
+
+	episodeID, err := h.memory.RecordWorldEvent(
+		c.Request.Context(), int(personaID),
+		request.Title, request.Summary, request.EmotionalValence,
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrOmniChatMemoryNotResident):
@@ -76,6 +93,8 @@ func (h *WorldEventHandler) RecordOmniRave(c *gin.Context) {
 			// "private" and "retired" alike, matching admission. Only platform
 			// characters are residents, so only they have a self tier at all.
 			apiresponse.WriteError(c, http.StatusForbidden, "Persona has no self-tier memory")
+		case errors.Is(err, services.ErrOmniChatMemoryValenceOutOfRange):
+			apiresponse.WriteError(c, http.StatusBadRequest, "Emotional valence must be within -1..1")
 		case errors.Is(err, services.ErrOmniChatMemoryUnavailable):
 			apiresponse.WriteError(c, http.StatusServiceUnavailable, "Character memory is unavailable")
 		default:

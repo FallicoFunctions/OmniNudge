@@ -688,19 +688,42 @@ func TestRecordWorldEventFilesAnUnownedEpisode(t *testing.T) {
 	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
 
 	episodeID, err := service.RecordWorldEvent(context.Background(), 7,
-		"Came third on the Moon Circuit", "Finished third in the final.")
+		"Came third on the Moon Circuit", "Finished third in the final.", nil)
 	require.NoError(t, err)
 	require.NotZero(t, episodeID)
 	require.Len(t, store.worldEvents, 1)
 	require.Equal(t, 7, store.worldEvents[0].PersonaID)
 	require.Equal(t, "Came third on the Moon Circuit", store.worldEvents[0].Title)
+	require.Nil(t, store.worldEvents[0].EmotionalValence,
+		"an unremarkable visit reaches the store with no feeling attached")
+}
+
+// A valence the world does supply is passed through untouched, and one that is
+// not a valence never reaches the store at all.
+func TestRecordWorldEventCarriesTheValence(t *testing.T) {
+	store := &fakeMemoryStore{}
+	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
+
+	valence := -0.2
+	_, err := service.RecordWorldEvent(context.Background(), 7,
+		"Wandered the main stage in OmniRave", "Was there alone the whole time.", &valence)
+	require.NoError(t, err)
+	require.Len(t, store.worldEvents, 1)
+	require.NotNil(t, store.worldEvents[0].EmotionalValence)
+	require.InDelta(t, -0.2, *store.worldEvents[0].EmotionalValence, 1e-9)
+
+	for _, bad := range []float64{1.5, -4} {
+		_, err := service.RecordWorldEvent(context.Background(), 7, "title", "summary", &bad)
+		require.ErrorIs(t, err, ErrOmniChatMemoryValenceOutOfRange)
+	}
+	require.Len(t, store.worldEvents, 1, "a refused valence must not reach the store")
 }
 
 func TestRecordWorldEventRefusesWithoutAPersona(t *testing.T) {
 	store := &fakeMemoryStore{}
 	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
 
-	_, err := service.RecordWorldEvent(context.Background(), 0, "title", "summary")
+	_, err := service.RecordWorldEvent(context.Background(), 0, "title", "summary", nil)
 	require.Error(t, err)
 	require.Empty(t, store.worldEvents, "a refused world event must not reach the store")
 }
@@ -711,6 +734,6 @@ func TestRecordWorldEventSurfacesTheResidencyRefusal(t *testing.T) {
 	store := &fakeMemoryStore{worldEventErr: models.ErrOmniChatMemoryNotResident}
 	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
 
-	_, err := service.RecordWorldEvent(context.Background(), 7, "title", "summary")
+	_, err := service.RecordWorldEvent(context.Background(), 7, "title", "summary", nil)
 	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
 }

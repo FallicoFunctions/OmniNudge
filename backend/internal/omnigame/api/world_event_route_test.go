@@ -404,3 +404,69 @@ func TestRouter_WorldEventRefusesWithoutADatabase(t *testing.T) {
 	})
 	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
 }
+
+// The end of the circuit, over the wire: what the world reports about how a
+// visit felt becomes who the character is, in the tier everybody shares.
+func TestRouter_WorldEventValenceMovesTheSelfTier(t *testing.T) {
+	router, pool, _ := newWorldEventRouter(t)
+	personaID := insertPlatformPersona(t, pool, "world-event-valence")
+
+	rec := postWorldEvent(t,
+		router,
+		`{"title":"Wandered the main stage in OmniRave","summary":"Was there with a crowd all evening.","emotionalValence":0.9}`,
+		func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		},
+	)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	traits, err := models.NewOmniChatCharacterTraitRepository(pool).
+		Load(context.Background(), int(personaID), models.OmniChatMemoryTierSelf)
+	require.NoError(t, err)
+	require.Greater(t, traits.Mood, 0.0)
+	require.Greater(t, traits.Warmth, 0.0)
+}
+
+// Omitting the valence is the ordinary report and must stay free: the memory is
+// kept and the character is unchanged.
+func TestRouter_WorldEventWithoutValenceLeavesTheCharacterAlone(t *testing.T) {
+	router, pool, _ := newWorldEventRouter(t)
+	personaID := insertPlatformPersona(t, pool, "world-event-no-valence")
+
+	rec := postWorldEvent(t,
+		router,
+		`{"title":"Wandered the main stage in OmniRave","summary":"Walked about for a while."}`,
+		func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		},
+	)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	traits, err := models.NewOmniChatCharacterTraitRepository(pool).
+		Load(context.Background(), int(personaID), models.OmniChatMemoryTierSelf)
+	require.NoError(t, err)
+	require.Zero(t, traits.Mood)
+	require.Zero(t, traits.Warmth)
+}
+
+// A number that is not a valence is told so, rather than being quietly pinned
+// to the end of the scale and moving the character anyway.
+func TestRouter_WorldEventRefusesValenceOutOfRange(t *testing.T) {
+	router, pool, _ := newWorldEventRouter(t)
+	personaID := insertPlatformPersona(t, pool, "world-event-bad-valence")
+
+	for _, body := range []string{
+		`{"title":"x","summary":"y","emotionalValence":1.5}`,
+		`{"title":"x","summary":"y","emotionalValence":-4}`,
+	} {
+		rec := postWorldEvent(t, router, body, func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		})
+		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	var episodes int
+	require.NoError(t, pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, personaID).Scan(&episodes))
+	require.Zero(t, episodes)
+}
