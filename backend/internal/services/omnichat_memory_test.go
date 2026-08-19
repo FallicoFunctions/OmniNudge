@@ -37,6 +37,12 @@ type fakeMemoryStore struct {
 	knownRootsErr   error
 	worldEvents     []models.OmniChatWorldEvent
 	worldEventErr   error
+	selfTraits      models.OmniChatCharacterTraits
+	selfTraitsErr   error
+}
+
+func (f *fakeMemoryStore) LoadSelfTraits(context.Context, int) (models.OmniChatCharacterTraits, error) {
+	return f.selfTraits, f.selfTraitsErr
 }
 
 func (f *fakeMemoryStore) RecordWorldEvent(_ context.Context, event models.OmniChatWorldEvent) (int64, error) {
@@ -736,4 +742,28 @@ func TestRecordWorldEventSurfacesTheResidencyRefusal(t *testing.T) {
 
 	_, err := service.RecordWorldEvent(context.Background(), 7, "title", "summary", nil)
 	require.ErrorIs(t, err, ErrOmniChatMemoryNotResident)
+}
+
+// A resident reads its own tier and nothing else, with the mood already
+// decayed, so what it acts on is what it actually feels now.
+func TestSelfDispositionReadsTheSelfTierDecayed(t *testing.T) {
+	store := &fakeMemoryStore{selfTraits: models.OmniChatCharacterTraits{
+		Mood:          -0.8,
+		MoodUpdatedAt: time.Now().Add(-3 * models.OmniChatTraitMoodHalfLife),
+		Trust:         -0.2,
+		Warmth:        0.4,
+	}}
+	service := NewOmniChatMemoryService(store, nil, nil, nil, nil)
+
+	disposition, err := service.SelfDisposition(context.Background(), 7)
+	require.NoError(t, err)
+	require.InDelta(t, -0.1, disposition.Mood, 0.01, "three half-lives of a -0.8 mood")
+	require.InDelta(t, -0.2, disposition.Trust, 1e-9)
+	require.InDelta(t, 0.4, disposition.Warmth, 1e-9)
+}
+
+func TestSelfDispositionRefusesWithoutAPersona(t *testing.T) {
+	service := NewOmniChatMemoryService(&fakeMemoryStore{}, nil, nil, nil, nil)
+	_, err := service.SelfDisposition(context.Background(), 0)
+	require.Error(t, err)
 }

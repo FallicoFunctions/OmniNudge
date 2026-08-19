@@ -40,6 +40,13 @@ type itinerary struct {
 	position   world.Vec3
 	distance   float64
 	zoneTime   map[world.ZoneID]time.Duration
+
+	// Who else was there, counted the same honest way as everything else here:
+	// out of the snapshots, never out of what this process hoped for. others is
+	// the latest reading, snapshots and withCompany are the whole visit.
+	others      []world.Vec3
+	snapshots   int
+	withCompany int
 }
 
 func newItinerary(playerName string, startedAt time.Time) *itinerary {
@@ -73,6 +80,38 @@ func (i *itinerary) observe(at time.Time, position world.Vec3, zone world.ZoneID
 	i.position = position
 	i.lastZone = zone
 	i.lastSeenAt = at
+}
+
+// observeOthers records who else the world says was there in the same snapshot.
+// It is separate from observe because it answers a different question -- not
+// where the character was, but whether it was alone -- and the two are only
+// ever called together, for the same snapshot, once the character itself has
+// been found in it.
+func (i *itinerary) observeOthers(others []world.Vec3) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	i.others = others
+	i.snapshots++
+	if len(others) > 0 {
+		i.withCompany++
+	}
+}
+
+// company is where the world last said everyone else was standing.
+func (i *itinerary) company() []world.Vec3 {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return append([]world.Vec3(nil), i.others...)
+}
+
+// felt is how the visit felt, or nil when there is nothing honest to say --
+// which is the ordinary answer. See companyFelt for what is and is not
+// knowable here.
+func (i *itinerary) felt(warmth float64) *float64 {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return companyFelt(warmth, i.snapshots, i.withCompany)
 }
 
 // current returns the last position the world confirmed, and whether the

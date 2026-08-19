@@ -55,6 +55,7 @@ type omniChatMemoryStore interface {
 	RecordExtractionFailure(ctx context.Context, conversationID, ownerUserID int) error
 	SkipTo(ctx context.Context, conversationID, ownerUserID, throughMessageID int) error
 	RecordWorldEvent(ctx context.Context, event models.OmniChatWorldEvent) (int64, error)
+	LoadSelfTraits(ctx context.Context, personaID int) (models.OmniChatCharacterTraits, error)
 	Recall(ctx context.Context, personaID, ownerUserID int, cue string, weights models.OmniChatMemoryRecallWeights, limit int) ([]*models.OmniChatMemoryEpisode, error)
 	MarkRetrieved(ctx context.Context, episodeIDs []int64) error
 	RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]models.OmniChatMemoryRoot, error)
@@ -344,6 +345,27 @@ func (s *OmniChatMemoryService) RecordWorldEvent(ctx context.Context, personaID 
 		Int64("episode_id", episodeID).
 		Msg("omnichat memory: world event recorded to the self tier")
 	return episodeID, nil
+}
+
+// SelfDisposition is who a resident is at this instant: the tier a world wrote
+// and everyone shares, with the mood already decayed to now.
+//
+// A resident reads this about itself before deciding anything, which is the
+// only reason it is exposed at all. It is not a conversation's disposition and
+// deliberately composes with no relationship: what a character is like with one
+// person is that person's business, and a world has no business knowing it.
+func (s *OmniChatMemoryService) SelfDisposition(ctx context.Context, personaID int) (models.OmniChatDisposition, error) {
+	if s == nil || s.store == nil {
+		return models.OmniChatDisposition{}, ErrOmniChatMemoryUnavailable
+	}
+	if personaID < 1 {
+		return models.OmniChatDisposition{}, errors.New("omnichat memory: disposition requires a persona")
+	}
+	traits, err := s.store.LoadSelfTraits(ctx, personaID)
+	if err != nil {
+		return models.OmniChatDisposition{}, err
+	}
+	return traits.DispositionAt(time.Now()), nil
 }
 
 // Recall returns the memories a persona should surface for the latest user

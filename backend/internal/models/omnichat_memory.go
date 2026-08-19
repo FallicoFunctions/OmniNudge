@@ -653,6 +653,17 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 	return episodeID, nil
 }
 
+// LoadSelfTraits reads the disposition a character carries in its own right --
+// the tier a world writes and everybody reads.
+//
+// A character nobody has done anything to is the neutral row, not an error, on
+// the same terms as every other traits read. There is nothing to guard here:
+// only a resident's self tier is ever written, so a character that is not one
+// has a neutral row and reading it tells the caller nothing it did not know.
+func (r *OmniChatMemoryRepository) LoadSelfTraits(ctx context.Context, personaID int) (OmniChatCharacterTraits, error) {
+	return loadTraits(ctx, r.pool, personaID, OmniChatMemoryTierSelf)
+}
+
 // recallQuery ranks a persona's memories against a free-text cue.
 //
 // Two tiers are visible at once: the caller's own relational memory, and the

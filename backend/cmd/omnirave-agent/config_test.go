@@ -73,6 +73,9 @@ func TestLoadConfigTrimsTheAPIBaseURL(t *testing.T) {
 	if want := "http://api.example/api/v1/omnigame/admit/omnirave"; cfg.AdmitURL() != want {
 		t.Errorf("admit url = %q, want %q", cfg.AdmitURL(), want)
 	}
+	if want := "http://api.example/api/v1/omnigame/disposition/omnirave"; cfg.DispositionURL() != want {
+		t.Errorf("DispositionURL() = %q, want %q", cfg.DispositionURL(), want)
+	}
 	if want := "http://api.example/api/v1/omnigame/world-event/omnirave"; cfg.WorldEventURL() != want {
 		t.Errorf("world event url = %q, want %q", cfg.WorldEventURL(), want)
 	}
@@ -90,5 +93,31 @@ func TestSocketURLCarriesTheWorldToken(t *testing.T) {
 	}
 	if want := "ws://localhost:8092/ws?token=world.token.value"; socketURL != want {
 		t.Errorf("socket url = %q, want %q", socketURL, want)
+	}
+}
+
+// The seed is optional, and a run given one is a run that can be reproduced.
+func TestLoadConfigTakesAnOptionalSeed(t *testing.T) {
+	cfg, err := LoadConfig(getenvFrom(completeEnv()))
+	if err != nil {
+		t.Fatalf("expected a usable config, got %v", err)
+	}
+	if cfg.Seed != 0 {
+		t.Errorf("seed = %d, want zero so the clock supplies one", cfg.Seed)
+	}
+
+	env := completeEnv()
+	env[envSeed] = "-99"
+	cfg, err = LoadConfig(getenvFrom(env))
+	if err != nil {
+		t.Fatalf("expected a usable config, got %v", err)
+	}
+	if cfg.Seed != -99 {
+		t.Errorf("seed = %d, want -99", cfg.Seed)
+	}
+
+	env[envSeed] = "not-a-number"
+	if _, err = LoadConfig(getenvFrom(env)); err == nil {
+		t.Error("a seed that is not a number should be refused at startup")
 	}
 }

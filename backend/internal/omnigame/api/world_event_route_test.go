@@ -470,3 +470,59 @@ func TestRouter_WorldEventRefusesValenceOutOfRange(t *testing.T) {
 		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1`, personaID).Scan(&episodes))
 	require.Zero(t, episodes)
 }
+
+// The read that closes the circuit: a resident asks who it is and gets back
+// what the world has already done to it.
+func TestRouter_DispositionReadsTheSelfTier(t *testing.T) {
+	router, pool, _ := newWorldEventRouter(t)
+	personaID := insertPlatformPersona(t, pool, "disposition-resident")
+
+	readDisposition := func(personaID int64) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/omnigame/disposition/omnirave", nil)
+		req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// A character nothing has happened to is neutral, not an error.
+	rec := readDisposition(personaID)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var before map[string]float64
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &before))
+	require.Zero(t, before["mood"])
+	require.Zero(t, before["warmth"])
+
+	postWorldEvent(t,
+		router,
+		`{"title":"Wandered the main stage in OmniRave","summary":"Was shouted off in front of everyone.","emotionalValence":-0.9}`,
+		func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, personaID))
+		},
+	)
+
+	rec = readDisposition(personaID)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var after map[string]float64
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &after))
+	require.Less(t, after["mood"], 0.0)
+	require.Less(t, after["trust"], 0.0)
+
+	// Another character's disposition is another credential's business.
+	other := insertPlatformPersona(t, pool, "disposition-bystander")
+	rec = readDisposition(other)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var bystander map[string]float64
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &bystander))
+	require.Zero(t, bystander["mood"])
+}
+
+// The same credential rule the write half has: no credential, nothing read.
+func TestRouter_DispositionRefusesWithoutTheWorldEventCredential(t *testing.T) {
+	router, _, _ := newWorldEventRouter(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/omnigame/disposition/omnirave", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+}

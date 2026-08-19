@@ -313,6 +313,17 @@ type OmniChatDisposition struct {
 	Warmth float64
 }
 
+// DispositionAt is one tier read on its own, with the mood already decayed to
+// the instant asked for. It is what a resident reads about itself: there is no
+// second party in a world, so there is nothing to compose against.
+func (t OmniChatCharacterTraits) DispositionAt(at time.Time) OmniChatDisposition {
+	return OmniChatDisposition{
+		Mood:   t.MoodAt(at),
+		Trust:  t.Trust,
+		Warmth: t.Warmth,
+	}
+}
+
 // ComposeOmniChatDisposition adds a character's own traits to the traits of
 // one relationship.
 //

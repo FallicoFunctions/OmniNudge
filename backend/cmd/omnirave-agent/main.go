@@ -8,9 +8,13 @@
 // still allowed to be here, so a withdrawal or a sanction takes hold within one
 // token lifetime.
 //
-// Deciding anything -- what to say, where to go and why, who to go and see --
-// is cognition, and cognition is deliberately not here. What is here is
-// presence, which nothing had until now.
+// What it does have is a disposition, which it reads about itself and which
+// colours three things: whether it goes out at all, how long it stays, and how
+// it moves while it is there. That is arithmetic on traits the world already
+// moved, and no model is asked anything at any point. See policy.go.
+//
+// Deciding what to say, and who to go and see by name, is cognition, and
+// cognition is still deliberately not here.
 package main
 
 import (
@@ -63,6 +67,11 @@ type agent struct {
 
 	transient *backoff
 	refused   *backoff
+	// rng is the character's own stream of choices. It is one stream, seeded
+	// once, so a run started with a known seed makes the same decisions in the
+	// same order -- which is what stops "it went out less" from being an
+	// anecdote.
+	rng *rand.Rand
 }
 
 func main() {
@@ -79,14 +88,19 @@ func main() {
 	}
 
 	worldConfig := world.DefaultConfig()
-	jitter := rand.New(rand.NewSource(time.Now().UnixNano()))
+	seed := cfg.Seed
+	if seed == 0 {
+		seed = time.Now().UnixNano()
+	}
+	rng := rand.New(rand.NewSource(seed))
 	runner := &agent{
 		cfg:       cfg,
 		api:       api,
 		walkable:  worldConfig.Walkable.IsValid,
 		now:       func() time.Time { return time.Now().UTC() },
-		transient: newBackoff(transientBackoffBase, transientBackoffMax, jitter.Float64),
-		refused:   newBackoff(refusedBackoffBase, refusedBackoffMax, jitter.Float64),
+		transient: newBackoff(transientBackoffBase, transientBackoffMax, rng.Float64),
+		refused:   newBackoff(refusedBackoffBase, refusedBackoffMax, rng.Float64),
+		rng:       rng,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -98,9 +112,57 @@ func main() {
 	log.Printf("omnirave-agent: stopped")
 }
 
-// run is the life of the character: admit, live, report, repeat.
+// run is the life of the character: read who it is, decide whether to go out,
+// go, come home, and ask again.
+//
+// The disposition is read fresh each time round rather than held, because the
+// last outing may well have changed it -- that is the circuit this closes.
 func (a *agent) run(ctx context.Context) {
 	for ctx.Err() == nil {
+		self, err := a.api.disposition(ctx)
+		if err != nil {
+			// Not knowing who it is, is not a reason to stay in. Neutral is
+			// what this agent was before it could read anything about itself,
+			// so an unreachable disposition degrades to exactly that rather
+			// than to a character that never leaves.
+			log.Printf("omnirave-agent: could not read the character's disposition (%v); going out as neutral", err)
+			self = disposition{}
+		}
+
+		if !self.goesOut(a.rng) {
+			delay := self.timeAtHome(a.rng)
+			log.Printf("omnirave-agent: persona %d is not going out this time; asking again in %s",
+				a.cfg.PersonaID, delay.Round(time.Second))
+			a.sleep(ctx, delay)
+			continue
+		}
+
+		a.outing(ctx, self)
+		if ctx.Err() != nil {
+			return
+		}
+		a.sleep(ctx, self.timeAtHome(a.rng))
+	}
+}
+
+// outing is one stretch of being in the world: admit, live, report, and admit
+// again until the character has had enough.
+//
+// It is several sessions, not one. A world token lasts five minutes and the
+// world ends the session when it expires, so what the budget actually decides
+// is whether the next admission happens -- the agent used to answer that with
+// an unconditional yes, forever.
+func (a *agent) outing(ctx context.Context, self disposition) {
+	startedAt := a.now()
+	budget := self.visitBudget(a.rng)
+	log.Printf("omnirave-agent: going out for about %s", budget.Round(time.Minute))
+
+	for ctx.Err() == nil {
+		if !self.stillOut(a.now().Sub(startedAt), budget) {
+			log.Printf("omnirave-agent: that is enough for now; going home")
+			return
+		}
+
 		admission, err := a.api.admit(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -122,9 +184,9 @@ func (a *agent) run(ctx context.Context) {
 		a.refused.reset()
 		log.Printf("omnirave-agent: admitted as %s (%s)", admission.PlayerName, admission.PlayerID)
 
-		startedAt := a.now()
-		itin, sessionErr := a.liveSession(ctx, admission)
-		lived := a.now().Sub(startedAt)
+		sessionStart := a.now()
+		itin, sessionErr := a.liveSession(ctx, admission, self)
+		lived := a.now().Sub(sessionStart)
 		if lived >= healthySession {
 			a.transient.reset()
 		}
@@ -135,7 +197,7 @@ func (a *agent) run(ctx context.Context) {
 			// The visit happened; record it before leaving, on a context that
 			// the signal has not already cancelled.
 			reportCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownReportTimeout)
-			a.reportVisit(reportCtx, itin)
+			a.reportVisit(reportCtx, itin, self)
 			cancel()
 			return
 		case sessionErr != nil:
@@ -146,15 +208,13 @@ func (a *agent) run(ctx context.Context) {
 			log.Printf("omnirave-agent: session ended after %s", lived.Round(time.Second))
 		}
 
-		a.reportVisit(ctx, itin)
+		a.reportVisit(ctx, itin, self)
 
 		if sessionErr != nil {
 			delay := a.transient.next()
 			log.Printf("omnirave-agent: reconnecting in %s", delay.Round(time.Second))
 			a.sleep(ctx, delay)
-			continue
 		}
-		log.Printf("omnirave-agent: re-admitting for a new session")
 	}
 }
 

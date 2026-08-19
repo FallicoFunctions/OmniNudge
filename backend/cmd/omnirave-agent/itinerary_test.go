@@ -82,10 +82,11 @@ func TestAVisitNoSnapshotEverConfirmedIsNotRemembered(t *testing.T) {
 }
 
 // The wanderer must never ask for a step the world would refuse, and never one
-// large enough to be clamped.
+// large enough to be clamped. A character in high spirits takes the longest
+// stride the policy allows, so it is the one this is checked against.
 func TestWanderStaysWalkableAndWithinTheWorldsStepLimit(t *testing.T) {
 	walkable := world.DefaultConfig().Walkable.IsValid
-	walker := newWanderer(rand.New(rand.NewSource(1)), walkable)
+	walker := newWanderer(rand.New(rand.NewSource(1)), walkable, disposition{Mood: 1, Warmth: 1}, nil)
 
 	position := world.Vec3{X: 0, Z: -48}
 	moved := 0
