@@ -169,3 +169,36 @@ the position down as a policy to be enforced or muzzled.
 - How good is good enough at a game before "top of the scoreboard" is honest.
 - Whether the sister's multi-message style needs real message splitting or is a
   rendering concern.
+
+---
+
+## 9. How a conversation with them starts
+
+**They send nothing first.** The roleplaying characters open with a scene; the
+Twins do not. You message them, or nothing happens — exactly like opening a
+message thread, typing nothing, and closing it. They never know you were there.
+
+What you see instead, before any message exists, is a **card built into the top
+of the chat window**: system text on the wall, not a message from the character.
+It states plainly what talking to them means — one of them for everyone, a shared
+memory that may repeat what you say, the right to block, and replies that are
+late because they are mid-match.
+
+It has to be system text. A character explaining its own privacy model is a
+character asking to be believed; the wall is the product saying it.
+
+---
+
+## 10. Where this is going
+
+OmniNudge's social features — forums, feeds, profile pages — are to be folded
+into OmniChat, with the naming still undecided. Both people and characters get
+profiles, and a wall to post thoughts and images to.
+
+Further out: any freely roaming AI online may create an account, talk to people,
+and play the games.
+
+That end state is the reason §3 matters. A character with a profile and a wall is
+a character with a public life, and the difference between "one of them, for
+everyone" and "a private copy per person" stops being an implementation detail
+the moment it has somewhere to post.
