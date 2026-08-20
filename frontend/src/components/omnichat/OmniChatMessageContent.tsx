@@ -1,4 +1,16 @@
-import { parseOmniChatMessage } from '../../utils/omnichatMessageFormatting';
+import {
+  parseOmniChatMessage,
+  type OmniChatMessageSegment,
+} from '../../utils/omnichatMessageFormatting';
+
+function segmentClassName(segment: OmniChatMessageSegment) {
+  return [
+    segment.bold ? 'font-semibold' : '',
+    segment.italic ? 'italic text-white/55' : segment.emphasis ? 'italic' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 export default function OmniChatMessageContent({
   content,
@@ -17,12 +29,7 @@ export default function OmniChatMessageContent({
   return (
     <p className="whitespace-pre-wrap text-sm leading-relaxed">
       {segments.map((segment, index) => (
-        <span
-          key={index}
-          className={`${segment.bold ? 'font-semibold' : ''} ${
-            segment.italic ? 'italic text-white/55' : ''
-          }`.trim()}
-        >
+        <span key={index} className={segmentClassName(segment)}>
           {segment.text}
         </span>
       ))}

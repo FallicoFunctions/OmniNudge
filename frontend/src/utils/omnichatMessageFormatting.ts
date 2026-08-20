@@ -1,7 +1,10 @@
 export type OmniChatMessageSegment = {
   text: string;
   bold: boolean;
+  // Narration: a physical action, rendered grey. Asterisks only.
   italic: boolean;
+  // Emphasis on a word or phrase, rendered in the normal text colour.
+  emphasis?: boolean;
 };
 
 type ParseOmniChatMessageOptions = {
@@ -16,6 +19,31 @@ export function normalizeOmniChatMessageContent(content: string) {
 
 function hasClosingMarker(content: string, marker: '*' | '**', fromIndex: number) {
   return content.indexOf(marker, fromIndex) !== -1;
+}
+
+const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
+
+function isWordCharacter(character: string | undefined) {
+  return character !== undefined && WORD_CHARACTER.test(character);
+}
+
+// snake_case, __dunder__ and any other mid-word underscore must survive as
+// text, so an emphasis marker has to sit on a word boundary and enclose
+// something.
+function canOpenEmphasis(content: string, index: number) {
+  if (isWordCharacter(content[index - 1])) return false;
+  const next = content[index + 1];
+  return next !== undefined && next !== '_' && !/\s/.test(next);
+}
+
+function findEmphasisClose(content: string, openIndex: number) {
+  for (let index = openIndex + 1; index < content.length; index += 1) {
+    if (content[index] !== '_') continue;
+    if (content[index - 1] === '_' || /\s/.test(content[index - 1])) continue;
+    if (isWordCharacter(content[index + 1])) continue;
+    return index;
+  }
+  return -1;
 }
 
 const QUOTED_DIALOGUE_AT_LINE_START =
@@ -85,7 +113,7 @@ function shouldMarkUnquotedSurroundingNarration(content: string) {
 
 function containsQuotedAssistantDialogue(segments: OmniChatMessageSegment[]) {
   return segments.some((segment) => {
-    if (segment.italic) return false;
+    if (segment.italic || segment.emphasis) return false;
     return collectQuotedDialogueMatches(segment.text).length > 0;
   });
 }
@@ -102,6 +130,10 @@ function repairQuotedAssistantDialogue(
   };
 
   for (const segment of segments) {
+    if (segment.emphasis) {
+      repaired.push(segment);
+      continue;
+    }
     if (segment.italic) {
       append(segment.text, segment.bold, true);
       continue;
@@ -146,7 +178,7 @@ function repairUnmarkedAssistantNarration(
   const repaired: OmniChatMessageSegment[] = [];
 
   for (const segment of segments) {
-    if (segment.italic) {
+    if (segment.italic || segment.emphasis) {
       repaired.push(segment);
       continue;
     }
@@ -181,12 +213,17 @@ export function parseOmniChatMessage(
   let buffer = '';
   let bold = false;
   let italic = false;
+  let emphasisCloseIndex = -1;
 
   const flush = () => {
     if (!buffer) {
       return;
     }
-    segments.push({ text: buffer, bold, italic });
+    segments.push(
+      emphasisCloseIndex === -1
+        ? { text: buffer, bold, italic }
+        : { text: buffer, bold, italic, emphasis: true }
+    );
     buffer = '';
   };
 
@@ -205,6 +242,27 @@ export function parseOmniChatMessage(
         continue;
       }
       index += 2;
+      continue;
+    }
+
+    if (normalizedContent[index] === '_') {
+      if (emphasisCloseIndex === index) {
+        flush();
+        emphasisCloseIndex = -1;
+        index += 1;
+        continue;
+      }
+      if (emphasisCloseIndex === -1 && canOpenEmphasis(normalizedContent, index)) {
+        const closeIndex = findEmphasisClose(normalizedContent, index);
+        if (closeIndex !== -1) {
+          flush();
+          emphasisCloseIndex = closeIndex;
+          index += 1;
+          continue;
+        }
+      }
+      buffer += '_';
+      index += 1;
       continue;
     }
 
