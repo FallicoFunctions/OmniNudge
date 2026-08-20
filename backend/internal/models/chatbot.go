@@ -27,13 +27,36 @@ const (
 // Response style profiles add a platform-level conversational style after the
 // character card prompt. "inherit" follows the current platform default while
 // "character_only" leaves imported/custom character instructions untouched.
+// "direct_message" is the one profile that is not a performance: no scene, no
+// scenario, no narration, and no opening line until the user speaks first.
 const (
 	ResponseStyleProfileInherit         = "inherit"
 	ResponseStyleProfileNaturalDialogue = "natural_dialogue"
 	ResponseStyleProfileLeanNarrative   = "lean_narrative"
 	ResponseStyleProfileProfessional    = "professional"
 	ResponseStyleProfileCharacterOnly   = "character_only"
+	ResponseStyleProfileDirectMessage   = "direct_message"
 )
+
+// PersonaSpeaksFirst reports whether a persona may open a conversation before
+// the user has said anything. Direct-message characters never do: an empty
+// thread is one they have no way of knowing exists, which is the whole point.
+func PersonaSpeaksFirst(persona *BotPersona) bool {
+	if persona == nil {
+		return false
+	}
+	return strings.TrimSpace(persona.ResponseStyleProfile) != ResponseStyleProfileDirectMessage
+}
+
+// PersonaPerformsAScene reports whether a persona's conversations carry scene
+// continuity state. A direct-message character has no scene to track -- there
+// is no location, no outfit, and no cast, only a message thread.
+func PersonaPerformsAScene(persona *BotPersona) bool {
+	if persona == nil {
+		return false
+	}
+	return strings.TrimSpace(persona.ResponseStyleProfile) != ResponseStyleProfileDirectMessage
+}
 
 // Message roles within a bot conversation.
 const (

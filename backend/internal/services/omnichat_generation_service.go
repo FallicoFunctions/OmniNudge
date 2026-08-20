@@ -14,6 +14,12 @@ import (
 var (
 	ErrOmniChatGenerationResourceNotFound = errors.New("omnichat generation resource not found")
 	ErrOmniChatGenerationUnavailable      = errors.New("omnichat generation unavailable")
+
+	// Scene rendering asks a character to hold still while a picture is taken
+	// of the moment being roleplayed. A direct-message character is not in a
+	// moment, and asking for a picture of them is a thing you say to them, not
+	// a button the product presses on their behalf.
+	ErrOmniChatGenerationNotSupported = errors.New("omnichat generation is not supported for this persona")
 )
 
 type OmniChatGenerationPersonaReader interface {
@@ -153,6 +159,9 @@ func (s *OmniChatGenerationService) CreateConversationMediaCommand(
 	if persona == nil {
 		return nil, nil, ErrOmniChatGenerationResourceNotFound
 	}
+	if !models.PersonaPerformsAScene(persona) {
+		return nil, nil, ErrOmniChatGenerationNotSupported
+	}
 
 	generationRequest := models.OmniChatGenerationRequest{
 		// The command endpoint owns the request-idempotency record. The inner
@@ -244,6 +253,9 @@ func (s *OmniChatGenerationService) CreateGeneration(ctx context.Context, ownerU
 	}
 	if persona == nil {
 		return nil, ErrOmniChatGenerationResourceNotFound
+	}
+	if !models.PersonaPerformsAScene(persona) {
+		return nil, ErrOmniChatGenerationNotSupported
 	}
 
 	if input.ConversationID != nil {

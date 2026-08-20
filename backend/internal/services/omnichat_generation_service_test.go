@@ -429,3 +429,61 @@ func TestOmniChatGenerationServiceMediaCommandReusesAcceptedJobAfterInterruptedR
 	require.Equal(t, requestID, *message.RequestID)
 	require.Nil(t, store.created)
 }
+
+func TestOmniChatGenerationServiceRejectsDirectMessagePersona(t *testing.T) {
+	conversationID := 7
+	directPersona := &models.BotPersona{
+		ID:                   42,
+		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
+	}
+
+	t.Run("scene generation", func(t *testing.T) {
+		store := &generationStoreFake{}
+		service := NewOmniChatGenerationService(
+			&generationPersonaReaderFake{persona: directPersona},
+			&generationConversationReaderFake{
+				conversation: &models.BotConversation{ID: conversationID, UserID: 9, PersonaID: 42},
+			},
+			store,
+			&generationEnqueuerFake{},
+			"runpod",
+		)
+
+		_, err := service.CreateGeneration(context.Background(), 9, models.OmniChatGenerationRequest{
+			Kind:           models.OmniChatMediaKindImage,
+			Mode:           models.OmniChatGenerationModeContextual,
+			PersonaID:      42,
+			ConversationID: &conversationID,
+			Prompt:         "Show me",
+		})
+
+		require.ErrorIs(t, err, ErrOmniChatGenerationNotSupported)
+		require.Nil(t, store.created)
+	})
+
+	// Hiding the buttons is cosmetic. A hand-rolled /photo request has to be
+	// refused by the server too, or the character is still made to pose.
+	t.Run("slash command", func(t *testing.T) {
+		store := &generationStoreFake{}
+		service := NewOmniChatGenerationService(
+			&generationPersonaReaderFake{persona: directPersona},
+			&generationConversationReaderFake{
+				conversation: &models.BotConversation{ID: conversationID, UserID: 9, PersonaID: 42},
+			},
+			store,
+			&generationEnqueuerFake{},
+			"runpod",
+		)
+		service.SetMessageWriter(&generationMessageWriterFake{})
+
+		_, _, err := service.CreateConversationMediaCommand(context.Background(), 9, conversationID,
+			models.OmniChatMediaCommandRequest{
+				RequestID: uuid.New(),
+				Kind:      models.OmniChatMediaKindImage,
+				Prompt:    "Show me what you're wearing",
+			})
+
+		require.ErrorIs(t, err, ErrOmniChatGenerationNotSupported)
+		require.Nil(t, store.created)
+	})
+}

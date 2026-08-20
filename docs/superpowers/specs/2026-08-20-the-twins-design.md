@@ -202,3 +202,35 @@ That end state is the reason §3 matters. A character with a profile and a wall 
 a character with a public life, and the difference between "one of them, for
 everyone" and "a private copy per person" stops being an implementation detail
 the moment it has somewhere to post.
+
+---
+
+## 11. No scene means no scene buttons
+
+The roleplaying characters have a Scene photo and Scene video button, and
+`/photo` and `/video` commands, because there is a scene to render. These
+characters have none of that. There is no moment to take a picture of, and the
+product must not offer one.
+
+Nor is there an inferred path. OmniChat currently reads "show me what you're
+wearing" as a request it can satisfy on the character's behalf and quietly
+generates an image. For a direct-message character that inference is off
+entirely, because it answers a question that was addressed to her.
+
+**Asking is still allowed. It is just addressed to the person.** "Send me a
+selfie" goes through as ordinary text, and what comes back is whatever she
+would actually say. That has to be a real answer, not a formality before
+compliance:
+
+- The brother, asked by a man to show what he is wearing, does not comply. He
+  is not gay, he finds the question odd, and he may say so bluntly.
+- If it keeps happening, that is what the blocking ladder in §7 is for.
+
+Compliance is a disposition outcome, not a request type. Whether a picture ever
+arrives depends on who is asking, how long they have been talking, and how the
+character feels about them -- the same trait state that governs everything else
+about how they treat someone.
+
+Enforced server-side, not just in the UI: a hand-rolled generation request for
+one of these characters is refused, or the character can still be made to pose
+by anyone who reads the network tab.

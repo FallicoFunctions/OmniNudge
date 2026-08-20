@@ -4406,6 +4406,15 @@
       "sharedEmpty": "Nothing from this conversation yet.",
       "ownLifeHeading": "{{name}}'s own life",
       "ownLifeDescription": "Things {{name}} did away from this conversation. They belong to her, not to you, so they cannot be removed here."
+    },
+    "directCharacterNotice": {
+      "title": "About {{name}}",
+      "shared": "There is one {{name}}, and everyone talks to the same one. This is not a private copy made for you.",
+      "remembers": "{{name}} remembers conversations the way a person does, across everyone. Anything you say here, {{name}} may repeat to someone else, or bring up months from now.",
+      "notActing": "{{name}} is not playing a part. There is no story here and no scene to set up, and {{name}} will not act one out if you ask.",
+      "ownTime": "Replies come when they come. {{name}} has other things going on and may be slow, short, or busy.",
+      "canLeave": "{{name}} can stop talking to you. Being unpleasant will end the conversation for a while, and repeatedly so will end it for good.",
+      "saySomething": "{{name}} does not know this window is open. Nothing happens until you send something."
     }
   }
 }

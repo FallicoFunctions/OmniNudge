@@ -566,7 +566,8 @@ func normalizeResponseStyleProfile(raw string, existing *models.BotPersona, sour
 		models.ResponseStyleProfileNaturalDialogue,
 		models.ResponseStyleProfileLeanNarrative,
 		models.ResponseStyleProfileProfessional,
-		models.ResponseStyleProfileCharacterOnly:
+		models.ResponseStyleProfileCharacterOnly,
+		models.ResponseStyleProfileDirectMessage:
 		return profile, nil
 	default:
 		return "", fmt.Errorf("response style profile is invalid")

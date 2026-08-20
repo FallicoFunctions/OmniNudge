@@ -124,6 +124,8 @@ func (h *OmniChatMediaHandler) CreateGeneration(c *gin.Context) {
 			RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_unavailable", "Media generation is temporarily unavailable")
 		case errors.Is(err, services.ErrOmniChatPaidFeatureRequired):
 			RespondError(c, http.StatusPaymentRequired, "Media generation requires OmniCredits")
+		case errors.Is(err, services.ErrOmniChatGenerationNotSupported):
+			RespondErrorCoded(c, http.StatusUnprocessableEntity, "generation_not_supported", "This character does not generate scenes")
 		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
 			RespondErrorCoded(c, http.StatusUnprocessableEntity, "safety_rejected", "This request cannot be generated")
 		default:
@@ -231,6 +233,8 @@ func (h *OmniChatMediaHandler) CreateConversationMediaCommand(c *gin.Context) {
 			RespondErrorCoded(c, http.StatusServiceUnavailable, "generation_unavailable", "Media generation is temporarily unavailable")
 		case errors.Is(err, services.ErrOmniChatPaidFeatureRequired):
 			RespondError(c, http.StatusPaymentRequired, "Media generation requires OmniCredits")
+		case errors.Is(err, services.ErrOmniChatGenerationNotSupported):
+			RespondErrorCoded(c, http.StatusUnprocessableEntity, "generation_not_supported", "This character does not generate scenes")
 		case errors.Is(err, services.ErrOmniChatGenerationSafetyRejected):
 			RespondErrorCoded(c, http.StatusUnprocessableEntity, "safety_rejected", "This request cannot be generated")
 		default:

@@ -510,6 +510,71 @@ describe('OmniChatChatPage', () => {
     ).toBeInTheDocument();
   });
 
+  describe('a character who is not roleplaying', () => {
+    const directPersona = {
+      id: 9,
+      slug: 'twin-brother',
+      name: 'Jesse',
+      description: 'Plays a lot of games.',
+      first_message: 'hey',
+      category: 'original' as const,
+      response_style_profile: 'direct_message' as const,
+      is_nsfw: false,
+      is_active: true,
+      created_at: '2026-07-01T10:00:00Z',
+      updated_at: '2026-07-01T10:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockListPersonas.mockResolvedValue([directPersona]);
+      mockGetConversation.mockResolvedValue({
+        conversation: {
+          id: 42,
+          user_id: 1,
+          persona_id: 9,
+          title: 'Jesse',
+          created_at: '2026-07-02T10:00:00Z',
+          last_message_at: '2026-07-02T10:15:00Z',
+          persona: directPersona,
+        },
+        messages: [],
+      });
+    });
+
+    it('states the terms on the window itself rather than as a message from the character', async () => {
+      renderPage();
+
+      const notice = await screen.findByTestId('omnichat-direct-character-notice');
+      expect(notice).toHaveTextContent('everyone talks to the same one');
+      expect(notice).toHaveTextContent('may repeat to someone else');
+
+      // The notice is chrome, not dialogue. It must not be attributed to Jesse
+      // or sit among the turns as something she said.
+      expect(notice.tagName).toBe('ASIDE');
+      expect(notice.closest('[data-testid="persona-avatar"]')).toBeNull();
+    });
+
+    it('offers no scene generation, because there is no scene', async () => {
+      renderPage();
+
+      await screen.findByTestId('omnichat-direct-character-notice');
+      expect(screen.queryByRole('button', { name: /scene photo/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /scene video/i })).toBeNull();
+    });
+
+    it('treats a photo request as something said, not a command the product executes', async () => {
+      renderPage();
+
+      const composer = await screen.findByPlaceholderText('Say or do something...');
+      fireEvent.change(composer, { target: { value: '/photo show me what you are wearing' } });
+      fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+      await waitFor(() => expect(mockSendMessage).toHaveBeenCalledOnce());
+      expect(mockCreateMediaCommand).not.toHaveBeenCalled();
+      expect(mockCreateGeneration).not.toHaveBeenCalled();
+    });
+  });
+
   it('renders media-only assistant turns without canned copy or text actions', async () => {
     mockGetConversation.mockResolvedValueOnce({
       conversation: {
