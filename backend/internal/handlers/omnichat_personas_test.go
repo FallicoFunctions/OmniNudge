@@ -522,3 +522,14 @@ func TestOmniChatPersonaHandler_UpdateDeleteAndExportRemainOwnerOnly(t *testing.
 	require.NoError(t, err)
 	require.Nil(t, lookup)
 }
+
+func TestDirectMessageProfileIsNotAvailableToUserPersonas(t *testing.T) {
+	// Everything this handler writes is private to its creator, and the notice
+	// a direct-message character opens with claims there is only one of them.
+	_, err := normalizeResponseStyleProfile("direct_message", nil, "native")
+	require.Error(t, err)
+
+	kept, err := normalizeResponseStyleProfile("lean_narrative", nil, "native")
+	require.NoError(t, err)
+	require.Equal(t, models.ResponseStyleProfileLeanNarrative, kept)
+}

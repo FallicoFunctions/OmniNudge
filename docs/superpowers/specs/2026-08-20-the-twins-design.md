@@ -234,3 +234,35 @@ about how they treat someone.
 Enforced server-side, not just in the UI: a hand-rolled generation request for
 one of these characters is refused, or the character can still be made to pose
 by anyone who reads the network tab.
+
+---
+
+## 12. Launch gate: the notice must become true before anyone sees it
+
+The card in §9 tells the reader two things about privacy:
+
+1. There is one of them, and everyone talks to the same one.
+2. Memory carries across everyone, so what you say may be repeated.
+
+**Only the first is true today.** A CHECK constraint
+(`bot_personas_direct_message_is_platform_owned`, migration 186) makes the
+profile reachable only for platform-owned personas, so no private per-user copy
+can exist and claim otherwise.
+
+The second is not built and is currently the opposite of what the schema does.
+`omnichat_memory_episodes_tier_check` guarantees that any episode derived from a
+conversation carries an `owner_user_id` -- conversation memory is structurally
+incapable of becoming persona-global. That constraint is load-bearing for every
+other character on the platform and must not simply be dropped.
+
+So the unified-memory work is a prerequisite, not a follow-up:
+
+- **No persona may be switched to `direct_message` until it exists.** Until
+  then the notice would misstate privacy, which is the worst thing on the card
+  to be wrong about. Nothing uses the profile today.
+- What that work needs is a per-persona opt-in that lets a conversation-derived
+  episode be written to the self tier, without weakening the tier check for
+  anyone else. Probably a persona-level flag consulted at extraction time, with
+  the CHECK rewritten to permit the global tier only for personas carrying it.
+
+Until that lands, the card is a promise the code does not keep.

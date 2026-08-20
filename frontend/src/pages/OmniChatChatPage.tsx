@@ -45,7 +45,11 @@ import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponse
 import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
 import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
 import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
-import { personaHasSceneMedia, personaShowsIntroNotice } from '../utils/omnichatPersonaMode';
+import {
+  personaHasSceneMedia,
+  personaShowsIntroNotice,
+  personaSpeaksFirst,
+} from '../utils/omnichatPersonaMode';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { Modal } from '../components/common/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -814,6 +818,7 @@ export default function OmniChatChatPage() {
 
   useEffect(() => {
     if (!isGuest || !guestPersona || guestMessages.length > 0) return;
+    if (!personaSpeaksFirst(guestPersona)) return;
     const openingMessage = guestPersona.first_message?.trim();
     if (!openingMessage) return;
 

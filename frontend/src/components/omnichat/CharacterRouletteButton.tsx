@@ -4,6 +4,7 @@ import { Dices, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { BotPersona } from '../../types/omnichat';
 import PersonaAvatar from './PersonaAvatar';
+import { personaSpeaksFirst } from '../../utils/omnichatPersonaMode';
 
 const ROULETTE_REVEAL_MS = 900;
 
@@ -14,7 +15,10 @@ export function getRouletteEligiblePersonas(personas: BotPersona[]): BotPersona[
       persona.owner_user_id == null &&
       persona.visibility === 'public' &&
       !persona.is_nsfw &&
-      Boolean(persona.first_message?.trim())
+      // The roulette drops you into a chat that is already underway. A
+      // character who says nothing until spoken to has no reveal to offer, so
+      // exclude them on the rule rather than on a blank greeting field.
+      personaSpeaksFirst(persona)
   );
 }
 
