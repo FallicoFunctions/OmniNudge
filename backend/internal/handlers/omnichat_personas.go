@@ -566,9 +566,15 @@ func normalizeResponseStyleProfile(raw string, existing *models.BotPersona, sour
 		models.ResponseStyleProfileNaturalDialogue,
 		models.ResponseStyleProfileLeanNarrative,
 		models.ResponseStyleProfileProfessional,
-		models.ResponseStyleProfileCharacterOnly,
-		models.ResponseStyleProfileDirectMessage:
+		models.ResponseStyleProfileCharacterOnly:
 		return profile, nil
+	case models.ResponseStyleProfileDirectMessage:
+		// Every persona this handler writes is private to its creator, and the
+		// notice a direct-message character opens with tells the reader there
+		// is only one of them and that everyone talks to it. On a private copy
+		// that is simply untrue, so the profile is reachable only for platform
+		// personas, which are seeded by migration.
+		return "", fmt.Errorf("response style profile is invalid")
 	default:
 		return "", fmt.Errorf("response style profile is invalid")
 	}

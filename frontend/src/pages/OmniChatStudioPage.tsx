@@ -31,6 +31,10 @@ const CATEGORIES: PersonaCategory[] = [
   'fiction_media',
 ];
 
+// 'direct_message' is deliberately absent. Everything created here is private
+// to its creator, and that profile's opening notice tells the reader there is
+// exactly one of the character and that everyone talks to it. The server
+// rejects it on this path and a CHECK constraint refuses to store it.
 const RESPONSE_STYLE_PROFILES: ResponseStyleProfile[] = [
   'inherit',
   'natural_dialogue',

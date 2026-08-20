@@ -38,24 +38,28 @@ const (
 	ResponseStyleProfileDirectMessage   = "direct_message"
 )
 
+func personaIsDirectMessage(persona *BotPersona) bool {
+	return persona != nil &&
+		strings.TrimSpace(persona.ResponseStyleProfile) == ResponseStyleProfileDirectMessage
+}
+
 // PersonaSpeaksFirst reports whether a persona may open a conversation before
 // the user has said anything. Direct-message characters never do: an empty
 // thread is one they have no way of knowing exists, which is the whole point.
 func PersonaSpeaksFirst(persona *BotPersona) bool {
-	if persona == nil {
-		return false
-	}
-	return strings.TrimSpace(persona.ResponseStyleProfile) != ResponseStyleProfileDirectMessage
+	return persona != nil && !personaIsDirectMessage(persona)
 }
 
 // PersonaPerformsAScene reports whether a persona's conversations carry scene
-// continuity state. A direct-message character has no scene to track -- there
-// is no location, no outfit, and no cast, only a message thread.
+// continuity state, which also decides whether that scene can be rendered as
+// an image. A direct-message character has no scene: no location, no outfit,
+// and no cast, only a message thread.
+//
+// Separate from PersonaSpeaksFirst despite agreeing today. They answer
+// different questions, and a later character could well have a scene without
+// opening one.
 func PersonaPerformsAScene(persona *BotPersona) bool {
-	if persona == nil {
-		return false
-	}
-	return strings.TrimSpace(persona.ResponseStyleProfile) != ResponseStyleProfileDirectMessage
+	return persona != nil && !personaIsDirectMessage(persona)
 }
 
 // Message roles within a bot conversation.

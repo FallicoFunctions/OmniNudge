@@ -6,6 +6,7 @@ import { omnichatService } from '../../services/omnichatService';
 import type { BotConversation, BotMessage, BotPersona } from '../../types/omnichat';
 import PersonaAvatar from './PersonaAvatar';
 import OmniChatMessageContent from './OmniChatMessageContent';
+import { personaSpeaksFirst } from '../../utils/omnichatPersonaMode';
 
 type QuickChatDialogProps = {
   isOpen: boolean;
@@ -53,7 +54,7 @@ export default function QuickChatDialog({
   const transcriptRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
-  const openingMessage = persona?.first_message?.trim() ?? '';
+  const openingMessage = personaSpeaksFirst(persona) ? (persona?.first_message?.trim() ?? '') : '';
 
   useEffect(() => {
     requestVersionRef.current += 1;
@@ -106,7 +107,7 @@ export default function QuickChatDialog({
   }, [assistantReply, openingMessage, submittedContent]);
 
   const generateReply = async (content: string) => {
-    if (!persona || !openingMessage) return;
+    if (!persona) return;
     const requestVersion = ++requestVersionRef.current;
     setIsGenerating(true);
     setGenerationError(false);
@@ -116,7 +117,9 @@ export default function QuickChatDialog({
       const response = await omnichatService.sendPreviewMessage({
         persona_id: persona.id,
         content,
-        history: [{ role: 'assistant', content: openingMessage }],
+        // A character who does not speak first has no opening line to carry
+        // into the preview, and the exchange starts from nothing said.
+        history: openingMessage ? [{ role: 'assistant' as const, content: openingMessage }] : [],
       });
       if (requestVersion !== requestVersionRef.current) return;
       if (response.failed || !response.content.trim()) {
@@ -138,7 +141,7 @@ export default function QuickChatDialog({
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || isGenerating || submittedContent || !openingMessage) return;
+    if (!content || isGenerating || submittedContent) return;
     setDraft('');
     setSubmittedContent(content);
     void generateReply(content);

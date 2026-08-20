@@ -8,13 +8,7 @@ import { useTranslation } from 'react-i18next';
 export default function DirectCharacterNotice({ name }: { name: string }) {
   const { t } = useTranslation();
 
-  const rules = [
-    t('omnichat.directCharacterNotice.shared', { name }),
-    t('omnichat.directCharacterNotice.remembers', { name }),
-    t('omnichat.directCharacterNotice.notActing', { name }),
-    t('omnichat.directCharacterNotice.ownTime', { name }),
-    t('omnichat.directCharacterNotice.canLeave', { name }),
-  ];
+  const rules = ['shared', 'remembers', 'notActing', 'ownTime', 'canLeave'] as const;
 
   return (
     <aside
@@ -27,7 +21,7 @@ export default function DirectCharacterNotice({ name }: { name: string }) {
       </p>
       <ul className="mt-2.5 space-y-1.5 text-[0.82rem] leading-relaxed text-white/55">
         {rules.map((rule) => (
-          <li key={rule}>{rule}</li>
+          <li key={rule}>{t(`omnichat.directCharacterNotice.${rule}`, { name })}</li>
         ))}
       </ul>
       <p className="mt-3 text-[0.82rem] leading-relaxed text-white/40">
