@@ -58,8 +58,19 @@ function collectQuotedDialogueMatches(content: string) {
   };
   collect(QUOTED_DIALOGUE_AT_LINE_START);
   collect(QUOTED_DIALOGUE_AFTER_SENTENCE);
-  matches.sort((left, right) => left.start - right.start);
-  return matches;
+  matches.sort((left, right) => left.start - right.start || right.end - left.end);
+
+  // The two patterns can both claim the same prose, and a quoted paragraph can
+  // carry a quoted passage inside it. Keeping the outermost span is what the
+  // repair loop needs: stripping the outer quotes already leaves the inner
+  // text intact, so a nested span would only append it a second time.
+  const outermost: QuotedDialogueMatch[] = [];
+  for (const match of matches) {
+    const previous = outermost.at(-1);
+    if (previous && match.start < previous.end) continue;
+    outermost.push(match);
+  }
+  return outermost;
 }
 
 function shouldMarkUnquotedSurroundingNarration(content: string) {
