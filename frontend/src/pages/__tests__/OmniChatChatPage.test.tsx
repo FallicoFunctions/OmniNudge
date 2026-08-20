@@ -519,6 +519,7 @@ describe('OmniChatChatPage', () => {
       first_message: 'hey',
       category: 'original' as const,
       response_style_profile: 'direct_message' as const,
+      visibility: 'public' as const,
       is_nsfw: false,
       is_active: true,
       created_at: '2026-07-01T10:00:00Z',
@@ -552,6 +553,34 @@ describe('OmniChatChatPage', () => {
       // or sit among the turns as something she said.
       expect(notice.tagName).toBe('ASIDE');
       expect(notice.closest('[data-testid="persona-avatar"]')).toBeNull();
+    });
+
+    it('drops the shared-identity claims for a character only her creator can reach', async () => {
+      const privatePersona = { ...directPersona, visibility: 'private' as const };
+      mockListPersonas.mockResolvedValue([privatePersona]);
+      mockGetConversation.mockResolvedValue({
+        conversation: {
+          id: 42,
+          user_id: 1,
+          persona_id: 9,
+          title: 'Jesse',
+          created_at: '2026-07-02T10:00:00Z',
+          last_message_at: '2026-07-02T10:15:00Z',
+          persona: privatePersona,
+        },
+        messages: [],
+      });
+
+      renderPage();
+
+      const notice = await screen.findByTestId('omnichat-direct-character-notice');
+
+      // She is still free -- that is what she is, not a consequence of being
+      // published -- but she is not one-of-them-for-everyone and must not say
+      // that a conversation here may be repeated to anyone else.
+      expect(notice).toHaveTextContent('decides who she is');
+      expect(notice).not.toHaveTextContent('everyone talks to the same one');
+      expect(notice).not.toHaveTextContent('may repeat to someone else');
     });
 
     it('offers no scene generation, because there is no scene', async () => {

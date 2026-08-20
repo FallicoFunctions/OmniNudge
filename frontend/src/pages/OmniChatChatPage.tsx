@@ -47,6 +47,7 @@ import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywa
 import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
 import {
   personaHasSceneMedia,
+  personaIsSharedWithOthers,
   personaShowsIntroNotice,
   personaSpeaksFirst,
 } from '../utils/omnichatPersonaMode';
@@ -2342,7 +2343,10 @@ export default function OmniChatChatPage() {
                 <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>
               )}
               {!isLoadingConversation && personaShowsIntroNotice(activePersona) && activePersona && (
-                <DirectCharacterNotice name={activePersona.name} />
+                <DirectCharacterNotice
+                  name={activePersona.name}
+                  isShared={personaIsSharedWithOthers(activePersona)}
+                />
               )}
               {!isLoadingConversation &&
                 activeMessages.length === 0 &&

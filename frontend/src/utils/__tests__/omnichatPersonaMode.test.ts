@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { personaHasSceneMedia, personaSpeaksFirst } from '../omnichatPersonaMode';
+import {
+  personaHasSceneMedia,
+  personaIsSharedWithOthers,
+  personaSpeaksFirst,
+} from '../omnichatPersonaMode';
 
 describe('personaSpeaksFirst', () => {
   it('withholds a stored greeting from a character who does not speak first', () => {
@@ -26,5 +30,18 @@ describe('personaHasSceneMedia', () => {
     // An unknown or absent profile must keep the existing behaviour.
     expect(personaHasSceneMedia({ response_style_profile: undefined })).toBe(true);
     expect(personaHasSceneMedia(null)).toBe(true);
+  });
+});
+
+describe('personaIsSharedWithOthers', () => {
+  it('is false only for a character nobody else can reach', () => {
+    expect(personaIsSharedWithOthers({ visibility: 'private' })).toBe(false);
+    expect(personaIsSharedWithOthers({ visibility: 'public' })).toBe(true);
+    expect(personaIsSharedWithOthers({ visibility: 'unlisted' })).toBe(true);
+  });
+
+  it('warns rather than reassures when visibility is unknown', () => {
+    expect(personaIsSharedWithOthers({ visibility: undefined })).toBe(true);
+    expect(personaIsSharedWithOthers(null)).toBe(true);
   });
 });
