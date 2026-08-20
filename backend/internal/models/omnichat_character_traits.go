@@ -120,6 +120,50 @@ func clampTrait(v float64) float64 {
 	return math.Max(-1, math.Min(1, v))
 }
 
+// omniChatHabituationScale is how quickly the same thing happening again stops
+// mattering. At 3, the fourth occurrence lands at a quarter of the first.
+const omniChatHabituationScale = 3.0
+
+// omniChatHabituatedValence is how much of an episode still lands, given how
+// many times the same thing has already happened to this character.
+//
+// The two hundredth ordinary evening does not move a person the way the first
+// one did, and until now it moved a character exactly as much. An agent files a
+// visit every few minutes -- hundreds a day -- while mood fades on a half-life
+// measured in days, so accumulation outran decay and five characters left
+// running overnight all converged on the ceiling regardless of who they were
+// written as. The half-life was not wrong; applying full weight to the
+// unremarkable was.
+//
+// A recurrence chain already knows how unremarkable something is. An episode
+// that names an earlier one as another instance of the same thing is, by its
+// own record, not novel, so the fraction that still lands is the square of how
+// novel it is: novelty = scale / (scale + priorOccurrences).
+//
+// The square is the fix and not a flourish. Novelty on its own sums to the
+// harmonic series, and the harmonic series diverges -- damped that way a long
+// enough run of identical evenings still reaches the ceiling, which is the bug
+// being fixed rather than a smaller version of it. Squared, the sum converges:
+// an unbounded run of +0.25 evenings settles a self-tier mood at about +0.44
+// and comes no nearer the top than that, so a character written low still reads
+// low underneath however long the agent runs.
+//
+// Novelty is untouched. A chain three hundred deep damps that chain and nothing
+// else, so the night a human player finally walks into an empty venue is a new
+// thing that has happened once, and it lands whole.
+//
+// This deliberately runs before Apply rather than inside it, which means the
+// lasting-change threshold and the trust asymmetry see the damped number. That
+// is the intended reading: the fiftieth repetition of something awful does not
+// change who a character is again. It already did, the first time.
+func omniChatHabituatedValence(valence float64, priorOccurrences int) float64 {
+	if priorOccurrences <= 0 {
+		return valence
+	}
+	novelty := omniChatHabituationScale / (omniChatHabituationScale + float64(priorOccurrences))
+	return valence * novelty * novelty
+}
+
 // omniChatTraitQuerier is satisfied by both a pool and a transaction, which is
 // what lets traits move inside the extraction that caused them.
 type omniChatTraitQuerier interface {
