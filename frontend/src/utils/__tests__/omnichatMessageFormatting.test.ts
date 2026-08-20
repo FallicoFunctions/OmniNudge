@@ -44,6 +44,41 @@ describe('parseOmniChatMessage', () => {
     ]);
   });
 
+  it('treats an underscore span as emphasis rather than narration', () => {
+    expect(parseOmniChatMessage('That is _not_ what I said.')).toEqual([
+      { text: 'That is ', bold: false, italic: false },
+      { text: 'not', bold: false, italic: false, emphasis: true },
+      { text: ' what I said.', bold: false, italic: false },
+    ]);
+  });
+
+  it('keeps asterisked actions as narration alongside underscored emphasis', () => {
+    expect(parseOmniChatMessage('*I lean back.* You _really_ mean that?')).toEqual([
+      { text: 'I lean back.', bold: false, italic: true },
+      { text: ' You ', bold: false, italic: false },
+      { text: 'really', bold: false, italic: false, emphasis: true },
+      { text: ' mean that?', bold: false, italic: false },
+    ]);
+  });
+
+  it('leaves snake_case and dunder underscores as literal text', () => {
+    const content = 'Call snake_case on __dunder__ and check trailing_.';
+
+    expect(parseOmniChatMessage(content)).toEqual([{ text: content, bold: false, italic: false }]);
+  });
+
+  it('renders an unclosed underscore literally', () => {
+    expect(parseOmniChatMessage('I mean _really')).toEqual([
+      { text: 'I mean _really', bold: false, italic: false },
+    ]);
+  });
+
+  it('does not emphasize an empty underscore span', () => {
+    expect(parseOmniChatMessage('nothing __ here')).toEqual([
+      { text: 'nothing __ here', bold: false, italic: false },
+    ]);
+  });
+
   it('repairs quote-formatted assistant dialogue and marks surrounding prose as narration', () => {
     expect(
       parseOmniChatMessage(
