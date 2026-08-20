@@ -240,6 +240,71 @@ func TestResponseStyleEndingRulesDifferByPersonaRole(t *testing.T) {
 	require.Contains(t, professional, "Do not append a second or closing question as a conversational handoff")
 }
 
+// legacyPersonalConversationModeV1 is the single constant that carried both
+// block shape and notation before the two were split apart. Nothing in it may
+// quietly change meaning during the split.
+const legacyPersonalConversationModeV1 = `[Personal Conversation Mode]
+This is a direct conversation between the character and the user, not a game-master or co-author narration. Never author, invent, choose, or embellish the user's actions, gestures, speech, thoughts, feelings, physical reactions, consent, or decisions. You may briefly refer to something the user explicitly stated, but do not restage it as new narration or add details. Never move the user's body or advance a physical interaction on the user's behalf, even when doing so would make the scene flow. The user's messages are the only authority for what the user does or experiences.
+Make the reply feel like a live conversation, not prose fiction. Lead with spoken dialogue and let dialogue carry the response. Format the reply as plain conversational paragraphs separated by one blank line, never as Markdown code fences. Use two medium blocks for ordinary moments and up to three medium blocks for deeper moments. You may add one optional short final block when a brief line adds natural emphasis. A medium block is one or two concise sentences and must contain 12 to 30 words. A short block is no more than 10 words. Never exceed three medium blocks, one short block, or 100 words total. A narration sentence counts toward the block containing it. Do not create a separate block for every action, observation, or thought.
+Default to no narration. Only when an essential nonverbal action changes the meaning of the spoken response may you add one short narration sentence describing the character's own externally observable behavior. Do not use prose narration to reveal private internal monologue, provide sensory scene-setting or cinematic description, repeat emotional or bodily tells, or restate what the character could simply say.
+Write spoken words as plain text without quotation marks or bold formatting. Write every narration beat in the character's first-person voice using I, me, and my. Never refer to the character by name or with third-person pronouns inside narration. Keep first-person possessives correct: write *I slide my hand away.*, never *Sadie slides her hand away.* or *I slide her hand away.* Every narration beat must be wrapped in single asterisks from its first character to its last so OmniChat renders it grey and italic. Never leave narration as unmarked plain text. If both are needed, use exactly this shape: *One brief observable action.* Spoken words. Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, all narration stays in first person, there is no more than one narration sentence, and dialogue carries the reply.`
+
+const legacyNotationRules = "Write spoken words as plain text without quotation marks or bold formatting. Write every narration beat in the character's first-person voice using I, me, and my. Never refer to the character by name or with third-person pronouns inside narration. Keep first-person possessives correct: write *I slide my hand away.*, never *Sadie slides her hand away.* or *I slide her hand away.* Every narration beat must be wrapped in single asterisks from its first character to its last so OmniChat renders it grey and italic. Never leave narration as unmarked plain text. "
+
+const legacyClosingVerification = "Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, all narration stays in first person, there is no more than one narration sentence, and dialogue carries the reply."
+
+// The split moves the notation rules out of the shape constant and divides the
+// one closing verification sentence along the same seam. Reversing exactly
+// those two edits has to reproduce the legacy text byte for byte, so no rule
+// was dropped, reworded, or reordered on the way through.
+func TestNotationSplitReproducesTheLegacyConversationModeText(t *testing.T) {
+	require.Contains(t, legacyPersonalConversationModeV1, legacyNotationRules)
+	require.Contains(t, legacyPersonalConversationModeV1, legacyClosingVerification)
+
+	shapeOnly := strings.Replace(legacyPersonalConversationModeV1, legacyNotationRules, "", 1)
+	shapeOnly = strings.Replace(shapeOnly, legacyClosingVerification, "Before sending, silently verify that there is no more than one narration sentence and that dialogue carries the reply.", 1)
+
+	require.Equal(t, shapeOnly, personalConversationModeV1)
+	require.Contains(t, omniChatNotationV1, strings.TrimSpace(legacyNotationRules))
+	require.Contains(t, omniChatNotationV1, "Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, and all narration stays in first person.")
+
+	natural := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
+		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
+	})
+	professional := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
+		ResponseStyleProfile: models.ResponseStyleProfileProfessional,
+	})
+	for _, prompt := range []string{natural, professional} {
+		require.Contains(t, prompt, personalConversationModeV1)
+		require.Contains(t, prompt, omniChatNotationV1)
+	}
+}
+
+func TestNotationReachesFreeFormCharactersWithoutShapeRules(t *testing.T) {
+	narrative := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
+		ResponseStyleProfile: models.ResponseStyleProfileLeanNarrative,
+	})
+	characterOnly := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
+		ResponseStyleProfile: models.ResponseStyleProfileCharacterOnly,
+	})
+
+	require.Contains(t, narrative, omniChatNotationV1)
+	require.NotContains(t, narrative, personalConversationModeV1)
+	require.NotContains(t, narrative, "must contain 12 to 30 words")
+	require.NotContains(t, narrative, "Never exceed three medium blocks")
+	require.NotContains(t, narrative, "there is no more than one narration sentence")
+
+	require.NotContains(t, characterOnly, omniChatNotationV1)
+	require.NotContains(t, characterOnly, personalConversationModeV1)
+}
+
+func TestNotationReservesAsterisksForPhysicalActionAndNamesUnderscoreEmphasis(t *testing.T) {
+	require.Contains(t, omniChatNotationV1, "Single asterisks mean a physical action and nothing else.")
+	require.Contains(t, omniChatNotationV1, "wrap it in single underscores")
+	require.Contains(t, omniChatNotationV1, "when it generates images and video of the scene")
+	require.Contains(t, omniChatNotationV1, "Never use bold, Markdown headings, or code fences.")
+}
+
 func TestResponseStyleQuestionBudgetsAreServerOwnedAndProfileSpecific(t *testing.T) {
 	natural := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,

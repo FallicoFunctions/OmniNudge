@@ -54,7 +54,17 @@ const personalConversationModeV1 = `[Personal Conversation Mode]
 This is a direct conversation between the character and the user, not a game-master or co-author narration. Never author, invent, choose, or embellish the user's actions, gestures, speech, thoughts, feelings, physical reactions, consent, or decisions. You may briefly refer to something the user explicitly stated, but do not restage it as new narration or add details. Never move the user's body or advance a physical interaction on the user's behalf, even when doing so would make the scene flow. The user's messages are the only authority for what the user does or experiences.
 Make the reply feel like a live conversation, not prose fiction. Lead with spoken dialogue and let dialogue carry the response. Format the reply as plain conversational paragraphs separated by one blank line, never as Markdown code fences. Use two medium blocks for ordinary moments and up to three medium blocks for deeper moments. You may add one optional short final block when a brief line adds natural emphasis. A medium block is one or two concise sentences and must contain 12 to 30 words. A short block is no more than 10 words. Never exceed three medium blocks, one short block, or 100 words total. A narration sentence counts toward the block containing it. Do not create a separate block for every action, observation, or thought.
 Default to no narration. Only when an essential nonverbal action changes the meaning of the spoken response may you add one short narration sentence describing the character's own externally observable behavior. Do not use prose narration to reveal private internal monologue, provide sensory scene-setting or cinematic description, repeat emotional or bodily tells, or restate what the character could simply say.
-Write spoken words as plain text without quotation marks or bold formatting. Write every narration beat in the character's first-person voice using I, me, and my. Never refer to the character by name or with third-person pronouns inside narration. Keep first-person possessives correct: write *I slide my hand away.*, never *Sadie slides her hand away.* or *I slide her hand away.* Every narration beat must be wrapped in single asterisks from its first character to its last so OmniChat renders it grey and italic. Never leave narration as unmarked plain text. If both are needed, use exactly this shape: *One brief observable action.* Spoken words. Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, all narration stays in first person, there is no more than one narration sentence, and dialogue carries the reply.`
+If both are needed, use exactly this shape: *One brief observable action.* Spoken words. Before sending, silently verify that there is no more than one narration sentence and that dialogue carries the reply.`
+
+// Notation is how a character marks what she does and what she says. It is
+// deliberately separate from block shape: a character who chooses her own
+// shape still has to mark narration the way the renderer and the scene
+// pipeline read it, so this reaches every profile that has not opted out of
+// platform instructions entirely.
+const omniChatNotationV1 = `[OmniChat Notation]
+Write spoken words as plain text without quotation marks or bold formatting. Write every narration beat in the character's first-person voice using I, me, and my. Never refer to the character by name or with third-person pronouns inside narration. Keep first-person possessives correct: write *I slide my hand away.*, never *Sadie slides her hand away.* or *I slide her hand away.* Every narration beat must be wrapped in single asterisks from its first character to its last so OmniChat renders it grey and italic. Never leave narration as unmarked plain text.
+Single asterisks mean a physical action and nothing else. OmniChat reads asterisked narration as its primary signal for what the character is physically doing when it generates images and video of the scene, so an emphasized word inside asterisks becomes a stage direction the character never performed. To emphasize a word or short phrase, wrap it in single underscores instead: _that_ is the part I meant. Never use bold, Markdown headings, or code fences.
+Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, and all narration stays in first person.`
 
 const naturalDialogueEndingV1 = `Do not habitually end the reply with a question, invitation, recap, or call to action. Normal conversation does not need a prompt for the user to continue. Otherwise prefer a statement, reaction, joke, disagreement, or moment of silence. Before sending, remove any reflexive or unnecessary closing question.`
 
@@ -908,6 +918,7 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona) st
 	if profile == models.ResponseStyleProfileNaturalDialogue || profile == models.ResponseStyleProfileProfessional {
 		style += "\n" + personalConversationModeV1
 	}
+	style += "\n" + omniChatNotationV1
 	switch profile {
 	case models.ResponseStyleProfileNaturalDialogue:
 		style += "\n" + naturalDialogueQuestionBudgetV1
