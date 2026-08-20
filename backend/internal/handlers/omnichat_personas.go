@@ -569,11 +569,16 @@ func normalizeResponseStyleProfile(raw string, existing *models.BotPersona, sour
 		models.ResponseStyleProfileCharacterOnly:
 		return profile, nil
 	case models.ResponseStyleProfileDirectMessage:
-		// Every persona this handler writes is private to its creator, and the
-		// notice a direct-message character opens with tells the reader there
-		// is only one of them and that everyone talks to it. On a private copy
-		// that is simply untrue, so the profile is reachable only for platform
-		// personas, which are seeded by migration.
+		// Not because a user's character may not be free -- one kept private
+		// still is -- but because this form cannot yet create a free one. It
+		// writes system_prompt, scenario, and post_history_instructions, which
+		// exist to make behaviour binding. A free character is defined by not
+		// having them: her backstory becomes starting disposition and seed
+		// memories, so "you will never leave him" has nowhere to be put.
+		//
+		// Opening this before that path exists would ship a character with no
+		// scene and no greeting who is nonetheless fully scriptable, which is
+		// worse than either state. Lift it with the Free AI creation flow.
 		return "", fmt.Errorf("response style profile is invalid")
 	default:
 		return "", fmt.Errorf("response style profile is invalid")

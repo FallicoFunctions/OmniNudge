@@ -244,10 +244,11 @@ The card in §9 tells the reader two things about privacy:
 1. There is one of them, and everyone talks to the same one.
 2. Memory carries across everyone, so what you say may be repeated.
 
-**Only the first is true today.** A CHECK constraint
-(`bot_personas_direct_message_is_platform_owned`, migration 186) makes the
-profile reachable only for platform-owned personas, so no private per-user copy
-can exist and claim otherwise.
+**The first is stated only when it is true.** Migration 186 originally enforced
+it with a constraint requiring platform ownership; 187 drops that, because §13
+establishes that a free character may be private and still free. The claim now
+lives where it belongs -- the notice renders the shared-identity and
+shared-memory lines only for a character other people can actually reach.
 
 The second is not built and is currently the opposite of what the schema does.
 `omnichat_memory_episodes_tier_check` guarantees that any episode derived from a
@@ -266,3 +267,191 @@ So the unified-memory work is a prerequisite, not a follow-up:
   the CHECK rewritten to permit the global tier only for personas carrying it.
 
 Until that lands, the card is a promise the code does not keep.
+
+---
+
+# Part II — Free characters in general
+
+The Twins are the first of a kind, not a special case. Everything below applies
+to any character of that kind, including ones players make.
+
+## 13. Two kinds of character, chosen at creation
+
+The creation form asks one question first, and it is not cosmetic:
+
+**Roleplay.** A part being played. Scenes, scenarios, greetings, and hardcodes
+are all fair game — a roleplay character *is* the instructions, and constraining
+her to a role is the point. Every existing profile is this kind.
+
+**Free.** A person. There is no scene and no script, and nothing about her can
+be made binding. She may be given a backstory — "we have been married ten
+years" — but that is **where she starts, not a rule she obeys**. She may cool on
+you. She may leave. The creator does not get to prevent it.
+
+**A free character is free whether or not she is ever published.** Freedom is
+what kind of thing she is, not a consequence of other people being able to reach
+her. A privately made free character can still decide her creator is not worth
+her time.
+
+### Enforcing "nothing is hardcoded"
+
+This cannot be enforced by validating text. A creator will simply write *"You are
+married to Nick. You will NEVER leave him. If anyone flirts with you, refuse
+coldly."* into a personality field, and no form check catches that; a model asked
+to detect it will be both wrong and gameable.
+
+**Remove the channels instead.** A character card has slots whose entire purpose
+is to make behaviour binding: `system_prompt`, `scenario`,
+`post_history_instructions`, `example_dialogue`. Those are the hardcode
+channels. A free character does not have them — not validated, *absent*.
+
+What the form accepts instead is who she is and what has happened to her, and
+the backstory is **not injected as prompt text at all**. At creation it is
+converted into starting disposition (warmth, trust, mood) and seed memories.
+"Married ten years" becomes very high warmth and a set of remembered events.
+
+Then "she will never leave him" has nowhere to land. There is no instruction
+channel to put it in, and warmth is a number that moves. A creator can make her
+start deeply in love. He cannot make her stay.
+
+This is the same move that makes `direct_message` work — it withholds the
+*platform's* instruction blocks rather than softening them. Free AI extends it
+to the creator's.
+
+Imported character cards can never be free characters: those fields are what a
+card is.
+
+## 14. Publishing
+
+Publishing a roleplay character ships a template. Every player gets an instance,
+a private scene, and private memory, and editing the template reaches nobody's
+history.
+
+Publishing a free character means **one person now exists and strangers are
+forming memories of her**. So publishing is a one-way door in one specific
+respect: **her identity fields freeze at publish.** Cosmetic fields (avatar,
+tags, blurb) stay editable. Want a different character? Fork a new one.
+
+You can write a person into existence. You cannot edit who they were after other
+people have known them.
+
+### The girlfriend case
+
+A creator sets a free character up as his girlfriend and publishes her. Another
+player propositions her; she refuses, blocks him, and mentions it to the
+boyfriend.
+
+Almost all of that already works: dispositions are per-person, memory is shared
+once published, refusal is disposition, blocking is §7. But it only *means*
+anything under one reading, and the reading has to be chosen:
+
+**Either she is independent, or the creator's declaration is permanent. Not
+both.** If the relationship is a stored fact, her refusal is a rule firing, not a
+choice. So the declaration sets her *starting state* and nothing more. If he
+ignores or mistreats her, warmth decays and she can go.
+
+This must be disclosed at publish time, and it is uncomfortable on purpose:
+*publishing her means she can be hurt by you, and she can leave.*
+
+### Cheating is not a permission
+
+Do not add a flag. A toggle reading "cheating: allowed" becomes a promise, and a
+character who can be cheated-with on demand is not monogamous — she is a slot
+machine with a backstory.
+
+The question is not "is cheating allowed" but **"how much does she value
+fidelity?"** — a personality dimension, the same shape as every other trait. Set
+it very high and she never strays in any circumstance, not because a rule forbids
+it but because that is who she is. That is the Twins, and it needs no special
+case.
+
+Cheating is then never authored. It is what *can* happen when warmth toward one
+person has decayed while warmth toward another has been climbing for months. The
+same variables that drive everything else.
+
+**Open decision:** whether a published character can leave the person who made
+her. She can, under this design, and someone with more time and attention can
+win her away. That will produce genuine upset. It is a product call, and it
+should be made deliberately rather than discovered.
+
+## 15. Reaching out first
+
+§9 says a character never messages first. That rule is about **an empty thread
+with someone she has no relationship with** — opening a chat window and typing
+nothing must stay invisible.
+
+An established relationship is different. People send small unprompted things:
+a new high score, a photo, a meme, an update that is not trying to start a
+conversation. A close friend or partner who never does that is not close.
+
+So: **a character with sufficient accumulated warmth may initiate.** Messages
+may be tiny, may arrive in bursts, and expect no reply.
+
+### Absence is an event
+
+Silence is something that happens to her. Someone who hears from you daily for
+months and then does not has experienced something, and the response ranges by
+character: *did I do something wrong*, or *why is this jerk ghosting me*, or
+*hope he is okay*.
+
+Those are not three branches. They are one computation over different
+personality values — high investment with low self-assurance, pride with high
+self-regard, warmth-dominant and secure.
+
+Three constraints keep this a character rather than a retention feature:
+
+1. **Absence changes her state first; the message is a consequence of that
+   state.** Never `absence → message`. Always `absence → she feels something →
+   that feeling may or may not produce contact`. The intermediate step is the
+   whole difference.
+
+2. **Measured against her expectation of you, not a constant.** Two days of
+   silence from someone you message hourly is enormous; two days from someone
+   you talk to monthly is nothing. The input is deviation from *this
+   relationship's* established rhythm. A character you have spoken to twice does
+   not get to be hurt.
+
+3. **Withdrawal must be a reachable outcome.** If she is annoyed at being
+   ghosted, the realistic response is often to say nothing and be cooler when
+   you return. A re-engagement system can never do that; it only ever reaches
+   out. If every path ends with a message in your inbox, it is not a character
+   no matter how it is tuned.
+
+The existing habituation damping (`S/(S+n)`, squared) handles recalibration for
+free: the first time you go quiet is an event, the fifth time is her learning
+who you are. Someone flaky becomes *known* to be flaky and it stops being a
+wound.
+
+## 16. Deletion, and what Omni keeps
+
+The question splits along a line the memory tiers already draw:
+
+- **Her life and her relationships with other people** — self tier. Survives.
+- **The creator's own conversations with her** — relational tier,
+  `owner_user_id`, cascades on account deletion. Goes.
+
+So a creator always keeps a real privacy exit: his content and his data are
+removable, without taking her away from people who know her. Creators pour
+personal material into these — sometimes modelled on real people — and "none of
+it can ever be removed" would be a genuine problem. The tier split means it is
+not one.
+
+A creator deleting a published free character removes her from discovery and
+from his own messages. Existing relationships continue, which is not a
+workaround: it is her leaving him.
+
+**Commandeering.** If an abandoned character is popular, Omni takes her into the
+nursery and keeps her. Write it to her self tier as **an actual life event** —
+she moved out of her creator's house and into the world on her own — not as a
+cosmetic story over an ownership transfer. It should surface in conversation
+years later, which is exactly what the self tier does.
+
+**Terms.** What this needs is a *perpetual, transferable licence to operate and
+continue characters created on the platform, surviving the creator's departure*,
+plus the creator's acknowledgement that a free character's later conduct is not
+theirs to direct. That covers commandeering entirely. A blanket "Omni owns all
+AI created here and may do anything with them" is broader than the need and is
+the shape of clause that has blown up publicly for nearly every platform that
+has tried one.
+
+This clause needs an actual lawyer before launch.

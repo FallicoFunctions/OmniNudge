@@ -29,3 +29,17 @@ export function personaSpeaksFirst(
   if (persona.response_style_profile === 'direct_message') return false;
   return Boolean(persona.first_message?.trim());
 }
+
+/**
+ * Whether anyone other than the creator can reach this character, which is what
+ * makes the notice's shared-identity and shared-memory lines true. A Free AI
+ * kept private is still free -- she can cool on you and leave -- but she is not
+ * one-of-them-for-everyone, and must not claim to be.
+ *
+ * Unknown visibility counts as shared on purpose. Over-warning that a
+ * conversation may be repeated costs a reader nothing; under-warning lets
+ * someone confide on a promise the product cannot keep.
+ */
+export function personaIsSharedWithOthers(persona: Pick<BotPersona, 'visibility'> | null) {
+  return persona?.visibility !== 'private';
+}

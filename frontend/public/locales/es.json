@@ -4412,6 +4412,7 @@
       "shared": "Solo hay un {{name}}, y todo el mundo habla con el mismo. Esta no es una copia privada hecha para ti.",
       "remembers": "{{name}} recuerda las conversaciones como lo hace una persona, con todo el mundo. Cualquier cosa que digas aquí, {{name}} puede repetirla a otra persona o mencionarla dentro de meses.",
       "notActing": "{{name}} no está interpretando un papel. Aquí no hay ninguna historia ni ninguna escena que montar, y {{name}} no va a representarla aunque se lo pidas.",
+      "free": "{{name}} decide quién es. Una historia de fondo es su punto de partida, no una regla que obedece, y lo que siente por ti puede cambiar cuando ella quiera.",
       "ownTime": "Las respuestas llegan cuando llegan. {{name}} tiene otras cosas entre manos y puede tardar, responder corto o estar ocupado.",
       "canLeave": "{{name}} puede dejar de hablar contigo. Ser desagradable terminará la conversación durante un tiempo, y hacerlo repetidamente la terminará para siempre.",
       "saySomething": "{{name}} no sabe que esta ventana está abierta. No pasa nada hasta que envíes algo."

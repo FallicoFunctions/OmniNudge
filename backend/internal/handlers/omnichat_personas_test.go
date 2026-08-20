@@ -524,8 +524,9 @@ func TestOmniChatPersonaHandler_UpdateDeleteAndExportRemainOwnerOnly(t *testing.
 }
 
 func TestDirectMessageProfileIsNotAvailableToUserPersonas(t *testing.T) {
-	// Everything this handler writes is private to its creator, and the notice
-	// a direct-message character opens with claims there is only one of them.
+	// A gate, not a rule about who may own a free character. This form still
+	// writes the instruction fields a free character is defined by not having,
+	// so it cannot create one yet. Lift with the Free AI creation flow.
 	_, err := normalizeResponseStyleProfile("direct_message", nil, "native")
 	require.Error(t, err)
 

@@ -4,11 +4,28 @@ import { useTranslation } from 'react-i18next';
  * Deliberately not a message bubble. A character explaining its own privacy
  * model is a character asking to be believed; this is the product saying it,
  * so it is built into the wall of the window and attributed to nobody.
+ *
+ * Two of the lines are claims about other people, and they are only true once
+ * the character is shared. A Free AI kept private is still not acting, still
+ * answers in her own time, and can still cool on you and leave -- but she is
+ * not one-of-them-for-everyone, and the card must not say she is.
  */
-export default function DirectCharacterNotice({ name }: { name: string }) {
+export default function DirectCharacterNotice({
+  name,
+  isShared,
+}: {
+  name: string;
+  isShared: boolean;
+}) {
   const { t } = useTranslation();
 
-  const rules = ['shared', 'remembers', 'notActing', 'ownTime', 'canLeave'] as const;
+  const rules = [
+    ...(isShared ? (['shared', 'remembers'] as const) : []),
+    'notActing',
+    'free',
+    'ownTime',
+    'canLeave',
+  ] as const;
 
   return (
     <aside
