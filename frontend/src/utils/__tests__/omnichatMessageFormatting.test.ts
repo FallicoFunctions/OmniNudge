@@ -150,6 +150,42 @@ describe('parseOmniChatMessage', () => {
     ]);
   });
 
+  it('renders a quoted paragraph containing a quoted passage exactly once', () => {
+    const inner =
+      "'Good luck with the cave paintings, hope you figure out fire before the wolves get you.'";
+    const spoken =
+      "God, you really are a hands-off deity, aren't you? You just drop them off in the " +
+      `middle of nowhere and say, ${inner} That’s almost cruel.`;
+    const content = `"${spoken}"`;
+
+    const segments = parseOmniChatMessage(content, { repairAssistantFormatting: true });
+    const rendered = segments.map((segment) => segment.text).join('');
+
+    expect(rendered).toBe(spoken);
+    expect(rendered.length).toBe(content.length - 2);
+    expect(rendered.split('cave paintings')).toHaveLength(2);
+  });
+
+  it('strips both of two sibling quoted spans in one paragraph', () => {
+    expect(
+      parseOmniChatMessage('"Come in." I step back from the door. "It is warmer inside."', {
+        repairAssistantFormatting: true,
+      })
+    ).toEqual([
+      { text: 'Come in.', bold: false, italic: false },
+      { text: ' I step back from the door. ', bold: false, italic: false },
+      { text: 'It is warmer inside.', bold: false, italic: false },
+    ]);
+  });
+
+  it('leaves a quotation inside an asterisked narration span alone', () => {
+    expect(
+      parseOmniChatMessage('*She says "hello" under her breath.*', {
+        repairAssistantFormatting: true,
+      })
+    ).toEqual([{ text: 'She says "hello" under her breath.', bold: false, italic: true }]);
+  });
+
   it('keeps ordinary first-person assistant speech unformatted', () => {
     const content =
       'I think we should keep talking honestly. My mother always told me direct questions are kinder.';
