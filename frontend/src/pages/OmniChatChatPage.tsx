@@ -44,6 +44,8 @@ import OmniChatUpgradeModal from '../components/omnichat/OmniChatUpgradeModal';
 import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponseReportModal';
 import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
 import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
+import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
+import { personaHasSceneMedia, personaShowsIntroNotice } from '../utils/omnichatPersonaMode';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { Modal } from '../components/common/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -1566,7 +1568,12 @@ export default function OmniChatChatPage() {
     (event: FormEvent) => {
       event.preventDefault();
       const content = draft.trim();
-      const directMediaCommand = parseOmniChatMediaCommand(content);
+      // For a character with no scene, /photo is not a command -- it is just
+      // something the user typed, and it goes to them as text to answer or
+      // refuse like anyone else would.
+      const directMediaCommand = personaHasSceneMedia(activePersona)
+        ? parseOmniChatMediaCommand(content)
+        : null;
       if (
         !content ||
         (allowanceExhausted && !directMediaCommand) ||
@@ -1699,7 +1706,12 @@ export default function OmniChatChatPage() {
         savedIntent.content === content
           ? savedIntent
           : (() => {
-              const mediaKind = detectOmniChatMediaIntent(content);
+              // "Send me a selfie" is a thing you say to a person, and the
+              // answer is theirs to give -- including no. Inferring a picture
+              // request and quietly producing one answers on their behalf.
+              const mediaKind = personaHasSceneMedia(activePersona)
+                ? detectOmniChatMediaIntent(content)
+                : null;
               return {
                 conversationId: selectedConversationId,
                 content,
@@ -2324,7 +2336,12 @@ export default function OmniChatChatPage() {
               {isLoadingConversation && (
                 <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>
               )}
-              {!isLoadingConversation && activeMessages.length === 0 && (
+              {!isLoadingConversation && personaShowsIntroNotice(activePersona) && activePersona && (
+                <DirectCharacterNotice name={activePersona.name} />
+              )}
+              {!isLoadingConversation &&
+                activeMessages.length === 0 &&
+                !personaShowsIntroNotice(activePersona) && (
                 <div className="flex h-full items-center justify-center text-white/35">
                   {t('omnichat.chat.emptyWorkspace')}
                 </div>
@@ -2530,7 +2547,10 @@ export default function OmniChatChatPage() {
                   {responseReportNotice}
                 </p>
               )}
-              {isAuthenticated && activePersona && selectedConversationId && (
+              {isAuthenticated &&
+                activePersona &&
+                selectedConversationId &&
+                personaHasSceneMedia(activePersona) && (
                 <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
                   <button
                     type="button"

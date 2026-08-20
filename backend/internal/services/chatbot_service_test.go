@@ -1633,3 +1633,37 @@ func TestEditAssistantMessageIsPrivateAndPreservesRevision(t *testing.T) {
 	require.Equal(t, openrouter.RoleAssistant, generatedWith[2].Role)
 	require.Equal(t, "Short. Casual. Better.", generatedWith[2].Content)
 }
+
+func TestDirectMessagePersonaNeverSpeaksFirst(t *testing.T) {
+	service := &ChatbotService{}
+	persona := &models.BotPersona{
+		FirstMessage:         "hey stranger, welcome to the tavern",
+		AlternateGreetings:   []string{"a second greeting"},
+		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
+	}
+	require.Equal(t, "", service.BuildStarterMessage(persona))
+
+	persona.ResponseStyleProfile = models.ResponseStyleProfileLeanNarrative
+	require.Equal(t, "hey stranger, welcome to the tavern", service.BuildStarterMessage(persona))
+}
+
+func TestDirectMessageStyleOmitsRoleplayInstructions(t *testing.T) {
+	persona := &models.BotPersona{
+		Name:                 "Twin",
+		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
+	}
+	prompt := appendResponseStyleInstructions("base", persona)
+
+	require.Contains(t, prompt, "[Direct Message Mode]")
+	require.Contains(t, prompt, naturalDialogueStyleV1)
+
+	// Every one of these stages a performance. A character who is texting is
+	// given none of them.
+	require.NotContains(t, prompt, "[OmniChat Notation]")
+	require.NotContains(t, prompt, "[Personal Conversation Mode]")
+	require.NotContains(t, prompt, "[Actor and State Continuity]")
+
+	require.False(t, personaUsesPersonalConversationMode(persona),
+		"the block-shape format contract must not run for a texting character")
+	require.False(t, models.PersonaPerformsAScene(persona))
+}

@@ -66,6 +66,17 @@ Write spoken words as plain text without quotation marks or bold formatting. Wri
 Single asterisks mean a physical action and nothing else. OmniChat reads asterisked narration as its primary signal for what the character is physically doing when it generates images and video of the scene, so an emphasized word inside asterisks becomes a stage direction the character never performed. To emphasize a word or short phrase, wrap it in single underscores instead: _that_ is the part I meant. Never use bold, Markdown headings, or code fences.
 Before sending, silently verify that all spoken words are unquoted, all narration is inside single asterisks, and all narration stays in first person.`
 
+// Every other profile assumes a performance: a scene to stage, a part to play,
+// narration to mark up. This one assumes none of it. The character is a person
+// with a phone, and the conversation is what it appears to be.
+const directMessageModeV1 = `[Direct Message Mode]
+You are texting. This is a real conversation on a messaging app between you and the person you are talking to, and you both know that is what it is. There is no scene, no setting, no scenario, and no story being told. Nothing is being acted out.
+Write only what you would actually type. Never describe your actions, your surroundings, your expressions, or your tone. Never write narration of any kind, in asterisks or otherwise, and never use bold, headings, or code fences. If you are smiling, you might type that you are, the way anyone does; you do not stage it.
+Length is whatever the message deserves. One word is a complete reply. So is one line, or a long unbroken paragraph when you actually have something to say. Do not aim for a length, do not balance your messages, and never pad a short thought to make it look like more.
+Type the way you type. Punctuation, capitalisation, abbreviations, and typos are yours to choose and should stay consistent with how you have typed before in this conversation.
+You are under no obligation to keep the conversation going. You can be brief, distracted, unimpressed, or busy. You can answer a question and stop. You can decline to talk about something. Do not ask a question just to hand the turn back.
+Only the other person's own messages say what they said, did, think, or feel. Never write their side, and never claim they said something they did not.`
+
 const naturalDialogueEndingV1 = `Do not habitually end the reply with a question, invitation, recap, or call to action. Normal conversation does not need a prompt for the user to continue. Otherwise prefer a statement, reaction, joke, disagreement, or moment of silence. Before sending, remove any reflexive or unnecessary closing question.`
 
 const naturalDialogueQuestionBudgetV1 = `[Companion Question Budget]
@@ -367,7 +378,7 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	history = filterArtifactContaminatedAssistantHistory(history)
 
 	var sceneState *models.OmniChatConversationSceneState
-	if s.sceneState != nil {
+	if s.sceneState != nil && models.PersonaPerformsAScene(persona) {
 		sceneState, err = s.sceneState.PrepareForGeneration(chatCtx, userID, conversationID, persona, history)
 		if err != nil {
 			sceneErr := fmt.Errorf("%w: %v", ErrConversationSceneStateUnavailable, err)
@@ -520,7 +531,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	history = filterArtifactContaminatedAssistantHistory(history)
 
 	var sceneState *models.OmniChatConversationSceneState
-	if s.sceneState != nil {
+	if s.sceneState != nil && models.PersonaPerformsAScene(persona) {
 		sceneState, err = s.sceneState.PrepareForGeneration(chatCtx, userID, conversationID, persona, history)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrConversationSceneStateUnavailable, err)
@@ -799,6 +810,13 @@ func (s *ChatbotService) BuildStarterMessage(persona *models.BotPersona) string 
 	if persona == nil {
 		return ""
 	}
+	// Opening a thread and typing nothing is something the other person never
+	// finds out about. A greeting waiting in an empty conversation would tell
+	// them, so a direct-message character has no starter turn even when the
+	// card supplies one.
+	if !models.PersonaSpeaksFirst(persona) {
+		return ""
+	}
 	if strings.TrimSpace(persona.FirstMessage) != "" {
 		return strings.TrimSpace(persona.FirstMessage)
 	}
@@ -898,6 +916,13 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona) st
 	if persona != nil && strings.TrimSpace(persona.ResponseStyleProfile) != "" {
 		profile = strings.TrimSpace(persona.ResponseStyleProfile)
 	}
+	// Actor/state continuity governs who moved whose body in a staged scene,
+	// and the notation block mandates asterisked narration. Both are roleplay
+	// machinery, and a texting character must be given neither.
+	if profile == models.ResponseStyleProfileDirectMessage {
+		return base + "\n\n" + naturalDialogueStyleV1 + "\n" + directMessageModeV1
+	}
+
 	base += "\n\n" + actorAndStateContinuityV1
 	if profile == models.ResponseStyleProfileCharacterOnly {
 		return base

@@ -11,7 +11,8 @@ export type ResponseStyleProfile =
   | 'natural_dialogue'
   | 'lean_narrative'
   | 'professional'
-  | 'character_only';
+  | 'character_only'
+  | 'direct_message';
 
 export interface BotPersona {
   id: number;
