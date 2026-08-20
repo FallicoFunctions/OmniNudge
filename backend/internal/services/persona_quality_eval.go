@@ -386,6 +386,7 @@ func findPersonaPromptOverlapOrigin(response, systemPrompt string, persona *mode
 			actorAndStateContinuityV1,
 			naturalDialogueStyleV1,
 			personalConversationModeV1,
+			omniChatNotationV1,
 			naturalDialogueEndingV1,
 			naturalDialogueQuestionBudgetV1,
 			professionalDialogueEndingV1,
