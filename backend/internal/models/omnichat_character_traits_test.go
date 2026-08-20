@@ -516,3 +516,213 @@ func TestOmniChatRecordWorldEventRefusesValenceOutOfRange(t *testing.T) {
 	require.Zero(t, self.Mood)
 	require.Zero(t, self.Trust)
 }
+
+// The damping curve itself, checked against numbers worked out by hand rather
+// than recorded from a run. A first occurrence is untouched; everything after
+// it is worth the square of how novel it still is.
+func TestOmniChatHabituationDampsRepetitionAndNotTheFirstTime(t *testing.T) {
+	const felt = 0.25
+
+	require.Equal(t, felt, omniChatHabituatedValence(felt, 0),
+		"the first time something happens, all of it lands")
+	require.Equal(t, felt, omniChatHabituatedValence(felt, -1),
+		"a caller with nothing to count is the same as a first occurrence")
+
+	// (3/(3+n))^2 at n = 1, 3, 9, 99 and 299.
+	for _, tc := range []struct {
+		prior int
+		want  float64
+	}{
+		{prior: 1, want: felt * 0.5625},
+		{prior: 3, want: felt * 0.25},
+		{prior: 9, want: felt * 0.0625},
+		{prior: 99, want: felt * 0.00086505},
+		{prior: 299, want: felt * 0.00009868},
+	} {
+		require.InDelta(t, tc.want, omniChatHabituatedValence(felt, tc.prior), 1e-9,
+			"repetition %d", tc.prior)
+	}
+
+	// Strictly downhill, and never past zero or into the other sign: a pleasant
+	// evening repeated forever stops mattering, it does not become unpleasant.
+	previous := omniChatHabituatedValence(felt, 0)
+	for prior := 1; prior <= 300; prior++ {
+		got := omniChatHabituatedValence(felt, prior)
+		require.Less(t, got, previous, "repetition %d must matter less than the one before", prior)
+		require.Greater(t, got, 0.0)
+		previous = got
+	}
+
+	// Sign is carried through untouched, so a repeated misery habituates on the
+	// same terms a repeated pleasure does.
+	require.InDelta(t, -felt*0.25, omniChatHabituatedValence(-felt, 3), 1e-9)
+}
+
+// The regression this exists for. Five characters ran unattended in a venue for
+// several hours, filing a memory every few minutes, and all five ended pinned
+// at a mood of 1.000 -- including the one written wounded and low, whose
+// baseline is -0.3. Disposition had stopped carrying any information at all.
+//
+// Three hundred identical pleasant evenings, applied back to back with no time
+// for the mood to decay between them, is the worst case that run represents.
+func TestOmniChatRepeatedWorldEventsCannotPinTheMoodAtTheCeiling(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "habituation")
+	memories := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	// Written wounded and low, the way Sadie Hart is.
+	_, err := pool.Exec(ctx, `
+		UPDATE bot_personas
+		SET baseline_mood = -0.3, baseline_trust = 0, baseline_warmth = 0
+		WHERE id = $1
+	`, fixture.personaID)
+	require.NoError(t, err)
+
+	for i := 0; i < 300; i++ {
+		_, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID:        fixture.personaID,
+			Title:            "Wandered the main stage in OmniRave",
+			Summary:          fmt.Sprintf("Was in OmniRave for 12m. There were people about. Visit %d.", i+1),
+			EmotionalValence: floatPtr(0.25),
+		})
+		require.NoError(t, err)
+	}
+
+	self, baseline, err := memories.LoadSelfDisposition(ctx, fixture.personaID)
+	require.NoError(t, err)
+	require.InDelta(t, -0.3, baseline.Mood, 1e-6)
+
+	// Undamped this is 0.125 per evening, so it clamps at 1 by the eighth one
+	// and every character in the venue is identical from there on. Habituated,
+	// the series converges: 0.5 * 0.25 * sum((3/(3+n))^2) over 300 terms.
+	require.InDelta(t, 0.4406, self.Mood, 0.005, "three hundred ordinary evenings must not saturate the mood")
+	require.Less(t, self.Mood, 0.5)
+
+	// The number that matters: who she was written as is still legible in what
+	// she is now, and is still exactly the 0.3 her card is worth.
+	now := time.Now()
+	composed := ComposeOmniChatSelfDisposition(baseline, self, now)
+	require.InDelta(t, 0.1406, composed.Mood, 0.005)
+	require.InDelta(t, self.MoodAt(now)-0.3, composed.Mood, 1e-6,
+		"the baseline must still be the whole difference between her and a character written neutral")
+
+	// An ordinary evening is far below the lasting-change threshold, and three
+	// hundred of them still are. She is in better spirits; she is not a
+	// different woman.
+	require.Zero(t, self.Trust)
+	require.Zero(t, self.Warmth)
+
+	// And the record is untouched. Habituation decides what an evening is worth
+	// to a disposition, never what happened or how the world said it felt.
+	var stored int
+	var rawValence float64
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT count(*), max(emotional_valence) FROM omnichat_memory_episodes
+		WHERE persona_id = $1 AND owner_user_id IS NULL
+	`, fixture.personaID).Scan(&stored, &rawValence))
+	require.Equal(t, 300, stored, "every visit is still kept")
+	require.InDelta(t, 0.25, rawValence, 1e-6, "the memory still says how the evening actually felt")
+}
+
+// The property habituation exists to protect. A character that has wandered an
+// empty venue three hundred times must still be moved when something genuinely
+// new happens -- otherwise the fix would have replaced one flat character with
+// another.
+func TestOmniChatANovelEventStillLandsAfterALongRunOfRepeats(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "habitnovel")
+	memories := NewOmniChatMemoryRepository(pool)
+	ctx := context.Background()
+
+	for i := 0; i < 300; i++ {
+		_, err := memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+			PersonaID:        fixture.personaID,
+			Title:            "Wandered the main stage in OmniRave",
+			Summary:          fmt.Sprintf("Was in OmniRave for 12m and saw nobody. Visit %d.", i+1),
+			EmotionalValence: floatPtr(0.25),
+		})
+		require.NoError(t, err)
+	}
+	worn, _, err := memories.LoadSelfDisposition(ctx, fixture.personaID)
+	require.NoError(t, err)
+
+	// A human player finally turns up. It has happened once.
+	_, err = memories.RecordWorldEvent(ctx, OmniChatWorldEvent{
+		PersonaID:        fixture.personaID,
+		Title:            "Danced with a stranger at the main stage in OmniRave",
+		Summary:          "Somebody came over and stayed the whole set.",
+		EmotionalValence: floatPtr(0.6),
+	})
+	require.NoError(t, err)
+
+	after, _, err := memories.LoadSelfDisposition(ctx, fixture.personaID)
+	require.NoError(t, err)
+
+	// Full strength: half of 0.6, the same as it would have been on her first
+	// night in the venue.
+	require.InDelta(t, 0.3, after.Mood-worn.Mood, 0.005,
+		"a new thing lands whole, however worn the old one is")
+	require.Greater(t, after.Mood-worn.Mood,
+		1000*(0.5*omniChatHabituatedValence(0.25, 300)),
+		"and by orders of magnitude more than another ordinary evening would")
+}
+
+// Habituation is driven by the recurrence chain, and only world events join
+// one: the extraction path writes retells_episode_id and never
+// recurs_episode_id, so a relational episode is always a first occurrence and
+// always lands whole.
+//
+// That is deliberate rather than incidental. Recurrence damping was added for
+// an agent filing hundreds of near-identical memories a day; a conversation
+// happens at human pace, and its valences are judged one exchange at a time by
+// a model that has read the exchange. Damping the second time somebody was
+// unkind would be discarding a measurement, not a repetition.
+func TestOmniChatHabituationLeavesRelationalEpisodesAlone(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "habitrelational")
+	memories := NewOmniChatMemoryRepository(pool)
+	traitRepo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	// The same thing, said again and again, in four separate extractions.
+	const rounds = 4
+	for i := 0; i < rounds; i++ {
+		require.NoError(t, memories.RecordExtraction(ctx, conversationID, fixture.userID, i, i+1,
+			[]OmniChatMemoryEpisode{{
+				PersonaID:        fixture.personaID,
+				OwnerUserID:      fixture.userID,
+				ConversationID:   conversationID,
+				Title:            "He asked about her sister",
+				Summary:          "He wanted to know how she was doing.",
+				Salience:         0.7,
+				Distinctiveness:  0.6,
+				EmotionalValence: floatPtr(0.25),
+			}}))
+	}
+
+	traits, err := traitRepo.Load(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+
+	// Four episodes at half of 0.25 each, undamped. Habituated it would have
+	// been 0.170.
+	require.InDelta(t, 0.5, traits.Mood, 1e-6)
+
+	var linked int
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT count(*) FROM omnichat_memory_episodes
+		WHERE persona_id = $1 AND owner_user_id = $2 AND recurs_episode_id IS NOT NULL
+	`, fixture.personaID, fixture.userID).Scan(&linked))
+	require.Zero(t, linked, "a conversation's episodes never join a recurrence chain")
+}

@@ -559,6 +559,11 @@ var ErrOmniChatMemoryNotResident = errors.New("omnichat memory: persona is not a
 // relationship's: same threshold, same asymmetry, same clamp. Nothing about a
 // world event is weighted more heavily for having happened in a world, because
 // nothing has measured that it should be.
+//
+// How much of it lands is another question, and the chain answers it. A visit
+// that is the two hundredth of its kind is damped by omniChatHabituatedValence
+// before it touches the disposition, which is why an agent filing a memory
+// every few minutes no longer pins every resident at the top of the scale.
 func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event OmniChatWorldEvent) (int64, error) {
 	// The world is a service, but its text still arrives over the wire, so it
 	// is bounded exactly as an extracted episode is. Validate refuses a valence
@@ -589,7 +594,14 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var episodeID int64
+	// priorOccurrences is how many times this character has already done this,
+	// counted before the row about to be written exists. It is what habituation
+	// reads: a visit joining a chain three hundred deep is, by its own record,
+	// not news.
+	var (
+		episodeID        int64
+		priorOccurrences int
+	)
 	err = tx.QueryRow(ctx, `
 		WITH prior_occurrence AS (
 			-- The root of the chain this visit joins, or nothing if the
@@ -604,23 +616,40 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 			  AND lower(btrim(title)) = lower(btrim($2))
 			ORDER BY recorded_at DESC, id DESC
 			LIMIT 1
+		),
+		-- The same rows the link is drawn from, counted rather than narrowed to
+		-- one. Every CTE reads the same snapshot, so this is the depth of the
+		-- chain as it stood before this visit joined it.
+		chain AS (
+			SELECT count(*) AS occurrences
+			FROM omnichat_memory_episodes
+			WHERE persona_id = $1
+			  AND owner_user_id IS NULL
+			  AND status = 'active'
+			  AND lower(btrim(title)) = lower(btrim($2))
+		),
+		recorded AS (
+			INSERT INTO omnichat_memory_episodes (
+				persona_id, owner_user_id, conversation_id, source_message_id,
+				title, summary, salience, distinctiveness, emotional_valence, recurs_episode_id
+			)
+			SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5, $6, (SELECT root_id FROM prior_occurrence)
+			FROM bot_personas p
+			-- The same line admission draws, and now literally the same line: a
+			-- resident is exactly a character that would be admitted. A character
+			-- that belongs to a user is never a resident, so nothing ever writes it
+			-- a self tier and it has none to read.
+			WHERE `+AdmissiblePersonaPredicate+`
+			RETURNING id
 		)
-		INSERT INTO omnichat_memory_episodes (
-			persona_id, owner_user_id, conversation_id, source_message_id,
-			title, summary, salience, distinctiveness, emotional_valence, recurs_episode_id
-		)
-		SELECT p.id, NULL, NULL, NULL, $2, $3, $4, $5, $6, (SELECT root_id FROM prior_occurrence)
-		FROM bot_personas p
-		-- The same line admission draws, and now literally the same line: a
-		-- resident is exactly a character that would be admitted. A character
-		-- that belongs to a user is never a resident, so nothing ever writes it
-		-- a self tier and it has none to read.
-		WHERE `+AdmissiblePersonaPredicate+`
-		RETURNING id
+		-- No row from the insert is a character that is not a resident, and the
+		-- join keeps it that way: nothing comes back and the caller gets the
+		-- refusal it would have got before.
+		SELECT recorded.id, chain.occurrences FROM recorded, chain
 	`,
 		episode.PersonaID, episode.Title, episode.Summary,
 		episode.Salience, episode.Distinctiveness, episode.EmotionalValence,
-	).Scan(&episodeID)
+	).Scan(&episodeID, &priorOccurrences)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrOmniChatMemoryNotResident
 	}
@@ -638,10 +667,17 @@ func (r *OmniChatMemoryRepository) RecordWorldEvent(ctx context.Context, event O
 	// extraction takes it last: there is one traits row per tier, and touching
 	// it early would put a shared lock in front of writes whose order the
 	// caller chose.
+	//
+	// What moves the character is the habituated valence, not the reported one.
+	// The episode row above keeps what the world actually said -- the memory is
+	// a record and must stay honest about how the evening felt -- while what it
+	// is worth to a disposition is decided here, by how many times it has
+	// happened before. The world reports; the brain weighs.
 	if episode.EmotionalValence != nil {
+		felt := omniChatHabituatedValence(*episode.EmotionalValence, priorOccurrences)
 		if err := applyEpisodeValencesTx(
 			ctx, tx, episode.PersonaID, OmniChatMemoryTierSelf,
-			[]float64{*episode.EmotionalValence},
+			[]float64{felt},
 		); err != nil {
 			return 0, err
 		}
