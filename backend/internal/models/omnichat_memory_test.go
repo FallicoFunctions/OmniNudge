@@ -303,7 +303,61 @@ func TestOmniChatMemoryTierCheckIsEnforcedBySchema(t *testing.T) {
 		VALUES ($1, NULL, $2, 'leak', 'leak')
 	`, fixture.personaID, conversationID)
 	require.Error(t, err, "a conversation-derived episode must not be storable as self tier")
-	require.Contains(t, err.Error(), "omnichat_memory_episodes_tier_check")
+	require.Contains(t, err.Error(), "tier violation")
+}
+
+// The same write, refused above, is the entire point of a free character: her
+// memory is whole, so what one person tells her another may hear. The
+// permission is read off the persona and nothing else, which is why this test
+// changes only the profile and repeats the identical insert.
+func TestOmniChatMemoryTierOpensOnlyForFreeCharacters(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "freetier")
+	ctx := context.Background()
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+
+	insertGlobal := func() error {
+		_, err := pool.Exec(ctx, `
+			INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, conversation_id, title, summary)
+			VALUES ($1, NULL, $2, 'shared', 'told to her by someone')
+		`, fixture.personaID, conversationID)
+		return err
+	}
+
+	require.Error(t, insertGlobal(), "an ordinary character keeps the original guarantee")
+
+	_, err := pool.Exec(ctx,
+		`UPDATE bot_personas SET response_style_profile = 'direct_message' WHERE id = $1`,
+		fixture.personaID)
+	require.NoError(t, err)
+
+	require.NoError(t, insertGlobal(), "a free character's conversation memory may be persona-global")
+
+	// Moving her back off the profile would strand what is already written in a
+	// tier no longer permitted to hold it. There is no owner to hand those
+	// episodes to -- they came from more than one person -- so the change is
+	// refused rather than silently repaired.
+	_, err = pool.Exec(ctx,
+		`UPDATE bot_personas SET response_style_profile = 'lean_narrative' WHERE id = $1`,
+		fixture.personaID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot leave the free profile")
+
+	// With nothing shared left, the same change is allowed again.
+	_, err = pool.Exec(ctx,
+		`DELETE FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id IS NULL`,
+		fixture.personaID)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx,
+		`UPDATE bot_personas SET response_style_profile = 'lean_narrative' WHERE id = $1`,
+		fixture.personaID)
+	require.NoError(t, err)
 }
 
 func TestOmniChatMemoryWatermarkLifecycle(t *testing.T) {
