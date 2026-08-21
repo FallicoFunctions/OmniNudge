@@ -69,15 +69,58 @@ func TestRenderTranscriptLookupIsAbsentWhenNothingWasFound(t *testing.T) {
 
 // The overwhelming majority of conversations are shorter than the window, so
 // the common case has to cost no query at all.
+//
+// A nil message repository would panic if the search were reached, which is what
+// makes these assertions mean anything.
 func TestLookUpTranscriptSkipsWhenTheWindowCoversEverything(t *testing.T) {
 	service := &ChatbotService{}
 
-	short := make([]*models.BotMessage, 0, maxHistoryMessages-1)
-	for i := 0; i < maxHistoryMessages-1; i++ {
-		short = append(short, lookedUpTurn(i+1, models.BotMessageRoleUser, "turn"))
+	full := make([]*models.BotMessage, 0, maxHistoryMessages)
+	for i := 0; i < maxHistoryMessages; i++ {
+		full = append(full, lookedUpTurn(i+1, models.BotMessageRoleUser, "turn"))
 	}
 
-	// A nil message repository would panic if the search were reached at all.
-	require.Nil(t, service.lookUpTranscript(t.Context(), 42, short, "anything"))
-	require.Nil(t, service.lookUpTranscript(t.Context(), 42, nil, "anything"))
+	require.Nil(t, service.lookUpTranscript(t.Context(), 42, full, "anything", false))
+	require.Nil(t, service.lookUpTranscript(t.Context(), 42, nil, "anything", true))
+	require.Nil(t, service.lookUpTranscript(t.Context(), 42, full, "   ", true))
+}
+
+// Whether anything older exists is the caller's to decide, from the unfiltered
+// fetch. History arrives here with failed and artifact-contaminated assistant
+// turns already removed, so its length is not evidence about the conversation's
+// true length -- and inferring from it meant one failed turn anywhere in the
+// last 200 switched this off for good in a conversation of any size.
+func TestTranscriptLookupDoesNotInferLengthFromFilteredHistory(t *testing.T) {
+	full := make([]*models.BotMessage, 0, maxHistoryMessages)
+	for i := 0; i < maxHistoryMessages; i++ {
+		full = append(full, lookedUpTurn(i+100, models.BotMessageRoleUser, "turn"))
+	}
+	// The same conversation, with turns filtered out of its window.
+	filtered := full[:maxHistoryMessages-3]
+
+	require.True(t, transcriptLookupIsWorthwhile(filtered, "a cue", true),
+		"a short filtered window still has older turns behind it")
+	require.True(t, transcriptLookupIsWorthwhile(full, "a cue", true))
+
+	// And the cheap cases stay cheap.
+	require.False(t, transcriptLookupIsWorthwhile(full, "a cue", false),
+		"nothing older means nothing to search")
+	require.False(t, transcriptLookupIsWorthwhile(nil, "a cue", true))
+	require.False(t, transcriptLookupIsWorthwhile(full, "   ", true))
+	require.False(t, transcriptLookupIsWorthwhile(
+		[]*models.BotMessage{nil}, "a cue", true))
+}
+
+// The best-ranked match is the one she was looking for. It must not be dropped
+// for being long while a worse and shorter one takes its place -- real messages
+// here reach 2,400 characters.
+func TestRenderTranscriptLookupTrimsLongQuotesRatherThanDroppingThem(t *testing.T) {
+	block := renderTranscriptLookup([]*models.BotMessage{
+		lookedUpTurn(1, models.BotMessageRoleUser, "RIVINGTON "+strings.Repeat("padding ", 300)),
+		lookedUpTurn(2, models.BotMessageRoleUser, "a short later match"),
+	}, "Sadie")
+
+	require.Contains(t, block, "RIVINGTON", "the top match survives")
+	require.Contains(t, block, "…")
+	require.LessOrEqual(t, len([]rune(block)), omniChatTranscriptLookupMaxRunes)
 }

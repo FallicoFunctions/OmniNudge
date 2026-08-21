@@ -404,6 +404,10 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 			Msg("chatbot: failed to persist fallback after history load failure")
 		return nil, fmt.Errorf("chatbot: load history: %w", err)
 	}
+	// Whether anything older than the window exists has to be read before
+	// filtering. Filtering removes failed and contaminated turns, so the length
+	// afterwards is not evidence about the conversation's true length.
+	conversationOutgrewWindow := len(history) == maxHistoryMessages
 	history = filterArtifactContaminatedAssistantHistory(history)
 
 	var sceneState *models.OmniChatConversationSceneState
@@ -425,7 +429,7 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	memories := s.recallMemories(chatCtx, persona, userID, content)
 	// Cued by the same turn as the memories, and covering exactly what the
 	// window does not reach.
-	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, content)
+	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, content, conversationOutgrewWindow)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
@@ -560,6 +564,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	if len(history) == 0 || history[len(history)-1].Role != models.BotMessageRoleUser {
 		return nil, ErrMessageNotRegeneratable
 	}
+	regenerationOutgrewWindow := len(history) == maxHistoryMessages
 	history = filterArtifactContaminatedAssistantHistory(history)
 
 	var sceneState *models.OmniChatConversationSceneState
@@ -574,7 +579,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	// retry answers a different question than the one the user asked. The cue is
 	// the trailing user turn, which the guard above has already established.
 	memories := s.recallMemories(chatCtx, persona, userID, history[len(history)-1].Content)
-	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, history[len(history)-1].Content)
+	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, history[len(history)-1].Content, regenerationOutgrewWindow)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
