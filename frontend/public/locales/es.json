@@ -4194,7 +4194,8 @@
       "gallery": "Galería",
       "showProfileImage": "Mostrar imagen de perfil",
       "showProfileVideo": "Mostrar video de perfil",
-      "mediaOnlyPreview": "Envió una foto"
+      "mediaOnlyPreview": "Envió una foto",
+      "loadingOlder": "Cargando mensajes anteriores…"
     },
     "exitToSite": "Salir a OmniNudge",
     "header": {

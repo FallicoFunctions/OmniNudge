@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -515,6 +516,19 @@ export default function OmniChatChatPage() {
   const persistedGuest = useRef(false);
   const nextOptimisticId = useRef(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Prepending older messages changes scrollHeight under the user. The anchor is
+  // the distance from the bottom, which is the thing that must not move; the
+  // flag stops the scroll-to-bottom effect from yanking the view down the moment
+  // older turns arrive.
+  const olderScrollAnchorRef = useRef<number | null>(null);
+  const suppressAutoScrollRef = useRef(false);
+  // The in-flight guard is a ref, not the state below. Scroll fires dozens of
+  // times a second and setState does not land until the next render, so two
+  // calls would both read false, both take the same cursor, and both prepend the
+  // same page. The state exists only to show the spinner.
+  const loadingOlderRef = useRef(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const sendMessageAbortRef = useRef<AbortController | null>(null);
   const sendCompletedLiveRef = useRef(false);
@@ -651,6 +665,46 @@ export default function OmniChatChatPage() {
     queryFn: () => omnichatService.getConversation(selectedConversationId as number),
     enabled: selectedConversationId !== null && !isGuest,
   });
+
+  // Scrolling back through a conversation. Every message has always been stored;
+  // this is what asks for the ones past the first page.
+  const loadOlderMessages = useCallback(async () => {
+    if (isGuest || selectedConversationId === null || loadingOlderRef.current) return;
+
+    const key = omnichatQueryKeys.conversation(selectedConversationId);
+    const detail = queryClient.getQueryData<BotConversationDetail>(key);
+    const oldest = detail?.messages[0];
+    if (!detail?.has_more || !oldest) return;
+
+    const container = scrollRef.current;
+    if (container) {
+      olderScrollAnchorRef.current = container.scrollHeight - container.scrollTop;
+      suppressAutoScrollRef.current = true;
+    }
+    loadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+    try {
+      const page = await omnichatService.getOlderMessages(selectedConversationId, oldest.id);
+      queryClient.setQueryData<BotConversationDetail>(key, (current) => {
+        if (!current) return current;
+        // Idempotent by id, so a page arriving twice cannot double the
+        // transcript even if something else ever races this.
+        const known = new Set(current.messages.map((message) => message.id));
+        const fresh = page.messages.filter((message) => !known.has(message.id));
+        return {
+          ...current,
+          messages: [...fresh, ...current.messages],
+          has_more: page.has_more,
+        };
+      });
+    } catch {
+      olderScrollAnchorRef.current = null;
+      suppressAutoScrollRef.current = false;
+    } finally {
+      loadingOlderRef.current = false;
+      setIsLoadingOlder(false);
+    }
+  }, [isGuest, queryClient, selectedConversationId]);
 
   const modelSelectionQuery = useQuery({
     queryKey: omnichatQueryKeys.modelSelection(selectedConversationId ?? -1),
@@ -912,7 +966,20 @@ export default function OmniChatChatPage() {
     }
   }, [guestMessages, guestPersonaId, isGuest]);
 
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    const anchor = olderScrollAnchorRef.current;
+    if (!container || anchor === null) return;
+    olderScrollAnchorRef.current = null;
+    // Hold the view where it was rather than where it now is.
+    container.scrollTop = container.scrollHeight - anchor;
+  }, [conversationQuery.data?.messages]);
+
   useEffect(() => {
+    if (suppressAutoScrollRef.current) {
+      suppressAutoScrollRef.current = false;
+      return;
+    }
     if (!scrollRef.current || typeof scrollRef.current.scrollTo !== 'function') return;
     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [conversationQuery.data?.messages, guestMessages, regenerationText, streamingText]);
@@ -2337,8 +2404,17 @@ export default function OmniChatChatPage() {
 
             <div
               ref={scrollRef}
+              data-testid="omnichat-transcript-scroller"
+              onScroll={(event) => {
+                if (event.currentTarget.scrollTop < 200) void loadOlderMessages();
+              }}
               className="min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-5 py-5"
             >
+              {isLoadingOlder && (
+                <p className="pb-4 text-center text-xs text-white/35">
+                  {t('omnichat.chat.loadingOlder')}
+                </p>
+              )}
               {isLoadingConversation && (
                 <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>
               )}

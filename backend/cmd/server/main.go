@@ -1409,6 +1409,7 @@ func main() {
 			protected.POST("/omnichat/conversations", omniChatHandler.CreateConversation)
 			protected.GET("/omnichat/conversations", omniChatHandler.ListConversations)
 			protected.GET("/omnichat/conversations/:id", omniChatHandler.GetConversation)
+			protected.GET("/omnichat/conversations/:id/messages", omniChatHandler.ListOlderMessages)
 			protected.GET("/omnichat/model-selection", omniChatHandler.GetModelSelection)
 			protected.PUT("/omnichat/model-selection", omniChatHandler.SetModelSelection)
 			protected.PUT("/omnichat/conversations/:id/settings", omniChatHandler.UpdateConversationSettings)

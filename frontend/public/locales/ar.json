@@ -4194,7 +4194,8 @@
       "gallery": "المعرض",
       "showProfileImage": "عرض صورة الملف الشخصي",
       "showProfileVideo": "عرض فيديو الملف الشخصي",
-      "mediaOnlyPreview": "أرسل صورة"
+      "mediaOnlyPreview": "أرسل صورة",
+      "loadingOlder": "جارٍ تحميل الرسائل السابقة…"
     },
     "exitToSite": "الخروج إلى OmniNudge",
     "header": {

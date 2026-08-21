@@ -434,6 +434,13 @@ export interface OmniChatRegenerationTokenPayload extends OmniChatTokenPayload {
 export interface BotConversationDetail {
   conversation: BotConversation;
   messages: BotMessage[];
+  /** Whether anything older than the oldest loaded message is still stored. */
+  has_more?: boolean;
+}
+
+export interface BotMessagePage {
+  messages: BotMessage[];
+  has_more: boolean;
 }
 
 export interface PreviewMessageRequest {
