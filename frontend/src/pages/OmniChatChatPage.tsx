@@ -662,9 +662,43 @@ export default function OmniChatChatPage() {
 
   const conversationQuery = useQuery({
     queryKey: omnichatQueryKeys.conversation(selectedConversationId ?? -1),
-    queryFn: () => omnichatService.getConversation(selectedConversationId as number),
+    // A refetch returns only the newest page. Anything the reader scrolled back
+    // to load is older than that page and would be dropped on the floor by a
+    // plain replace -- so an error, a rate limit, or a window refocus would
+    // silently collapse a transcript somebody had walked back through. Merging
+    // here covers every refetch path at once rather than each call site.
+    queryFn: async () => {
+      const conversationID = selectedConversationId as number;
+      const fresh = await omnichatService.getConversation(conversationID);
+      const existing = queryClient.getQueryData<BotConversationDetail>(
+        omnichatQueryKeys.conversation(conversationID)
+      );
+      const newestPageStart = fresh.messages[0]?.id;
+      if (!existing || newestPageStart === undefined) return fresh;
+
+      const alreadyFresh = new Set(fresh.messages.map((message) => message.id));
+      const keptOlder = existing.messages.filter(
+        (message) => message.id < newestPageStart && !alreadyFresh.has(message.id)
+      );
+      if (keptOlder.length === 0) return fresh;
+
+      return {
+        ...fresh,
+        messages: [...keptOlder, ...fresh.messages],
+        // What is older than the oldest message still held, which the fresh
+        // page cannot know because it never reached back that far.
+        has_more: existing.has_more,
+      };
+    },
     enabled: selectedConversationId !== null && !isGuest,
   });
+
+  // Switching conversations mid-load would otherwise restore one conversation's
+  // scroll position into another's transcript.
+  useEffect(() => {
+    olderScrollAnchorRef.current = null;
+    suppressAutoScrollRef.current = false;
+  }, [selectedConversationId]);
 
   // Scrolling back through a conversation. Every message has always been stored;
   // this is what asks for the ones past the first page.
@@ -804,9 +838,19 @@ export default function OmniChatChatPage() {
       queryFn: () => omnichatService.getConversation(conversation.id),
       // Media-only threads already have a known placeholder, so skip the
       // detail fetch rather than pulling a whole message history for a label.
+      //
+      // The open conversation is excluded, and that exclusion is load-bearing
+      // rather than an optimisation. This shares a cache key with the transcript
+      // query above but fetches differently: a plain page one, with none of the
+      // merging that keeps scrolled-back history. Left enabled, the sidebar's
+      // hunt for a preview label would periodically overwrite the open
+      // transcript with its newest 200 and throw away everything the reader had
+      // walked back to. The transcript query already holds this conversation's
+      // detail, so there is nothing here left to fetch anyway.
       enabled:
         isAuthenticated &&
         !isGuest &&
+        conversation.id !== selectedConversationId &&
         !conversation.last_message_preview &&
         !conversation.last_message_media_only,
       staleTime: 60_000,
