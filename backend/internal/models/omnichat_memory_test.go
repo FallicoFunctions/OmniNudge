@@ -148,6 +148,12 @@ type memoryFixture struct {
 }
 
 func seedMemoryFixture(t *testing.T, pool *pgxpool.Pool, suffix string) memoryFixture {
+	return seedMemoryFixtureWithProfile(t, pool, suffix, "inherit")
+}
+
+// A character's kind is fixed when she is created and cannot be changed after,
+// so a test that needs a free character has to make one rather than convert one.
+func seedMemoryFixtureWithProfile(t *testing.T, pool *pgxpool.Pool, suffix, profile string) memoryFixture {
 	t.Helper()
 	ctx := context.Background()
 	var fixture memoryFixture
@@ -159,8 +165,9 @@ func seedMemoryFixture(t *testing.T, pool *pgxpool.Pool, suffix string) memoryFi
 		`INSERT INTO users (username, username_normalized, password_hash) VALUES ($1, $1, 'x') RETURNING id`,
 		"memother_"+suffix).Scan(&fixture.otherID))
 	require.NoError(t, pool.QueryRow(ctx,
-		`INSERT INTO bot_personas (slug, name, system_prompt) VALUES ($1, 'Memtest', 'You are Memtest.') RETURNING id`,
-		"memtest-persona-"+suffix).Scan(&fixture.personaID))
+		`INSERT INTO bot_personas (slug, name, system_prompt, response_style_profile)
+		 VALUES ($1, 'Memtest', 'You are Memtest.', $2) RETURNING id`,
+		"memtest-persona-"+suffix, profile).Scan(&fixture.personaID))
 
 	return fixture
 }
@@ -308,21 +315,21 @@ func TestOmniChatMemoryTierCheckIsEnforcedBySchema(t *testing.T) {
 
 // The same write, refused above, is the entire point of a free character: her
 // memory is whole, so what one person tells her another may hear. The
-// permission is read off the persona and nothing else, which is why this test
-// changes only the profile and repeats the identical insert.
+// permission is read off the persona and nothing else -- these are two
+// characters differing only in kind, receiving the identical insert.
 func TestOmniChatMemoryTierOpensOnlyForFreeCharacters(t *testing.T) {
 	pool, cleanup := setupMemoryTestDB(t)
 	defer cleanup()
 
-	fixture := seedMemoryFixture(t, pool, "freetier")
 	ctx := context.Background()
+	ordinary := seedMemoryFixture(t, pool, "tierordinary")
+	free := seedMemoryFixtureWithProfile(t, pool, "tierfree", "direct_message")
 
-	var conversationID int
-	require.NoError(t, pool.QueryRow(ctx,
-		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
-		fixture.userID, fixture.personaID).Scan(&conversationID))
-
-	insertGlobal := func() error {
+	insertGlobal := func(fixture memoryFixture) error {
+		var conversationID int
+		require.NoError(t, pool.QueryRow(ctx,
+			`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+			fixture.userID, fixture.personaID).Scan(&conversationID))
 		_, err := pool.Exec(ctx, `
 			INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, conversation_id, title, summary)
 			VALUES ($1, NULL, $2, 'shared', 'told to her by someone')
@@ -330,33 +337,40 @@ func TestOmniChatMemoryTierOpensOnlyForFreeCharacters(t *testing.T) {
 		return err
 	}
 
-	require.Error(t, insertGlobal(), "an ordinary character keeps the original guarantee")
+	require.Error(t, insertGlobal(ordinary), "an ordinary character keeps the original guarantee")
+	require.NoError(t, insertGlobal(free), "a free character's conversation memory may be persona-global")
+}
+
+// Kind is decided at creation and never afterwards. It governs whether a
+// backstory binds her, whether there is a scene, whether she greets anyone, and
+// whose her memory is -- so changing it would leave the same name and history
+// attached to a different character.
+func TestOmniChatCharacterKindCannotBeChanged(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	ordinary := seedMemoryFixture(t, pool, "kindordinary")
+	free := seedMemoryFixtureWithProfile(t, pool, "kindfree", "direct_message")
 
 	_, err := pool.Exec(ctx,
 		`UPDATE bot_personas SET response_style_profile = 'direct_message' WHERE id = $1`,
-		fixture.personaID)
-	require.NoError(t, err)
+		ordinary.personaID)
+	require.Error(t, err, "a roleplay character cannot become free")
+	require.Contains(t, err.Error(), "kind is fixed at creation")
 
-	require.NoError(t, insertGlobal(), "a free character's conversation memory may be persona-global")
-
-	// Moving her back off the profile would strand what is already written in a
-	// tier no longer permitted to hold it. There is no owner to hand those
-	// episodes to -- they came from more than one person -- so the change is
-	// refused rather than silently repaired.
+	// Refused even with no memories at stake: this is about what she is, not
+	// about protecting rows.
 	_, err = pool.Exec(ctx,
 		`UPDATE bot_personas SET response_style_profile = 'lean_narrative' WHERE id = $1`,
-		fixture.personaID)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot leave the free profile")
+		free.personaID)
+	require.Error(t, err, "a free character cannot become a roleplay one")
+	require.Contains(t, err.Error(), "kind is fixed at creation")
 
-	// With nothing shared left, the same change is allowed again.
+	// Moving between two roleplay styles is an ordinary edit and stays allowed.
 	_, err = pool.Exec(ctx,
-		`DELETE FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id IS NULL`,
-		fixture.personaID)
-	require.NoError(t, err)
-	_, err = pool.Exec(ctx,
-		`UPDATE bot_personas SET response_style_profile = 'lean_narrative' WHERE id = $1`,
-		fixture.personaID)
+		`UPDATE bot_personas SET response_style_profile = 'professional' WHERE id = $1`,
+		ordinary.personaID)
 	require.NoError(t, err)
 }
 
@@ -1596,13 +1610,8 @@ func TestOmniChatMemoryExtractionSharesEpisodesButNotFeelings(t *testing.T) {
 	defer cleanup()
 
 	repo := NewOmniChatMemoryRepository(pool)
-	fixture := seedMemoryFixture(t, pool, "sharedextract")
+	fixture := seedMemoryFixtureWithProfile(t, pool, "sharedextract", "direct_message")
 	ctx := context.Background()
-
-	_, err := pool.Exec(ctx,
-		`UPDATE bot_personas SET response_style_profile = 'direct_message' WHERE id = $1`,
-		fixture.personaID)
-	require.NoError(t, err)
 
 	var conversationID int
 	require.NoError(t, pool.QueryRow(ctx,

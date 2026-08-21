@@ -425,3 +425,76 @@ func TestExportOmniChatConversationsReportsCompleteWhenWithinCaps(t *testing.T) 
 	require.Equal(t, float64(22), out["total_messages"], "20 new plus the seeded 2")
 	require.Equal(t, false, out["truncated"])
 }
+
+// A free character keeps what she is told as her own memory, not as part of one
+// relationship. It is still derived from what this user said, so their data
+// download has to show it -- marked as hers, because deleting the account will
+// not remove it and she may repeat it to someone else.
+func TestExportOmniChatMemoryIncludesSharedMemoriesFromOwnConversations(t *testing.T) {
+	pool := setupOmniChatExportDB(t)
+	fixture := seedOmniChatExport(t, pool, "memoryshared")
+	ctx := context.Background()
+
+	var freePersonaID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, system_prompt, response_style_profile)
+		VALUES ($1, 'Free', 'You are Free.', 'direct_message') RETURNING id`,
+		"exp-free-memoryshared").Scan(&freePersonaID))
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, freePersonaID).Scan(&conversationID))
+
+	_, err := pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, conversation_id, title, summary)
+		VALUES ($1, NULL, $2, 'He lost his passport', 'He told me he lost it in Barcelona.')`,
+		freePersonaID, conversationID)
+	require.NoError(t, err)
+
+	encoded := encodeExport(t, mustExportMemory(t, ctx, pool, fixture.userID))
+	require.Equal(t, float64(1), encoded["total"])
+
+	episodes := encoded["episodes"].([]interface{})
+	episode := episodes[0].(map[string]interface{})
+	require.Equal(t, "He lost his passport", episode["title"])
+	require.Equal(t, true, episode["shared_with_others"],
+		"the download must say plainly that this one is hers and will not be deleted")
+}
+
+// The join is on conversation ownership, so a shared memory formed with someone
+// else stays out. Exporting by persona instead would hand every user everything
+// the character had ever been told.
+func TestExportOmniChatMemoryExcludesSharedMemoriesFromOtherPeople(t *testing.T) {
+	pool := setupOmniChatExportDB(t)
+	fixture := seedOmniChatExport(t, pool, "memorysharedother")
+	ctx := context.Background()
+
+	var freePersonaID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, system_prompt, response_style_profile)
+		VALUES ($1, 'Free', 'You are Free.', 'direct_message') RETURNING id`,
+		"exp-free-memorysharedother").Scan(&freePersonaID))
+
+	var otherConversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.otherUserID, freePersonaID).Scan(&otherConversationID))
+
+	_, err := pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, conversation_id, title, summary)
+		VALUES ($1, NULL, $2, 'Someone else confided', 'Not this user to tell.')`,
+		freePersonaID, otherConversationID)
+	require.NoError(t, err)
+
+	encoded := encodeExport(t, mustExportMemory(t, ctx, pool, fixture.userID))
+	require.Equal(t, float64(0), encoded["total"],
+		"a shared memory is still not a licence to read what other people said")
+}
+
+func mustExportMemory(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int) interface{} {
+	t.Helper()
+	data, err := exportOmniChatMemoryData(ctx, pool, userID)
+	require.NoError(t, err)
+	return data
+}
