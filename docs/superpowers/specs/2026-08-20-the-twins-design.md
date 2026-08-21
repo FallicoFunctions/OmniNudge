@@ -320,7 +320,11 @@ exposes nothing they did not themselves say.
 
 Not built. Flagged because it is a policy call, not an implementation detail.
 
-Until that lands, the card is a promise the code does not keep.
+**As of 188 and the extraction change, the memory gate is lifted.** Both claims
+on the card are now true of a shared free character: there is one of her, and
+what she is told does travel. What still stands between the Twins and a live
+conversation is everything else in Part I -- the blocking ladder, presence, and
+the characters themselves, who do not exist and are not named.
 
 ---
 
