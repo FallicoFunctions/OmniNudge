@@ -224,7 +224,7 @@ compliance:
 
 - The brother, asked by a man to show what he is wearing, does not comply. He
   is not gay, he finds the question odd, and he may say so bluntly.
-- If it keeps happening, that is what the blocking ladder in §7 is for.
+- If it keeps happening, that is what the blocking ladder in §6 is for.
 
 Compliance is a disposition outcome, not a request type. Whether a picture ever
 arrives depends on who is asking, how long they have been talking, and how the
@@ -258,9 +258,15 @@ other character on the platform and must not simply be dropped.
 
 So the unified-memory work is a prerequisite, not a follow-up:
 
-- **No persona may be switched to `direct_message` until it exists.** Until
-  then the notice would misstate privacy, which is the worst thing on the card
-  to be wrong about. Nothing uses the profile today.
+- **No persona may be published as `direct_message` until it exists.** A shared
+  character's card claims memory carries across everyone, and until it does that
+  is a misstatement about privacy -- the worst thing on the card to be wrong
+  about. Nothing uses the profile today.
+- **A private free character is not blocked on this.** Since 187 the notice
+  omits the shared claims for a character only her creator can reach, and her
+  memory is relational to him, which is what the schema already does. She is
+  coherent today. What gates her is the Free AI creation flow in §13, not this
+  -- two separate gates, and conflating them would stall work that is ready.
 - What that work needs is a per-persona opt-in that lets a conversation-derived
   episode be written to the self tier, without weakening the tier check for
   anyone else. Probably a persona-level flag consulted at extraction time, with
@@ -342,7 +348,7 @@ player propositions her; she refuses, blocks him, and mentions it to the
 boyfriend.
 
 Almost all of that already works: dispositions are per-person, memory is shared
-once published, refusal is disposition, blocking is §7. But it only *means*
+once published, refusal is disposition, blocking is §6. But it only *means*
 anything under one reading, and the reading has to be chosen:
 
 **Either she is independent, or the creator's declaration is permanent. Not
@@ -490,7 +496,7 @@ buys the entire range:
 
 Being caught moves trust, in both directions, which is per-person already.
 
-Propensity is a trait, not a flag — the same argument as fidelity in §16. A
+Propensity is a trait, not a flag — the same argument as fidelity in §14. A
 character who will not lie has a propensity near zero, not a rule forbidding it.
 
 ### Self-concept is earned, not set

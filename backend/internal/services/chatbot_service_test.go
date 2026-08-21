@@ -1655,7 +1655,7 @@ func TestDirectMessageStyleOmitsRoleplayInstructions(t *testing.T) {
 	prompt := appendResponseStyleInstructions("base", persona)
 
 	require.Contains(t, prompt, "[Direct Message Mode]")
-	require.Contains(t, prompt, naturalDialogueStyleV1)
+	require.Contains(t, prompt, directMessageBaseStyleV1)
 
 	// Every one of these stages a performance. A character who is texting is
 	// given none of them.
@@ -1666,4 +1666,33 @@ func TestDirectMessageStyleOmitsRoleplayInstructions(t *testing.T) {
 	require.False(t, personaUsesPersonalConversationMode(persona),
 		"the block-shape format contract must not run for a texting character")
 	require.False(t, models.PersonaPerformsAScene(persona))
+}
+
+func TestNaturalDialogueStyleIsUnchangedBySplit(t *testing.T) {
+	// The split exists to withhold one sentence from a texting character. Every
+	// other profile's prompt must come out byte-identical to what it was.
+	const original = `[Platform Response Style: Natural Dialogue v1]
+Keep the character's established voice, opinions, knowledge, and boundaries. Respond to what the user actually said without opening by restating their message, summarizing their feelings, or automatically validating them. Agree, disagree, tease, object, or change direction when that fits the character.
+Avoid canned conversational bridges, generic therapy language, repetitive physical tells, mixed-emotion formulas, and habitual rhetorical contrasts such as "not X, but Y." Use actions and sensory detail only when they add something specific. Prefer plain punctuation over frequent em dashes or semicolons, and avoid decorative metaphor unless it belongs to the character.
+Let sentence length and rhythm vary naturally. Fragments are fine. Do not use a mechanical response template.`
+
+	require.Equal(t, original, naturalDialogueStyleV1)
+}
+
+func TestDirectMessageStyleDoesNotInviteTheNarrationItForbids(t *testing.T) {
+	persona := &models.BotPersona{
+		Name:                 "Twin",
+		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
+	}
+	prompt := appendResponseStyleInstructions("base", persona)
+
+	// Telling her to use actions sparingly presumes she may use them, while the
+	// next block tells her never to narrate at all. Both in one prompt is how
+	// you get a character who narrates sometimes.
+	require.NotContains(t, prompt, "Use actions and sensory detail")
+	require.Contains(t, prompt, "Never write narration of any kind")
+
+	// The rest of the anti-slop guidance is style-agnostic and must survive.
+	require.Contains(t, prompt, `habitual rhetorical contrasts such as "not X, but Y."`)
+	require.Contains(t, prompt, "Let sentence length and rhythm vary naturally.")
 }

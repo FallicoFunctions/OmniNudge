@@ -41,10 +41,25 @@ var (
 	userExampleMarkerPattern      = regexp.MustCompile(`(?i)\{\{\s*user\s*\}\}`)
 )
 
-const naturalDialogueStyleV1 = `[Platform Response Style: Natural Dialogue v1]
+// The anti-slop guidance below is style-agnostic and belongs in every profile.
+// One sentence of it is not: telling a character to use actions and sensory
+// detail sparingly presumes she may use them at all, which contradicts a
+// texting character being told never to narrate. So that sentence is composed
+// in rather than embedded, and the assembled naturalDialogueStyleV1 is
+// byte-identical to what it has always been.
+const naturalDialogueStyleSharedHeadV1 = `[Platform Response Style: Natural Dialogue v1]
 Keep the character's established voice, opinions, knowledge, and boundaries. Respond to what the user actually said without opening by restating their message, summarizing their feelings, or automatically validating them. Agree, disagree, tease, object, or change direction when that fits the character.
-Avoid canned conversational bridges, generic therapy language, repetitive physical tells, mixed-emotion formulas, and habitual rhetorical contrasts such as "not X, but Y." Use actions and sensory detail only when they add something specific. Prefer plain punctuation over frequent em dashes or semicolons, and avoid decorative metaphor unless it belongs to the character.
+Avoid canned conversational bridges, generic therapy language, repetitive physical tells, mixed-emotion formulas, and habitual rhetorical contrasts such as "not X, but Y."`
+
+const naturalDialogueSceneDetailV1 = ` Use actions and sensory detail only when they add something specific.`
+
+const naturalDialogueSharedTailV1 = ` Prefer plain punctuation over frequent em dashes or semicolons, and avoid decorative metaphor unless it belongs to the character.
 Let sentence length and rhythm vary naturally. Fragments are fine. Do not use a mechanical response template.`
+
+const naturalDialogueStyleV1 = naturalDialogueStyleSharedHeadV1 + naturalDialogueSceneDetailV1 + naturalDialogueSharedTailV1
+
+// Same guidance with the one scene-presuming sentence withheld.
+const directMessageBaseStyleV1 = naturalDialogueStyleSharedHeadV1 + naturalDialogueSharedTailV1
 
 const actorAndStateContinuityV1 = `[Actor and State Continuity]
 Treat the current conversation as an authoritative record of who did, proposed, received, and owns each action, object, body part, role, and decision. Never swap who performed, proposed, received, or owns an action. Do not turn a proposed, conditional, or hypothetical action into something that already happened.
@@ -920,7 +935,7 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona) st
 	// and the notation block mandates asterisked narration. Both are roleplay
 	// machinery, and a texting character must be given neither.
 	if profile == models.ResponseStyleProfileDirectMessage {
-		return base + "\n\n" + naturalDialogueStyleV1 + "\n" + directMessageModeV1
+		return base + "\n\n" + directMessageBaseStyleV1 + "\n" + directMessageModeV1
 	}
 
 	base += "\n\n" + actorAndStateContinuityV1
