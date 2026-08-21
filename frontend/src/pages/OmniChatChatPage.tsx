@@ -466,7 +466,16 @@ export default function OmniChatChatPage() {
   const [modelSelectionError, setModelSelectionError] = useState('');
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [newChatMenuOpen, setNewChatMenuOpen] = useState(false);
+  // One banner for "she did not answer, and here is why". A 429 is the platform
+  // saying wait; a 403 is the character saying no, which is hers to say and the
+  // person is entitled to know rather than being left staring at a failure.
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+
+  const sendRefusalBanner = (status: number | undefined) => {
+    if (status === 429) return 'rateLimited';
+    if (status === 403) return 'blockedByCharacter';
+    return null;
+  };
   const [mediaGenerationError, setMediaGenerationError] = useState<string | null>(null);
   const [shareChatError, setShareChatError] = useState('');
   const [reportingMessageId, setReportingMessageId] = useState<number | null>(null);
@@ -1308,7 +1317,7 @@ export default function OmniChatChatPage() {
         setShowCommerce(true);
         return;
       }
-      setRateLimitError(err.status === 429 ? 'rateLimited' : null);
+      setRateLimitError(sendRefusalBanner(err.status));
       queryClient.invalidateQueries({
         queryKey: omnichatQueryKeys.conversation(selectedConversationId as number),
       });
@@ -1750,7 +1759,7 @@ export default function OmniChatChatPage() {
               previous.filter((message) => message.id !== optimisticMessageId)
             );
             setDraft(content);
-            setRateLimitError(error.status === 429 ? 'rateLimited' : null);
+            setRateLimitError(sendRefusalBanner(error.status));
           })
           .finally(() => {
             setGuestIsGenerating(false);

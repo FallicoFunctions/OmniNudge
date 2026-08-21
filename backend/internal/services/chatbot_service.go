@@ -166,6 +166,7 @@ type ChatbotService struct {
 	memory      omniChatMemoryRecaller
 	memoryQueue omniChatMemoryEnqueuer
 	traits      omniChatTraitLoader
+	blocks      omniChatBlockKeeper
 	hub         *websocket.Hub
 }
 
@@ -211,6 +212,20 @@ func NewChatbotService(
 
 func (s *ChatbotService) SetConversationSceneStateCoordinator(coordinator conversationSceneStatePreparer) *ChatbotService {
 	s.sceneState = coordinator
+	return s
+}
+
+// omniChatBlockKeeper is how a character stops talking to somebody. Optional:
+// without it she has no way to refuse anyone, which is how the service behaved
+// before blocking existed.
+type omniChatBlockKeeper interface {
+	ActiveBlock(ctx context.Context, personaID, userID int) (*models.OmniChatPersonaBlock, error)
+	Block(ctx context.Context, request models.OmniChatBlockRequest) (*models.OmniChatPersonaBlock, error)
+}
+
+// SetBlocks wires the blocking ladder.
+func (s *ChatbotService) SetBlocks(keeper omniChatBlockKeeper) *ChatbotService {
+	s.blocks = keeper
 	return s
 }
 
@@ -347,6 +362,12 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		return nil, ErrNotFound
 	}
 
+	// Before anything is reserved, billed, or generated. Somebody she is not
+	// talking to should cost them nothing and cost us nothing.
+	if s.blockInForce(ctx, persona, userID) != nil {
+		return nil, ErrOmniChatBlockedByPersona
+	}
+
 	completion, profile := s.completionProfileForConversation(ctx, userID, conversationID)
 	billingOperationID, billingLinked, err := s.reserveResponseProfile(ctx, userID, profile, deriveOmniChatRequestBillingOperationID(ctx, userID, "chat_send"))
 	if err != nil {
@@ -436,7 +457,7 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition.Composed), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -506,6 +527,10 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	// would teach the persona a history that never happened.
 	if !failed {
 		s.scheduleMemoryExtraction(ctx, conversationID)
+		// She has had her last word; now the door can close. The disposition
+		// read for this turn is the one the decision is made on, so the reply
+		// they just received already came from somebody at the floor.
+		s.considerBlocking(ctx, persona, userID, disposition, history)
 	}
 
 	return assistantMsg, genErr
@@ -530,6 +555,13 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	}
 	if persona == nil || !persona.IsActive {
 		return nil, ErrNotFound
+	}
+
+	// Regenerating is generating. Without this, somebody she has stopped talking
+	// to could keep pulling fresh replies out of her by asking for the last one
+	// again -- billed, and with the whole ladder bypassed.
+	if s.blockInForce(ctx, persona, userID) != nil {
+		return nil, ErrOmniChatBlockedByPersona
 	}
 
 	target, err := s.messageRepo.GetLatestAssistantForRegeneration(ctx, conversationID, messageID)
@@ -586,7 +618,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition.Composed), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -817,6 +849,13 @@ func (s *ChatbotService) SendPreviewMessage(ctx context.Context, personaID int, 
 	previewUserID := 0
 	if viewerUserID != nil {
 		previewUserID = *viewerUserID
+	}
+
+	// A preview has no conversation, but it is still her talking to them. Left
+	// open it is the simplest way around a block: open quick chat and carry on.
+	// An unidentified visitor cannot be matched to a block and is unaffected.
+	if previewUserID > 0 && s.blockInForce(ctx, persona, previewUserID) != nil {
+		return "", false, ErrOmniChatBlockedByPersona
 	}
 	messages := make([]openrouter.Message, 0, 1+len(history)+1)
 	messages = append(messages, openrouter.Message{

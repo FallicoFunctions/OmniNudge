@@ -46,6 +46,45 @@ function BlockState({ block }: { block: AdminOmniChatPersonaBlock }) {
  * ladder, so an unfair ten minutes does not silently make the next block two
  * hours.
  */
+/**
+ * The exchange she acted on, beside her account of it. Collapsed by default --
+ * forty turns is a lot of card, and most rows are opened to check a name and a
+ * date rather than to read an argument.
+ */
+function BlockTranscript({ block }: { block: AdminOmniChatPersonaBlock }) {
+  const turns = block.transcript ?? [];
+  if (turns.length === 0) {
+    return (
+      <p className="mt-3 text-xs italic text-[var(--color-text-secondary)]">
+        No exchange was recorded with this block.
+      </p>
+    );
+  }
+
+  return (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-secondary)]">
+        What she was reacting to ({turns.length} messages)
+      </summary>
+      <ol className="mt-2 space-y-2 border-l-2 border-[var(--color-border)] pl-3">
+        {turns.map((turn, index) => (
+          <li key={`${block.id}-${index}`} className="text-sm">
+            <span className="font-semibold">
+              {turn.role === 'assistant' ? block.persona_name : `@${block.username}`}
+            </span>
+            <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
+              {new Date(turn.created_at).toLocaleString()}
+            </span>
+            <p className="mt-0.5 whitespace-pre-wrap text-[var(--color-text-secondary)]">
+              {turn.content}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 export default function OmniChatPersonaBlocksTab() {
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -80,6 +119,8 @@ export default function OmniChatPersonaBlocksTab() {
           blocks stay listed — a short block ends before anyone can look at it, and those are the
           ones most likely to have been unfair. Overturning lets the person back in immediately and
           takes the block off that character&rsquo;s escalation ladder, so the next one starts over.
+          Each block carries the exchange she was reacting to, because the question being asked is
+          whether her account of it was fair.
         </p>
       </div>
 
@@ -126,6 +167,8 @@ export default function OmniChatPersonaBlocksTab() {
             </div>
 
             <p className="mt-3 rounded bg-[var(--color-surface)] p-3 text-sm">{block.reason}</p>
+
+            <BlockTranscript block={block} />
 
             {block.overturn_note && (
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">

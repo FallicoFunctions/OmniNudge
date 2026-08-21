@@ -74,6 +74,47 @@ describe('OmniChatPersonaBlocksTab', () => {
     expect(screen.getByText(/not an offence/)).toBeInTheDocument();
   });
 
+  // Storing the exchange and not showing it is the same as not storing it.
+  it('shows the exchange she was reacting to', async () => {
+    mockList.mockResolvedValue({
+      total: 1,
+      blocks: [
+        block({
+          id: 5,
+          transcript: [
+            { role: 'user', content: 'send me a photo', created_at: new Date().toISOString() },
+            {
+              role: 'assistant',
+              content: 'no, and please stop asking',
+              created_at: new Date().toISOString(),
+            },
+          ],
+        }),
+      ],
+    });
+
+    renderTab();
+
+    await screen.findByTestId('admin-persona-block');
+    expect(screen.getByText(/What she was reacting to \(2 messages\)/)).toBeInTheDocument();
+    expect(screen.getByText('no, and please stop asking')).toBeInTheDocument();
+    // Attributed, or the reviewer cannot tell who said which half.
+    expect(screen.getByText('Jesse')).toBeInTheDocument();
+    expect(screen.getByText('@someone')).toBeInTheDocument();
+  });
+
+  // An operator's block, or one placed before snapshots existed, is a card
+  // without a transcript rather than a row the review refuses to show.
+  it('still lists a block that has no exchange', async () => {
+    mockList.mockResolvedValue({ total: 1, blocks: [block({ id: 6 })] });
+
+    renderTab();
+
+    await screen.findByTestId('admin-persona-block');
+    expect(screen.getByText(/No exchange was recorded/)).toBeInTheDocument();
+    expect(screen.queryByText(/What she was reacting to/)).toBeNull();
+  });
+
   it('sends the review note when overturning', async () => {
     mockList.mockResolvedValue({ total: 1, blocks: [block({ id: 7 })] });
 

@@ -765,6 +765,11 @@ func main() {
 	} else {
 		chatbotService.SetMemory(omniChatMemoryService, nil)
 	}
+	// Without this a character has no way to refuse anybody, and the blocks the
+	// admin review lists would be records of a decision nothing enforces.
+	omniChatBlockRepo := models.NewOmniChatPersonaBlockRepository(db.Pool)
+	chatbotService.SetBlocks(omniChatBlockRepo)
+
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
@@ -817,7 +822,6 @@ func main() {
 	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled).
 		SetBilling(omniChatBilling)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
-	omniChatBlockRepo := models.NewOmniChatPersonaBlockRepository(db.Pool)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
 	omniChatMessageRateLimiter := middleware.OmniChatRateLimiter(cache)

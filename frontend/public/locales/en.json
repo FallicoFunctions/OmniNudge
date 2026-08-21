@@ -4195,7 +4195,8 @@
       "showProfileImage": "Show profile image",
       "showProfileVideo": "Show profile video",
       "mediaOnlyPreview": "Sent a photo",
-      "loadingOlder": "Loading earlier messages…"
+      "loadingOlder": "Loading earlier messages…",
+      "blockedByCharacter": "This character is not talking to you right now."
     },
     "exitToSite": "Exit to OmniNudge",
     "header": {

@@ -137,4 +137,12 @@ export interface AdminOmniChatPersonaBlock {
   persona_slug: string;
   username: string;
   in_force: boolean;
+  /** The exchange she acted on. Absent on operator-placed blocks. */
+  transcript?: AdminOmniChatBlockTurn[];
+}
+
+export interface AdminOmniChatBlockTurn {
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
 }

@@ -4195,7 +4195,8 @@
       "showProfileImage": "عرض صورة الملف الشخصي",
       "showProfileVideo": "عرض فيديو الملف الشخصي",
       "mediaOnlyPreview": "أرسل صورة",
-      "loadingOlder": "جارٍ تحميل الرسائل السابقة…"
+      "loadingOlder": "جارٍ تحميل الرسائل السابقة…",
+      "blockedByCharacter": "هذه الشخصية لا تتحدث إليك في الوقت الحالي."
     },
     "exitToSite": "الخروج إلى OmniNudge",
     "header": {
