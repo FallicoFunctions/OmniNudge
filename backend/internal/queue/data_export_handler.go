@@ -671,20 +671,14 @@ func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID in
 // that decide when a memory resurfaces -- so the record can be checked and
 // contested rather than merely read.
 //
-// Two tiers appear here, and they are not the same thing.
+// Only the relational tier is exported. A NULL owner is the character's own
+// memory and belongs to no user, and the WHERE clause excludes it.
 //
-// Memory owned by this user is theirs: exported, and removed when they delete
-// their account. Memory a free character formed from their conversation belongs
-// to her -- she has one memory across everyone, which the chat window tells the
-// reader before they say anything. It is exported too, because it is still a
-// record derived from what they said and they are entitled to see it, but it is
-// marked shared and it does not go away when they leave.
-//
-// The join is on conversation ownership rather than on the memory's owner, so
-// this returns only what this user's own conversations produced. Nothing another
-// person said can appear in it. Persona-global memory with no conversation
-// behind it -- the character's own life -- is not anyone's record and is
-// excluded entirely.
+// That now covers two different things, deliberately. One is a character's own
+// life, which was never anybody's record. The other is what a free character
+// kept from a conversation: hers, because she has one memory across everyone,
+// which the chat window states before anyone speaks. Neither is exposed to
+// players -- shared memory is ours, visible in the backend and nowhere else.
 //
 // Unlike the in-app review panel, this deliberately includes memories the user
 // has already forgotten. Hiding one withdraws it from recall but the row is
@@ -692,19 +686,12 @@ func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID in
 // The two surfaces answer different questions and are meant to differ.
 func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	rows, err := db.Query(ctx, `
-		SELECT e.id, e.persona_id, e.conversation_id, e.source_message_id, e.title, e.summary,
-		       e.salience, e.distinctiveness, e.emotional_valence, e.status, e.recorded_at,
-		       e.retrieval_count, e.last_retrieved_at,
-		       e.owner_user_id IS NULL AS shared_with_others
-		FROM omnichat_memory_episodes e
-		WHERE e.owner_user_id = $1
-		   OR (
-		        e.owner_user_id IS NULL
-		        AND e.conversation_id IN (
-		            SELECT c.id FROM bot_conversations c WHERE c.user_id = $1
-		        )
-		      )
-		ORDER BY e.recorded_at DESC
+		SELECT id, persona_id, conversation_id, source_message_id, title, summary,
+		       salience, distinctiveness, emotional_valence, status, recorded_at,
+		       retrieval_count, last_retrieved_at
+		FROM omnichat_memory_episodes
+		WHERE owner_user_id = $1
+		ORDER BY recorded_at DESC
 		LIMIT 10000
 	`, userID)
 	if err != nil {
@@ -726,11 +713,6 @@ func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int)
 		RecordedAt       time.Time  `json:"recorded_at"`
 		RetrievalCount   int        `json:"retrieval_count"`
 		LastRetrievedAt  *time.Time `json:"last_retrieved_at,omitempty"`
-
-		// True when the character kept this as her own rather than as part of
-		// her relationship with this user: she may bring it up with other
-		// people, and deleting this account does not remove it.
-		SharedWithOthers bool `json:"shared_with_others"`
 	}
 
 	episodes := []Episode{}
@@ -740,7 +722,7 @@ func exportOmniChatMemoryData(ctx context.Context, db *pgxpool.Pool, userID int)
 			&episode.ID, &episode.PersonaID, &episode.ConversationID, &episode.SourceMessageID,
 			&episode.Title, &episode.Summary, &episode.Salience, &episode.Distinctiveness,
 			&episode.EmotionalValence, &episode.Status, &episode.RecordedAt,
-			&episode.RetrievalCount, &episode.LastRetrievedAt, &episode.SharedWithOthers,
+			&episode.RetrievalCount, &episode.LastRetrievedAt,
 		); err != nil {
 			continue
 		}

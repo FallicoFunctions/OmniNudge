@@ -319,18 +319,19 @@ read and update paths are both scoped `WHERE id = $1 AND owner_user_id = $2`, an
 platform characters have no owner, so no user ever matches. Verified rather than
 assumed.
 
-**Shared memory appears in the data download, marked as hers.** Memory a free
-character formed from someone's conversation belongs to her, so it is not deleted
-when they delete their account and she may repeat it to others. That is the
-design, and the card says so before anyone speaks. But it is still a record
-derived from what they said, so the export now includes it with
-`shared_with_others: true` -- visible, and plainly labelled as something they
-cannot remove.
+**Shared memory is backend-only and stays out of the player data download.**
+What a free character keeps from a conversation is hers, not the speaker's, so
+the export keeps filtering on `owner_user_id` and returns none of it -- neither
+what this user said nor what anyone else did. A test asserts both.
 
-The join is on **conversation ownership**, not on the memory's owner, so a user
-sees only what their own conversations produced. Nothing another person told her
-can appear. Her own life -- persona-global memory with no conversation behind it
--- is nobody's record and stays out entirely.
+Nick decided this after seeing the alternative built. The reasoning for exposing
+it was that the record derives from what the user said; the reasoning against is
+that it is the character's memory, and the chat window already tells the reader
+that before they speak, which is where the disclosure belongs.
+
+**Left open deliberately:** whether a subject-access request has to return it
+anyway. The data is still linked to a user's conversation, so this is a question
+for whoever reviews the terms in §16, not one to settle in code.
 
 **As of 188 and the extraction change, the memory gate is lifted.** Both claims
 on the card are now true of a shared free character: there is one of her, and
