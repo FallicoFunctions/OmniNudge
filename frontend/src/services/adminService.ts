@@ -6,6 +6,7 @@ import type {
   UpdateRoleRequest,
   BanHistoryItem,
   AdminOmniChatPersona,
+  AdminOmniChatPersonaBlock,
   AdminOmniChatResponseFeedback,
   AdminOmniChatResponseFeedbackStatus,
   AdminOmniChatResponseFeedbackDetail,
@@ -285,6 +286,25 @@ export const adminService = {
     return api.get<{ feedback: AdminOmniChatResponseFeedbackDetail }>(
       `/admin/omnichat/response-feedback/${encodeURIComponent(id)}`
     );
+  },
+
+  async listOmniChatPersonaBlocks(
+    personaId?: number,
+    limit = 50,
+    offset = 0
+  ): Promise<{ blocks: AdminOmniChatPersonaBlock[]; total: number }> {
+    const params = new URLSearchParams({
+      limit: String(Math.min(Math.max(limit, 1), 200)),
+      offset: String(Math.max(offset, 0)),
+    });
+    if (personaId) params.set('persona_id', String(personaId));
+    return api.get<{ blocks: AdminOmniChatPersonaBlock[]; total: number }>(
+      `/admin/omnichat/blocks?${params.toString()}`
+    );
+  },
+
+  async overturnOmniChatPersonaBlock(id: number, note: string): Promise<void> {
+    await api.post(`/admin/omnichat/blocks/${id}/overturn`, { note });
   },
 
   async listOmniChatPublicationReports(

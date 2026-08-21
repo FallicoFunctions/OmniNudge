@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import AdminPersonasTab from '../components/admin/AdminPersonasTab';
 import OmniChatResponseFeedbackTab from '../components/admin/OmniChatResponseFeedbackTab';
 import OmniChatPublicationReportsTab from '../components/admin/OmniChatPublicationReportsTab';
+import OmniChatPersonaBlocksTab from '../components/admin/OmniChatPersonaBlocksTab';
 
 type TabType =
   | 'stats'
@@ -27,7 +28,8 @@ type TabType =
   | 'retention'
   | 'personas'
   | 'response-feedback'
-  | 'publication-reports';
+  | 'publication-reports'
+  | 'persona-blocks';
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -130,6 +132,16 @@ export default function AdminPage() {
             Explore Reports
           </button>
           <button
+            onClick={() => setActiveTab('persona-blocks')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'persona-blocks'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Character Blocks
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
               activeTab === 'analytics'
@@ -166,6 +178,7 @@ export default function AdminPage() {
       {activeTab === 'personas' && <AdminPersonasTab />}
       {activeTab === 'response-feedback' && <OmniChatResponseFeedbackTab />}
       {activeTab === 'publication-reports' && <OmniChatPublicationReportsTab />}
+      {activeTab === 'persona-blocks' && <OmniChatPersonaBlocksTab />}
       {activeTab === 'analytics' && <AnalyticsTab />}
       {activeTab === 'retention' && <RetentionTab />}
     </div>

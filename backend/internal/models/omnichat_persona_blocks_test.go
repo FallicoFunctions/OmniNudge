@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Escalation happens across blocks, not within one. Each rung is reached by
+// coming back after the last had lapsed and giving her a fresh reason.
 func TestOmniChatBlockLadderEscalatesAndStopsAtIndefinite(t *testing.T) {
 	pool, cleanup := setupMemoryTestDB(t)
 	defer cleanup()
@@ -15,6 +17,14 @@ func TestOmniChatBlockLadderEscalatesAndStopsAtIndefinite(t *testing.T) {
 	repo := NewOmniChatPersonaBlockRepository(pool)
 	fixture := seedMemoryFixture(t, pool, "blockladder")
 	ctx := context.Background()
+
+	lapse := func() {
+		_, err := pool.Exec(ctx, `
+			UPDATE omnichat_persona_user_blocks SET expires_at = now() - interval '1 second'
+			WHERE persona_id = $1 AND user_id = $2 AND expires_at IS NOT NULL`,
+			fixture.personaID, fixture.userID)
+		require.NoError(t, err)
+	}
 
 	expected := []struct {
 		tier    int16
@@ -40,6 +50,7 @@ func TestOmniChatBlockLadderEscalatesAndStopsAtIndefinite(t *testing.T) {
 		require.NotNil(t, block.ExpiresAt)
 		require.False(t, block.IsIndefinite())
 		require.WithinDuration(t, time.Now().Add(want.lasts), *block.ExpiresAt, time.Minute)
+		lapse()
 	}
 
 	// Someone already shut out for good who does it again is still shut out for
@@ -48,6 +59,46 @@ func TestOmniChatBlockLadderEscalatesAndStopsAtIndefinite(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, OmniChatTopBlockTier, again.Tier)
 	require.Nil(t, again.ExpiresAt)
+}
+
+// Somebody who cannot be heard cannot give a fresh reason, so a second call
+// during a standing block would escalate on nothing. Without this, a retry, a
+// redelivered job, or a loop in whatever comes to make these decisions walks a
+// person from ten minutes to permanent in four calls having done nothing.
+func TestOmniChatBlockDoesNotEscalateSomeoneAlreadyBlocked(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	repo := NewOmniChatPersonaBlockRepository(pool)
+	fixture := seedMemoryFixture(t, pool, "blockstanding")
+	ctx := context.Background()
+
+	first, err := repo.Block(ctx, fixture.personaID, fixture.userID, "rude")
+	require.NoError(t, err)
+	require.Equal(t, int16(1), first.Tier)
+
+	for i := 0; i < 3; i++ {
+		again, err := repo.Block(ctx, fixture.personaID, fixture.userID, "called again by mistake")
+		require.NoError(t, err)
+		require.Equal(t, first.ID, again.ID, "the standing block is returned, not a new rung")
+		require.Equal(t, int16(1), again.Tier)
+	}
+
+	var rows int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_persona_user_blocks WHERE persona_id = $1 AND user_id = $2`,
+		fixture.personaID, fixture.userID).Scan(&rows))
+	require.Equal(t, 1, rows, "no row is written while a block already stands")
+
+	// Once it has lapsed, coming back and offending again does escalate.
+	_, err = pool.Exec(ctx,
+		`UPDATE omnichat_persona_user_blocks SET expires_at = now() - interval '1 second' WHERE id = $1`,
+		first.ID)
+	require.NoError(t, err)
+
+	second, err := repo.Block(ctx, fixture.personaID, fixture.userID, "came back and did it again")
+	require.NoError(t, err)
+	require.Equal(t, int16(2), second.Tier)
 }
 
 func TestOmniChatBlockLaddersPerPersonAndPerCharacter(t *testing.T) {
@@ -60,6 +111,10 @@ func TestOmniChatBlockLaddersPerPersonAndPerCharacter(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		_, err := repo.Block(ctx, fixture.personaID, fixture.userID, "repeatedly unpleasant")
+		require.NoError(t, err)
+		_, err = pool.Exec(ctx, `
+			UPDATE omnichat_persona_user_blocks SET expires_at = now() - interval '1 second'
+			WHERE persona_id = $1 AND user_id = $2`, fixture.personaID, fixture.userID)
 		require.NoError(t, err)
 	}
 
@@ -136,8 +191,9 @@ func TestOmniChatOverturnedBlockDoesNotCountTowardEscalation(t *testing.T) {
 
 	// And the reversal is recorded rather than erased, because that record is
 	// what the review reads.
-	history, err := repo.RecentBlocks(ctx, 10)
+	history, total, err := repo.ListForAdmin(ctx, nil, 10, 0)
 	require.NoError(t, err)
+	require.Equal(t, 2, total)
 	require.Len(t, history, 2)
 
 	var found bool
