@@ -52,6 +52,7 @@ import {
   personaShowsIntroNotice,
   personaSpeaksFirst,
 } from '../utils/omnichatPersonaMode';
+import { mergeFetchedTranscript } from '../utils/omnichatTranscript';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { Modal } from '../components/common/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -670,25 +671,12 @@ export default function OmniChatChatPage() {
     queryFn: async () => {
       const conversationID = selectedConversationId as number;
       const fresh = await omnichatService.getConversation(conversationID);
-      const existing = queryClient.getQueryData<BotConversationDetail>(
-        omnichatQueryKeys.conversation(conversationID)
+      return mergeFetchedTranscript(
+        queryClient.getQueryData<BotConversationDetail>(
+          omnichatQueryKeys.conversation(conversationID)
+        ),
+        fresh
       );
-      const newestPageStart = fresh.messages[0]?.id;
-      if (!existing || newestPageStart === undefined) return fresh;
-
-      const alreadyFresh = new Set(fresh.messages.map((message) => message.id));
-      const keptOlder = existing.messages.filter(
-        (message) => message.id < newestPageStart && !alreadyFresh.has(message.id)
-      );
-      if (keptOlder.length === 0) return fresh;
-
-      return {
-        ...fresh,
-        messages: [...keptOlder, ...fresh.messages],
-        // What is older than the oldest message still held, which the fresh
-        // page cannot know because it never reached back that far.
-        has_more: existing.has_more,
-      };
     },
     enabled: selectedConversationId !== null && !isGuest,
   });
