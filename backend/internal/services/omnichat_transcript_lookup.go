@@ -28,15 +28,20 @@ const (
 // Nothing runs when the window already covers the whole conversation, which for
 // most conversations is always: the average is well under the 200 turns she
 // holds. A short conversation therefore costs no query at all.
+//
+// hasOlder is decided by the caller from the *unfiltered* fetch, and must be.
+// The history handed here has already had failed and artifact-contaminated
+// assistant turns removed, so its length says nothing about whether the
+// conversation is longer than the window -- one failed turn anywhere in the last
+// 200 would make a 5,000-message conversation look short and silently switch
+// this off for good.
 func (s *ChatbotService) lookUpTranscript(
-	ctx context.Context, conversationID int, history []*models.BotMessage, cue string,
+	ctx context.Context, conversationID int, history []*models.BotMessage, cue string, hasOlder bool,
 ) []*models.BotMessage {
-	if s == nil || s.messageRepo == nil || conversationID < 1 || strings.TrimSpace(cue) == "" {
+	if s == nil || s.messageRepo == nil || conversationID < 1 {
 		return nil
 	}
-	// A window shorter than its own bound has reached the start of the
-	// conversation, so there is nothing older to find.
-	if len(history) < maxHistoryMessages {
+	if !transcriptLookupIsWorthwhile(history, cue, hasOlder) {
 		return nil
 	}
 	oldest := history[0]
@@ -57,6 +62,24 @@ func (s *ChatbotService) lookUpTranscript(
 		return nil
 	}
 	return found
+}
+
+// transcriptLookupIsWorthwhile decides whether there is anything to search for.
+//
+// It takes hasOlder rather than deriving it, and that is the whole point. The
+// history it is handed has already had failed and artifact-contaminated
+// assistant turns removed, so a window that came back short may still belong to
+// a conversation of any length -- deriving "nothing older exists" from
+// len(history) meant a single failed turn in the last 200 disabled the lookup
+// permanently, silently, in a conversation of five thousand messages.
+func transcriptLookupIsWorthwhile(history []*models.BotMessage, cue string, hasOlder bool) bool {
+	if !hasOlder || len(history) == 0 {
+		return false
+	}
+	if strings.TrimSpace(cue) == "" {
+		return false
+	}
+	return history[0] != nil && history[0].ID > 0
 }
 
 // renderTranscriptLookup formats older turns for the system prompt.
@@ -97,7 +120,7 @@ func renderTranscriptLookup(messages []*models.BotMessage, personaName string) s
 			who = speaker + " wrote"
 		}
 		line := "- " + message.CreatedAt.Format("2 Jan 2006") + ", " + who + ": " +
-			collapseTranscriptWhitespace(message.Content) + "\n"
+			truncateTranscriptQuote(collapseTranscriptWhitespace(message.Content)) + "\n"
 
 		cost := utf8.RuneCountInString(line)
 		if cost > remaining {
@@ -118,6 +141,20 @@ func renderTranscriptLookup(messages []*models.BotMessage, personaName string) s
 // multi-line quote reads as fresh narration rather than as a record.
 func collapseTranscriptWhitespace(content string) string {
 	return strings.Join(strings.Fields(content), " ")
+}
+
+// Quotes are trimmed to a per-line budget rather than dropped for being long.
+// Without this the block's own cap does the dropping, and it drops whole lines
+// -- so the best-ranked match, which is the one she was looking for, vanishes
+// for the crime of being wordy while a worse and shorter one takes its place.
+// Real messages reach 2,400 characters here, so that is not a rare shape.
+func truncateTranscriptQuote(content string) string {
+	const maxQuoteRunes = 220
+	runes := []rune(content)
+	if len(runes) <= maxQuoteRunes {
+		return content
+	}
+	return strings.TrimRight(string(runes[:maxQuoteRunes]), " ") + "…"
 }
 
 // personaDisplayName is how a looked-up assistant turn is attributed. Falling

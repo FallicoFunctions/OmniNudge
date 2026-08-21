@@ -848,6 +848,19 @@ half of them are the user's. A line lifted out of a year-old argument, unlabelle
 reads as the argument restarting. It sits below the trust boundary for the same
 reason memories do.
 
+**Whether anything older exists is read before filtering, and must be.** The
+history the lookup sees has already had failed and artifact-contaminated
+assistant turns removed, so its length says nothing about the conversation's
+true length. Deriving the answer from it meant one failed reply anywhere in the
+last 200 turns disabled the lookup permanently and silently, in a conversation
+of any size. The decision is a named predicate now, tested on its own, because
+the repository is concrete and cannot be faked.
+
+**Long quotes are trimmed rather than dropped.** The block cap drops whole
+lines, and messages here reach 2,400 characters -- so the top-ranked match, the
+one she was looking for, would vanish for being wordy while a worse and shorter
+one took its place.
+
 **Scoped to this conversation.** For a free character, searching across everyone
 she has ever talked to would put other people's raw words into this prompt --
 which is a much larger privacy surface than a shared episode summary, and a
