@@ -620,7 +620,10 @@ describe('OmniChatChatPage', () => {
     }
 
     beforeEach(() => {
-      mockGetConversation.mockResolvedValue({
+      // Fresh objects per call, the way an HTTP response is. A shared object
+      // from mockResolvedValue is the same reference every time, which is not
+      // how the thing under test is ever actually fed.
+      mockGetConversation.mockImplementation(async () => ({
         conversation: {
           id: 42,
           user_id: 1,
@@ -631,7 +634,7 @@ describe('OmniChatChatPage', () => {
         },
         messages: seedPage(3, 100),
         has_more: true,
-      });
+      }));
     });
 
     // Scroll fires dozens of times a second. The in-flight guard has to be a
