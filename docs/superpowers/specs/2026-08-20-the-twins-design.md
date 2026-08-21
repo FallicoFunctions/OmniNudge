@@ -131,6 +131,35 @@ direction: sanctions *by* a persona against a user rather than against it.
 The hard part is not the table. It is **who decides**, and that is the first
 thing in this build that genuinely needs a model rather than a policy.
 
+### Built: the mechanism (migration 190)
+
+`omnichat_persona_user_blocks`, mirroring `omnirave_persona_sanctions` closely
+enough that a reader who knows one knows this one. The rung is stored rather
+than inferred from the duration, because escalation asks how far up someone
+already is and reading that back out of an interval becomes guesswork the first
+time a duration is tuned. The durations are a table in Go, so tuning a rung is
+editing a row.
+
+181's hazard is refused here too: the indefinite rung may not carry an expiry,
+and every rung below it must have one. A block that expired on arrival would
+read as in force to anyone looking and do nothing.
+
+Blocks end by lapsing, with no sweeper. Overturning marks the row and never
+deletes it, because the history is what the review reads.
+
+**The rule that carries the design:** an overturned block is off the ladder
+entirely. If it still counted, reversing an unfair block would only postpone its
+effect to the next thing the person said wrong -- the review would look like it
+worked and quietly wouldn't have. Tested directly.
+
+The review queue deliberately shows lapsed and overturned blocks, not just ones
+in force. A queue of only-active blocks would never show a ten-minute one: it is
+gone before anybody looks.
+
+**Not built: who decides.** Nothing calls `Block` yet. Every field is written
+the same way whether the decision comes from a model, an operator, or a test,
+so the judgment can be wired in without touching any of this.
+
 ---
 
 ## 7. Politics
