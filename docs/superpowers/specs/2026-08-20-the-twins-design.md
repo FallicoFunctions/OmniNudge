@@ -267,10 +267,34 @@ So the unified-memory work is a prerequisite, not a follow-up:
   memory is relational to him, which is what the schema already does. She is
   coherent today. What gates her is the Free AI creation flow in §13, not this
   -- two separate gates, and conflating them would stall work that is ready.
-- What that work needs is a per-persona opt-in that lets a conversation-derived
-  episode be written to the self tier, without weakening the tier check for
-  anyone else. Probably a persona-level flag consulted at extraction time, with
-  the CHECK rewritten to permit the global tier only for personas carrying it.
+### The schema half is built (migration 188)
+
+Two corrections to what this section originally proposed.
+
+**No new flag.** The sketch called for a persona-level boolean. The schema
+already says which kind a character is -- `response_style_profile` -- and a
+second column that must agree with it is duplicated state. The permission is
+read off the profile and nothing else.
+
+**A trigger, not a CHECK.** A CHECK may not contain a subquery, so it cannot ask
+about the persona. Rewriting it was never possible. `omnichat_memory_episodes`
+now carries a `BEFORE INSERT OR UPDATE` trigger permitting a conversation-derived
+persona-global episode only for a free character. Sadie's guarantee is
+bit-for-bit what it was; hers is simply not the row being asked about.
+
+**A second guard came out of building it.** Since the permission is read off the
+persona, moving a character *off* the free profile would strand her existing
+shared memories in a tier no longer allowed to hold them -- the guarantee would
+be one UPDATE away from false, which is what putting it in the database was
+supposed to prevent. There is no safe automatic repair: those episodes came from
+several people's conversations at once, so they cannot be handed to an owner,
+and deleting them would destroy a character's history on a settings change. So
+`bot_personas` refuses the change while shared episodes exist.
+
+**Still to build:** extraction must actually write the global tier for these
+personas (it hardcodes an owner today), and entities need the same treatment or
+the episode/entity join splits across tiers. Recall already returns self-tier
+episodes to everyone, so it needs nothing.
 
 Until that lands, the card is a promise the code does not keep.
 
