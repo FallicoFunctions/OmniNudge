@@ -114,7 +114,7 @@ func TestLoadDispositionReadsOnlyTheConversationsOwnUser(t *testing.T) {
 	service := (&ChatbotService{}).SetCharacterTraits(loader)
 	persona := testPersona()
 
-	forB := renderCharacterDisposition(service.loadDisposition(context.Background(), persona, 42))
+	forB := renderCharacterDisposition(service.loadDisposition(context.Background(), persona, 42).Composed)
 
 	require.Contains(t, forB, "fond of them")
 	require.NotContains(t, forB, "guarded", "user A's history must never reach user B's prompt")
@@ -126,13 +126,19 @@ func TestLoadDispositionDegradesWhenTheRepositoryFails(t *testing.T) {
 
 	disposition := service.loadDisposition(context.Background(), testPersona(), 42)
 
-	require.Equal(t, models.OmniChatDisposition{}, disposition)
-	require.Empty(t, renderCharacterDisposition(disposition))
+	require.Equal(t, loadedDisposition{}, disposition)
+	require.Empty(t, renderCharacterDisposition(disposition.Composed))
 }
 
 func TestLoadDispositionWithoutARepositoryIsNeutral(t *testing.T) {
-	require.Equal(t, models.OmniChatDisposition{},
-		(&ChatbotService{}).loadDisposition(context.Background(), testPersona(), 42))
+	loaded := (&ChatbotService{}).loadDisposition(context.Background(), testPersona(), 42)
+
+	// Neutral in every part, not only in the composition the prompt reads. The
+	// blocking decision reads the other two, and a character nobody has any
+	// traits for must not look to it like somebody who has been driven down.
+	require.Equal(t, loadedDisposition{}, loaded)
+	require.Equal(t, models.OmniChatDisposition{}, loaded.Composed)
+	require.False(t, models.ShouldBlock(loaded.Baseline, loaded.Relationship))
 }
 
 func TestBuildConversationSystemPromptOrdersDispositionBlock(t *testing.T) {

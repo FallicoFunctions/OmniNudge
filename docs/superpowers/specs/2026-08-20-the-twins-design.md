@@ -168,9 +168,43 @@ The review keeps the overturn control on lapsed blocks too. It cannot let
 anybody back in, but it takes the block off the ladder -- so an unfair ten
 minutes does not silently make the next one two hours.
 
-**Not built: who decides.** Nothing calls `Block` yet. Every field is written
-the same way whether the decision comes from a model, an operator, or a test,
-so the judgment can be wired in without touching any of this.
+### Built: what decides (migration 192)
+
+**Accumulated warmth toward this person, and nothing else.** `ShouldBlock`
+reads a number that moved over many exchanges. That is what makes it
+un-arguable: a model asked to judge can be flattered, worn down, or
+prompt-injected into an opinion; a trait cannot be talked into anything.
+
+Four things follow from choosing that signal:
+
+- **The floor is on the relationship traits, not the composed disposition.** A
+  character written cold starts near the bottom of the composed scale and would
+  shut out everyone she met. The question is what *this person* did to her,
+  measured from wherever she began.
+- **Personality still moves the line.** A warm character carries further before
+  she is done, a prickly one has less to spend. Same code, different card.
+- **Warmth, not trust.** Somebody can be unreliable without being unpleasant. A
+  character who shuts out everyone who ever exaggerated is brittle, not
+  protected.
+- **Blocking discharges the feeling.** She has said her piece and the block is
+  the consequence, so the relationship comes back to just above the floor.
+  Without it the duration is decorative: a ten-minute block lapses with her
+  still at the floor, the next message re-blocks, and the ladder climbs to
+  permanent with the person having done nothing new. The rung they are on is the
+  memory of it; the feeling is not. It shares the block's transaction, because a
+  block that landed without its discharge produces exactly that failure, silently
+  and only under partial failure.
+
+Every block now keeps **the exchange it acted on**, snapshotted rather than
+joined: messages get edited and account deletion cascades them away, so a join
+would show the reviewer something other than what she saw, or nothing. Bounded to
+her context window -- older provably did not influence her, less leaves the
+reviewer judging a fragment.
+
+**Still not built: the reason in her words.** Blocks carry a factual reason
+today. A short generation writing why, afterwards, in her voice is the next
+piece -- and it stays strictly downstream of the decision, so the model is
+describing a judgment already made rather than making one.
 
 ---
 

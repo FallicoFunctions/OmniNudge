@@ -43,9 +43,21 @@ func (s *ChatbotService) SetCharacterTraits(loader omniChatTraitLoader) *Chatbot
 // that is missing or failing yields the neutral disposition -- which renders
 // nothing -- rather than an error. This is how recall degrades, for the same
 // reason.
-func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.BotPersona, userID int) models.OmniChatDisposition {
+// loadedDisposition carries the composed disposition the prompt reads and the
+// two parts the blocking decision needs. They come from one read because this
+// sits in front of the model call, and a second round trip for a second row of
+// the same table is time the person waits for nothing.
+type loadedDisposition struct {
+	Composed models.OmniChatDisposition
+	Baseline models.OmniChatDispositionBaseline
+	// What this person in particular has done to her, which is what decides
+	// whether she is still willing to talk to them.
+	Relationship models.OmniChatCharacterTraits
+}
+
+func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.BotPersona, userID int) loadedDisposition {
 	if s == nil || s.traits == nil || persona == nil {
-		return models.OmniChatDisposition{}
+		return loadedDisposition{}
 	}
 	// Both tiers in one read, keyed on the conversation's own user. That key is
 	// what keeps one person's history with the character out of everybody
@@ -56,9 +68,13 @@ func (s *ChatbotService) loadDisposition(ctx context.Context, persona *models.Bo
 	if err != nil {
 		zlog.Warn().Err(err).Int("persona_id", persona.ID).
 			Msg("omnichat traits: unavailable, generating without disposition")
-		return models.OmniChatDisposition{}
+		return loadedDisposition{}
 	}
-	return models.ComposeOmniChatDisposition(baseline, self, relationship, time.Now())
+	return loadedDisposition{
+		Composed:     models.ComposeOmniChatDisposition(baseline, self, relationship, time.Now()),
+		Baseline:     baseline,
+		Relationship: relationship,
+	}
 }
 
 // renderCharacterDisposition writes the disposition as a note about how the

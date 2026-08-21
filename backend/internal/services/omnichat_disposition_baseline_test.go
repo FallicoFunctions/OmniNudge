@@ -137,8 +137,8 @@ func TestBaselineAppliesToBothTiers(t *testing.T) {
 	service := (&ChatbotService{}).SetCharacterTraits(loader)
 
 	withPerson := service.loadDisposition(context.Background(), testPersona(), 42)
-	require.InDelta(t, -0.7, withPerson.Trust, 1e-9, "the authored guard plus what this person did")
-	require.InDelta(t, -0.3, withPerson.Warmth, 1e-9)
+	require.InDelta(t, -0.7, withPerson.Composed.Trust, 1e-9, "the authored guard plus what this person did")
+	require.InDelta(t, -0.3, withPerson.Composed.Warmth, 1e-9)
 
 	self := models.ComposeOmniChatSelfDisposition(baseline, models.OmniChatCharacterTraits{MoodUpdatedAt: now}, now)
 	require.InDelta(t, -0.5, self.Trust, 1e-9, "and it is who she is with nobody in the room")
@@ -157,10 +157,10 @@ func TestNoBaselineLeavesThePromptByteIdentical(t *testing.T) {
 	service := (&ChatbotService{}).SetCharacterTraits(loader)
 
 	disposition := service.loadDisposition(context.Background(), persona, 42)
-	require.Empty(t, renderCharacterDisposition(disposition))
+	require.Empty(t, renderCharacterDisposition(disposition.Composed))
 
 	before := buildConversationSystemPromptWithMemory(persona, nil, nil, nil, nil)
-	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{}, disposition)
+	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{}, disposition.Composed)
 	require.Equal(t, before, after)
 }
 
@@ -176,7 +176,7 @@ func TestMildBaselineAloneSaysNothing(t *testing.T) {
 		},
 	}
 	service := (&ChatbotService{}).SetCharacterTraits(loader)
-	require.Empty(t, renderCharacterDisposition(service.loadDisposition(context.Background(), testPersona(), 42)))
+	require.Empty(t, renderCharacterDisposition(service.loadDisposition(context.Background(), testPersona(), 42).Composed))
 }
 
 // The point of a resting state: a bad week fades, and what it fades back to is

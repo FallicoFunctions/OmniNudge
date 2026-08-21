@@ -2,12 +2,14 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // The ladder, as data. Tuning how long a rung lasts is editing this table and
@@ -100,34 +102,79 @@ func scanOmniChatBlock(row pgx.Row) (*OmniChatPersonaBlock, error) {
 	return &block, nil
 }
 
+// OmniChatBlockTranscriptEntry is one message as the review will read it.
+// Stored rather than joined, so it survives the messages being edited or the
+// account being deleted.
+type OmniChatBlockTranscriptEntry struct {
+	Role      string    `json:"role"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OmniChatBlockRequest is everything one block needs. A struct rather than six
+// positional arguments, three of which would be easy to transpose.
+type OmniChatBlockRequest struct {
+	PersonaID int
+	UserID    int
+	Reason    string
+
+	// What she could see when she decided. Bounded by the caller to her context
+	// window: older than that provably did not influence her, and less than that
+	// leaves the reviewer judging a fragment.
+	Transcript []OmniChatBlockTranscriptEntry
+
+	// Where the relationship should sit once the block is placed. Blocking
+	// discharges the feeling, so a lapsed block does not re-fire on the next
+	// message and walk the ladder to permanent unaided.
+	DischargedWarmth float64
+}
+
 // Block puts someone one rung further up than they have already been, and
 // returns what was recorded.
 //
 // **Someone already blocked is not escalated.** They cannot say anything new
 // while they cannot be heard, so a second call during a standing block would be
 // escalating on nothing -- and a retry, a redelivered job, or a loop in whatever
-// comes to make these decisions would otherwise walk a person from ten minutes
-// to permanent in four calls without them having done anything. The standing
-// block is returned instead, so a caller cannot tell the difference between
-// "blocked them" and "they were already blocked", which is the truth either way.
-// Escalation happens across blocks: the rung goes up when someone comes back
-// after one has lapsed and gives the character a fresh reason.
+// makes these decisions would otherwise walk a person from ten minutes to
+// permanent in four calls without them having done anything. The standing block
+// is returned instead. Escalation happens across blocks: the rung goes up when
+// someone comes back after one has lapsed and gives the character a fresh
+// reason.
 //
-// One statement, so two messages arriving together cannot both read the same
-// history and both write the same rung.
+// The discharge shares the transaction with the insert deliberately. If the
+// block landed and the discharge did not, she would sit at the floor for the
+// whole duration, re-block on the first message after it lapsed, and climb the
+// ladder to permanent -- the exact failure the recovery exists to prevent, made
+// silently and only under partial failure.
 func (r *OmniChatPersonaBlockRepository) Block(
-	ctx context.Context, personaID, userID int, reason string,
+	ctx context.Context, request OmniChatBlockRequest,
 ) (*OmniChatPersonaBlock, error) {
-	if personaID < 1 || userID < 1 {
+	if request.PersonaID < 1 || request.UserID < 1 {
 		return nil, errors.New("omnichat block: persona and user are required")
 	}
-	if reason == "" {
+	if request.Reason == "" {
 		// The admin review exists to judge whether the reason was fair. A block
 		// with no reason cannot be reviewed, only guessed at.
 		return nil, errors.New("omnichat block: a reason is required")
 	}
 
-	block, err := scanOmniChatBlock(r.pool.QueryRow(ctx, `
+	snapshot := []byte("null")
+	if len(request.Transcript) > 0 {
+		encoded, err := json.Marshal(request.Transcript)
+		if err != nil {
+			return nil, fmt.Errorf("omnichat block: encode transcript: %w", err)
+		}
+		snapshot = encoded
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat block: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var placed bool
+	block, err := scanOmniChatBlockPlacement(tx.QueryRow(ctx, `
 		WITH standing AS (
 			SELECT `+omniChatBlockColumns+`
 			FROM omnichat_persona_user_blocks
@@ -146,27 +193,59 @@ func (r *OmniChatPersonaBlockRepository) Block(
 		), next AS (
 			SELECT LEAST(reached.tier + 1, $4::smallint) AS tier FROM reached
 		), placed AS (
-			INSERT INTO omnichat_persona_user_blocks (persona_id, user_id, tier, expires_at, reason)
+			INSERT INTO omnichat_persona_user_blocks
+				(persona_id, user_id, tier, expires_at, reason, transcript_snapshot)
 			SELECT $1, $2, next.tier,
 			       CASE
 			           WHEN next.tier >= $4 THEN NULL
 			           ELSE now() + make_interval(secs => ($5::int[])[next.tier])
 			       END,
-			       $3
+			       $3, $6::jsonb
 			FROM next
 			WHERE NOT EXISTS (SELECT 1 FROM standing)
 			RETURNING `+omniChatBlockColumns+`
 		)
-		SELECT `+omniChatBlockColumns+` FROM placed
+		SELECT `+omniChatBlockColumns+`, true AS placed FROM placed
 		UNION ALL
-		SELECT `+omniChatBlockColumns+` FROM standing
+		SELECT `+omniChatBlockColumns+`, false AS placed FROM standing
 	`,
-		personaID, userID, reason, OmniChatTopBlockTier, omniChatBlockRungSeconds(),
-	))
+		request.PersonaID, request.UserID, request.Reason, OmniChatTopBlockTier,
+		omniChatBlockRungSeconds(), snapshot,
+	), &placed)
 	if err != nil {
 		return nil, fmt.Errorf("omnichat block: record: %w", err)
 	}
+
+	// Only a block that was actually placed discharges anything. Returning a
+	// standing block is not a fresh decision and must not top her back up.
+	if placed {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO omnichat_character_traits (persona_id, owner_user_id, warmth)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (persona_id, COALESCE(owner_user_id, 0)) DO UPDATE
+			SET warmth = GREATEST(omnichat_character_traits.warmth, EXCLUDED.warmth),
+			    updated_at = CURRENT_TIMESTAMP
+		`, request.PersonaID, request.UserID, request.DischargedWarmth); err != nil {
+			return nil, fmt.Errorf("omnichat block: discharge: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("omnichat block: commit: %w", err)
+	}
 	return block, nil
+}
+
+func scanOmniChatBlockPlacement(row pgx.Row, placed *bool) (*OmniChatPersonaBlock, error) {
+	var block OmniChatPersonaBlock
+	if err := row.Scan(
+		&block.ID, &block.PersonaID, &block.UserID, &block.Tier, &block.ExpiresAt,
+		&block.Reason, &block.OverturnedAt, &block.OverturnedBy, &block.OverturnNote,
+		&block.CreatedAt, placed,
+	); err != nil {
+		return nil, err
+	}
+	return &block, nil
 }
 
 // ActiveBlock returns the block in force between this character and this
@@ -243,6 +322,11 @@ type OmniChatPersonaBlockAdminSummary struct {
 	PersonaSlug string `json:"persona_slug"`
 	Username    string `json:"username"`
 
+	// The exchange she acted on. Without it the review has her one-line account
+	// and nothing to check it against, which is the half that does not work
+	// alone -- the question being asked is whether her account was fair.
+	Transcript []OmniChatBlockTranscriptEntry `json:"transcript,omitempty"`
+
 	// Computed by the database rather than from the row, so the answer uses the
 	// same clock the block will be enforced against.
 	InForce bool `json:"in_force"`
@@ -273,6 +357,7 @@ func (r *OmniChatPersonaBlockRepository) ListForAdmin(
 	rows, err := r.pool.Query(ctx, `
 		SELECT b.id, b.persona_id, b.user_id, b.tier, b.expires_at, b.reason,
 		       b.overturned_at, b.overturned_by, b.overturn_note, b.created_at,
+		       b.transcript_snapshot,
 		       p.name, p.slug, u.username,
 		       (b.overturned_at IS NULL AND (b.expires_at IS NULL OR b.expires_at > now())) AS in_force
 		FROM omnichat_persona_user_blocks b
@@ -290,15 +375,81 @@ func (r *OmniChatPersonaBlockRepository) ListForAdmin(
 	summaries := make([]*OmniChatPersonaBlockAdminSummary, 0, limit)
 	for rows.Next() {
 		var summary OmniChatPersonaBlockAdminSummary
+		var snapshot []byte
 		if err := rows.Scan(
 			&summary.ID, &summary.PersonaID, &summary.UserID, &summary.Tier,
 			&summary.ExpiresAt, &summary.Reason, &summary.OverturnedAt,
 			&summary.OverturnedBy, &summary.OverturnNote, &summary.CreatedAt,
+			&snapshot,
 			&summary.PersonaName, &summary.PersonaSlug, &summary.Username, &summary.InForce,
 		); err != nil {
 			return nil, 0, fmt.Errorf("omnichat block: scan admin row: %w", err)
 		}
+		// A block placed before snapshots existed, or by an operator with no
+		// exchange to point at, has none. That is a card without a transcript,
+		// not a row the review should refuse to show.
+		if len(snapshot) > 0 {
+			if err := json.Unmarshal(snapshot, &summary.Transcript); err != nil {
+				zlog.Warn().Err(err).Int64("block_id", summary.ID).
+					Msg("omnichat block: unreadable transcript snapshot")
+			}
+		}
 		summaries = append(summaries, &summary)
 	}
 	return summaries, total, rows.Err()
+}
+
+// How far this person has to have pushed her before she stops talking to them,
+// and how much of that is given back when she does.
+const (
+	// The floor is on the *relationship* traits, not the composed disposition.
+	// A character written cold starts near the bottom of the composed scale and
+	// would shut out everyone she met; what this asks instead is what this
+	// person in particular has done to her, measured from wherever she began.
+	omniChatBlockWarmthFloor = -0.6
+
+	// Personality still moves the line, which is the whole reason it is not a
+	// constant. A warm character carries further before she is done; a prickly
+	// one has less to spend. Same code, different card.
+	omniChatBlockPatienceSpan = 0.2
+
+	// Blocking discharges the feeling. She has said her piece, and the block is
+	// the consequence -- so the relationship comes back up to just above the
+	// floor rather than sitting on it.
+	//
+	// Without this the duration would be decorative: a ten-minute block would
+	// lapse with her still at the floor, the next message would re-block, and
+	// the ladder would climb to permanent without the person having done
+	// anything new. The rung they are on is the memory of it; the feeling is
+	// not.
+	omniChatBlockRecoveryMargin = 0.25
+)
+
+// OmniChatBlockThreshold is the relationship warmth at which this character
+// stops talking to this person. Lower means more patience.
+func OmniChatBlockThreshold(baseline OmniChatDispositionBaseline) float64 {
+	return clampTrait(omniChatBlockWarmthFloor - baseline.Warmth*omniChatBlockPatienceSpan)
+}
+
+// ShouldBlock reports whether this person has worn out their welcome.
+//
+// It reads warmth and not trust. Trust is whether she believes you, and
+// somebody can be unreliable without being unpleasant -- a character who shuts
+// out everyone who ever exaggerated is not protecting herself, she is just
+// brittle. Warmth is how she feels about the person, which is the question
+// actually being asked.
+//
+// Nothing here reads the conversation. The decision is a number that moved over
+// many exchanges, which is what makes it un-arguable: a model asked to judge can
+// be talked round, flattered, or prompt-injected into an opinion, and an
+// accumulated trait cannot be talked into anything. What a model is for is
+// saying *why*, afterwards, in her words.
+func ShouldBlock(baseline OmniChatDispositionBaseline, relationship OmniChatCharacterTraits) bool {
+	return relationship.Warmth <= OmniChatBlockThreshold(baseline)
+}
+
+// OmniChatDischargedWarmth is where a relationship sits once she has blocked:
+// far enough above the threshold that the block has to be earned again.
+func OmniChatDischargedWarmth(baseline OmniChatDispositionBaseline) float64 {
+	return clampTrait(OmniChatBlockThreshold(baseline) + omniChatBlockRecoveryMargin)
 }

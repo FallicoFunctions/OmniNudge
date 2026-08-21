@@ -616,6 +616,13 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
+		// Told, not left wondering. There is a review to appeal to, and an
+		// appeal nobody knows they need is not one.
+		if errors.Is(err, services.ErrOmniChatBlockedByPersona) {
+			RespondErrorCoded(c, http.StatusForbidden, "blocked_by_character",
+				"This character is not talking to you right now.")
+			return
+		}
 		if assistantMsg != nil {
 			completed = true
 			// Generation failed but the exchange was persisted (assistantMsg.Failed
