@@ -50,7 +50,7 @@ func TestRenderCharacterDispositionSaysNothingAtRest(t *testing.T) {
 func TestNeutralDispositionLeavesThePromptByteIdentical(t *testing.T) {
 	persona := testPersona()
 	before := buildConversationSystemPromptWithMemory(persona, nil, nil, nil, nil)
-	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, nil,
+	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{},
 		models.OmniChatDisposition{Mood: 0.1, Trust: -0.15, Warmth: 0.05})
 	require.Equal(t, before, after)
 	require.NotContains(t, after, "[How You Are Right Now]")
@@ -151,7 +151,7 @@ func TestBuildConversationSystemPromptOrdersDispositionBlock(t *testing.T) {
 		Revision:        1,
 	}
 
-	prompt := buildConversationSystemPromptWithDisposition(persona, nil, nil, sceneState, memories,
+	prompt := buildConversationSystemPromptWithDisposition(persona, nil, nil, sceneState, promptRecall{Memories: memories},
 		models.OmniChatDisposition{Mood: -0.7, Trust: -0.4})
 
 	trustIdx := strings.Index(prompt, "[Conversation Integrity]")

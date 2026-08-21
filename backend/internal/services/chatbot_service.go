@@ -423,13 +423,16 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	// already present verbatim, so cueing on it would surface memories about
 	// whatever was discussed twenty turns ago rather than what was just asked.
 	memories := s.recallMemories(chatCtx, persona, userID, content)
+	// Cued by the same turn as the memories, and covering exactly what the
+	// window does not reach.
+	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, content)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, memories, disposition), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -571,13 +574,14 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	// retry answers a different question than the one the user asked. The cue is
 	// the trailing user turn, which the guard above has already established.
 	memories := s.recallMemories(chatCtx, persona, userID, history[len(history)-1].Content)
+	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, history[len(history)-1].Content)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, memories, disposition), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -879,7 +883,7 @@ func buildConversationSystemPromptWithMemory(
 	sceneState *models.OmniChatConversationSceneState,
 	memories []*models.OmniChatMemoryEpisode,
 ) string {
-	return buildConversationSystemPromptWithDisposition(persona, settings, history, sceneState, memories, models.OmniChatDisposition{})
+	return buildConversationSystemPromptWithDisposition(persona, settings, history, sceneState, promptRecall{Memories: memories}, models.OmniChatDisposition{})
 }
 
 // buildConversationSystemPromptWithDisposition assembles the system prompt.
@@ -896,17 +900,31 @@ func buildConversationSystemPromptWithMemory(
 // fact about the present. Reading it directly after what the character
 // remembers is also how it reads best: the history, and then what the history
 // has left it feeling.
+// promptRecall bundles what a turn surfaced from the past. Both halves answer
+// the same cue and sit in the same place in the prompt, so they travel together
+// rather than as two more positional arguments in a chain that already has
+// enough of them.
+type promptRecall struct {
+	// What she remembers, in her words, as the extractor wrote it.
+	Memories []*models.OmniChatMemoryEpisode
+	// What was actually written, in theirs, older than the window she holds.
+	LookedUp []*models.BotMessage
+}
+
 func buildConversationSystemPromptWithDisposition(
 	persona *models.BotPersona,
 	settings *models.ConversationSettings,
 	history []*models.BotMessage,
 	sceneState *models.OmniChatConversationSceneState,
-	memories []*models.OmniChatMemoryEpisode,
+	recall promptRecall,
 	disposition models.OmniChatDisposition,
 ) string {
 	base := buildCharacterPromptBase(persona, history)
 	base += conversationHistoryTrustBoundary
-	base += renderRecalledMemories(memories)
+	base += renderRecalledMemories(recall.Memories)
+	// Immediately after what she remembers, because it answers the same cue and
+	// is the more exact half of the same act: the impression, then the record.
+	base += renderTranscriptLookup(recall.LookedUp, personaDisplayName(persona))
 	base += renderCharacterDisposition(disposition)
 	if settings != nil {
 		metadata := make([]string, 0, 3)

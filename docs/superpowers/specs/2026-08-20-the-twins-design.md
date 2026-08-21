@@ -815,6 +815,46 @@ that falls off its front is still older history the reader had loaded, and
 keeping it is right. What must not happen is a duplicate, which is what the test
 asserts.
 
+
+---
+
+## 23a. Built: she can look things up
+
+The third of the three, and the one that matters most for a free character.
+
+Memory holds what the extractor thought worth keeping, in its words. The window
+holds the last 200 turns verbatim. Neither reaches a specific exchange from a
+year ago -- the window does not go back that far, and extraction only kept what
+it judged worth keeping. A person in that position scrolls up and reads.
+
+`SearchOlderThan` does full-text search over the stored transcript, and its
+bound is what makes it worth having: **only messages older than the turns she
+already holds.** Returning what is already in front of her would spend prompt
+budget telling her what she can see. This covers exactly what the window does
+not reach, which is also why it costs nothing for most conversations -- the
+average is 73 messages against a 200-turn window, so the search never runs.
+
+The tsquery ORs the cue's lexemes. `plainto_tsquery` ANDs them, so "whereabouts
+did you say your sister ended up living again?" would require every one of those
+words in one message and match nothing. Same construction as memory recall, same
+reason.
+
+Results render as `[From Earlier in This Conversation]`, immediately after the
+memories: the impression, then the record. Each line is **attributed and dated**,
+and the block says plainly that it is a record rather than something being said
+now. That framing is more delicate than it is for memory -- a recalled memory is
+the character's own account, but a quoted turn is somebody's actual words and
+half of them are the user's. A line lifted out of a year-old argument, unlabelled,
+reads as the argument restarting. It sits below the trust boundary for the same
+reason memories do.
+
+**Scoped to this conversation.** For a free character, searching across everyone
+she has ever talked to would put other people's raw words into this prompt --
+which is a much larger privacy surface than a shared episode summary, and a
+separate decision. §3's shared memory already travels as episodes. Raw
+cross-conversation search is not built and should not be until that is decided
+deliberately.
+
 ---
 
 # Part IV — Recorded, not scheduled
