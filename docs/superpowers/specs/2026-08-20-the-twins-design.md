@@ -814,3 +814,53 @@ has shifted forward and no longer starts where the held one did, the message
 that falls off its front is still older history the reader had loaded, and
 keeping it is right. What must not happen is a duplicate, which is what the test
 asserts.
+
+---
+
+# Part IV — Recorded, not scheduled
+
+Ideas worth keeping, written down when they came up rather than when they will
+be built.
+
+## 24. Mirror mode
+
+Roleplay characters get two options for how they talk, chosen on the form:
+
+1. **Default** — as today.
+2. **Mirror** — she writes the way *you* write. Same grammar habits, similar
+   message length, and the same relationship to action notation: **if you never
+   write actions, she never writes them.**
+
+The appeal is that it is self-calibrating. Instead of a creator picking a format
+from a menu and a platform block enforcing it, the reader teaches the format by
+example, continuously, without being asked. It also dissolves the complaint that
+started the whole response-style effort -- a character whose format feels imposed
+-- because the format stops being imposed by anybody.
+
+It needs her to *observe* style from history rather than be told it: message
+length distribution, punctuation and capitalisation habits, whether asterisked
+action ever appears at all. That is derived from the transcript, which is the
+same material §25 is about.
+
+Open: whether mirroring is absolute or a lean. Someone who writes in one-word
+fragments probably does not want one-word replies forever.
+
+## 25. Multiple messages, in both directions
+
+Two halves of one idea, and both are missing.
+
+**Inbound: she replies too fast, and instantly is a tell.** A reply bubble
+appears the moment a message lands. But plenty of people send three short
+messages in a row rather than one composed one, and today each gets its own
+reply -- so a burst becomes a pile-up, and she answers the first thought before
+the second one arrives. There should be a short settling window after a message
+before generation starts, so a burst becomes one turn.
+
+This is not a sleep. It has to interact with the generation queue, with a second
+message arriving *while* generation is already running, and with the dangling-
+turn repair that already exists for interrupted replies.
+
+**Outbound: she should be able to write that way too**, when that is who she is.
+Already noted for the sister in §1, but it belongs to roleplay characters as
+well, and to anything a creator builds -- so it is a property set at creation,
+not a trait of the Twins.
