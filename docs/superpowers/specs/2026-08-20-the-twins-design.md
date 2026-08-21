@@ -303,22 +303,34 @@ the valence from a conversation still updates the traits for the person she was
 talking to, never her self tier. A character who remembers everything can still
 feel differently about everyone.
 
-### An open question this created
+### Two rules that came out of this, both decided
 
-Data export filters on `owner_user_id`, so shared episodes appear in nobody's
-export, and account deletion cascades on the same column, so they survive the
-departure of the person who caused them. For a character's own life that is
-right. But with unified memory, **things a user said now land in a tier their
-subject-access export does not show and their account deletion does not remove**,
-while remaining readable by other people.
+**A character's kind is fixed at creation and can never change** (migration 189).
+188 refused only the direction that would strand shared memories, and only while
+some existed. Too narrow. Kind decides whether a backstory binds her, whether
+there is a scene, whether she greets anyone, and whose her memory is -- so
+flipping it leaves the same name and history attached to a different character.
+Neither direction is allowed, with or without memories at stake. A change of
+kind is a new character. Moving between two roleplay styles is an ordinary edit
+and stays allowed.
 
-The disclosure card does warn before they speak, which is the substantive
-protection. Still, a defensible answer probably exists and is cheap: shared
-episodes carry `conversation_id`, so an export could include those derived from
-that user's *own* conversations, marked as shared and non-removable. That
-exposes nothing they did not themselves say.
+Related and already true: **no user can edit a default character.** The persona
+read and update paths are both scoped `WHERE id = $1 AND owner_user_id = $2`, and
+platform characters have no owner, so no user ever matches. Verified rather than
+assumed.
 
-Not built. Flagged because it is a policy call, not an implementation detail.
+**Shared memory appears in the data download, marked as hers.** Memory a free
+character formed from someone's conversation belongs to her, so it is not deleted
+when they delete their account and she may repeat it to others. That is the
+design, and the card says so before anyone speaks. But it is still a record
+derived from what they said, so the export now includes it with
+`shared_with_others: true` -- visible, and plainly labelled as something they
+cannot remove.
+
+The join is on **conversation ownership**, not on the memory's owner, so a user
+sees only what their own conversations produced. Nothing another person told her
+can appear. Her own life -- persona-global memory with no conversation behind it
+-- is nobody's record and stays out entirely.
 
 **As of 188 and the extraction change, the memory gate is lifted.** Both claims
 on the card are now true of a shared free character: there is one of her, and
