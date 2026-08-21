@@ -817,6 +817,8 @@ func main() {
 	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled).
 		SetBilling(omniChatBilling)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
+	omniChatBlockRepo := models.NewOmniChatPersonaBlockRepository(db.Pool)
+	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
 	omniChatMessageRateLimiter := middleware.OmniChatRateLimiter(cache)
 	omniChatSocialRateLimiter := middleware.OmniChatSocialRateLimiter(cache)
@@ -1738,6 +1740,11 @@ func main() {
 				admin.GET("/omnichat/response-feedback", adminOmniChatResponseFeedbackHandler.List)
 				admin.GET("/omnichat/response-feedback/:id", adminOmniChatResponseFeedbackHandler.Get)
 				admin.PATCH("/omnichat/response-feedback/:id/status", adminOmniChatResponseFeedbackHandler.Transition)
+				// Blocks a character has placed. Read and reverse only: an admin
+				// cannot create one here, because a block is the character's
+				// judgment and the record has to stay able to say whose it was.
+				admin.GET("/omnichat/blocks", adminOmniChatBlockHandler.List)
+				admin.POST("/omnichat/blocks/:id/overturn", adminOmniChatBlockHandler.Overturn)
 				admin.GET("/omnichat/publication-reports", omniChatSocialHandler.ListReports)
 				admin.PATCH("/omnichat/publication-reports/:report_id", omniChatSocialHandler.ResolveReport)
 

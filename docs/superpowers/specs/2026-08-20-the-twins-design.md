@@ -156,6 +156,18 @@ The review queue deliberately shows lapsed and overturned blocks, not just ones
 in force. A queue of only-active blocks would never show a ten-minute one: it is
 gone before anybody looks.
 
+**Someone already blocked is not escalated.** They cannot say anything new while
+they cannot be heard, so a second call during a standing block escalates on
+nothing -- and a retry, a redelivered job, or a loop in whatever comes to make
+these decisions would otherwise walk a person from ten minutes to permanent in
+four calls having done nothing at all. The standing block is returned instead.
+Escalation happens *across* blocks: the rung goes up when someone comes back
+after one has lapsed and gives a fresh reason.
+
+The review keeps the overturn control on lapsed blocks too. It cannot let
+anybody back in, but it takes the block off the ladder -- so an unfair ten
+minutes does not silently make the next one two hours.
+
 **Not built: who decides.** Nothing calls `Block` yet. Every field is written
 the same way whether the decision comes from a model, an operator, or a test,
 so the judgment can be wired in without touching any of this.

@@ -10,10 +10,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// The ladder, as data. Tuning how long a rung lasts is editing this table, and
-// adding a rung is adding a row -- neither is a change to the logic that walks
-// it. A nil duration is the indefinite rung, which is why it is a pointer
-// rather than a sentinel like zero: zero is a duration somebody could mean.
+// The ladder, as data. Tuning how long a rung lasts is editing this table and
+// nothing else -- the durations are passed to the insert as an array indexed by
+// rung, so the SQL never names one. A nil duration is the indefinite rung, a
+// pointer rather than a sentinel like zero because zero is a duration somebody
+// could mean.
+//
+// Adding a rung is not only a row: the schema pins the top rung (it is the one
+// forbidden an expiry, and the tier range is checked), so a fifth would need a
+// migration alongside it.
 var omniChatBlockLadder = []struct {
 	Tier     int16
 	Duration *time.Duration
@@ -26,10 +31,25 @@ var omniChatBlockLadder = []struct {
 
 func durationPtr(d time.Duration) *time.Duration { return &d }
 
-// OmniChatTopBlockTier is the indefinite rung. Escalation stops here rather
-// than wrapping or erroring: someone already blocked indefinitely who does it
-// again is still blocked indefinitely.
-const OmniChatTopBlockTier int16 = 4
+// OmniChatTopBlockTier is the indefinite rung, read off the ladder rather than
+// declared beside it -- two places saying "4" is one place to forget. Escalation
+// stops here rather than wrapping or erroring: someone already blocked
+// indefinitely who does it again is still blocked indefinitely.
+var OmniChatTopBlockTier = omniChatBlockLadder[len(omniChatBlockLadder)-1].Tier
+
+// omniChatBlockRungSeconds is the ladder as the insert consumes it: one entry
+// per timed rung, indexed by tier. The indefinite rung has no entry, and is
+// never indexed for.
+func omniChatBlockRungSeconds() []int32 {
+	seconds := make([]int32, 0, len(omniChatBlockLadder))
+	for _, rung := range omniChatBlockLadder {
+		if rung.Duration == nil {
+			continue
+		}
+		seconds = append(seconds, int32(rung.Duration.Seconds()))
+	}
+	return seconds
+}
 
 var ErrOmniChatBlockNotFound = errors.New("omnichat block: not found")
 
@@ -83,9 +103,18 @@ func scanOmniChatBlock(row pgx.Row) (*OmniChatPersonaBlock, error) {
 // Block puts someone one rung further up than they have already been, and
 // returns what was recorded.
 //
-// The whole operation is one statement so that two messages arriving together
-// cannot both read the same history and both write the same rung. The ladder
-// walk is a subquery rather than a read followed by a write for that reason.
+// **Someone already blocked is not escalated.** They cannot say anything new
+// while they cannot be heard, so a second call during a standing block would be
+// escalating on nothing -- and a retry, a redelivered job, or a loop in whatever
+// comes to make these decisions would otherwise walk a person from ten minutes
+// to permanent in four calls without them having done anything. The standing
+// block is returned instead, so a caller cannot tell the difference between
+// "blocked them" and "they were already blocked", which is the truth either way.
+// Escalation happens across blocks: the rung goes up when someone comes back
+// after one has lapsed and gives the character a fresh reason.
+//
+// One statement, so two messages arriving together cannot both read the same
+// history and both write the same rung.
 func (r *OmniChatPersonaBlockRepository) Block(
 	ctx context.Context, personaID, userID int, reason string,
 ) (*OmniChatPersonaBlock, error) {
@@ -99,7 +128,15 @@ func (r *OmniChatPersonaBlockRepository) Block(
 	}
 
 	block, err := scanOmniChatBlock(r.pool.QueryRow(ctx, `
-		WITH reached AS (
+		WITH standing AS (
+			SELECT `+omniChatBlockColumns+`
+			FROM omnichat_persona_user_blocks
+			WHERE persona_id = $1 AND user_id = $2
+			  AND overturned_at IS NULL
+			  AND (expires_at IS NULL OR expires_at > now())
+			ORDER BY (expires_at IS NULL) DESC, expires_at DESC
+			LIMIT 1
+		), reached AS (
 			-- Overturned blocks are excluded on purpose. A decision an admin
 			-- judged unfair must not push the next one further up the ladder,
 			-- or reversing it would only have postponed its effect.
@@ -108,22 +145,23 @@ func (r *OmniChatPersonaBlockRepository) Block(
 			WHERE persona_id = $1 AND user_id = $2 AND overturned_at IS NULL
 		), next AS (
 			SELECT LEAST(reached.tier + 1, $4::smallint) AS tier FROM reached
+		), placed AS (
+			INSERT INTO omnichat_persona_user_blocks (persona_id, user_id, tier, expires_at, reason)
+			SELECT $1, $2, next.tier,
+			       CASE
+			           WHEN next.tier >= $4 THEN NULL
+			           ELSE now() + make_interval(secs => ($5::int[])[next.tier])
+			       END,
+			       $3
+			FROM next
+			WHERE NOT EXISTS (SELECT 1 FROM standing)
+			RETURNING `+omniChatBlockColumns+`
 		)
-		INSERT INTO omnichat_persona_user_blocks (persona_id, user_id, tier, expires_at, reason)
-		SELECT $1, $2, next.tier,
-		       CASE next.tier
-		           WHEN 1 THEN now() + $5::interval
-		           WHEN 2 THEN now() + $6::interval
-		           WHEN 3 THEN now() + $7::interval
-		           ELSE NULL
-		       END,
-		       $3
-		FROM next
-		RETURNING `+omniChatBlockColumns,
-		personaID, userID, reason, OmniChatTopBlockTier,
-		omniChatBlockLadder[0].Duration.String(),
-		omniChatBlockLadder[1].Duration.String(),
-		omniChatBlockLadder[2].Duration.String(),
+		SELECT `+omniChatBlockColumns+` FROM placed
+		UNION ALL
+		SELECT `+omniChatBlockColumns+` FROM standing
+	`,
+		personaID, userID, reason, OmniChatTopBlockTier, omniChatBlockRungSeconds(),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("omnichat block: record: %w", err)
@@ -196,34 +234,71 @@ func (r *OmniChatPersonaBlockRepository) Overturn(
 	return block, nil
 }
 
-// RecentBlocks is the admin review queue: what characters have done lately,
-// newest first, including blocks already lapsed or already overturned. A
-// review that only showed blocks currently in force would hide every short one
-// -- the ten-minute rung would be gone before anyone looked.
-func (r *OmniChatPersonaBlockRepository) RecentBlocks(
-	ctx context.Context, limit int,
-) ([]*OmniChatPersonaBlock, error) {
-	if limit < 1 || limit > 500 {
-		limit = 100
+// OmniChatPersonaBlockAdminSummary is a block with enough context to judge it.
+// The review asks whether this character was fair to this person, and neither
+// half of that question can be answered from ids.
+type OmniChatPersonaBlockAdminSummary struct {
+	OmniChatPersonaBlock
+	PersonaName string `json:"persona_name"`
+	PersonaSlug string `json:"persona_slug"`
+	Username    string `json:"username"`
+
+	// Computed by the database rather than from the row, so the answer uses the
+	// same clock the block will be enforced against.
+	InForce bool `json:"in_force"`
+}
+
+// ListForAdmin is the review queue. It returns blocks in every state -- in
+// force, lapsed, and already overturned -- because a queue of live blocks would
+// never once show a ten-minute one, and the shortest blocks are the ones most
+// likely to have been unfair.
+func (r *OmniChatPersonaBlockRepository) ListForAdmin(
+	ctx context.Context, personaID *int, limit, offset int,
+) ([]*OmniChatPersonaBlockAdminSummary, int, error) {
+	if limit < 1 || limit > 200 {
+		limit = 50
 	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `
+		SELECT count(*) FROM omnichat_persona_user_blocks
+		WHERE ($1::int IS NULL OR persona_id = $1)
+	`, personaID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("omnichat block: count for admin: %w", err)
+	}
+
 	rows, err := r.pool.Query(ctx, `
-		SELECT `+omniChatBlockColumns+`
-		FROM omnichat_persona_user_blocks
-		ORDER BY created_at DESC, id DESC
-		LIMIT $1
-	`, limit)
+		SELECT b.id, b.persona_id, b.user_id, b.tier, b.expires_at, b.reason,
+		       b.overturned_at, b.overturned_by, b.overturn_note, b.created_at,
+		       p.name, p.slug, u.username,
+		       (b.overturned_at IS NULL AND (b.expires_at IS NULL OR b.expires_at > now())) AS in_force
+		FROM omnichat_persona_user_blocks b
+		JOIN bot_personas p ON p.id = b.persona_id
+		JOIN users u ON u.id = b.user_id
+		WHERE ($1::int IS NULL OR b.persona_id = $1)
+		ORDER BY b.created_at DESC, b.id DESC
+		LIMIT $2 OFFSET $3
+	`, personaID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("omnichat block: list: %w", err)
+		return nil, 0, fmt.Errorf("omnichat block: list for admin: %w", err)
 	}
 	defer rows.Close()
 
-	blocks := make([]*OmniChatPersonaBlock, 0, limit)
+	summaries := make([]*OmniChatPersonaBlockAdminSummary, 0, limit)
 	for rows.Next() {
-		block, err := scanOmniChatBlock(rows)
-		if err != nil {
-			return nil, fmt.Errorf("omnichat block: scan: %w", err)
+		var summary OmniChatPersonaBlockAdminSummary
+		if err := rows.Scan(
+			&summary.ID, &summary.PersonaID, &summary.UserID, &summary.Tier,
+			&summary.ExpiresAt, &summary.Reason, &summary.OverturnedAt,
+			&summary.OverturnedBy, &summary.OverturnNote, &summary.CreatedAt,
+			&summary.PersonaName, &summary.PersonaSlug, &summary.Username, &summary.InForce,
+		); err != nil {
+			return nil, 0, fmt.Errorf("omnichat block: scan admin row: %w", err)
 		}
-		blocks = append(blocks, block)
+		summaries = append(summaries, &summary)
 	}
-	return blocks, rows.Err()
+	return summaries, total, rows.Err()
 }

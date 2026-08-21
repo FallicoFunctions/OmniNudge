@@ -115,3 +115,26 @@ export interface AdminOmniChatPublicationReport {
   status: AdminOmniChatPublicationReportStatus;
   created_at: string;
 }
+
+/**
+ * One character's decision to stop talking to one person, as the review sees
+ * it. `in_force` is computed by the server rather than from `expires_at`, so a
+ * reviewer's clock cannot disagree with the clock the block is enforced against.
+ */
+export interface AdminOmniChatPersonaBlock {
+  id: number;
+  persona_id: number;
+  user_id: number;
+  /** 1 = 10 minutes, 2 = 2 hours, 3 = a day, 4 = indefinite. */
+  tier: number;
+  expires_at: string | null;
+  reason: string;
+  overturned_at?: string | null;
+  overturned_by?: number | null;
+  overturn_note?: string | null;
+  created_at: string;
+  persona_name: string;
+  persona_slug: string;
+  username: string;
+  in_force: boolean;
+}
