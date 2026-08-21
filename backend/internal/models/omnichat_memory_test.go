@@ -1587,3 +1587,76 @@ func TestOmniChatMemoryRecordWorldEventBoundsItsText(t *testing.T) {
 		`SELECT title FROM omnichat_memory_episodes WHERE id = $1`, episodeID).Scan(&title))
 	require.Len(t, []rune(title), omniChatMemoryMaxTitle)
 }
+
+// The whole point of a free character, end to end: something one person tells
+// her is recalled when a different person talks to her, while how she feels
+// about each of them stays separate.
+func TestOmniChatMemoryExtractionSharesEpisodesButNotFeelings(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	repo := NewOmniChatMemoryRepository(pool)
+	fixture := seedMemoryFixture(t, pool, "sharedextract")
+	ctx := context.Background()
+
+	_, err := pool.Exec(ctx,
+		`UPDATE bot_personas SET response_style_profile = 'direct_message' WHERE id = $1`,
+		fixture.personaID)
+	require.NoError(t, err)
+
+	var conversationID int
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
+		fixture.userID, fixture.personaID).Scan(&conversationID))
+	messageID := insertMessage(t, pool, conversationID, "user", "I got fired today.")
+
+	valence := -0.6
+	require.NoError(t, repo.RecordExtraction(ctx, conversationID, fixture.userID, 0, messageID,
+		[]OmniChatMemoryEpisode{{
+			PersonaID:        fixture.personaID,
+			SourceMessageID:  messageID,
+			Title:            "He lost his job",
+			Summary:          "He told me he was fired today and took it badly.",
+			Salience:         0.9,
+			Distinctiveness:  0.8,
+			EmotionalValence: &valence,
+			Entities: []OmniChatMemoryEntityRef{
+				{CanonicalName: "job", Kind: OmniChatMemoryEntityTopic},
+			},
+		}}))
+
+	// Stored persona-global rather than against the person who said it.
+	var globalEpisodes int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_episodes
+		 WHERE persona_id = $1 AND owner_user_id IS NULL AND conversation_id = $2`,
+		fixture.personaID, conversationID).Scan(&globalEpisodes))
+	require.Equal(t, 1, globalEpisodes, "a free character's conversation memory is hers, not the relationship's")
+
+	// The entity has to move with it, or the episode/entity join splits across
+	// tiers and the association graph silently stops matching.
+	var globalEntities int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_memory_entities
+		 WHERE persona_id = $1 AND owner_user_id IS NULL`,
+		fixture.personaID).Scan(&globalEntities))
+	require.Equal(t, 1, globalEntities)
+
+	// Someone who was never in that conversation recalls it.
+	recalled, err := repo.Recall(ctx, fixture.personaID, fixture.otherID, "how is his job going",
+		DefaultOmniChatMemoryRecallWeights(), 6)
+	require.NoError(t, err)
+	require.NotEmpty(t, recalled, "a stranger must be able to surface what she was told by someone else")
+	require.Equal(t, "He lost his job", recalled[0].Title)
+
+	// But the feeling it caused belongs to the relationship it happened in.
+	var relationalTraits, selfTraits int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
+		fixture.personaID, fixture.userID).Scan(&relationalTraits))
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT count(*) FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id IS NULL`,
+		fixture.personaID).Scan(&selfTraits))
+	require.Equal(t, 1, relationalTraits, "the valence moved the relationship it happened in")
+	require.Equal(t, 0, selfTraits, "sharing memory must not make every feeling persona-global")
+}

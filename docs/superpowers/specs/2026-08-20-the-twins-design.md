@@ -291,10 +291,34 @@ several people's conversations at once, so they cannot be handed to an owner,
 and deleting them would destroy a character's history on a settings change. So
 `bot_personas` refuses the change while shared episodes exist.
 
-**Still to build:** extraction must actually write the global tier for these
-personas (it hardcodes an owner today), and entities need the same treatment or
-the episode/entity join splits across tiers. Recall already returns self-tier
-episodes to everyone, so it needs nothing.
+Extraction now writes the right tier, deciding it from the database inside the
+same transaction as the write so a caller cannot pass a wrong answer and a
+profile change cannot land in between. Entities move with their episodes, or the
+association graph splits across tiers and quietly stops matching. Recall needed
+nothing -- it already returns self-tier episodes to everyone, which is what made
+this the right seam.
+
+**Only the memory moves.** Her feelings stay per-relationship, as §3 requires:
+the valence from a conversation still updates the traits for the person she was
+talking to, never her self tier. A character who remembers everything can still
+feel differently about everyone.
+
+### An open question this created
+
+Data export filters on `owner_user_id`, so shared episodes appear in nobody's
+export, and account deletion cascades on the same column, so they survive the
+departure of the person who caused them. For a character's own life that is
+right. But with unified memory, **things a user said now land in a tier their
+subject-access export does not show and their account deletion does not remove**,
+while remaining readable by other people.
+
+The disclosure card does warn before they speak, which is the substantive
+protection. Still, a defensible answer probably exists and is cheap: shared
+episodes carry `conversation_id`, so an export could include those derived from
+that user's *own* conversations, marked as shared and non-removable. That
+exposes nothing they did not themselves say.
+
+Not built. Flagged because it is a policy call, not an implementation detail.
 
 Until that lands, the card is a promise the code does not keep.
 

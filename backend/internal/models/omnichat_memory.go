@@ -358,6 +358,30 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Whether this character's conversation memory is hers rather than this
+	// relationship's is read from the database inside the same transaction that
+	// writes it, so a caller cannot pass the wrong answer and a profile change
+	// cannot land between the decision and the insert. The trigger added in 188
+	// enforces the same rule; asking here means the code and the trigger can
+	// never disagree.
+	var sharedMemory bool
+	if err := tx.QueryRow(ctx, `
+		SELECT p.response_style_profile = 'direct_message'
+		FROM bot_conversations c
+		JOIN bot_personas p ON p.id = c.persona_id
+		WHERE c.id = $1
+	`, conversationID).Scan(&sharedMemory); err != nil {
+		return fmt.Errorf("omnichat memory: resolve memory tier: %w", err)
+	}
+
+	// Only the memory moves. Her feelings about the person she is talking to
+	// stay that relationship's, which is what makes a character who remembers
+	// everything still able to feel differently about everyone.
+	episodeOwner := &ownerUserID
+	if sharedMemory {
+		episodeOwner = nil
+	}
+
 	valences := make(map[int][]float64)
 	movedPersonas := make([]int, 0, 1)
 
@@ -373,7 +397,7 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 			) VALUES ($1, $2, $3, NULLIF($4, 0), $5, $6, $7, $8, $9, NULLIF($10, 0)::bigint)
 			RETURNING id
 		`,
-			episode.PersonaID, ownerUserID, conversationID, episode.SourceMessageID,
+			episode.PersonaID, episodeOwner, conversationID, episode.SourceMessageID,
 			episode.Title, episode.Summary,
 			episode.Salience, episode.Distinctiveness, episode.EmotionalValence,
 			episode.RetellsEpisodeID,
@@ -413,7 +437,7 @@ func (r *OmniChatMemoryRepository) RecordExtraction(
 				        FROM unnest(omnichat_memory_entities.aliases || EXCLUDED.aliases) AS a
 				    )
 				RETURNING id
-			`, episode.PersonaID, ownerUserID, entity.CanonicalName, string(entity.Kind), aliases).Scan(&entityID)
+			`, episode.PersonaID, episodeOwner, entity.CanonicalName, string(entity.Kind), aliases).Scan(&entityID)
 			if err != nil {
 				return fmt.Errorf("omnichat memory: upsert entity %q: %w", entity.CanonicalName, err)
 			}
