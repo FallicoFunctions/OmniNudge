@@ -1261,21 +1261,45 @@ func (r *BotMessageRepository) RepairStaleDanglingUserTurn(ctx context.Context, 
 
 // ListByConversationID retrieves the most recent messages for a conversation
 // and returns that bounded window in chronological order.
+// ListByConversationID returns the newest `limit` messages, oldest first.
 func (r *BotMessageRepository) ListByConversationID(ctx context.Context, conversationID int, limit int) ([]*BotMessage, error) {
+	messages, _, err := r.ListByConversationIDBefore(ctx, conversationID, 0, limit)
+	return messages, err
+}
+
+// ListByConversationIDBefore returns the `limit` messages immediately older
+// than beforeID, oldest first, and whether anything older still exists.
+// beforeID of 0 means the newest page.
+//
+// This is how a conversation gets scrolled back through. Without it the read
+// took a limit and no cursor, so everything past the newest page was stored,
+// billed for, and unreachable -- a conversation of 637 messages showed its most
+// recent 200 and there was no request that could ask for the other 437.
+//
+// hasMore comes from fetching one row beyond the page and discarding it, so the
+// caller learns whether to offer "load older" without a second count query over
+// a table that only grows.
+func (r *BotMessageRepository) ListByConversationIDBefore(
+	ctx context.Context, conversationID, beforeID, limit int,
+) ([]*BotMessage, bool, error) {
+	if limit < 1 {
+		limit = 1
+	}
 	query := `
 		SELECT id, conversation_id, role, content, failed, created_at
 		FROM (
 			SELECT id, conversation_id, role, content, failed, created_at
 			FROM bot_messages
 			WHERE conversation_id = $1
+			  AND ($2 = 0 OR id < $2)
 			ORDER BY id DESC
-			LIMIT $2
+			LIMIT $3
 		) recent
 		ORDER BY id
 	`
-	rows, err := r.pool.Query(ctx, query, conversationID, limit)
+	rows, err := r.pool.Query(ctx, query, conversationID, beforeID, limit+1)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 
@@ -1285,17 +1309,25 @@ func (r *BotMessageRepository) ListByConversationID(ctx context.Context, convers
 	for rows.Next() {
 		m := &BotMessage{}
 		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		messages = append(messages, m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
+
+	// The extra row was fetched to answer "is there more", never to be shown.
+	// It is the oldest of the batch, so it comes off the front.
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[1:]
+	}
+
 	if err := r.hydrateAttachments(ctx, conversationID, messages); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return messages, nil
+	return messages, hasMore, nil
 }
 
 func (r *BotMessageRepository) hydrateAttachments(ctx context.Context, conversationID int, messages []*BotMessage) error {

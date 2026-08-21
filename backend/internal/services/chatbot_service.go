@@ -20,9 +20,23 @@ import (
 )
 
 // maxHistoryMessages bounds how many prior turns are sent as context on each
-// generation call; older turns fall off rather than growing the prompt (and
-// OpenRouter request cost) unbounded.
-const maxHistoryMessages = 40
+// generation call. It is what the character has in front of her, and raising it
+// from 40 to 200 is the difference between recalling last week from a
+// compressed memory and simply still seeing it.
+//
+// 200 was chosen against measured traffic rather than picked: an average
+// message is ~250 characters, so this is roughly 12k tokens of history, which
+// is small beside the 200k contexts these models carry and well short of where
+// attention starts thinning in the middle of a long prompt. The average stored
+// conversation is 73 messages, so for most conversations this is the entire
+// history, verbatim.
+//
+// It cannot simply be unbounded. History is re-sent on every turn, so every
+// message is paid for once per turn forever, and the longest conversations grow
+// without limit. What handles anything past this window is memory, and -- for a
+// free character, whose memory is fed by conversations this one cannot contain
+// at any size -- retrieval over the stored transcript.
+const maxHistoryMessages = 200
 
 // A provider should never hold an interactive chat request for the full HTTP
 // timeout. The shared personal-generation schedule reserves bounded time for

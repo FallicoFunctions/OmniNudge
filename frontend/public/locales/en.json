@@ -4194,7 +4194,8 @@
       "gallery": "Gallery",
       "showProfileImage": "Show profile image",
       "showProfileVideo": "Show profile video",
-      "mediaOnlyPreview": "Sent a photo"
+      "mediaOnlyPreview": "Sent a photo",
+      "loadingOlder": "Loading earlier messages…"
     },
     "exitToSite": "Exit to OmniNudge",
     "header": {

@@ -611,3 +611,86 @@ func TestBotMessageRepositoryListsMostRecentWindowChronologically(t *testing.T) 
 		messages[3].Content,
 	})
 }
+
+// Scrolling a conversation back to its beginning. Every message has always been
+// stored; before the cursor existed there was simply no way to ask for one past
+// the newest page, so a long conversation had an unreachable middle.
+func TestListByConversationIDBeforeWalksBackToTheBeginning(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_cursor_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	persona, err := NewBotPersonaRepository(db.Pool).CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-cursor-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Cursor Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "Scroll back.",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	conversation, err := NewBotConversationRepository(db.Pool).CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	messageRepo := NewBotMessageRepository(db.Pool)
+
+	const total = 25
+	for i := 0; i < total; i++ {
+		role := BotMessageRoleUser
+		if i%2 == 1 {
+			role = BotMessageRoleAssistant
+		}
+		_, createErr := messageRepo.Create(ctx, conversation.ID, role, fmt.Sprintf("message %d", i), false)
+		require.NoError(t, createErr)
+	}
+
+	// Page back through the whole thing, gathering it in order.
+	var walked []*BotMessage
+	cursor := 0
+	for page := 0; ; page++ {
+		require.Less(t, page, 20, "paging is not terminating")
+
+		batch, hasMore, err := messageRepo.ListByConversationIDBefore(ctx, conversation.ID, cursor, 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, batch)
+		walked = append(append([]*BotMessage{}, batch...), walked...)
+
+		if !hasMore {
+			break
+		}
+		cursor = batch[0].ID
+	}
+
+	require.Len(t, walked, total, "every stored message is reachable")
+	for i, message := range walked {
+		require.Equal(t, fmt.Sprintf("message %d", i), message.Content, "order is preserved across pages")
+	}
+
+	// The extra row fetched to answer hasMore must never be handed back.
+	page, hasMore, err := messageRepo.ListByConversationIDBefore(ctx, conversation.ID, 0, 10)
+	require.NoError(t, err)
+	require.True(t, hasMore)
+	require.Len(t, page, 10)
+	require.Equal(t, "message 24", page[len(page)-1].Content, "the newest page ends at the newest message")
+
+	// A page that reaches the start says so rather than offering another turn.
+	first, hasMore, err := messageRepo.ListByConversationIDBefore(ctx, conversation.ID, walked[3].ID, 10)
+	require.NoError(t, err)
+	require.False(t, hasMore)
+	require.Len(t, first, 3)
+}

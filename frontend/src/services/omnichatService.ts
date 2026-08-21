@@ -5,6 +5,7 @@ import type {
   OmniChatAllowanceState,
   BotConversation,
   BotConversationDetail,
+  BotMessagePage,
   BotMessage,
   BotPersona,
   BotPersonaDefinition,
@@ -138,6 +139,13 @@ export const omnichatService = {
 
   async getConversation(conversationId: number): Promise<BotConversationDetail> {
     return api.get<BotConversationDetail>(`/omnichat/conversations/${conversationId}`);
+  },
+
+  /** Messages older than `beforeId`, oldest first. Every message is stored. */
+  async getOlderMessages(conversationId: number, beforeId: number): Promise<BotMessagePage> {
+    return api.get<BotMessagePage>(
+      `/omnichat/conversations/${conversationId}/messages?before=${beforeId}`
+    );
   },
 
   async sendMessage(

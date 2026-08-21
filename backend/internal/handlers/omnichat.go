@@ -453,7 +453,7 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 	}
 	conversation.Persona = persona
 
-	messages, err := h.messageRepo.ListByConversationID(c.Request.Context(), conversationID, 200)
+	messages, hasMore, err := h.messageRepo.ListByConversationIDBefore(c.Request.Context(), conversationID, 0, omniChatTranscriptPageSize)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to load messages")
 		return
@@ -471,7 +471,7 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 			RespondError(c, http.StatusInternalServerError, "Failed to update conversation activity")
 			return
 		}
-		messages, err = h.messageRepo.ListByConversationID(c.Request.Context(), conversationID, 200)
+		messages, hasMore, err = h.messageRepo.ListByConversationIDBefore(c.Request.Context(), conversationID, 0, omniChatTranscriptPageSize)
 		if err != nil {
 			RespondError(c, http.StatusInternalServerError, "Failed to load messages")
 			return
@@ -479,7 +479,61 @@ func (h *OmniChatHandler) GetConversation(c *gin.Context) {
 	}
 	decorateOmniChatMessageAttachments(messages, userID)
 
-	c.JSON(http.StatusOK, gin.H{"conversation": conversation, "messages": messages})
+	c.JSON(http.StatusOK, gin.H{
+		"conversation": conversation,
+		"messages":     messages,
+		"has_more":     hasMore,
+	})
+}
+
+// omniChatTranscriptPageSize is how much transcript one request carries. It is
+// a page now rather than a ceiling: what falls outside it is reachable through
+// ListOlderMessages instead of being unreachable.
+const omniChatTranscriptPageSize = 200
+
+// ListOlderMessages walks back through a conversation. A person expects to
+// scroll a chat back to its beginning however old it is, and every message has
+// always been stored -- there was simply no request that could ask for one past
+// the newest page.
+func (h *OmniChatHandler) ListOlderMessages(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || conversationID < 1 {
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+
+	// Ownership is checked before anything is read. The cursor is a message id
+	// supplied by the caller, so without this a guessed id would page through
+	// somebody else's conversation.
+	conversation, err := h.convRepo.GetByID(c.Request.Context(), conversationID, userID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load conversation")
+		return
+	}
+	if conversation == nil {
+		RespondError(c, http.StatusNotFound, "Conversation not found")
+		return
+	}
+
+	beforeID, err := strconv.Atoi(c.Query("before"))
+	if err != nil || beforeID < 1 {
+		RespondError(c, http.StatusBadRequest, "Invalid cursor")
+		return
+	}
+
+	messages, hasMore, err := h.messageRepo.ListByConversationIDBefore(
+		c.Request.Context(), conversationID, beforeID, omniChatTranscriptPageSize)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load messages")
+		return
+	}
+	decorateOmniChatMessageAttachments(messages, userID)
+
+	c.JSON(http.StatusOK, gin.H{"messages": messages, "has_more": hasMore})
 }
 
 func decorateOmniChatMessageAttachments(messages []*models.BotMessage, viewerUserID int) {

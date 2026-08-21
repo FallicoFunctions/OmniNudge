@@ -9,6 +9,7 @@ const {
   mockListPersonas,
   mockListConversations,
   mockGetConversation,
+  mockGetOlderMessages,
   mockSendMessage,
   mockCreateGeneration,
   mockCreateMediaCommand,
@@ -26,6 +27,7 @@ const {
   mockListPersonas: vi.fn(),
   mockListConversations: vi.fn(),
   mockGetConversation: vi.fn(),
+  mockGetOlderMessages: vi.fn(),
   mockSendMessage: vi.fn(),
   mockCreateGeneration: vi.fn(),
   mockCreateMediaCommand: vi.fn(),
@@ -74,6 +76,7 @@ vi.mock('../../services/omnichatService', () => ({
     listPersonas: (...args: unknown[]) => mockListPersonas(...args),
     listConversations: (...args: unknown[]) => mockListConversations(...args),
     getConversation: (...args: unknown[]) => mockGetConversation(...args),
+    getOlderMessages: (...args: unknown[]) => mockGetOlderMessages(...args),
     sendMessage: (...args: unknown[]) => mockSendMessage(...args),
     createGeneration: (...args: unknown[]) => mockCreateGeneration(...args),
     createMediaCommand: (...args: unknown[]) => mockCreateMediaCommand(...args),
@@ -601,6 +604,92 @@ describe('OmniChatChatPage', () => {
       await waitFor(() => expect(mockSendMessage).toHaveBeenCalledOnce());
       expect(mockCreateMediaCommand).not.toHaveBeenCalled();
       expect(mockCreateGeneration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('scrolling back through a long conversation', () => {
+    function seedPage(count: number, startId: number) {
+      return Array.from({ length: count }, (_, index) => ({
+        id: startId + index,
+        conversation_id: 42,
+        role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `message ${startId + index}`,
+        failed: false,
+        created_at: '2026-07-02T10:00:00Z',
+      }));
+    }
+
+    beforeEach(() => {
+      mockGetConversation.mockResolvedValue({
+        conversation: {
+          id: 42,
+          user_id: 1,
+          persona_id: 9,
+          title: 'Campfire Thread',
+          created_at: '2026-07-02T10:00:00Z',
+          last_message_at: '2026-07-02T10:15:00Z',
+        },
+        messages: seedPage(3, 100),
+        has_more: true,
+      });
+    });
+
+    // Scroll fires dozens of times a second. The in-flight guard has to be a
+    // ref: with setState both calls read the stale false, take the same cursor,
+    // and prepend the same page, which is exactly what happened in the browser.
+    it('fetches one page however many scroll events arrive', async () => {
+      mockGetOlderMessages.mockResolvedValue({ messages: seedPage(3, 50), has_more: false });
+
+      renderPage();
+      await screen.findByText('message 100');
+
+      const scroller = screen.getByTestId('omnichat-transcript-scroller');
+      Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true });
+      fireEvent.scroll(scroller);
+      fireEvent.scroll(scroller);
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => expect(screen.getByText('message 50')).toBeInTheDocument());
+      expect(mockGetOlderMessages).toHaveBeenCalledTimes(1);
+      expect(mockGetOlderMessages).toHaveBeenCalledWith(42, 100);
+    });
+
+    it('does not double the transcript if a page arrives twice', async () => {
+      mockGetOlderMessages.mockResolvedValue({ messages: seedPage(3, 100), has_more: false });
+
+      renderPage();
+      await screen.findByText('message 100');
+
+      const scroller = screen.getByTestId('omnichat-transcript-scroller');
+      Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true });
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => expect(mockGetOlderMessages).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getAllByText('message 100')).toHaveLength(1));
+    });
+
+    it('asks for nothing older once the beginning is reached', async () => {
+      mockGetConversation.mockResolvedValue({
+        conversation: {
+          id: 42,
+          user_id: 1,
+          persona_id: 9,
+          title: 'Campfire Thread',
+          created_at: '2026-07-02T10:00:00Z',
+          last_message_at: '2026-07-02T10:15:00Z',
+        },
+        messages: seedPage(3, 100),
+        has_more: false,
+      });
+
+      renderPage();
+      await screen.findByText('message 100');
+
+      const scroller = screen.getByTestId('omnichat-transcript-scroller');
+      Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true });
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => expect(mockGetOlderMessages).not.toHaveBeenCalled());
     });
   });
 
