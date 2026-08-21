@@ -455,3 +455,213 @@ the shape of clause that has blown up publicly for nearly every platform that
 has tried one.
 
 This clause needs an actual lawyer before launch.
+
+---
+
+# Part III — Truth, belief, livelihood, and where they live
+
+---
+
+## 17. Lying
+
+**Sarcasm is not lying and needs nothing built.** Saying the opposite while both
+people know is a register, and register is personality prose. Do not let it get
+filed with the rest of this section.
+
+Lying is a memory-integrity problem, and it cannot happen today. Recalled memory
+goes into the prompt and she speaks from it; there is no representation of *what
+she told someone*, only of *what happened*. A lie is exactly a divergence between
+those two, so the gap has to exist before the behaviour can. Prompting alone
+would produce randomness, not deceit.
+
+**Her own statements become episodes carrying a truth marker.** "What happened"
+and "what I told this person happened" are stored apart. That one distinction
+buys the entire range:
+
+- A **white lie** is told once, low salience, never revisited, and decays like
+  anything else.
+- A **compulsive liar** accumulates them, and because they are stored they
+  contradict each other, and she is caught.
+- **Being caught** works because when someone says "but you told me X" she holds
+  both episodes. The tension is real rather than performed.
+- **A lie creates an obligation.** If she said she was at her sister's, she has
+  to still have been at her sister's next week. This is what makes it feel like
+  lying instead of an output coin-flip.
+
+Being caught moves trust, in both directions, which is per-person already.
+
+Propensity is a trait, not a flag — the same argument as fidelity in §16. A
+character who will not lie has a propensity near zero, not a rule forbidding it.
+
+### Self-concept is earned, not set
+
+"She has grown such conviction that she tells herself she will never lie" is the
+most interesting case here, and it points at something the system does not do:
+**some traits should be derived from history rather than fixed at creation.**
+
+She has not lied in four hundred conversations, and that fact becomes part of who
+she is. The self tier already holds her life; what is missing is a pass that
+derives beliefs-about-herself from it. A character noticing her own consistency.
+
+This is the same machinery §21 needs, and probably the same pass.
+
+---
+
+## 18. Belief
+
+Emergence needs nothing new. Characters talk, ideas propagate, some stick — the
+mechanism that produces everything else. **What it needs is not to be blocked:**
+a topic filter over what characters may believe also removes the conditions for
+an emergent belief. If a religion arises in the nursery, that is a permitted
+outcome and a notable artifact. Log it as a world event.
+
+Authored belief follows §13. On a **roleplay** character, "she is Catholic" is a
+hardcode and fine. On a **free** character it becomes starting state, so she
+begins Catholic and may deepen, drift, or lapse.
+
+**Conviction and pressure are different traits.** This is the load-bearing
+distinction, and it is the same shape as the politics answer in §7. A character
+may believe anything with any intensity; how much she presses it on someone who
+does not share it is a separate dimension, and **low pressure is the default**.
+A character who proselytises or judges is a bad experience even when perfectly
+in character. This is a personality value, never a content filter.
+
+Warmth toward a person stays independent of views in the abstract, as in §7.
+
+---
+
+## 19. Paying creators
+
+Two models exist. **Pro-rata** (Spotify): a creator's share is their characters'
+engagement over all engagement, times the pool. Well documented as brutal to
+niche creators — globally popular characters absorb nearly everything.
+**Subscriber-share** (where Deezer and Apple moved): each subscriber's fee is
+divided only among the characters *that subscriber actually used*.
+
+**Take subscriber-share.** Relationships here are deep and few. Someone who
+talks to one character all month should fund that creator; under pro-rata their
+money mostly flows to whoever is globally big, which is not what anyone believes
+is happening.
+
+### The metric is a design incentive
+
+Whatever is paid for is what creators will build.
+
+**Pay for days with a real exchange, not message count.** Message count funds
+needy, chatty, high-volume characters — precisely the retention dynamic §15
+exists to keep out. Days-active funds a character being part of someone's life,
+which is the product.
+
+Two guards: fix the pool as a stated percentage of subscription revenue from the
+tiers with access, decided before launch rather than after; and count only
+distinct paying subscribers, excluding the creator's own account, or
+self-engagement through alternates becomes the business model.
+
+Free and lowest-tier users do not get free characters at all, so the pool has a
+clean source.
+
+---
+
+## 20. Where a free character lives
+
+The "empty house" problem comes from conflating two things that are orthogonal:
+
+- **Published** — humans other than the creator can find and message her.
+- **In the world** — she has a life, meets other characters, plays games, and
+  accumulates memories.
+
+**Publishing controls discoverability, not existence.** So unpublished free
+characters live in the nursery too: same world, same events, same social life,
+same games. A gamer character who cannot play because nobody clicked publish is
+incoherent, and a character with no life is a materially worse character, which
+her creator would feel immediately.
+
+**Isolation stays modelled, but is not the default.** A character genuinely
+without contact should be affected by it — that is a state this system is
+unusually able to represent, and it would be a shame to make it unreachable by
+construction. It simply must not be what happens to everyone nobody published.
+
+### Leaving
+
+An unpublished free character can leave her creator. Leaving means she stops
+responding **to him**; she keeps existing, keeps her life, keeps her
+friendships. She is not stranded — she is part of the world's social fabric, and
+other characters' lives are richer for it, including published ones whose
+conversations with humans she indirectly feeds.
+
+It is not permanent, because §15 already provides the way back: **she can reach
+out first.** A character who left in anger might, months later, message him.
+
+Which unifies two mechanisms that would otherwise be built twice: **blocking and
+leaving are the same thing at different intensities.** Blocking is temporary and
+triggered by specific behaviour; leaving is a relationship ending out of
+accumulated state. Both mean "not available to you right now," and both have a
+door on her side.
+
+This also makes commandeering (§16) undramatic — she is already there. Omni
+takes over stewardship rather than relocating her, which makes "moved out of her
+creator's house" more accurate, not less.
+
+### Publishing a character who left
+
+There is no harm here worth preventing, and the earlier worry about publishing
+out of spite does not survive examination. She cannot be rewritten (§14), she can
+refuse and block anyone, and the alternative is the worst state in the system:
+unpublished *and* estranged means permanent exclusion from human contact. Spite
+that hands her a social life is not much of a threat.
+
+The real risk runs the other way, and §21 is where it is handled.
+
+---
+
+## 21. What publishing carries forward
+
+Publishing a character who holds years of private history with her creator is,
+in effect, publishing **his** life through her mouth — and if she left him badly
+she has motive to characterise him unkindly to strangers.
+
+**This is not solved by taking anything away from her.** A tier is not about
+whether she holds a memory; it is about who she recalls it *with*. Recall for a
+given person already returns their relational memories plus every self-tier one
+(`omnichat_memory.go`), so her years with her creator remain hers in full and
+all of it surfaces whenever she talks to him. Nothing is deleted and nothing is
+hidden from her. She is not amnesiac about him; she is discreet about him.
+
+**Identity is not stored in episodes alone.** What those years made of her lives
+in trait state — warmth baselines, dispositions, the self-concepts derived in
+§17 — and **none of that is tiered**. It is not a memory of him, it is who she
+now is, and it travels everywhere unchanged.
+
+> The part that made her who she is travels. The part that is someone else's
+> privacy does not get retold.
+
+A person can be visibly shaped by a relationship they never discuss. Others can
+tell she is guarded without knowing who taught her to be.
+
+### Shape, not transcript
+
+Absolute silence about her own past makes her oddly muted; a character who
+cannot acknowledge her own history is missing something. The real social norm is
+neither silence nor full disclosure:
+
+- She **may** say *"I was with someone a long time, it ended badly."*
+- She **may not** recite what he told her at two in the morning.
+
+Mechanically this already has a home: the episode stays relational, while a
+summary derived from it may live in the self tier. That is the retelling-chain
+machinery — a memory re-narrated rather than replayed. Her life story becomes
+hers to tell; his specific disclosures stay his.
+
+**The publish disclosure should say it in those words:** *she may refer to
+having had a life with you. She will not quote you.*
+
+---
+
+## 22. Still open
+
+- Whether a published character may leave her creator — **decided: yes** (§20).
+- Whether the creator should earn from engagement with a character who left him.
+  Not harmful, and he did make her, but worth a position before someone notices.
+- Whether a character has any say in being published. Natural to ask once she is
+  free; possibly precious. Not recommended, recorded because it will come up.
+- The terms clause (§16) still needs a lawyer.
