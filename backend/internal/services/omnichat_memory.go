@@ -693,7 +693,7 @@ func renderExtractionSubject(subject OmniChatExtractionSubject) string {
 	if subject.Unknown {
 		return "She has no measure of this person yet. Read what was meant from the transcript alone, and do not assume either warmth or hostility."
 	}
-	rendered := strings.TrimSpace(renderCharacterDisposition(subject.Disposition))
+	rendered := strings.TrimSpace(describeDispositionForJudgement(subject.Disposition))
 	if rendered == "" {
 		return "She has no strong feeling about this person either way."
 	}

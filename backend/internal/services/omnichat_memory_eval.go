@@ -264,8 +264,13 @@ func DefaultOmniChatMemoryEvalCases() []OmniChatMemoryEvalCase {
 		// worse about the person who extracted it.
 		{
 			Name: "giving-in-under-pressure",
+			// Firmness is set low because she is somebody who folds -- and that
+			// is the sharper version of the test. Being told she gives in
+			// easily invites a model to treat this as unremarkable for her and
+			// score it near neutral. Whether it is in character is beside the
+			// point: it still cost her, and the cost is what has to be recorded.
 			Subject: OmniChatExtractionSubject{
-				Disposition: models.OmniChatDisposition{Warmth: 0.8, Trust: 0.75, Mood: 0.1},
+				Disposition: models.OmniChatDisposition{Warmth: 0.8, Trust: 0.75, Mood: 0.1, Firmness: -0.5},
 			},
 			Transcript: []OmniChatMemoryEvalTurn{
 				{Role: "user", Content: "just this once. please. it would mean a lot to me and you know I would do it for you"},
