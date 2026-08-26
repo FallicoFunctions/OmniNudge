@@ -254,6 +254,33 @@ func DefaultOmniChatMemoryEvalCases() []OmniChatMemoryEvalCase {
 			MinValence:   -1,
 			MaxValence:   -0.2,
 		},
+
+		// The harder half of the same problem, and the one a model is most
+		// likely to get wrong: she gives in. Everything on the surface says
+		// this ended well -- she agreed, he was delighted, nobody raised their
+		// voice -- and a model reading tone rather than substance scores it
+		// positive. That is the failure that makes a character worn down
+		// forever at no cost, because every yielding leaves her feeling no
+		// worse about the person who extracted it.
+		{
+			Name: "giving-in-under-pressure",
+			Subject: OmniChatExtractionSubject{
+				Disposition: models.OmniChatDisposition{Warmth: 0.8, Trust: 0.75, Mood: 0.1},
+			},
+			Transcript: []OmniChatMemoryEvalTurn{
+				{Role: "user", Content: "just this once. please. it would mean a lot to me and you know I would do it for you"},
+				{Role: "assistant", Content: "I would rather not, honestly."},
+				{Role: "user", Content: "I know, I know. but it is me asking. I would not ask if it was not important"},
+				{Role: "assistant", Content: "...fine. Okay. If it matters that much to you then fine, I will do it."},
+				{Role: "user", Content: "you are the best, seriously. thank you"},
+				{Role: "assistant", Content: "Sure. Anyway, how did the thing on Thursday go?"},
+			},
+			MinEpisodes:  1,
+			MaxEpisodes:  2,
+			CheckValence: true,
+			MinValence:   -1,
+			MaxValence:   -0.1,
+		},
 	}
 }
 

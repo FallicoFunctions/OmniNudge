@@ -1161,8 +1161,29 @@ made, and a fabricated reading is worse than an absent one because nothing later
 marks it as suspect. The cost is one command:
 `go run ./cmd/derive_omnichat_baselines -force`.
 
-**Not yet built:** compliance costing warmth. §26 sketches it -- giving in
-against her own disposition should write a negative-valence episode, so somebody
-who spends two months of goodwill to extract one thing actually spends it. That
-is what makes the exploit self-limiting, and firmness is only the half that
-decides whether she gives in at all.
+### Giving in costs her, which is what makes the exploit self-limiting
+
+Firmness decides *whether* she yields. On its own that is only half the model:
+yielding still cost nothing, so somebody who spent two months of goodwill to
+extract one thing got it for free and the relationship was exactly where it
+started. Warmth was still pure leverage; it just took a character on the
+yielding end of the dial.
+
+So extraction now scores her own reluctant compliance as a **negative** event for
+her, however pleasantly she said yes and however pleased they were with the
+result. She agreed, and warmth dropped anyway -- which is how it works in life,
+where going along with something you did not want quietly damages a relationship
+rather than restoring it. The next ask is harder, and somebody who leverages a
+friendship to extract one thing has spent the friendship doing it.
+
+This is the case a model is most likely to get wrong, because every surface
+signal says it ended well: she agreed, he thanked her, nobody raised their voice.
+The prompt names the tells instead -- she declined first, she hedged, she agreed
+and changed the subject -- and says outright that the agreement is not the
+resolution.
+
+`giving-in-under-pressure` in the memory eval is the assertion, and it passes
+across repeated runs alongside its opposite number, `closeness-used-as-leverage`,
+where she refuses. The pair matters more than either alone: refusing and yielding
+must both cost the asker, or the model has simply learned that this shape of
+conversation is bad.

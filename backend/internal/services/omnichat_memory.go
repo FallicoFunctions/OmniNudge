@@ -665,6 +665,8 @@ Meaning it kindly is not the same as it landing well. Somebody can be plainly jo
 
 Closeness is not a licence. Somebody who spends months being pleasant and then uses that standing to push for something she does not want has not made it harmless by being a friend first; that is worse, and scores worse. Judge what was actually done, not the tone it was delivered in.
 
+Giving in is not the same as being fine with it. When she agreed to something she did not want -- because she was worn down, because refusing again was harder than yielding, because she did not want to lose the person -- that is a bad event for her and scores negative, however pleasantly she said yes and however pleased they were with the outcome. Do not read the agreement as the resolution. The tells are in the transcript: she declined first, she hedged, she agreed and then changed the subject, she added a condition nobody asked for. A character who says yes under pressure and records it as a happy memory is one who can be worn down forever at no cost, and that is not a person.
+
 retells_id is the id of the already-recorded memory this retells, or 0.
 
 entities are the names the memory could later be recalled by: people, places, things, topics, events. Give each a name and a kind from person, place, thing, topic, event. Use the most natural everyday form of the name. Include the user and the character only when they are genuinely part of what makes the memory findable.
