@@ -55,7 +55,7 @@ func main() {
 	// would derive baselines nothing in production would have produced.
 	chosenModel := strings.TrimSpace(*model)
 	if chosenModel == "" {
-		chosenModel = strings.TrimSpace(cfg.OpenRouter.StandardModel)
+		chosenModel = strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
 	}
 	if chosenModel == "" {
 		chosenModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)

@@ -28,12 +28,22 @@ const (
 	// resenting things nobody minded about.
 	OmniChatCommitmentBroken   = "broken"
 	OmniChatCommitmentReleased = "released"
+
+	// Not a stored status. It is what extraction returns when an exchange
+	// disputes a closure -- "no, you still owe me that" -- and the only
+	// resolution that puts a commitment back rather than ending it.
+	OmniChatCommitmentReopened = "reopened"
 )
 
 // How many outstanding commitments reach a prompt at once. Somebody who owes a
 // character eleven things has a different problem, and listing all of them
 // would crowd out the conversation they are actually having.
 const OmniChatMaxOpenCommitments = 5
+
+// How many recently settled commitments are offered back for dispute. Small on
+// purpose: this is a correction path, not a history, and the ones worth
+// disputing are the ones closed recently enough that somebody still remembers.
+const OmniChatMaxSettledCommitments = 3
 
 const maxOmniChatCommitmentSummaryRunes = 300
 
@@ -222,6 +232,85 @@ func (r *OmniChatCommitmentRepository) Resolve(
 
 var ErrOmniChatCommitmentNotOpen = errors.New("omnichat commitment: nothing open to resolve")
 
+var ErrOmniChatCommitmentNotSettled = errors.New("omnichat commitment: nothing settled to reopen")
+
+// Reopen puts a settled commitment back to outstanding.
+//
+// It exists because closing one wrongly is otherwise permanent, and the way it
+// gets closed wrongly is specific: an exchange that discusses a promise without
+// completing it can read as completing it. When that happens nobody finds out,
+// because the commitment simply stops appearing and the only evidence is
+// somebody bringing it up months later.
+//
+// It is also just how people work. "No, you still owe me that" is a thing
+// somebody says whether or not she got it wrong -- if she has it right she
+// should say so, and if she has it wrong this is what fixes it. The same move
+// has to work in both directions or she cannot be argued with.
+//
+// Deliberately narrow: it reopens, and it does not decide. Whether a claim to
+// be owed something is honest is a judgement made further up, where the
+// relationship and her trust in this person are in view.
+func (r *OmniChatCommitmentRepository) Reopen(
+	ctx context.Context, commitmentID int64,
+) (*OmniChatCommitment, error) {
+	if commitmentID < 1 {
+		return nil, errors.New("omnichat commitment: an id is required")
+	}
+	rows, err := r.pool.Query(ctx, `
+		UPDATE omnichat_commitments
+		SET status = 'open', resolved_at = NULL
+		WHERE id = $1 AND status <> 'open'
+		RETURNING `+omniChatCommitmentColumns,
+		commitmentID)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat commitment: reopen: %w", err)
+	}
+	defer rows.Close()
+
+	reopened, err := scanOmniChatCommitments(rows)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat commitment: scan reopen: %w", err)
+	}
+	if len(reopened) == 0 {
+		// Missing and already-open answer alike: either way there is nothing
+		// settled here to undo.
+		return nil, ErrOmniChatCommitmentNotSettled
+	}
+	return reopened[0], nil
+}
+
+// RecentlySettled is what has been closed lately, so an exchange that disputes
+// one can name it. Without this a wrongly closed commitment is invisible:
+// extraction only ever sees what is outstanding, so the one thing it can never
+// be told about is the promise it just made disappear.
+func (r *OmniChatCommitmentRepository) RecentlySettled(
+	ctx context.Context, personaID, ownerUserID, limit int,
+) ([]*OmniChatCommitment, error) {
+	if personaID < 1 || ownerUserID < 1 {
+		return nil, nil
+	}
+	if limit < 1 || limit > 50 {
+		limit = OmniChatMaxSettledCommitments
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+omniChatCommitmentColumns+`
+		FROM omnichat_commitments
+		WHERE persona_id = $1 AND owner_user_id = $2 AND status <> 'open'
+		ORDER BY resolved_at DESC, id DESC
+		LIMIT $3
+	`, personaID, ownerUserID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat commitment: load settled: %w", err)
+	}
+	defer rows.Close()
+
+	settled, err := scanOmniChatCommitments(rows)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat commitment: scan settled: %w", err)
+	}
+	return settled, nil
+}
+
 func truncateOmniChatCommitmentSummary(summary string) string {
 	runes := []rune(summary)
 	if len(runes) <= maxOmniChatCommitmentSummaryRunes {
@@ -241,7 +330,8 @@ type OmniChatCommitmentResolution struct {
 // 'open' is not: a commitment cannot be resolved back into being outstanding.
 func ValidOmniChatCommitmentResolution(status string) bool {
 	switch status {
-	case OmniChatCommitmentKept, OmniChatCommitmentBroken, OmniChatCommitmentReleased:
+	case OmniChatCommitmentKept, OmniChatCommitmentBroken,
+		OmniChatCommitmentReleased, OmniChatCommitmentReopened:
 		return true
 	}
 	return false

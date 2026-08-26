@@ -150,7 +150,7 @@ func main() {
 	// is called, which is what keeps a 20-second reasoning pass off the send
 	// path entirely.
 	workerBotConversationRepo := models.NewBotConversationRepository(db.Pool)
-	memoryExtractionModel := strings.TrimSpace(cfg.OpenRouter.StandardModel)
+	memoryExtractionModel := strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
 	if memoryExtractionModel == "" {
 		memoryExtractionModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
 	}

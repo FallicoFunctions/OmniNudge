@@ -72,9 +72,27 @@ type GeminiConfig struct {
 // OpenRouterConfig holds OpenRouter API configuration for OmniChat bot personas.
 // When APIKey is empty the generate endpoint returns a 503.
 type OpenRouterConfig struct {
-	APIKey            string // OPENROUTER_API_KEY
-	Model             string // OPENROUTER_MODEL — fixed low-cost model for moderation and legacy callers
-	StandardModel     string // OMNICHAT_MODEL_STANDARD_PRIMARY
+	APIKey        string // OPENROUTER_API_KEY
+	Model         string // OPENROUTER_MODEL — fixed low-cost model for moderation and legacy callers
+	StandardModel string // OMNICHAT_MODEL_STANDARD_PRIMARY
+
+	// ExtractionModel is what reads transcripts in the background: memory
+	// episodes, commitments and their resolutions, and character baselines.
+	//
+	// Separate from StandardModel, which it used to share, because they are
+	// different jobs judged on different things. StandardModel is what a free
+	// member talks to and is chosen for feel and latency; this one never speaks
+	// to anybody and is chosen for whether it holds a distinction under
+	// instruction. Sharing the knob meant fixing extraction would have silently
+	// changed what free members chat with.
+	//
+	// Measured, not guessed: gemini-3.1-flash-lite reads a promise that has only
+	// been *scheduled* as one that was kept, which quietly loses the obligation.
+	// gemini-3-flash-preview holds all five resolution scenarios repeatedly and
+	// still passes the salience rubric, at flash pricing rather than Sonnet's.
+	// See TestLiveCommitmentResolution.
+	ExtractionModel string // OMNICHAT_MODEL_EXTRACTION
+
 	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
 	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
 	PremiumQuickModel string // OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY
@@ -376,6 +394,7 @@ func Load() (*Config, error) {
 			APIKey:            getEnv("OPENROUTER_API_KEY", ""),
 			Model:             getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
 			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.1-flash-lite"),
+			ExtractionModel:   getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3-flash-preview"),
 			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "mistralai/mistral-large-2512"),
 			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "mistralai/mistral-large-2512"),
 			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "anthropic/claude-sonnet-5"),

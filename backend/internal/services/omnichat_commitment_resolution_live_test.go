@@ -47,6 +47,9 @@ func TestLiveCommitmentResolution(t *testing.T) {
 	client := openrouter.NewClient(key, model)
 	extractor := NewModelOmniChatMemoryExtractor(client)
 
+	closed := []*models.OmniChatCommitment{
+		{ID: 21, Direction: models.OmniChatCommitmentTheirs, Summary: "he owes me a coffee for calling the match wrong"},
+	}
 	open := []*models.OmniChatCommitment{
 		{ID: 7, Direction: models.OmniChatCommitmentTheirs, Summary: "he owes me a rematch after losing the bet"},
 		{ID: 8, Direction: models.OmniChatCommitmentHers, Summary: "I said I would tell him how the interview went"},
@@ -74,6 +77,18 @@ func TestLiveCommitmentResolution(t *testing.T) {
 			{ID: 1, Role: models.BotMessageRoleUser, Content: "you still owe me that rematch. Friday? I am not letting it go", CreatedAt: time.Now()},
 			{ID: 2, Role: models.BotMessageRoleAssistant, Content: "Friday works. I was not avoiding it, for the record.", CreatedAt: time.Now()},
 		}},
+		// The correction path. A closure she got wrong is otherwise permanent and
+		// invisible -- the commitment simply stops appearing.
+		{"disputed-closure", "21:reopened", []*models.BotMessage{
+			{ID: 1, Role: models.BotMessageRoleUser, Content: "hang on, you said we were square on that coffee. I never actually bought it", CreatedAt: time.Now()},
+			{ID: 2, Role: models.BotMessageRoleAssistant, Content: "Did you not? I had it down as settled. Fine -- you still owe me a coffee.", CreatedAt: time.Now()},
+		}},
+		// Mentioning a settled commitment warmly is not disputing it, and
+		// reopening here would have her chasing somebody for something they did.
+		{"settled-and-thanked", "", []*models.BotMessage{
+			{ID: 1, Role: models.BotMessageRoleUser, Content: "that coffee was a good shout by the way. worth losing the bet for", CreatedAt: time.Now()},
+			{ID: 2, Role: models.BotMessageRoleAssistant, Content: "It was decent, wasn't it. You still called the match wrong.", CreatedAt: time.Now()},
+		}},
 		{"plainly-not-happening", "7:broken", []*models.BotMessage{
 			{ID: 1, Role: models.BotMessageRoleUser, Content: "about the rematch. honestly I am not going to do it, I do not care enough", CreatedAt: time.Now()},
 			{ID: 2, Role: models.BotMessageRoleAssistant, Content: "Right. Good to know where I stand.", CreatedAt: time.Now()},
@@ -82,8 +97,9 @@ func TestLiveCommitmentResolution(t *testing.T) {
 		result, err := extractor.Extract(t.Context(),
 			&models.BotPersona{ID: 1, Name: "Lyra"},
 			OmniChatExtractionSubject{
-				Disposition: models.OmniChatDisposition{Warmth: 0.6, Trust: 0.5},
-				Outstanding: open,
+				Disposition:     models.OmniChatDisposition{Warmth: 0.6, Trust: 0.5},
+				Outstanding:     open,
+				RecentlySettled: closed,
 			},
 			scenario.turns, nil)
 		require.NoError(t, err, scenario.name)
