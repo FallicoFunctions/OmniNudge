@@ -86,11 +86,15 @@ type OpenRouterConfig struct {
 	// instruction. Sharing the knob meant fixing extraction would have silently
 	// changed what free members chat with.
 	//
+	// It still has its own setting even while it points at the same model as
+	// chat, because the reason they are separate has not gone away: they are
+	// judged on different things, and the next model that is better at one will
+	// not automatically be better at the other.
+	//
 	// Measured, not guessed: gemini-3.1-flash-lite reads a promise that has only
 	// been *scheduled* as one that was kept, which quietly loses the obligation.
-	// gemini-3-flash-preview holds all five resolution scenarios repeatedly and
-	// still passes the salience rubric, at flash pricing rather than Sonnet's.
-	// See TestLiveCommitmentResolution.
+	// gemini-3.7-flash fails it too, despite costing more. 3.5-flash-lite holds
+	// all seven scenarios repeatedly. See TestLiveCommitmentResolution.
 	ExtractionModel string // OMNICHAT_MODEL_EXTRACTION
 
 	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
@@ -391,14 +395,25 @@ func Load() (*Config, error) {
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
 		},
 		OpenRouter: OpenRouterConfig{
-			APIKey:            getEnv("OPENROUTER_API_KEY", ""),
-			Model:             getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
-			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.1-flash-lite"),
-			ExtractionModel:   getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3-flash-preview"),
-			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "mistralai/mistral-large-2512"),
-			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "mistralai/mistral-large-2512"),
-			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "anthropic/claude-sonnet-5"),
-			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "anthropic/claude-sonnet-5"),
+			APIKey: getEnv("OPENROUTER_API_KEY", ""),
+			Model:  getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
+			// One model everywhere by default. A tier buys volume, features, and
+			// how hard she thinks -- not a different character. Somebody who
+			// upgrades because they liked talking to her should get more of
+			// her, not a stranger with her name.
+			//
+			// Measured rather than assumed: on the response corpus
+			// gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3-flash-preview
+			// and claude-sonnet-5 all pass 9 of 9, and mistral-large -- which
+			// used to be the paid upgrade -- passes 8. There was never a quality
+			// argument for the ladder. 3.5-flash-lite is the one that also holds
+			// the extraction distinctions, at a third of Sonnet's input price.
+			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.5-flash-lite"),
+			ExtractionModel:   getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3.5-flash-lite"),
+			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "google/gemini-3-flash-preview"),
+			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "google/gemini-3.5-flash-lite"),
+			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "google/gemini-3.5-flash-lite"),
+			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "google/gemini-3.5-flash-lite"),
 			UltraFastModel:    getEnv("OMNICHAT_MODEL_ULTRA_FAST_PRIMARY", "anthropic/claude-opus-4.8"),
 		},
 		OmniChatMedia: OmniChatMediaConfig{

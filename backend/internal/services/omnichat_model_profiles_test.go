@@ -18,18 +18,20 @@ func TestDefaultOmniChatModelProfilesAreServerOwnedNamedOffers(t *testing.T) {
 	}, []OmniChatModelProfileKey{profiles[0].Key, profiles[1].Key, profiles[2].Key, profiles[3].Key, profiles[4].Key})
 
 	standard := profiles[0]
-	require.Equal(t, "google/gemini-3.1-flash-lite", standard.ModelKey)
+	require.Equal(t, "google/gemini-3.5-flash-lite", standard.ModelKey)
 	require.Equal(t, OmniChatModelReasoningEffortLow, standard.ReasoningEffort)
 	require.Equal(t, OmniChatModelSpeedStandard, standard.Speed)
 
 	quick := profiles[2]
 	require.Equal(t, OmniChatModelTierPremium, quick.RequiredTier)
-	require.Equal(t, "anthropic/claude-sonnet-5", quick.ModelKey)
+	// Same model as Standard, deliberately. A tier buys effort and volume, not a
+	// different character -- upgrading must not hand somebody a stranger.
+	require.Equal(t, standard.ModelKey, quick.ModelKey)
 	require.Equal(t, OmniChatModelReasoningEffortLow, quick.ReasoningEffort)
 	require.Equal(t, OmniChatModelSpeedStandard, quick.Speed)
 
 	deep := profiles[3]
-	require.Equal(t, "anthropic/claude-sonnet-5", deep.ModelKey)
+	require.Equal(t, standard.ModelKey, deep.ModelKey)
 	require.Equal(t, OmniChatModelReasoningEffortHigh, deep.ReasoningEffort)
 	require.Equal(t, OmniChatModelProfilePremiumQuick, deep.FallbackProfileKey)
 

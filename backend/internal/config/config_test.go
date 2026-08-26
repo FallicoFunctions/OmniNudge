@@ -72,13 +72,24 @@ func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
 
 	cfg, err := Load()
 	require.NoError(t, err)
-	require.Equal(t, "google/gemini-3.1-flash-lite", cfg.OpenRouter.StandardModel)
+	// One model across every tier. A tier buys volume, features and how hard she
+	// thinks; it does not buy a different character.
+	require.Equal(t, "google/gemini-3.5-flash-lite", cfg.OpenRouter.StandardModel)
+	require.Equal(t, "google/gemini-3.5-flash-lite", cfg.OpenRouter.PlusModel)
+	require.Equal(t, "google/gemini-3.5-flash-lite", cfg.OpenRouter.PremiumQuickModel)
+	require.Equal(t, "google/gemini-3.5-flash-lite", cfg.OpenRouter.PremiumDeepModel)
 
-	// Extraction has its own default and must not silently follow the chat
-	// model. They are chosen on different criteria, and when they shared a knob,
-	// fixing one would have changed what free members talk to.
-	require.Equal(t, "google/gemini-3-flash-preview", cfg.OpenRouter.ExtractionModel)
-	require.NotEqual(t, cfg.OpenRouter.StandardModel, cfg.OpenRouter.ExtractionModel)
+	// Extraction keeps its own setting even while it names the same model. What
+	// matters is that it *can* differ, not that it does: the two are judged on
+	// different things, and the next model better at one will not automatically
+	// be better at the other. Asserting they differ would have been asserting
+	// the wrong half of that.
+	require.Equal(t, "google/gemini-3.5-flash-lite", cfg.OpenRouter.ExtractionModel)
+	t.Setenv("OMNICHAT_MODEL_EXTRACTION", "some/other-model")
+	independent, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "some/other-model", independent.OpenRouter.ExtractionModel)
+	require.Equal(t, "google/gemini-3.5-flash-lite", independent.OpenRouter.StandardModel)
 	require.Equal(t, "runpod", cfg.OmniChatMedia.Provider)
 	require.Equal(t, "server-only", cfg.OmniChatMedia.RunPodAPIKey)
 	require.Equal(t, "image-endpoint", cfg.OmniChatMedia.RunPodImageEndpointID)

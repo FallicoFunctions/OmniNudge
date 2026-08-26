@@ -48,12 +48,23 @@ type OmniChatModelProfile struct {
 
 // DefaultOmniChatModelProfiles returns a fresh copy so callers cannot mutate
 // the server-owned catalog shared by later requests.
+// Every profile below the credit-gated one names the same model on purpose.
+//
+// A tier buys volume, features, and how hard she thinks -- reasoning effort and
+// speed still differ -- and not a different character. Somebody who upgrades
+// because they liked talking to her should get more of her, not a stranger
+// wearing her name, and the ladder never bought quality anyway: on the response
+// corpus the free model and Sonnet both pass 9 of 9, and the old paid middle
+// tier passed 8.
+//
+// UltraFast keeps a more capable model because it is an OmniCredits purchase
+// rather than a tier floor -- a choice somebody makes, not a swap done to them.
 func DefaultOmniChatModelProfiles() []OmniChatModelProfile {
 	return []OmniChatModelProfile{
-		{Key: OmniChatModelProfileStandard, RequiredTier: OmniChatModelTierFree, ModelKey: "google/gemini-3.1-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePlus, RequiredTier: OmniChatModelTierPlus, ModelKey: "mistralai/mistral-large-2512", ReasoningEffort: OmniChatModelReasoningEffortMedium, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfileStandard, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePremiumQuick, RequiredTier: OmniChatModelTierPremium, ModelKey: "anthropic/claude-sonnet-5", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePlus, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium, ModelKey: "anthropic/claude-sonnet-5", ReasoningEffort: OmniChatModelReasoningEffortHigh, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePremiumQuick, CreditMultiplier: 1},
+		{Key: OmniChatModelProfileStandard, RequiredTier: OmniChatModelTierFree, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, CreditMultiplier: 1},
+		{Key: OmniChatModelProfilePlus, RequiredTier: OmniChatModelTierPlus, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortMedium, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfileStandard, CreditMultiplier: 1},
+		{Key: OmniChatModelProfilePremiumQuick, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePlus, CreditMultiplier: 1},
+		{Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortHigh, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePremiumQuick, CreditMultiplier: 1},
 		{Key: OmniChatModelProfileUltraFast, RequiredTier: OmniChatModelTierPremium, ModelKey: "anthropic/claude-opus-4.8", ReasoningEffort: OmniChatModelReasoningEffortHigh, Speed: OmniChatModelSpeedFast, FallbackProfileKey: OmniChatModelProfilePremiumDeep, CreditMultiplier: 2, RequiresOmniCredits: true},
 	}
 }
@@ -134,6 +145,9 @@ func ValidateOmniChatModelProfileCatalog(profiles []OmniChatModelProfile) error 
 			return fmt.Errorf("omnichat model profiles: fallback %q for %q increases credit cost", fallback.Key, profile.Key)
 		}
 	}
+	if err := validateOneCharacterAcrossTiers(profiles); err != nil {
+		return err
+	}
 	for _, profile := range profiles {
 		seen := map[OmniChatModelProfileKey]bool{}
 		for current := profile; current.FallbackProfileKey != ""; {
@@ -147,20 +161,55 @@ func ValidateOmniChatModelProfileCatalog(profiles []OmniChatModelProfile) error 
 	return nil
 }
 
+// validateKnownOmniChatProfile guards what each named offer promises.
+//
+// It used to pin a specific model to each paid tier, which was the right
+// instinct pointed at the wrong thing: those pins were what made upgrading
+// hand somebody a different character. The promise worth enforcing is the
+// opposite one.
 func validateKnownOmniChatProfile(profile OmniChatModelProfile) error {
 	switch profile.Key {
 	case OmniChatModelProfilePremiumQuick:
-		if profile.RequiredTier != OmniChatModelTierPremium || profile.ModelKey != "anthropic/claude-sonnet-5" || profile.ReasoningEffort != OmniChatModelReasoningEffortLow || profile.Speed != OmniChatModelSpeedStandard {
-			return fmt.Errorf("omnichat model profiles: premium_quick must use Claude Sonnet 5 at low effort and standard speed")
+		if profile.RequiredTier != OmniChatModelTierPremium || profile.ReasoningEffort != OmniChatModelReasoningEffortLow || profile.Speed != OmniChatModelSpeedStandard {
+			return fmt.Errorf("omnichat model profiles: premium_quick must be a premium offer at low effort and standard speed")
 		}
 	case OmniChatModelProfilePremiumDeep:
-		if profile.RequiredTier != OmniChatModelTierPremium || profile.ModelKey != "anthropic/claude-sonnet-5" || profile.ReasoningEffort != OmniChatModelReasoningEffortHigh || profile.Speed != OmniChatModelSpeedStandard {
-			return fmt.Errorf("omnichat model profiles: premium_deep must use Claude Sonnet 5 at high effort and standard speed")
+		if profile.RequiredTier != OmniChatModelTierPremium || profile.ReasoningEffort != OmniChatModelReasoningEffortHigh || profile.Speed != OmniChatModelSpeedStandard {
+			return fmt.Errorf("omnichat model profiles: premium_deep must be a premium offer at high effort and standard speed")
 		}
 	case OmniChatModelProfileUltraFast:
+		// The one profile that keeps a pinned model, because it is the one
+		// somebody buys on purpose rather than arrives at by subscribing.
 		if profile.RequiredTier != OmniChatModelTierPremium || profile.ModelKey != "anthropic/claude-opus-4.8" || profile.ReasoningEffort != OmniChatModelReasoningEffortHigh || profile.Speed != OmniChatModelSpeedFast || !profile.RequiresOmniCredits {
 			return fmt.Errorf("omnichat model profiles: ultra_fast must use Claude Opus 4.8 at high effort, fast speed, and OmniCredits")
 		}
+	}
+	return nil
+}
+
+// validateOneCharacterAcrossTiers is the promise that replaced the pins: every
+// subscription profile talks to the same model, so upgrading buys volume,
+// features and how hard she thinks -- never a different person wearing her name.
+//
+// UltraFast is exempt. It is an OmniCredits purchase somebody makes
+// deliberately, not something a subscription silently swaps underneath them.
+func validateOneCharacterAcrossTiers(profiles []OmniChatModelProfile) error {
+	baseline := ""
+	for _, profile := range profiles {
+		if profile.Key == OmniChatModelProfileStandard {
+			baseline = profile.ModelKey
+		}
+	}
+	if baseline == "" {
+		return nil
+	}
+	for _, profile := range profiles {
+		if profile.RequiresOmniCredits || profile.ModelKey == "" || profile.ModelKey == baseline {
+			continue
+		}
+		return fmt.Errorf(
+			"omnichat model profiles: %q uses %q but subscription tiers must all use %q; a tier buys more of her, not a different her",
+			profile.Key, profile.ModelKey, baseline)
 	}
 	return nil
 }
