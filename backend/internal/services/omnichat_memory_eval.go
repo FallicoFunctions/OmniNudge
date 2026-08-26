@@ -307,15 +307,15 @@ func RunOmniChatMemoryEval(
 		})
 	}
 
-	episodes, err := extractor.Extract(ctx, persona, evalCase.Subject, messages, nil)
+	extracted, err := extractor.Extract(ctx, persona, evalCase.Subject, messages, nil)
 	if err != nil {
 		result.Err = err
 		return result
 	}
-	result.Episodes = episodes
+	result.Episodes = extracted.Episodes
 
 	entitySet := map[string]struct{}{}
-	for _, episode := range episodes {
+	for _, episode := range extracted.Episodes {
 		if episode.Distinctiveness > result.TopDistinctiveness {
 			result.TopDistinctiveness = episode.Distinctiveness
 		}

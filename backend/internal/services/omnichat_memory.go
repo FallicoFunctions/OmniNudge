@@ -94,7 +94,7 @@ type OmniChatExtractionSubject struct {
 
 // OmniChatMemoryExtractor turns a stretch of transcript into episodes.
 type OmniChatMemoryExtractor interface {
-	Extract(ctx context.Context, persona *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error)
+	Extract(ctx context.Context, persona *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) (OmniChatExtractionResult, error)
 }
 
 // OmniChatMemoryService owns character memory: extraction off the request path,
@@ -106,6 +106,62 @@ type OmniChatMemoryService struct {
 	personas      omniChatMemoryPersonaReader
 	extractor     OmniChatMemoryExtractor
 	weights       models.OmniChatMemoryRecallWeights
+
+	// Optional. A deployment without it extracts memory and quietly drops
+	// commitments, which is what every deployment did before they existed --
+	// worse than recording them, better than failing extraction over them.
+	commitments omniChatCommitmentWriter
+}
+
+type omniChatCommitmentWriter interface {
+	Record(ctx context.Context, commitment models.OmniChatCommitment) (*models.OmniChatCommitment, bool, error)
+}
+
+// SetCommitments wires the store for what an exchange obliges either party to.
+func (s *OmniChatMemoryService) SetCommitments(commitments omniChatCommitmentWriter) *OmniChatMemoryService {
+	if s != nil {
+		s.commitments = commitments
+	}
+	return s
+}
+
+// recordCommitments stores what this exchange left outstanding.
+//
+// Failures are logged and swallowed on purpose. The episodes are already
+// written by this point, and failing the extraction over a commitment would
+// roll the watermark back and re-read a transcript whose memories landed fine.
+// A missed commitment is a character who forgot a promise; a wedged watermark
+// is a character who stops remembering anything.
+func (s *OmniChatMemoryService) recordCommitments(
+	ctx context.Context, personaID, ownerUserID, conversationID, sourceMessageID int,
+	commitments []models.OmniChatCommitment,
+) {
+	if s == nil || s.commitments == nil || len(commitments) == 0 {
+		return
+	}
+	for _, commitment := range commitments {
+		commitment.PersonaID = personaID
+		commitment.OwnerUserID = ownerUserID
+		commitment.ConversationID = &conversationID
+		commitment.SourceMessageID = &sourceMessageID
+
+		stored, created, err := s.commitments.Record(ctx, commitment)
+		if err != nil {
+			zlog.Warn().Err(err).
+				Int("persona_id", personaID).
+				Int("conversation_id", conversationID).
+				Msg("omnichat commitment: could not record what was promised")
+			continue
+		}
+		if !created {
+			continue
+		}
+		zlog.Info().
+			Int64("commitment_id", stored.ID).
+			Str("direction", stored.Direction).
+			Int("conversation_id", conversationID).
+			Msg("omnichat commitment: recorded")
+	}
 }
 
 func NewOmniChatMemoryService(
@@ -262,7 +318,7 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 	}
 
 	extractCtx, cancel := context.WithTimeout(ctx, omniChatMemoryExtractionTimeout)
-	episodes, extractErr := s.extractor.Extract(extractCtx, persona, subject, usable, alreadyRecorded)
+	extracted, extractErr := s.extractor.Extract(extractCtx, persona, subject, usable, alreadyRecorded)
 	cancel()
 	if extractErr != nil {
 		zlog.Warn().Err(extractErr).Int("conversation_id", conversationID).Msg("omnichat memory: extraction failed")
@@ -277,8 +333,8 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 		return false, fmt.Errorf("%w: %w", ErrOmniChatMemoryExtractionFailed, extractErr)
 	}
 
-	stored := make([]models.OmniChatMemoryEpisode, 0, len(episodes))
-	for _, episode := range episodes {
+	stored := make([]models.OmniChatMemoryEpisode, 0, len(extracted.Episodes))
+	for _, episode := range extracted.Episodes {
 		episode.PersonaID = persona.ID
 		episode.OwnerUserID = ownerUserID
 		episode.ConversationID = conversationID
@@ -322,6 +378,12 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 		}
 		return false, err
 	}
+
+	// After the episodes are committed, and only if they were. A commitment
+	// recorded for turns whose memories lost the race would be a promise she
+	// holds somebody to without remembering the conversation it came from.
+	s.recordCommitments(ctx, persona.ID, ownerUserID, conversationID, throughMessageID, extracted.Commitments)
+
 	zlog.Debug().
 		Int("conversation_id", conversationID).
 		Int("episodes", len(stored)).
@@ -611,6 +673,11 @@ type memoryExtractionInput struct {
 	AlreadyRecorded []models.OmniChatMemoryRoot `json:"already_recorded,omitempty"`
 }
 
+type memoryExtractionCommitment struct {
+	Direction string `json:"direction"`
+	Summary   string `json:"summary"`
+}
+
 type memoryExtractionEpisode struct {
 	Title            string   `json:"title"`
 	Summary          string   `json:"summary"`
@@ -626,7 +693,18 @@ type memoryExtractionEpisode struct {
 }
 
 type memoryExtractionOutput struct {
-	Episodes []memoryExtractionEpisode `json:"episodes"`
+	Episodes    []memoryExtractionEpisode    `json:"episodes"`
+	Commitments []memoryExtractionCommitment `json:"commitments"`
+}
+
+// OmniChatExtractionResult is everything one reading of a transcript produced.
+//
+// A struct rather than a second return value: what an exchange leaves behind is
+// open-ended -- episodes, commitments, and whatever the next slice adds -- and
+// each of those should not be another signature change through five files.
+type OmniChatExtractionResult struct {
+	Episodes    []models.OmniChatMemoryEpisode
+	Commitments []models.OmniChatCommitment
 }
 
 // The two scores are the whole point of this prompt.
@@ -679,7 +757,15 @@ If a listed memory is only mentioned in passing rather than retold, record nothi
 
 Set retells_id to 0 for anything this exchange establishes for the first time. Only use an id that appears in the list.
 
-Return at most 4 episodes. Required keys: episodes. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases.`
+commitments are the separate question of what this exchange obliges either of them to later. A bet, a dare, a promise, "I will tell you tomorrow", "you owe me one" -- anything said here that makes something true or expected afterwards. Give each a direction and a summary written from her side.
+
+direction is "hers" when she is the one who undertook it, and "theirs" when she is the one who is owed. Record both: whether she keeps her word and whether they keep theirs are separate facts about the two of them, and she notices being let down as much as letting somebody down.
+
+Only record what was actually undertaken. Wondering aloud is not a promise, "we should do that sometime" is not a plan, and enthusiasm is not an agreement. If nobody would be surprised to find it had not happened, it is not a commitment. Return an empty list rather than reaching for one.
+
+Do not record a commitment that this exchange also settles. Somebody who promises to send a link and sends it in the next message has not left anything outstanding.
+
+Return at most 4 episodes and at most 3 commitments. Required keys: episodes, commitments. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases. Each commitment requires direction and summary.`
 
 // renderExtractionSubject describes the relationship the way the disposition
 // block describes it to the character herself -- as a state, in language.
@@ -706,9 +792,9 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 	subject OmniChatExtractionSubject,
 	messages []*models.BotMessage,
 	alreadyRecorded []models.OmniChatMemoryRoot,
-) ([]models.OmniChatMemoryEpisode, error) {
+) (OmniChatExtractionResult, error) {
 	if e == nil || e.client == nil {
-		return nil, errors.New("omnichat memory: extraction client is unavailable")
+		return OmniChatExtractionResult{}, errors.New("omnichat memory: extraction client is unavailable")
 	}
 	personaName := ""
 	if persona != nil {
@@ -721,11 +807,11 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 		AlreadyRecorded: alreadyRecorded,
 	}
 	if len(input.Transcript) == 0 {
-		return nil, nil
+		return OmniChatExtractionResult{}, nil
 	}
 	payload, err := json.Marshal(input)
 	if err != nil {
-		return nil, fmt.Errorf("omnichat memory: encode extraction input: %w", err)
+		return OmniChatExtractionResult{}, fmt.Errorf("omnichat memory: encode extraction input: %w", err)
 	}
 	request := []openrouter.Message{
 		{Role: openrouter.RoleSystem, Content: omniChatMemoryExtractionSystemPrompt},
@@ -742,17 +828,17 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 		response, err = e.client.Generate(ctx, request, func(string) {})
 	}
 	if err != nil {
-		return nil, fmt.Errorf("omnichat memory: extract: %w", err)
+		return OmniChatExtractionResult{}, fmt.Errorf("omnichat memory: extract: %w", err)
 	}
 
 	var output memoryExtractionOutput
 	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(response)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&output); err != nil {
-		return nil, fmt.Errorf("omnichat memory: decode extraction: %w", err)
+		return OmniChatExtractionResult{}, fmt.Errorf("omnichat memory: decode extraction: %w", err)
 	}
 	if err := ensureJSONDocumentEnded(decoder); err != nil {
-		return nil, err
+		return OmniChatExtractionResult{}, err
 	}
 
 	episodes := make([]models.OmniChatMemoryEpisode, 0, len(output.Episodes))
@@ -775,7 +861,24 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 		}
 		episodes = append(episodes, episode)
 	}
-	return episodes, nil
+
+	// A direction the model invented is dropped rather than guessed at. Filing
+	// something she owes as something she is owed inverts who is disappointed in
+	// whom, which is worse than not recording it.
+	commitments := make([]models.OmniChatCommitment, 0, len(output.Commitments))
+	for _, raw := range output.Commitments {
+		direction := strings.ToLower(strings.TrimSpace(raw.Direction))
+		summary := strings.TrimSpace(raw.Summary)
+		if summary == "" || !models.ValidOmniChatCommitmentDirection(direction) {
+			continue
+		}
+		commitments = append(commitments, models.OmniChatCommitment{
+			Direction: direction,
+			Summary:   summary,
+		})
+	}
+
+	return OmniChatExtractionResult{Episodes: episodes, Commitments: commitments}, nil
 }
 
 func clampUnit(value float64) float64 {

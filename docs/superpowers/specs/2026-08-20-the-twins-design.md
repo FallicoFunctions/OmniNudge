@@ -976,14 +976,50 @@ holds herself to anything is a very good transcript.
 3. **Resolved.** Somebody did or did not do the thing.
 4. **Answered.** How she takes that, which is where the trait system already is.
 
-Steps 1 and 4 sit on machinery that exists. Step 2 does not: an episode's status
-is active, superseded, corrected or hidden, and it has nowhere to record a
-counterparty, a direction, or whether the thing was ever done. That is a small
-addition rather than a hard one.
+Steps 1, 2 and 4 are built (migration 194). Extraction notices what an exchange
+obliged either of them to, `omnichat_commitments` holds it with a direction and
+a counterparty, and what is still open is rendered into every later prompt.
 
-**Step 3 is the gap**, and it is the whole of the interesting work: she would
-remember the bet perfectly well, and nothing anywhere would ever prompt her to
-wonder whether you paid up.
+**Step 3 remains the gap**, and it is the whole of the interesting work: she
+remembers the bet perfectly well, and nothing anywhere prompts her to wonder
+whether you paid up. `Resolve` exists and nothing calls it.
+
+### What was built, and the decisions inside it
+
+**A table rather than columns on episodes.** An episode records that something
+happened, is scored for how memorable it was, and is finished the moment it is
+written. A commitment is unfinished by definition, has two parties and a
+direction, and is interesting precisely while nothing has happened to it. Four
+more columns on episodes would have been four columns almost no episode uses.
+
+**Always owned.** A memory can be a character's own; a commitment cannot,
+because there is always somebody on the other end. Even for a character whose
+memory is shared across everyone, what she owes is owed to one person.
+
+**Both directions, kept apart.** Whether she keeps her word and whether they
+keep theirs are separate facts, and being chased for something you are actually
+owed is a specific kind of galling -- so the prompt renders them under separate
+headings rather than as one list.
+
+**Released is not broken.** A bet called off, a favour that stopped mattering,
+something both of them let go: collapsing that into broken would have her
+resenting things nobody minded about.
+
+**Recorded, not raised.** The block says what is unsettled and explicitly does
+not say to bring it up. A person carrying an unkept promise does not raise it
+every time they speak; sometimes it only colours the tone. A character told to
+mention them would do nothing else.
+
+**Duplicates are the real hazard, not volume.** Extraction runs over a sliding
+window, so the same promise is read several times, and a character who believes
+she was promised the same thing four times is worse than one who missed it.
+Recording is idempotent on direction and summary while a commitment is open.
+
+**Storage failures are swallowed.** The episodes are already committed by then,
+and failing extraction over a commitment would roll the watermark back and
+re-read a transcript whose memories landed fine. A missed promise is a character
+who forgot one; a wedged watermark is a character who stops remembering
+anything.
 
 ### Some commitments are checkable and most are not
 
