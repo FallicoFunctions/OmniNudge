@@ -413,6 +413,16 @@ const (
 	// one has less to spend. Same code, different card.
 	omniChatBlockPatienceSpan = 0.2
 
+	// Firmness moves it the other way. Warmth is how much she will endure;
+	// firmness is how willing she is to end it, and they are not the same
+	// question -- somebody can be fond of a person and still be the sort who
+	// says "we are done" the moment it stops being worth it.
+	//
+	// The two extremes are the interesting ones. Warm and yielding stays far
+	// past the point anybody would advise, which is a recognisable kind of
+	// person and not a bug. Cool and firm is gone almost immediately.
+	omniChatBlockFirmnessSpan = 0.2
+
 	// Blocking discharges the feeling. She has said her piece, and the block is
 	// the consequence -- so the relationship comes back up to just above the
 	// floor rather than sitting on it.
@@ -428,7 +438,9 @@ const (
 // OmniChatBlockThreshold is the relationship warmth at which this character
 // stops talking to this person. Lower means more patience.
 func OmniChatBlockThreshold(baseline OmniChatDispositionBaseline) float64 {
-	return clampTrait(omniChatBlockWarmthFloor - baseline.Warmth*omniChatBlockPatienceSpan)
+	return clampTrait(omniChatBlockWarmthFloor -
+		baseline.Warmth*omniChatBlockPatienceSpan +
+		baseline.Firmness*omniChatBlockFirmnessSpan)
 }
 
 // ShouldBlock reports whether this person has worn out their welcome.

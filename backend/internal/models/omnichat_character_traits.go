@@ -219,7 +219,7 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		tiers = append(tiers, userID)
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth,
+		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth, p.baseline_firmness,
 		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth
 		FROM bot_personas p
 		LEFT JOIN omnichat_character_traits t
@@ -232,15 +232,15 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 	defer rows.Close()
 
 	for rows.Next() {
-		var baselineMood, baselineTrust, baselineWarmth *float64
+		var baselineMood, baselineTrust, baselineWarmth, baselineFirmness *float64
 		var owner *int
 		var mood, trust, warmth *float64
 		var moodUpdatedAt *time.Time
-		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth,
+		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth, &baselineFirmness,
 			&owner, &mood, &moodUpdatedAt, &trust, &warmth); err != nil {
 			return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 		}
-		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth)
+		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth, baselineFirmness)
 		// The outer join emits the persona row on its own when no tier
 		// matched, which is a character nobody has met rather than a row to
 		// read.
@@ -272,15 +272,18 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 // written together and constrained all-or-nothing, so a single NULL among them
 // is a character nobody has derived yet -- neutral, and indistinguishable in
 // effect from how she behaved before baselines existed.
-func dispositionBaseline(mood, trust, warmth *float64) OmniChatDispositionBaseline {
-	if mood == nil || trust == nil || warmth == nil {
+func dispositionBaseline(mood, trust, warmth, firmness *float64) OmniChatDispositionBaseline {
+	// All four or none. The schema enforces it, and a reader that accepted three
+	// would be treating a partial derivation as a complete one.
+	if mood == nil || trust == nil || warmth == nil || firmness == nil {
 		return OmniChatDispositionBaseline{}
 	}
 	return OmniChatDispositionBaseline{
-		Mood:    clampTrait(*mood),
-		Trust:   clampTrait(*trust),
-		Warmth:  clampTrait(*warmth),
-		Derived: true,
+		Mood:     clampTrait(*mood),
+		Trust:    clampTrait(*trust),
+		Warmth:   clampTrait(*warmth),
+		Firmness: clampTrait(*firmness),
+		Derived:  true,
 	}
 }
 
@@ -403,6 +406,11 @@ type OmniChatDisposition struct {
 	Mood   float64
 	Trust  float64
 	Warmth float64
+
+	// Firmness passes through from the baseline unchanged -- nothing
+	// accumulates it -- and travels here anyway so that everything reading a
+	// disposition reads one object rather than two.
+	Firmness float64
 }
 
 // OmniChatDispositionBaseline is who a character was written to be: the resting
@@ -418,9 +426,21 @@ type OmniChatDisposition struct {
 // is a character nobody has derived, and it composes to exactly the behaviour
 // that existed before baselines did.
 type OmniChatDispositionBaseline struct {
-	Mood    float64
-	Trust   float64
-	Warmth  float64
+	Mood   float64
+	Trust  float64
+	Warmth float64
+
+	// Firmness is how hard she is to move off a no: negative yields under
+	// pressure, positive does not shift for anyone.
+	//
+	// It has no accumulated counterpart, and that is deliberate rather than
+	// unfinished. Whether she can be worn down is who she is; what a
+	// relationship supplies is the *pressure*, which warmth already measures.
+	// Without this axis warmth is the only thing between a character and
+	// somebody leaning on her, which makes fondness into leverage -- the more
+	// she likes you, the more you can extract, with nothing on the other side.
+	Firmness float64
+
 	Derived bool
 }
 
@@ -435,9 +455,10 @@ type OmniChatDispositionBaseline struct {
 // stops the sum running past the scale the wording can express.
 func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, relationship OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
 	return OmniChatDisposition{
-		Mood:   clampTrait(baseline.Mood + self.MoodAt(at) + relationship.MoodAt(at)),
-		Trust:  clampTrait(baseline.Trust + self.Trust + relationship.Trust),
-		Warmth: clampTrait(baseline.Warmth + self.Warmth + relationship.Warmth),
+		Mood:     clampTrait(baseline.Mood + self.MoodAt(at) + relationship.MoodAt(at)),
+		Trust:    clampTrait(baseline.Trust + self.Trust + relationship.Trust),
+		Warmth:   clampTrait(baseline.Warmth + self.Warmth + relationship.Warmth),
+		Firmness: clampTrait(baseline.Firmness),
 	}
 }
 
@@ -447,8 +468,9 @@ func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, rela
 // against.
 func ComposeOmniChatSelfDisposition(baseline OmniChatDispositionBaseline, self OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
 	return OmniChatDisposition{
-		Mood:   clampTrait(baseline.Mood + self.MoodAt(at)),
-		Trust:  clampTrait(baseline.Trust + self.Trust),
-		Warmth: clampTrait(baseline.Warmth + self.Warmth),
+		Mood:     clampTrait(baseline.Mood + self.MoodAt(at)),
+		Trust:    clampTrait(baseline.Trust + self.Trust),
+		Warmth:   clampTrait(baseline.Warmth + self.Warmth),
+		Firmness: clampTrait(baseline.Firmness),
 	}
 }

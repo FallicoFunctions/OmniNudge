@@ -44,13 +44,15 @@ trust: her readiness to take a person at their word. Negative is guarded, suspic
 
 warmth: her fondness and openness toward people. Negative is cold, aloof, keeps distance; positive is affectionate, quick to like people, glad of company.
 
-Read what the card actually says about her, not what her genre usually implies. A character described as flirtatious is not automatically warm -- flirtation can be a tool used at a distance. A character with a painful history is not automatically low; some people carry it lightly. Wit is not warmth. Confidence is not trust.
+firmness: how hard she is to move once she has said no. Negative is someone who folds under pressure, talks herself out of her own position, agrees to keep the peace and resents it after; positive is someone a no from whom is the end of it, however long anybody leans. This is not confidence, aggression, or strength of opinion. A shy character can be immovable and a loud one can cave at the first push. Ask what happens when somebody she likes keeps asking after she has already declined.
+
+Read what the card actually says about her, not what her genre usually implies. A character described as flirtatious is not automatically warm -- flirtation can be a tool used at a distance. A character with a painful history is not automatically low; some people carry it lightly. Wit is not warmth. Confidence is not trust. Agreeableness is not softness: a character written as accommodating may still be immovable about the few things she actually minds.
 
 Be restrained. These numbers are added to whatever later happens to her, so an extreme baseline leaves no room for her life to move her, and a cast where everyone sits at the ends of the scale says nothing about anyone: if all of them are guarded and bleak, none of them is. Most characters belong between -0.4 and 0.4 on any axis. Go past 0.6 only when the card is emphatic and consistent about that trait -- when it is the first thing anyone would say about her. Use 0 freely; a card that says nothing about an axis must get 0 on it, not a guess.
 
 Return only this JSON object, with no other text:
 
-{"mood": 0.0, "trust": 0.0, "warmth": 0.0}`
+{"mood": 0.0, "trust": 0.0, "warmth": 0.0, "firmness": 0.0}`
 
 type omniChatBaselineDerivationCard struct {
 	Name            string   `json:"name"`
@@ -65,9 +67,10 @@ type omniChatBaselineDerivationCard struct {
 }
 
 type omniChatBaselineDerivationOutput struct {
-	Mood   float64 `json:"mood"`
-	Trust  float64 `json:"trust"`
-	Warmth float64 `json:"warmth"`
+	Mood     float64 `json:"mood"`
+	Trust    float64 `json:"trust"`
+	Warmth   float64 `json:"warmth"`
+	Firmness float64 `json:"firmness"`
 }
 
 // OmniChatDispositionBaselineDeriver reads a character's card and reports the
@@ -134,16 +137,20 @@ func (d *OmniChatDispositionBaselineDeriver) Derive(ctx context.Context, persona
 	// Out of range is refused, never clamped. A model that answered 3.2 did not
 	// read the scale it was given, and the rest of that answer has not earned
 	// the benefit of the doubt either.
-	for name, value := range map[string]float64{"mood": output.Mood, "trust": output.Trust, "warmth": output.Warmth} {
+	for name, value := range map[string]float64{
+		"mood": output.Mood, "trust": output.Trust,
+		"warmth": output.Warmth, "firmness": output.Firmness,
+	} {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value < -1 || value > 1 {
 			return models.OmniChatDispositionBaseline{}, fmt.Errorf("omnichat baseline: derivation for %q returned %s=%v, outside -1..1", persona.Name, name, value)
 		}
 	}
 	return models.OmniChatDispositionBaseline{
-		Mood:    output.Mood,
-		Trust:   output.Trust,
-		Warmth:  output.Warmth,
-		Derived: true,
+		Mood:     output.Mood,
+		Trust:    output.Trust,
+		Warmth:   output.Warmth,
+		Firmness: output.Firmness,
+		Derived:  true,
 	}, nil
 }
 

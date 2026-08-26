@@ -97,7 +97,8 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	if phrase := warmthPhrase(disposition.Warmth); phrase != "" {
 		toward = append(toward, phrase)
 	}
-	if mood == "" && len(toward) == 0 {
+	firmness := firmnessPhrase(disposition.Firmness)
+	if mood == "" && firmness == "" && len(toward) == 0 {
 		return ""
 	}
 
@@ -111,7 +112,32 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	if len(toward) > 0 {
 		builder.WriteString("With this person you are " + joinClauses(toward) + ".\n")
 	}
+	// Written as a separate line because it is about her rather than about them.
+	// Folding it into "with this person you are..." would read as something this
+	// relationship produced, when it is the one part of her that does not move.
+	if firmness != "" {
+		builder.WriteString(firmness + "\n")
+	}
 	return strings.TrimRight(builder.String(), "\n")
+}
+
+// firmnessPhrase says what happens when somebody keeps pushing after a no.
+//
+// Deliberately about the behaviour rather than the label. "You are firm" invites
+// a character to announce that she is firm; "a no from you is the end of it"
+// describes what she does, which is the thing that has to show up in the reply.
+func firmnessPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "When you have said no, that is the end of it. Pressure does not move you, and being fond of someone does not make you owe them a yes."
+	case bandMildPositive:
+		return "You do not give in easily once you have said no, though you would rather not make a scene about it."
+	case bandMildNegative:
+		return "You find it hard to hold a no when someone keeps pushing, and you tend to give a little to keep the peace."
+	case bandStrongNegative:
+		return "You fold when someone pushes. You agree to things you did not want, and it sits badly with you afterwards."
+	}
+	return ""
 }
 
 func moodPhrase(value float64) string {

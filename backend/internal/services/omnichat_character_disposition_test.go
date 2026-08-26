@@ -170,3 +170,40 @@ func TestBuildConversationSystemPromptOrdersDispositionBlock(t *testing.T) {
 	require.Less(t, memoryIdx, dispositionIdx, "the history, then what it left her feeling")
 	require.Less(t, dispositionIdx, sceneIdx, "the scene still governs the present")
 }
+
+// Firmness says what she does when pushed, not what she is. "You are firm"
+// invites a character to announce it; describing the behaviour is what actually
+// shows up in a reply.
+func TestFirmnessRendersAsBehaviourAndSitsApartFromTheRelationship(t *testing.T) {
+	immovable := renderCharacterDisposition(models.OmniChatDisposition{
+		Warmth: 0.8, Firmness: 0.9,
+	})
+	pliable := renderCharacterDisposition(models.OmniChatDisposition{
+		Warmth: 0.8, Firmness: -0.9,
+	})
+
+	require.NotEqual(t, immovable, pliable,
+		"two equally fond characters who yield differently must not read alike")
+	require.Contains(t, immovable, "said no")
+	require.Contains(t, pliable, "fold")
+
+	// It is about her, not about them, so it must not be folded into the clause
+	// describing the relationship -- that would read as something this person
+	// produced, when it is the one part of her that does not move.
+	for _, line := range strings.Split(immovable, "\n") {
+		if strings.HasPrefix(line, "With this person you are") {
+			require.NotContains(t, line, "said no")
+		}
+	}
+
+	// And it says nothing at all inside the deadband, like every other trait.
+	require.NotContains(t,
+		renderCharacterDisposition(models.OmniChatDisposition{Warmth: 0.8, Firmness: 0.1}),
+		"said no")
+}
+
+// A character nobody has read renders exactly as one did before firmness
+// existed: silence.
+func TestUnreadFirmnessRendersNothing(t *testing.T) {
+	require.Empty(t, renderCharacterDisposition(models.OmniChatDisposition{}))
+}
