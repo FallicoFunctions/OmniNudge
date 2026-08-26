@@ -308,6 +308,33 @@ func GenerateResponseEvaluationCase(
 	return normalizeAssistantMessageContent(response), nil
 }
 
+// AlignResponseEvaluationCorpusToPersonas rewrites each case's format
+// expectation to match the style its persona is actually configured with.
+//
+// The expectation used to be hardcoded per case, and it was correct when it was
+// written. Then the platform characters were moved to a free-form style, the
+// block-shape contract stopped applying to them, and every case went on
+// asserting it -- so the corpus reported 0 of 9 against a model that was
+// behaving exactly as intended. A stale eval is worse than no eval: it reports
+// failure confidently and moves attention to the wrong thing.
+//
+// Deriving it from the persona means the corpus cannot drift from production
+// again, because it is now reading the same field production reads.
+func AlignResponseEvaluationCorpusToPersonas(
+	corpus ResponseEvaluationCorpus, personas map[string]*models.BotPersona,
+) ResponseEvaluationCorpus {
+	aligned := corpus
+	aligned.Cases = make([]ResponseEvaluationCase, 0, len(corpus.Cases))
+	for _, testCase := range corpus.Cases {
+		persona := personas[testCase.PersonaSlug]
+		if persona != nil {
+			testCase.Expect.PersonalConversation = personaUsesPersonalConversationMode(persona)
+		}
+		aligned.Cases = append(aligned.Cases, testCase)
+	}
+	return aligned
+}
+
 // RunResponseEvaluationCorpus evaluates a supplied responder, so tests can
 // use deterministic fakes and production runners can opt into real requests.
 func RunResponseEvaluationCorpus(ctx context.Context, corpus ResponseEvaluationCorpus, respond ResponseEvaluationResponder) (ResponseEvaluationReport, error) {
@@ -396,7 +423,13 @@ func evaluateResponseEvaluationCase(testCase ResponseEvaluationCase, response st
 		result.FailureReasons = []string{"generation"}
 		return result
 	}
-	semanticsOK, semanticsDetail := validatePersonalConversationSemantics(response)
+	// A character not under the personal-conversation contract is judged only on
+	// what is true of any character. Applying the contract's own rules to her
+	// marks her down for following the instructions she was actually given.
+	semanticsOK, semanticsDetail := validateUniversalResponseSemantics(response)
+	if testCase.Expect.PersonalConversation {
+		semanticsOK, semanticsDetail = validatePersonalConversationSemantics(response)
+	}
 	lengthOK, lengthDetail := meetsConversationalLengthBudget(response)
 	formatOK, formatDetail := validatePersonalConversationFormatting(response)
 	hygieneOK, hygieneDetail := validateAssistantOutputHygiene(response)

@@ -1274,16 +1274,30 @@ func validatePersonalDialogueOnlyRecoveryWithConstraints(response string, constr
 }
 
 func validatePersonalConversationSemantics(response string) (bool, string) {
-	if containsConflictingTurnOwnership(response) {
-		return false, "response contains conflicting turn ownership for the same body target"
+	if valid, detail := validateUniversalResponseSemantics(response); !valid {
+		return false, detail
 	}
+	// The question budget belongs to the personal-conversation contract and to
+	// nothing else. A narrative character is told the opposite -- to end on a
+	// playable opening, which is often a question -- so applying this to one
+	// would be marking her down for following her own instructions.
 	if questions := countQuestionMarks(response); questions > 1 {
 		return false, fmt.Sprintf("response contains %d questions (limit 1)", questions)
+	}
+	return true, "personal conversation response semantics are coherent"
+}
+
+// validateUniversalResponseSemantics is the part that is true of any character
+// in any style: she must not flip who owns a turn, and she must not trail off
+// mid-phrase. Neither depends on a format contract.
+func validateUniversalResponseSemantics(response string) (bool, string) {
+	if containsConflictingTurnOwnership(response) {
+		return false, "response contains conflicting turn ownership for the same body target"
 	}
 	if incompleteIntensifierPattern.MatchString(response) {
 		return false, "response contains an incomplete intensifier fragment"
 	}
-	return true, "personal conversation response semantics are coherent"
+	return true, "response semantics are coherent"
 }
 
 // containsConflictingTurnOwnership catches a high-confidence ownership flip:
