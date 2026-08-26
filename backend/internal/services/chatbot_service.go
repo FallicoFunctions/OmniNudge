@@ -545,7 +545,7 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 // immediately before an existing assistant reply, then replaces that reply in
 // place. The original content is preserved unless generation and persistence
 // both succeed.
-func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversationID, messageID int) (result *models.BotMessage, resultErr error) {
+func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversationID, messageID int) (*models.BotMessage, error) {
 	conv, err := s.convRepo.GetByID(ctx, conversationID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("chatbot: load conversation for regeneration: %w", err)
