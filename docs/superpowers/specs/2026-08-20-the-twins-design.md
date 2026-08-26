@@ -594,6 +594,26 @@ to the creator's.
 Imported character cards can never be IAI: those fields are what a
 card is.
 
+### The platform does not get to say "must" either
+
+Removing the creator's instruction channels is half of it. The other half is
+that **we** stop issuing rules to an IAI about how she behaves.
+
+A platform block that says she must reply in two to four messages is the same
+kind of thing as a creator writing "you will never leave him". It is smaller and
+better intentioned, and it is still somebody outside her deciding how she comes
+across. A character who is independent except where we have opinions is not
+independent, she is on a longer leash.
+
+So a rule aimed at an IAI describes what is *available* rather than what is
+required. She is told that a blank line separates one message from the next. She
+is not told how many to send.
+
+There will be exceptions, taken one at a time rather than by policy. Anything
+that keeps somebody safe, or keeps a promise the interface has already made to a
+reader, can be a "must". The test is whether the rule protects a person or
+merely satisfies a preference about style. Style is hers.
+
 ## 14. Publishing
 
 Publishing a roleplay character ships a template. Every player gets an instance,
@@ -1056,8 +1076,31 @@ length distribution, punctuation and capitalisation habits, whether asterisked
 action ever appears at all. That is derived from the transcript, which is the
 same material §25 is about.
 
-Open: whether mirroring is absolute or a lean. Someone who writes in one-word
-fragments probably does not want one-word replies forever.
+### Resolved: a lean with a floor
+
+Mirroring is a lean, not a copy. She moves toward how you write and keeps a
+minimum of her own substance underneath.
+
+Absolute mirroring turns a terse user into a boring character. Somebody who
+writes in one-word fragments is not asking for one-word replies forever -- he is
+just someone who types that way, and a character who answers "k" to everything
+has not matched him, she has stopped being worth talking to.
+
+The floor is what she will not go below however you write: enough words to
+actually answer, and whatever her own character keeps regardless.
+
+Four things this needs, all of which make it measured rather than instructed:
+
+- **Numbers, not adjectives.** "Write like this person" gets weak results. Words
+  per message, messages per turn, share of messages carrying asterisks,
+  capitalisation rate -- those are countable, and they are what to hand her.
+- **The asterisk rule needs no judgement.** It is a count. Somebody who has
+  never written an action in fifty messages does not get them back.
+- **It belongs to the relationship.** Two people write to the same character
+  differently, so observed style is relational tier, beside memory and warmth.
+- **It needs a sample.** Style cannot be read from three messages. Mirror falls
+  back to default until there is enough history to be reading a habit rather
+  than a mood.
 
 ## 25. Multiple messages, in both directions
 
@@ -1077,6 +1120,43 @@ turn repair that already exists for interrupted replies.
 **Outbound: she should be able to write that way too**, when that is who she is.
 Already noted for the sister in §1, but it belongs to roleplay characters as
 well, and to anything a creator builds.
+
+### The notation is everyone's; the count is not
+
+The response contract already requires a personal-mode reply to be two to four
+blocks separated by blank lines, under a hundred words. She has been writing in
+separate pieces the whole time. The delivery code joins them.
+
+So outbound multi-message is not a generation problem. It is a delivery one:
+store each block as its own message, send them with a gap, and show the typing
+indicator in between. One model call, and the breaks are chosen by the character
+rather than guessed by a splitter that cuts on sentence boundaries and gets it
+wrong.
+
+Two calls would buy one thing -- the second message could react to something
+that arrived after the first -- at three times the cost and with a new problem
+of deciding when she stops. Not worth it for a first version.
+
+**But the rule cannot be given to everyone as it stands**, because "two to four"
+is a requirement, and §13 says we do not hand an IAI requirements about style.
+The rule splits:
+
+- **The notation is universal.** A blank line separates one message from the
+  next. Every character can use it. This is a fact about the medium, like
+  knowing that asterisks render as italics, and telling her is not instructing
+  her.
+- **The count is a roleplay setting.** "Two to four blocks" is a shape somebody
+  chose, so it belongs where shapes are chosen: on the creation form, enforced
+  by the contract, alongside Default and Mirror in §24.
+
+An IAI gets the notation and no count. She sends five short messages or one long
+paragraph because that is who she is, and she can do both on different days.
+
+There is work in the code before either happens. The block rule currently lives
+inside the personal-mode bundle, which also carries the required system prompt,
+scene-state validation, a shorter timeout, extra retries, and the narration
+shape. An IAI must not have scene state -- §2 -- so the count has to come out of
+that bundle before it can be a setting rather than a mode.
 
 ### Where it lives depends on the kind of character
 
