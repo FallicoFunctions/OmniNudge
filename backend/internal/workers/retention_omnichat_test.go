@@ -161,6 +161,49 @@ func TestRetentionWorkerRefundsOrphanedCreditReservation(t *testing.T) {
 	require.Equal(t, models.OmniCreditsReservationRefunded, status)
 }
 
+// A chat hold reaches this worker when a free user buys overage messages and
+// the process dies before the allowance lease is committed. Nothing links it to
+// a generation job, speech row, or call session, so it must land on the refund
+// branch: the reply was never billed, and charging for it later would invent a
+// purchase. Chat is no longer metered per response, which makes the allowance
+// the only thing that reserves against it.
+func TestRetentionWorkerRefundsStrandedOverageChatReservation(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	user := &models.User{Username: "stranded_overage_chat_user", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
+	credits := models.NewOmniCreditsRepository(db.Pool)
+	_, err = credits.CreditPurchased(ctx, user.ID, uuid.New(), 20)
+	require.NoError(t, err)
+	operationID := uuid.New()
+	_, err = credits.ReserveUsage(ctx, user.ID, operationID, models.OmniCreditsUsageChat, 1)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE omnicredits_usage_reservations
+		SET created_at=NOW()-INTERVAL '3 hours', updated_at=NOW()-INTERVAL '3 hours'
+		WHERE user_id=$1 AND operation_id=$2
+	`, user.ID, operationID)
+	require.NoError(t, err)
+
+	worker := NewRetentionWorker(db.Pool, nil, nil, config.RetentionConfig{})
+	worker.cleanupOrphanedOmniCreditsReservations(ctx)
+
+	wallet, err := credits.GetWallet(ctx, user.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(20), wallet.TotalBalance)
+	var status string
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT status FROM omnicredits_usage_reservations
+		WHERE user_id=$1 AND operation_id=$2
+	`, user.ID, operationID).Scan(&status))
+	require.Equal(t, models.OmniCreditsReservationRefunded, status)
+}
+
 func TestRetentionWorkerFailsAndRefundsStaleGenerationReservations(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()
