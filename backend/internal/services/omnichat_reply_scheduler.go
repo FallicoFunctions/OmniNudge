@@ -55,6 +55,23 @@ type replyTimer interface {
 type pendingReply struct {
 	timer  replyTimer
 	userID int
+	// onDone reports what became of this reply exactly once: true when it was
+	// generated, false when it was superseded, cancelled, or dropped at
+	// shutdown. Callers use it to settle whatever they were holding open on the
+	// reply's behalf -- an allowance lease, most of all, since a burst that
+	// coalesces into one answer must give back the messages it did not spend.
+	onDone func(delivered bool)
+}
+
+// settle runs onDone once and never again. Superseding and firing can otherwise
+// both reach for the same entry.
+func (p *pendingReply) settle(delivered bool) {
+	if p == nil || p.onDone == nil {
+		return
+	}
+	done := p.onDone
+	p.onDone = nil
+	done(delivered)
 }
 
 // NewOmniChatReplyScheduler builds a scheduler over whatever produces replies.
@@ -76,8 +93,11 @@ func NewOmniChatReplyScheduler(replier omniChatReplier) *OmniChatReplyScheduler 
 // caller is an HTTP handler that is about to return, and generation takes as
 // long as the model takes; running it inline would put it back on the request
 // this whole layer exists to get it off.
-func (s *OmniChatReplyScheduler) Schedule(userID, conversationID int, delay time.Duration) {
+func (s *OmniChatReplyScheduler) Schedule(userID, conversationID int, delay time.Duration, onDone func(delivered bool)) {
 	if s == nil || conversationID < 1 || userID < 1 {
+		if onDone != nil {
+			onDone(false)
+		}
 		return
 	}
 	if delay < 0 {
@@ -89,20 +109,31 @@ func (s *OmniChatReplyScheduler) Schedule(userID, conversationID int, delay time
 		// explains itself.
 		zlog.Error().Int("conversation_id", conversationID).
 			Msg("omnichat: reply scheduler has no generator; dropping scheduled reply")
+		if onDone != nil {
+			onDone(false)
+		}
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.closed {
+		s.mu.Unlock()
+		if onDone != nil {
+			onDone(false)
+		}
 		return
 	}
-	if existing, ok := s.pending[conversationID]; ok {
-		existing.timer.Stop()
+	superseded := s.pending[conversationID]
+	if superseded != nil {
+		superseded.timer.Stop()
 		delete(s.pending, conversationID)
 	}
-	entry := &pendingReply{userID: userID}
+	entry := &pendingReply{userID: userID, onDone: onDone}
 	entry.timer = s.afterFunc(delay, func() { s.fire(conversationID) })
 	s.pending[conversationID] = entry
+	s.mu.Unlock()
+
+	// Outside the lock: settling talks to the database.
+	superseded.settle(false)
 }
 
 // Cancel drops any pending reply for a conversation. Used when the thing the
@@ -112,11 +143,13 @@ func (s *OmniChatReplyScheduler) Cancel(conversationID int) {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if entry, ok := s.pending[conversationID]; ok {
+	entry := s.pending[conversationID]
+	if entry != nil {
 		entry.timer.Stop()
 		delete(s.pending, conversationID)
 	}
+	s.mu.Unlock()
+	entry.settle(false)
 }
 
 // Pending reports whether a reply is waiting for this conversation.
@@ -137,11 +170,16 @@ func (s *OmniChatReplyScheduler) Close() {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.closed = true
+	dropped := make([]*pendingReply, 0, len(s.pending))
 	for conversationID, entry := range s.pending {
 		entry.timer.Stop()
+		dropped = append(dropped, entry)
 		delete(s.pending, conversationID)
+	}
+	s.mu.Unlock()
+	for _, entry := range dropped {
+		entry.settle(false)
 	}
 }
 
@@ -165,6 +203,9 @@ func (s *OmniChatReplyScheduler) fire(conversationID int) {
 	s.generating[conversationID] = struct{}{}
 	s.mu.Unlock()
 
+	delivered := false
+	defer func() { entry.settle(delivered) }()
+
 	defer func() {
 		s.mu.Lock()
 		delete(s.generating, conversationID)
@@ -181,7 +222,9 @@ func (s *OmniChatReplyScheduler) fire(conversationID int) {
 	// Detached from any request: the one that scheduled this returned long ago.
 	ctx, cancel := context.WithTimeout(context.Background(), omniChatScheduledReplyTimeout)
 	defer cancel()
-	if _, err := s.replier.GenerateReply(ctx, userID, conversationID); err != nil {
+	reply, err := s.replier.GenerateReply(ctx, userID, conversationID)
+	delivered = err == nil && reply != nil && !reply.Failed
+	if err != nil {
 		// The reply is already persisted as a failed turn by the generator
 		// itself where it could be; anything reaching here had no turn to
 		// write, so log rather than lose it silently.

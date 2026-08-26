@@ -24,7 +24,10 @@ func (r *recordingReplier) GenerateReply(_ context.Context, userID, conversation
 	defer r.mu.Unlock()
 	r.users = append(r.users, userID)
 	r.conversations = append(r.conversations, conversationID)
-	return nil, r.err
+	if r.err != nil {
+		return nil, r.err
+	}
+	return &models.BotMessage{ID: len(r.conversations), ConversationID: conversationID}, nil
 }
 
 func (r *recordingReplier) calls() ([]int, []int) {
@@ -81,9 +84,9 @@ func TestSchedulingReplacesThePendingReplySoABurstIsAnsweredOnce(t *testing.T) {
 	scheduler, timers := manualScheduler(replier)
 
 	// Three messages in a row, the way people actually text.
-	scheduler.Schedule(7, 42, time.Second)
-	scheduler.Schedule(7, 42, time.Second)
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
+	scheduler.Schedule(7, 42, time.Second, nil)
+	scheduler.Schedule(7, 42, time.Second, nil)
 
 	require.Len(t, *timers, 3, "each message arms a timer")
 	require.True(t, (*timers)[0].stopped, "an earlier reply must be cancelled, not left to fire")
@@ -106,8 +109,8 @@ func TestSeparateConversationsDoNotDisplaceEachOther(t *testing.T) {
 	replier := &recordingReplier{}
 	scheduler, timers := manualScheduler(replier)
 
-	scheduler.Schedule(7, 42, time.Second)
-	scheduler.Schedule(9, 43, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
+	scheduler.Schedule(9, 43, time.Second, nil)
 
 	require.True(t, scheduler.Pending(42))
 	require.True(t, scheduler.Pending(43))
@@ -124,16 +127,16 @@ func TestCancelAndCloseStopAPendingReplyFromEverArriving(t *testing.T) {
 	replier := &recordingReplier{}
 	scheduler, timers := manualScheduler(replier)
 
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 	scheduler.Cancel(42)
 	require.False(t, scheduler.Pending(42))
 
-	scheduler.Schedule(8, 43, time.Second)
+	scheduler.Schedule(8, 43, time.Second, nil)
 	scheduler.Close()
 	require.False(t, scheduler.Pending(43))
 
 	// Scheduling after Close is refused rather than silently held forever.
-	scheduler.Schedule(9, 44, time.Second)
+	scheduler.Schedule(9, 44, time.Second, nil)
 	require.False(t, scheduler.Pending(44))
 
 	for _, timer := range *timers {
@@ -147,7 +150,7 @@ func TestAFailedScheduledReplyDoesNotLeaveTheConversationPending(t *testing.T) {
 	replier := &recordingReplier{err: errors.New("provider unavailable")}
 	scheduler, timers := manualScheduler(replier)
 
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 	(*timers)[0].run()
 
 	require.False(t, scheduler.Pending(42),
@@ -174,7 +177,7 @@ func (r *blockingReplier) GenerateReply(_ context.Context, _, _ int) (*models.Bo
 		close(r.done)
 		<-r.release
 	}
-	return nil, nil
+	return &models.BotMessage{ID: 1}, nil
 }
 
 func (r *blockingReplier) startedCount() int {
@@ -187,12 +190,12 @@ func TestAFollowUpDoesNotRaceTheReplyItFollows(t *testing.T) {
 	replier := &blockingReplier{release: make(chan struct{}), done: make(chan struct{})}
 	scheduler, timers := manualScheduler(replier)
 
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 	go (*timers)[0].run()
 	<-replier.done // the first reply is now in flight and parked
 
 	// The follow-up arrives while she is still writing.
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 	require.True(t, scheduler.Pending(42))
 	before := len(*timers)
 	(*timers)[before-1].run()
@@ -207,7 +210,7 @@ func TestAFollowUpDoesNotRaceTheReplyItFollows(t *testing.T) {
 
 func TestASchedulerWithNoGeneratorRefusesRatherThanArming(t *testing.T) {
 	scheduler, timers := manualScheduler(nil)
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 	require.Empty(t, *timers)
 	require.False(t, scheduler.Pending(42))
 }
@@ -220,7 +223,7 @@ func (panickingReplier) GenerateReply(context.Context, int, int) (*models.BotMes
 
 func TestAPanickingReplyDoesNotTakeTheProcessDown(t *testing.T) {
 	scheduler, timers := manualScheduler(panickingReplier{})
-	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second, nil)
 
 	require.NotPanics(t, func() { (*timers)[0].run() },
 		"a detached reply has no gin recovery behind it")
@@ -234,12 +237,78 @@ func TestAPanickingReplyDoesNotTakeTheProcessDown(t *testing.T) {
 	require.False(t, busy)
 }
 
+func TestEverySchedulingIsSettledExactlyOnce(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, timers := manualScheduler(replier)
+
+	var mu sync.Mutex
+	outcomes := []bool{}
+	record := func(delivered bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		outcomes = append(outcomes, delivered)
+	}
+
+	// A burst: two superseded, one answered. The two that never happened must
+	// hand back what they were holding, or a coalesced burst quietly charges
+	// for messages it never spent.
+	scheduler.Schedule(7, 42, time.Second, record)
+	scheduler.Schedule(7, 42, time.Second, record)
+	scheduler.Schedule(7, 42, time.Second, record)
+
+	mu.Lock()
+	require.Equal(t, []bool{false, false}, outcomes, "superseded replies settle immediately")
+	mu.Unlock()
+
+	for _, timer := range *timers {
+		timer.run()
+	}
+	mu.Lock()
+	require.Equal(t, []bool{false, false, true}, outcomes, "and the survivor settles as delivered")
+	mu.Unlock()
+}
+
+func TestACancelledOrClosedReplyIsSettledAsUndelivered(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, _ := manualScheduler(replier)
+
+	var mu sync.Mutex
+	outcomes := []bool{}
+	record := func(delivered bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		outcomes = append(outcomes, delivered)
+	}
+
+	scheduler.Schedule(7, 42, time.Second, record)
+	scheduler.Cancel(42)
+	scheduler.Schedule(8, 43, time.Second, record)
+	scheduler.Close()
+	// Refused after close, and refusal is still an outcome the caller must hear.
+	scheduler.Schedule(9, 44, time.Second, record)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []bool{false, false, false}, outcomes)
+}
+
+func TestAFailedReplyIsNotSettledAsDelivered(t *testing.T) {
+	replier := &recordingReplier{err: errors.New("provider unavailable")}
+	scheduler, timers := manualScheduler(replier)
+
+	settled := make(chan bool, 1)
+	scheduler.Schedule(7, 42, time.Second, func(delivered bool) { settled <- delivered })
+	(*timers)[0].run()
+
+	require.False(t, <-settled, "a reply that never arrived must not be charged for")
+}
+
 func TestScheduleRefusesIdentifiersItCouldNotAnswer(t *testing.T) {
 	replier := &recordingReplier{}
 	scheduler, timers := manualScheduler(replier)
 
-	scheduler.Schedule(0, 42, time.Second)
-	scheduler.Schedule(7, 0, time.Second)
+	scheduler.Schedule(0, 42, time.Second, nil)
+	scheduler.Schedule(7, 0, time.Second, nil)
 
 	require.Empty(t, *timers)
 	require.False(t, scheduler.Pending(42))
