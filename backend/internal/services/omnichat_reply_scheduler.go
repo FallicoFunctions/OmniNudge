@@ -238,6 +238,25 @@ func (s *OmniChatReplyScheduler) fire(conversationID int) {
 // the other end of it any more.
 const omniChatScheduledReplyTimeout = 5 * time.Minute
 
+// OmniChatSettleWindow is how long a turn waits before it is answered.
+//
+// It buys two things with one delay. Plenty of people send three short messages
+// rather than one composed one, and answering the first thought before the
+// second arrives is not reading somebody, it is racing them. The window lets a
+// burst finish, because each new message replaces the pending reply and starts
+// the wait again.
+//
+// The second is that a reply which lands the instant a message is sent reads as
+// a machine. Nobody is that fast, and nothing about being fast here is worth
+// the tell.
+//
+// This is the wait after the *last* message, not the total for a burst, so it
+// is what a single message costs. Two seconds is long enough to catch a gap
+// somebody types through and short enough that one message does not feel
+// ignored. Whatever she is busy doing will add to it later; it does not replace
+// it, because she still reads a burst before answering it.
+const OmniChatSettleWindow = 2 * time.Second
+
 // omniChatReplyBusyRetry is how long a reply waits when the conversation is
 // already mid-answer. Short, because it is only bridging the tail of a
 // generation that is already running.

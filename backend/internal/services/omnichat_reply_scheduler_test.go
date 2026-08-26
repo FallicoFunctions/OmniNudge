@@ -83,10 +83,11 @@ func TestSchedulingReplacesThePendingReplySoABurstIsAnsweredOnce(t *testing.T) {
 	replier := &recordingReplier{}
 	scheduler, timers := manualScheduler(replier)
 
-	// Three messages in a row, the way people actually text.
-	scheduler.Schedule(7, 42, time.Second, nil)
-	scheduler.Schedule(7, 42, time.Second, nil)
-	scheduler.Schedule(7, 42, time.Second, nil)
+	// Three messages in a row, the way people actually text, each landing inside
+	// the window the one before it opened.
+	scheduler.Schedule(7, 42, OmniChatSettleWindow, nil)
+	scheduler.Schedule(7, 42, OmniChatSettleWindow, nil)
+	scheduler.Schedule(7, 42, OmniChatSettleWindow, nil)
 
 	require.Len(t, *timers, 3, "each message arms a timer")
 	require.True(t, (*timers)[0].stopped, "an earlier reply must be cancelled, not left to fire")
@@ -301,6 +302,22 @@ func TestAFailedReplyIsNotSettledAsDelivered(t *testing.T) {
 	(*timers)[0].run()
 
 	require.False(t, <-settled, "a reply that never arrived must not be charged for")
+}
+
+func TestTheSettleWindowIsLongEnoughToBeWorthHavingAndShortEnoughToUse(t *testing.T) {
+	// Zero would mean the first message of a burst is answered before the
+	// second one is read, which is the whole thing this window exists to stop:
+	// scheduling only folds messages together while an earlier reply is still
+	// pending.
+	require.Greater(t, OmniChatSettleWindow, time.Duration(0))
+
+	// And this is what one message costs, every time. Past a few seconds a
+	// person who sent one thing is left watching nothing happen.
+	require.LessOrEqual(t, OmniChatSettleWindow, 5*time.Second)
+
+	// It has to outlast the retry that bridges a generation already running, or
+	// a follow-up would jump the queue it is supposed to wait in.
+	require.Greater(t, OmniChatSettleWindow, omniChatReplyBusyRetry)
 }
 
 func TestScheduleRefusesIdentifiersItCouldNotAnswer(t *testing.T) {

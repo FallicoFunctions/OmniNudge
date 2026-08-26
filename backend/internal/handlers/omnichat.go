@@ -678,15 +678,10 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 	}
 
 	leaseSettled = true
-	h.replies.Schedule(userID, conversationID, omniChatImmediateReply, settleLease)
+	h.replies.Schedule(userID, conversationID, services.OmniChatSettleWindow, settleLease)
 
 	c.JSON(http.StatusAccepted, accepted)
 }
-
-// omniChatImmediateReply is the delay used while nothing yet has an opinion
-// about when she should answer. The settling window and whatever she is busy
-// doing replace it; both are a value passed here, not a change to this path.
-const omniChatImmediateReply = 0
 
 // RegenerateMessage replaces the latest assistant reply with a newly
 // generated version. The service preserves the original reply on failure.
