@@ -437,6 +437,15 @@ export interface BotConversationDetail {
   has_more?: boolean;
 }
 
+/**
+ * What sending a message returns now: confirmation the turn was recorded, not
+ * the answer to it. The answer arrives over the websocket when she gets to it.
+ */
+export interface OmniChatAcceptedTurn {
+  accepted: boolean;
+  user_message?: BotMessage;
+}
+
 export interface BotMessagePage {
   messages: BotMessage[];
   has_more: boolean;

@@ -27,6 +27,22 @@ type OmniChatHandler struct {
 	modelSelection *services.OmniChatModelSelectionService
 	allowance      *services.OmniChatAllowance
 	idempotency    OmniChatRequestIdempotencyStore
+	replies        *services.OmniChatReplyScheduler
+}
+
+// SetReplyScheduler hands the handler somewhere to put a turn it has accepted
+// but is not going to answer on this request.
+func (h *OmniChatHandler) SetReplyScheduler(replies *services.OmniChatReplyScheduler) *OmniChatHandler {
+	h.replies = replies
+	return h
+}
+
+// OmniChatAcceptedTurn is what sending a message returns now: confirmation that
+// the turn was recorded, not the answer to it. The answer arrives over the
+// websocket when she gets to it, which may be after this response is long gone.
+type OmniChatAcceptedTurn struct {
+	Accepted    bool               `json:"accepted"`
+	UserMessage *models.BotMessage `json:"user_message,omitempty"`
 }
 
 type OmniChatRequestIdempotencyStore interface {
@@ -600,14 +616,29 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 			h.failOmniChatRequest(userID, req.RequestID)
 		}
 	}()
+	if h.replies == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Chat is temporarily unavailable")
+		return
+	}
 	lease, ok := reserveOmniChatAllowance(c, h.allowance, 1)
 	if !ok {
 		return
 	}
-	successfulReplies := 0
-	defer commitOmniChatAllowance(h.allowance, lease, &successfulReplies)
+	leaseSettled := false
+	settleLease := func(delivered bool) {
+		replies := 0
+		if delivered {
+			replies = 1
+		}
+		commitOmniChatAllowance(h.allowance, lease, &replies)
+	}
+	defer func() {
+		if !leaseSettled {
+			settleLease(false)
+		}
+	}()
 
-	assistantMsg, err := h.chatbotService.SendMessage(services.WithOmniChatClientRequestID(c.Request.Context(), req.RequestID), userID, conversationID, content)
+	userTurn, err := h.chatbotService.AcceptUserTurn(services.WithOmniChatClientRequestID(c.Request.Context(), req.RequestID), userID, conversationID, content)
 	if err != nil {
 		if respondOmniChatCreditsRequired(c, err) {
 			return
@@ -623,23 +654,34 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 				"This character is not talking to you right now.")
 			return
 		}
-		if assistantMsg != nil {
-			completed = true
-			// Generation failed but the exchange was persisted (assistantMsg.Failed
-			// is set with safe, user-facing copy) — return it rather than a 500.
-			c.JSON(http.StatusOK, assistantMsg)
-			return
-		}
 		RespondError(c, http.StatusInternalServerError, "Failed to send message")
 		return
 	}
-	if !assistantMsg.Failed {
-		successfulReplies = 1
+
+	accepted := OmniChatAcceptedTurn{Accepted: true, UserMessage: userTurn}
+	// The claim is settled by acceptance, not by the answer. It used to be
+	// closed when the assistant message was written, and leaving it open until
+	// then would now hold the conversation's in-progress lock for the whole
+	// wait -- so the next message in a burst would be refused as a duplicate
+	// turn rather than folded into this one.
+	if payload, marshalErr := json.Marshal(accepted); marshalErr == nil {
+		if completeErr := h.completeOmniChatRequest(userID, req.RequestID, payload); completeErr != nil {
+			zlog.Warn().Err(completeErr).Int("user_id", userID).
+				Msg("omnichat: failed to close the request claim for an accepted turn")
+		}
 	}
 	completed = true
 
-	c.JSON(http.StatusOK, assistantMsg)
+	leaseSettled = true
+	h.replies.Schedule(userID, conversationID, omniChatImmediateReply, settleLease)
+
+	c.JSON(http.StatusAccepted, accepted)
 }
+
+// omniChatImmediateReply is the delay used while nothing yet has an opinion
+// about when she should answer. The settling window and whatever she is busy
+// doing replace it; both are a value passed here, not a change to this path.
+const omniChatImmediateReply = 0
 
 // RegenerateMessage replaces the latest assistant reply with a newly
 // generated version. The service preserves the original reply on failure.
@@ -765,6 +807,18 @@ func (h *OmniChatHandler) failOmniChatRequest(userID int, requestID uuid.UUID) {
 	if err := h.idempotency.Fail(ctx, userID, requestID); err != nil {
 		zlog.Error().Err(err).Int("user_id", userID).Str("request_id", requestID.String()).Msg("omnichat: failed to release request idempotency claim")
 	}
+}
+
+// completeOmniChatRequest closes a claim with the response a replay should get.
+// The counterpart to failOmniChatRequest, for the path where the work the
+// request asked for is done even though the reply it leads to is not.
+func (h *OmniChatHandler) completeOmniChatRequest(userID int, requestID uuid.UUID, response json.RawMessage) error {
+	if h.idempotency == nil || requestID == uuid.Nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return h.idempotency.Complete(ctx, userID, requestID, response)
 }
 
 func respondOmniChatCreditsRequired(c *gin.Context, err error) bool {

@@ -116,6 +116,21 @@ vi.mock('../../services/omnichatService', () => ({
   },
 }));
 
+// The websocket layer turns a completed reply into this window event; the page
+// listens for it. Tests deliver replies the same way rather than through the
+// send response, which no longer carries one.
+function deliverAssistantReply(message: {
+  id: number;
+  conversation_id: number;
+  role: 'assistant';
+  content: string;
+  failed: boolean;
+  created_at: string;
+  request_id?: string;
+}) {
+  window.dispatchEvent(new CustomEvent('omnichat-message-complete', { detail: message }));
+}
+
 function renderPage(initialEntry = '/omnichat/c/42') {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -219,13 +234,21 @@ describe('OmniChatChatPage', () => {
       default_model_key: 'standard',
       effective_model_key: 'standard',
     });
-    mockSendMessage.mockResolvedValue({
-      id: 7,
-      conversation_id: 42,
-      role: 'assistant',
-      content: 'Reply from the bot.',
-      failed: false,
-      created_at: '2026-07-02T10:16:00Z',
+    // Sending records the turn; the reply follows over the websocket, which the
+    // app surfaces as this window event. The default mock plays both halves so
+    // a test that only cares about "she answered" still gets an answer.
+    mockSendMessage.mockImplementation(async () => {
+      queueMicrotask(() =>
+        deliverAssistantReply({
+          id: 7,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'Reply from the bot.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        })
+      );
+      return { accepted: true };
     });
     mockCreateGeneration.mockResolvedValue({
       id: 'generation-1',
@@ -1332,14 +1355,19 @@ describe('OmniChatChatPage', () => {
       .mockReturnValueOnce('unexpected-new-id');
     mockSendMessage
       .mockRejectedValueOnce(new Error('temporary network failure'))
-      .mockResolvedValueOnce({
-        id: 8,
-        conversation_id: 42,
-        role: 'assistant',
-        content: 'The safely replayed reply.',
-        failed: false,
-        created_at: '2026-07-02T10:17:00Z',
-      });
+      .mockImplementationOnce(async () => {
+      queueMicrotask(() =>
+        deliverAssistantReply({
+          id: 8,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'The safely replayed reply.',
+          failed: false,
+          created_at: '2026-07-02T10:17:00Z',
+        })
+      );
+      return { accepted: true };
+    });
     renderPage();
 
     const composer = await screen.findByPlaceholderText('Say or do something...');
@@ -1363,22 +1391,32 @@ describe('OmniChatChatPage', () => {
       .mockReturnValueOnce('first-send-id')
       .mockReturnValueOnce('second-send-id');
     mockSendMessage
-      .mockResolvedValueOnce({
-        id: 7,
-        conversation_id: 42,
-        role: 'assistant',
-        content: 'First acknowledgment.',
-        failed: false,
-        created_at: '2026-07-02T10:16:00Z',
-      })
-      .mockResolvedValueOnce({
-        id: 8,
-        conversation_id: 42,
-        role: 'assistant',
-        content: 'Second acknowledgment.',
-        failed: false,
-        created_at: '2026-07-02T10:17:00Z',
-      });
+      .mockImplementationOnce(async () => {
+      queueMicrotask(() =>
+        deliverAssistantReply({
+          id: 7,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'First acknowledgment.',
+          failed: false,
+          created_at: '2026-07-02T10:16:00Z',
+        })
+      );
+      return { accepted: true };
+    })
+      .mockImplementationOnce(async () => {
+      queueMicrotask(() =>
+        deliverAssistantReply({
+          id: 8,
+          conversation_id: 42,
+          role: 'assistant',
+          content: 'Second acknowledgment.',
+          failed: false,
+          created_at: '2026-07-02T10:17:00Z',
+        })
+      );
+      return { accepted: true };
+    });
     mockGetConversation.mockResolvedValue({
       conversation: {
         id: 42,

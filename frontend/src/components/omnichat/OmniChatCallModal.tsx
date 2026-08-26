@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom';
 import { Loader2, Mic, MicOff, PhoneOff, Send, Video } from 'lucide-react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import PersonaAvatar from './PersonaAvatar';
-import { createOmniChatRequestId, omnichatService } from '../../services/omnichatService';
+import {
+  createOmniChatRequestId,
+  omnichatService,
+  waitForOmniChatReply,
+} from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
 import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
@@ -269,12 +273,18 @@ export default function OmniChatCallModal({
     setManualText('');
     setStatus('thinking');
     try {
-      const assistant = await omnichatService.sendMessage(
+      // Listen first: the reply can land before the send call settles.
+      const replyArrived = waitForOmniChatReply(conversationId, turnController.signal);
+      // If the send itself fails, nothing below ever awaits this one, and an
+      // unobserved rejection is an unhandled promise rejection.
+      void replyArrived.catch(() => undefined);
+      await omnichatService.sendMessage(
         conversationId,
         content,
         createOmniChatRequestId(),
         turnController.signal
       );
+      const assistant = await replyArrived;
       if (closedRef.current || callEpochRef.current !== callEpoch) return;
       onAssistant(assistant);
       let avatarHandledSpeech = false;

@@ -1280,12 +1280,19 @@ export default function OmniChatChatPage() {
         controller.signal
       );
     },
-    onSuccess: (assistantMessage, intent) => {
+    onSuccess: (_accepted, intent) => {
+      // The turn is recorded; the reply is not here and is not supposed to be.
+      // It arrives on the websocket, which is where it always actually arrived
+      // -- the socket handler below routinely beat this response and aborted it.
+      //
+      // The intent is cleared here rather than when the reply lands, because
+      // the reply can no longer identify the send that caused it: it is written
+      // by a detached generation that never saw the request id. What this ref
+      // tracks is a send still in flight, and this send is no longer in flight.
       if (pendingSendIntentRef.current?.requestId === intent.requestId) {
         pendingSendIntentRef.current = null;
       }
       sendCompletedLiveRef.current = false;
-      completeAssistantMessage(assistantMessage);
     },
     onError: (error, { content, optimisticMessageId, requestId }) => {
       if (sendCompletedLiveRef.current && (error as Error).name === 'AbortError') {

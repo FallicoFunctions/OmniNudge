@@ -32,8 +32,13 @@ vi.mock('livekit-client', () => ({
   Track: { Kind: { Video: 'video', Audio: 'audio' } },
 }));
 
-vi.mock('../../../services/omnichatService', () => ({
+vi.mock('../../../services/omnichatService', async (importOriginal) => ({
   createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
+  // Real, not stubbed: waiting for the reply is the behaviour under test in the
+  // call path now that sending no longer returns one.
+  waitForOmniChatReply: (
+    await importOriginal<typeof import('../../../services/omnichatService')>()
+  ).waitForOmniChatReply,
   omnichatService: {
     startCall: vi.fn(),
     endCall: vi.fn(),
@@ -260,6 +265,19 @@ describe('OmniChatCallModal', () => {
     expect(isTrustedOmniChatCallUrl('javascript:alert(1)')).toBe(false);
   });
 
+  // Sending only records the turn now; the reply reaches the modal over the
+  // websocket, which the app surfaces as this window event.
+  const deliverReply = (message: {
+    id: number;
+    conversation_id: number;
+    role: 'assistant';
+    content: string;
+    failed: boolean;
+    created_at: string;
+  }) => {
+    window.dispatchEvent(new CustomEvent('omnichat-message-complete', { detail: message }));
+  };
+
   it('uses the avatar worker for video speech without duplicating it in the browser', async () => {
     vi.mocked(omnichatService.startCall).mockResolvedValue({
       ...call,
@@ -267,14 +285,7 @@ describe('OmniChatCallModal', () => {
       live_video_url: 'wss://livekit.omninudge.com',
       live_video_token: 'short-lived-token',
     });
-    vi.mocked(omnichatService.sendMessage).mockResolvedValue({
-      id: 99,
-      conversation_id: 12,
-      role: 'assistant',
-      content: 'Hello from the avatar.',
-      failed: false,
-      created_at: '',
-    });
+    vi.mocked(omnichatService.sendMessage).mockResolvedValue({ accepted: true });
     render(
       <OmniChatCallModal
         persona={persona}
@@ -287,6 +298,15 @@ describe('OmniChatCallModal', () => {
     await waitFor(() => expect(roomMock.connect).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText('Type during call'), { target: { value: 'Hi' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send during call' }));
+    await waitFor(() => expect(omnichatService.sendMessage).toHaveBeenCalled());
+    deliverReply({
+      id: 99,
+      conversation_id: 12,
+      role: 'assistant',
+      content: 'Hello from the avatar.',
+      failed: false,
+      created_at: '',
+    });
     await waitFor(() => expect(roomMock.localParticipant.publishData).toHaveBeenCalled());
     expect(speakOmniChatMessage).not.toHaveBeenCalled();
   });
@@ -294,19 +314,7 @@ describe('OmniChatCallModal', () => {
   it('does not start late speech after the user ends a thinking call', async () => {
     vi.mocked(omnichatService.startCall).mockResolvedValue(call);
     vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
-    let resolveMessage!: (message: {
-      id: number;
-      conversation_id: number;
-      role: 'assistant';
-      content: string;
-      failed: boolean;
-      created_at: string;
-    }) => void;
-    vi.mocked(omnichatService.sendMessage).mockReturnValue(
-      new Promise((resolve) => {
-        resolveMessage = resolve;
-      })
-    );
+    vi.mocked(omnichatService.sendMessage).mockResolvedValue({ accepted: true });
     const onAssistant = vi.fn();
     render(
       <OmniChatCallModal
@@ -321,16 +329,18 @@ describe('OmniChatCallModal', () => {
     fireEvent.change(screen.getByLabelText('Type during call'), { target: { value: 'Hello' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send during call' }));
     fireEvent.click(screen.getByRole('button', { name: 'End call' }));
-    await act(async () =>
-      resolveMessage({
+    // The reply lands after the call is over, which is the whole point: it must
+    // not be spoken into a call the user has already left.
+    await act(async () => {
+      deliverReply({
         id: 99,
         conversation_id: 12,
         role: 'assistant',
         content: 'Hi',
         failed: false,
         created_at: '',
-      })
-    );
+      });
+    });
 
     expect(onAssistant).not.toHaveBeenCalled();
     expect(speakOmniChatMessage).not.toHaveBeenCalled();

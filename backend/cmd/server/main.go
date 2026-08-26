@@ -773,8 +773,12 @@ func main() {
 	omniChatMemoryService.SetCommitments(omniChatCommitmentRepo)
 
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
+	// Replies are produced here rather than in the worker: they stream over the
+	// hub, and the hub's clients live in this process.
+	omniChatReplyScheduler := services.NewOmniChatReplyScheduler(chatbotService)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
-		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
+		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
+		SetReplyScheduler(omniChatReplyScheduler)
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
@@ -1875,6 +1879,11 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		zlog.Error().Err(err).Msg("Server forced to shutdown")
 	}
+
+	// Before the hub goes: a reply generated after the sockets close has nowhere
+	// to be delivered. Pending turns are left dangling for the repair path,
+	// which is the same thing that happens on any hard restart.
+	omniChatReplyScheduler.Close()
 
 	// Drain WebSocket connections — send close frames to all connected clients.
 	hub.Shutdown()

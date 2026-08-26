@@ -30,6 +30,7 @@ import type {
   OmniChatModelScope,
   OmniChatResponseFeedbackRequest,
   OmniChatMemoryList,
+  OmniChatAcceptedTurn,
 } from '../types/omnichat';
 import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from './authSession';
@@ -108,6 +109,55 @@ function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): 
   return candidate.toString();
 }
 
+/**
+ * Resolves with the persona's next reply in a conversation.
+ *
+ * Sending no longer returns the answer, but a live call still needs one before
+ * it can speak. The completed reply already arrives as a window event from the
+ * websocket layer, so this waits on that rather than on the request.
+ *
+ * Start it before sending: a fast reply can land before the send promise
+ * settles, and a listener attached afterwards would miss it.
+ */
+export function waitForOmniChatReply(
+  conversationId: number,
+  signal?: AbortSignal,
+  timeoutMs = 90_000
+): Promise<BotMessage> {
+  return new Promise<BotMessage>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('omnichat-message-complete', onComplete);
+      signal?.removeEventListener('abort', onAbort);
+      globalThis.clearTimeout(timer);
+    };
+    const onComplete = (event: Event) => {
+      const message = (event as CustomEvent<BotMessage>).detail;
+      if (!message || message.conversation_id !== conversationId) return;
+      if (message.role !== 'assistant') return;
+      settled = true;
+      cleanup();
+      resolve(message);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DOMException('Waiting for the reply was cancelled', 'AbortError'));
+    };
+    const timer = globalThis.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DOMException('The reply did not arrive in time', 'TimeoutError'));
+    }, timeoutMs);
+
+    window.addEventListener('omnichat-message-complete', onComplete);
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export const omnichatService = {
   async listPersonas(category?: PersonaCategory): Promise<BotPersona[]> {
     const query = category ? `?category=${encodeURIComponent(category)}` : '';
@@ -148,12 +198,17 @@ export const omnichatService = {
     );
   },
 
+  /**
+   * Records the turn. The reply is not in the response: it arrives over the
+   * websocket, which is also where it always arrived -- this call simply stops
+   * waiting around for it.
+   */
   async sendMessage(
     conversationId: number,
     content: string,
     requestId: string,
     signal?: AbortSignal
-  ): Promise<BotMessage> {
+  ): Promise<OmniChatAcceptedTurn> {
     const requestController = new AbortController();
     const abortFromCaller = () => requestController.abort(signal?.reason);
     const timeout = globalThis.setTimeout(() => {
@@ -164,7 +219,7 @@ export const omnichatService = {
     else signal?.addEventListener('abort', abortFromCaller, { once: true });
 
     try {
-      return await api.post<BotMessage>(
+      return await api.post<OmniChatAcceptedTurn>(
         `/omnichat/conversations/${conversationId}/messages`,
         { content, request_id: requestId },
         { signal: requestController.signal }
