@@ -333,11 +333,28 @@ func (s *ChatbotService) completionForConversation(ctx context.Context, userID, 
 	return completion
 }
 
-// SendMessage persists the user's message, generates the persona's reply, and
-// persists the reply. Returns the assistant's message once generation
-// completes — including when generation failed, in which case the returned
-// message's Failed flag is set and err is non-nil.
-func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID int, content string) (result *models.BotMessage, resultErr error) {
+// SendMessage accepts the turn and answers it on the spot, returning the
+// assistant's message once generation completes — including when generation
+// failed, in which case the returned message's Failed flag is set and err is
+// non-nil.
+//
+// Callers that want the reply to arrive on its own schedule use AcceptUserTurn
+// and leave the timing to the reply scheduler.
+func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID int, content string) (*models.BotMessage, error) {
+	if _, err := s.AcceptUserTurn(ctx, userID, conversationID, content); err != nil {
+		return nil, err
+	}
+	return s.GenerateReply(ctx, userID, conversationID)
+}
+
+// AcceptUserTurn records what the user said and everything that has to be true
+// before she is asked to answer -- the conversation exists, the persona is
+// active and is still speaking to this person, and a retried request does not
+// append a second copy of the same turn.
+//
+// It deliberately stops short of the answer. Whether that happens now, in two
+// seconds, or when she is out of a match is not this function's business.
+func (s *ChatbotService) AcceptUserTurn(ctx context.Context, userID, conversationID int, content string) (*models.BotMessage, error) {
 	conv, err := s.convRepo.GetByID(ctx, conversationID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("chatbot: load conversation: %w", err)
@@ -383,14 +400,17 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	}
 
 	if requestBound && requestID != uuid.Nil {
-		if _, _, err := s.messageRepo.CreateUserTurnWithRequestID(ctx, conversationID, content, requestID); err != nil {
+		userTurn, _, err := s.messageRepo.CreateUserTurnWithRequestID(ctx, conversationID, content, requestID)
+		if err != nil {
 			return nil, fmt.Errorf("chatbot: save idempotent user message: %w", err)
 		}
-	} else if _, err := s.messageRepo.Create(ctx, conversationID, models.BotMessageRoleUser, content, false); err != nil {
+		return userTurn, nil
+	}
+	userTurn, err := s.messageRepo.Create(ctx, conversationID, models.BotMessageRoleUser, content, false)
+	if err != nil {
 		return nil, fmt.Errorf("chatbot: save user message: %w", err)
 	}
-
-	return s.GenerateReply(ctx, userID, conversationID)
+	return userTurn, nil
 }
 
 func latestUserTurnContent(history []*models.BotMessage) string {
@@ -421,6 +441,12 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	}
 	if persona == nil || !persona.IsActive {
 		return nil, ErrNotFound
+	}
+	// Checked again here, not only when the turn was accepted. Those were the
+	// same instant while replies were produced on the request; they are not any
+	// more, and somebody she blocked in between must not still get an answer.
+	if s.blockInForce(ctx, persona, userID) != nil {
+		return nil, ErrOmniChatBlockedByPersona
 	}
 	completion := s.completionForConversation(ctx, userID, conversationID)
 
