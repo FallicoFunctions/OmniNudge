@@ -1040,6 +1040,13 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 			continue
 		}
 		if restatesAHeldCommitment(summary, held) {
+			// Logged rather than dropped quietly. The guard is blunt on
+			// purpose, so the one way to find out it ever ate something real is
+			// for it to say what it ate.
+			zlog.Info().
+				Str("summary", summary).
+				Str("direction", direction).
+				Msg("omnichat commitment: discarded as a restatement of one already held")
 			continue
 		}
 		commitments = append(commitments, models.OmniChatCommitment{
