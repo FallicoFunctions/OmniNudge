@@ -127,6 +127,7 @@ function deliverAssistantReply(message: {
   failed: boolean;
   created_at: string;
   request_id?: string;
+  more_coming?: boolean;
 }) {
   window.dispatchEvent(new CustomEvent('omnichat-message-complete', { detail: message }));
 }
@@ -1453,6 +1454,54 @@ describe('OmniChatChatPage', () => {
       'first-send-id',
       'second-send-id',
     ]);
+  });
+
+  it('stays visible between her own messages when she sends more than one', async () => {
+    // A character who writes in separate messages arrives one at a time. The
+    // indicator must survive the first one, or she looks like she stopped
+    // talking twice in the middle of answering.
+    mockSendMessage.mockImplementation(async () => ({ accepted: true }));
+
+    renderPage();
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'you there?' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+    await waitFor(() => expect(mockSendMessage).toHaveBeenCalledOnce());
+
+    act(() => {
+      deliverAssistantReply({
+        id: 11,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'wait',
+        failed: false,
+        created_at: '2026-07-02T10:16:00Z',
+        more_coming: true,
+      });
+    });
+    expect(await screen.findByText('wait')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('omnichat-token', {
+          detail: { conversation_id: 42, token: 'still typing' },
+        })
+      );
+    });
+    expect(await screen.findByText('still typing')).toBeInTheDocument();
+
+    act(() => {
+      deliverAssistantReply({
+        id: 12,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'no seriously',
+        failed: false,
+        created_at: '2026-07-02T10:16:02Z',
+      });
+    });
+    expect(await screen.findByText('no seriously')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('still typing')).not.toBeInTheDocument());
   });
 
   it('keeps showing her writing after the send request has already returned', async () => {

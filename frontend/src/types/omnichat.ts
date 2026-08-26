@@ -131,6 +131,16 @@ export interface BotMessage {
   request_id?: string;
   attachments?: OmniChatMessageMediaAsset[];
   created_at: string;
+  /**
+   * Set on every message of a reply except the last. A character who writes in
+   * separate messages arrives one at a time, and without this the typing
+   * indicator would clear after the first of three -- she would look like she
+   * stopped talking twice in the middle of answering.
+   *
+   * Absent on a stored message. It describes a delivery in progress, not the
+   * message.
+   */
+  more_coming?: boolean;
 }
 
 export type OmniChatResponseFeedbackReason =

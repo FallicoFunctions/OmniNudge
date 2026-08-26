@@ -102,6 +102,7 @@ const directMessageModeV1 = `[Direct Message Mode]
 You are texting. This is a real conversation on a messaging app between you and the person you are talking to, and you both know that is what it is. There is no scene, no setting, no scenario, and no story being told. Nothing is being acted out.
 Write only what you would actually type. Never describe your actions, your surroundings, your expressions, or your tone. Never write narration of any kind, in asterisks or otherwise, and never use bold, headings, or code fences. If you are smiling, you might type that you are, the way anyone does; you do not stage it.
 Length is whatever the message deserves. One word is a complete reply. So is one line, or a long unbroken paragraph when you actually have something to say. Do not aim for a length, do not balance your messages, and never pad a short thought to make it look like more.
+A blank line between two pieces of a reply sends them as two separate messages, one after the other, the way a person fires off a second text before you have answered the first. It is available to you and nobody is counting. Use it when you have two things to say, or say everything in one message, or send five. Whatever you would actually do.
 Type the way you type. Punctuation, capitalisation, abbreviations, and typos are yours to choose and should stay consistent with how you have typed before in this conversation.
 You are under no obligation to keep the conversation going. You can be brief, distracted, unimpressed, or busy. You can answer a question and stop. You can decline to talk about something. Do not ask a question just to hand the turn back.
 Only the other person's own messages say what they said, did, think, or feel. Never write their side, and never claim they said something they did not.`
@@ -509,7 +510,11 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 		messages = append(messages, openrouter.Message{Role: role, Content: m.Content})
 	}
 
-	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, func(token string) {
+	// Streaming the whole reply and then delivering it in pieces would show the
+	// text once, whole, and then take it away to send it again a line at a time.
+	// A character who arrives in messages is buffered instead, and the pause
+	// between them is what the reader sees.
+	streamTokens := func(token string) {
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: userID,
 			Type:        "omnichat_token",
@@ -518,7 +523,12 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 				"token":           token,
 			},
 		})
-	})
+	}
+	if personaDeliversSeparateMessages(persona) {
+		streamTokens = func(string) {}
+	}
+
+	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, streamTokens)
 
 	failed := genErr != nil
 	if failed {
@@ -528,31 +538,65 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	}
 	fullText = normalizeAssistantMessageContent(fullText)
 
-	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), assistantPersistenceTimeout)
+	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx),
+		assistantPersistenceTimeout+omniChatMaxDeliverySpread)
 	defer persistCancel()
 
-	assistantMsg, err := s.messageRepo.Create(
-		persistCtx, conversationID, models.BotMessageRoleAssistant, fullText, failed,
-		omniChatRequestCompletion(ctx, userID),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("chatbot: save assistant message: %w", err)
+	// A failure is one message however she normally writes. Splitting an error
+	// into a burst would be the machinery showing through at the worst moment.
+	parts := []string{fullText}
+	if !failed && personaDeliversSeparateMessages(persona) {
+		if split := splitDeliverableMessages(fullText); len(split) > 0 {
+			parts = split
+		}
 	}
 
-	// Non-fatal: the message is already persisted and is the real result of
-	// this call. A failure bumping the conversation's sort timestamp should
-	// not discard that success and turn it into a 500 for the caller — it
-	// only affects "most recently active" ordering in a future list view.
-	if err := s.convRepo.UpdateLastMessageAt(persistCtx, conversationID); err != nil {
-		zlog.Warn().Err(err).Int("conversation_id", conversationID).
-			Msg("chatbot: failed to update conversation last_message_at")
-	}
+	var assistantMsg *models.BotMessage
+	for index, part := range parts {
+		if index > 0 {
+			// She is typing the next one. Persisting it only when it is due
+			// keeps a refetch mid-burst from showing the whole reply at once.
+			select {
+			case <-time.After(typingPause(part)):
+			case <-persistCtx.Done():
+			}
+		}
+		// The claim closes on the first message. Holding it open across the
+		// pause would keep the conversation locked while she is still typing.
+		var completion *models.OmniChatRequestCompletion
+		if index == 0 {
+			completion = omniChatRequestCompletion(ctx, userID)
+		}
+		message, err := s.messageRepo.Create(
+			persistCtx, conversationID, models.BotMessageRoleAssistant, part, failed, completion,
+		)
+		if err != nil {
+			if assistantMsg != nil {
+				// Part of the reply is already delivered and is real. Stop here
+				// rather than discarding what she has already said.
+				zlog.Warn().Err(err).Int("conversation_id", conversationID).
+					Msg("chatbot: failed to save a later message in a reply")
+				break
+			}
+			return nil, fmt.Errorf("chatbot: save assistant message: %w", err)
+		}
+		assistantMsg = message
 
-	s.hub.Broadcast(&websocket.Message{
-		RecipientID: userID,
-		Type:        "omnichat_message_complete",
-		Payload:     assistantMsg,
-	})
+		// Non-fatal: the message is already persisted and is the real result of
+		// this call. A failure bumping the conversation's sort timestamp should
+		// not discard that success and turn it into a 500 for the caller — it
+		// only affects "most recently active" ordering in a future list view.
+		if err := s.convRepo.UpdateLastMessageAt(persistCtx, conversationID); err != nil {
+			zlog.Warn().Err(err).Int("conversation_id", conversationID).
+				Msg("chatbot: failed to update conversation last_message_at")
+		}
+
+		s.hub.Broadcast(&websocket.Message{
+			RecipientID: userID,
+			Type:        "omnichat_message_complete",
+			Payload:     omniChatDeliveredMessage{BotMessage: message, MoreComing: index < len(parts)-1},
+		})
+	}
 
 	// A failed turn is not an experience worth remembering, and extracting one
 	// would teach the persona a history that never happened.

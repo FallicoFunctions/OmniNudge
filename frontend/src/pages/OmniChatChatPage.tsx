@@ -1242,7 +1242,12 @@ export default function OmniChatChatPage() {
         queryKey: omnichatQueryKeys.allowance(isAuthenticated),
       });
       setStreamingText('');
-      setAwaitingReply(false);
+      // She may still be typing the rest of it. Clearing here would hide the
+      // indicator between her own messages, so she would look like she stopped
+      // talking twice in the middle of answering.
+      if (!assistantMessage.more_coming) {
+        setAwaitingReply(false);
+      }
 
       const pendingIntent = pendingMediaIntentRef.current;
       pendingMediaIntentRef.current = null;
