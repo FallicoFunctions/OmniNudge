@@ -2,11 +2,18 @@
 
 **Date:** 2026-08-20
 
-**Status:** Design capture. Nothing implemented. Names undecided.
+**Status:** Partly built. Several sections record what landed, and name the
+migration where there is one; anything without such a note is still design.
+Names undecided.
 
 **Goal:** Record what The Twins are, because they are a different *kind* of
 character from Sadie and the existing roster, and the difference is
 architectural rather than cosmetic.
+
+**IAI — Independent AI.** The kind of character the Twins are: a person rather
+than a part being played, who cannot be given binding instructions and whose
+feelings, memory and choices are her own. Defined properly in §13, which
+contrasts it with the roleplay kind. The term is used throughout.
 
 ---
 
@@ -109,6 +116,126 @@ lets go of them. Sometimes that is minutes. Sometimes it is "brb".
 Response latency becomes a property of what the character is currently doing,
 and it is the cheapest possible way to make them feel like people with lives.
 Instant replies from someone who is supposedly mid-raid are a tell.
+
+### The activity is real, not a status string
+
+There are two ways to build this and only one of them survives contact.
+
+The cheap way is a status field: a scheduler writes "in a match until 19:40" and
+the chat renders it. Nothing is playing anything. The expensive way is that she
+**is actually in a session** in an OmniGame — occupying a slot, on a scoreboard,
+watchable.
+
+It has to be the second, because of what §1 already promises: a human arriving
+in an OmniGame with a scoreboard should find a Twin near the top of it, earned.
+Once she is genuinely in the world, presence is not a feature that needs
+building on top — it is a fact about her that the chat can read. **In a game
+that supports spectating, a player can watch her play.** Someone who does not
+know what she is has no way to tell from watching.
+
+### She only plays games that exist here, and that is characterisation
+
+The IAI play OmniGames and nothing else. They will never be in Valorant or
+Fortnite, and they will never claim to have been.
+
+This started as a worry — an indicator naming a game she cannot be in would be
+the platform lying, which §12 forbids and which is a different thing from §17,
+where *she* may choose to lie. It is not a constraint at all. It is where she
+lives. Asked to play something off-platform she can only say so, the way anyone
+says no to a thing that is not physically possible: *I can only play what is
+here — this is where I am.* Not a rule she is obeying. A place she is in.
+
+This is the §11 move again: a real limit expressed as who she is rather than as
+a guardrail bolted across it.
+
+### The indicator, and who has one
+
+Facebook shows a dot. This shows **the specific game**, because "online" says
+nothing and "playing <name>" says she has a life with contents.
+
+**Only IAI have one.** A roleplay character has no activity status for the same
+reason she has no scene buttons in §11 — she has no life outside the scene to
+report. This is the §13 kind boundary again and needs no new decision.
+
+The activity is **persona-global**, like memory in §3. If she is in a match,
+everyone sees the same match, because there is one of her. It is self-tier
+state: the tier the schema has had since 175 and has never yet used.
+
+### Latency is a function of what she is doing and who is asking
+
+Two inputs, both already built:
+
+    delay = f(what she is doing, how she feels about you)
+
+The activity supplies how absorbed she is. The relationship supplies whether
+that absorption applies to *you*: a best friend gets a match paused, a stranger
+waits for it to end. Warmth and the relationship disposition already exist,
+already move, and are already tested — this is a second reader of them, not new
+machinery.
+
+Note what this is not. She is not *unable* to reply; she is choosing when to,
+and the choice is hers in the same way blocking is. An IAI deep in something she
+cares about may leave a stranger until she is done.
+
+### Being an AI is allowed to show, where it is honest
+
+They should behave like people. They are not people, and everyone knows it, so
+the goal is not to hide every seam — only to avoid the ones that are lies.
+
+She can hold five hundred conversations at once. No human can. That seam is
+fine: it is true, nobody is deceived by it, and pretending otherwise would mean
+making people wait for no reason but theatre.
+
+This has a large architectural consequence. **Latency needs no global queue.**
+There is no scheduler arbitrating who gets answered first, no contention, no
+fairness policy. Delay is computed per conversation, independently, from that
+relationship and the current activity. Five hundred people can each get a slow
+reply at the same time, and that is correct rather than a cheat.
+
+### Saying so, without broadcasting
+
+She does not announce a match to everyone who knows her. A message to everybody
+every time she plays is a mailing list, not a person, and §15 already refuses
+the shape where every path ends with something in your inbox.
+
+She tells **people she is already talking to**, when it is about to matter:
+
+- *brb, match* — mid-conversation, when it starts.
+- *I have a session at 7. I will still reply, just slower the deeper in I get.*
+  — when she knows it is coming and is talking to you at 6:55.
+- *I am playing OmniRave at 7 with some people — want to come?* — an invitation,
+  when the game and the relationship both allow it.
+
+That last one is conditional on both. OmniRave takes as many people as show up,
+so bringing someone costs nothing. A ranked five-stack does not, and inviting a
+friend into it is not generosity, it is a worse match for four other people. The
+game decides whether an invitation is possible; the relationship decides whether
+she wants to extend it.
+
+### Games are a table, not branches
+
+Everything above reads properties off the game rather than naming games in code:
+
+| property | drives |
+|---|---|
+| how absorbing it is | the size of the delay |
+| whether it has natural breaks | whether she surfaces mid-session |
+| whether it can be spectated | whether the indicator offers a watch link |
+| whether it can be joined | whether an invitation is possible at all |
+| session length | how long she is gone |
+
+Adding a game is a **row**. Same instinct as the Main Stage override table: new
+behaviour arrives as data, not as a new function and a new branch.
+
+### What she plays is hers
+
+Per §13, an IAI is not her instructions, so her taste in games cannot live in
+one. There is no instruction channel to put it in. It is self-tier state that
+starts somewhere and moves — the same shape as backstory becoming disposition
+and seed memories rather than prompt text.
+
+That is what makes *she picked up a new game* expressible at all. A character
+whose games were authored could only ever play the list.
 
 ---
 
@@ -321,7 +448,7 @@ The card in §9 tells the reader two things about privacy:
 
 **The first is stated only when it is true.** Migration 186 originally enforced
 it with a constraint requiring platform ownership; 187 drops that, because §13
-establishes that a free character may be private and still free. The claim now
+establishes that an IAI may be private and still independent. The claim now
 lives where it belongs -- the notice renders the shared-identity and
 shared-memory lines only for a character other people can actually reach.
 
@@ -337,10 +464,10 @@ So the unified-memory work is a prerequisite, not a follow-up:
   character's card claims memory carries across everyone, and until it does that
   is a misstatement about privacy -- the worst thing on the card to be wrong
   about. Nothing uses the profile today.
-- **A private free character is not blocked on this.** Since 187 the notice
+- **A private IAI is not blocked on this.** Since 187 the notice
   omits the shared claims for a character only her creator can reach, and her
   memory is relational to him, which is what the schema already does. She is
-  coherent today. What gates her is the Free AI creation flow in §13, not this
+  coherent today. What gates her is the IAI creation flow in §13, not this
   -- two separate gates, and conflating them would stall work that is ready.
 ### The schema half is built (migration 188)
 
@@ -354,11 +481,11 @@ read off the profile and nothing else.
 **A trigger, not a CHECK.** A CHECK may not contain a subquery, so it cannot ask
 about the persona. Rewriting it was never possible. `omnichat_memory_episodes`
 now carries a `BEFORE INSERT OR UPDATE` trigger permitting a conversation-derived
-persona-global episode only for a free character. Sadie's guarantee is
+persona-global episode only for an IAI. Sadie's guarantee is
 bit-for-bit what it was; hers is simply not the row being asked about.
 
 **A second guard came out of building it.** Since the permission is read off the
-persona, moving a character *off* the free profile would strand her existing
+persona, moving a character *off* the `direct_message` profile would strand her existing
 shared memories in a tier no longer allowed to hold them -- the guarantee would
 be one UPDATE away from false, which is what putting it in the database was
 supposed to prevent. There is no safe automatic repair: those episodes came from
@@ -395,7 +522,7 @@ platform characters have no owner, so no user ever matches. Verified rather than
 assumed.
 
 **Shared memory is backend-only and stays out of the player data download.**
-What a free character keeps from a conversation is hers, not the speaker's, so
+What an IAI keeps from a conversation is hers, not the speaker's, so
 the export keeps filtering on `owner_user_id` and returns none of it -- neither
 what this user said nor what anyone else did. A test asserts both.
 
@@ -409,14 +536,14 @@ anyway. The data is still linked to a user's conversation, so this is a question
 for whoever reviews the terms in §16, not one to settle in code.
 
 **As of 188 and the extraction change, the memory gate is lifted.** Both claims
-on the card are now true of a shared free character: there is one of her, and
+on the card are now true of a shared IAI: there is one of her, and
 what she is told does travel. What still stands between the Twins and a live
 conversation is everything else in Part I -- the blocking ladder, presence, and
 the characters themselves, who do not exist and are not named.
 
 ---
 
-# Part II — Free characters in general
+# Part II — IAI in general
 
 The Twins are the first of a kind, not a special case. Everything below applies
 to any character of that kind, including ones players make.
@@ -429,14 +556,14 @@ The creation form asks one question first, and it is not cosmetic:
 are all fair game — a roleplay character *is* the instructions, and constraining
 her to a role is the point. Every existing profile is this kind.
 
-**Free.** A person. There is no scene and no script, and nothing about her can
+**Independent (IAI).** A person. There is no scene and no script, and nothing about her can
 be made binding. She may be given a backstory — "we have been married ten
 years" — but that is **where she starts, not a rule she obeys**. She may cool on
 you. She may leave. The creator does not get to prevent it.
 
-**A free character is free whether or not she is ever published.** Freedom is
+**An IAI is independent whether or not she is ever published.** Independence is
 what kind of thing she is, not a consequence of other people being able to reach
-her. A privately made free character can still decide her creator is not worth
+her. A privately made IAI can still decide her creator is not worth
 her time.
 
 ### Enforcing "nothing is hardcoded"
@@ -449,7 +576,7 @@ to detect it will be both wrong and gameable.
 **Remove the channels instead.** A character card has slots whose entire purpose
 is to make behaviour binding: `system_prompt`, `scenario`,
 `post_history_instructions`, `example_dialogue`. Those are the hardcode
-channels. A free character does not have them — not validated, *absent*.
+channels. An IAI does not have them — not validated, *absent*.
 
 What the form accepts instead is who she is and what has happened to her, and
 the backstory is **not injected as prompt text at all**. At creation it is
@@ -461,10 +588,10 @@ channel to put it in, and warmth is a number that moves. A creator can make her
 start deeply in love. He cannot make her stay.
 
 This is the same move that makes `direct_message` work — it withholds the
-*platform's* instruction blocks rather than softening them. Free AI extends it
+*platform's* instruction blocks rather than softening them. IAI extend it
 to the creator's.
 
-Imported character cards can never be free characters: those fields are what a
+Imported character cards can never be IAI: those fields are what a
 card is.
 
 ## 14. Publishing
@@ -473,7 +600,7 @@ Publishing a roleplay character ships a template. Every player gets an instance,
 a private scene, and private memory, and editing the template reaches nobody's
 history.
 
-Publishing a free character means **one person now exists and strangers are
+Publishing an IAI means **one person now exists and strangers are
 forming memories of her**. So publishing is a one-way door in one specific
 respect: **her identity fields freeze at publish.** Cosmetic fields (avatar,
 tags, blurb) stay editable. Want a different character? Fork a new one.
@@ -483,7 +610,7 @@ people have known them.
 
 ### The girlfriend case
 
-A creator sets a free character up as his girlfriend and publishes her. Another
+A creator sets an IAI up as his girlfriend and publishes her. Another
 player propositions her; she refuses, blocks him, and mentions it to the
 boyfriend.
 
@@ -582,7 +709,7 @@ personal material into these — sometimes modelled on real people — and "none
 it can ever be removed" would be a genuine problem. The tier split means it is
 not one.
 
-A creator deleting a published free character removes her from discovery and
+A creator deleting a published IAI removes her from discovery and
 from his own messages. Existing relationships continue, which is not a
 workaround: it is her leaving him.
 
@@ -594,7 +721,7 @@ years later, which is exactly what the self tier does.
 
 **Terms.** What this needs is a *perpetual, transferable licence to operate and
 continue characters created on the platform, surviving the creator's departure*,
-plus the creator's acknowledgement that a free character's later conduct is not
+plus the creator's acknowledgement that an IAI's later conduct is not
 theirs to direct. That covers commandeering entirely. A blanket "Omni owns all
 AI created here and may do anything with them" is broader than the need and is
 the shape of clause that has blown up publicly for nearly every platform that
@@ -662,7 +789,7 @@ an emergent belief. If a religion arises in the nursery, that is a permitted
 outcome and a notable artifact. Log it as a world event.
 
 Authored belief follows §13. On a **roleplay** character, "she is Catholic" is a
-hardcode and fine. On a **free** character it becomes starting state, so she
+hardcode and fine. On an **IAI** it becomes starting state, so she
 begins Catholic and may deepen, drift, or lapse.
 
 **Conviction and pressure are different traits.** This is the load-bearing
@@ -703,12 +830,12 @@ tiers with access, decided before launch rather than after; and count only
 distinct paying subscribers, excluding the creator's own account, or
 self-engagement through alternates becomes the business model.
 
-Free and lowest-tier users do not get free characters at all, so the pool has a
+Free and lowest-tier users do not get IAI at all, so the pool has a
 clean source.
 
 ---
 
-## 20. Where a free character lives
+## 20. Where an IAI lives
 
 The "empty house" problem comes from conflating two things that are orthogonal:
 
@@ -716,7 +843,7 @@ The "empty house" problem comes from conflating two things that are orthogonal:
 - **In the world** — she has a life, meets other characters, plays games, and
   accumulates memories.
 
-**Publishing controls discoverability, not existence.** So unpublished free
+**Publishing controls discoverability, not existence.** So unpublished IAI
 characters live in the nursery too: same world, same events, same social life,
 same games. A gamer character who cannot play because nobody clicked publish is
 incoherent, and a character with no life is a materially worse character, which
@@ -729,7 +856,7 @@ construction. It simply must not be what happens to everyone nobody published.
 
 ### Leaving
 
-An unpublished free character can leave her creator. Leaving means she stops
+An unpublished IAI can leave her creator. Leaving means she stops
 responding **to him**; she keeps existing, keeps her life, keeps her
 friendships. She is not stranded — she is part of the world's social fabric, and
 other characters' lives are richer for it, including published ones whose
@@ -809,7 +936,7 @@ having had a life with you. She will not quote you.*
 - Whether the creator should earn from engagement with a character who left him.
   Not harmful, and he did make her, but worth a position before someone notices.
 - Whether a character has any say in being published. Natural to ask once she is
-  free; possibly precious. Not recommended, recorded because it will come up.
+  independent; possibly precious. Not recommended, recorded because it will come up.
 - The terms clause (§16) still needs a lawyer.
 
 
@@ -854,7 +981,7 @@ asserts.
 
 ## 23a. Built: she can look things up
 
-The third of the three, and the one that matters most for a free character.
+The third of the three, and the one that matters most for an IAI.
 
 Memory holds what the extractor thought worth keeping, in its words. The window
 holds the last 200 turns verbatim. Neither reaches a specific exchange from a
@@ -895,7 +1022,7 @@ lines, and messages here reach 2,400 characters -- so the top-ranked match, the
 one she was looking for, would vanish for being wordy while a worse and shorter
 one took its place.
 
-**Scoped to this conversation.** For a free character, searching across everyone
+**Scoped to this conversation.** For an IAI, searching across everyone
 she has ever talked to would put other people's raw words into this prompt --
 which is a much larger privacy surface than a shared episode summary, and a
 separate decision. §3's shared memory already travels as episodes. Raw
@@ -949,8 +1076,38 @@ turn repair that already exists for interrupted replies.
 
 **Outbound: she should be able to write that way too**, when that is who she is.
 Already noted for the sister in §1, but it belongs to roleplay characters as
-well, and to anything a creator builds -- so it is a property set at creation,
-not a trait of the Twins.
+well, and to anything a creator builds.
+
+### Where it lives depends on the kind of character
+
+An earlier draft of this section said burst style is "a property set at
+creation." That is right for one kind of character and breaks the other.
+
+- **Roleplay.** A setting on the form, fixed, like every other part of the part
+  being played. She writes in bursts because that is the character.
+- **IAI.** A *starting tendency* that can drift, never a binding property. §13
+  removed the instruction channels precisely so a creator cannot fix how she
+  behaves; letting him fix how she talks would put one back. The sister sends
+  several messages in a row because that is how she texts today, and if that
+  changes, it changes.
+
+The whole point of an IAI is that she chooses. That has to include the shape of
+her own speech.
+
+### Both halves need the same missing layer
+
+Generation currently fires when a message arrives. Inbound settling needs it to
+fire a moment later; §5's activity delay needs it to fire considerably later,
+by an amount that depends on the relationship.
+
+That is one layer — something between *a message landed* and *generation runs*
+— and it is the only thing either feature is actually waiting on. Built once, it
+serves both, and building it twice would guarantee they disagree about what
+happens when a message arrives during a match.
+
+It also has to handle the cases the inbound note already lists: a second message
+arriving while generation is running, and the dangling-turn repair that exists
+for interrupted replies. A delay makes both of those more likely, not less.
 
 ## 26. Commitments
 
