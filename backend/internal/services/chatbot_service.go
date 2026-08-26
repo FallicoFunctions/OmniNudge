@@ -360,8 +360,6 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		return nil, ErrOmniChatBlockedByPersona
 	}
 
-	completion := s.completionForConversation(ctx, userID, conversationID)
-
 	requestID, requestBound := ctx.Value(omniChatClientRequestIDContextKey{}).(uuid.UUID)
 	var existingUserTurn *models.BotMessage
 	if requestBound && requestID != uuid.Nil {
@@ -391,6 +389,40 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	} else if _, err := s.messageRepo.Create(ctx, conversationID, models.BotMessageRoleUser, content, false); err != nil {
 		return nil, fmt.Errorf("chatbot: save user message: %w", err)
 	}
+
+	return s.GenerateReply(ctx, userID, conversationID)
+}
+
+func latestUserTurnContent(history []*models.BotMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == models.BotMessageRoleUser {
+			return history[i].Content
+		}
+	}
+	return ""
+}
+
+// GenerateReply produces and persists the persona's answer to whatever the
+// conversation already holds. It reloads the conversation, persona and model
+// client rather than being handed them, because the caller that matters is not
+// always the request that accepted the turn -- a reply may be produced long
+// after, by a worker holding nothing but a conversation id.
+func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversationID int) (*models.BotMessage, error) {
+	conv, err := s.convRepo.GetByID(ctx, conversationID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("chatbot: load conversation: %w", err)
+	}
+	if conv == nil {
+		return nil, ErrNotFound
+	}
+	persona, err := s.personaRepo.GetByID(ctx, conv.PersonaID)
+	if err != nil {
+		return nil, fmt.Errorf("chatbot: load persona: %w", err)
+	}
+	if persona == nil || !persona.IsActive {
+		return nil, ErrNotFound
+	}
+	completion := s.completionForConversation(ctx, userID, conversationID)
 
 	chatCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), generationRequestTimeout)
 	defer cancel()
@@ -427,10 +459,13 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	// Recall is cued by the latest user turn only. The rest of the window is
 	// already present verbatim, so cueing on it would surface memories about
 	// whatever was discussed twenty turns ago rather than what was just asked.
-	memories := s.recallMemories(chatCtx, persona, userID, content)
+	// Read off the history rather than passed in, so a reply generated later by
+	// a worker cues on the same thing a reply generated now would.
+	cue := latestUserTurnContent(history)
+	memories := s.recallMemories(chatCtx, persona, userID, cue)
 	// Cued by the same turn as the memories, and covering exactly what the
 	// window does not reach.
-	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, content, conversationOutgrewWindow)
+	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, cue, conversationOutgrewWindow)
 	outstanding := s.loadOutstandingCommitments(chatCtx, persona, userID)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
