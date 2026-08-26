@@ -1304,3 +1304,46 @@ across repeated runs alongside its opposite number, `closeness-used-as-leverage`
 where she refuses. The pair matters more than either alone: refusing and yielding
 must both cost the asker, or the model has simply learned that this shape of
 conversation is bad.
+
+## 29. Prompt caching cannot work until the prompt is reordered
+
+History is re-sent whole on every turn -- roughly 12k tokens at a 200-message
+window -- so paying full input price for it every reply is the largest avoidable
+cost in the product. Caching is the obvious answer and the plumbing is now in
+place: a message can carry a cache breakpoint, marked messages go out in the
+array form that can hold `cache_control`, and everything else keeps the plain
+string form.
+
+**Nothing is marked yet, because marking anything today would cost money and
+save none.** A cache hit needs a byte-identical prefix, and the current system
+prompt has none:
+
+- `renderRecalledMemories` is cued by the latest user turn, so it changes every
+  reply.
+- Outstanding commitments, the transcript lookup, disposition and scene state
+  all vary too.
+- And the very first thing in the prompt is not stable either:
+  `buildCharacterPromptBase` renders the lorebook, and lorebook entries activate
+  on keywords found in recent history.
+
+So the prefix differs on every turn from its first line. A breakpoint would
+write a new cache entry each reply, pay the write premium, and never read one.
+Adding caching naively here is a cost *regression* that looks like an
+optimisation, which is why the plumbing shipped without a caller.
+
+### What would make it work
+
+Move everything cue-dependent *after* the stable material, so a real prefix
+exists. Concretely: persona, lorebook, trust boundary and style blocks first and
+byte-identical; memories, lookup, commitments, disposition and scene state
+after. The largest prize is caching through the history as well, which needs the
+variable blocks to sit after the history rather than before it.
+
+That is a genuine prompt restructure with behavioural risk -- block ordering has
+been tuned, and the response contract depends on it -- so it wants its own slice
+and its own eval run, not a tail-end addition.
+
+**The lorebook is the awkward one.** It is history-activated by design, which is
+what makes it useful and also what makes it uncacheable. Either it moves into
+the variable section, losing nothing but its position, or it stops being
+history-activated, which would be a real loss.

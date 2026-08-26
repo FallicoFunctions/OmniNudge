@@ -94,6 +94,60 @@ const (
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+
+	// CacheBreakpoint asks the provider to cache everything up to and including
+	// this message and reuse it on the next call.
+	//
+	// It exists because a character's system prompt is large and identical on
+	// every turn -- persona, lorebook, style contract, memories -- and history
+	// is re-sent whole each time. Paying full input price for the same
+	// thousands of tokens on every reply of a long conversation is the largest
+	// avoidable cost in the product.
+	//
+	// Anthropic honours this explicitly and charges cached reads at a fraction
+	// of fresh ones. Providers that cache implicitly, Gemini among them, ignore
+	// the marker and do it anyway; providers that do neither also ignore it.
+	// So it is safe everywhere and only pays somewhere, which is why it is a
+	// hint rather than a setting.
+	CacheBreakpoint bool `json:"-"`
+}
+
+// cacheableTextPart is the array form of message content. A plain string cannot
+// carry a cache marker, so a marked message is sent as one text part with the
+// control attached.
+type cacheableTextPart struct {
+	Type         string        `json:"type"`
+	Text         string        `json:"text"`
+	CacheControl *cacheControl `json:"cache_control,omitempty"`
+}
+
+type cacheControl struct {
+	Type string `json:"type"`
+}
+
+// MarshalJSON keeps unmarked messages in the plain string form every provider
+// accepts, and only switches to the array form where a marker has to be
+// carried. Sending every message as an array would be equivalent for
+// well-behaved providers and is not worth the risk with the less well-behaved
+// ones.
+func (m Message) MarshalJSON() ([]byte, error) {
+	if !m.CacheBreakpoint {
+		return json.Marshal(struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		}{Role: m.Role, Content: m.Content})
+	}
+	return json.Marshal(struct {
+		Role    string              `json:"role"`
+		Content []cacheableTextPart `json:"content"`
+	}{
+		Role: m.Role,
+		Content: []cacheableTextPart{{
+			Type:         "text",
+			Text:         m.Content,
+			CacheControl: &cacheControl{Type: "ephemeral"},
+		}},
+	})
 }
 
 // GenerationOptions contains bounded provider parameters that callers may
