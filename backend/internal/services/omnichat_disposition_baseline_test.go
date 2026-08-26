@@ -47,7 +47,7 @@ func guardedCard() *models.BotPersona {
 }
 
 func TestDeriveBaselineReadsTheCardAndBoundsTheResult(t *testing.T) {
-	client := &stubBaselineClient{response: `{"mood": -0.2, "trust": -0.55, "warmth": -0.1}`}
+	client := &stubBaselineClient{response: `{"mood": -0.2, "trust": -0.55, "warmth": -0.1, "firmness": 0.7}`}
 
 	baseline, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), guardedCard())
 
@@ -56,6 +56,7 @@ func TestDeriveBaselineReadsTheCardAndBoundsTheResult(t *testing.T) {
 	require.InDelta(t, -0.2, baseline.Mood, 1e-9)
 	require.InDelta(t, -0.55, baseline.Trust, 1e-9)
 	require.InDelta(t, -0.1, baseline.Warmth, 1e-9)
+	require.InDelta(t, 0.7, baseline.Firmness, 1e-9)
 	require.Equal(t, 1, client.calls)
 	require.Contains(t, client.card, "Scarlett Voss")
 	require.Contains(t, client.card, "Trusts nobody quickly")
@@ -115,7 +116,10 @@ func TestDeriveBaselineBoundsAHugeCard(t *testing.T) {
 		Scenario: huge, SystemPrompt: huge, FirstMessage: huge,
 		ExampleDialogue: huge, CreatorNotes: huge,
 	}
-	client := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0}`}
+	// Any readable answer will do; this test is about what goes up, not what
+	// comes back. All-zero would trip the echo guard for reasons unrelated to
+	// the size of the card.
+	client := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0, "firmness": 0.4}`}
 	_, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), persona)
 	require.NoError(t, err)
 	require.Less(t, len([]rune(client.card)), omniChatBaselineCardMaxRunes+2000,
@@ -197,4 +201,34 @@ func TestSelfDispositionSettlesOnTheBaselineNotOnZero(t *testing.T) {
 	require.InDelta(t, -0.6, disposition.Mood, 0.01,
 		"three half-lives of a -0.8 episode, settling toward a -0.5 resting state")
 	require.InDelta(t, -0.4, disposition.Trust, 1e-9)
+}
+
+// The prompt used to end with a worked example of all zeros, and models returned
+// it verbatim -- spacing included -- for cards that plainly had something to
+// say. Three of the five characters in the nursery database still carry that
+// echo, and nothing caught it, because a stored zero is indistinguishable from a
+// character somebody read and found unremarkable.
+func TestDeriveRefusesAnAllZeroReadingAsAnEcho(t *testing.T) {
+	deriver := NewOmniChatDispositionBaselineDeriver(
+		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.0, "warmth": 0.0, "firmness": 0.0}`},
+	)
+
+	_, err := deriver.Derive(context.Background(), guardedCard())
+
+	require.ErrorIs(t, err, ErrOmniChatBaselineUnreadable)
+}
+
+// Zero on some axes is a real reading: a card can genuinely say nothing about
+// mood while being emphatic about how immovable she is.
+func TestDeriveAcceptsZeroOnSomeAxes(t *testing.T) {
+	deriver := NewOmniChatDispositionBaselineDeriver(
+		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.2, "warmth": 0.0, "firmness": 0.6}`},
+	)
+
+	baseline, err := deriver.Derive(context.Background(), guardedCard())
+
+	require.NoError(t, err)
+	require.True(t, baseline.Derived)
+	require.InDelta(t, 0.6, baseline.Firmness, 0.001)
+	require.Zero(t, baseline.Mood)
 }

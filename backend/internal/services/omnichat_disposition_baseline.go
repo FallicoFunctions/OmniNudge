@@ -52,7 +52,9 @@ Be restrained. These numbers are added to whatever later happens to her, so an e
 
 Return only this JSON object, with no other text:
 
-{"mood": 0.0, "trust": 0.0, "warmth": 0.0, "firmness": 0.0}`
+Answer with one JSON object and nothing else, of the shape {"mood": <number>, "trust": <number>, "warmth": <number>, "firmness": <number>}, each between -1 and 1.
+
+Every one of the four is a judgement about this particular card. Returning zero on an axis is a real answer and means the card genuinely says nothing either way about it -- but returning zero on all four at once is not a reading, it is a refusal, and a card with any content in it has something to say about at least one of them. Decide each axis before you write it.`
 
 type omniChatBaselineDerivationCard struct {
 	Name            string   `json:"name"`
@@ -91,6 +93,22 @@ func NewOmniChatDispositionBaselineDeriver(client chatCompletionClient) *OmniCha
 // it cannot fully validate: a refused derivation leaves the character NULL,
 // which is the neutral behaviour that already works, and a stored bad number
 // would quietly mis-colour every conversation she ever has.
+// ErrOmniChatBaselineUnreadable is a card with no temperament in it.
+//
+// It is not a failure. The pure narrators are the honest case: a story-telling
+// voice is a device rather than a person, and zero on every axis is the correct
+// reading of one. Left underived they behave as neutral, which is what they
+// should be.
+//
+// It is refused as a *stored* baseline because a zero that was written down is
+// indistinguishable from a character somebody read and found unremarkable. The
+// prompt used to end with a worked example of all zeros and models returned it
+// verbatim, spacing included, for cards that plainly did have something to say;
+// three of the five characters in the nursery database still carry that echo,
+// and nothing ever caught it. A reading nobody can tell apart from a refusal is
+// worse than an absent one.
+var ErrOmniChatBaselineUnreadable = errors.New("omnichat baseline: card has no temperament to read")
+
 func (d *OmniChatDispositionBaselineDeriver) Derive(ctx context.Context, persona *models.BotPersona) (models.OmniChatDispositionBaseline, error) {
 	if d == nil || d.client == nil {
 		return models.OmniChatDispositionBaseline{}, errors.New("omnichat baseline: derivation client is unavailable")
@@ -145,6 +163,22 @@ func (d *OmniChatDispositionBaselineDeriver) Derive(ctx context.Context, persona
 			return models.OmniChatDispositionBaseline{}, fmt.Errorf("omnichat baseline: derivation for %q returned %s=%v, outside -1..1", persona.Name, name, value)
 		}
 	}
+	// Exactly zero on all four is refused as a non-answer.
+	//
+	// This is not hypothetical caution. The prompt used to end with a worked
+	// example of {"mood": 0.0, "trust": 0.0, "warmth": 0.0}, and models returned
+	// it verbatim -- spacing included -- for some cards and read others
+	// properly. Three of five characters in the nursery database carry that
+	// echo, and nothing ever caught it, because a stored zero is
+	// indistinguishable from a character who is genuinely unremarkable. The
+	// feature was half inert and looked fine.
+	//
+	// Four independent judgements landing on exactly 0.0 is not a reading of a
+	// card that has any content. The cost of being wrong is one re-run.
+	if output.Mood == 0 && output.Trust == 0 && output.Warmth == 0 && output.Firmness == 0 {
+		return models.OmniChatDispositionBaseline{}, fmt.Errorf("%w: %q", ErrOmniChatBaselineUnreadable, persona.Name)
+	}
+
 	return models.OmniChatDispositionBaseline{
 		Mood:     output.Mood,
 		Trust:    output.Trust,

@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -85,7 +86,7 @@ func main() {
 	}
 	fmt.Printf("Deriving %d character(s) with %s.\n\n", len(pending), chosenModel)
 
-	derived, skipped, failed := 0, 0, 0
+	derived, skipped, unreadable, failed := 0, 0, 0, 0
 	for index, persona := range pending {
 		if index > 0 && *pause > 0 {
 			time.Sleep(*pause)
@@ -96,14 +97,22 @@ func main() {
 		// same thing. Re-run the command later; it will pick up whatever is
 		// still NULL.
 		baseline, err := deriver.Derive(ctx, persona)
+		if errors.Is(err, services.ErrOmniChatBaselineUnreadable) {
+			// A card with no temperament in it, which the pure narrators
+			// genuinely are. Left underived it behaves as neutral, which is
+			// right for a device rather than a person.
+			unreadable++
+			fmt.Printf("  %-28s no temperament to read, left underived\n", persona.Slug)
+			continue
+		}
 		if err != nil {
 			failed++
 			fmt.Printf("  %-28s FAILED  %v\n", persona.Slug, err)
 			continue
 		}
 		if *dryRun {
-			fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f  (dry run, not stored)\n",
-				persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth)
+			fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f  firmness %+.2f  (dry run, not stored)\n",
+				persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness)
 			continue
 		}
 		stored, err := personas.SetOmniChatDispositionBaseline(ctx, persona.ID, baseline, *force)
@@ -118,11 +127,12 @@ func main() {
 			continue
 		}
 		derived++
-		fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f\n",
-			persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth)
+		fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f  firmness %+.2f\n",
+			persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness)
 	}
 
-	fmt.Printf("\n%d derived, %d left alone, %d failed.\n", derived, skipped, failed)
+	fmt.Printf("\n%d derived, %d left alone, %d with no temperament to read, %d failed.\n",
+		derived, skipped, unreadable, failed)
 	if failed > 0 {
 		os.Exit(1)
 	}
