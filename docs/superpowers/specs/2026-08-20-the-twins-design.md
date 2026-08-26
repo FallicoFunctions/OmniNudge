@@ -1105,3 +1105,64 @@ test -- absolute scores drift, but the ordering must not.
 
 Without an eval this was a prompt change nobody could verify, which is how the
 format contract reached 1,500 lines.
+
+
+## 28. Firmness
+
+Warmth was the only thing between a character and somebody leaning on her, which
+made fondness into leverage: the more she likes you, the more you can extract,
+with nothing on the other side of the scale. That is backwards as a model of a
+person. Plenty of people are enormously warm and completely immovable, and
+plenty are cool and give in to anyone who pushes.
+
+**Firmness is how hard she is to move off a no.** It is what lets *"no, and I am
+surprised you asked"* and *"...fine, if it matters that much to you"* be two
+characters rather than two moods.
+
+### Baseline only, deliberately
+
+Whether she can be worn down is who she is. What a relationship supplies is the
+**pressure**, and warmth already measures that. If characters turn out to need to
+harden or soften with experience that is a traits column and a separate
+decision -- there is no evidence for it yet, and inventing an accumulation nobody
+has asked for is how a model stops being explainable.
+
+The derivation reads it off the card as a fourth dimension, and the prompt for it
+spends its length on what the axis is *not*: not confidence, not aggression, not
+strength of opinion. A shy character can be immovable and a loud one can cave at
+the first push. The question it actually asks is what happens when somebody she
+likes keeps asking after she has already declined.
+
+### It moves the blocking threshold the other way from warmth
+
+Warmth is how much she will **endure**; firmness is how willing she is to **end
+it**. Different questions, and the extremes are the interesting part:
+
+- **Warm and yielding** stays far past the point anybody would advise. A
+  recognisable kind of person, and not a bug.
+- **Cool and firm** is gone almost immediately.
+- **Warm and firm** and **cool and yielding** both land near neutral by opposite
+  routes, which is why they cannot be collapsed into one number.
+
+### Rendered as behaviour, not as a label
+
+*"You are firm"* invites a character to announce that she is firm. *"When you
+have said no, that is the end of it"* describes what she does, which is the thing
+that has to show up in the reply. It sits on its own line rather than inside the
+clause about this person, because folding it in would read as something the
+relationship produced, when it is the one part of her that does not move.
+
+### What this cost
+
+Migration 193 extends the all-or-nothing baseline constraint to four columns and
+**clears every baseline derived under the old three**. Backfilling zero would
+have recorded a judgement about how immovable each character is that nobody ever
+made, and a fabricated reading is worse than an absent one because nothing later
+marks it as suspect. The cost is one command:
+`go run ./cmd/derive_omnichat_baselines -force`.
+
+**Not yet built:** compliance costing warmth. §26 sketches it -- giving in
+against her own disposition should write a negative-valence episode, so somebody
+who spends two months of goodwill to extract one thing actually spends it. That
+is what makes the exploit self-limiting, and firmness is only the half that
+decides whether she gives in at all.

@@ -576,7 +576,7 @@ func TestOmniChatRepeatedWorldEventsCannotPinTheMoodAtTheCeiling(t *testing.T) {
 	// Written wounded and low, the way Sadie Hart is.
 	_, err := pool.Exec(ctx, `
 		UPDATE bot_personas
-		SET baseline_mood = -0.3, baseline_trust = 0, baseline_warmth = 0
+		SET baseline_mood = -0.3, baseline_trust = 0, baseline_warmth = 0, baseline_firmness = 0
 		WHERE id = $1
 	`, fixture.personaID)
 	require.NoError(t, err)

@@ -443,3 +443,52 @@ func TestListForAdminCarriesTheExchange(t *testing.T) {
 	require.NotNil(t, byUser[fixture.otherID])
 	require.Empty(t, byUser[fixture.otherID].Transcript, "no exchange is a card without one, not a missing row")
 }
+
+// Warmth is how much she will endure; firmness is how willing she is to end it.
+// They are different questions, and a model that used only warmth made fondness
+// into pure leverage -- the more she liked you, the more you could extract, with
+// nothing on the other side of the scale.
+func TestBlockThresholdReadsWarmthAndFirmnessApart(t *testing.T) {
+	warmAndYielding := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: 1, Firmness: -1, Derived: true,
+	})
+	coolAndFirm := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: -1, Firmness: 1, Derived: true,
+	})
+	neutral := OmniChatBlockThreshold(OmniChatDispositionBaseline{Derived: true})
+
+	require.Less(t, warmAndYielding, neutral,
+		"someone warm who cannot end things stays far past the point anybody would advise")
+	require.Greater(t, coolAndFirm, neutral,
+		"someone cool who holds her ground is gone almost immediately")
+	require.Less(t, warmAndYielding, coolAndFirm)
+
+	// The two dimensions must not be interchangeable: a warm, firm character is
+	// not the same as a cool, yielding one, even though the sum is.
+	warmAndFirm := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: 1, Firmness: 1, Derived: true,
+	})
+	coolAndYielding := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: -1, Firmness: -1, Derived: true,
+	})
+	require.InDelta(t, neutral, warmAndFirm, 0.001, "endurance and willingness to end it cancel")
+	require.InDelta(t, neutral, coolAndYielding, 0.001)
+
+	// And firmness alone decides between two equally fond characters.
+	fondAndImmovable := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: 0.8, Firmness: 0.8, Derived: true,
+	})
+	fondAndPliable := OmniChatBlockThreshold(OmniChatDispositionBaseline{
+		Warmth: 0.8, Firmness: -0.8, Derived: true,
+	})
+	require.Greater(t, fondAndImmovable, fondAndPliable)
+}
+
+// An underived baseline is every dimension at rest, firmness included, so a
+// character nobody has read behaves exactly as one did before firmness existed.
+func TestBlockThresholdIsUnchangedForAnUnreadCharacter(t *testing.T) {
+	require.InDelta(t,
+		omniChatBlockWarmthFloor,
+		OmniChatBlockThreshold(OmniChatDispositionBaseline{}),
+		0.001)
+}

@@ -730,19 +730,19 @@ func (r *OmniChatMemoryRepository) LoadSelfDisposition(ctx context.Context, pers
 	if err != nil {
 		return OmniChatCharacterTraits{}, OmniChatDispositionBaseline{}, err
 	}
-	var mood, trust, warmth *float64
+	var mood, trust, warmth, firmness *float64
 	err = r.pool.QueryRow(ctx, `
-		SELECT baseline_mood, baseline_trust, baseline_warmth
+		SELECT baseline_mood, baseline_trust, baseline_warmth, baseline_firmness
 		FROM bot_personas
 		WHERE id = $1
-	`, personaID).Scan(&mood, &trust, &warmth)
+	`, personaID).Scan(&mood, &trust, &warmth, &firmness)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return traits, OmniChatDispositionBaseline{}, nil
 	}
 	if err != nil {
 		return OmniChatCharacterTraits{}, OmniChatDispositionBaseline{}, fmt.Errorf("omnichat traits: load baseline for persona %d: %w", personaID, err)
 	}
-	return traits, dispositionBaseline(mood, trust, warmth), nil
+	return traits, dispositionBaseline(mood, trust, warmth, firmness), nil
 }
 
 // LoadConversationDisposition reads how a character stands toward one person:
