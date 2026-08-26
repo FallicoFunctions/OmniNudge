@@ -126,6 +126,52 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 // Deliberately about the behaviour rather than the label. "You are firm" invites
 // a character to announce that she is firm; "a no from you is the end of it"
 // describes what she does, which is the thing that has to show up in the reply.
+// describeDispositionForJudgement is the same state written for a reader who is
+// judging what happened rather than for the character living it.
+//
+// The two must not share a renderer. renderCharacterDisposition is addressed to
+// her, in the second person, under a header that tells her not to announce or
+// perform it -- an instruction that is meaningless to an extractor and, worse,
+// points it away from the disposition at exactly the moment it is supposed to be
+// scoring through it.
+func describeDispositionForJudgement(disposition models.OmniChatDisposition) string {
+	var parts []string
+	if phrase := moodPhrase(disposition.Mood); phrase != "" {
+		parts = append(parts, "She is "+phrase+".")
+	}
+
+	var toward []string
+	if phrase := trustPhrase(disposition.Trust); phrase != "" {
+		toward = append(toward, phrase)
+	}
+	if phrase := warmthPhrase(disposition.Warmth); phrase != "" {
+		toward = append(toward, phrase)
+	}
+	if len(toward) > 0 {
+		parts = append(parts, "With this person she is "+joinClauses(toward)+".")
+	}
+
+	if phrase := firmnessDescription(disposition.Firmness); phrase != "" {
+		parts = append(parts, phrase)
+	}
+	return strings.Join(parts, " ")
+}
+
+// firmnessDescription is firmnessPhrase told about her rather than to her.
+func firmnessDescription(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "When she has said no, that is the end of it: pressure does not move her, and being fond of someone does not make her owe them a yes."
+	case bandMildPositive:
+		return "She does not give in easily once she has said no."
+	case bandMildNegative:
+		return "She finds it hard to hold a no when someone keeps pushing, and tends to give a little to keep the peace."
+	case bandStrongNegative:
+		return "She folds when someone pushes, agrees to things she did not want, and it sits badly with her afterwards."
+	}
+	return ""
+}
+
 func firmnessPhrase(value float64) string {
 	switch band(value) {
 	case bandStrongPositive:

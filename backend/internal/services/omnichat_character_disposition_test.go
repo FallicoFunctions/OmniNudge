@@ -207,3 +207,37 @@ func TestFirmnessRendersAsBehaviourAndSitsApartFromTheRelationship(t *testing.T)
 func TestUnreadFirmnessRendersNothing(t *testing.T) {
 	require.Empty(t, renderCharacterDisposition(models.OmniChatDisposition{}))
 }
+
+// The character's block and the extractor's description must not be the same
+// text. Hers is second person under a header telling her not to announce or
+// perform it -- an instruction that means nothing to something judging what
+// happened, and that points it away from the disposition at the moment it is
+// meant to be scoring through it.
+func TestJudgementDescriptionIsNotTheCharactersOwnBlock(t *testing.T) {
+	state := models.OmniChatDisposition{Mood: 0.3, Trust: 0.7, Warmth: 0.8, Firmness: 0.7}
+
+	hers := renderCharacterDisposition(state)
+	described := describeDispositionForJudgement(state)
+
+	require.Contains(t, hers, "[How You Are Right Now]")
+	require.Contains(t, hers, "do not announce it")
+
+	require.NotContains(t, described, "[How You Are Right Now]")
+	require.NotContains(t, described, "do not announce it")
+	require.NotContains(t, described, "not an instruction")
+
+	// Third person throughout: it is about her, not addressed to her.
+	require.NotContains(t, described, " you ")
+	require.NotContains(t, described, "You ")
+	require.Contains(t, described, "She is")
+
+	// And it still carries every dimension, or the extractor is judging blind.
+	require.Contains(t, described, "good spirits")
+	require.Contains(t, described, "take them at their word")
+	require.Contains(t, described, "fond of them")
+	require.Contains(t, described, "said no")
+}
+
+func TestJudgementDescriptionIsEmptyForACharacterNobodyHasRead(t *testing.T) {
+	require.Empty(t, describeDispositionForJudgement(models.OmniChatDisposition{}))
+}
