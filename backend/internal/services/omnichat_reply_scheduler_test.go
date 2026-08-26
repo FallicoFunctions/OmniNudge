@@ -1,0 +1,246 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/omninudge/backend/internal/models"
+)
+
+type recordingReplier struct {
+	mu            sync.Mutex
+	conversations []int
+	users         []int
+	err           error
+}
+
+func (r *recordingReplier) GenerateReply(_ context.Context, userID, conversationID int) (*models.BotMessage, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.users = append(r.users, userID)
+	r.conversations = append(r.conversations, conversationID)
+	return nil, r.err
+}
+
+func (r *recordingReplier) calls() ([]int, []int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]int(nil), r.users...), append([]int(nil), r.conversations...)
+}
+
+// manualTimer fires only when a test says so, so scheduling can be asserted
+// without a sleep deciding whether the suite passes.
+type manualTimer struct {
+	mu      sync.Mutex
+	fire    func()
+	stopped bool
+}
+
+func (t *manualTimer) Stop() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stopped {
+		return false
+	}
+	t.stopped = true
+	return true
+}
+
+func (t *manualTimer) run() {
+	t.mu.Lock()
+	stopped := t.stopped
+	fire := t.fire
+	t.mu.Unlock()
+	if stopped {
+		return
+	}
+	fire()
+}
+
+func manualScheduler(replier omniChatReplier) (*OmniChatReplyScheduler, *[]*manualTimer) {
+	scheduler := NewOmniChatReplyScheduler(replier)
+	timers := &[]*manualTimer{}
+	var mu sync.Mutex
+	scheduler.afterFunc = func(_ time.Duration, f func()) replyTimer {
+		timer := &manualTimer{fire: f}
+		mu.Lock()
+		*timers = append(*timers, timer)
+		mu.Unlock()
+		return timer
+	}
+	return scheduler, timers
+}
+
+func TestSchedulingReplacesThePendingReplySoABurstIsAnsweredOnce(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, timers := manualScheduler(replier)
+
+	// Three messages in a row, the way people actually text.
+	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(7, 42, time.Second)
+
+	require.Len(t, *timers, 3, "each message arms a timer")
+	require.True(t, (*timers)[0].stopped, "an earlier reply must be cancelled, not left to fire")
+	require.True(t, (*timers)[1].stopped)
+	require.False(t, (*timers)[2].stopped)
+	require.True(t, scheduler.Pending(42))
+
+	// Every timer runs; only the survivor should produce anything.
+	for _, timer := range *timers {
+		timer.run()
+	}
+
+	users, conversations := replier.calls()
+	require.Equal(t, []int{42}, conversations, "a burst is one reply, not three")
+	require.Equal(t, []int{7}, users)
+	require.False(t, scheduler.Pending(42), "firing clears the pending reply")
+}
+
+func TestSeparateConversationsDoNotDisplaceEachOther(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, timers := manualScheduler(replier)
+
+	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Schedule(9, 43, time.Second)
+
+	require.True(t, scheduler.Pending(42))
+	require.True(t, scheduler.Pending(43))
+	for _, timer := range *timers {
+		timer.run()
+	}
+
+	users, conversations := replier.calls()
+	require.ElementsMatch(t, []int{42, 43}, conversations)
+	require.ElementsMatch(t, []int{7, 9}, users)
+}
+
+func TestCancelAndCloseStopAPendingReplyFromEverArriving(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, timers := manualScheduler(replier)
+
+	scheduler.Schedule(7, 42, time.Second)
+	scheduler.Cancel(42)
+	require.False(t, scheduler.Pending(42))
+
+	scheduler.Schedule(8, 43, time.Second)
+	scheduler.Close()
+	require.False(t, scheduler.Pending(43))
+
+	// Scheduling after Close is refused rather than silently held forever.
+	scheduler.Schedule(9, 44, time.Second)
+	require.False(t, scheduler.Pending(44))
+
+	for _, timer := range *timers {
+		timer.run()
+	}
+	_, conversations := replier.calls()
+	require.Empty(t, conversations, "nothing cancelled or closed may still answer")
+}
+
+func TestAFailedScheduledReplyDoesNotLeaveTheConversationPending(t *testing.T) {
+	replier := &recordingReplier{err: errors.New("provider unavailable")}
+	scheduler, timers := manualScheduler(replier)
+
+	scheduler.Schedule(7, 42, time.Second)
+	(*timers)[0].run()
+
+	require.False(t, scheduler.Pending(42),
+		"a conversation stuck pending would refuse every later reply to it")
+	_, conversations := replier.calls()
+	require.Equal(t, []int{42}, conversations)
+}
+
+// blockingReplier holds the first reply open so a second can be attempted while
+// it is still running -- the case where somebody sends a follow-up mid-answer.
+type blockingReplier struct {
+	mu      sync.Mutex
+	started int
+	release chan struct{}
+	done    chan struct{}
+}
+
+func (r *blockingReplier) GenerateReply(_ context.Context, _, _ int) (*models.BotMessage, error) {
+	r.mu.Lock()
+	r.started++
+	first := r.started == 1
+	r.mu.Unlock()
+	if first {
+		close(r.done)
+		<-r.release
+	}
+	return nil, nil
+}
+
+func (r *blockingReplier) startedCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.started
+}
+
+func TestAFollowUpDoesNotRaceTheReplyItFollows(t *testing.T) {
+	replier := &blockingReplier{release: make(chan struct{}), done: make(chan struct{})}
+	scheduler, timers := manualScheduler(replier)
+
+	scheduler.Schedule(7, 42, time.Second)
+	go (*timers)[0].run()
+	<-replier.done // the first reply is now in flight and parked
+
+	// The follow-up arrives while she is still writing.
+	scheduler.Schedule(7, 42, time.Second)
+	require.True(t, scheduler.Pending(42))
+	before := len(*timers)
+	(*timers)[before-1].run()
+
+	require.Equal(t, 1, replier.startedCount(),
+		"a second generation must not start while the first is still running")
+	require.True(t, scheduler.Pending(42), "the follow-up stays pending rather than being dropped")
+	require.Greater(t, len(*timers), before, "and it rearms rather than waiting forever")
+
+	close(replier.release)
+}
+
+func TestASchedulerWithNoGeneratorRefusesRatherThanArming(t *testing.T) {
+	scheduler, timers := manualScheduler(nil)
+	scheduler.Schedule(7, 42, time.Second)
+	require.Empty(t, *timers)
+	require.False(t, scheduler.Pending(42))
+}
+
+type panickingReplier struct{}
+
+func (panickingReplier) GenerateReply(context.Context, int, int) (*models.BotMessage, error) {
+	panic("nil somewhere deep in generation")
+}
+
+func TestAPanickingReplyDoesNotTakeTheProcessDown(t *testing.T) {
+	scheduler, timers := manualScheduler(panickingReplier{})
+	scheduler.Schedule(7, 42, time.Second)
+
+	require.NotPanics(t, func() { (*timers)[0].run() },
+		"a detached reply has no gin recovery behind it")
+	require.False(t, scheduler.Pending(42))
+
+	// And the conversation is not left marked busy, which would stall every
+	// later reply to it behind a generation that already died.
+	scheduler.mu.Lock()
+	_, busy := scheduler.generating[42]
+	scheduler.mu.Unlock()
+	require.False(t, busy)
+}
+
+func TestScheduleRefusesIdentifiersItCouldNotAnswer(t *testing.T) {
+	replier := &recordingReplier{}
+	scheduler, timers := manualScheduler(replier)
+
+	scheduler.Schedule(0, 42, time.Second)
+	scheduler.Schedule(7, 0, time.Second)
+
+	require.Empty(t, *timers)
+	require.False(t, scheduler.Pending(42))
+}
