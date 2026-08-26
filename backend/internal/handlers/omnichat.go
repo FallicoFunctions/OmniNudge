@@ -640,9 +640,6 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 
 	userTurn, err := h.chatbotService.AcceptUserTurn(services.WithOmniChatClientRequestID(c.Request.Context(), req.RequestID), userID, conversationID, content)
 	if err != nil {
-		if respondOmniChatCreditsRequired(c, err) {
-			return
-		}
 		if errors.Is(err, services.ErrNotFound) {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
@@ -664,13 +661,21 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 	// then would now hold the conversation's in-progress lock for the whole
 	// wait -- so the next message in a burst would be refused as a duplicate
 	// turn rather than folded into this one.
-	if payload, marshalErr := json.Marshal(accepted); marshalErr == nil {
-		if completeErr := h.completeOmniChatRequest(userID, req.RequestID, payload); completeErr != nil {
-			zlog.Warn().Err(completeErr).Int("user_id", userID).
-				Msg("omnichat: failed to close the request claim for an accepted turn")
-		}
+	payload, claimErr := json.Marshal(accepted)
+	if claimErr == nil {
+		claimErr = h.completeOmniChatRequest(userID, req.RequestID, payload)
 	}
-	completed = true
+	if claimErr != nil {
+		// Deliberately leave `completed` false so the deferred failure marks the
+		// claim. A claim stuck pending holds the conversation's lock and the
+		// user cannot send again until the lease runs out; a failed one lets a
+		// retry straight through, and the retry cannot duplicate anything
+		// because the turn is keyed by the same request id.
+		zlog.Warn().Err(claimErr).Int("user_id", userID).Int("conversation_id", conversationID).
+			Msg("omnichat: could not close the request claim for an accepted turn")
+	} else {
+		completed = true
+	}
 
 	leaseSettled = true
 	h.replies.Schedule(userID, conversationID, omniChatImmediateReply, settleLease)
