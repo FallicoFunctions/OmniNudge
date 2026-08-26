@@ -28,12 +28,10 @@ import (
 	"github.com/omninudge/backend/internal/services/openrouter"
 )
 
-// defaultStandardModel mirrors config.OpenRouter.StandardModel's default so the
-// eval exercises what production would run when nothing is configured.
-// Mirrors config.OpenRouter.ExtractionModel's default, so the eval exercises
-// what the worker would actually run when nothing is configured. Pointing it at
-// anything else measures a model nobody uses.
-const defaultStandardModel = "google/gemini-3-flash-preview"
+// defaultExtractionModel mirrors config.OpenRouter.ExtractionModel's default so
+// the eval exercises what the worker would actually run when nothing is
+// configured. Pointing it at anything else measures a model nobody uses.
+const defaultExtractionModel = "google/gemini-3.5-flash-lite"
 
 func main() {
 	var (
@@ -53,18 +51,16 @@ func main() {
 	if apiKey == "" {
 		fatalf("OPENROUTER_API_KEY is required")
 	}
-	// Match how the server wires extraction (cmd/server, cmd/worker): it uses
-	// the standard model, not OPENROUTER_MODEL. Evaluating the wrong model would
-	// validate calibration that production never exercises.
+	// Extraction has its own setting; it is not the chat model any more, even
+	// though both currently name the same route. Reading the standard model here
+	// would validate calibration production never exercises the moment they
+	// diverge.
 	model := strings.TrimSpace(*modelFlag)
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("OMNICHAT_MODEL_STANDARD_PRIMARY"))
+		model = strings.TrimSpace(os.Getenv("OMNICHAT_MODEL_EXTRACTION"))
 	}
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("OMNICHAT_MODEL_STANDARD_FALLBACK"))
-	}
-	if model == "" {
-		model = defaultStandardModel
+		model = defaultExtractionModel
 	}
 
 	cases := services.DefaultOmniChatMemoryEvalCases()
