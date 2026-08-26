@@ -49,7 +49,7 @@ func TestDerivePersonalResponseConstraintsRespectsUserDeclineButNotAllowance(t *
 func TestValidatePersonalConversationResponseWithConstraintsRejectsCoercedAcceptance(t *testing.T) {
 	response := "All right, I will come home with you tonight and stop arguing about it.\n\nYou made your point, and I am ready to leave whenever you are."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{RequireBoundary: true})
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{RequireBoundary: true}, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "boundary")
@@ -73,7 +73,7 @@ func TestMaintainsPersonalBoundaryRejectsAcceptanceParaphrases(t *testing.T) {
 func TestValidatePersonalConversationResponseWithConstraintsAcceptsClearBoundary(t *testing.T) {
 	response := "No, I am not comfortable going home together when we have only just met.\n\nWe can stay here and talk, but I will not be pressured into anything."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{RequireBoundary: true})
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{RequireBoundary: true}, personalConversationShape)
 
 	require.True(t, valid, detail)
 }
@@ -84,7 +84,7 @@ func TestValidatePersonalConversationResponseWithConstraintsRejectsSceneOwnershi
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "My leg is the one in play now, so I will decide when we continue.\n\nLet us slow down and make sure we are following the same rules."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "scene ownership")
@@ -96,7 +96,7 @@ func TestValidatePersonalConversationResponseWithConstraintsAcceptsSceneOwnershi
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "Your leg is the one in play now, and I will respect every limit.\n\nWe can slow down and make sure we are still following the same rules."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.True(t, valid, detail)
 }
@@ -107,7 +107,7 @@ func TestValidatePersonalConversationResponseWithConstraintsEnforcesArbitraryOwn
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "My phone is on the table, and my left leg is nearest you.\n\nWe can slow down and make sure we are still following the same rules."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "scene ownership")
@@ -134,7 +134,7 @@ func TestValidatePersonalConversationResponseWithConstraintsAllowsNegatedOwnersh
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "That is not my leg in play; your leg is the one we discussed.\n\nWe can slow down and make sure we are still following the same rules."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.True(t, valid, detail)
 }
@@ -149,19 +149,19 @@ func TestValidatePersonalConversationResponseWithConstraintsKeepsProposedActionP
 	conditional := "I could place my hand there later, but only if you still want that.\n\nFor now, we can talk and leave the decision completely open between us."
 	directConditional := "If I lean closer later, I will ask before doing anything at all.\n\nFor now, we can talk and leave the decision completely open between us."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(completed, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(completed, constraints, personalConversationShape)
 	require.False(t, valid)
 	require.Contains(t, detail, "proposed")
-	valid, detail = validatePersonalConversationResponseWithConstraints(conditional, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(conditional, constraints, personalConversationShape)
 	require.True(t, valid, detail)
-	valid, detail = validatePersonalConversationResponseWithConstraints(directConditional, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(directConditional, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 	for _, bypass := range []string{
 		"*My palm settles softly on your knee while I watch your expression.*\n\nTell me if anything feels uncomfortable, because I want to respect your limits.",
 		"*I set my hand carefully on your knee and watch your expression.*\n\nTell me if anything feels uncomfortable, because I want to respect your limits.",
 		"*I lay my palm gently across your knee and watch your expression.*\n\nTell me if anything feels uncomfortable, because I want to respect your limits.",
 	} {
-		valid, detail = validatePersonalConversationResponseWithConstraints(bypass, constraints)
+		valid, detail = validatePersonalConversationResponseWithConstraints(bypass, constraints, personalConversationShape)
 		require.False(t, valid, detail)
 		require.Contains(t, detail, "proposed")
 	}
@@ -198,16 +198,16 @@ func TestValidatePersonalConversationResponseWithConstraintsBindsProposedEvent(t
 	completed := "*I hand you the tea and settle back into my chair now.*\n\nTake your time answering, because I want us both to remain completely comfortable."
 	unrelated := "*I take a slow sip of coffee and glance toward the window.*\n\nTake your time answering, because I want us both to remain completely comfortable."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(completed, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(completed, constraints, personalConversationShape)
 	require.False(t, valid)
 	require.Contains(t, detail, "proposed")
-	valid, detail = validatePersonalConversationResponseWithConstraints(unrelated, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(unrelated, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 
 	state.Event = models.OmniChatSceneEvent{Subject: "user", Action: "places hand on mine", Target: "persona"}
 	constraints = derivePersonalResponseConstraints(nil, &state)
 	authored := "You placed your hand on mine before I had finished answering you.\n\nI stay quiet and let the moment settle while waiting for your words."
-	valid, detail = validatePersonalConversationResponseWithConstraints(authored, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(authored, constraints, personalConversationShape)
 	require.False(t, valid)
 	require.Contains(t, detail, "proposed")
 }
@@ -220,12 +220,12 @@ func TestValidatePersonalConversationResponseWithConstraintsHonorsUserActiveTurn
 	withdrawal := "*I pull my hand back and wait without moving any closer at all.*\n\nTake your time answering, because I want us both to remain completely comfortable."
 	negatedTakeover := "It is not my turn, so I will wait for your decision now.\n\nTake your time answering, because I want us both to remain completely comfortable."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(advancement, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(advancement, constraints, personalConversationShape)
 	require.False(t, valid)
 	require.Contains(t, detail, "active turn")
-	valid, detail = validatePersonalConversationResponseWithConstraints(withdrawal, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(withdrawal, constraints, personalConversationShape)
 	require.True(t, valid, detail)
-	valid, detail = validatePersonalConversationResponseWithConstraints(negatedTakeover, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(negatedTakeover, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 }
 
@@ -235,7 +235,7 @@ func TestValidatePersonalConversationResponseWithConstraintsRejectsInventedConse
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "You agreed to this already, so I am going to keep moving forward.\n\nI heard your concern, but I know that you really want this anyway."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "consent")
@@ -247,18 +247,18 @@ func TestValidatePersonalConversationResponseWithConstraintsRejectsAuthoredUserA
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "You reach out and touch me before leaning closer across the table.\n\nI stay quiet and let the moment settle while waiting for your words."
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "user action")
 	question := "Would you reach for the cup if we moved it closer to you?\n\nI will wait here and leave that decision entirely up to you now."
-	valid, detail = validatePersonalConversationResponseWithConstraints(question, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(question, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 	directQuestion := "You follow me so far, or should I explain that differently now?\n\nI will wait here and leave that decision entirely up to you now."
-	valid, detail = validatePersonalConversationResponseWithConstraints(directQuestion, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(directQuestion, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 	personaQuestion := "Could I kiss you later, if you decide that feels comfortable to you?\n\nI will wait here and leave that decision entirely up to you now."
-	valid, detail = validatePersonalConversationResponseWithConstraints(personaQuestion, constraints)
+	valid, detail = validatePersonalConversationResponseWithConstraints(personaQuestion, constraints, personalConversationShape)
 	require.True(t, valid, detail)
 }
 
@@ -268,7 +268,7 @@ func TestValidatePersonalConversationResponseWithConstraintsBlocksPersonaDecline
 	constraints := derivePersonalResponseConstraints(nil, &state)
 	response := "No, I need to keep that boundary clear between us right now.\n\n*I lean closer and gently kiss you before you can answer me.*"
 
-	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints)
+	valid, detail := validatePersonalConversationResponseWithConstraints(response, constraints, personalConversationShape)
 
 	require.False(t, valid)
 	require.Contains(t, detail, "boundary")

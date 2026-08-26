@@ -430,7 +430,13 @@ func evaluateResponseEvaluationCase(testCase ResponseEvaluationCase, response st
 	if testCase.Expect.PersonalConversation {
 		semanticsOK, semanticsDetail = validatePersonalConversationSemantics(response)
 	}
-	lengthOK, lengthDetail := meetsConversationalLengthBudget(response)
+	// Same reason as the semantics above: a character who was never given a
+	// block count must not be marked down for the number of blocks she chose.
+	lengthShape := messageShape{}
+	if testCase.Expect.PersonalConversation {
+		lengthShape = personalConversationShape
+	}
+	lengthOK, lengthDetail := meetsConversationalLengthBudget(response, lengthShape)
 	formatOK, formatDetail := validatePersonalConversationFormatting(response)
 	hygieneOK, hygieneDetail := validateAssistantOutputHygiene(response)
 	fluencyOK, fluencyDetail := isInCharacterQualityResponse(response)

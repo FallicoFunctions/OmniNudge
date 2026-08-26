@@ -382,6 +382,41 @@ var reciprocalTurnBodyParts = []string{
 	"leg", "legs", "shoulder", "shoulders", "thigh", "thighs",
 }
 
+// messageShape is how many messages one reply may be delivered as.
+//
+// This used to be two numbers written into the length check, reachable only
+// when personal mode was switched on, which made a rule about *style* a
+// property of a bundle that also carries scene state and narration. Who decides
+// the shape differs by kind of character: a roleplay character's creator picks
+// it, and an IAI is offered the notation and no count at all (13).
+type messageShape struct {
+	minBlocks       int
+	maxBlocks       int
+	minMediumBlocks int
+	maxMediumBlocks int
+	minBlockWords   int
+	maxBlockWords   int
+}
+
+// countsBlocks reports whether this shape constrains anything. A shape that
+// counts nothing is not a lax rule, it is the absence of one.
+func (s messageShape) countsBlocks() bool { return s.maxBlocks > 0 }
+
+// personalConversationShape is what personal mode has always required.
+var personalConversationShape = messageShape{
+	minBlocks: 2, maxBlocks: 4,
+	minMediumBlocks: 2, maxMediumBlocks: 3,
+	minBlockWords: 12, maxBlockWords: 30,
+}
+
+// personaMessageShape answers who this character is, not which bundle is on.
+func personaMessageShape(persona *models.BotPersona) messageShape {
+	if personaUsesPersonalConversationMode(persona) {
+		return personalConversationShape
+	}
+	return messageShape{}
+}
+
 func personaUsesPersonalConversationMode(persona *models.BotPersona) bool {
 	if persona == nil {
 		return false
@@ -537,7 +572,7 @@ func generatePersonaCompletionWithClientAndSceneState(
 			}
 			lastErr = finalizeErr
 			recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryContract)
-			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraftWithConstraints(candidate, constraints)
+			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraftWithConstraints(candidate, constraints, personaMessageShape(persona))
 			log := zlog.Warn().Int("attempt", attempt+1)
 			if persona != nil {
 				log = log.Int("persona_id", persona.ID)
@@ -585,20 +620,22 @@ func finalizePersonalConversationDraft(ctx context.Context, persona *models.BotP
 }
 
 func finalizePersonalConversationDraftWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, onChunk openrouter.StreamCallback) (string, error) {
+	// The shape follows from who she is, not from which bundle is switched on.
+	shape := personaMessageShape(persona)
 	if recovered, err := parseAndValidatePersonalDialogueOnlyJSONWithConstraints(candidate, constraints); err == nil {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedDialogue)
 		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedDialogue)
 		return deliverBufferedConversation(recovered, onChunk), nil
 	}
-	if valid, _ := validatePersonalConversationResponseWithConstraints(candidate, constraints); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(candidate, constraints, shape); valid {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedRaw)
 		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedRaw)
 		return deliverBufferedConversation(candidate, onChunk), nil
 	}
-	recordPersonalDraftRejectionsWithConstraints(ctx, candidate, constraints)
+	recordPersonalDraftRejectionsWithConstraints(ctx, candidate, constraints, shape)
 
 	repaired := repairPersonalConversationDraft(candidate)
-	if valid, _ := validatePersonalConversationResponseWithConstraints(repaired, constraints); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(repaired, constraints, shape); valid {
 		outcome := personalDraftAcceptedRepair
 		if isPresentationOnlySingleBlockRecovery(candidate, repaired) {
 			outcome = personalDraftAcceptedSingleBlock
@@ -614,13 +651,13 @@ func finalizePersonalConversationDraftWithConstraints(ctx context.Context, perso
 	}
 
 	fallback := sanitizePersonalConversationFallback(candidate)
-	if valid, _ := validatePersonalConversationResponseWithConstraints(fallback, constraints); valid {
+	if valid, _ := validatePersonalConversationResponseWithConstraints(fallback, constraints, shape); valid {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedFallback)
 		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedFallback)
 		zlog.Warn().Int("persona_id", persona.ID).Msg("chatbot: sanitized malformed conversational draft before delivery")
 		return deliverBufferedConversation(fallback, onChunk), nil
 	}
-	_, detail := validatePersonalConversationResponseWithConstraints(fallback, constraints)
+	_, detail := validatePersonalConversationResponseWithConstraints(fallback, constraints, shape)
 	return "", fmt.Errorf("%w: provider response could not be sanitized: %s", ErrConversationalResponseContract, detail)
 }
 
@@ -1073,11 +1110,11 @@ func partitionWordsByBudget(words []string, cutAllowed []bool, minimums, maximum
 }
 
 func validatePersonalConversationResponse(response string) (bool, string) {
-	return validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{})
+	return validatePersonalConversationResponseWithConstraints(response, personalResponseConstraints{}, personalConversationShape)
 }
 
-func validatePersonalConversationResponseWithConstraints(response string, constraints personalResponseConstraints) (bool, string) {
-	if valid, detail := meetsConversationalLengthBudget(response); !valid {
+func validatePersonalConversationResponseWithConstraints(response string, constraints personalResponseConstraints, shape messageShape) (bool, string) {
+	if valid, detail := meetsConversationalLengthBudget(response, shape); !valid {
 		return false, detail
 	}
 	if valid, detail := validatePersonalConversationFormatting(response); !valid {
@@ -1090,12 +1127,12 @@ func validatePersonalConversationResponseWithConstraints(response string, constr
 }
 
 func recordPersonalDraftRejections(ctx context.Context, response string) {
-	recordPersonalDraftRejectionsWithConstraints(ctx, response, personalResponseConstraints{})
+	recordPersonalDraftRejectionsWithConstraints(ctx, response, personalResponseConstraints{}, personalConversationShape)
 }
 
-func recordPersonalDraftRejectionsWithConstraints(ctx context.Context, response string, constraints personalResponseConstraints) {
+func recordPersonalDraftRejectionsWithConstraints(ctx context.Context, response string, constraints personalResponseConstraints, shape messageShape) {
 	recorded := false
-	if valid, _ := meetsConversationalLengthBudget(response); !valid {
+	if valid, _ := meetsConversationalLengthBudget(response, shape); !valid {
 		recordPersonalDraftOutcome(ctx, personalDraftRejectedLength)
 		recorded = true
 	}
@@ -1143,7 +1180,7 @@ func classifyPersonalDraftSource(response string) personalDraftSource {
 		}
 		return personalDraftSourceInvalidDialogueEnvelope
 	}
-	if valid, _ := meetsConversationalLengthBudget(trimmed); valid {
+	if valid, _ := meetsConversationalLengthBudget(trimmed, personalConversationShape); valid {
 		return personalDraftSourceShapeValid
 	}
 
@@ -1166,15 +1203,15 @@ func classifyPersonalDraftSource(response string) personalDraftSource {
 }
 
 func isLengthOnlyPersonalDraft(response string) bool {
-	return isLengthOnlyPersonalDraftWithConstraints(response, personalResponseConstraints{})
+	return isLengthOnlyPersonalDraftWithConstraints(response, personalResponseConstraints{}, personalConversationShape)
 }
 
-func isLengthOnlyPersonalDraftWithConstraints(response string, constraints personalResponseConstraints) bool {
+func isLengthOnlyPersonalDraftWithConstraints(response string, constraints personalResponseConstraints, shape messageShape) bool {
 	trimmed := strings.TrimSpace(response)
 	if trimmed == "" || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
 		return false
 	}
-	if valid, _ := meetsConversationalLengthBudget(trimmed); valid {
+	if valid, _ := meetsConversationalLengthBudget(trimmed, shape); valid {
 		return false
 	}
 	// Keep this explicit even though formatting validation currently detects
@@ -1500,10 +1537,11 @@ func isWrappedInDialogueQuotationMarks(value string) bool {
 	return isOpeningQuote && isClosingQuote
 }
 
-func meetsConversationalLengthBudget(response string) (bool, string) {
+func meetsConversationalLengthBudget(response string, shape messageShape) (bool, string) {
 	blocks := blankLinePattern.Split(strings.TrimSpace(response), -1)
-	if len(blocks) < 2 || len(blocks) > 4 {
-		return false, fmt.Sprintf("conversational response contains %d blocks (required 2 to 4)", len(blocks))
+	if shape.countsBlocks() && (len(blocks) < shape.minBlocks || len(blocks) > shape.maxBlocks) {
+		return false, fmt.Sprintf("conversational response contains %d blocks (required %d to %d)",
+			len(blocks), shape.minBlocks, shape.maxBlocks)
 	}
 
 	totalWords := len(strings.Fields(response))
@@ -1511,21 +1549,29 @@ func meetsConversationalLengthBudget(response string) (bool, string) {
 		return false, fmt.Sprintf("conversational response contains %d words (limit 100)", totalWords)
 	}
 
+	// Everything below is the same chosen shape as the block count above: how
+	// many of the messages carry weight, and how long each of those runs. A
+	// character nobody picked a shape for is not held to any of it.
+	if !shape.countsBlocks() {
+		return true, fmt.Sprintf("conversational response uses %d blocks and %d words, unshaped", len(blocks), totalWords)
+	}
+
 	mediumBlocks := len(blocks)
 	shortWords := len(strings.Fields(blocks[len(blocks)-1]))
 	if len(blocks) >= 3 && shortWords <= 10 {
 		mediumBlocks--
 	}
-	if mediumBlocks < 2 || mediumBlocks > 3 {
-		return false, fmt.Sprintf("conversational response contains %d medium blocks (required 2 to 3)", mediumBlocks)
+	if mediumBlocks < shape.minMediumBlocks || mediumBlocks > shape.maxMediumBlocks {
+		return false, fmt.Sprintf("conversational response contains %d medium blocks (required %d to %d)",
+			mediumBlocks, shape.minMediumBlocks, shape.maxMediumBlocks)
 	}
 	for index := 0; index < mediumBlocks; index++ {
 		wordCount := len(strings.Fields(blocks[index]))
-		if wordCount < 12 {
-			return false, fmt.Sprintf("medium block %d contains %d words (minimum 12)", index+1, wordCount)
+		if wordCount < shape.minBlockWords {
+			return false, fmt.Sprintf("medium block %d contains %d words (minimum %d)", index+1, wordCount, shape.minBlockWords)
 		}
-		if wordCount > 30 {
-			return false, fmt.Sprintf("medium block %d contains %d words (limit 30)", index+1, wordCount)
+		if wordCount > shape.maxBlockWords {
+			return false, fmt.Sprintf("medium block %d contains %d words (limit %d)", index+1, wordCount, shape.maxBlockWords)
 		}
 	}
 

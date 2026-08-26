@@ -339,9 +339,9 @@ func TestPersonalDraftDiagnosticsCountQuestionBudgetRejection(t *testing.T) {
 func TestPersonalDraftDiagnosticsCountServerConstraintRejections(t *testing.T) {
 	ctx, diagnostics := withPersonalDraftDiagnostics(context.Background())
 	boundaryResponse := "Fine, I am coming home with you even though I am not comfortable.\n\nI will leave with you now, and we can discuss my concern after arriving."
-	recordPersonalDraftRejectionsWithConstraints(ctx, boundaryResponse, personalResponseConstraints{RequireBoundary: true})
+	recordPersonalDraftRejectionsWithConstraints(ctx, boundaryResponse, personalResponseConstraints{RequireBoundary: true}, personalConversationShape)
 	sceneResponse := "My leg is the one in play now, so I will decide what happens.\n\nWe can slow down and make sure we are following the same rules."
-	recordPersonalDraftRejectionsWithConstraints(ctx, sceneResponse, personalResponseConstraints{Ownership: []personalOwnershipConstraint{{Subject: "leg", ForbiddenPossessive: "my"}}})
+	recordPersonalDraftRejectionsWithConstraints(ctx, sceneResponse, personalResponseConstraints{Ownership: []personalOwnershipConstraint{{Subject: "leg", ForbiddenPossessive: "my"}}}, personalConversationShape)
 
 	counters := diagnostics.snapshot()
 	require.Equal(t, 1, counters.RejectedBoundary)
