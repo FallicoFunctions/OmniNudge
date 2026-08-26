@@ -45,11 +45,6 @@ func TestOmniChatAdminBillingBypassesCreditsForEveryMeteredFeature(t *testing.T)
 		require.True(t, reservation.AdminBypass, kind)
 	}
 
-	reservation, err := billing.ReserveChatMultiplierOwned(context.Background(), userID, uuid.New(), 2)
-	require.NoError(t, err)
-	require.Zero(t, reservation.Cost)
-	require.True(t, reservation.AdminBypass)
-
 	allowed, cost, err := billing.CanReserveVideoOwned(context.Background(), userID)
 	require.NoError(t, err)
 	require.True(t, allowed)

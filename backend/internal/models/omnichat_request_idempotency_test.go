@@ -107,8 +107,8 @@ func TestOmniChatFreeTierMessageCompletesRequestAtomically(t *testing.T) {
 	resource := "conversation:" + strconv.Itoa(conversation.ID)
 	_, err = repo.Begin(ctx, user.ID, requestID, "chat_send", resource, hash)
 	require.NoError(t, err)
-	message, err := models.NewBotMessageRepository(db.Pool).CreateWithBilling(
-		ctx, conversation.ID, models.BotMessageRoleAssistant, "I hear you.", true, nil, nil,
+	message, err := models.NewBotMessageRepository(db.Pool).Create(
+		ctx, conversation.ID, models.BotMessageRoleAssistant, "I hear you.", true,
 		&models.OmniChatRequestCompletion{UserID: user.ID, RequestID: requestID},
 	)
 	require.NoError(t, err)

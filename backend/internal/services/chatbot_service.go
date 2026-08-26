@@ -142,12 +142,6 @@ func omniChatRequestCompletion(ctx context.Context, userID int) *models.OmniChat
 	return &models.OmniChatRequestCompletion{UserID: userID, RequestID: requestID}
 }
 
-type omniChatResponseBilling interface {
-	ReserveChatMultiplierOwned(context.Context, int, uuid.UUID, int64) (*models.OmniCreditsUsageReservation, error)
-	CaptureOwned(context.Context, int, uuid.UUID) error
-	RefundOwned(context.Context, int, uuid.UUID) error
-}
-
 // ChatbotService orchestrates OmniChat conversations: it assembles a
 // persona's system prompt and conversation history into a request, delivers
 // the generated reply over the WebSocket hub, and persists both sides of the
@@ -160,7 +154,6 @@ type ChatbotService struct {
 	messageRepo *models.BotMessageRepository
 	openrouter  chatCompletionClient
 	modelRouter OmniChatCompletionResolver
-	billing     omniChatResponseBilling
 	sceneState  conversationSceneStatePreparer
 	entitlement *OmniChatContentEntitlement
 	memory      omniChatMemoryRecaller
@@ -290,11 +283,6 @@ func (s *ChatbotService) scheduleMemoryExtraction(ctx context.Context, conversat
 	}()
 }
 
-func (s *ChatbotService) SetBilling(billing omniChatResponseBilling) *ChatbotService {
-	s.billing = billing
-	return s
-}
-
 // SetContentEntitlement installs the same rule media generation uses, so an
 // account cannot be told no by one surface and yes by the other.
 //
@@ -331,32 +319,18 @@ func (s *ChatbotService) clampSystemPrompt(ctx context.Context, prompt string, u
 	return prompt + omniChatSFWClamp
 }
 
+// The resolved client already carries its profile's model and reasoning
+// effort, so which profile it came from no longer changes anything here.
 func (s *ChatbotService) completionForConversation(ctx context.Context, userID, conversationID int) chatCompletionClient {
-	completion, _ := s.completionProfileForConversation(ctx, userID, conversationID)
-	return completion
-}
-
-func (s *ChatbotService) completionProfileForConversation(ctx context.Context, userID, conversationID int) (chatCompletionClient, OmniChatModelProfile) {
-	standard, _ := FindOmniChatModelProfile(OmniChatModelProfileStandard)
 	if s.modelRouter == nil {
-		return s.openrouter, standard
+		return s.openrouter
 	}
 	if resolver, ok := s.modelRouter.(omniChatCompletionProfileResolver); ok {
-		return resolver.ResolveProfile(ctx, userID, conversationID)
+		completion, _ := resolver.ResolveProfile(ctx, userID, conversationID)
+		return completion
 	}
-	completion, tier := s.modelRouter.Resolve(ctx, userID, conversationID)
-	key := OmniChatModelProfileStandard
-	switch tier {
-	case OmniChatModelTierPlus:
-		key = OmniChatModelProfilePlus
-	case OmniChatModelTierPremium:
-		key = OmniChatModelProfilePremiumQuick
-	}
-	profile, found := FindOmniChatModelProfile(key)
-	if !found {
-		profile = standard
-	}
-	return completion, profile
+	completion, _ := s.modelRouter.Resolve(ctx, userID, conversationID)
+	return completion
 }
 
 // SendMessage persists the user's message, generates the persona's reply, and
@@ -386,19 +360,7 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 		return nil, ErrOmniChatBlockedByPersona
 	}
 
-	completion, profile := s.completionProfileForConversation(ctx, userID, conversationID)
-	billingOperationID, billingLinked, err := s.reserveResponseProfile(ctx, userID, profile, deriveOmniChatRequestBillingOperationID(ctx, userID, "chat_send"))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if billingOperationID == nil || billingLinked {
-			return
-		}
-		if refundErr := s.refundResponseReservation(userID, *billingOperationID); refundErr != nil {
-			resultErr = errors.Join(resultErr, refundErr)
-		}
-	}()
+	completion := s.completionForConversation(ctx, userID, conversationID)
 
 	requestID, requestBound := ctx.Value(omniChatClientRequestIDContextKey{}).(uuid.UUID)
 	var existingUserTurn *models.BotMessage
@@ -508,23 +470,12 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), assistantPersistenceTimeout)
 	defer persistCancel()
 
-	var billingUserID *int
-	if billingOperationID != nil && !failed {
-		billingUserID = &userID
-	}
-	assistantMsg, err := s.messageRepo.CreateWithBilling(
+	assistantMsg, err := s.messageRepo.Create(
 		persistCtx, conversationID, models.BotMessageRoleAssistant, fullText, failed,
-		billingUserID, billingOperationIDIfSuccessful(billingOperationID, failed),
 		omniChatRequestCompletion(ctx, userID),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("chatbot: save assistant message: %w", err)
-	}
-	if billingOperationID != nil && !failed {
-		billingLinked = true
-		if err := s.captureResponseReservation(userID, *billingOperationID); err != nil {
-			return assistantMsg, err
-		}
 	}
 
 	// Non-fatal: the message is already persisted and is the real result of
@@ -591,19 +542,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 		return nil, ErrMessageNotRegeneratable
 	}
 
-	completion, profile := s.completionProfileForConversation(ctx, userID, conversationID)
-	billingOperationID, billingLinked, err := s.reserveResponseProfile(ctx, userID, profile, deriveOmniChatRequestBillingOperationID(ctx, userID, "chat_regenerate"))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if billingOperationID == nil || billingLinked {
-			return
-		}
-		if refundErr := s.refundResponseReservation(userID, *billingOperationID); refundErr != nil {
-			resultErr = errors.Join(resultErr, refundErr)
-		}
-	}()
+	completion := s.completionForConversation(ctx, userID, conversationID)
 
 	chatCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), generationRequestTimeout)
 	defer cancel()
@@ -673,18 +612,12 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), assistantPersistenceTimeout)
 	defer persistCancel()
 
-	var billingUserID *int
-	if billingOperationID != nil {
-		billingUserID = &userID
-	}
-	updated, err := s.messageRepo.ReplaceLatestAssistantContentWithBilling(
+	updated, err := s.messageRepo.ReplaceLatestAssistantContent(
 		persistCtx,
 		conversationID,
 		messageID,
 		target.Content,
 		fullText,
-		billingUserID,
-		billingOperationID,
 		omniChatRequestCompletion(ctx, userID),
 	)
 	if err != nil {
@@ -692,12 +625,6 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	}
 	if updated == nil {
 		return nil, ErrMessageNotRegeneratable
-	}
-	if billingOperationID != nil {
-		billingLinked = true
-		if err := s.captureResponseReservation(userID, *billingOperationID); err != nil {
-			return updated, err
-		}
 	}
 
 	if err := s.convRepo.UpdateLastMessageAt(persistCtx, conversationID); err != nil {
@@ -714,65 +641,6 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	return updated, nil
 }
 
-func billingOperationIDIfSuccessful(operationID *uuid.UUID, failed bool) *uuid.UUID {
-	if failed {
-		return nil
-	}
-	return operationID
-}
-
-func (s *ChatbotService) reserveResponseProfile(ctx context.Context, userID int, profile OmniChatModelProfile, stableOperationID *uuid.UUID) (*uuid.UUID, bool, error) {
-	if !profile.RequiresOmniCredits {
-		return nil, false, nil
-	}
-	if s.billing == nil || profile.CreditMultiplier < 1 {
-		return nil, false, errors.New("chatbot: OmniCredits metering unavailable")
-	}
-	operationID := uuid.New()
-	if stableOperationID != nil && *stableOperationID != uuid.Nil {
-		operationID = *stableOperationID
-	}
-	reservation, err := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier))
-	if err != nil {
-		// A prior attempt with this client UUID may have reached a durable
-		// refund before a recoverable transport failure. Reservation rows are
-		// append-only, so advance to a new server-owned attempt operation only
-		// after the repository confirms the old stable operation is closed.
-		if stableOperationID != nil && errors.Is(err, models.ErrOmniCreditsReservationRefunded) {
-			operationID = uuid.New()
-			reservation, retryErr := s.billing.ReserveChatMultiplierOwned(ctx, userID, operationID, int64(profile.CreditMultiplier))
-			if retryErr == nil {
-				if reservation == nil {
-					return nil, false, errors.New("chatbot: reserve retry response credits returned no reservation")
-				}
-				if reservation.AdminBypass {
-					return nil, true, nil
-				}
-				return &operationID, false, nil
-			} else {
-				return nil, false, fmt.Errorf("chatbot: reserve retry response credits: %w", retryErr)
-			}
-		}
-		return nil, false, fmt.Errorf("chatbot: reserve response credits: %w", err)
-	}
-	if reservation == nil {
-		return nil, false, errors.New("chatbot: reserve response credits returned no reservation")
-	}
-	if reservation.AdminBypass {
-		return nil, true, nil
-	}
-	return &operationID, false, nil
-}
-
-func deriveOmniChatRequestBillingOperationID(ctx context.Context, userID int, operation string) *uuid.UUID {
-	requestID, ok := ctx.Value(omniChatClientRequestIDContextKey{}).(uuid.UUID)
-	if !ok || requestID == uuid.Nil || userID <= 0 {
-		return nil
-	}
-	value := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("omnichat:%s:%d:%s", operation, userID, requestID)))
-	return &value
-}
-
 // DeriveOmniChatRequestBillingOperationID returns the stable server-side
 // billing operation for one already-claimed client request. It never accepts a
 // client-selected price, usage kind, or plan tier.
@@ -782,24 +650,6 @@ func DeriveOmniChatRequestBillingOperationID(userID int, operation string, reque
 	}
 	value := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("omnichat:%s:%d:%s", operation, userID, requestID)))
 	return &value
-}
-
-func (s *ChatbotService) captureResponseReservation(userID int, operationID uuid.UUID) error {
-	billingCtx, cancel := context.WithTimeout(context.Background(), assistantPersistenceTimeout)
-	defer cancel()
-	if err := s.billing.CaptureOwned(billingCtx, userID, operationID); err != nil {
-		return fmt.Errorf("chatbot: capture response credits: %w", err)
-	}
-	return nil
-}
-
-func (s *ChatbotService) refundResponseReservation(userID int, operationID uuid.UUID) error {
-	billingCtx, cancel := context.WithTimeout(context.Background(), assistantPersistenceTimeout)
-	defer cancel()
-	if err := s.billing.RefundOwned(billingCtx, userID, operationID); err != nil {
-		return fmt.Errorf("chatbot: refund response credits: %w", err)
-	}
-	return nil
 }
 
 // EditAssistantMessage replaces the latest assistant reply for one owned
@@ -830,9 +680,9 @@ func (s *ChatbotService) persistAssistantFallback(ctx context.Context, userID, c
 	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), assistantPersistenceTimeout)
 	defer cancel()
 
-	assistantMsg, err := s.messageRepo.CreateWithBilling(
+	assistantMsg, err := s.messageRepo.Create(
 		persistCtx, conversationID, models.BotMessageRoleAssistant, content, true,
-		nil, nil, omniChatRequestCompletion(ctx, userID),
+		omniChatRequestCompletion(ctx, userID),
 	)
 	if err != nil {
 		return nil, err

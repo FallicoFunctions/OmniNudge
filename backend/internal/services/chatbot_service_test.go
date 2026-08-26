@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/openrouter"
@@ -48,68 +47,6 @@ type conversationSceneStatePreparerFake struct {
 	conversationID int
 }
 
-type meteredChatProfileResolverFake struct {
-	client  chatCompletionClient
-	profile OmniChatModelProfile
-}
-
-func (f *meteredChatProfileResolverFake) Resolve(context.Context, int, int) (chatCompletionClient, OmniChatModelTier) {
-	return f.client, f.profile.RequiredTier
-}
-
-func (f *meteredChatProfileResolverFake) ResolveProfile(context.Context, int, int) (chatCompletionClient, OmniChatModelProfile) {
-	return f.client, f.profile
-}
-
-type flakyChatResponseBilling struct {
-	credits         *models.OmniCreditsRepository
-	captureFailures int
-	reserved        []uuid.UUID
-	captured        []uuid.UUID
-	refunded        []uuid.UUID
-	seenMultipliers []int64
-}
-
-type refundedOperationChatBillingFake struct {
-	operations []uuid.UUID
-}
-
-func (f *refundedOperationChatBillingFake) ReserveChatMultiplierOwned(_ context.Context, _ int, operationID uuid.UUID, _ int64) (*models.OmniCreditsUsageReservation, error) {
-	f.operations = append(f.operations, operationID)
-	if len(f.operations) == 1 {
-		return nil, models.ErrOmniCreditsReservationRefunded
-	}
-	return &models.OmniCreditsUsageReservation{OperationID: operationID}, nil
-}
-func (*refundedOperationChatBillingFake) CaptureOwned(context.Context, int, uuid.UUID) error {
-	return nil
-}
-func (*refundedOperationChatBillingFake) RefundOwned(context.Context, int, uuid.UUID) error {
-	return nil
-}
-
-func (f *flakyChatResponseBilling) ReserveChatMultiplierOwned(ctx context.Context, userID int, operationID uuid.UUID, multiplier int64) (*models.OmniCreditsUsageReservation, error) {
-	f.reserved = append(f.reserved, operationID)
-	f.seenMultipliers = append(f.seenMultipliers, multiplier)
-	return f.credits.ReserveUsage(ctx, userID, operationID, models.OmniCreditsUsageChat, multiplier)
-}
-
-func (f *flakyChatResponseBilling) CaptureOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
-	f.captured = append(f.captured, operationID)
-	if f.captureFailures > 0 {
-		f.captureFailures--
-		return errors.New("transient capture failure")
-	}
-	_, err := f.credits.CaptureUsage(ctx, userID, operationID)
-	return err
-}
-
-func (f *flakyChatResponseBilling) RefundOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
-	f.refunded = append(f.refunded, operationID)
-	_, err := f.credits.RefundUsage(ctx, userID, operationID)
-	return err
-}
-
 func (f *conversationSceneStatePreparerFake) PrepareForGeneration(
 	_ context.Context,
 	_, conversationID int,
@@ -125,20 +62,6 @@ func (f *conversationSceneStatePreparerFake) PrepareForGeneration(
 
 func (c *optionsAwareChatCompletionClient) Generate(context.Context, []openrouter.Message, openrouter.StreamCallback) (string, error) {
 	return "", fmt.Errorf("unbounded generation should not be used for personal conversation mode")
-}
-
-func TestReserveResponseProfileAdvancesAfterRefundedStableOperation(t *testing.T) {
-	billing := &refundedOperationChatBillingFake{}
-	service := &ChatbotService{billing: billing}
-	profile := OmniChatModelProfile{RequiresOmniCredits: true, CreditMultiplier: 2}
-	stable := uuid.New()
-	operation, _, err := service.reserveResponseProfile(context.Background(), 7, profile, &stable)
-	require.NoError(t, err)
-	require.NotNil(t, operation)
-	require.Len(t, billing.operations, 2)
-	require.Equal(t, stable, billing.operations[0])
-	require.NotEqual(t, stable, billing.operations[1])
-	require.Equal(t, billing.operations[1], *operation)
 }
 
 func (c *optionsAwareChatCompletionClient) GenerateWithOptions(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback, options openrouter.GenerationOptions) (string, error) {
@@ -1466,109 +1389,6 @@ func TestRegenerateMessagePreservesOriginalReplyWhenSceneContractOrProviderFails
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
 	require.Equal(t, "Keep this original reply.", messages[1].Content)
-}
-
-func TestSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testing.T) {
-	db, err := database.NewTest()
-	require.NoError(t, err)
-	t.Cleanup(db.Close)
-
-	ctx := context.Background()
-	require.NoError(t, db.Migrate(ctx))
-	require.NoError(t, database.ResetTestData(ctx, db))
-
-	user := &models.User{
-		Username:     fmt.Sprintf("omnichat_billing_ops_%d", time.Now().UnixNano()),
-		PasswordHash: "hash", Role: "user",
-	}
-	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
-	personaRepo := models.NewBotPersonaRepository(db.Pool)
-	persona, err := personaRepo.CreateOwned(ctx, user.ID, &models.BotPersona{
-		Slug: fmt.Sprintf("u%d-ultra-fast-%d", user.ID, time.Now().UnixNano()),
-		Name: "Fast Reasoner", Category: models.PersonaCategoryOriginal,
-		Visibility: "private", SourceFormat: "native", SystemPrompt: "Answer directly.",
-		AlternateGreetings: []string{}, Tags: []string{}, GalleryURLs: []string{},
-		ExtensionsJSON: json.RawMessage(`{}`),
-	})
-	require.NoError(t, err)
-	convRepo := models.NewBotConversationRepository(db.Pool)
-	conversation, err := convRepo.CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
-	require.NoError(t, err)
-	messageRepo := models.NewBotMessageRepository(db.Pool)
-
-	credits := models.NewOmniCreditsRepository(db.Pool)
-	_, err = credits.CreditPurchased(ctx, user.ID, uuid.New(), 10)
-	require.NoError(t, err)
-	billing := &flakyChatResponseBilling{credits: credits, captureFailures: 1}
-	replies := []string{
-		"A brass key hangs inside the lock, polished enough to catch the light from the hall.\n\nThe door is waiting, but I would check the hinges before trusting anything this obvious.",
-		"The new angle reveals a hairline seam around the frame, too precise to be ordinary wear.\n\nI would test the wall first; the obvious lock may only be a distraction.",
-	}
-	call := 0
-	client := stubChatCompletionClient{generate: func(_ context.Context, _ []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
-		reply := replies[call]
-		call++
-		return reply, nil
-	}}
-	// The shipped catalogue no longer contains a credit-gated profile, so the
-	// metering path has to be driven from one built here.
-	profile := OmniChatModelProfile{
-		Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium,
-		ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortHigh,
-		Speed: OmniChatModelSpeedStandard, RequiresOmniCredits: true, CreditMultiplier: 1,
-	}
-	router := &meteredChatProfileResolverFake{client: client, profile: profile}
-	service := NewChatbotService(
-		db.Pool, personaRepo, convRepo, messageRepo, client, websocket.NewHub(), router,
-	).SetBilling(billing)
-
-	first, sendErr := service.SendMessage(ctx, user.ID, conversation.ID, "What is behind the door?")
-	require.ErrorContains(t, sendErr, "capture response credits")
-	require.NotNil(t, first, "a capture failure must not hide a delivered response")
-	require.Len(t, billing.refunded, 0, "a durably linked response must remain reserved for reconciliation")
-
-	regenerated, err := service.RegenerateMessage(ctx, user.ID, conversation.ID, first.ID)
-	require.NoError(t, err)
-	require.Equal(t, first.ID, regenerated.ID)
-	require.Equal(t, replies[1], regenerated.Content)
-	// What this test is about is that both the send and the regeneration are
-	// metered at all, not what they cost.
-	require.Equal(t, []int64{1, 1}, billing.seenMultipliers)
-
-	var deliveries int
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM omnichat_chat_billing_deliveries WHERE message_id=$1
-	`, first.ID).Scan(&deliveries))
-	require.Equal(t, 2, deliveries, "regeneration must append instead of overwriting the earlier pending capture")
-	var firstStatus, secondStatus string
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		SELECT status FROM omnicredits_usage_reservations WHERE user_id=$1 AND operation_id=$2
-	`, user.ID, billing.reserved[0]).Scan(&firstStatus))
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		SELECT status FROM omnicredits_usage_reservations WHERE user_id=$1 AND operation_id=$2
-	`, user.ID, billing.reserved[1]).Scan(&secondStatus))
-	require.Equal(t, models.OmniCreditsReservationReserved, firstStatus)
-	require.Equal(t, models.OmniCreditsReservationCaptured, secondStatus)
-
-	// Drain what the send and the regeneration left so the next turn has
-	// nothing to reserve against.
-	drainOperationID := uuid.New()
-	_, err = credits.ReserveUsage(ctx, user.ID, drainOperationID, models.OmniCreditsUsageChat, 8)
-	require.NoError(t, err)
-	_, err = credits.CaptureUsage(ctx, user.ID, drainOperationID)
-	require.NoError(t, err)
-
-	deniedSend, err := service.SendMessage(ctx, user.ID, conversation.ID, "Do not save this draft.")
-	require.ErrorIs(t, err, models.ErrOmniCreditsInsufficient)
-	require.Nil(t, deniedSend)
-	deniedRegeneration, err := service.RegenerateMessage(ctx, user.ID, conversation.ID, regenerated.ID)
-	require.ErrorIs(t, err, models.ErrOmniCreditsInsufficient)
-	require.Nil(t, deniedRegeneration)
-	storedMessages, err := messageRepo.ListByConversationID(ctx, conversation.ID, 10)
-	require.NoError(t, err)
-	require.Len(t, storedMessages, 2, "an unaffordable send must not persist the user's draft")
-	require.Equal(t, replies[1], storedMessages[1].Content, "an unaffordable regeneration must preserve the original")
-	require.Equal(t, 2, call, "provider generation must not start without a reservation")
 }
 
 func TestEditAssistantMessageIsPrivateAndPreservesRevision(t *testing.T) {

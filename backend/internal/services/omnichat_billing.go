@@ -380,30 +380,6 @@ func (s *OmniChatBillingService) ReserveOwned(ctx context.Context, userID int, o
 	return s.credits.ReserveUsage(ctx, userID, operationID, usageKind, cost)
 }
 
-// ReserveChatMultiplierOwned prices a server-resolved premium profile from
-// the configured base chat cost. Only positive bounded catalog multipliers are
-// accepted so callers cannot accidentally create a free or overflowing hold.
-func (s *OmniChatBillingService) ReserveChatMultiplierOwned(ctx context.Context, userID int, operationID uuid.UUID, multiplier int64) (*models.OmniCreditsUsageReservation, error) {
-	baseCost, ok := s.costs[models.OmniCreditsUsageChat]
-	if !ok || multiplier < 1 || multiplier > 100 || baseCost > (1<<63-1)/multiplier {
-		return nil, fmt.Errorf("omnichat billing: invalid chat multiplier")
-	}
-	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
-	if err != nil {
-		return nil, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
-	}
-	if admin {
-		return &models.OmniCreditsUsageReservation{
-			UserID: userID, OperationID: operationID, UsageKind: models.OmniCreditsUsageChat,
-			Cost: 0, Status: models.OmniCreditsReservationCaptured, AdminBypass: true,
-		}, nil
-	}
-	if s.credits == nil {
-		return nil, fmt.Errorf("omnichat billing: credits unavailable")
-	}
-	return s.credits.ReserveUsage(ctx, userID, operationID, models.OmniCreditsUsageChat, baseCost*multiplier)
-}
-
 func (s *OmniChatBillingService) CaptureOwned(ctx context.Context, userID int, operationID uuid.UUID) error {
 	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
 	if err != nil {

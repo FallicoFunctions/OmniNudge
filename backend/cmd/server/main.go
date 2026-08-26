@@ -752,7 +752,6 @@ func main() {
 		hub,
 		omniChatModelRouter,
 	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
-		SetBilling(omniChatBilling).
 		SetContentEntitlement(omniChatContentEntitlement).
 		SetCharacterTraits(models.NewOmniChatCharacterTraitRepository(db.Pool))
 	// A nil queue means no worker will ever extract, so the persona recalls what

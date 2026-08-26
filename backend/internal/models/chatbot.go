@@ -1073,9 +1073,6 @@ func NewBotMessageRepository(pool *pgxpool.Pool) *BotMessageRepository {
 }
 
 // Create inserts a new message (user or assistant turn) into a conversation.
-func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, role, content string, failed bool) (*BotMessage, error) {
-	return r.CreateWithBilling(ctx, conversationID, role, content, failed, nil, nil)
-}
 
 // CreateUserTurnWithRequestID creates a request-owned user turn, or returns
 // the existing turn when an interrupted request is retried. The unique index
@@ -1133,13 +1130,7 @@ func (r *BotMessageRepository) GetUserTurnByRequestID(ctx context.Context, conve
 	return m, nil
 }
 
-// CreateWithBilling atomically links a successful assistant response to the
-// credit reservation that paid for it. Both billing values must be nil or
-// non-nil; the database also enforces the assistant/success boundary.
-func (r *BotMessageRepository) CreateWithBilling(ctx context.Context, conversationID int, role, content string, failed bool, billingUserID *int, billingOperationID *uuid.UUID, completions ...*OmniChatRequestCompletion) (*BotMessage, error) {
-	if (billingUserID == nil) != (billingOperationID == nil) {
-		return nil, errors.New("bot message billing identity must be complete")
-	}
+func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, role, content string, failed bool, completions ...*OmniChatRequestCompletion) (*BotMessage, error) {
 	completion, err := onlyOmniChatRequestCompletion(completions)
 	if err != nil {
 		return nil, err
@@ -1150,15 +1141,12 @@ func (r *BotMessageRepository) CreateWithBilling(ctx context.Context, conversati
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at
 	`
-	if billingOperationID == nil && completion == nil {
+	if completion == nil {
 		err := r.pool.QueryRow(ctx, query, conversationID, role, content, failed).Scan(&m.ID, &m.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
 		return m, nil
-	}
-	if billingOperationID != nil && (role != BotMessageRoleAssistant || failed) {
-		return nil, errors.New("only successful assistant messages can have billing deliveries")
 	}
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -1169,20 +1157,10 @@ func (r *BotMessageRepository) CreateWithBilling(ctx context.Context, conversati
 	if err != nil {
 		return nil, err
 	}
-	if billingOperationID != nil {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO omnichat_chat_billing_deliveries(user_id, operation_id, message_id)
-			VALUES($1,$2,$3)
-		`, *billingUserID, *billingOperationID, m.ID); err != nil {
-			return nil, err
-		}
-	}
-	if completion != nil {
-		requestID := completion.RequestID
-		m.RequestID = &requestID
-		if err := completeOmniChatRequestInTx(ctx, tx, *completion, m); err != nil {
-			return nil, err
-		}
+	requestID := completion.RequestID
+	m.RequestID = &requestID
+	if err := completeOmniChatRequestInTx(ctx, tx, *completion, m); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -1477,23 +1455,12 @@ func (r *BotMessageRepository) ListAfterMessageID(ctx context.Context, conversat
 // ReplaceLatestAssistantContent updates a reply only if it is still latest
 // and still contains the content the caller originally read. The content
 // check prevents two concurrent regenerations from overwriting each other.
-func (r *BotMessageRepository) ReplaceLatestAssistantContent(ctx context.Context, conversationID, messageID int, expectedContent, content string) (*BotMessage, error) {
-	return r.ReplaceLatestAssistantContentWithBilling(ctx, conversationID, messageID, expectedContent, content, nil, nil)
-}
-
-// ReplaceLatestAssistantContentWithBilling records a regenerated response and
-// its reservation in the same statement, preserving the lost-update guard.
-func (r *BotMessageRepository) ReplaceLatestAssistantContentWithBilling(
+func (r *BotMessageRepository) ReplaceLatestAssistantContent(
 	ctx context.Context,
 	conversationID, messageID int,
 	expectedContent, content string,
-	billingUserID *int,
-	billingOperationID *uuid.UUID,
 	completions ...*OmniChatRequestCompletion,
 ) (*BotMessage, error) {
-	if (billingUserID == nil) != (billingOperationID == nil) {
-		return nil, errors.New("bot message billing identity must be complete")
-	}
 	completion, err := onlyOmniChatRequestCompletion(completions)
 	if err != nil {
 		return nil, err
@@ -1517,7 +1484,7 @@ func (r *BotMessageRepository) ReplaceLatestAssistantContentWithBilling(
 	queryer := interface {
 		QueryRow(context.Context, string, ...any) pgx.Row
 	}(r.pool)
-	if billingOperationID != nil || completion != nil {
+	if completion != nil {
 		var err error
 		tx, err = r.pool.BeginTx(ctx, pgx.TxOptions{})
 		if err != nil {
@@ -1536,22 +1503,12 @@ func (r *BotMessageRepository) ReplaceLatestAssistantContentWithBilling(
 		}
 		return nil, err
 	}
-	if billingOperationID != nil {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO omnichat_chat_billing_deliveries(user_id, operation_id, message_id)
-			VALUES($1,$2,$3)
-		`, *billingUserID, *billingOperationID, m.ID); err != nil {
-			return nil, err
-		}
-	}
 	if completion != nil {
 		requestID := completion.RequestID
 		m.RequestID = &requestID
 		if err := completeOmniChatRequestInTx(ctx, tx, *completion, m); err != nil {
 			return nil, err
 		}
-	}
-	if billingOperationID != nil || completion != nil {
 		if err := tx.Commit(ctx); err != nil {
 			return nil, err
 		}

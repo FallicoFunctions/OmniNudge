@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"196_retire_chat_billing_deliveries",
 		"195_retire_ultra_fast_profile",
 		"194_omnichat_commitments",
 		"193_baseline_firmness",
@@ -159,7 +160,6 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		"omnicredits_wallets",
 		"omnichat_checkout_sessions",
 		"omnichat_billing_events",
-		"omnichat_chat_billing_deliveries",
 		"omnichat_request_idempotency",
 		"omnichat_model_preferences",
 		"auth_sessions",
@@ -261,6 +261,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"196_retire_chat_billing_deliveries",
 		"195_retire_ultra_fast_profile",
 		"194_omnichat_commitments",
 		"193_baseline_firmness",

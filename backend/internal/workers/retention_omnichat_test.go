@@ -273,64 +273,6 @@ func TestRetentionWorkerFailsAndRefundsStaleGenerationReservations(t *testing.T)
 	require.Equal(t, int64(40), wallet.TotalBalance)
 }
 
-func TestRetentionWorkerCapturesDeliveredChatAfterTransientCaptureFailure(t *testing.T) {
-	ctx := context.Background()
-	db, err := database.NewTest()
-	require.NoError(t, err)
-	t.Cleanup(db.Close)
-	require.NoError(t, db.Migrate(ctx))
-	require.NoError(t, database.ResetTestData(ctx, db))
-
-	user := &models.User{Username: "linked_chat_credit_user", PasswordHash: "hash", Role: "user"}
-	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
-	var personaID int
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		INSERT INTO bot_personas(slug,name,category,system_prompt,visibility,source_format,is_active)
-		VALUES('linked-chat-credit','Linked Chat','original','Stay in character.','public','native',TRUE)
-		RETURNING id
-	`).Scan(&personaID))
-	conversation, err := models.NewBotConversationRepository(db.Pool).Create(ctx, user.ID, personaID, nil, nil)
-	require.NoError(t, err)
-
-	credits := models.NewOmniCreditsRepository(db.Pool)
-	_, err = credits.CreditPurchased(ctx, user.ID, uuid.New(), 20)
-	require.NoError(t, err)
-	operationID := uuid.New()
-	_, err = credits.ReserveUsage(ctx, user.ID, operationID, models.OmniCreditsUsageChat, 2)
-	require.NoError(t, err)
-	_, err = models.NewBotMessageRepository(db.Pool).CreateWithBilling(
-		ctx, conversation.ID, models.BotMessageRoleAssistant, "Delivered response", false, &user.ID, &operationID,
-	)
-	require.NoError(t, err)
-	_, err = db.Pool.Exec(ctx, `DELETE FROM bot_conversations WHERE id=$1`, conversation.ID)
-	require.NoError(t, err)
-	var linkedMessageID *int
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		SELECT message_id FROM omnichat_chat_billing_deliveries
-		WHERE user_id=$1 AND operation_id=$2
-	`, user.ID, operationID).Scan(&linkedMessageID))
-	require.Nil(t, linkedMessageID, "deleting the conversation must retain the delivered billing outcome")
-	_, err = db.Pool.Exec(ctx, `
-		UPDATE omnicredits_usage_reservations
-		SET created_at=NOW()-INTERVAL '3 hours', updated_at=NOW()-INTERVAL '3 hours'
-		WHERE user_id=$1 AND operation_id=$2
-	`, user.ID, operationID)
-	require.NoError(t, err)
-
-	worker := NewRetentionWorker(db.Pool, nil, nil, config.RetentionConfig{})
-	worker.cleanupOrphanedOmniCreditsReservations(ctx)
-
-	wallet, err := credits.GetWallet(ctx, user.ID)
-	require.NoError(t, err)
-	require.Equal(t, int64(18), wallet.TotalBalance)
-	var status string
-	require.NoError(t, db.Pool.QueryRow(ctx, `
-		SELECT status FROM omnicredits_usage_reservations
-		WHERE user_id=$1 AND operation_id=$2
-	`, user.ID, operationID).Scan(&status))
-	require.Equal(t, models.OmniCreditsReservationCaptured, status)
-}
-
 func TestRetentionWorkerDrainsUserMediaDeletionOutbox(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

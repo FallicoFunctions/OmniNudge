@@ -35,14 +35,12 @@ const (
 // tuning values are deliberately excluded from JSON so a client cannot turn a
 // profile chooser into arbitrary provider configuration.
 type OmniChatModelProfile struct {
-	Key                 OmniChatModelProfileKey      `json:"key"`
-	RequiredTier        OmniChatModelTier            `json:"required_tier"`
-	ModelKey            string                       `json:"-"`
-	ReasoningEffort     OmniChatModelReasoningEffort `json:"-"`
-	Speed               OmniChatModelSpeed           `json:"-"`
-	FallbackProfileKey  OmniChatModelProfileKey      `json:"-"`
-	CreditMultiplier    int                          `json:"credit_multiplier"`
-	RequiresOmniCredits bool                         `json:"requires_omni_credits"`
+	Key                OmniChatModelProfileKey      `json:"key"`
+	RequiredTier       OmniChatModelTier            `json:"required_tier"`
+	ModelKey           string                       `json:"-"`
+	ReasoningEffort    OmniChatModelReasoningEffort `json:"-"`
+	Speed              OmniChatModelSpeed           `json:"-"`
+	FallbackProfileKey OmniChatModelProfileKey      `json:"-"`
 }
 
 // DefaultOmniChatModelProfiles returns a fresh copy so callers cannot mutate
@@ -62,10 +60,10 @@ type OmniChatModelProfile struct {
 // and Sonnet both pass 9 of 9, and the old paid middle tier passed 8.
 func DefaultOmniChatModelProfiles() []OmniChatModelProfile {
 	return []OmniChatModelProfile{
-		{Key: OmniChatModelProfileStandard, RequiredTier: OmniChatModelTierFree, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePlus, RequiredTier: OmniChatModelTierPlus, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortMedium, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfileStandard, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePremiumQuick, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePlus, CreditMultiplier: 1},
-		{Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortHigh, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePremiumQuick, CreditMultiplier: 1},
+		{Key: OmniChatModelProfileStandard, RequiredTier: OmniChatModelTierFree, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard},
+		{Key: OmniChatModelProfilePlus, RequiredTier: OmniChatModelTierPlus, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortMedium, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfileStandard},
+		{Key: OmniChatModelProfilePremiumQuick, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortLow, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePlus},
+		{Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium, ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortHigh, Speed: OmniChatModelSpeedStandard, FallbackProfileKey: OmniChatModelProfilePremiumQuick},
 	}
 }
 
@@ -122,7 +120,7 @@ func ValidateOmniChatModelProfileCatalog(profiles []OmniChatModelProfile) error 
 		if omniChatModelTierRank(profile.RequiredTier) < 0 {
 			return fmt.Errorf("omnichat model profiles: unknown required tier %q", profile.RequiredTier)
 		}
-		if strings.TrimSpace(profile.ModelKey) == "" || !validOmniChatReasoningEffort(profile.ReasoningEffort) || !validOmniChatSpeed(profile.Speed) || profile.CreditMultiplier < 1 {
+		if strings.TrimSpace(profile.ModelKey) == "" || !validOmniChatReasoningEffort(profile.ReasoningEffort) || !validOmniChatSpeed(profile.Speed) {
 			return fmt.Errorf("omnichat model profiles: profile %q has invalid server configuration", profile.Key)
 		}
 		byKey[profile.Key] = profile
@@ -140,9 +138,6 @@ func ValidateOmniChatModelProfileCatalog(profiles []OmniChatModelProfile) error 
 		}
 		if omniChatModelTierRank(fallback.RequiredTier) > omniChatModelTierRank(profile.RequiredTier) {
 			return fmt.Errorf("omnichat model profiles: fallback %q for %q increases required tier", fallback.Key, profile.Key)
-		}
-		if fallback.CreditMultiplier > profile.CreditMultiplier {
-			return fmt.Errorf("omnichat model profiles: fallback %q for %q increases credit cost", fallback.Key, profile.Key)
 		}
 	}
 	if err := validateOneCharacterAcrossTiers(profiles); err != nil {
@@ -177,12 +172,6 @@ func validateKnownOmniChatProfile(profile OmniChatModelProfile) error {
 		if profile.RequiredTier != OmniChatModelTierPremium || profile.ReasoningEffort != OmniChatModelReasoningEffortHigh || profile.Speed != OmniChatModelSpeedStandard {
 			return fmt.Errorf("omnichat model profiles: premium_deep must be a premium offer at high effort and standard speed")
 		}
-	}
-	// Nothing in chat is bought with credits any more. Credits pay for image and
-	// video generation, at every tier, which is where the real cost is -- they
-	// are not a way to buy a different character.
-	if profile.RequiresOmniCredits {
-		return fmt.Errorf("omnichat model profiles: %q must not be credit-gated; credits pay for media, not for a different model", profile.Key)
 	}
 	return nil
 }

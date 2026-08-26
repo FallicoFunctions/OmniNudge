@@ -290,8 +290,7 @@ func (w *RetentionWorker) cleanupDeletedUserMedia(ctx context.Context) {
 
 // cleanupOrphanedOmniCreditsReservations repairs the narrow crash window
 // between a durable credit hold and creation of its provider-backed resource.
-// Delivered chat or speech responses and successful generation jobs are
-// captured. Stale active jobs are failed before refund; a call with a durable
+// Delivered speech responses and successful generation jobs are captured. Stale active jobs are failed before refund; a call with a durable
 // provider session is billable, while an unlinked hold is refunded.
 func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Context) {
 	if w.db == nil || w.cfg.DryRun {
@@ -304,8 +303,7 @@ func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Con
 		       generation.last_activity_at,
 		       call_session.status,
 		       call_session.provider_session_id,
-		       speech.id,
-		       chat_delivery.operation_id
+		       speech.id
 		FROM omnicredits_usage_reservations reservation
 		LEFT JOIN omnichat_generation_jobs generation
 		  ON generation.billing_operation_id = reservation.operation_id
@@ -316,9 +314,6 @@ func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Con
 		LEFT JOIN omnichat_speech_audio speech
 		  ON speech.billing_operation_id = reservation.operation_id
 		 AND speech.owner_user_id = reservation.user_id
-		LEFT JOIN omnichat_chat_billing_deliveries chat_delivery
-		  ON chat_delivery.operation_id = reservation.operation_id
-		 AND chat_delivery.user_id = reservation.user_id
 		WHERE reservation.status = 'reserved'
 		  AND reservation.updated_at < NOW() - INTERVAL '15 minutes'
 		ORDER BY reservation.updated_at
@@ -338,7 +333,6 @@ func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Con
 		callStatus         *string
 		providerSessionID  *string
 		speechID           *string
-		chatOperationID    *string
 	}
 	candidates := make([]reservationCandidate, 0, 500)
 	for rows.Next() {
@@ -351,7 +345,6 @@ func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Con
 			&candidate.callStatus,
 			&candidate.providerSessionID,
 			&candidate.speechID,
-			&candidate.chatOperationID,
 		); err != nil {
 			rows.Close()
 			log.Printf("[RETENTION] Failed to scan orphaned OmniCredits reservation: %v", err)
@@ -373,9 +366,7 @@ func (w *RetentionWorker) cleanupOrphanedOmniCreditsReservations(ctx context.Con
 			log.Printf("[RETENTION] Ignoring malformed OmniCredits operation id")
 			continue
 		}
-		if candidate.chatOperationID != nil {
-			_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
-		} else if candidate.generationStatus != nil {
+		if candidate.generationStatus != nil {
 			switch *candidate.generationStatus {
 			case string(models.OmniChatGenerationStatusSucceeded):
 				_, err = credits.CaptureUsage(ctx, candidate.userID, operationID)
