@@ -91,8 +91,7 @@ export type OmniChatModelKey =
   | 'standard'
   | 'plus'
   | 'premium_quick'
-  | 'premium_deep'
-  | 'ultra_fast';
+  | 'premium_deep';
 export type OmniChatModelScope = 'this_chat' | 'all_chats';
 
 export interface OmniChatModelSelection {

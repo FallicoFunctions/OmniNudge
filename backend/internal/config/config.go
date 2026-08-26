@@ -101,7 +101,6 @@ type OpenRouterConfig struct {
 	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
 	PremiumQuickModel string // OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY
 	PremiumDeepModel  string // OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY
-	UltraFastModel    string // OMNICHAT_MODEL_ULTRA_FAST_PRIMARY
 }
 
 // OmniChatMediaConfig keeps generative-media credentials server-side and
@@ -414,7 +413,6 @@ func Load() (*Config, error) {
 			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "google/gemini-3.5-flash-lite"),
 			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "google/gemini-3.5-flash-lite"),
 			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "google/gemini-3.5-flash-lite"),
-			UltraFastModel:    getEnv("OMNICHAT_MODEL_ULTRA_FAST_PRIMARY", "anthropic/claude-opus-4.8"),
 		},
 		OmniChatMedia: OmniChatMediaConfig{
 			Provider:                    getEnv("OMNICHAT_MEDIA_PROVIDER", "runpod"),

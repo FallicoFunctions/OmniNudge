@@ -143,7 +143,6 @@ func configuredEvaluationProfile(
 		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
 		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
 		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
-		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
 	}, cfg.OpenRouter.StandardFallback)
 	if err != nil {
 		return services.OmniChatModelProfile{}, err

@@ -202,10 +202,12 @@ func TestConfiguredTieredRouterDoesNotFallbackOnProviderAccessDenial(t *testing.
 
 func TestProfileClientOverridesProviderControlsWithServerOwnedProfile(t *testing.T) {
 	upstream := &modelRouterOptionsFake{}
-	profile, ok := FindOmniChatModelProfile(OmniChatModelProfileUltraFast)
+	profile, ok := FindOmniChatModelProfile(OmniChatModelProfilePremiumDeep)
 	require.True(t, ok)
 	client := &profileChatCompletionClient{completion: upstream, profile: profile}
 
+	// A caller asking for low effort on a high-effort profile is overruled: the
+	// profile owns its controls, not the request.
 	_, err := client.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{
 		MaxTokens:       256,
 		ReasoningEffort: "low",
@@ -214,12 +216,12 @@ func TestProfileClientOverridesProviderControlsWithServerOwnedProfile(t *testing
 	require.NoError(t, err)
 	require.Equal(t, 256, upstream.options.MaxTokens)
 	require.Equal(t, "high", upstream.options.ReasoningEffort)
-	require.Equal(t, "fast", upstream.options.Speed)
+	require.Empty(t, upstream.options.Speed, "no profile asks for fast routing any more")
 }
 
 func TestNewOmniChatProfileEvaluationClientAppliesServerOwnedControls(t *testing.T) {
 	upstream := &modelRouterOptionsFake{}
-	profile, found := FindOmniChatModelProfile(OmniChatModelProfileUltraFast)
+	profile, found := FindOmniChatModelProfile(OmniChatModelProfilePremiumDeep)
 	require.True(t, found)
 
 	client, err := NewOmniChatProfileEvaluationClient(upstream, profile)
@@ -228,7 +230,7 @@ func TestNewOmniChatProfileEvaluationClientAppliesServerOwnedControls(t *testing
 
 	require.NoError(t, err)
 	require.Equal(t, "high", upstream.options.ReasoningEffort)
-	require.Equal(t, "fast", upstream.options.Speed)
+	require.Empty(t, upstream.options.Speed)
 }
 
 func TestNewOmniChatProfileEvaluationClientRejectsInvalidInput(t *testing.T) {
@@ -329,31 +331,33 @@ func TestResolveConfiguredOmniChatModelRoutesUsesEffectiveFallbackChain(t *testi
 	require.Equal(t, "configured/quick", routes[OmniChatModelProfilePremiumDeep], "an omitted paid profile should inherit only its configured fallback")
 }
 
+// A profile whose own client fails falls through to its fallback, and the
+// fallback applies *its* controls rather than inheriting the caller's.
 func TestProfiledRouterFallsBackWithFallbackProfilesOwnControls(t *testing.T) {
-	ultra := &modelRouterOptionsFake{modelRouterCompletionFake: modelRouterCompletionFake{err: errors.New("fast preview unavailable")}}
-	deep := &modelRouterOptionsFake{}
+	deep := &modelRouterOptionsFake{modelRouterCompletionFake: modelRouterCompletionFake{err: errors.New("deep unavailable")}}
+	quick := &modelRouterOptionsFake{}
 	router := newProfiledOmniChatModelRouter(
 		&modelRouterPlanReaderFake{plan: "premium"},
-		&modelRouterPreferenceReaderFake{selection: string(OmniChatModelProfileUltraFast)},
+		&modelRouterPreferenceReaderFake{selection: string(OmniChatModelProfilePremiumDeep)},
 		DefaultOmniChatModelProfiles(),
 		map[OmniChatModelProfileKey]chatCompletionClient{
-			OmniChatModelProfileUltraFast:   ultra,
-			OmniChatModelProfilePremiumDeep: deep,
+			OmniChatModelProfilePremiumDeep:  deep,
+			OmniChatModelProfilePremiumQuick: quick,
 		},
 	)
-	client, resolvedKey := router.clientForProfile(OmniChatModelProfileUltraFast)
+	client, resolvedKey := router.clientForProfile(OmniChatModelProfilePremiumDeep)
 
 	text, err := generateWithOptionalOptions(context.Background(), client, nil, nil, openrouter.GenerationOptions{MaxTokens: 256}, true)
 
 	require.NoError(t, err)
 	require.Equal(t, "ok", text)
-	require.Equal(t, OmniChatModelProfileUltraFast, resolvedKey)
-	require.Equal(t, 1, ultra.calls)
-	require.Equal(t, "fast", ultra.options.Speed)
-	require.Equal(t, "high", ultra.options.ReasoningEffort)
+	require.Equal(t, OmniChatModelProfilePremiumDeep, resolvedKey)
 	require.Equal(t, 1, deep.calls)
-	require.Empty(t, deep.options.Speed)
 	require.Equal(t, "high", deep.options.ReasoningEffort)
+	require.Equal(t, 1, quick.calls)
+	require.Equal(t, "low", quick.options.ReasoningEffort,
+		"the fallback runs at its own effort, not the profile that failed")
+	require.Empty(t, quick.options.Speed)
 }
 
 func TestGenerateWithOptionalOptionsRejectsStructuredOutputWithoutOptionsClient(t *testing.T) {
@@ -383,16 +387,18 @@ func TestFallbackRouterDoesNotDowngradeStructuredOutputOnUnsupportedPrimary(t *t
 	require.Zero(t, fallback.calls)
 }
 
-func TestProfiledRouterResolvesStoredCreditProfileForMeteredExecution(t *testing.T) {
+// A stored preference for a paid profile is honoured for a member entitled to
+// it, rather than quietly served from Standard.
+func TestProfiledRouterResolvesStoredPaidProfile(t *testing.T) {
 	standard := &modelRouterCompletionFake{name: "standard"}
-	ultra := &modelRouterCompletionFake{name: "ultra"}
+	deep := &modelRouterCompletionFake{name: "deep"}
 	router := newProfiledOmniChatModelRouter(
 		&modelRouterPlanReaderFake{plan: "premium"},
-		&modelRouterPreferenceReaderFake{selection: string(OmniChatModelProfileUltraFast)},
+		&modelRouterPreferenceReaderFake{selection: string(OmniChatModelProfilePremiumDeep)},
 		DefaultOmniChatModelProfiles(),
 		map[OmniChatModelProfileKey]chatCompletionClient{
-			OmniChatModelProfileStandard:  standard,
-			OmniChatModelProfileUltraFast: ultra,
+			OmniChatModelProfileStandard:    standard,
+			OmniChatModelProfilePremiumDeep: deep,
 		},
 	)
 
@@ -401,5 +407,5 @@ func TestProfiledRouterResolvesStoredCreditProfileForMeteredExecution(t *testing
 	require.NoError(t, err)
 	require.Equal(t, OmniChatModelTierPremium, tier)
 	require.Zero(t, standard.calls)
-	require.Equal(t, 1, ultra.calls)
+	require.Equal(t, 1, deep.calls)
 }

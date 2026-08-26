@@ -270,7 +270,6 @@ func parseDiagnosticProfileKeys(value string) ([]services.OmniChatModelProfileKe
 	known := map[services.OmniChatModelProfileKey]struct{}{
 		services.OmniChatModelProfileStandard: {}, services.OmniChatModelProfilePlus: {},
 		services.OmniChatModelProfilePremiumQuick: {}, services.OmniChatModelProfilePremiumDeep: {},
-		services.OmniChatModelProfileUltraFast: {},
 	}
 	parts := strings.Split(value, ",")
 	keys := make([]services.OmniChatModelProfileKey, 0, len(parts))
@@ -425,7 +424,6 @@ func configuredOmniChatModelRoutes(cfg *config.Config) map[services.OmniChatMode
 		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
 		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
 		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
-		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
 	}
 }
 

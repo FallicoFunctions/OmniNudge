@@ -94,10 +94,10 @@ func TestOmniChatAdminCanSelectPremiumModelWithoutPlan(t *testing.T) {
 	store := &modelSelectionStoreFake{defaultKey: "standard"}
 	selectionService := NewOmniChatModelSelectionService(nil, store).SetAdminReader(reader)
 
-	selection, err := selectionService.Set(context.Background(), 42, 9, string(OmniChatModelProfileUltraFast), OmniChatModelScopeThisChat)
+	selection, err := selectionService.Set(context.Background(), 42, 9, string(OmniChatModelProfilePremiumDeep), OmniChatModelScopeThisChat)
 	require.NoError(t, err)
 	require.Equal(t, OmniChatModelTierPremium, selection.AccountTier)
-	require.Equal(t, string(OmniChatModelProfileUltraFast), selection.EffectiveModelKey)
+	require.Equal(t, string(OmniChatModelProfilePremiumDeep), selection.EffectiveModelKey)
 }
 
 func TestOmniChatAdminModelRouterUsesSelectedPremiumProfile(t *testing.T) {

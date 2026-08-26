@@ -27,6 +27,17 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"195_retire_ultra_fast_profile",
+		"194_omnichat_commitments",
+		"193_baseline_firmness",
+		"192_blocks_carry_the_exchange",
+		"191_bot_messages_are_searchable",
+		"190_omnichat_persona_user_blocks",
+		"189_character_kind_is_immutable",
+		"188_unified_memory_for_free_characters",
+		"187_free_characters_may_be_private",
+		"186_direct_message_personas_are_platform_owned",
+		"185_omnichat_direct_message_style",
 		"184_omnichat_persona_disposition_baseline",
 		"183_omnichat_character_traits",
 		"182_omnichat_memory_recurrences",
@@ -218,7 +229,6 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 	require.NoError(t, db.Pool.QueryRow(ctx, `
 		SELECT pg_get_constraintdef(oid) LIKE '%premium_quick%'
 			AND pg_get_constraintdef(oid) LIKE '%premium_deep%'
-			AND pg_get_constraintdef(oid) LIKE '%ultra_fast%'
 		FROM pg_constraint
 		WHERE conname='omnichat_model_preferences_key_check'
 	`).Scan(&profileConstraint))
@@ -251,6 +261,17 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"195_retire_ultra_fast_profile",
+		"194_omnichat_commitments",
+		"193_baseline_firmness",
+		"192_blocks_carry_the_exchange",
+		"191_bot_messages_are_searchable",
+		"190_omnichat_persona_user_blocks",
+		"189_character_kind_is_immutable",
+		"188_unified_memory_for_free_characters",
+		"187_free_characters_may_be_private",
+		"186_direct_message_personas_are_platform_owned",
+		"185_omnichat_direct_message_style",
 		"184_omnichat_persona_disposition_baseline",
 		"183_omnichat_character_traits",
 		"182_omnichat_memory_recurrences",

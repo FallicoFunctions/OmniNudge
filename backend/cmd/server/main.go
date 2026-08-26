@@ -664,7 +664,6 @@ func main() {
 		Bool("plus_model_set", cfg.OpenRouter.PlusModel != "").
 		Bool("premium_quick_model_set", cfg.OpenRouter.PremiumQuickModel != "").
 		Bool("premium_deep_model_set", cfg.OpenRouter.PremiumDeepModel != "").
-		Bool("ultra_fast_model_set", cfg.OpenRouter.UltraFastModel != "").
 		Msg("OmniChat config")
 	botPersonaRepo := models.NewBotPersonaRepository(db.Pool)
 	botConversationRepo := models.NewBotConversationRepository(db.Pool)
@@ -695,7 +694,6 @@ func main() {
 		services.OmniChatModelProfilePlus:         cfg.OpenRouter.PlusModel,
 		services.OmniChatModelProfilePremiumQuick: cfg.OpenRouter.PremiumQuickModel,
 		services.OmniChatModelProfilePremiumDeep:  cfg.OpenRouter.PremiumDeepModel,
-		services.OmniChatModelProfileUltraFast:    cfg.OpenRouter.UltraFastModel,
 	}
 	if err := services.ValidateConfiguredOmniChatModelRoutes(omniChatModelRoutes, cfg.OpenRouter.StandardFallback); err != nil {
 		zlog.Fatal().Err(err).Msg("Invalid OmniChat model route configuration")

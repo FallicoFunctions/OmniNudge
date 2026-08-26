@@ -77,7 +77,6 @@ func NewTieredOmniChatModelRouter(
 			OmniChatModelProfilePlus:         plusClient,
 			OmniChatModelProfilePremiumQuick: premiumClient,
 			OmniChatModelProfilePremiumDeep:  premiumClient,
-			OmniChatModelProfileUltraFast:    premiumClient,
 		},
 	}
 }
@@ -316,7 +315,7 @@ func newProfiledOmniChatModelRouter(plans OmniChatPlanReader, preferences OmniCh
 // things that have been tried, not a guess about what ought to work.
 func omniChatProviderAcceptsReasoningEffort(modelKey string) bool {
 	route := strings.ToLower(strings.TrimSpace(modelKey))
-	return strings.HasPrefix(route, "anthropic/") || strings.HasPrefix(route, "google/")
+	return strings.HasPrefix(route, "google/")
 }
 
 // profileChatCompletionClient injects immutable profile controls after all
@@ -371,15 +370,12 @@ func (c *profileChatCompletionClient) GenerateWithOptions(ctx context.Context, m
 		options.ReasoningEffort = ""
 	}
 
-	// Fast speed stays Anthropic-only because it is an Anthropic routing
-	// feature rather than a general one, and ultra_fast -- the only profile that
-	// asks for it -- is pinned to Anthropic anyway.
-	if c.profile.Speed == OmniChatModelSpeedFast &&
-		strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.profile.ModelKey)), "anthropic/") {
-		options.Speed = "fast"
-	} else {
-		options.Speed = ""
-	}
+	// Speed is never set. It only ever meant Anthropic's fast routing, and the
+	// one profile that asked for it is gone along with the last Anthropic route.
+	// The field stays on the profile because it is part of what a profile *is*;
+	// nothing currently populates it, and if something does again it will need a
+	// provider that implements it.
+	options.Speed = ""
 	return generateWithOptionalOptions(ctx, c.completion, messages, onChunk, options, true)
 }
 

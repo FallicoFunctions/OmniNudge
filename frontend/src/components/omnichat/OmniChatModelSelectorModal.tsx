@@ -61,14 +61,6 @@ const MODELS: Array<{
     note: 'Requires Premium',
     requiredTier: 'premium',
   },
-  {
-    key: 'ultra_fast',
-    label: OMNICHAT_MODEL_LABELS.ultra_fast,
-    eyebrow: 'Complex reasoning',
-    description: 'Advanced reasoning for complex character and scene continuity.',
-    note: 'Premium · Uses 2 OmniCredits per response',
-    requiredTier: 'premium',
-  },
 ];
 
 const tierRank: Record<OmniChatAccountTier, number> = { free: 0, plus: 1, premium: 2 };

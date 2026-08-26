@@ -72,7 +72,7 @@ func TestOmniChatModelSelectionServiceAcceptsOnlyNamedEntitledProfiles(t *testin
 	store := &modelSelectionStoreFake{defaultKey: "standard"}
 	service := NewOmniChatModelSelectionService(&modelRouterPlanReaderFake{plan: "premium"}, store)
 
-	for _, key := range []string{"premium_quick", "premium_deep", "ultra_fast"} {
+	for _, key := range []string{"premium_quick", "premium_deep"} {
 		selection, err := service.Set(context.Background(), 4, 9, key, OmniChatModelScopeThisChat)
 		require.NoError(t, err)
 		require.Equal(t, key, selection.EffectiveModelKey)
@@ -80,16 +80,20 @@ func TestOmniChatModelSelectionServiceAcceptsOnlyNamedEntitledProfiles(t *testin
 
 	_, err := service.Set(context.Background(), 4, 9, "anthropic/claude-opus-4.8", OmniChatModelScopeThisChat)
 	require.ErrorIs(t, err, ErrInvalidOmniChatModelSelection)
+
+	// A retired offer is refused like any other name that is not a profile.
+	_, err = service.Set(context.Background(), 4, 9, "ultra_fast", OmniChatModelScopeThisChat)
+	require.ErrorIs(t, err, ErrInvalidOmniChatModelSelection)
 }
 
-func TestOmniChatModelSelectionServiceReturnsStoredCreditProfile(t *testing.T) {
-	ultra := "ultra_fast"
+func TestOmniChatModelSelectionServiceReturnsStoredConversationOverride(t *testing.T) {
+	override := "premium_deep"
 	service := NewOmniChatModelSelectionService(
 		&modelRouterPlanReaderFake{plan: "premium"},
-		&modelSelectionStoreFake{defaultKey: "premium_deep", override: &ultra},
+		&modelSelectionStoreFake{defaultKey: "premium_quick", override: &override},
 	)
 
 	selection, err := service.Get(context.Background(), 4, 9)
 	require.NoError(t, err)
-	require.Equal(t, "ultra_fast", selection.EffectiveModelKey)
+	require.Equal(t, "premium_deep", selection.EffectiveModelKey)
 }

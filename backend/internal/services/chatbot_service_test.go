@@ -1468,7 +1468,7 @@ func TestRegenerateMessagePreservesOriginalReplyWhenSceneContractOrProviderFails
 	require.Equal(t, "Keep this original reply.", messages[1].Content)
 }
 
-func TestUltraFastSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testing.T) {
+func TestSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testing.T) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 	t.Cleanup(db.Close)
@@ -1478,7 +1478,7 @@ func TestUltraFastSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testi
 	require.NoError(t, database.ResetTestData(ctx, db))
 
 	user := &models.User{
-		Username:     fmt.Sprintf("omnichat_ultra_fast_%d", time.Now().UnixNano()),
+		Username:     fmt.Sprintf("omnichat_billing_ops_%d", time.Now().UnixNano()),
 		PasswordHash: "hash", Role: "user",
 	}
 	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
@@ -1510,9 +1510,14 @@ func TestUltraFastSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testi
 		call++
 		return reply, nil
 	}}
-	ultra, found := FindOmniChatModelProfile(OmniChatModelProfileUltraFast)
-	require.True(t, found)
-	router := &meteredChatProfileResolverFake{client: client, profile: ultra}
+	// The shipped catalogue no longer contains a credit-gated profile, so the
+	// metering path has to be driven from one built here.
+	profile := OmniChatModelProfile{
+		Key: OmniChatModelProfilePremiumDeep, RequiredTier: OmniChatModelTierPremium,
+		ModelKey: "google/gemini-3.5-flash-lite", ReasoningEffort: OmniChatModelReasoningEffortHigh,
+		Speed: OmniChatModelSpeedStandard, RequiresOmniCredits: true, CreditMultiplier: 1,
+	}
+	router := &meteredChatProfileResolverFake{client: client, profile: profile}
 	service := NewChatbotService(
 		db.Pool, personaRepo, convRepo, messageRepo, client, websocket.NewHub(), router,
 	).SetBilling(billing)
@@ -1526,7 +1531,9 @@ func TestUltraFastSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testi
 	require.NoError(t, err)
 	require.Equal(t, first.ID, regenerated.ID)
 	require.Equal(t, replies[1], regenerated.Content)
-	require.Equal(t, []int64{2, 2}, billing.seenMultipliers)
+	// What this test is about is that both the send and the regeneration are
+	// metered at all, not what they cost.
+	require.Equal(t, []int64{1, 1}, billing.seenMultipliers)
 
 	var deliveries int
 	require.NoError(t, db.Pool.QueryRow(ctx, `
@@ -1543,8 +1550,10 @@ func TestUltraFastSendAndRegenerationKeepEveryDeliveredBillingOperation(t *testi
 	require.Equal(t, models.OmniCreditsReservationReserved, firstStatus)
 	require.Equal(t, models.OmniCreditsReservationCaptured, secondStatus)
 
+	// Drain what the send and the regeneration left so the next turn has
+	// nothing to reserve against.
 	drainOperationID := uuid.New()
-	_, err = credits.ReserveUsage(ctx, user.ID, drainOperationID, models.OmniCreditsUsageChat, 6)
+	_, err = credits.ReserveUsage(ctx, user.ID, drainOperationID, models.OmniCreditsUsageChat, 8)
 	require.NoError(t, err)
 	_, err = credits.CaptureUsage(ctx, user.ID, drainOperationID)
 	require.NoError(t, err)

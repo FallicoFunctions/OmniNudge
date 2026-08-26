@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import OmniChatModelSelectorModal from '../OmniChatModelSelectorModal';
 
 describe('OmniChatModelSelectorModal', () => {
-  it('shows the five user-facing conversation profiles without provider configuration', () => {
+  it('shows the four user-facing conversation profiles without provider configuration', () => {
     render(
       <OmniChatModelSelectorModal
         isOpen
@@ -22,10 +22,6 @@ describe('OmniChatModelSelectorModal', () => {
     expect(screen.getByRole('button', { name: /select plus/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /select premium quick/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /select premium deep/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /select advanced/i })).toBeInTheDocument();
-    expect(
-      screen.getByText(/advanced reasoning for complex character and scene continuity/i)
-    ).toBeInTheDocument();
     expect(screen.getByText(/a plus profile for conversations you return to/i)).toBeInTheDocument();
     expect(
       screen.queryByText(
@@ -93,8 +89,10 @@ describe('OmniChatModelSelectorModal', () => {
     expect(onRequestUpgrade).toHaveBeenCalledWith('premium');
   });
 
-  it('offers Advanced to Premium members with accurate OmniCredits pricing copy', () => {
-    const onApply = vi.fn();
+  // No profile is bought with credits any more. Credits pay for image and video
+  // generation, at every tier; a subscription never reaches a different model,
+  // so there is nothing here to meter per response.
+  it('offers no credit-metered profile and never mentions per-response credits', () => {
     render(
       <OmniChatModelSelectorModal
         isOpen
@@ -102,16 +100,15 @@ describe('OmniChatModelSelectorModal', () => {
         currentModelKey="premium_deep"
         isGuest={false}
         onClose={vi.fn()}
-        onApply={onApply}
+        onApply={vi.fn()}
         onRequestAuth={vi.fn()}
         onRequestUpgrade={vi.fn()}
       />
     );
 
-    expect(screen.getByText(/uses 2 omnicredits per response/i)).toBeInTheDocument();
-    const advanced = screen.getByRole('button', { name: /select advanced/i });
-    fireEvent.click(advanced);
-    fireEvent.click(screen.getByRole('button', { name: /only this chat/i }));
-    expect(onApply).toHaveBeenCalledWith('ultra_fast', 'this_chat');
+    expect(screen.queryByText(/omnicredits per response/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /select advanced/i })).toBeNull();
+    // The offers that remain are still all there.
+    expect(screen.getByRole('button', { name: /select premium deep/i })).toBeInTheDocument();
   });
 });

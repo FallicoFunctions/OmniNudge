@@ -14,8 +14,7 @@ func TestDefaultOmniChatModelProfilesAreServerOwnedNamedOffers(t *testing.T) {
 		OmniChatModelProfilePlus,
 		OmniChatModelProfilePremiumQuick,
 		OmniChatModelProfilePremiumDeep,
-		OmniChatModelProfileUltraFast,
-	}, []OmniChatModelProfileKey{profiles[0].Key, profiles[1].Key, profiles[2].Key, profiles[3].Key, profiles[4].Key})
+	}, []OmniChatModelProfileKey{profiles[0].Key, profiles[1].Key, profiles[2].Key, profiles[3].Key})
 
 	standard := profiles[0]
 	require.Equal(t, "google/gemini-3.5-flash-lite", standard.ModelKey)
@@ -35,16 +34,25 @@ func TestDefaultOmniChatModelProfilesAreServerOwnedNamedOffers(t *testing.T) {
 	require.Equal(t, OmniChatModelReasoningEffortHigh, deep.ReasoningEffort)
 	require.Equal(t, OmniChatModelProfilePremiumQuick, deep.FallbackProfileKey)
 
-	ultra := profiles[4]
-	require.Equal(t, "anthropic/claude-opus-4.8", ultra.ModelKey)
-	require.Equal(t, OmniChatModelReasoningEffortHigh, ultra.ReasoningEffort)
-	require.Equal(t, OmniChatModelSpeedFast, ultra.Speed)
-	require.True(t, ultra.RequiresOmniCredits)
-	require.Greater(t, ultra.CreditMultiplier, deep.CreditMultiplier)
+	// Every profile, not most of them. There is no longer any offer that reaches
+	// a different model, and nothing in chat is bought with credits: credits pay
+	// for image and video generation, at every tier.
+	for _, profile := range profiles {
+		require.Equal(t, standard.ModelKey, profile.ModelKey, string(profile.Key))
+		require.False(t, profile.RequiresOmniCredits, string(profile.Key))
+		require.NotEqual(t, OmniChatModelSpeedFast, profile.Speed,
+			"fast speed was an Anthropic routing feature and no Anthropic route remains")
+	}
 }
 
 func TestResolveOmniChatModelProfileFailsClosedByEntitlement(t *testing.T) {
-	profile, ok := ResolveOmniChatModelProfile(OmniChatModelProfileUltraFast, OmniChatModelTierPlus)
+	profile, ok := ResolveOmniChatModelProfile(OmniChatModelProfilePremiumDeep, OmniChatModelTierPlus)
+	require.False(t, ok)
+	require.Empty(t, profile)
+
+	// A retired offer is not merely unavailable to a lower tier, it resolves for
+	// nobody.
+	profile, ok = ResolveOmniChatModelProfile(OmniChatModelProfileKey("ultra_fast"), OmniChatModelTierPremium)
 	require.False(t, ok)
 	require.Empty(t, profile)
 
@@ -66,9 +74,9 @@ func TestValidateOmniChatModelProfileCatalogRejectsUnsafeFallbacksAndInvalidProf
 		{"duplicate key", func(p []OmniChatModelProfile) { p[1].Key = p[0].Key }, "duplicate profile key"},
 		{"unknown tier", func(p []OmniChatModelProfile) { p[0].RequiredTier = "admin" }, "unknown required tier"},
 		{"fallback raises tier", func(p []OmniChatModelProfile) { p[1].FallbackProfileKey = OmniChatModelProfilePremiumQuick }, "increases required tier"},
-		{"fallback raises cost", func(p []OmniChatModelProfile) { p[3].FallbackProfileKey = OmniChatModelProfileUltraFast }, "increases credit cost"},
+		{"credit-gated chat", func(p []OmniChatModelProfile) { p[3].RequiresOmniCredits = true }, "must not be credit-gated"},
 		{"fallback cycle", func(p []OmniChatModelProfile) { p[2].FallbackProfileKey = OmniChatModelProfilePremiumDeep }, "fallback cycle"},
-		{"fast model invariant", func(p []OmniChatModelProfile) { p[4].Speed = OmniChatModelSpeedStandard }, "ultra_fast"},
+		{"a tier reaching a different model", func(p []OmniChatModelProfile) { p[3].ModelKey = "anthropic/claude-opus-4.8" }, "not a different her"},
 		{"sonnet quick invariant", func(p []OmniChatModelProfile) { p[2].ReasoningEffort = OmniChatModelReasoningEffortHigh }, "premium_quick"},
 	}
 	for _, tt := range tests {

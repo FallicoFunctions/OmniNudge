@@ -42,7 +42,7 @@ const OmniChatCompanionBakeOffCorpusFingerprint = "4fb70db22463f00c2449afad582cb
 // prompts assembled from the migrated public companion fixtures. The database
 // migration golden test must verify any intentional replacement before this
 // approved value changes.
-const OmniChatCompanionPersonaFingerprint = "265ae25cad6d37b754ef3e8ff810fee03d51a22ad7fb776a130c12537e6431f5"
+const OmniChatCompanionPersonaFingerprint = "fab1c59878bbf468d24352d25f427d6f6a295d58f6d0fffe44a62c3e0d1c35a3"
 
 // PersonaQualityExpectation identifies one deterministic response check.
 type PersonaQualityExpectation string

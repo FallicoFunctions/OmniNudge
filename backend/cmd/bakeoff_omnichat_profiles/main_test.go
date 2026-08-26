@@ -44,21 +44,17 @@ func TestConfiguredCandidatesUseDeploymentRoutesWithoutExposingCredentials(t *te
 	cfg.OpenRouter.PlusModel = "configured/plus"
 	cfg.OpenRouter.PremiumQuickModel = "configured/quick"
 	cfg.OpenRouter.PremiumDeepModel = "configured/deep"
-	cfg.OpenRouter.UltraFastModel = "configured/fast"
 
 	candidates := configuredCandidates(cfg, nil)
 
-	require.Len(t, candidates, 5)
+	require.Len(t, candidates, 4)
 	require.Equal(t, []string{
-		"configured/standard", "configured/plus", "configured/quick",
-		"configured/deep", "configured/fast",
+		"configured/standard", "configured/plus", "configured/quick", "configured/deep",
 	}, []string{
-		candidates[0].Route, candidates[1].Route, candidates[2].Route,
-		candidates[3].Route, candidates[4].Route,
+		candidates[0].Route, candidates[1].Route, candidates[2].Route, candidates[3].Route,
 	})
 	require.Equal(t, services.OmniChatBakeOffReasoningLow, candidates[2].Profile.ReasoningEffort)
 	require.Equal(t, services.OmniChatBakeOffReasoningHigh, candidates[3].Profile.ReasoningEffort)
-	require.True(t, candidates[4].Profile.FastMode)
 }
 
 func TestConfiguredCandidatesSelectDiagnosticProfilesInCanonicalBlindOrder(t *testing.T) {
@@ -67,7 +63,6 @@ func TestConfiguredCandidatesSelectDiagnosticProfilesInCanonicalBlindOrder(t *te
 	cfg.OpenRouter.PlusModel = "configured/plus"
 	cfg.OpenRouter.PremiumQuickModel = "configured/quick"
 	cfg.OpenRouter.PremiumDeepModel = "configured/deep"
-	cfg.OpenRouter.UltraFastModel = "configured/fast"
 
 	candidates := configuredCandidates(cfg, []services.OmniChatModelProfileKey{
 		services.OmniChatModelProfilePlus,
@@ -86,16 +81,15 @@ func TestConfiguredCandidatesResolveFallbackRoutesAndOmitUnconfiguredProfiles(t 
 
 	candidates := configuredCandidates(cfg, nil)
 
-	require.Len(t, candidates, 5)
-	require.Equal(t, []string{"candidate-a", "candidate-b", "candidate-c", "candidate-d", "candidate-e"}, []string{
-		candidates[0].BlindID, candidates[1].BlindID, candidates[2].BlindID, candidates[3].BlindID, candidates[4].BlindID,
+	require.Len(t, candidates, 4)
+	require.Equal(t, []string{"candidate-a", "candidate-b", "candidate-c", "candidate-d"}, []string{
+		candidates[0].BlindID, candidates[1].BlindID, candidates[2].BlindID, candidates[3].BlindID,
 	})
 	require.Equal(t, services.OmniChatModelProfileStandard, services.OmniChatModelProfileKey(candidates[0].Profile.Name))
 	require.Equal(t, "configured/fallback", candidates[0].Route)
 	require.Equal(t, "configured/plus", candidates[1].Route)
 	require.Equal(t, "configured/plus", candidates[2].Route)
 	require.Equal(t, "configured/plus", candidates[3].Route)
-	require.Equal(t, "configured/plus", candidates[4].Route)
 
 	selected := configuredCandidates(cfg, []services.OmniChatModelProfileKey{services.OmniChatModelProfileStandard})
 	require.Len(t, selected, 1)
@@ -210,22 +204,20 @@ func TestValidateBakeOffRepetitions(t *testing.T) {
 		candidateCount int
 		valid          bool
 	}{
-		{name: "single screening", repetitions: 1, candidateCount: 5, valid: true},
+		{name: "single screening", repetitions: 1, candidateCount: 4, valid: true},
 		{name: "one candidate", repetitions: 3, candidateCount: 1, valid: true},
 		{name: "two candidates balanced", repetitions: 6, candidateCount: 2, valid: true},
 		{name: "three candidates balanced", repetitions: 3, candidateCount: 3, valid: true},
-		{name: "four candidates balanced", repetitions: 8, candidateCount: 4, valid: true},
-		{name: "full matrix balanced", repetitions: 5, candidateCount: 5, valid: true},
-		{name: "maximum balanced", repetitions: services.MaxOmniChatBakeOffRepetitions, candidateCount: 5, valid: true},
-		{name: "zero repetitions", repetitions: 0, candidateCount: 5},
-		{name: "negative repetitions", repetitions: -1, candidateCount: 5},
-		{name: "above maximum", repetitions: services.MaxOmniChatBakeOffRepetitions + 1, candidateCount: 5},
+		{name: "full matrix balanced", repetitions: 8, candidateCount: 4, valid: true},
+		{name: "maximum balanced", repetitions: services.MaxOmniChatBakeOffRepetitions, candidateCount: 4, valid: true},
+		{name: "zero repetitions", repetitions: 0, candidateCount: 4},
+		{name: "negative repetitions", repetitions: -1, candidateCount: 4},
+		{name: "above maximum", repetitions: services.MaxOmniChatBakeOffRepetitions + 1, candidateCount: 4},
 		{name: "zero candidates", repetitions: 1, candidateCount: 0},
-		{name: "too many candidates", repetitions: 1, candidateCount: 6},
+		{name: "too many candidates", repetitions: 1, candidateCount: 5},
 		{name: "two candidates unbalanced", repetitions: 3, candidateCount: 2},
 		{name: "three candidates unbalanced", repetitions: 4, candidateCount: 3},
-		{name: "four candidates unbalanced", repetitions: 5, candidateCount: 4},
-		{name: "full matrix unbalanced", repetitions: 6, candidateCount: 5},
+		{name: "full matrix unbalanced", repetitions: 6, candidateCount: 4},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			err := validateBakeOffRepetitions(testCase.repetitions, testCase.candidateCount)
@@ -239,7 +231,7 @@ func TestValidateBakeOffRepetitions(t *testing.T) {
 }
 
 func TestParseBakeOffOptionsRequiresPaidConfirmationBeforeWorkCanStart(t *testing.T) {
-	_, err := parseBakeOffOptions([]string{"-repetitions=5"}, &strings.Builder{})
+	_, err := parseBakeOffOptions([]string{"-repetitions=4"}, &strings.Builder{})
 	require.ErrorContains(t, err, "-confirm-paid is required")
 }
 
@@ -269,7 +261,6 @@ func TestParseBakeOffOptionsAcceptsPositionBalancedRepeatedDiagnosticSubsets(t *
 	for _, arguments := range [][]string{
 		{"-confirm-paid", "-repetitions=3", "-provider-cost-stop-target-usd=3", "-profiles=standard"},
 		{"-confirm-paid", "-repetitions=3", "-provider-cost-stop-target-usd=3", "-profiles=standard,plus,premium_quick"},
-		{"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=4", "-profiles=standard,plus,premium_quick,premium_deep"},
 	} {
 		_, parseErr := parseBakeOffOptions(arguments, &strings.Builder{})
 		require.NoError(t, parseErr, arguments)
@@ -284,7 +275,7 @@ func TestParseBakeOffOptionsAcceptsPositionBalancedRepeatedDiagnosticSubsets(t *
 		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=standard,standard"},
 		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=standard,,plus"},
 		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=all,standard"},
-		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=standard,plus,premium_quick,premium_deep,ultra_fast"},
+		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=standard,plus,premium_quick,premium_deep"},
 		{"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1", "-profiles=unknown"},
 	} {
 		_, parseErr := parseBakeOffOptions(arguments, &strings.Builder{})
@@ -313,27 +304,27 @@ func TestParseBakeOffOptionsValidatesRunAndBudgetBounds(t *testing.T) {
 		{"-confirm-paid", "-repetitions=21"},
 		{"-confirm-paid", "-provider-cost-stop-target-usd=0"},
 		{"-confirm-paid", "-provider-cost-stop-target-usd=101"},
-		{"-confirm-paid", "-repetitions=5", "-provider-cost-stop-target-usd=4.99"},
+		{"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=3.99"},
 		{"-confirm-paid", "unexpected"},
 	} {
 		_, err := parseBakeOffOptions(arguments, &strings.Builder{})
 		require.Error(t, err, arguments)
 	}
 	options, err := parseBakeOffOptions([]string{
-		"-confirm-paid", "-repetitions=5", "-provider-cost-stop-target-usd=5", "-timeout=12m",
+		"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=4", "-timeout=12m",
 	}, &strings.Builder{})
 	require.NoError(t, err)
-	require.Equal(t, 5, options.repetitions)
-	require.Equal(t, 5.0, options.providerCostStopTargetUSD)
+	require.Equal(t, 4, options.repetitions)
+	require.Equal(t, 4.0, options.providerCostStopTargetUSD)
 	require.Equal(t, 12*time.Minute, options.timeout)
 }
 
 func TestRunValidatedBakeOffCommandDoesNotReachSideEffectsForHelpOrUnsafeArguments(t *testing.T) {
 	for _, arguments := range [][]string{
 		{"-h"},
-		{"-repetitions=5"},
+		{"-repetitions=4"},
 		{"-confirm-paid", "-repetitions=0"},
-		{"-confirm-paid", "-repetitions=5", "-provider-cost-stop-target-usd=4.99"},
+		{"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=3.99"},
 		{
 			"-confirm-paid", "-repetitions=1", "-provider-cost-stop-target-usd=1",
 			"-output", filepath.Join(t.TempDir(), "missing", "report.json"),
@@ -352,7 +343,7 @@ func TestRunValidatedBakeOffCommandDoesNotReachSideEffectsForHelpOrUnsafeArgumen
 func TestRunValidatedBakeOffCommandPassesValidatedBudgetToExecution(t *testing.T) {
 	var received bakeOffOptions
 	err := runValidatedBakeOffCommand(
-		[]string{"-confirm-paid", "-repetitions=5", "-provider-cost-stop-target-usd=6"},
+		[]string{"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=6"},
 		&strings.Builder{},
 		func(options bakeOffOptions) error {
 			received = options
@@ -360,14 +351,14 @@ func TestRunValidatedBakeOffCommandPassesValidatedBudgetToExecution(t *testing.T
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, 5, received.repetitions)
+	require.Equal(t, 4, received.repetitions)
 	require.Equal(t, 6.0, received.providerCostStopTargetUSD)
 	require.True(t, received.confirmPaid)
 }
 
 func TestParseBakeOffOptionsDefaultsToFullRunTimeout(t *testing.T) {
 	options, err := parseBakeOffOptions(
-		[]string{"-confirm-paid", "-repetitions=5", "-provider-cost-stop-target-usd=5"},
+		[]string{"-confirm-paid", "-repetitions=4", "-provider-cost-stop-target-usd=4"},
 		&strings.Builder{},
 	)
 	require.NoError(t, err)

@@ -85,12 +85,23 @@ func TestOmniChatModelSelectionHandlerPersistsAllChatsScope(t *testing.T) {
 	require.Equal(t, "plus", store.allKey)
 }
 
-func TestOmniChatModelSelectionHandlerPersistsMeteredUltraFastModel(t *testing.T) {
+func TestOmniChatModelSelectionHandlerPersistsPremiumProfile(t *testing.T) {
+	store := &handlerModelStoreFake{defaultKey: "standard"}
+	handler := &OmniChatHandler{modelSelection: services.NewOmniChatModelSelectionService(handlerModelPlanFake{plan: "premium"}, store)}
+
+	response := serveModelSelectionRequest(t, handler, http.MethodPut, "/", `{"conversation_id":23,"model_key":"premium_deep","scope":"this_chat"}`)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, "premium_deep", store.chatKey)
+}
+
+// A retired offer is refused at the edge, not stored and puzzled over later.
+func TestOmniChatModelSelectionHandlerRejectsARetiredProfile(t *testing.T) {
 	store := &handlerModelStoreFake{defaultKey: "standard"}
 	handler := &OmniChatHandler{modelSelection: services.NewOmniChatModelSelectionService(handlerModelPlanFake{plan: "premium"}, store)}
 
 	response := serveModelSelectionRequest(t, handler, http.MethodPut, "/", `{"conversation_id":23,"model_key":"ultra_fast","scope":"this_chat"}`)
 
-	require.Equal(t, http.StatusOK, response.Code)
-	require.Equal(t, "ultra_fast", store.chatKey)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Empty(t, store.chatKey)
 }
