@@ -76,6 +76,11 @@ func main() {
 	if err != nil {
 		fatalf("configure profile completion client: %v", err)
 	}
+	// What the corpus asserts about format has to follow what each character is
+	// actually configured as, or a style change silently invalidates the whole
+	// corpus and it reports failure against correct behaviour.
+	corpus = services.AlignResponseEvaluationCorpusToPersonas(corpus, personas)
+
 	report, err := services.RunResponseEvaluationCorpus(ctx, corpus, func(parent context.Context, testCase services.ResponseEvaluationCase) (string, error) {
 		caseCtx, cancelCase := context.WithTimeout(parent, options.caseTimeout)
 		defer cancelCase()
