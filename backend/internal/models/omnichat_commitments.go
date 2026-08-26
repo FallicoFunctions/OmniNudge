@@ -229,3 +229,20 @@ func truncateOmniChatCommitmentSummary(summary string) string {
 	}
 	return strings.TrimRight(string(runes[:maxOmniChatCommitmentSummaryRunes]), " ") + "…"
 }
+
+// OmniChatCommitmentResolution is one outstanding commitment being settled by a
+// later exchange.
+type OmniChatCommitmentResolution struct {
+	CommitmentID int64
+	Status       string
+}
+
+// ValidOmniChatCommitmentResolution reports whether a status is an ending.
+// 'open' is not: a commitment cannot be resolved back into being outstanding.
+func ValidOmniChatCommitmentResolution(status string) bool {
+	switch status {
+	case OmniChatCommitmentKept, OmniChatCommitmentBroken, OmniChatCommitmentReleased:
+		return true
+	}
+	return false
+}

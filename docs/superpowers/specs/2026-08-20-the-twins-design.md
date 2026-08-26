@@ -980,9 +980,30 @@ Steps 1, 2 and 4 are built (migration 194). Extraction notices what an exchange
 obliged either of them to, `omnichat_commitments` holds it with a direction and
 a counterparty, and what is still open is rendered into every later prompt.
 
-**Step 3 remains the gap**, and it is the whole of the interesting work: she
-remembers the bet perfectly well, and nothing anywhere prompts her to wonder
-whether you paid up. `Resolve` exists and nothing calls it.
+**Step 3 is built for the conversational half.** What is still open is handed to
+extraction the way already-recorded memories are, and an exchange that settles
+one says which and how it ended. The checkable half waits on §10: there is no
+wall yet to resolve a wall post against.
+
+Two guards, both the same shape as the retelling link. A resolution for an id
+extraction was never offered is dropped, because settling an unoffered
+commitment closes a promise made to somebody else. And an already-settled
+commitment is not an error: two passes over overlapping windows can both read
+the same resolution, and the second is simply late.
+
+**Mentioning is not settling, and that had to be taught.** The first live run
+closed a commitment as `released` on the strength of *"we still need to do that
+rematch"* -- which is somebody holding the other to it, the exact opposite. The
+prompt now says so outright, and that bringing something up is usually the
+opposite of settling it. Erring toward leaving things open is cheap; closing one
+wrongly loses it for good.
+
+**Released turned out to need a test of its own.** *"I am not going to do it, I
+do not care enough"* wobbled between `broken` and `released` across runs. The
+distinction that settles it is **whether anybody was let down**: released is for
+commitments that stopped applying without anyone failing anyone, and one person
+deciding alone that they cannot be bothered is somebody breaking their word
+while sounding relaxed about it.
 
 ### What was built, and the decisions inside it
 
