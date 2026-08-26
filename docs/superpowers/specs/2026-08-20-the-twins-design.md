@@ -998,6 +998,27 @@ prompt now says so outright, and that bringing something up is usually the
 opposite of settling it. Erring toward leaving things open is cheap; closing one
 wrongly loses it for good.
 
+**Scheduling is not doing, and that one is model-dependent.** *"You still owe me
+that rematch. Friday?"* was being closed -- as `kept` on one run and `released`
+on the next. Both are wrong and in the dangerous direction: agreeing a date
+leaves the thing exactly as undone as it was, and closing it there has her
+believing somebody paid up when they have only made a plan.
+
+The prompt now says so outright, and **that fixed it on
+`anthropic/claude-sonnet-5`, which passes all five scenarios repeatedly.** It did
+not fix it on `google/gemini-3.1-flash-lite`, the configured extraction model,
+which keeps closing that case and occasionally returns malformed JSON on it.
+
+So this is a capability finding rather than a prompt one: the same prompt is
+right on the stronger model. `TestLiveCommitmentResolution` is the executable
+record -- skipped unless `OMNICHAT_LIVE_EXTRACTION=1`, with `OMNICHAT_LIVE_MODEL`
+to compare -- and it fails on flash-lite by design.
+
+**Open decision:** whether resolution should run on a stronger model than the
+rest of extraction. It is far less frequent than episode scoring and much more
+expensive to get wrong, since a wrongly closed commitment is gone and there is no
+reopen. Nothing is wired either way yet.
+
 **Released turned out to need a test of its own.** *"I am not going to do it, I
 do not care enough"* wobbled between `broken` and `released` across runs. The
 distinction that settles it is **whether anybody was let down**: released is for
