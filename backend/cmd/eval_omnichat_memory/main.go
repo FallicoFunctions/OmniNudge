@@ -30,7 +30,10 @@ import (
 
 // defaultStandardModel mirrors config.OpenRouter.StandardModel's default so the
 // eval exercises what production would run when nothing is configured.
-const defaultStandardModel = "google/gemini-3.1-flash-lite"
+// Mirrors config.OpenRouter.ExtractionModel's default, so the eval exercises
+// what the worker would actually run when nothing is configured. Pointing it at
+// anything else measures a model nobody uses.
+const defaultStandardModel = "google/gemini-3-flash-preview"
 
 func main() {
 	var (

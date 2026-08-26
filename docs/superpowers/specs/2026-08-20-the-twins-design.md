@@ -1014,10 +1014,49 @@ right on the stronger model. `TestLiveCommitmentResolution` is the executable
 record -- skipped unless `OMNICHAT_LIVE_EXTRACTION=1`, with `OMNICHAT_LIVE_MODEL`
 to compare -- and it fails on flash-lite by design.
 
-**Open decision:** whether resolution should run on a stronger model than the
-rest of extraction. It is far less frequent than episode scoring and much more
-expensive to get wrong, since a wrongly closed commitment is gone and there is no
-reopen. Nothing is wired either way yet.
+**Settled by measuring, and the answer was neither.** Five scenarios across five
+models:
+
+| model | result |
+|---|---|
+| `gemini-3.1-flash-lite` (was configured) | 4/5 -- closes a scheduled promise |
+| `mistral-large-2512` | 3/5 -- closes it *and* records a duplicate |
+| `gemini-2.5-flash` | 4/5 -- calls a refusal "released" |
+| **`gemini-3-flash-preview`** | **5/5, stable**, and still passes the salience rubric at +0.85 |
+| `claude-sonnet-5` | 5/5, at roughly twenty times the price |
+
+So the fix was one tier up from lite rather than Sonnet, at flash pricing.
+
+**Extraction now has its own model setting**, which it needed anyway.
+`OMNICHAT_MODEL_EXTRACTION` was `StandardModel` -- shared with the *free chat
+tier*, so fixing extraction would silently have changed what free members talk
+to. They are judged on different things: one is chosen for feel and latency, the
+other never speaks to anybody and is chosen for whether it holds a distinction
+under instruction.
+
+### A wrongly closed commitment can be put back
+
+Closing one wrongly was permanent, and the failure is invisible: the commitment
+simply stops appearing, and the only evidence is somebody raising it months
+later. So `recently_settled` is offered to extraction alongside what is open,
+and `reopened` is a resolution that puts one back.
+
+It is not only an error-correction path. *"No, you still owe me that"* is
+something people say whether or not she got it wrong -- if her record is right
+she should push back, and if it is wrong this is what fixes it. The same move
+has to work in both directions or she cannot be argued with.
+
+**And a duplicate needed a structural guard, not a better prompt.** Live runs had
+it reopening a settled commitment *and* recording it again in the same breath --
+which cannot coherently happen, and would leave her holding one promise twice,
+permanently. Two rounds of prompt sharpening got it from always to two-in-three,
+which is not good enough for something irreversible. A blunt lexical overlap test
+against everything already held now drops the restatement in code.
+
+That guard can cost a genuinely new commitment made in the same exchange as a
+reopening. That trade is deliberate: a missed promise is a character who did not
+notice, and a duplicate is a character who holds you to the same thing twice
+forever.
 
 **Released turned out to need a test of its own.** *"I am not going to do it, I
 do not care enough"* wobbled between `broken` and `released` across runs. The

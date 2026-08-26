@@ -96,6 +96,12 @@ type OmniChatExtractionSubject struct {
 	// sixth parameter because it is a fact about this relationship, which is
 	// what a subject is.
 	Outstanding []*models.OmniChatCommitment
+
+	// RecentlySettled is what was closed lately, so somebody saying "no, you
+	// still owe me that" can be acted on. Without it a wrongly closed
+	// commitment is unreachable: extraction only ever sees what is open, so the
+	// one promise it can never be told about is the one it just made vanish.
+	RecentlySettled []*models.OmniChatCommitment
 }
 
 // OmniChatMemoryExtractor turns a stretch of transcript into episodes.
@@ -122,7 +128,9 @@ type OmniChatMemoryService struct {
 type omniChatCommitmentWriter interface {
 	Record(ctx context.Context, commitment models.OmniChatCommitment) (*models.OmniChatCommitment, bool, error)
 	Outstanding(ctx context.Context, personaID, ownerUserID, limit int) ([]*models.OmniChatCommitment, error)
+	RecentlySettled(ctx context.Context, personaID, ownerUserID, limit int) ([]*models.OmniChatCommitment, error)
 	Resolve(ctx context.Context, commitmentID int64, status string) (*models.OmniChatCommitment, error)
+	Reopen(ctx context.Context, commitmentID int64) (*models.OmniChatCommitment, error)
 }
 
 // settleCommitments closes what this exchange finished.
@@ -140,6 +148,25 @@ func (s *OmniChatMemoryService) settleCommitments(
 		return
 	}
 	for _, resolution := range resolutions {
+		if resolution.Status == models.OmniChatCommitmentReopened {
+			reopened, err := s.commitments.Reopen(ctx, resolution.CommitmentID)
+			if errors.Is(err, models.ErrOmniChatCommitmentNotSettled) {
+				continue
+			}
+			if err != nil {
+				zlog.Warn().Err(err).
+					Int64("commitment_id", resolution.CommitmentID).
+					Int("conversation_id", conversationID).
+					Msg("omnichat commitment: could not reopen a disputed closure")
+				continue
+			}
+			zlog.Info().
+				Int64("commitment_id", reopened.ID).
+				Int("conversation_id", conversationID).
+				Msg("omnichat commitment: reopened after a disputed closure")
+			continue
+		}
+
 		settled, err := s.commitments.Resolve(ctx, resolution.CommitmentID, resolution.Status)
 		if errors.Is(err, models.ErrOmniChatCommitmentNotOpen) {
 			continue
@@ -372,6 +399,14 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 				Msg("omnichat commitment: outstanding unavailable; nothing will be settled this pass")
 		} else {
 			subject.Outstanding = open
+		}
+		if closed, closedErr := s.commitments.RecentlySettled(
+			ctx, persona.ID, ownerUserID, models.OmniChatMaxSettledCommitments,
+		); closedErr != nil {
+			zlog.Warn().Err(closedErr).Int("conversation_id", conversationID).
+				Msg("omnichat commitment: recently settled unavailable; a disputed closure cannot be corrected this pass")
+		} else {
+			subject.RecentlySettled = closed
 		}
 	}
 
@@ -735,6 +770,9 @@ type memoryExtractionInput struct {
 	// commitment can be created and never closed: the exchange where somebody
 	// finally does the thing reads as an ordinary conversation.
 	StillOutstanding []omniChatOutstandingForExtraction `json:"still_outstanding,omitempty"`
+	// RecentlySettled are commitments already closed, offered so an exchange
+	// that disputes one can say so.
+	RecentlySettled []omniChatOutstandingForExtraction `json:"recently_settled,omitempty"`
 }
 
 type omniChatOutstandingForExtraction struct {
@@ -842,7 +880,7 @@ Only record what was actually undertaken. Wondering aloud is not a promise, "we 
 
 Do not record a commitment that this exchange also settles. Somebody who promises to send a link and sends it in the next message has not left anything outstanding.
 
-Do not record anything already listed in still_outstanding. Those are held; repeating one creates a second copy of the same promise, and a character who believes she was promised the same thing twice is worse than one who missed it. Naming a time for something already promised does not make it a new commitment either -- it is the same promise with a date on it.
+Do not record anything already listed in still_outstanding or recently_settled. Those are held; repeating one creates a second copy of the same promise, and a character who believes she was promised the same thing twice is worse than one who missed it. Naming a time for something already promised does not make it a new commitment either -- it is the same promise with a date on it. Reopening one is not recording one: if you are putting a settled commitment back, that is the whole of it, and adding it again would leave her holding two.
 
 resolutions settle something that was already outstanding. Some are listed with ids; if this exchange closes one, give its id and how it ended.
 
@@ -850,9 +888,11 @@ resolutions settle something that was already outstanding. Some are listed with 
 
 Say nothing about a commitment this exchange only mentions. Bringing it up is usually the opposite of settling it -- "we still need to do that", "you still owe me", "I have not forgotten" are all somebody holding the other to it, and it stays outstanding. Asking whether something happened does not settle it. Neither does promising again, apologising for the delay, or agreeing it is overdue. When in doubt, return no resolution: leaving something open costs nothing, and closing it wrongly loses it for good.
 
+"reopened" is the correction, and only applies to something in recently_settled. Use it when this exchange shows a commitment was closed wrongly -- somebody saying they never did it, or that they are still owed it, and not being contradicted. Do not use it merely because a settled commitment came up: somebody thanking her again for something she did is not a dispute. Reopening is for a claim that the record is wrong.
+
 A resolution is usually also an event worth remembering, and how it landed belongs in emotional_valence like anything else. Somebody keeping a promise she was not sure about is a good moment; somebody plainly not intending to keep one is a bad one, and it is worse from a person she had been counting on.
 
-Return at most 4 episodes and at most 3 commitments. Required keys: episodes, commitments. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases. Each commitment requires direction and summary. Each resolution requires id and status, where status is kept, broken, or released. Use only an id from still_outstanding, and return an empty list when this exchange settles nothing.`
+Return at most 4 episodes and at most 3 commitments. Required keys: episodes, commitments. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases. Each commitment requires direction and summary. Each resolution requires id and status, where status is kept, broken, released, or reopened. Use an id from still_outstanding for the first three and from recently_settled for reopened, and return an empty list when this exchange settles nothing.`
 
 // renderExtractionSubject describes the relationship the way the disposition
 // block describes it to the character herself -- as a state, in language.
@@ -899,12 +939,25 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 		})
 	}
 
+	settled := make([]omniChatOutstandingForExtraction, 0, len(subject.RecentlySettled))
+	for _, commitment := range subject.RecentlySettled {
+		if commitment == nil || commitment.ID < 1 {
+			continue
+		}
+		settled = append(settled, omniChatOutstandingForExtraction{
+			ID:        commitment.ID,
+			Direction: commitment.Direction,
+			Summary:   commitment.Summary,
+		})
+	}
+
 	input := memoryExtractionInput{
 		PersonaName:      personaName,
 		TowardThePerson:  renderExtractionSubject(subject),
 		Transcript:       buildMemoryExtractionTranscript(messages),
 		AlreadyRecorded:  alreadyRecorded,
 		StillOutstanding: outstanding,
+		RecentlySettled:  settled,
 	}
 	if len(input.Transcript) == 0 {
 		return OmniChatExtractionResult{}, nil
@@ -965,11 +1018,28 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 	// A direction the model invented is dropped rather than guessed at. Filing
 	// something she owes as something she is owed inverts who is disappointed in
 	// whom, which is worse than not recording it.
+	// Anything already held, in either list, is what a new commitment must not
+	// duplicate. The prompt asks for this too and mostly obeys, but "mostly" is
+	// not good enough for a duplicate: a second copy of the same promise is
+	// permanent, and she would hold somebody to it twice. Repeated live runs had
+	// it reopening a settled commitment and recording it again in the same
+	// breath, which is a thing that cannot coherently happen.
+	held := make([]string, 0, len(outstanding)+len(settled))
+	for _, known := range outstanding {
+		held = append(held, known.Summary)
+	}
+	for _, known := range settled {
+		held = append(held, known.Summary)
+	}
+
 	commitments := make([]models.OmniChatCommitment, 0, len(output.Commitments))
 	for _, raw := range output.Commitments {
 		direction := strings.ToLower(strings.TrimSpace(raw.Direction))
 		summary := strings.TrimSpace(raw.Summary)
 		if summary == "" || !models.ValidOmniChatCommitmentDirection(direction) {
+			continue
+		}
+		if restatesAHeldCommitment(summary, held) {
 			continue
 		}
 		commitments = append(commitments, models.OmniChatCommitment{
@@ -982,15 +1052,24 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 	for _, open := range outstanding {
 		offered[open.ID] = struct{}{}
 	}
+	settledIDs := make(map[int64]struct{}, len(settled))
+	for _, closed := range settled {
+		settledIDs[closed.ID] = struct{}{}
+	}
 	resolutions := make([]models.OmniChatCommitmentResolution, 0, len(output.Resolutions))
 	for _, raw := range output.Resolutions {
 		status := strings.ToLower(strings.TrimSpace(raw.Status))
 		if !models.ValidOmniChatCommitmentResolution(status) {
 			continue
 		}
-		// An id it was never shown is one it invented, and settling an
-		// unoffered commitment would close a promise made to somebody else.
-		if _, ok := offered[raw.ID]; !ok {
+		// Each status is checked against the list it can legally apply to. An id
+		// it was never shown is one it invented, and acting on it would touch a
+		// promise made to somebody else.
+		if status == models.OmniChatCommitmentReopened {
+			if _, ok := settledIDs[raw.ID]; !ok {
+				continue
+			}
+		} else if _, ok := offered[raw.ID]; !ok {
 			continue
 		}
 		resolutions = append(resolutions, models.OmniChatCommitmentResolution{

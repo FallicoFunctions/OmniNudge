@@ -73,6 +73,12 @@ func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	require.Equal(t, "google/gemini-3.1-flash-lite", cfg.OpenRouter.StandardModel)
+
+	// Extraction has its own default and must not silently follow the chat
+	// model. They are chosen on different criteria, and when they shared a knob,
+	// fixing one would have changed what free members talk to.
+	require.Equal(t, "google/gemini-3-flash-preview", cfg.OpenRouter.ExtractionModel)
+	require.NotEqual(t, cfg.OpenRouter.StandardModel, cfg.OpenRouter.ExtractionModel)
 	require.Equal(t, "runpod", cfg.OmniChatMedia.Provider)
 	require.Equal(t, "server-only", cfg.OmniChatMedia.RunPodAPIKey)
 	require.Equal(t, "image-endpoint", cfg.OmniChatMedia.RunPodImageEndpointID)
