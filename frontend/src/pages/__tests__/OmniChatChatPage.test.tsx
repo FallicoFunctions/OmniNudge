@@ -1455,6 +1455,42 @@ describe('OmniChatChatPage', () => {
     ]);
   });
 
+  it('keeps showing her writing after the send request has already returned', async () => {
+    // The send used to stay open for the whole generation, so its pending flag
+    // covered this window. It returns as soon as the turn is recorded now, and
+    // the streamed tokens are drawn inside the same block as the indicator: if
+    // that block closes on the response, live streaming is never seen at all.
+    mockSendMessage.mockImplementation(async () => ({ accepted: true }));
+
+    renderPage();
+    const composer = await screen.findByPlaceholderText('Say or do something...');
+    fireEvent.change(composer, { target: { value: 'Are you there?' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(mockSendMessage).toHaveBeenCalledOnce());
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('omnichat-token', {
+          detail: { conversation_id: 42, token: 'Still here.' },
+        })
+      );
+    });
+    expect(await screen.findByText('Still here.')).toBeInTheDocument();
+
+    act(() => {
+      deliverAssistantReply({
+        id: 9,
+        conversation_id: 42,
+        role: 'assistant',
+        content: 'Still here, yes.',
+        failed: false,
+        created_at: '2026-07-02T10:16:00Z',
+      });
+    });
+    expect(await screen.findByText('Still here, yes.')).toBeInTheDocument();
+  });
+
   it('settles a stalled HTTP send when the completed reply arrives live', async () => {
     let requestSignal: AbortSignal | undefined;
     mockSendMessage.mockImplementation(

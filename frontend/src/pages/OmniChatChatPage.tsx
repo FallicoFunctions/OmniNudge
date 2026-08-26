@@ -453,6 +453,12 @@ export default function OmniChatChatPage() {
   const [galleryTab, setGalleryTab] = useState<ProfileTab>('profile');
   const [draft, setDraft] = useState('');
   const [streamingText, setStreamingText] = useState('');
+  // True from the moment a turn is accepted until her reply lands. The send
+  // request used to stay open for the whole generation, so its pending flag
+  // covered this window for free. It returns as soon as the turn is recorded
+  // now, and without this the typing indicator -- and the streamed tokens
+  // rendered beside it -- would disappear before a single token arrived.
+  const [awaitingReply, setAwaitingReply] = useState(false);
   const [regenerationText, setRegenerationText] = useState('');
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<number | null>(null);
   const [regenerationError, setRegenerationError] = useState(false);
@@ -1236,6 +1242,7 @@ export default function OmniChatChatPage() {
         queryKey: omnichatQueryKeys.allowance(isAuthenticated),
       });
       setStreamingText('');
+      setAwaitingReply(false);
 
       const pendingIntent = pendingMediaIntentRef.current;
       pendingMediaIntentRef.current = null;
@@ -1271,6 +1278,7 @@ export default function OmniChatChatPage() {
     }) => {
       sendMessageAbortRef.current?.abort();
       sendCompletedLiveRef.current = false;
+      setAwaitingReply(true);
       const controller = new AbortController();
       sendMessageAbortRef.current = controller;
       return omnichatService.sendMessage(
@@ -1302,6 +1310,7 @@ export default function OmniChatChatPage() {
       }
       pendingMediaIntentRef.current = null;
       setStreamingText('');
+      setAwaitingReply(false);
       const err = error as Error & { status?: number };
       if (pendingSendIntentRef.current?.requestId === requestId) {
         // Keep the exact request ID and draft available for a safe retry after a timeout or outage.
@@ -1362,6 +1371,7 @@ export default function OmniChatChatPage() {
     pendingSendIntentRef.current = null;
     pendingRegenerationIntentRef.current = null;
     pendingMediaIntentRef.current = null;
+    setAwaitingReply(false);
     pendingMediaGenerationRef.current = null;
     pendingMediaCommandRef.current = null;
     setMediaGenerationError(null);
@@ -2042,7 +2052,7 @@ export default function OmniChatChatPage() {
 
   const activeConversationSettings = conversationQuery.data?.conversation.settings;
   const isLoadingConversation = isGuest ? guestPersonaLoading : conversationQuery.isLoading;
-  const isSendingMessage = sendMessageMutation.isPending || guestIsGenerating;
+  const isSendingMessage = sendMessageMutation.isPending || awaitingReply || guestIsGenerating;
   const isGenerating = isSendingMessage || regeneratingMessageId !== null;
   // Keep the composer usable when chat replies are exhausted: a direct
   // /photo or /video request is a separate media action and must be allowed to
