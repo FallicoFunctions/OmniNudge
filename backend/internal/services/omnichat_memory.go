@@ -56,6 +56,7 @@ type omniChatMemoryStore interface {
 	SkipTo(ctx context.Context, conversationID, ownerUserID, throughMessageID int) error
 	RecordWorldEvent(ctx context.Context, event models.OmniChatWorldEvent) (int64, error)
 	LoadSelfDisposition(ctx context.Context, personaID int) (models.OmniChatCharacterTraits, models.OmniChatDispositionBaseline, error)
+	LoadConversationDisposition(ctx context.Context, personaID, ownerUserID int) (models.OmniChatDispositionBaseline, models.OmniChatCharacterTraits, models.OmniChatCharacterTraits, error)
 	Recall(ctx context.Context, personaID, ownerUserID int, cue string, weights models.OmniChatMemoryRecallWeights, limit int) ([]*models.OmniChatMemoryEpisode, error)
 	MarkRetrieved(ctx context.Context, episodeIDs []int64) error
 	RecentRoots(ctx context.Context, personaID, ownerUserID, limit int) ([]models.OmniChatMemoryRoot, error)
@@ -73,9 +74,27 @@ type omniChatMemoryPersonaReader interface {
 	GetByID(ctx context.Context, id int) (*models.BotPersona, error)
 }
 
+// OmniChatExtractionSubject is who the character was talking to, as far as
+// scoring is concerned.
+//
+// Valence cannot be read off a message alone -- the same sentence from a friend
+// of two years and from somebody met an hour ago are different events -- so the
+// extractor is handed how she stands toward this person and asked to judge from
+// there. Everything else in extraction is about what happened; this is the one
+// part that is about whom it happened with.
+type OmniChatExtractionSubject struct {
+	Disposition models.OmniChatDisposition
+
+	// True when nothing is known about the relationship yet. A neutral
+	// disposition and an unread one are the same numbers and mean opposite
+	// things: one is somebody she feels nothing in particular about, the other
+	// is somebody she has no measure of at all.
+	Unknown bool
+}
+
 // OmniChatMemoryExtractor turns a stretch of transcript into episodes.
 type OmniChatMemoryExtractor interface {
-	Extract(ctx context.Context, persona *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error)
+	Extract(ctx context.Context, persona *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error)
 }
 
 // OmniChatMemoryService owns character memory: extraction off the request path,
@@ -224,8 +243,26 @@ func (s *OmniChatMemoryService) extractOnce(ctx context.Context, conversationID,
 		offeredRoots[root.ID] = struct{}{}
 	}
 
+	// How she stands toward this person, so the same words from a friend and
+	// from a stranger are not scored as the same event. A failure here is not
+	// worth abandoning the extraction over -- what happened is still worth
+	// recording, and Unknown says plainly that the reading has no relationship
+	// behind it rather than quietly passing a neutral one off as measured.
+	subject := OmniChatExtractionSubject{Unknown: true}
+	if baseline, self, relationship, dispErr := s.store.LoadConversationDisposition(
+		ctx, persona.ID, ownerUserID,
+	); dispErr != nil {
+		zlog.Warn().Err(dispErr).Int("conversation_id", conversationID).
+			Msg("omnichat memory: disposition unavailable; scoring valence without the relationship")
+	} else {
+		subject = OmniChatExtractionSubject{
+			Disposition: models.ComposeOmniChatDisposition(baseline, self, relationship, time.Now()),
+			Unknown:     !baseline.Derived && relationship == (models.OmniChatCharacterTraits{}),
+		}
+	}
+
 	extractCtx, cancel := context.WithTimeout(ctx, omniChatMemoryExtractionTimeout)
-	episodes, extractErr := s.extractor.Extract(extractCtx, persona, usable, alreadyRecorded)
+	episodes, extractErr := s.extractor.Extract(extractCtx, persona, subject, usable, alreadyRecorded)
 	cancel()
 	if extractErr != nil {
 		zlog.Warn().Err(extractErr).Int("conversation_id", conversationID).Msg("omnichat memory: extraction failed")
@@ -561,8 +598,13 @@ type memoryExtractionTranscriptMessage struct {
 }
 
 type memoryExtractionInput struct {
-	PersonaName string                              `json:"persona_name"`
-	Transcript  []memoryExtractionTranscriptMessage `json:"transcript"`
+	PersonaName string `json:"persona_name"`
+	// TowardThePerson is how the character stands toward whoever she is talking
+	// to, in words rather than numbers. Valence is judged through it: the same
+	// sentence from a friend and from a stranger are different events, and
+	// without this the extractor can only score the words.
+	TowardThePerson string                              `json:"toward_the_person,omitempty"`
+	Transcript      []memoryExtractionTranscriptMessage `json:"transcript"`
 	// AlreadyRecorded are the original accounts this persona already holds, with
 	// the ids a retelling attaches to. Without them a retold story is filed as a
 	// brand new event and the same moment accumulates copies of itself.
@@ -615,6 +657,14 @@ Two events that mention the same place are not equally memorable. A weekly coffe
 
 emotional_valence runs -1 (painful) to 1 (joyful), or null when neutral.
 
+Judge it as the character, from this person, not as the words alone. The same sentence is a different event depending on who said it. Being called useless by someone she has traded insults with for months is not the injury it would be from a stranger, and warm words from someone she has come to distrust are not the gift they look like. A note above says how she is toward this person; read the valence through it.
+
+Read what was meant before scoring how it landed. Between people who are close, mockery, swearing, and threats of violence at a video game are usually affection wearing a rude coat, and scoring them as pain would record the opposite of what happened. From someone she barely knows the same words might be an insult, or might be someone hoping to be liked and pitching it badly. The transcript is the evidence: whether they have done this before, whether she played along, and whether either of them enjoyed it.
+
+Meaning it kindly is not the same as it landing well. Somebody can be plainly joking and still have touched something, and a character who is fine with everything a friend says is not a person. When the transcript shows she took it badly, record that, however it was meant.
+
+Closeness is not a licence. Somebody who spends months being pleasant and then uses that standing to push for something she does not want has not made it harmless by being a friend first; that is worse, and scores worse. Judge what was actually done, not the tone it was delivered in.
+
 retells_id is the id of the already-recorded memory this retells, or 0.
 
 entities are the names the memory could later be recalled by: people, places, things, topics, events. Give each a name and a kind from person, place, thing, topic, event. Use the most natural everyday form of the name. Include the user and the character only when they are genuinely part of what makes the memory findable.
@@ -629,9 +679,29 @@ Set retells_id to 0 for anything this exchange establishes for the first time. O
 
 Return at most 4 episodes. Required keys: episodes. Each episode requires title, summary, salience, distinctiveness, emotional_valence, retells_id, entities. Each entity requires name, kind, aliases.`
 
+// renderExtractionSubject describes the relationship the way the disposition
+// block describes it to the character herself -- as a state, in language.
+//
+// An unread relationship says so rather than rendering as neutral. Neutral and
+// unknown are the same numbers and opposite facts: one is somebody she feels
+// nothing much about, the other is somebody she has no measure of at all, and a
+// stranger's insult and an indifferent acquaintance's insult should not be
+// scored alike.
+func renderExtractionSubject(subject OmniChatExtractionSubject) string {
+	if subject.Unknown {
+		return "She has no measure of this person yet. Read what was meant from the transcript alone, and do not assume either warmth or hostility."
+	}
+	rendered := strings.TrimSpace(renderCharacterDisposition(subject.Disposition))
+	if rendered == "" {
+		return "She has no strong feeling about this person either way."
+	}
+	return rendered
+}
+
 func (e *ModelOmniChatMemoryExtractor) Extract(
 	ctx context.Context,
 	persona *models.BotPersona,
+	subject OmniChatExtractionSubject,
 	messages []*models.BotMessage,
 	alreadyRecorded []models.OmniChatMemoryRoot,
 ) ([]models.OmniChatMemoryEpisode, error) {
@@ -644,6 +714,7 @@ func (e *ModelOmniChatMemoryExtractor) Extract(
 	}
 	input := memoryExtractionInput{
 		PersonaName:     personaName,
+		TowardThePerson: renderExtractionSubject(subject),
 		Transcript:      buildMemoryExtractionTranscript(messages),
 		AlreadyRecorded: alreadyRecorded,
 	}

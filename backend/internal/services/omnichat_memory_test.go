@@ -40,6 +40,14 @@ type fakeMemoryStore struct {
 	selfTraits      models.OmniChatCharacterTraits
 	selfBaseline    models.OmniChatDispositionBaseline
 	selfTraitsErr   error
+
+	convBaseline     models.OmniChatDispositionBaseline
+	convRelationship models.OmniChatCharacterTraits
+	convDispErr      error
+}
+
+func (f *fakeMemoryStore) LoadConversationDisposition(context.Context, int, int) (models.OmniChatDispositionBaseline, models.OmniChatCharacterTraits, models.OmniChatCharacterTraits, error) {
+	return f.convBaseline, f.selfTraits, f.convRelationship, f.convDispErr
 }
 
 func (f *fakeMemoryStore) LoadSelfDisposition(context.Context, int) (models.OmniChatCharacterTraits, models.OmniChatDispositionBaseline, error) {
@@ -139,14 +147,16 @@ func (f *fakeMemoryPersonas) GetByID(context.Context, int) (*models.BotPersona, 
 }
 
 type fakeMemoryExtractor struct {
-	episodes  []models.OmniChatMemoryEpisode
-	err       error
-	calls     int
-	sawCounts []int
-	sawKnown  [][]models.OmniChatMemoryRoot
+	episodes   []models.OmniChatMemoryEpisode
+	err        error
+	calls      int
+	sawCounts  []int
+	sawKnown   [][]models.OmniChatMemoryRoot
+	sawSubject OmniChatExtractionSubject
 }
 
-func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error) {
+func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error) {
+	f.sawSubject = subject
 	f.calls++
 	f.sawCounts = append(f.sawCounts, len(messages))
 	f.sawKnown = append(f.sawKnown, alreadyRecorded)
@@ -767,4 +777,61 @@ func TestSelfDispositionRefusesWithoutAPersona(t *testing.T) {
 	service := NewOmniChatMemoryService(&fakeMemoryStore{}, nil, nil, nil, nil)
 	_, err := service.SelfDisposition(context.Background(), 0)
 	require.Error(t, err)
+}
+
+// The same words from a friend and from a stranger are different events, so the
+// extractor has to be told which it is looking at. Without this it can only
+// score the words -- and a competitive character's every exchange with the
+// rivals he likes best reads as injury.
+func TestExtractionCarriesTheRelationshipToTheExtractor(t *testing.T) {
+	store := &fakeMemoryStore{
+		convBaseline:     models.OmniChatDispositionBaseline{Warmth: 0.5, Derived: true},
+		convRelationship: models.OmniChatCharacterTraits{Warmth: 0.4, Trust: 0.3},
+	}
+	extractor := &fakeMemoryExtractor{}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+
+	require.Equal(t, 1, extractor.calls)
+	require.False(t, extractor.sawSubject.Unknown, "a measured relationship is not an unknown one")
+	require.Greater(t, extractor.sawSubject.Disposition.Warmth, 0.0,
+		"warmth toward this person has to reach the thing scoring how his words landed")
+}
+
+// A disposition that cannot be read is reported as unknown rather than passed
+// off as neutral. They are the same numbers and opposite facts: nothing much
+// either way, versus no measure of this person at all.
+func TestExtractionSaysSoWhenTheRelationshipIsUnreadable(t *testing.T) {
+	store := &fakeMemoryStore{convDispErr: errors.New("traits unavailable")}
+	extractor := &fakeMemoryExtractor{}
+	service := NewOmniChatMemoryService(store,
+		&fakeMemoryMessages{messages: memoryTestMessages()},
+		&fakeMemoryConversations{conversation: &models.BotConversation{ID: 1, PersonaID: 5}},
+		&fakeMemoryPersonas{}, extractor)
+
+	// Extraction still runs. What happened is worth recording even when how she
+	// feels about the person cannot be read.
+	require.NoError(t, service.ExtractForConversation(context.Background(), 1, 2))
+
+	require.Equal(t, 1, extractor.calls)
+	require.True(t, extractor.sawSubject.Unknown)
+	require.Equal(t, models.OmniChatDisposition{}, extractor.sawSubject.Disposition)
+}
+
+func TestRenderExtractionSubjectDistinguishesUnknownFromNeutral(t *testing.T) {
+	unknown := renderExtractionSubject(OmniChatExtractionSubject{Unknown: true})
+	neutral := renderExtractionSubject(OmniChatExtractionSubject{})
+
+	require.NotEqual(t, unknown, neutral)
+	require.Contains(t, unknown, "no measure of this person")
+	require.NotContains(t, neutral, "no measure of this person")
+
+	warm := renderExtractionSubject(OmniChatExtractionSubject{
+		Disposition: models.OmniChatDisposition{Warmth: 0.9, Trust: 0.8},
+	})
+	require.NotEqual(t, warm, neutral, "a warm relationship must not read as a blank one")
 }

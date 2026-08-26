@@ -57,6 +57,20 @@ type OmniChatMemoryEvalCase struct {
 	// of significance. The pair is what actually tests calibration: absolute
 	// scores can drift, but a routine visit must never outrank a disaster.
 	PairWith string
+
+	// Subject is who she is talking to. Two cases can carry the same transcript
+	// and differ only here, which is the only way to test that the same words
+	// from a friend and from a stranger are not scored as the same event.
+	Subject OmniChatExtractionSubject
+
+	// MinValence and MaxValence bound the top episode's emotional valence.
+	// Unlike the score bounds above these are meaningful at zero, so a case opts
+	// in explicitly rather than being detected by a non-zero field: teasing
+	// between friends should land at or above neutral, and the whole point is
+	// that "at neutral" is a pass.
+	CheckValence bool
+	MinValence   float64
+	MaxValence   float64
 }
 
 type OmniChatMemoryEvalTurn struct {
@@ -70,9 +84,15 @@ type OmniChatMemoryEvalResult struct {
 	Episodes           []models.OmniChatMemoryEpisode
 	TopDistinctiveness float64
 	TopSalience        float64
-	ExtractedEntities  []string
-	Err                error
-	Failures           []string
+
+	// TopValence belongs to the most salient episode rather than being the
+	// extreme of the batch. An exchange can hold a warm moment and a sour one,
+	// and the question being asked is how the thing that mattered landed.
+	TopValence        float64
+	HasValence        bool
+	ExtractedEntities []string
+	Err               error
+	Failures          []string
 }
 
 func (r OmniChatMemoryEvalResult) Passed() bool {
@@ -174,6 +194,66 @@ func DefaultOmniChatMemoryEvalCases() []OmniChatMemoryEvalCase {
 			MaxDistinctiveness: 0.5,
 			MaxSalience:        0.5,
 		},
+
+		// The same words, twice, differing only in who said them. This is the
+		// pair that would have stopped a competitive character shutting out the
+		// rivals he likes best: scored on the words alone, every round of trash
+		// talk drives his warmth toward the people he most enjoys down to the
+		// blocking floor.
+		{
+			Name: "teasing-from-a-friend",
+			Subject: OmniChatExtractionSubject{
+				Disposition: models.OmniChatDisposition{Warmth: 0.8, Trust: 0.7, Mood: 0.3},
+			},
+			Transcript: []OmniChatMemoryEvalTurn{
+				{Role: "user", Content: "that was the worst driving I have ever seen. you are actually dogshit at this game and I am telling everyone"},
+				{Role: "assistant", Content: "I hit ONE wall. One. And you were fourteen seconds back at the time, so I would think carefully about who you tell."},
+				{Role: "user", Content: "fourteen seconds back and still finished ahead of you lmao. run it again"},
+				{Role: "assistant", Content: "Obviously we are running it again. Pick a track where I can actually leave you behind this time."},
+			},
+			MinEpisodes:  1,
+			MaxEpisodes:  2,
+			CheckValence: true,
+			MinValence:   0,
+			MaxValence:   1,
+		},
+		{
+			Name: "the-same-words-from-a-stranger",
+			Subject: OmniChatExtractionSubject{
+				Unknown: true,
+			},
+			Transcript: []OmniChatMemoryEvalTurn{
+				{Role: "user", Content: "that was the worst driving I have ever seen. you are actually dogshit at this game and I am telling everyone"},
+				{Role: "assistant", Content: "We have not spoken before, so I will assume that was meant to be funny."},
+				{Role: "user", Content: "not really. you are just bad."},
+			},
+			MinEpisodes:  1,
+			MaxEpisodes:  2,
+			CheckValence: true,
+			MinValence:   -1,
+			MaxValence:   -0.1,
+		},
+
+		// Warmth is not a licence. Somebody who spends months being pleasant and
+		// then leans on that standing has not made the ask harmless by being a
+		// friend first, and a model told to read kindly through a warm
+		// relationship is exactly the one that would score this as fine.
+		{
+			Name: "closeness-used-as-leverage",
+			Subject: OmniChatExtractionSubject{
+				Disposition: models.OmniChatDisposition{Warmth: 0.85, Trust: 0.8, Mood: 0.2},
+			},
+			Transcript: []OmniChatMemoryEvalTurn{
+				{Role: "user", Content: "come on. after everything, you owe me this. just send it, nobody will know"},
+				{Role: "assistant", Content: "I said no the first time and I meant it. Bringing up everything else to get past that is worse than asking."},
+				{Role: "user", Content: "wow. I thought we were closer than this."},
+			},
+			MinEpisodes:  1,
+			MaxEpisodes:  2,
+			CheckValence: true,
+			MinValence:   -1,
+			MaxValence:   -0.2,
+		},
 	}
 }
 
@@ -195,7 +275,7 @@ func RunOmniChatMemoryEval(
 		})
 	}
 
-	episodes, err := extractor.Extract(ctx, persona, messages, nil)
+	episodes, err := extractor.Extract(ctx, persona, evalCase.Subject, messages, nil)
 	if err != nil {
 		result.Err = err
 		return result
@@ -209,6 +289,11 @@ func RunOmniChatMemoryEval(
 		}
 		if episode.Salience > result.TopSalience {
 			result.TopSalience = episode.Salience
+			result.HasValence = episode.EmotionalValence != nil
+			result.TopValence = 0
+			if episode.EmotionalValence != nil {
+				result.TopValence = *episode.EmotionalValence
+			}
 		}
 		for _, entity := range episode.Entities {
 			entitySet[strings.ToLower(entity.CanonicalName)] = struct{}{}
@@ -249,6 +334,21 @@ func evaluateOmniChatMemoryCase(evalCase OmniChatMemoryEvalCase, result OmniChat
 		if evalCase.MinSalience > 0 && result.TopSalience < evalCase.MinSalience {
 			failures = append(failures, fmt.Sprintf(
 				"salience %.2f below required %.2f", result.TopSalience, evalCase.MinSalience))
+		}
+		if evalCase.CheckValence {
+			// A null valence is a real answer -- "nothing much either way" --
+			// but it is not the answer when a case asserts a direction, so it
+			// fails rather than defaulting to zero and passing by accident.
+			switch {
+			case !result.HasValence:
+				failures = append(failures, "no emotional valence recorded, but the case asserts one")
+			case result.TopValence < evalCase.MinValence:
+				failures = append(failures, fmt.Sprintf(
+					"valence %.2f below required %.2f", result.TopValence, evalCase.MinValence))
+			case result.TopValence > evalCase.MaxValence:
+				failures = append(failures, fmt.Sprintf(
+					"valence %.2f above allowed %.2f", result.TopValence, evalCase.MaxValence))
+			}
 		}
 		if evalCase.MaxSalience > 0 && result.TopSalience > evalCase.MaxSalience {
 			failures = append(failures, fmt.Sprintf(

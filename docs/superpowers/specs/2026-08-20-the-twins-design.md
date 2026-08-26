@@ -1056,3 +1056,52 @@ Her own broken commitments have to cost her too. A character who holds everyone
 else to their word and quietly drops her own is not principled, she is badly
 implemented -- and the person she disappointed is exactly the one who will
 remember.
+
+
+## 27. Valence is read through the relationship
+
+Extraction used to score a message's emotional weight from the words alone. That
+is the wrong measurement, and everything downstream inherits it -- disposition,
+the prompt, and now blocking, which is driven entirely by accumulated warmth.
+
+**It is a hard blocker on a competitive character.** Trash talk scored on its
+words is injury every time, so a character whose defining trait is antagonism
+drives his own warmth down fastest with the people he likes most, and blocks his
+best rivals. Not a subtle failure: he would be structurally unable to be himself.
+
+### Three layers, kept apart
+
+- **What happened** -- extraction's existing job.
+- **How she read it** -- playful or hostile. A model judgment, and it needs the
+  relationship in front of it to make it.
+- **How she felt** -- separate, because *"I know you are joking and I am still
+  annoyed"* is a real state, and collapsing it into the reading makes a character
+  who is either always fine with banter or never is.
+
+The division mirrors blocking, inverted: there the numbers decide and the model
+explains; here the model interprets and the numbers react.
+
+### Unknown is not neutral
+
+They are the same numbers and opposite facts. Somebody she feels nothing much
+about is not somebody she has no measure of, and a stranger's insult should not
+score like an indifferent acquaintance's. `Unknown` says which, and a disposition
+that cannot be read reports itself as unknown rather than passing a neutral one
+off as measured.
+
+### Warmth is not a licence
+
+The obvious failure of "read it kindly when she is fond of them" is that
+closeness becomes cover. Somebody pleasant for two months who then leans on that
+standing has not made the ask harmless by being a friend first -- that is worse,
+and scores worse. The prompt says so, and a calibration case asserts it.
+
+### How this is known to work
+
+Three cases in the eval suite, two of them carrying **the same transcript and
+differing only in who said it**: teasing from a friend must land at or above
+neutral, the identical words from a stranger below it. That pair is the whole
+test -- absolute scores drift, but the ordering must not.
+
+Without an eval this was a prompt change nobody could verify, which is how the
+format contract reached 1,500 lines.

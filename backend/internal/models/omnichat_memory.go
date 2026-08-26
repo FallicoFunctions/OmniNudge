@@ -745,6 +745,21 @@ func (r *OmniChatMemoryRepository) LoadSelfDisposition(ctx context.Context, pers
 	return traits, dispositionBaseline(mood, trust, warmth), nil
 }
 
+// LoadConversationDisposition reads how a character stands toward one person:
+// who she was written as, what has happened to her in the open, and what this
+// relationship has made of her.
+//
+// Extraction needs it to score valence, because the same words from a friend and
+// from a stranger are not the same event. It is a straight delegation to the
+// traits repository, which owns this question -- duplicating the query here
+// would be a second definition of a character's disposition, and the two would
+// eventually disagree.
+func (r *OmniChatMemoryRepository) LoadConversationDisposition(
+	ctx context.Context, personaID, ownerUserID int,
+) (OmniChatDispositionBaseline, OmniChatCharacterTraits, OmniChatCharacterTraits, error) {
+	return NewOmniChatCharacterTraitRepository(r.pool).LoadForConversation(ctx, personaID, ownerUserID)
+}
+
 // recallQuery ranks a persona's memories against a free-text cue.
 //
 // Two tiers are visible at once: the caller's own relational memory, and the
