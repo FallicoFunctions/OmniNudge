@@ -251,14 +251,27 @@ func TestConfiguredProfileRoutesUseTheActualProviderForExecutionControls(t *test
 
 	quick := configured[2]
 	require.Equal(t, "vendor/custom-model", quick.ModelKey)
-	require.Equal(t, "anthropic/claude-sonnet-5", profiles[2].ModelKey, "the product catalog must remain immutable")
+	require.Equal(t, "google/gemini-3.5-flash-lite", profiles[2].ModelKey, "the product catalog must remain immutable")
 
 	upstream := &modelRouterOptionsFake{}
 	client := &profileChatCompletionClient{completion: upstream, profile: quick}
 	_, err := client.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{MaxTokens: 256})
 	require.NoError(t, err)
+	// A route to an unrecognised provider gets no execution controls at all: it
+	// may not implement them, and a rejected parameter fails the whole reply.
 	require.Empty(t, upstream.options.ReasoningEffort)
 	require.Empty(t, upstream.options.Speed)
+
+	// A route to a provider known to accept effort does receive it, which is
+	// what keeps the paid tiers distinct now that they share a model.
+	googleRoute := quick
+	googleRoute.ModelKey = "google/gemini-3.5-flash-lite"
+	googleUpstream := &modelRouterOptionsFake{}
+	googleClient := &profileChatCompletionClient{completion: googleUpstream, profile: googleRoute}
+	_, err = googleClient.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{MaxTokens: 256})
+	require.NoError(t, err)
+	require.Equal(t, string(quick.ReasoningEffort), googleUpstream.options.ReasoningEffort)
+	require.Empty(t, googleUpstream.options.Speed, "fast speed stays an Anthropic routing feature")
 }
 
 func TestConfiguredProfiledRouterUsesStandardFallbackWhenPrimaryIsBlank(t *testing.T) {
@@ -289,7 +302,7 @@ func TestValidateConfiguredOmniChatModelRoutesFailsClosedForInvalidDeploymentInp
 		"mistralai/mistral-small-2506",
 	))
 	require.Error(t, ValidateConfiguredOmniChatModelRoutes(
-		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: "google/gemini-3.1-flash-lite"},
+		map[OmniChatModelProfileKey]string{OmniChatModelProfileStandard: "google/gemini-3.5-flash-lite"},
 		"bad route",
 	))
 	require.Error(t, ValidateConfiguredOmniChatModelRoutes(

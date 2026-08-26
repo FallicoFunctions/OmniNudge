@@ -311,6 +311,14 @@ func newProfiledOmniChatModelRouter(plans OmniChatPlanReader, preferences OmniCh
 	return &TieredOmniChatModelRouter{plans: plans, preferences: preferences, clients: clients}
 }
 
+// omniChatProviderAcceptsReasoningEffort reports whether a route is one whose
+// provider is known to take a reasoning effort. Deliberately a prefix list of
+// things that have been tried, not a guess about what ought to work.
+func omniChatProviderAcceptsReasoningEffort(modelKey string) bool {
+	route := strings.ToLower(strings.TrimSpace(modelKey))
+	return strings.HasPrefix(route, "anthropic/") || strings.HasPrefix(route, "google/")
+}
+
 // profileChatCompletionClient injects immutable profile controls after all
 // caller options have been assembled. A browser can therefore choose only a
 // profile name, never provider effort or fast-mode flags.
@@ -345,15 +353,31 @@ func (c *profileChatCompletionClient) GenerateWithOptions(ctx context.Context, m
 	if c == nil || c.completion == nil {
 		return "", errors.New("omnichat: profile completion client is unavailable")
 	}
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.profile.ModelKey)), "anthropic/") {
+	// Reasoning effort goes to providers known to accept it, and nowhere else.
+	//
+	// It used to go to Anthropic alone, which was harmless while every tier had
+	// its own model and became a silent problem the moment they shared one:
+	// with effort stripped, Plus, Premium Quick and Premium Deep would have been
+	// the same model at the same settings, differing in nothing but name and
+	// price. A tier has to buy *something*.
+	//
+	// Still an allowlist rather than send-to-all, because a deployment can route
+	// a profile to any model string it likes and an unknown provider may reject
+	// a parameter it does not implement. Verified by hand against the models
+	// named here; anything else gets nothing, which is what it got before.
+	if omniChatProviderAcceptsReasoningEffort(c.profile.ModelKey) {
 		options.ReasoningEffort = string(c.profile.ReasoningEffort)
-		if c.profile.Speed == OmniChatModelSpeedFast {
-			options.Speed = "fast"
-		} else {
-			options.Speed = ""
-		}
 	} else {
 		options.ReasoningEffort = ""
+	}
+
+	// Fast speed stays Anthropic-only because it is an Anthropic routing
+	// feature rather than a general one, and ultra_fast -- the only profile that
+	// asks for it -- is pinned to Anthropic anyway.
+	if c.profile.Speed == OmniChatModelSpeedFast &&
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.profile.ModelKey)), "anthropic/") {
+		options.Speed = "fast"
+	} else {
 		options.Speed = ""
 	}
 	return generateWithOptionalOptions(ctx, c.completion, messages, onChunk, options, true)
