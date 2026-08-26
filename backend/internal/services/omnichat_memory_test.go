@@ -147,20 +147,21 @@ func (f *fakeMemoryPersonas) GetByID(context.Context, int) (*models.BotPersona, 
 }
 
 type fakeMemoryExtractor struct {
-	episodes   []models.OmniChatMemoryEpisode
-	err        error
-	calls      int
-	sawCounts  []int
-	sawKnown   [][]models.OmniChatMemoryRoot
-	sawSubject OmniChatExtractionSubject
+	episodes    []models.OmniChatMemoryEpisode
+	commitments []models.OmniChatCommitment
+	err         error
+	calls       int
+	sawCounts   []int
+	sawKnown    [][]models.OmniChatMemoryRoot
+	sawSubject  OmniChatExtractionSubject
 }
 
-func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error) {
+func (f *fakeMemoryExtractor) Extract(_ context.Context, _ *models.BotPersona, subject OmniChatExtractionSubject, messages []*models.BotMessage, alreadyRecorded []models.OmniChatMemoryRoot) (OmniChatExtractionResult, error) {
 	f.sawSubject = subject
 	f.calls++
 	f.sawCounts = append(f.sawCounts, len(messages))
 	f.sawKnown = append(f.sawKnown, alreadyRecorded)
-	return f.episodes, f.err
+	return OmniChatExtractionResult{Episodes: f.episodes, Commitments: f.commitments}, f.err
 }
 
 func memoryTestMessages() []*models.BotMessage {

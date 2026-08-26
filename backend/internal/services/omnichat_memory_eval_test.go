@@ -19,8 +19,8 @@ type scriptedExtractor struct {
 	err      error
 }
 
-func (s *scriptedExtractor) Extract(context.Context, *models.BotPersona, OmniChatExtractionSubject, []*models.BotMessage, []models.OmniChatMemoryRoot) ([]models.OmniChatMemoryEpisode, error) {
-	return s.episodes, s.err
+func (s *scriptedExtractor) Extract(context.Context, *models.BotPersona, OmniChatExtractionSubject, []*models.BotMessage, []models.OmniChatMemoryRoot) (OmniChatExtractionResult, error) {
+	return OmniChatExtractionResult{Episodes: s.episodes}, s.err
 }
 
 func evalCase() OmniChatMemoryEvalCase {

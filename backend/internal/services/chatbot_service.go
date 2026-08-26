@@ -167,7 +167,25 @@ type ChatbotService struct {
 	memoryQueue omniChatMemoryEnqueuer
 	traits      omniChatTraitLoader
 	blocks      omniChatBlockKeeper
-	hub         *websocket.Hub
+
+	// Optional, like the rest of the enrichment above. Absent, she simply does
+	// not carry what was promised -- which is what she did before commitments
+	// existed, and is a character who forgot rather than a turn that failed.
+	commitments omniChatCommitmentReader
+
+	hub *websocket.Hub
+}
+
+type omniChatCommitmentReader interface {
+	Outstanding(ctx context.Context, personaID, ownerUserID, limit int) ([]*models.OmniChatCommitment, error)
+}
+
+// SetCommitments wires what these two still owe each other into the prompt.
+func (s *ChatbotService) SetCommitments(commitments omniChatCommitmentReader) *ChatbotService {
+	if s != nil {
+		s.commitments = commitments
+	}
+	return s
 }
 
 // omniChatMemoryEnqueueTimeout bounds the background enqueue so a Redis stall
@@ -451,13 +469,14 @@ func (s *ChatbotService) SendMessage(ctx context.Context, userID, conversationID
 	// Cued by the same turn as the memories, and covering exactly what the
 	// window does not reach.
 	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, content, conversationOutgrewWindow)
+	outstanding := s.loadOutstandingCommitments(chatCtx, persona, userID)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition.Composed), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -612,13 +631,14 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	// the trailing user turn, which the guard above has already established.
 	memories := s.recallMemories(chatCtx, persona, userID, history[len(history)-1].Content)
 	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, history[len(history)-1].Content, regenerationOutgrewWindow)
+	outstanding := s.loadOutstandingCommitments(chatCtx, persona, userID)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp}, disposition.Composed), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -953,6 +973,9 @@ type promptRecall struct {
 	Memories []*models.OmniChatMemoryEpisode
 	// What was actually written, in theirs, older than the window she holds.
 	LookedUp []*models.BotMessage
+	// What the two of them have left unsettled. Not recalled -- an unkept
+	// promise is not waiting to be reminded of, it is simply outstanding.
+	Outstanding []*models.OmniChatCommitment
 }
 
 func buildConversationSystemPromptWithDisposition(
@@ -969,6 +992,10 @@ func buildConversationSystemPromptWithDisposition(
 	// Immediately after what she remembers, because it answers the same cue and
 	// is the more exact half of the same act: the impression, then the record.
 	base += renderTranscriptLookup(recall.LookedUp, personaDisplayName(persona))
+	// After the past and before how she is, because that is where it sits for a
+	// person: something unsettled is not a memory she reaches for, it is part of
+	// how she is toward somebody right now.
+	base += renderOutstandingCommitments(recall.Outstanding)
 	base += renderCharacterDisposition(disposition)
 	if settings != nil {
 		metadata := make([]string, 0, 3)

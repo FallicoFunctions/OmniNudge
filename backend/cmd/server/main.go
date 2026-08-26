@@ -768,7 +768,12 @@ func main() {
 	// Without this a character has no way to refuse anybody, and the blocks the
 	// admin review lists would be records of a decision nothing enforces.
 	omniChatBlockRepo := models.NewOmniChatPersonaBlockRepository(db.Pool)
+	omniChatCommitmentRepo := models.NewOmniChatCommitmentRepository(db.Pool)
 	chatbotService.SetBlocks(omniChatBlockRepo)
+	// Both halves: the memory service records what an exchange promised, and the
+	// chat service carries what is still outstanding into the next reply.
+	chatbotService.SetCommitments(omniChatCommitmentRepo)
+	omniChatMemoryService.SetCommitments(omniChatCommitmentRepo)
 
 	omniChatRequestIdempotencyRepo := models.NewOmniChatRequestIdempotencyRepository(db.Pool)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
