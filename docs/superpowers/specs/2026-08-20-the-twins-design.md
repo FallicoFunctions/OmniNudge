@@ -976,9 +976,14 @@ holds herself to anything is a very good transcript.
 3. **Resolved.** Somebody did or did not do the thing.
 4. **Answered.** How she takes that, which is where the trait system already is.
 
-Steps 1, 2 and 4 sit on machinery that exists. **Step 3 is the gap**, and it is
-the whole of the interesting work: she would remember the bet perfectly well, and
-nothing anywhere would ever prompt her to wonder whether you paid up.
+Steps 1 and 4 sit on machinery that exists. Step 2 does not: an episode's status
+is active, superseded, corrected or hidden, and it has nowhere to record a
+counterparty, a direction, or whether the thing was ever done. That is a small
+addition rather than a hard one.
+
+**Step 3 is the gap**, and it is the whole of the interesting work: she would
+remember the bet perfectly well, and nothing anywhere would ever prompt her to
+wonder whether you paid up.
 
 ### Some commitments are checkable and most are not
 
@@ -994,8 +999,16 @@ later, which is exactly the situation a person is in, and the only honest
 handling is the human one: she can ask, she can be told, and she can decide
 whether she believes it. That is a conversation, not a check.
 
-A commitment that nobody resolves should quietly stop mattering rather than
-nagging forever. The recurrence damping already does this to everything else.
+Whether she believes an unverifiable *"I did it"* is a trust question, and trust
+is already per-person -- so the same claim from two people is not the same claim,
+which is the right answer and needs nothing new. See §17.
+
+A commitment nobody resolves should quietly stop mattering rather than nagging
+forever. Recall already applies recency pressure -- a 0.3 weight against a 90-day
+half-life -- so an old unresolved bet surfaces less and less on its own. But that
+is *retrieval* fading, not expiry: the record would still be open, and a
+commitment probably needs its own notion of having gone stale. Not the recurrence
+damping, which decays repetition rather than age.
 
 ### Whose consequences
 
@@ -1029,8 +1042,13 @@ By the sixth, habituation has decayed the valence to nothing and it is simply a
 thing the two of them do, while the identical behaviour from somebody new lands
 at full force because their novelty has not decayed.
 
-That damping was built to stop the nursery moods saturating. It produces this for
-free, which is usually a sign a model is right.
+That damping was built to stop the nursery moods saturating. It produces this
+without being asked, which is usually a sign a model is right.
+
+One dependency, since "free" is doing work in that sentence: habituation keys on
+recurrence chains, so it only applies if extraction recognises the sixth welshing
+as a recurrence of the first. If it files them as six unrelated
+disappointments, each lands whole and she resents a running joke.
 
 ### Symmetry
 
