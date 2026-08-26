@@ -700,6 +700,7 @@ func TestConstrainedFinalizationCannotRepairSceneConflict(t *testing.T) {
 		&models.BotPersona{ID: 23, ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue},
 		candidate,
 		constraints,
+		personalConversationShape,
 		func(string) { streamed = true },
 	)
 

@@ -38,6 +38,15 @@ const (
 	ResponseStyleProfileDirectMessage   = "direct_message"
 )
 
+// How a character decides the way she writes. Default means the way she was
+// made to; mirror means the way the person she is talking to writes. Only a
+// roleplay character may mirror -- an IAI already writes however she wants, and
+// telling her to copy somebody would be us choosing her style.
+const (
+	MessageStyleModeDefault = "default"
+	MessageStyleModeMirror  = "mirror"
+)
+
 func personaIsDirectMessage(persona *BotPersona) bool {
 	return persona != nil &&
 		strings.TrimSpace(persona.ResponseStyleProfile) == ResponseStyleProfileDirectMessage
@@ -84,6 +93,7 @@ type BotPersona struct {
 	FirstMessage            string          `json:"first_message"`
 	ExampleDialogue         string          `json:"-"`
 	ResponseStyleProfile    string          `json:"response_style_profile,omitempty"`
+	MessageStyleMode        string          `json:"message_style_mode,omitempty"`
 	PostHistoryInstructions string          `json:"-"`
 	AlternateGreetings      []string        `json:"-"`
 	CreatorNotes            string          `json:"-"`
@@ -164,6 +174,7 @@ const maxPersonaListSize = 500
 const botPersonaSelectColumns = `
 	id, slug, name, description, category, owner_user_id, visibility, source_format,
 	system_prompt, personality, scenario, first_message, example_dialogue, response_style_profile,
+	message_style_mode,
 	post_history_instructions, alternate_greetings, creator_notes, tags, creator_name,
 	character_version, extensions_json, character_book_json, raw_card_json,
 	import_source_filename, avatar_url, preview_video_url, gallery_urls,
@@ -189,6 +200,7 @@ func scanBotPersona(scanner interface {
 	err := scanner.Scan(
 		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
+		&p.MessageStyleMode,
 		&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 		&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 		&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
@@ -202,6 +214,9 @@ func scanBotPersona(scanner interface {
 	}
 	if p.SourceFormat == "" {
 		p.SourceFormat = "native"
+	}
+	if p.MessageStyleMode == "" {
+		p.MessageStyleMode = MessageStyleModeDefault
 	}
 	if p.ResponseStyleProfile == "" {
 		p.ResponseStyleProfile = ResponseStyleProfileInherit
@@ -793,6 +808,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			&c.CreatedAt, &c.LastMessageAt, &c.ArchivedAt,
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
+			&p.MessageStyleMode,
 			&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 			&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 			&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,

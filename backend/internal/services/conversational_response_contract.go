@@ -481,6 +481,14 @@ func generatePersonaCompletionWithClientAndSceneState(
 	if personalMode {
 		maxAttempts = personalConversationAttempts
 	}
+	// The shape is settled before the first attempt: a mirroring character is
+	// judged against how the other person writes, not against the shape she was
+	// made with, or the contract would reject the very reply mirroring asked
+	// her for.
+	shape := personaMessageShape(persona)
+	if personaMirrorsUser(persona) {
+		shape = mirroredShape(shape, observeUserWritingStyleInPrompt(messages))
+	}
 	constraints := personalResponseConstraints{}
 	if personalMode {
 		constraints = derivePersonalResponseConstraints(messages, sceneState)
@@ -559,7 +567,7 @@ func generatePersonaCompletionWithClientAndSceneState(
 			if !personalMode {
 				return deliverBufferedConversation(candidate, onChunk), nil
 			}
-			finalized, finalizeErr := finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, constraints, onChunk)
+			finalized, finalizeErr := finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, constraints, shape, onChunk)
 			if finalizeErr == nil {
 				return finalized, nil
 			}
@@ -572,7 +580,7 @@ func generatePersonaCompletionWithClientAndSceneState(
 			}
 			lastErr = finalizeErr
 			recordPersonalDraftTerminal(ctx, personalDraftTerminalRetryContract)
-			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraftWithConstraints(candidate, constraints, personaMessageShape(persona))
+			lengthOnlyRetry = personalMode && isLengthOnlyPersonalDraftWithConstraints(candidate, constraints, shape)
 			log := zlog.Warn().Int("attempt", attempt+1)
 			if persona != nil {
 				log = log.Int("persona_id", persona.ID)
@@ -616,12 +624,10 @@ func containsSystemPrompt(messages []openrouter.Message) bool {
 }
 
 func finalizePersonalConversationDraft(ctx context.Context, persona *models.BotPersona, candidate string, onChunk openrouter.StreamCallback) (string, error) {
-	return finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, personalResponseConstraints{}, onChunk)
+	return finalizePersonalConversationDraftWithConstraints(ctx, persona, candidate, personalResponseConstraints{}, personaMessageShape(persona), onChunk)
 }
 
-func finalizePersonalConversationDraftWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, onChunk openrouter.StreamCallback) (string, error) {
-	// The shape follows from who she is, not from which bundle is switched on.
-	shape := personaMessageShape(persona)
+func finalizePersonalConversationDraftWithConstraints(ctx context.Context, persona *models.BotPersona, candidate string, constraints personalResponseConstraints, shape messageShape, onChunk openrouter.StreamCallback) (string, error) {
 	if recovered, err := parseAndValidatePersonalDialogueOnlyJSONWithConstraints(candidate, constraints); err == nil {
 		recordPersonalDraftOutcome(ctx, personalDraftAcceptedDialogue)
 		recordPersonalDraftTerminal(ctx, personalDraftTerminalAcceptedDialogue)

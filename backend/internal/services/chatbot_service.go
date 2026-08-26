@@ -952,6 +952,14 @@ func buildConversationSystemPromptWithDisposition(
 	// how she is toward somebody right now.
 	base += renderOutstandingCommitments(recall.Outstanding)
 	base += renderCharacterDisposition(disposition)
+	// How the other person writes, for a character who takes her format from
+	// them. Beside the disposition rather than up with the persona, because it
+	// is observed from this conversation and changes as they do.
+	if personaMirrorsUser(persona) {
+		if mirrored := renderMirroredStyle(observeUserWritingStyle(history)); mirrored != "" {
+			base += "\n\n" + mirrored
+		}
+	}
 	if settings != nil {
 		metadata := make([]string, 0, 3)
 		if settings.UserName != "" {
