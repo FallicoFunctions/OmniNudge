@@ -951,3 +951,90 @@ turn repair that already exists for interrupted replies.
 Already noted for the sister in §1, but it belongs to roleplay characters as
 well, and to anything a creator builds -- so it is a property set at creation,
 not a trait of the Twins.
+
+## 26. Commitments
+
+A bet, a dare, a promise, "I'll tell you tomorrow", "you owe me one", and a lie
+are the same primitive wearing different clothes: **something said in a
+conversation that constrains what should be true later.**
+
+§17 arrived at this from one direction -- a lie creates an obligation, because if
+she said she was at her sister's she has to still have been at her sister's next
+week. A bet is the same record pointed at the future instead of the past. Build
+it once and all of them work; build them separately and each one is a feature.
+
+It is also the thing that makes her feel like she has continuity of *intent*
+rather than merely of recall. A character who remembers everything but never
+holds herself to anything is a very good transcript.
+
+### The four parts
+
+1. **Made.** Something in the exchange creates it. Extraction already reads
+   conversations for what happened; this is a second thing to notice.
+2. **Held.** It persists as a record, with a counterparty and a direction --
+   hers to discharge, or theirs.
+3. **Resolved.** Somebody did or did not do the thing.
+4. **Answered.** How she takes that, which is where the trait system already is.
+
+Steps 1, 2 and 4 sit on machinery that exists. **Step 3 is the gap**, and it is
+the whole of the interesting work: she would remember the bet perfectly well, and
+nothing anywhere would ever prompt her to wonder whether you paid up.
+
+### Some commitments are checkable and most are not
+
+This split decides how much can be built and how much has to be inferred.
+
+**Checkable** — the thing happens on the platform. *"Loser posts what the winner
+writes on their wall"* resolves against the wall, which the system can see. Once
+§10 lands, a meaningful share of social commitments are of this kind.
+
+**Not checkable** — *"I'll go to bed early"*, *"I'll think about it"*, *"I was at
+my sister's"*. Nothing observes these. The only evidence is what somebody says
+later, which is exactly the situation a person is in, and the only honest
+handling is the human one: she can ask, she can be told, and she can decide
+whether she believes it. That is a conversation, not a check.
+
+A commitment that nobody resolves should quietly stop mattering rather than
+nagging forever. The recurrence damping already does this to everything else.
+
+### Whose consequences
+
+The line is **not** that a conversation cannot cause an action outside itself.
+That would forbid the dare, and the dare is the point -- a character who cannot
+be talked into posting something embarrassing cannot take part in the life of
+the site.
+
+The line is **whose consequences land**:
+
+- **Hers to be talked into.** She posts something mortifying on her own wall
+  because she lost. She wears it. Being embarrassed is the substance of the
+  thing, not a side effect, and she can hold it.
+- **Not hers to be talked into.** Consequences landing on somebody who is not in
+  the conversation. Not because she is fragile, but because **they never agreed
+  to be exposed to whatever a determined person can talk her into.** Money is the
+  clearest case: it is not hers, and there is no sense in which she can carry the
+  outcome.
+
+So persuasion reaches as far as she does, and stops where other people begin.
+
+### The answer is relational, and the boring case is free
+
+A broken bet does not have one reaction. She might be genuinely annoyed, might
+never bet with that person again, might not care -- and which one is a function
+of who welshed, not of what was welshed on.
+
+The case worth noticing is the one that needs no work: **two people who bet
+constantly and never once follow through.** The first time it stings a little.
+By the sixth, habituation has decayed the valence to nothing and it is simply a
+thing the two of them do, while the identical behaviour from somebody new lands
+at full force because their novelty has not decayed.
+
+That damping was built to stop the nursery moods saturating. It produces this for
+free, which is usually a sign a model is right.
+
+### Symmetry
+
+Her own broken commitments have to cost her too. A character who holds everyone
+else to their word and quietly drops her own is not principled, she is badly
+implemented -- and the person she disappointed is exactly the one who will
+remember.
