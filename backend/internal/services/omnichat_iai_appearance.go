@@ -47,9 +47,16 @@ const (
 	// interface is not enforcing anything.
 	omniChatIAIMinimumAge = 18
 
-	// omniChatIAIMaximumAge is the top of §34's slider, where the label reads
-	// "55+". Above it is the same answer said louder.
-	omniChatIAIMaximumAge = 55
+	// omniChatIAIMaximumAge is the top of §34's slider, and it is a real age
+	// rather than a bucket. A "55+" label looked like a range and was not one:
+	// every answer above it collapsed to the same number, so two people who
+	// asked for different characters got the same one and were never told.
+	//
+	// 99 costs something honest instead. The likeness generator and the 3D rigs
+	// have to cover old age, and until they do an old character reads correctly
+	// in text and not yet in a portrait. That is a gap to close, not a reason to
+	// refuse the answer.
+	omniChatIAIMaximumAge = 99
 )
 
 // ErrIAIUnderage refuses a character described as a minor. Unlike every other
@@ -65,8 +72,13 @@ func IAIAgeRange() (minimum, maximum int) {
 
 // IAIAppearanceOptions is what the form may offer, so the interface and this
 // table cannot drift apart without a test noticing.
+//
+// Copies, not the tables themselves. The order is §34's and several tests assert
+// it, so one caller sorting the list it was handed -- to render it alphabetically,
+// say -- would quietly reorder the canonical list for everybody afterwards. The
+// key lists and the plan limits already copy for the same reason.
 func IAIAppearanceOptions() map[string][]string {
-	return map[string][]string{
+	options := map[string][]string{
 		"style":       iaiStyles,
 		"gender":      iaiGenders,
 		"ethnicity":   iaiEthnicities,
@@ -75,6 +87,10 @@ func IAIAppearanceOptions() map[string][]string {
 		"eyes":        iaiEyes,
 		"build":       iaiBuilds,
 	}
+	for field, values := range options {
+		options[field] = append([]string(nil), values...)
+	}
+	return options
 }
 
 // normaliseIAIAppearance keeps what it recognises and drops what it does not.

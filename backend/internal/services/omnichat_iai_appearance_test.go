@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,6 +28,16 @@ func TestTheAppearanceOptionsAreTheOnesTheSpecOffers(t *testing.T) {
 	require.Equal(t, []string{"brunette", "blonde", "black", "red", "dyed"}, options["hair_colour"])
 	require.Equal(t, []string{"brown", "blue", "green", "grey", "hazel"}, options["eyes"])
 	require.Equal(t, []string{"slim", "athletic", "average", "curvy", "heavy"}, options["build"])
+}
+
+func TestTheCallerCannotReorderTheServersOwnTable(t *testing.T) {
+	// The order is §34's, and the tests above assert it. Handing out the backing
+	// array let one caller sorting for display change the canonical list for
+	// everybody afterwards, with nothing to notice it had happened.
+	sort.Strings(IAIAppearanceOptions()["style"])
+
+	require.Equal(t, []string{"realistic", "anime"}, IAIAppearanceOptions()["style"])
+	require.Equal(t, []string{"realistic", "anime"}, iaiStyles)
 }
 
 func TestTheSliderIsDrawnFromTheRuleItEnforces(t *testing.T) {
@@ -95,14 +106,18 @@ func TestACharacterUnderEighteenIsRefusedRatherThanCorrected(t *testing.T) {
 	require.ErrorIs(t, err, ErrIAIUnderage)
 }
 
-func TestTheTopOfTheSliderIsTheSameAnswerSaidLouder(t *testing.T) {
+func TestAnAgeAboveTheSliderComesBackToTheTop(t *testing.T) {
+	// Nothing on the form can send this, so it is somebody hitting the endpoint
+	// directly. The top of the slider is a real age, not a bucket, so this is a
+	// value out of range rather than a coarser way of saying the same thing.
 	appearance := fullAppearance()
 	appearance.Age = 200
 
 	normalised, err := normaliseIAIAppearance(appearance)
 
 	require.NoError(t, err)
-	require.Equal(t, omniChatIAIMaximumAge, normalised.Age, "§34's slider tops out at 55+")
+	require.Equal(t, omniChatIAIMaximumAge, normalised.Age)
+	require.Equal(t, 99, omniChatIAIMaximumAge, "§34's slider runs 18 to 99")
 }
 
 func TestNobodyAnsweringLooksNothingLikeAnsweringBlank(t *testing.T) {
