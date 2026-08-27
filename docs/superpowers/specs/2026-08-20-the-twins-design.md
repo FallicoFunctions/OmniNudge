@@ -1864,11 +1864,24 @@ The §13 fork happens before any of this. Everything here follows "Independent".
 
 ### The screens
 
-**1. Style.** Realistic or anime. Fixed after this, because her 2D likeness and
-her eventual 3D avatar have to be the same character.
+**1. Who they are.** Woman or man; age from 18 to 99. Trans characters are out of
+scope for now, recorded as scope rather than principle.
 
-**2. Who she is.** Woman or man; age from 18. Trans characters are out of scope
-for now, recorded as scope rather than principle.
+This screen goes first because every screen after it is written in a pronoun. A
+flow that says "she" before it has asked has answered its own question, and the
+style cards cannot show a sample of anybody until they know who they are drawing.
+Nothing before this answer, on this screen or in the rail, assumes one.
+
+The slider is a real range and not a bucket. A "55+" label looked like a range
+and was not one: every answer above it collapsed to the same number, so two
+people who asked for different characters got the same one and were never told.
+99 costs something honest instead -- the likeness generator and the 3D rigs have
+to cover old age, and until they do an old character reads right in text and not
+yet in a portrait. That is a gap to close, not a reason to refuse the answer.
+
+**2. Style.** Realistic or anime. Fixed after this, because her 2D likeness and
+her eventual 3D avatar have to be the same character. Both cards show a sample in
+their style, of the person chosen on screen one.
 
 **3. Her face.** Ethnicity, hair, hair colour, eyes. Four grids on one screen.
 Generation inputs only -- none of it touches who she is.

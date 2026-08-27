@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #7da8ff; text-decoration: none; }
+    a:hover { color: #a8c6ff; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 72% -10%, rgba(59,130,246,0.16), transparent 34rem), radial-gradient(circle at 22% 36%, rgba(96,165,250,0.07), transparent 28rem), #090a0f; font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; color: #f7f7fb; overflow: hidden;">
+  <div style="width: 780px; display: flex; flex-direction: column; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); background: #0e1017; box-shadow: 0 32px 120px rgba(0,0,0,0.72); overflow: hidden;">
+    <header style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 30px 34px 22px 34px;">
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #7da8ff;">Independent character</p>
+        <h1 style="margin: 0; font-size: 30px; line-height: 1.16; font-weight: 600; letter-spacing: -0.02em; color: #ffffff;">This one comes with Plus</h1>
+        <p style="margin: 0; max-width: 560px; font-size: 15px; line-height: 24px; color: rgba(255,255,255,0.55); text-wrap: pretty;">Characters you write are yours on every tier. One who answers for themselves, remembers, and can tell you no is a Plus feature.</p>
+      </div>
+      <button type="button" aria-label="Close" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -8px -10px 0 0; flex-shrink: 0; border: none; border-radius: 999px; background: transparent; color: rgba(255,255,255,0.55); cursor: pointer;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+      </button>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 0 34px 24px 34px;">
+      <article style="display: flex; flex-direction: column; gap: 8px; border-radius: 22px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); padding: 20px;">
+        <span style="align-self: flex-start; border-radius: 999px; background: rgba(255,255,255,0.07); padding: 5px 11px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5);">You are here</span>
+        <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 600; color: #ffffff;">Standard</h2>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: rgba(255,255,255,0.5);">2 characters you write.</p>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: rgba(255,255,255,0.3);">No independent character.</p>
+      </article>
+      <article style="display: flex; flex-direction: column; gap: 8px; border-radius: 22px; border: 1px solid rgba(93,143,255,0.7); background: rgba(49,92,168,0.14); box-shadow: 0 18px 70px rgba(49,92,168,0.16); padding: 20px;">
+        <span style="align-self: flex-start; border-radius: 999px; background: #426fc4; padding: 5px 11px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #ffffff;">Unlocks this</span>
+        <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 600; color: #ffffff;">Plus</h2>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: rgba(255,255,255,0.6);">5 characters you write.</p>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: #a8c6ff;">One who is their own.</p>
+      </article>
+      <article style="display: flex; flex-direction: column; gap: 8px; border-radius: 22px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); padding: 20px;">
+        <span style="align-self: flex-start; border-radius: 999px; background: rgba(255,255,255,0.07); padding: 5px 11px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5);">The most room</span>
+        <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 600; color: #ffffff;">Premium</h2>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: rgba(255,255,255,0.5);">10 characters you write.</p>
+        <p style="margin: 0; font-size: 13.5px; line-height: 20px; color: rgba(255,255,255,0.5);">One who is their own.</p>
+      </article>
+    </div>
+
+    <footer style="display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding: 18px 34px;">
+      <p style="margin: 0; max-width: 380px; font-size: 12px; line-height: 18px; color: rgba(255,255,255,0.35);">A character you write does what you wrote. That control is the trade, and it is why both kinds exist.</p>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button type="button" style="height: 46px; padding: 0 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: rgba(255,255,255,0.7); font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer;">Write one instead</button>
+        <button type="button" style="min-width: 168px; height: 46px; padding: 0 26px; border: none; border-radius: 999px; background: #426fc4; color: #ffffff; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer;">See the plans</button>
+      </div>
+    </footer>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

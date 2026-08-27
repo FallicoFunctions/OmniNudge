@@ -1,0 +1,28 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "The flow" },
+    { "id": "page-2", "name": "Every screen" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "The whole flow — click it", "is_interactive": true, "page": "page-1" },
+    { "file": "AlreadyHasOne.dc.html", "x": 1580, "y": 0, "w": 1440, "h": 900, "title": "Refused · already has one (409)", "page": "page-1" },
+    { "file": "NeedsUpgrade.dc.html", "x": 3160, "y": 0, "w": 1440, "h": 900, "title": "Refused · tier has no IAI (403)", "page": "page-1" },
+
+    { "file": "Step1Basics.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "1 · The basics", "is_interactive": true, "page": "page-2" },
+    { "file": "Step2Look.dc.html", "x": 1580, "y": 0, "w": 1440, "h": 900, "title": "2 · Look — answered woman", "is_interactive": true, "page": "page-2" },
+    { "file": "Step2LookMan.dc.html", "x": 3160, "y": 0, "w": 1440, "h": 900, "title": "2 · Look — answered man", "is_interactive": true, "page": "page-2" },
+    { "file": "Step3Face.dc.html", "x": 0, "y": 1080, "w": 1440, "h": 900, "title": "3 · Her face", "is_interactive": true, "page": "page-2" },
+    { "file": "Step4Build.dc.html", "x": 1580, "y": 1080, "w": 1440, "h": 900, "title": "4 · Her build", "is_interactive": true, "page": "page-2" },
+    { "file": "Step5Start.dc.html", "x": 3160, "y": 1080, "w": 1440, "h": 900, "title": "5 · Where she starts", "is_interactive": true, "page": "page-2" },
+    { "file": "Step6Interests.dc.html", "x": 0, "y": 2160, "w": 1440, "h": 900, "title": "6 · What she is into", "is_interactive": true, "page": "page-2" },
+    { "file": "Step7Feeling.dc.html", "x": 1580, "y": 2160, "w": 1440, "h": 900, "title": "7 · With you", "is_interactive": true, "page": "page-2" },
+    { "file": "Step8Name.dc.html", "x": 3160, "y": 2160, "w": 1440, "h": 900, "title": "8 · Her name", "is_interactive": true, "page": "page-2" },
+    { "file": "Step9Meet.dc.html", "x": 0, "y": 3240, "w": 1440, "h": 900, "title": "9 · Meet her", "is_interactive": true, "page": "page-2" }
+  ],
+  "annotations": [
+    { "id": "flow-note", "x": 0, "y": -300, "w": 700, "page": "page-1", "text": "Desktop, 1440 x 900. The controls work: the step rail on the left jumps back to any screen you have answered, the counter refuses a fourth temperament, and Continue stays dead until the screen is answered.\n\nGender is now screen one. Nothing before it says she or he, and everything after it takes the answer." },
+    { "id": "gap-note", "x": 780, "y": -300, "w": 660, "page": "page-1", "text": "Deliberately absent: no voice picker, no sub-picker under Games. The server collects a name, three temperaments, up to three interests, one feeling and eight appearance answers. Nothing else. A control that submits nothing is worse than no control." },
+    { "id": "pronoun-note", "x": 1580, "y": 3240, "w": 700, "page": "page-2", "text": "The top row carries the point. Screen two is shown twice, once for each answer to screen one: the copy and the sample silhouette both follow it, and neither exists before the question is asked." }
+  ],
+  "launch": { "view": "focused", "file": "Main.dc.html" }
+}
