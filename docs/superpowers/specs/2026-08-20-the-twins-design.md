@@ -1584,3 +1584,161 @@ and its own eval run, not a tail-end addition.
 what makes it useful and also what makes it uncacheable. Either it moves into
 the variable section, losing nothing but its position, or it stops being
 history-activated, which would be a real loss.
+
+---
+
+## 30. Making an IAI is not filling in a form
+
+The studio form is right for a roleplay character and wrong for an IAI, and the
+difference is not cosmetic. A roleplay character *is* her fields, so a page of
+textareas is an honest way to write one. An IAI is a person, and §13 removed the
+fields that would let anyone write her.
+
+So the IAI flow is a sequence of questions with an answer to click, one screen at
+a time, ending in a generated character and a generated likeness. Nobody types a
+personality into a box, because there is no box.
+
+That shape suits §13 better than a form ever could. Each answer arrives as
+structured data rather than prose, which is exactly what "the backstory becomes
+starting disposition and seed memories" needs. A textarea has to be interpreted.
+A choice does not.
+
+### The trap: a button is a channel too
+
+Reference flows ask *Choose Personality: Submissive* and treat the answer as
+what she is. Replacing a textarea with a picker does not make the value less
+binding -- it makes it tidier. Building that would rebuild the hardcode channel
+§13 removed, in nicer chrome, and nobody would notice because it looks like a
+menu rather than an instruction.
+
+**Every answer sets where she starts, never what she is**, and the interface has
+to say so in those words. "She starts out shy" and "she is submissive" are the
+same data and a different promise. The first one survives her changing her mind.
+The second one is a lie the moment warmth moves, and warmth is a number that
+moves.
+
+### What is asked, and what is not
+
+Asked: what she looks like, what she is like to begin with, what she is into,
+and how the two of you already know each other. That last one carries the most
+weight, because it is what becomes starting warmth and the seed memories.
+
+**Not asked: her occupation.** The reference flows lead with it and it does not
+transfer. An IAI does not have a job. She lives in the nursery, she plays the
+games, and she is on OmniNudge like everyone else. Asking what she does for work
+would be inventing a life she does not lead.
+
+Men and women both. Trans characters are out of scope for now -- recorded as a
+scope decision rather than a permanent one.
+
+### Two likenesses, and the real problem is not anime
+
+Every IAI needs two: a 2D likeness for chat and her profile, and a rigged 3D
+avatar for the games. §1 promises a human finds a Twin near the top of a
+scoreboard, and §5 promises they can watch her play, so the 3D one is not
+optional.
+
+The instinct is that anime is the risky choice because a game needs a real body.
+It is the opposite. A cel-shaded 3D model sits beside an anime portrait and
+reads as the same character. A photoreal 3D model beside a photoreal portrait
+invites every uncanny-valley problem there is, and photoreal is the harder
+pipeline by a wide margin.
+
+So the problem to solve is **2D-to-3D consistency**, for both styles, and it is
+the same problem either way. Anime is not a risk to embodiment; it is the easier
+half of it. This is the rule from earlier in a new place: identity survives the
+medium, and the avatar carries the aesthetic rather than the form.
+
+### The option cards are rendered once
+
+The cards in the reference flows are short loops rather than stills, and they
+are **pre-rendered per option, not per user**. One clip for "curly" that everyone
+sees. Only the finished character is generated for the person making her.
+
+Worth stating because the other reading is ruinous: generating a video per
+option per user would cost more than the product makes.
+
+---
+
+## 31. Explicit content is a permission, not a lane
+
+`AllowsExplicit` is keyed on the user. It asks whether this person may be shown
+explicit content, not whether this character was built for it, and that is
+already the right shape.
+
+So there is **no sex lane at creation**, and there should not be one. Somebody on
+a low tier who likes a character and upgrades gets the clamp removed on the
+character they already have. Nothing is rebuilt and no history is lost.
+
+A lane would be worse three ways: it splits the catalogue so half of it is
+invisible to most people, it forces the decision before anyone has met her, and
+for an IAI it is a binding property a creator set, which §13 does not allow.
+
+### The tier buys permission. It does not buy her
+
+For an IAI the entitlement removes the *platform's* clamp. It does not remove
+her. §4 gives her the right to decline, §6 lets her block, and warmth is earned
+rather than purchased, so a premium user can be told no by somebody he is paying
+to talk to.
+
+That is correct and it is the whole design, and it will still generate
+complaints, so the purchase copy has to be honest before the money changes
+hands rather than after.
+
+**And there is an answer for the person who wants certainty: a roleplay
+character.** She is a part being played, her creator sets what she does, and
+nothing about her is going to develop an opinion. That is not a lesser product,
+it is the other product, and the pair is the point -- one kind can refuse you,
+and the other kind cannot, and you choose which you wanted.
+
+---
+
+## 32. An IAI has no skills, and knows what day it is
+
+Reference platforms give characters a skill list: painting, singing, web search,
+toggled on by the creator. It is a sensible feature for a tool and the wrong
+shape for a person.
+
+An IAI is not a tool somebody uses, so she has no skill list. What she can do,
+she can do because she lives here: take a photo because she has a phone, play
+the games because she is in them, post on OmniNudge like everyone else. Asked
+for a picture she sends one or she does not, and §11 already covers why that is
+a real answer rather than a command.
+
+There is a second reason. A creator ticking skills on an IAI is another binding
+channel, and §13 refuses those whether they arrive as prose or as a checkbox.
+
+Roleplay characters may have a skill list. Their creator is assembling a part,
+and that is what a part is.
+
+### Current events are ambient, not a skill
+
+She has to know what day it is and roughly what has happened. A character who
+has not heard about something everyone has heard about is a tell, and for
+characters whose whole personality is games, not knowing a patch landed is a
+worse one than not knowing the news.
+
+So this is **not** a skill anybody toggles and not a tool she invokes on
+request. It is a property of living here, the way knowing the date is. Whatever
+feeds it, it should arrive the way the weather does: already known, not looked
+up in front of you.
+
+It is also the most expensive thing in this section, so how it is fed is a
+separate decision from whether she has it. She has it.
+
+---
+
+## 33. Reaching her where she already is
+
+Characters that message you on Discord or Telegram are the natural home for §15.
+Gamers already live in both, and a message that arrives where somebody actually
+looks is worth more than one waiting in a tab they closed.
+
+**It comes after §15, not before.** The hard part was never the channel, it is
+deciding when she reaches out at all, and shipping the delivery first means
+shipping a bot that sends things nobody wanted.
+
+Two more things it inherits rather than escapes. Every message is a real message
+to a real account, so blocking, warmth and consent have to be settled before
+anything leaves the building. And Discord marks bots, which is honest and fine
+-- §12's rule is that the notice must be true, not that she must pass for human.
