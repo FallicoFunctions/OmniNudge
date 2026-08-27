@@ -47,6 +47,14 @@ const (
 	MessageStyleModeMirror  = "mirror"
 )
 
+// PersonaIsIAI reports whether this row describes an Independent AI rather than
+// a part somebody wrote. It is the one place that knows how that is spelled, so
+// callers can ask the question without each keeping their own copy of the
+// answer.
+func PersonaIsIAI(persona *BotPersona) bool {
+	return personaIsDirectMessage(persona)
+}
+
 func personaIsDirectMessage(persona *BotPersona) bool {
 	return persona != nil &&
 		strings.TrimSpace(persona.ResponseStyleProfile) == ResponseStyleProfileDirectMessage

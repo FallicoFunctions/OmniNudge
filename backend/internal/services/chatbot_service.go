@@ -500,7 +500,7 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed, time.Now()), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -682,7 +682,7 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed, time.Now()), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -902,7 +902,11 @@ func buildConversationSystemPromptWithMemory(
 	sceneState *models.OmniChatConversationSceneState,
 	memories []*models.OmniChatMemoryEpisode,
 ) string {
-	return buildConversationSystemPromptWithDisposition(persona, settings, history, sceneState, promptRecall{Memories: memories}, models.OmniChatDisposition{})
+	// No clock on purpose. This path builds prompts for previews and for the
+	// approval fingerprint, and a prompt carrying the current minute would hash
+	// differently every minute -- the gate would be unapprovable and every test
+	// that asserts prompt text would fail one run in sixty.
+	return buildConversationSystemPromptWithDisposition(persona, settings, history, sceneState, promptRecall{Memories: memories}, models.OmniChatDisposition{}, time.Time{})
 }
 
 // buildConversationSystemPromptWithDisposition assembles the system prompt.
@@ -940,6 +944,7 @@ func buildConversationSystemPromptWithDisposition(
 	sceneState *models.OmniChatConversationSceneState,
 	recall promptRecall,
 	disposition models.OmniChatDisposition,
+	now time.Time,
 ) string {
 	base := buildCharacterPromptBase(persona, history)
 	base += conversationHistoryTrustBoundary
@@ -952,6 +957,10 @@ func buildConversationSystemPromptWithDisposition(
 	// how she is toward somebody right now.
 	base += renderOutstandingCommitments(recall.Outstanding)
 	base += renderCharacterDisposition(disposition)
+	// Late rather than up with the persona, because this is the one block that
+	// changes on its own. §29 needs the stable material first, and a date that
+	// moves would spoil a prefix everything else is trying to keep still.
+	base += renderCurrentMoment(persona, now)
 	// How the other person writes, for a character who takes her format from
 	// them. Beside the disposition rather than up with the persona, because it
 	// is observed from this conversation and changes as they do.

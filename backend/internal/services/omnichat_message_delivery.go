@@ -45,10 +45,7 @@ const omniChatMaxDeliverySpread = omniChatMaxDeliveredMessages * omniChatTypingP
 // changing how every existing character arrives is the creator's call and not
 // ours.
 func personaDeliversSeparateMessages(persona *models.BotPersona) bool {
-	if persona == nil {
-		return false
-	}
-	return strings.TrimSpace(persona.ResponseStyleProfile) == models.ResponseStyleProfileDirectMessage
+	return models.PersonaIsIAI(persona)
 }
 
 // splitDeliverableMessages turns one generated reply into the messages it was

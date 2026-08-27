@@ -51,7 +51,7 @@ func TestNeutralDispositionLeavesThePromptByteIdentical(t *testing.T) {
 	persona := testPersona()
 	before := buildConversationSystemPromptWithMemory(persona, nil, nil, nil, nil)
 	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{},
-		models.OmniChatDisposition{Mood: 0.1, Trust: -0.15, Warmth: 0.05})
+		models.OmniChatDisposition{Mood: 0.1, Trust: -0.15, Warmth: 0.05}, time.Time{})
 	require.Equal(t, before, after)
 	require.NotContains(t, after, "[How You Are Right Now]")
 }
@@ -158,7 +158,7 @@ func TestBuildConversationSystemPromptOrdersDispositionBlock(t *testing.T) {
 	}
 
 	prompt := buildConversationSystemPromptWithDisposition(persona, nil, nil, sceneState, promptRecall{Memories: memories},
-		models.OmniChatDisposition{Mood: -0.7, Trust: -0.4})
+		models.OmniChatDisposition{Mood: -0.7, Trust: -0.4}, time.Time{})
 
 	trustIdx := strings.Index(prompt, "[Conversation Integrity]")
 	memoryIdx := strings.Index(prompt, "[Recalled Memories]")
