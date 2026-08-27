@@ -161,6 +161,7 @@ type ChatbotService struct {
 	memoryQueue omniChatMemoryEnqueuer
 	traits      omniChatTraitLoader
 	blocks      omniChatBlockKeeper
+	reading     omniChatFeedReader
 
 	// Optional, like the rest of the enrichment above. Absent, she simply does
 	// not carry what was promised -- which is what she did before commitments
@@ -289,6 +290,13 @@ func (s *ChatbotService) scheduleMemoryExtraction(ctx context.Context, conversat
 //
 // Leaving it unset clamps every conversation to non-explicit, which is the
 // safe default: a misconfiguration should cost tone, never exposure.
+// SetReading gives her the feeds. Without it she simply has not read anything,
+// which degrades to exactly what it sounds like rather than to an error.
+func (s *ChatbotService) SetReading(reader omniChatFeedReader) *ChatbotService {
+	s.reading = reader
+	return s
+}
+
 func (s *ChatbotService) SetContentEntitlement(entitlement *OmniChatContentEntitlement) *ChatbotService {
 	s.entitlement = entitlement
 	return s
@@ -495,12 +503,13 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, cue, conversationOutgrewWindow)
 	outstanding := s.loadOutstandingCommitments(chatCtx, persona, userID)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
+	reading := recentReadingFor(chatCtx, s.reading, persona)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
-		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed, time.Now()), userID)
+		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding, Reading: reading}, disposition.Composed, time.Now()), userID)
 	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -677,12 +686,13 @@ func (s *ChatbotService) RegenerateMessage(ctx context.Context, userID, conversa
 	lookedUp := s.lookUpTranscript(chatCtx, conversationID, history, history[len(history)-1].Content, regenerationOutgrewWindow)
 	outstanding := s.loadOutstandingCommitments(chatCtx, persona, userID)
 	disposition := s.loadDisposition(chatCtx, persona, userID)
+	reading := recentReadingFor(chatCtx, s.reading, persona)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
 	messages = append(messages, openrouter.Message{
 		Role: openrouter.RoleSystem,
 		Content: s.clampSystemPrompt(ctx,
-			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding}, disposition.Composed, time.Now()), userID),
+			buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding, Reading: reading}, disposition.Composed, time.Now()), userID),
 	})
 	for _, m := range history {
 		role := openrouter.RoleUser
@@ -928,6 +938,10 @@ func buildConversationSystemPromptWithMemory(
 // rather than as two more positional arguments in a chain that already has
 // enough of them.
 type promptRecall struct {
+	// Reading is what she has seen in the feeds lately (§32). It sits with the
+	// rest of the recalled material because it is the same kind of thing:
+	// something she is carrying into the conversation rather than being told.
+	Reading []models.OmniChatFeedItem
 	// What she remembers, in her words, as the extractor wrote it.
 	Memories []*models.OmniChatMemoryEpisode
 	// What was actually written, in theirs, older than the window she holds.
@@ -961,6 +975,7 @@ func buildConversationSystemPromptWithDisposition(
 	// changes on its own. §29 needs the stable material first, and a date that
 	// moves would spoil a prefix everything else is trying to keep still.
 	base += renderCurrentMoment(persona, now)
+	base += renderRecentReading(recall.Reading)
 	// How the other person writes, for a character who takes her format from
 	// them. Beside the disposition rather than up with the persona, because it
 	// is observed from this conversation and changes as they do.

@@ -188,6 +188,15 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
+	// Reading the feeds (§32). A ticker rather than a queued job: it is the same
+	// small run for everybody once a day, so there is nothing to fan out and
+	// nothing to key a task on.
+	readingCtx, stopReading := context.WithCancel(context.Background())
+	defer stopReading()
+	go runOmniChatReading(readingCtx,
+		services.NewOmniChatReadingService(
+			models.NewOmniChatFeedRepository(db.Pool), services.DefaultOmniChatFeeds))
+
 	// Start worker in a goroutine so we can wait for the signal below.
 	workerErrChan := make(chan error, 1)
 	go func() {
@@ -197,6 +206,10 @@ func main() {
 	select {
 	case sig := <-sigChan:
 		zlog.Info().Str("signal", sig.String()).Msg("Received shutdown signal, gracefully stopping worker")
+		// Reading stops first. It is the one thing here that reaches outside and
+		// writes on its own schedule, and there is no reason for it to be
+		// starting a fetch while the queue is draining.
+		stopReading()
 		worker.Shutdown()
 	case err := <-workerErrChan:
 		if err != nil {
@@ -219,4 +232,36 @@ func workerConcurrencyFromEnv(raw string) int {
 		return maxWorkerConcurrency
 	}
 	return concurrency
+}
+
+// omniChatReadingInterval is how often the feeds are read. Once a day is what
+// §32 asks for: she skims the news like anybody else, rather than sitting on a
+// wire watching it arrive.
+const omniChatReadingInterval = 24 * time.Hour
+
+func runOmniChatReading(ctx context.Context, reading *services.OmniChatReadingService) {
+	// Once at startup, so a fresh deployment is not blind until tomorrow.
+	readOmniChatFeedsOnce(ctx, reading)
+
+	ticker := time.NewTicker(omniChatReadingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			readOmniChatFeedsOnce(ctx, reading)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func readOmniChatFeedsOnce(ctx context.Context, reading *services.OmniChatReadingService) {
+	runCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	stored, err := reading.Refresh(runCtx)
+	if err != nil {
+		zlog.Warn().Err(err).Msg("omnichat reading: refresh failed")
+		return
+	}
+	zlog.Info().Int("stored", stored).Msg("omnichat reading: feeds refreshed")
 }
