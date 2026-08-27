@@ -75,26 +75,72 @@ type IAIOptions struct {
 	Interests        []string            `json:"interests"`
 	InterestPicks    int                 `json:"interest_picks"`
 	Appearance       map[string][]string `json:"appearance"`
-	MinimumAge       int                 `json:"minimum_age"`
-	MaximumAge       int                 `json:"maximum_age"`
-	IAILimit         int                 `json:"iai_limit"`
-	RoleplayLimits   map[string]int      `json:"roleplay_limits"`
+
+	// Three of the appearance answers depend on an earlier one, so they cannot
+	// be flat lists. They are served as every answer already worked out, indexed
+	// by what they depend on, rather than as a rule the interface applies for
+	// itself -- a rule sent to the client is a rule that can disagree with the
+	// server, which is the whole reason this endpoint exists.
+	//
+	// Eyes are indexed by drawing style: violet is offered to a drawing and not
+	// to a character claiming to be a person. Builds are indexed by gender, and
+	// hair shapes by drawing style, then gender, then texture.
+	Eyes       map[string][]string                       `json:"eyes"`
+	Builds     map[string][]string                       `json:"builds"`
+	HairStyles map[string]map[string]map[string][]string `json:"hair_styles"`
+
+	MinimumAge          int            `json:"minimum_age"`
+	MaximumAge          int            `json:"maximum_age"`
+	MinimumHeightInches int            `json:"minimum_height_inches"`
+	MaximumHeightInches int            `json:"maximum_height_inches"`
+	IAILimit            int            `json:"iai_limit"`
+	IAIRequiredPlan     string         `json:"iai_required_plan"`
+	RoleplayLimits      map[string]int `json:"roleplay_limits"`
 }
 
 // GetIAIOptions answers what the creation flow may show.
 func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
+	appearance := services.IAIAppearanceOptions()
+
+	eyes := make(map[string][]string, len(appearance["style"]))
+	hairStyles := make(map[string]map[string]map[string][]string, len(appearance["style"]))
+	for _, style := range appearance["style"] {
+		eyes[style] = services.IAIEyeColours(style)
+		hairStyles[style] = make(map[string]map[string][]string, len(appearance["gender"]))
+		for _, gender := range appearance["gender"] {
+			byTexture := make(map[string][]string, len(appearance["hair_texture"]))
+			for _, texture := range appearance["hair_texture"] {
+				byTexture[texture] = services.IAIHairStyles(style, gender, texture)
+			}
+			hairStyles[style][gender] = byTexture
+		}
+	}
+
+	builds := make(map[string][]string, len(appearance["gender"]))
+	for _, gender := range appearance["gender"] {
+		builds[gender] = services.IAIBuilds(gender)
+	}
+
 	minimumAge, maximumAge := services.IAIAgeRange()
+	minimumHeight, maximumHeight := services.IAIHeightRange()
 	c.JSON(http.StatusOK, IAIOptions{
 		Temperaments:     services.IAITemperamentKeys(),
 		TemperamentPicks: services.IAITemperamentPicks(),
 		Feelings:         services.IAIFeelingKeys(),
 		Interests:        services.IAIInterestKeys(),
 		InterestPicks:    services.IAIInterestPicks(),
-		Appearance:       services.IAIAppearanceOptions(),
-		MinimumAge:       minimumAge,
-		MaximumAge:       maximumAge,
-		IAILimit:         services.OmniChatIAILimit,
-		RoleplayLimits:   services.OmniChatRoleplayLimits(),
+		Appearance:       appearance,
+		Eyes:             eyes,
+		Builds:           builds,
+		HairStyles:       hairStyles,
+
+		MinimumAge:          minimumAge,
+		MaximumAge:          maximumAge,
+		MinimumHeightInches: minimumHeight,
+		MaximumHeightInches: maximumHeight,
+		IAILimit:            services.OmniChatIAILimit,
+		IAIRequiredPlan:     services.OmniChatIAIRequiredPlan(),
+		RoleplayLimits:      services.OmniChatRoleplayLimits(),
 	})
 }
 

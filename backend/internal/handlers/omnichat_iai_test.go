@@ -75,7 +75,47 @@ func TestTheFormIsToldWhatTheServerWillAccept(t *testing.T) {
 	minimumAge, maximumAge := services.IAIAgeRange()
 	require.Equal(t, minimumAge, options.MinimumAge)
 	require.Equal(t, maximumAge, options.MaximumAge)
+
+	minimumHeight, maximumHeight := services.IAIHeightRange()
+	require.Equal(t, minimumHeight, options.MinimumHeightInches)
+	require.Equal(t, maximumHeight, options.MaximumHeightInches)
+
+	// The three answers that depend on an earlier one arrive worked out, not as
+	// a rule for the interface to apply. Every one of these was missing from the
+	// payload after the schema changed, which left screens three and four with
+	// nothing to draw.
+	require.Equal(t, services.IAIEyeColours("anime"), options.Eyes["anime"])
+	require.Equal(t, services.IAIEyeColours("realistic"), options.Eyes["realistic"])
+	require.NotContains(t, options.Eyes["realistic"], "violet")
+	require.Contains(t, options.Eyes["anime"], "violet")
+
+	require.Equal(t, services.IAIBuilds("woman"), options.Builds["woman"])
+	require.Equal(t, services.IAIBuilds("man"), options.Builds["man"])
+	require.Contains(t, options.Builds["woman"], "curvy")
+	require.NotContains(t, options.Builds["man"], "curvy")
+
+	// Every drawing style, gender and texture is indexed, so the interface looks
+	// its answer up rather than working it out.
+	for _, style := range options.Appearance["style"] {
+		for _, gender := range options.Appearance["gender"] {
+			for _, texture := range options.Appearance["hair_texture"] {
+				require.Equal(t, services.IAIHairStyles(style, gender, texture),
+					options.HairStyles[style][gender][texture],
+					"%s %s %s hair", style, gender, texture)
+			}
+		}
+	}
+	require.NotContains(t, options.HairStyles["realistic"]["woman"]["straight"], "afro")
+	require.Contains(t, options.HairStyles["anime"]["woman"]["straight"], "afro")
+	require.Contains(t, options.HairStyles["realistic"]["man"]["straight"], "man_bun",
+		"length does not decide which shapes exist")
 	require.Equal(t, services.OmniChatIAILimit, options.IAILimit)
+
+	// One is the count. Which tier may have one is the other half, and without
+	// it the interface has to hold its own copy of a rule the server enforces.
+	require.Equal(t, services.OmniChatIAIRequiredPlan(), options.IAIRequiredPlan)
+	require.Equal(t, "premium", options.IAIRequiredPlan)
+	require.Equal(t, 0, options.RoleplayLimits["free"], "writing one is a paid feature too")
 	require.Equal(t, services.OmniChatRoleplayLimits(), options.RoleplayLimits)
 
 	// Every list has to arrive as a list. A map or a count would still pass the
@@ -168,12 +208,19 @@ func TestWhatSheLooksLikeReachesTheMaker(t *testing.T) {
 	router := newIAITestRouter(maker, &omniChatRequestIdempotencyFake{})
 
 	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
-		"appearance":{"style":"anime","gender":"woman","age":27,"hair":"curly"}}`)
+		"appearance":{"style":"anime","gender":"woman","age":27,"height_inches":65,
+			"hair_length":"long","hair_texture":"curly","hair_style":"high_ponytail"}}`)
 
 	require.Equal(t, http.StatusCreated, response.Code)
 	require.Equal(t, "anime", maker.answers.Appearance.Style)
 	require.Equal(t, 27, maker.answers.Appearance.Age)
-	require.Equal(t, "curly", maker.answers.Appearance.Hair)
+	require.Equal(t, 65, maker.answers.Appearance.HeightInches)
+
+	// Hair arrives as the three answers it is, rather than one word standing in
+	// for all of them.
+	require.Equal(t, "long", maker.answers.Appearance.HairLength)
+	require.Equal(t, "curly", maker.answers.Appearance.HairTexture)
+	require.Equal(t, "high_ponytail", maker.answers.Appearance.HairStyle)
 }
 
 func TestAnAvalancheOfAnswersIsRefusedBeforeAnythingReadsIt(t *testing.T) {

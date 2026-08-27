@@ -57,7 +57,8 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 		Interests:    []string{"games", "music"},
 		Feeling:      "besotted",
 		Appearance: services.IAIAppearance{
-			Style: "anime", Gender: "woman", Age: 27, Hair: "curly",
+			Style: "anime", Gender: "woman", Age: 27, HeightInches: 65,
+			HairLength: "long", HairTexture: "curly", HairStyle: "high_ponytail",
 			Ethnicity: "not-a-real-option",
 		},
 	})
@@ -70,7 +71,8 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 	// Appearance survives as JSON, and the answer nobody recognises is gone
 	// rather than stored for a generator to choke on later.
 	require.JSONEq(t,
-		`{"style":"anime","gender":"woman","age":27,"hair":"curly"}`,
+		`{"style":"anime","gender":"woman","age":27,"height_inches":65,`+
+			`"hair_length":"long","hair_texture":"curly","hair_style":"high_ponytail"}`,
 		string(made.IAIAppearance))
 
 	// She feels that way about her creator, and her baseline is her own.
