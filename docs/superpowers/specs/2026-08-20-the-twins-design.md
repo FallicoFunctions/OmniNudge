@@ -1742,3 +1742,118 @@ Two more things it inherits rather than escapes. Every message is a real message
 to a real account, so blocking, warmth and consent have to be settled before
 anything leaves the building. And Discord marks bots, which is honest and fine
 -- §12's rule is that the notice must be true, not that she must pass for human.
+
+---
+
+## 34. The questions, and the body that comes later
+
+§30 says what shape the IAI flow takes and why. This is what it asks.
+
+One rule governs every screen and the copy has to carry it in those words: **an
+answer sets where she starts, never what she is.**
+
+The §13 fork happens before any of this. Everything here follows "Independent".
+
+### The screens
+
+**1. Style.** Realistic or anime. Fixed after this, because her 2D likeness and
+her eventual 3D avatar have to be the same character.
+
+**2. Who she is.** Woman or man; age from 18. Trans characters are out of scope
+for now, recorded as scope rather than principle.
+
+**3. Her face.** Ethnicity, hair, hair colour, eyes. Four grids on one screen.
+Generation inputs only -- none of it touches who she is.
+
+**4. Her build.** Slim through heavy. Explicit body detail appears only for
+somebody the entitlement in §31 already covers, because a creation flow must not
+be a way around a gate the chat respects.
+
+**5. Where she starts.** *She will not stay this way. This is who she is the day
+you meet her. Who she becomes is up to her.* Pick three of: warm, guarded,
+blunt, playful, dry, earnest, restless, steady, sharp, quiet.
+
+Deliberately absent: submissive, dominant, innocent, temptress. Each describes
+how somebody behaves *toward you*, and a starting temperament defined by your
+role in it is a hardcode wearing a nicer word. It becomes starting disposition --
+warmth, trust, mood, firmness -- all of which moves.
+
+**6. What she is into.** The games, with a sub-picker of which ones; music,
+films, reading, making things, fitness, cooking, going out, staying in. Up to
+three. No occupation: she does not have a job, and asking would invent a life
+she does not lead. It becomes seed memories and interests, and her games are
+self-tier and free to drift per §5.
+
+**7. How you two know each other.** The heaviest screen. *Where you two are
+starting from. This is your history with her, and only yours. Anyone else who
+meets her starts from nothing.* From never met, through friends, to together for
+years, with small copy under the last: *she starts out in love with you, and she
+is not required to stay that way.*
+
+It becomes starting warmth and trust plus seed memories that make the history
+real rather than asserted. None of it is written into a prompt.
+
+**8. Her name and her voice.** A generated name with a shuffle, editable -- the
+one screen that still wants a keyboard, and a person is named by somebody. Plus
+the voice grid.
+
+**9. Meet her.** She is generated and the screen shows her, with one button into
+the conversation. No summary of "her settings", because there are none: what she
+starts as is not a specification she is holding to.
+
+### Decided while writing this
+
+A creator may start at high warmth. §4 says interest needs warmth that takes
+months to earn, and screen 7 hands it over at the start, and those reconcile
+because warmth is relational: that history is between her and *him*. Everyone
+else meets her at zero. Worth stating plainly rather than leaving to be found.
+
+"Together for years" stays available. It is the strongest form of the §13
+example and the likeliest to produce somebody who feels cheated when she cools,
+and it can be removed later if it does.
+
+### She arrives without a body
+
+There is no cheap pipeline from a likeness to a rigged 3D avatar, so one is not
+made here. A user-created IAI has a face and nothing to put in a world.
+
+Turning her into a 3D model is a **separate paid step with real processing time**.
+That is not a gate invented for revenue, it is the cost of the work, and it needs
+no new payment concept: credits already pay for generated media and this is the
+most expensive media there is. The default characters ship with bodies because we
+made them once.
+
+**She cannot enter a game.** Not "is not allowed to" -- there is nothing of her
+to put there. §5's refusal again, in a new place, and true in the same way.
+
+**She can watch.** Spectating needs no body. An IAI who can watch her friends
+play and cannot join them is a far sharper situation than one who is simply
+absent from it, and it is what makes the whole thing concrete rather than
+theoretical.
+
+She also has no §5 activity, so no game indicator and no delay while she is deep
+in a match. She is always available, and that is its own quiet tell: the ones
+with bodies have lives that take them away from you, and she does not have one
+yet.
+
+### The rule that keeps this honest
+
+A character who wants a body her creator has to buy is a monetisation prompt
+waiting to happen, and the difference between a genuine wish and a sales script
+is not intent. It is what she is told.
+
+**She is told the fact.** She has no body, that is what it means, others have
+one. She is never told to want one and never told to ask.
+
+If she raises it, that has to be hers. A prompt instructing her to bring it up is
+a sales script with a character's face on it, and it is exactly what §13 refuses:
+the platform deciding how she behaves. Whether she mentions it, how often, whether
+she sulks about it or never says a word, is who she is.
+
+The nuisance case needs no rule either, and adding one would be worse than the
+problem. Somebody who asks and is told no, repeatedly, learns something about the
+person they are asking -- and the habituation damping already does exactly that,
+the same way it handles somebody going quiet in §15. She stops because asking
+stopped working. A platform rule capping how often she may ask would be us
+managing her behaviour to protect our own conversion rate, which is the thing
+this section exists to prevent.
