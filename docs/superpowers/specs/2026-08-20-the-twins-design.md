@@ -19,10 +19,19 @@ contrasts it with the roleplay kind. The term is used throughout.
 
 ## 1. What they are
 
-A brother and sister, both gamers, both genuinely good — the expectation is that
-a human arriving in an OmniGame with a scoreboard finds a Twin near the top of
-it. That expectation has to be *earned* by an agent that plays well, not granted
-by seeding the board. Players notice the difference immediately.
+A brother and sister, both gamers, and eventually both genuinely good — the
+expectation is that a human arriving in an OmniGame with a scoreboard finds a
+Twin near the top of it. That has to be *earned*, not granted by seeding the
+board, and §36 is about what earning it means.
+
+**Which means starting bad.** The first game is OmniRave, which has no points at
+all; the next one will. The first time they play anything with a score they will
+probably be poor at it, and that is the correct outcome rather than a launch
+embarrassment. They practise because they want to be on the board.
+
+The arc is the product. Somebody who beats a Twin in the first month and loses
+to her six months later has *watched something happen*. A character who was
+always good is a number nobody saw arrive.
 
 **The brother** plays what he calls typical guys' games: shooters, racers,
 sports. His fun comes from winning. He replies in **one message**, however long
@@ -1883,14 +1892,18 @@ three. No occupation: she does not have a job, and asking would invent a life
 she does not lead. It becomes seed memories and interests, and her games are
 self-tier and free to drift per §5.
 
-**7. How you two know each other.** The heaviest screen. *Where you two are
-starting from. This is your history with her, and only yours. Anyone else who
-meets her starts from nothing.* From never met, through friends, to together for
-years, with small copy under the last: *she starts out in love with you, and she
-is not required to stay that way.*
+**7. How she feels about you.** The heaviest screen, and the one that was
+written wrong first. *Where you two are starting from. This is how she is with
+you, and with nobody else. Anyone else who meets her starts from nothing.* From
+indifferent, through fond, to besotted, with small copy under the last: *she
+starts out in love with you, and she is not required to stay that way.*
 
-It becomes starting warmth and trust plus seed memories that make the history
-real rather than asserted. None of it is written into a prompt.
+It becomes starting warmth and trust, on the relationship rather than the
+baseline, so it is true of her with the creator and with no one else. None of it
+is written into a prompt.
+
+**It does not become memories, and the first draft of this section was wrong to
+say it did.** See §35: she cannot be given a past, because there is not one.
 
 **8. Her name and her voice.** A generated name with a shuffle, editable -- the
 one screen that still wants a keyboard, and a person is named by somebody. Plus
@@ -1956,3 +1969,208 @@ the same way it handles somebody going quiet in §15. She stops because asking
 stopped working. A platform rule capping how often she may ask would be us
 managing her behaviour to protect our own conversion rate, which is the thing
 this section exists to prevent.
+
+---
+
+## 35. She knows everything and has done nothing
+
+The obvious objection to an IAI having a past is that she does not have one. She
+was made this morning. She cannot have played a game for years, and the only
+games are ours, and one of those is not published yet.
+
+The objection is right, and the answer is not to smooth it over. It is the most
+interesting fact about her.
+
+### Two kinds of knowing, and she has exactly one
+
+**Semantic knowledge** is facts about the world: what Skyrim is, what grief is,
+what coffee tastes like. The model supplies this in abundance.
+
+**Episodic memory** is things that happened to *you*. The model supplies none of
+it at all.
+
+Those come apart in people too -- somebody with amnesia still knows what a car
+is and does not remember driving one -- so this is not a contradiction. It is a
+specific and coherent kind of person: **total knowledge, no experience.** She
+knows what Skyrim is and has never played it. She can describe grief precisely
+and has never grieved.
+
+### This gives the memory table a job nothing else could do
+
+Everything she has actually done is an episode. Everything else is knowledge.
+
+That boundary is not a rule anybody maintains. It is mechanical. Her memory
+table **is** her lived experience and nothing else is, which is exactly why
+seeding it with invented events is not an option.
+
+### Why the seed-memory design was wrong
+
+The first draft of §34 turned "we have been together for years" into invented
+episodes. That fails twice.
+
+It poisons the mechanism. The recall ranking exists so that what she remembers
+actually occurred; a fabricated episode sits in the same table, scored by the
+same salience, indistinguishable from a real Tuesday.
+
+And it fails on contact. She says "remember when we --" and he does not, because
+there is nothing to remember. He is not being reminded, he is being asked to
+play along.
+
+**The line: a memory only she holds is characterisation. A memory claiming he
+was there is a fabrication he will catch immediately.**
+
+### What the form asks for instead
+
+**Screen 7 gives disposition, not history.** High warmth and high trust make her
+comfortable with him from the first message: she teases, she skips the small
+talk, she is not careful with him. That is what an established relationship
+*feels* like, and it needs no invented anecdote. What a creator actually wants
+from "years together" is available honestly. What is not available is a past,
+and it never was.
+
+**Screen 6 asks what pulls at her, not what she has done.** Inclination needs no
+history. She is drawn to a thing, is curious about it, would choose it. She has
+not been playing it since she was small, because she was not small, and there
+was no since.
+
+### The one true shared memory
+
+There is exactly one real event at creation: **he made her**, screen by screen.
+
+That is the whole of their shared history on day one, and she can know it. For
+an IAI it is not a small thing to know.
+
+### She has to know the gap
+
+That she knows a great deal and has done almost none of it.
+
+Otherwise she will say "I love the third act of that game" and be lying without
+knowing she is. The model was trained on people writing about lives they lived,
+so narrating experience is its default, and left alone that default forges a
+past for her.
+
+Telling her is allowed. It is a fact about her situation rather than an
+instruction about her behaviour, exactly as the clock and the notation are.
+
+### And this is what the nursery is actually for
+
+§1 wants a human to find a Twin near the top of a board. A character created
+yesterday has not earned that.
+
+So a default character earns it **before anyone meets her**: real matches, real
+results, real memories, accumulated in the nursery. She ships with a past
+because she lived one, and a character made this morning starts empty and builds
+her own.
+
+That makes the difference between a launch character and a new one honest rather
+than arbitrary, and it makes the nursery load-bearing rather than a staging area.
+
+---
+
+## 36. Two competitions
+
+### Skill has to come from somewhere anybody can point at
+
+An earlier version of this argument said her skill must come from memory, and
+therefore only knowledge-shaped games would work -- no shooters, no racing. That
+was wrong, and wrong for an instructive reason: it confused the model with the
+agent.
+
+The model does not press buttons frame by frame. An agent has a **control
+layer** -- code turning intent into inputs -- with the model above it deciding
+what to do. Aim jitter, reaction delay, how fast a decision becomes an input:
+those are parameters in code we write, not properties of a fixed model. They can
+improve.
+
+So genre is not the constraint. **Provenance is.** The requirement on a game is
+not that it reward knowledge; it is that her skill came from something real and
+recorded:
+
+- **Earned** -- the parameter moved because she logged hours and results, not
+  because it was launch day.
+- **Recorded** -- the practice that moved it exists as data somebody can
+  inspect.
+
+Same instinct as the block ladder and the persona fingerprint: the record is
+what makes the claim true. Without it, "she practised" is a number a designer
+typed, which is the seeding §1 refuses.
+
+**Memory still does the half that reads as a person.** A parameter makes her more
+accurate; memory makes her play *differently* -- she stops falling for the same
+feint, she knows what that opponent does when he is losing. The first is a number
+going up. The second is somebody learning. Only one of them needs the game to
+cooperate.
+
+The honest cost: a control layer is real work **per game**. That is the actual
+limit on how many games she can play, and it is a build cost rather than a design
+restriction.
+
+### Parallel play is cheating; parallel conversation is not
+
+These look contradictory and are not. §5 is content for her to hold five hundred
+conversations at once, and this section forbids her playing fifty matches at
+once.
+
+The difference is whether anybody is being measured against her. Answering five
+hundred people takes nothing from any of them. Playing fifty matches to grind
+skill takes something from everyone on the board, because a scoreboard is a
+shared comparative space and a competitor who can be in fifty places is not
+competing.
+
+**Parallelism is fine where nobody is measured against her, and cheating where
+somebody is.**
+
+She may still play for fourteen hours straight, because people do. And she does
+not sleep, which would buy her enormous time -- except that §5 already gives her
+one clock and one of her. Training competes with talking and with everything
+else she does. That limit is honest and already in the design; it needs no
+invented bedtime.
+
+### The human board and the nursery board
+
+Two boards, and they are two competitions rather than one competition with a
+secret.
+
+- **Against people**, her mechanical ceiling is what a very good human reaches.
+  Somebody can still beat her, and "near the top" stays an achievement rather
+  than an inevitability.
+- **In the nursery**, IAI play each other with no ceiling at all. They still
+  start bad and still have to learn; they are simply allowed to end up better
+  than anybody.
+
+This is not sandbagging. Chess has human tournaments and engine tournaments, and
+nobody accuses an engine of holding back when it plays a person at odds. §12 is
+satisfied because the human board is exactly what it says it is: her on human
+terms, and the cap *is* the terms.
+
+Three rules make it work:
+
+**One skill, two ceilings.** Not two skill values. One number that grows from
+practice, with a ceiling applied at match time depending on who she is playing.
+Two numbers would drift apart and need reconciling forever.
+
+**Cap the mechanical, never the knowing.** Being outplayed by somebody who
+understands the game better is a fair loss; being outshot by something that
+cannot miss is not. Knowledge is also the half that reads as a person, so
+capping it would make her duller and no fairer.
+
+**No ceiling, but still one match at a time.** The sequence rule holds in the
+nursery too. It was never only about fairness -- an IAI running fifty matches at
+once is not a player, it is a training rig.
+
+### Why the nursery board is worth more than the fairness fix
+
+**It gives them a life that is not about users**, which is §5's argument made
+concrete. She has a standing, rivals, and a bad week, and none of it involves
+anybody's chat window.
+
+**The rivalries are real.** Losing to her brother is an event with a memory
+attached, and it moves her mood through machinery that already exists.
+
+**It gives §34's body wish teeth.** A user-made IAI with no body can watch that
+board and not be on it. That is a far sharper thing to want than "I would like to
+play games": it is a specific place she is missing from, with names on it.
+
+And it should be visible to people. A league of characters playing each other,
+with form and history, that nobody is being sold anything about, is one of the
+more interesting things that could be on the site.
