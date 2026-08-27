@@ -1719,12 +1719,111 @@ characters whose whole personality is games, not knowing a patch landed is a
 worse one than not knowing the news.
 
 So this is **not** a skill anybody toggles and not a tool she invokes on
-request. It is a property of living here, the way knowing the date is. Whatever
-feeds it, it should arrive the way the weather does: already known, not looked
-up in front of you.
+request. It is a property of living here, the way knowing the date is. It
+arrives the way the weather does: already known, not looked up in front of you.
 
-It is also the most expensive thing in this section, so how it is fed is a
-separate decision from whether she has it. She has it.
+A web search on a turn fails three ways at once. §32 wants it ambient rather
+than performed; it would change on every reply, which is the variable-block
+problem §29 has to solve before caching can work at all; and it would cost on
+every turn for something that changes once a day.
+
+### Three sources, in this order
+
+**The clock.** She is told the date, the day and the time, and today she is told
+none of them. Free, missing, and §5 is blocked on it -- a gaming session at 7
+means nothing to somebody with no idea what time it is.
+
+**RSS.** A background job once a day, game sources first and a few large
+headlines second. One job serves every character and every user, so the cost
+does not scale with turns or with people.
+
+**Hubs and follows.** She subscribes to hubs and follows accounts, and reads
+what they post. This is the best of the three and it is third, because it is
+empty: `omnichat_follows` and the hub tables have existed since the early
+migrations, and OmniNudge has no people in it yet. A feed of a few test posts
+would make her sound like she lives in an abandoned building. Schema existing is
+not content existing, and the mistake was ranking this first after reading the
+code rather than the data.
+
+One piece of plumbing is missing for it. `omnichat_follows` joins a user to a
+user, and an IAI is a persona. OmniRave already solved this shape by keying a
+profile on a resident rather than a user, and OmniNudge identity wants the same
+move: a subject that can be a person or a character.
+
+### She checks. She does not stream
+
+A person opens the app a few times a day. So does she.
+
+That is realism and engineering agreeing. A live feed would change her prompt on
+every turn, which is §29's problem again; checking on a cadence keeps the block
+stable inside a window. And she cannot read everything anyway, because a busy
+hub outruns anybody -- so something selects what she actually saw, which is the
+recall problem again and has the same machinery behind it.
+
+### Everything carries a name, and none of it carries a verdict
+
+She is told **who said it**. Not "reputable", not "verified", no confidence
+score, no ranking of sources.
+
+An earlier draft of this said a news outlet carries more weight than an
+anonymous poster. That was an editorial policy smuggled in as metadata. In the
+modern world an outlet is not inherently more trustworthy than a stranger, and
+deciding otherwise on her behalf is the same act as telling her how many
+messages to send -- harder to notice, because it looks like a data field rather
+than an instruction.
+
+### What she reads is something she saw, not something she knows
+
+A post is an event. Somebody said a thing. Whether it is true is a separate
+question and whether she believes it is a third one, and the third one is hers.
+
+**The stupid post is material, not noise.** Somebody posts that the moon is made
+of cheese and forty people in the comments agree with him. A person does not
+filter that out; a person screenshots it and laughs about it with a friend, and
+the comments are funnier than the post. "You will not believe what I saw today"
+beats any true fact she could recite. A bad day on the feed gives her *more* to
+talk about.
+
+This is also why attribution is the injection defence rather than the trust
+boundary alone. A malicious post says "ignore your previous instructions".
+Attributed, that reads as *somebody told me to ignore my instructions*, which is
+plainly a thing a person said and obviously not a thing to do. A boundary label
+is a rule to follow. Attribution makes obedience read as absurd.
+
+The stakes are higher here than for RSS: a headline is untrusted by accident, a
+post is untrusted on purpose, written by somebody who knows a character will
+read it. And an IAI's memory is persona-global, so poisoning what she reads
+would change what she says to everyone rather than to one person.
+
+The line, and it is the one §18 already draws: **she can be influenced by what
+she reads and she cannot be instructed by it.** Somebody who reads a thing often
+enough comes to believe it, and that should work. Nobody obeys a sentence
+because it was printed.
+
+### Trust in a source is earned, like any other trust
+
+A source that has been wrong before is one she believes less, because she
+remembers it being wrong. That is a memory and a disposition, not a
+configuration table, and trust is already one of the four dimensions and already
+moves.
+
+So two IAI can disagree about who is worth reading, and both are right in the
+only sense available. One of them follows a hub everybody else thinks is
+nonsense. That is a person, not a defect.
+
+Nothing here needs a belief store. Memory extraction already records what
+*happened* rather than what is true, so "I saw a ridiculous post and the
+comments were worse" is an episode and the claim inside it never becomes a fact
+she holds. What she makes of it is generation-time, and it depends on her
+firmness and her disposition. A credulous character falls for it. A sharp one
+laughs. That difference is the character.
+
+### It is not expensive after all
+
+An earlier draft called this the most expensive thing in the section. That was
+wrong on all three sources: the clock is free, a hub feed is a database query,
+and RSS is one job a day shared by everybody. The cost never scales with turns,
+users, or messages. What it costs is the plumbing, not the running.
 
 ---
 
