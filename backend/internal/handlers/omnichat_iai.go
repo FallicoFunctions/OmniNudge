@@ -61,6 +61,43 @@ func (h *OmniChatHandler) SetIAICreator(creator OmniChatIAIMaker) *OmniChatHandl
 	return h
 }
 
+// IAIOptions is every choice the nine screens may offer, plus the limits that
+// decide whether they can be offered at all.
+//
+// Served rather than duplicated. The lists live in one place and the interface
+// draws from them, so a temperament added on the server does not need a second
+// edit on the client -- and cannot silently be offered as an option that
+// converts to nothing.
+type IAIOptions struct {
+	Temperaments     []string            `json:"temperaments"`
+	TemperamentPicks int                 `json:"temperament_picks"`
+	Feelings         []string            `json:"feelings"`
+	Interests        []string            `json:"interests"`
+	InterestPicks    int                 `json:"interest_picks"`
+	Appearance       map[string][]string `json:"appearance"`
+	MinimumAge       int                 `json:"minimum_age"`
+	MaximumAge       int                 `json:"maximum_age"`
+	IAILimit         int                 `json:"iai_limit"`
+	RoleplayLimits   map[string]int      `json:"roleplay_limits"`
+}
+
+// GetIAIOptions answers what the creation flow may show.
+func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
+	minimumAge, maximumAge := services.IAIAgeRange()
+	c.JSON(http.StatusOK, IAIOptions{
+		Temperaments:     services.IAITemperamentKeys(),
+		TemperamentPicks: services.IAITemperamentPicks(),
+		Feelings:         services.IAIFeelingKeys(),
+		Interests:        services.IAIInterestKeys(),
+		InterestPicks:    services.IAIInterestPicks(),
+		Appearance:       services.IAIAppearanceOptions(),
+		MinimumAge:       minimumAge,
+		MaximumAge:       maximumAge,
+		IAILimit:         services.OmniChatIAILimit,
+		RoleplayLimits:   services.OmniChatRoleplayLimits(),
+	})
+}
+
 // CreateIAI turns the answers into somebody.
 func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)

@@ -62,6 +62,10 @@ func IAIInterestKeys() []string {
 // omniChatIAIInterestPicks matches §34's "up to three".
 const omniChatIAIInterestPicks = 3
 
+// IAIInterestPicks matches §34's "up to three", exposed so the form applies
+// the same number rather than a copy of it.
+func IAIInterestPicks() int { return omniChatIAIInterestPicks }
+
 // IAIAnswers is what nine screens collect. Every field is a choice off a list
 // except the name, which is the one screen §34 lets somebody type on.
 //

@@ -71,6 +71,10 @@ func IAITemperamentKeys() []string {
 // as a person; one is a caricature and five is a character sheet.
 const omniChatIAITemperamentPicks = 3
 
+// IAITemperamentPicks is how many she starts with, so the form enforces the
+// same number this file does rather than its own copy of it.
+func IAITemperamentPicks() int { return omniChatIAITemperamentPicks }
+
 // iaiFeeling is one of the answers on §34's seventh screen: how she is with the
 // person who made her, on the day they meet.
 //

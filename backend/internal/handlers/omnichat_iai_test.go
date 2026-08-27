@@ -50,6 +50,42 @@ func postIAI(t *testing.T, router *gin.Engine, body string) *httptest.ResponseRe
 	return response
 }
 
+func TestTheFormIsToldWhatTheServerWillAccept(t *testing.T) {
+	// Served rather than duplicated. An option the interface offers that this
+	// endpoint does not list is one the server drops on the way in, and the
+	// person gets a blanker character than the one they chose.
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/omnichat/iai/options", (&OmniChatHandler{}).GetIAIOptions)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/iai/options", nil))
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var options IAIOptions
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &options))
+
+	require.Equal(t, services.IAITemperamentKeys(), options.Temperaments)
+	require.Equal(t, services.IAIFeelingKeys(), options.Feelings)
+	require.Equal(t, services.IAIInterestKeys(), options.Interests)
+	require.Equal(t, services.IAIAppearanceOptions(), options.Appearance)
+	require.Equal(t, services.IAITemperamentPicks(), options.TemperamentPicks)
+	require.Equal(t, services.IAIInterestPicks(), options.InterestPicks)
+
+	minimumAge, maximumAge := services.IAIAgeRange()
+	require.Equal(t, minimumAge, options.MinimumAge)
+	require.Equal(t, maximumAge, options.MaximumAge)
+	require.Equal(t, services.OmniChatIAILimit, options.IAILimit)
+	require.Equal(t, services.OmniChatRoleplayLimits(), options.RoleplayLimits)
+
+	// Every list has to arrive as a list. A map or a count would still pass the
+	// equality checks above while being useless to render from.
+	body := response.Body.String()
+	require.Contains(t, body, `"temperaments":["warm"`)
+	require.Contains(t, body, `"appearance":{`)
+	require.NotContains(t, body, "null", "an empty list renders as [] or the form has nothing to draw")
+}
+
 func TestCreatingAnIAIAnswersWithHer(t *testing.T) {
 	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
 	router := newIAITestRouter(maker, &omniChatRequestIdempotencyFake{})

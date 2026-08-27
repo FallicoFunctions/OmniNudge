@@ -1417,6 +1417,9 @@ func main() {
 			// different kinds of thing, and the writer under this one has no
 			// column to put an instruction in.
 			protected.POST("/omnichat/iai", omniChatHandler.CreateIAI)
+			// The lists the nine screens draw from, so the interface never
+			// keeps its own copy of what the server will accept.
+			protected.GET("/omnichat/iai/options", omniChatHandler.GetIAIOptions)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)
