@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -32,6 +33,14 @@ type IAIPersona struct {
 	// tried.
 	SlugBase string
 	Name     string
+	// Appearance is the encoded answers from §34's first four screens, or nil
+	// when nobody answered them.
+	//
+	// json.RawMessage rather than []byte, matching every other JSON column on
+	// the persona. Go marshals a plain []byte to base64, so the created
+	// character came back from the API as a base64 blob where the appearance
+	// should have been.
+	Appearance json.RawMessage
 	// Personality is composed from the picks on §34's sixth screen, never typed.
 	// Structure is what makes it safe: a chooser cannot smuggle an instruction
 	// into a list of options.
@@ -81,15 +90,18 @@ func (r *BotPersonaRepository) CreateIAI(
 		INSERT INTO bot_personas (
 			id, slug, name, category, owner_user_id, visibility, source_format,
 			system_prompt, personality, response_style_profile, is_active,
+			iai_appearance,
 			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness
 		) VALUES (
 			$1, $2, $3, 'original', $4, 'private', 'native',
 			'', $5, $6, TRUE,
-			$7, $8, $9, $10
+			$7,
+			$8, $9, $10, $11
 		)
 		RETURNING `+botPersonaSelectColumns,
 		personaID, fmt.Sprintf("%s-%d", persona.SlugBase, personaID), persona.Name,
 		creatorUserID, persona.Personality, ResponseStyleProfileDirectMessage,
+		persona.Appearance,
 		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
 	))
 	if err != nil {

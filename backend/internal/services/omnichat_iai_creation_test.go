@@ -1,8 +1,13 @@
 package services
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/omninudge/backend/internal/models"
 
 	"github.com/stretchr/testify/require"
 )
@@ -69,8 +74,57 @@ func TestASlugSurvivesANameItCannotSpell(t *testing.T) {
 	require.LessOrEqual(t, len(iaiSlugBase(strings.Repeat("long ", 40))), 48)
 }
 
+type stubUserReader struct {
+	user *models.User
+	err  error
+}
+
+func (r stubUserReader) GetByID(context.Context, int) (*models.User, error) {
+	return r.user, r.err
+}
+
+func TestOnlyTheTopTierMakesIndependentCharacters(t *testing.T) {
+	// §19. Free and the lowest paid tier do not get IAI at all, which is what
+	// gives the creator payout pool a clean source.
+	for _, testCase := range []struct {
+		plan    string
+		role    string
+		allowed bool
+	}{
+		{plan: models.PlanPremium, allowed: true},
+		{plan: models.PlanPlus, allowed: false},
+		{plan: models.PlanFree, allowed: false},
+		{plan: models.PlanFree, role: "admin", allowed: true},
+	} {
+		creator := &OmniChatIAICreator{users: stubUserReader{
+			user: &models.User{ID: 1, Plan: testCase.plan, Role: testCase.role},
+		}}
+		require.Equal(t, testCase.allowed, creator.entitled(context.Background(), 1),
+			"%s/%s", testCase.plan, testCase.role)
+	}
+}
+
+func TestEveryEntitlementFailurePathRefuses(t *testing.T) {
+	// A lookup outage must never hand somebody a character they cannot have.
+	// Refusing costs them a retry; the other way costs the rule.
+	lapsed := time.Now().Add(-time.Hour)
+	for name, creator := range map[string]*OmniChatIAICreator{
+		"no reader":     {},
+		"lookup failed": {users: stubUserReader{err: errors.New("database down")}},
+		"no such user":  {users: stubUserReader{}},
+		"lapsed plan": {users: stubUserReader{
+			user: &models.User{ID: 1, Plan: models.PlanPremium, PlanExpiresAt: &lapsed},
+		}},
+	} {
+		require.False(t, creator.entitled(context.Background(), 1), name)
+	}
+
+	entitled := &OmniChatIAICreator{users: stubUserReader{user: &models.User{ID: 1, Plan: models.PlanPremium}}}
+	require.False(t, entitled.entitled(context.Background(), 0), "an unauthenticated caller is nobody")
+}
+
 func TestCreationRefusesWhatItCannotMake(t *testing.T) {
-	creator := NewOmniChatIAICreator(nil)
+	creator := NewOmniChatIAICreator(nil, nil)
 
 	_, err := creator.Create(t.Context(), 1, IAIAnswers{Name: "Sam"})
 	require.Error(t, err, "no repository means creation is unavailable, not silently skipped")

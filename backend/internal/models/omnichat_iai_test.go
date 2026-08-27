@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -122,6 +123,53 @@ func TestOnePersonMayMakeTwoCharactersWithTheSameName(t *testing.T) {
 	require.NotEqual(t, first.Slug, second.Slug)
 	require.Contains(t, first.Slug, "sam")
 	require.Contains(t, second.Slug, "sam")
+}
+
+func TestWhatSheLooksLikeIsKeptForWhoeverEventuallyDrawsHer(t *testing.T) {
+	// Nothing renders her yet. It is stored because creation is the only moment
+	// somebody is thinking about it, and asking again later is worse.
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	repo := NewBotPersonaRepository(pool)
+	creatorID := iaiCreator(t, pool, "iai_owner_looks")
+
+	created, err := repo.CreateIAI(ctx, creatorID, IAIPersona{
+		SlugBase: "hers", Name: "Hers",
+		Appearance: []byte(`{"style":"anime","hair":"curly"}`),
+	}, OmniChatCharacterTraits{})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"style":"anime","hair":"curly"}`, string(created.IAIAppearance))
+
+	var stored []byte
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT iai_appearance FROM bot_personas WHERE id = $1`, created.ID).Scan(&stored))
+	require.JSONEq(t, `{"style":"anime","hair":"curly"}`, string(stored))
+
+	// And it comes back out of the API as an object rather than base64. A plain
+	// []byte marshals to base64 in Go, so the field was returning a blob no
+	// client could read.
+	encoded, err := json.Marshal(created)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"iai_appearance":{`)
+	require.Contains(t, string(encoded), `"style":"anime"`)
+}
+
+func TestACharacterNobodyDescribedStoresNothingRatherThanBlank(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	repo := NewBotPersonaRepository(pool)
+	creatorID := iaiCreator(t, pool, "iai_owner_nolooks")
+
+	created, err := repo.CreateIAI(ctx, creatorID,
+		IAIPersona{SlugBase: "hers", Name: "Hers"}, OmniChatCharacterTraits{})
+	require.NoError(t, err)
+
+	var stored []byte
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT iai_appearance FROM bot_personas WHERE id = $1`, created.ID).Scan(&stored))
+	require.Nil(t, stored, "never asked is not the same as asked and declined")
 }
 
 func TestCreationRefusesRatherThanWritingHalfACharacter(t *testing.T) {

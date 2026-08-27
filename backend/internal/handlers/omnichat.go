@@ -28,6 +28,7 @@ type OmniChatHandler struct {
 	allowance      *services.OmniChatAllowance
 	idempotency    OmniChatRequestIdempotencyStore
 	replies        *services.OmniChatReplyScheduler
+	iaiCreator     OmniChatIAIMaker
 }
 
 // SetReplyScheduler hands the handler somewhere to put a turn it has accepted

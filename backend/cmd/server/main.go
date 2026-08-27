@@ -779,7 +779,8 @@ func main() {
 	omniChatReplyScheduler := services.NewOmniChatReplyScheduler(chatbotService)
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
-		SetReplyScheduler(omniChatReplyScheduler)
+		SetReplyScheduler(omniChatReplyScheduler).
+		SetIAICreator(services.NewOmniChatIAICreator(botPersonaRepo, userRepo))
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
@@ -1411,6 +1412,10 @@ func main() {
 			// OmniChat: AI chat bot personas and conversations
 			protected.GET("/omnichat/my-personas", omniChatHandler.ListMyPersonas)
 			protected.POST("/omnichat/personas", omniChatHandler.CreatePersona)
+			// Separate from the line above on purpose. §13: these are two
+			// different kinds of thing, and the writer under this one has no
+			// column to put an instruction in.
+			protected.POST("/omnichat/iai", omniChatHandler.CreateIAI)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)
