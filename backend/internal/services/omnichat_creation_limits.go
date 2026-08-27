@@ -1,0 +1,92 @@
+package services
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	zlog "github.com/rs/zerolog/log"
+
+	"github.com/omninudge/backend/internal/models"
+)
+
+// How many characters one account may have.
+//
+// Two different limits for two different reasons. A roleplay character is a
+// part somebody wrote, and how many parts they may keep is a tier benefit. An
+// IAI is a person, and the limit there is not about generosity: keeping one
+// alive is what makes her relationship, her memory and her drift mean anything.
+// Somebody cycling through twenty of them is not living with any of them.
+
+// OmniChatIAILimit is one, on every tier that has access at all.
+//
+// Deleting her is how you make another, and that is deliberately a decision
+// rather than a slot freeing up. §16 covers what deletion actually takes with
+// it.
+const OmniChatIAILimit = 1
+
+// omniChatRoleplayLimits is how many roleplay characters a plan may own.
+//
+// A table, so changing the offer is a row rather than a branch. The taper is a
+// product decision rather than a technical one -- these numbers are a starting
+// position, not a finding.
+var omniChatRoleplayLimits = map[string]int{
+	models.PlanPremium: 10,
+	models.PlanPlus:    5,
+	models.PlanFree:    2,
+}
+
+// omniChatDefaultRoleplayLimit applies to a plan nobody has listed. The lowest
+// number, because an unrecognised plan should not be a way to get more.
+const omniChatDefaultRoleplayLimit = 2
+
+// OmniChatCreationLimits answers how many of each kind an account may own.
+type OmniChatCreationLimits struct {
+	users OmniChatUserReader
+}
+
+func NewOmniChatCreationLimits(users OmniChatUserReader) *OmniChatCreationLimits {
+	return &OmniChatCreationLimits{users: users}
+}
+
+// RoleplayLimit is how many roleplay characters this account may keep.
+//
+// A lookup failure returns the lowest limit rather than the highest. Somebody
+// briefly told they are at their limit can try again; the other way hands out
+// slots nobody paid for and there is no taking them back.
+func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) int {
+	if l == nil || l.users == nil || userID <= 0 {
+		return omniChatDefaultRoleplayLimit
+	}
+	user, err := l.users.GetByID(ctx, userID)
+	if err != nil {
+		zlog.Warn().Err(err).Int("user_id", userID).
+			Msg("omnichat: plan lookup failed; applying the lowest creation limit")
+		return omniChatDefaultRoleplayLimit
+	}
+	if user == nil {
+		return omniChatDefaultRoleplayLimit
+	}
+	if strings.EqualFold(strings.TrimSpace(user.Role), "admin") {
+		return omniChatRoleplayLimits[models.PlanPremium]
+	}
+	// A lapsed subscription is not a subscription, which is the same rule the
+	// content entitlement applies.
+	if user.PlanExpiresAt != nil && !user.PlanExpiresAt.After(time.Now()) {
+		return omniChatDefaultRoleplayLimit
+	}
+	if limit, listed := omniChatRoleplayLimits[strings.TrimSpace(strings.ToLower(user.Plan))]; listed {
+		return limit
+	}
+	return omniChatDefaultRoleplayLimit
+}
+
+// OmniChatRoleplayLimits exposes the table so the interface can say what each
+// tier gets without keeping its own copy of the numbers.
+func OmniChatRoleplayLimits() map[string]int {
+	listed := make(map[string]int, len(omniChatRoleplayLimits))
+	for plan, limit := range omniChatRoleplayLimits {
+		listed[plan] = limit
+	}
+	return listed
+}

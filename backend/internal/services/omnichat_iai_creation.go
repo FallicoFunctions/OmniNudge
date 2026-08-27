@@ -167,7 +167,7 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 		Personality: renderIAIInterests(answers.Interests),
 		Appearance:  encoded,
 		Baseline:    seed.Baseline,
-	}, seed.Relationship)
+	}, seed.Relationship, OmniChatIAILimit)
 }
 
 // omniChatIAINameRunes bounds the one field somebody types into.

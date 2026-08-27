@@ -393,9 +393,37 @@ func (r *BotPersonaRepository) ListAll(ctx context.Context) ([]*BotPersona, erro
 }
 
 // CreateOwned creates a new persona owned by the given user.
-func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, persona *BotPersona) (*BotPersona, error) {
+// ErrRoleplayLimitReached means this account already keeps as many roleplay
+// characters as its plan allows.
+var ErrRoleplayLimitReached = errors.New("bot persona: this account is at its character limit")
+
+// CreateOwned writes a roleplay character somebody authored.
+//
+// The limit is counted inside the same transaction as the insert. Checking
+// first and inserting after lets two requests arriving together both pass a
+// check that was true when each of them read it.
+func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, persona *BotPersona, limit int) (*BotPersona, error) {
 	if err := r.validatePersonaMediaURLs(ctx, userID, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs); err != nil {
 		return nil, err
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("bot persona: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx,
+		`SELECT pg_advisory_xact_lock(hashtext('omnichat_persona_create'), $1)`, userID); err != nil {
+		return nil, fmt.Errorf("bot persona: serialise creation: %w", err)
+	}
+	var owned int
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*) FROM bot_personas
+		WHERE owner_user_id = $1 AND response_style_profile <> $2
+	`, userID, ResponseStyleProfileDirectMessage).Scan(&owned); err != nil {
+		return nil, fmt.Errorf("bot persona: count owned: %w", err)
+	}
+	if owned >= limit {
+		return nil, ErrRoleplayLimitReached
 	}
 	query := `
 		INSERT INTO bot_personas (
@@ -412,7 +440,8 @@ func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, pers
 			$23, $24, $25, $26, $27, TRUE
 		)
 		RETURNING ` + botPersonaSelectColumns
-	return scanBotPersona(r.pool.QueryRow(
+	// Same transaction as the count above, or the limit is only advisory.
+	created, err := scanBotPersona(tx.QueryRow(
 		ctx,
 		query,
 		persona.Slug, persona.Name, persona.Description, persona.Category, userID, persona.Visibility, persona.SourceFormat,
@@ -421,6 +450,13 @@ func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, pers
 		persona.CreatorName, persona.CharacterVersion, emptyRawJSON(persona.ExtensionsJSON), nilIfEmptyRawJSON(persona.CharacterBookJSON), nilIfEmptyRawJSON(persona.RawCardJSON),
 		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
 	))
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("bot persona: commit: %w", err)
+	}
+	return created, nil
 }
 
 // UpdateOwned updates an existing user-owned persona.

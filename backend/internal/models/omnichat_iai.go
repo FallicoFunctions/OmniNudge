@@ -54,8 +54,12 @@ type IAIPersona struct {
 // Both rows or neither. A character who exists with no disposition is a blank
 // nobody chose, and one whose relationship failed to write would meet her own
 // creator as a stranger.
+// ErrIAILimitReached means she already has one. Deleting her is how another is
+// made, which is a decision rather than a slot quietly freeing up.
+var ErrIAILimitReached = errors.New("omnichat iai: this account already has an independent character")
+
 func (r *BotPersonaRepository) CreateIAI(
-	ctx context.Context, creatorUserID int, persona IAIPersona, relationship OmniChatCharacterTraits,
+	ctx context.Context, creatorUserID int, persona IAIPersona, relationship OmniChatCharacterTraits, limit int,
 ) (*BotPersona, error) {
 	if creatorUserID < 1 {
 		return nil, errors.New("omnichat iai: a creator is required")
@@ -76,6 +80,26 @@ func (r *BotPersonaRepository) CreateIAI(
 		return nil, fmt.Errorf("omnichat iai: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Counting and inserting have to be one decision. Two requests arriving
+	// together would both read "none yet" and both create, which for a limit of
+	// one is exactly the duplicate the idempotency claim exists to prevent --
+	// except this one does not need the same request id to happen.
+
+	if _, err := tx.Exec(ctx,
+		`SELECT pg_advisory_xact_lock(hashtext('omnichat_iai_create'), $1)`, creatorUserID); err != nil {
+		return nil, fmt.Errorf("omnichat iai: serialise creation: %w", err)
+	}
+	var existing int
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*) FROM bot_personas
+		WHERE owner_user_id = $1 AND response_style_profile = $2
+	`, creatorUserID, ResponseStyleProfileDirectMessage).Scan(&existing); err != nil {
+		return nil, fmt.Errorf("omnichat iai: count existing: %w", err)
+	}
+	if existing >= limit {
+		return nil, ErrIAILimitReached
+	}
 
 	// Her id first, so the slug can carry it and be unique by construction. The
 	// alternative is inserting a guess and retrying on collision, which is a
