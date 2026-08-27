@@ -29,6 +29,25 @@ type OmniChatHandler struct {
 	idempotency    OmniChatRequestIdempotencyStore
 	replies        *services.OmniChatReplyScheduler
 	iaiCreator     OmniChatIAIMaker
+	creationLimits *services.OmniChatCreationLimits
+}
+
+// SetCreationLimits installs how many characters a plan may keep.
+func (h *OmniChatHandler) SetCreationLimits(limits *services.OmniChatCreationLimits) *OmniChatHandler {
+	h.creationLimits = limits
+	return h
+}
+
+// roleplayLimit is how many roleplay characters this account may own.
+//
+// Unset, it returns zero, which refuses every creation rather than allowing
+// every creation. A handler wired without its limits should stop the feature
+// loudly, not hand out unlimited characters quietly.
+func (h *OmniChatHandler) roleplayLimit(ctx context.Context, userID int) int {
+	if h.creationLimits == nil {
+		return 0
+	}
+	return h.creationLimits.RoleplayLimit(ctx, userID)
 }
 
 // SetReplyScheduler hands the handler somewhere to put a turn it has accepted

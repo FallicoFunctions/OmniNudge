@@ -128,7 +128,7 @@ func TestOmniChatMediaRepositoryGenerationLifecycleIsOwnerScoped(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     []byte(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 	deletionRequest := withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, models.OmniChatGenerationRequest{
 		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,

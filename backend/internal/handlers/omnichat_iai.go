@@ -122,6 +122,13 @@ func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 				"Independent characters are available on the top tier.")
 			return
 		}
+		if errors.Is(err, models.ErrIAILimitReached) {
+			// One at a time (§34). Deleting her is how another is made, and the
+			// interface should say that rather than report a failure.
+			RespondErrorCoded(c, http.StatusConflict, "iai_already_exists",
+				"You already have an independent character. Delete her to make another.")
+			return
+		}
 		if errors.Is(err, services.ErrIAIUnderage) {
 			// Said plainly. A safety refusal hidden behind "cannot be created
 			// as described" leaves somebody adjusting hair colour to find out

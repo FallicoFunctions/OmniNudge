@@ -780,7 +780,8 @@ func main() {
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
 		SetReplyScheduler(omniChatReplyScheduler).
-		SetIAICreator(services.NewOmniChatIAICreator(botPersonaRepo, userRepo))
+		SetIAICreator(services.NewOmniChatIAICreator(botPersonaRepo, userRepo)).
+		SetCreationLimits(services.NewOmniChatCreationLimits(userRepo))
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)

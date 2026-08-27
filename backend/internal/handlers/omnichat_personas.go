@@ -149,10 +149,17 @@ func (h *OmniChatHandler) CreatePersona(c *gin.Context) {
 		return
 	}
 
-	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona)
+	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona, h.roleplayLimit(c.Request.Context(), userID))
 	if err != nil {
 		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
 			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
+			return
+		}
+		if errors.Is(err, models.ErrRoleplayLimitReached) {
+			// Coded, so the interface can offer the upgrade or the delete
+			// rather than reporting a failure somebody cannot act on.
+			RespondErrorCoded(c, http.StatusConflict, "character_limit_reached",
+				"You have as many characters as your plan allows. Delete one, or upgrade for more.")
 			return
 		}
 		RespondError(c, http.StatusInternalServerError, "Failed to create persona")
@@ -304,10 +311,15 @@ func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
 	}
 	persona.RawCardJSON = append(json.RawMessage(nil), bytes.TrimSpace(card.Raw)...)
 
-	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona)
+	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona, h.roleplayLimit(c.Request.Context(), userID))
 	if err != nil {
 		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
 			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
+			return
+		}
+		if errors.Is(err, models.ErrRoleplayLimitReached) {
+			RespondErrorCoded(c, http.StatusConflict, "character_limit_reached",
+				"You have as many characters as your plan allows. Delete one, or upgrade for more.")
 			return
 		}
 		RespondError(c, http.StatusInternalServerError, "Failed to import persona")

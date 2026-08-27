@@ -356,7 +356,7 @@ func TestSendPreviewMessageAllowsOnlyPublicOrOwnedPersonas(t *testing.T) {
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
 		IsActive:           true,
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	service := NewChatbotService(db.Pool, personaRepo, nil, nil, stubChatCompletionClient{
@@ -1101,7 +1101,7 @@ func TestSendMessagePersistsFallbackWhenParentContextIsCanceled(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := models.NewBotConversationRepository(db.Pool)
@@ -1178,7 +1178,7 @@ func TestSendMessagePersistsFallbackWhenGenerationTimesOut(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := models.NewBotConversationRepository(db.Pool)
@@ -1245,7 +1245,7 @@ func TestRegenerateMessageReplacesLatestReplyFromOriginalTurnState(t *testing.T)
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := models.NewBotConversationRepository(db.Pool)
@@ -1336,7 +1336,7 @@ func TestRegenerateMessagePreservesOriginalReplyWhenSceneContractOrProviderFails
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := models.NewBotConversationRepository(db.Pool)
@@ -1411,7 +1411,7 @@ func TestEditAssistantMessageIsPrivateAndPreservesRevision(t *testing.T) {
 		Slug: fmt.Sprintf("u%d-edit-%d", owner.ID, time.Now().UnixNano()), Name: "Editable Persona",
 		Category: models.PersonaCategoryOriginal, Visibility: "private", SourceFormat: "native",
 		AlternateGreetings: []string{}, Tags: []string{}, GalleryURLs: []string{}, ExtensionsJSON: json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := models.NewBotConversationRepository(db.Pool)

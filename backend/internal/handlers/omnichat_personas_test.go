@@ -33,7 +33,12 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 
 	userRepo := models.NewUserRepository(db.Pool)
 	personaRepo := models.NewBotPersonaRepository(db.Pool)
-	handler := NewOmniChatHandler(personaRepo, nil, nil, &services.ChatbotService{}, nil)
+	// Limits are explicit here rather than defaulted. An unset limit refuses
+	// every creation, which is the right default for a handler wired wrong in
+	// production and would otherwise make these tests fail for a reason that
+	// has nothing to do with what they check.
+	handler := NewOmniChatHandler(personaRepo, nil, nil, &services.ChatbotService{}, nil).
+		SetCreationLimits(services.NewOmniChatCreationLimits(models.NewUserRepository(db.Pool)))
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -371,7 +376,7 @@ func TestOmniChatPersonaHandler_GetPersonaDefinitionAllowsPublicAndOwnerPrivateO
 		CharacterBookJSON:  []byte(`{}`),
 		IsNSFW:             false,
 		IsActive:           true,
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	publicReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/personas/"+strconv.Itoa(publicPersona.ID), nil)
@@ -416,7 +421,7 @@ func TestOmniChatPersonaHandler_UpdateDeleteAndExportRemainOwnerOnly(t *testing.
 		CharacterBookJSON:  []byte(`{}`),
 		IsNSFW:             false,
 		IsActive:           true,
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	updateBody := []byte(`{

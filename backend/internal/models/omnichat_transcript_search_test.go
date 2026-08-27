@@ -38,7 +38,7 @@ func seedSearchConversation(t *testing.T) (*BotMessageRepository, int, *pgxpool.
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	conversation, err := NewBotConversationRepository(db.Pool).

@@ -231,7 +231,7 @@ func TestBotConversationRepositoryListByUserIDWithOwnedPersona(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 	require.NotNil(t, persona)
 
@@ -282,7 +282,7 @@ func TestBotConversationRepositoryListByUserIDExcludesInactivePersonas(t *testin
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 	require.NotNil(t, persona)
 
@@ -337,7 +337,7 @@ func TestBotConversationRepositoryArchiveByUserAndPersonaID(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 	secondPersona, err := personaRepo.CreateOwned(ctx, user.ID, &BotPersona{
 		Slug:               fmt.Sprintf("u%d-archive-b-%d", user.ID, time.Now().UnixNano()),
@@ -350,7 +350,7 @@ func TestBotConversationRepositoryArchiveByUserAndPersonaID(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := NewBotConversationRepository(db.Pool)
@@ -457,7 +457,7 @@ func TestBotMessageRepositoryRepairsStaleDanglingUserTurn(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := NewBotConversationRepository(db.Pool)
@@ -542,7 +542,7 @@ func TestBotMessageRepositoryDoesNotRepairFreshDanglingUserTurn(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	convRepo := NewBotConversationRepository(db.Pool)
@@ -586,7 +586,7 @@ func TestBotMessageRepositoryListsMostRecentWindowChronologically(t *testing.T) 
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	conversation, err := NewBotConversationRepository(db.Pool).CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
@@ -642,7 +642,7 @@ func TestListByConversationIDBeforeWalksBackToTheBeginning(t *testing.T) {
 		Tags:               []string{},
 		GalleryURLs:        []string{},
 		ExtensionsJSON:     json.RawMessage(`{}`),
-	})
+	}, 100)
 	require.NoError(t, err)
 
 	conversation, err := NewBotConversationRepository(db.Pool).CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
