@@ -1,0 +1,119 @@
+package models
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// Creating an IAI (§13, §34).
+//
+// A separate writer from CreateOwned, and the separation is the point. §13 says
+// an IAI does not have the hardcode channels -- not validated, *absent* -- and a
+// comment saying so is not a guarantee. This function cannot write a system
+// prompt, a scenario, post-history instructions or example dialogue, because it
+// does not name those columns. There is nowhere for "she will never leave him"
+// to go.
+//
+// It writes the baseline in the INSERT rather than afterwards.
+// SetOmniChatDispositionBaseline refuses a persona with an owner, having been
+// built for the derivation command that walks platform characters, and an IAI
+// made by somebody has an owner.
+
+// IAIPersona is everything creation may set. Notably short, and every field
+// here is either a fact about her or a value somebody picked off a list.
+type IAIPersona struct {
+	// SlugBase is the readable part, and it is not unique on its own. Two
+	// characters called Sam is a thing one person will do inside a minute, so
+	// her id is appended here rather than hoping names do not repeat -- which
+	// they do, and which failed on a unique constraint the first time it was
+	// tried.
+	SlugBase string
+	Name     string
+	// Personality is composed from the picks on §34's sixth screen, never typed.
+	// Structure is what makes it safe: a chooser cannot smuggle an instruction
+	// into a list of options.
+	Personality string
+	Baseline    OmniChatDispositionBaseline
+}
+
+// CreateIAI writes a new independent character owned by her creator, together
+// with how she starts out feeling about him.
+//
+// Both rows or neither. A character who exists with no disposition is a blank
+// nobody chose, and one whose relationship failed to write would meet her own
+// creator as a stranger.
+func (r *BotPersonaRepository) CreateIAI(
+	ctx context.Context, creatorUserID int, persona IAIPersona, relationship OmniChatCharacterTraits,
+) (*BotPersona, error) {
+	if creatorUserID < 1 {
+		return nil, errors.New("omnichat iai: a creator is required")
+	}
+	if persona.SlugBase == "" || persona.Name == "" {
+		return nil, errors.New("omnichat iai: slug and name are required")
+	}
+	for _, value := range []float64{
+		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
+	} {
+		if value < -1 || value > 1 {
+			return nil, fmt.Errorf("omnichat iai: baseline value %v is outside -1..1", value)
+		}
+	}
+
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("omnichat iai: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Her id first, so the slug can carry it and be unique by construction. The
+	// alternative is inserting a guess and retrying on collision, which is a
+	// loop that exists only because the name was never going to be unique.
+	var personaID int
+	if err := tx.QueryRow(ctx,
+		`SELECT nextval(pg_get_serial_sequence('bot_personas','id'))`).Scan(&personaID); err != nil {
+		return nil, fmt.Errorf("omnichat iai: reserve identity: %w", err)
+	}
+
+	created, err := scanBotPersona(tx.QueryRow(ctx, `
+		INSERT INTO bot_personas (
+			id, slug, name, category, owner_user_id, visibility, source_format,
+			system_prompt, personality, response_style_profile, is_active,
+			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness
+		) VALUES (
+			$1, $2, $3, 'original', $4, 'private', 'native',
+			'', $5, $6, TRUE,
+			$7, $8, $9, $10
+		)
+		RETURNING `+botPersonaSelectColumns,
+		personaID, fmt.Sprintf("%s-%d", persona.SlugBase, personaID), persona.Name,
+		creatorUserID, persona.Personality, ResponseStyleProfileDirectMessage,
+		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
+	))
+	if err != nil {
+		return nil, fmt.Errorf("omnichat iai: create persona: %w", err)
+	}
+
+	// Her feeling toward her creator, and toward nobody else. §34's promise
+	// lives in this row being keyed on him.
+	//
+	// No ON CONFLICT. The persona was created a line ago, so a conflict is not
+	// a case to absorb -- it would mean a reused persona id, which is worth
+	// hearing about rather than quietly ignoring. (The unique index here is on
+	// (persona_id, COALESCE(owner_user_id, 0)), an expression, so a naive
+	// conflict target naming the two columns would not match any index and
+	// would fail at plan time on every single creation.)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO omnichat_character_traits(persona_id, owner_user_id, mood, trust, warmth)
+		VALUES($1, $2, 0, $3, $4)
+	`, created.ID, creatorUserID, relationship.Trust, relationship.Warmth); err != nil {
+		return nil, fmt.Errorf("omnichat iai: seed relationship: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("omnichat iai: commit: %w", err)
+	}
+	return created, nil
+}
