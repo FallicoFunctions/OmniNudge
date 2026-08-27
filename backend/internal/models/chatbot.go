@@ -87,21 +87,25 @@ const (
 
 // BotPersona is a catalog entry for an OmniChat character.
 type BotPersona struct {
-	ID                      int             `json:"id"`
-	Slug                    string          `json:"slug"`
-	Name                    string          `json:"name"`
-	Description             *string         `json:"description,omitempty"`
-	Category                string          `json:"category"` // genre/content tag: see PersonaCategory* constants
-	OwnerUserID             *int            `json:"owner_user_id,omitempty"`
-	Visibility              string          `json:"visibility,omitempty"`
-	SourceFormat            string          `json:"source_format,omitempty"`
-	SystemPrompt            string          `json:"-"`
-	Personality             string          `json:"-"`
-	Scenario                string          `json:"-"`
-	FirstMessage            string          `json:"first_message"`
-	ExampleDialogue         string          `json:"-"`
-	ResponseStyleProfile    string          `json:"response_style_profile,omitempty"`
-	MessageStyleMode        string          `json:"message_style_mode,omitempty"`
+	ID                   int     `json:"id"`
+	Slug                 string  `json:"slug"`
+	Name                 string  `json:"name"`
+	Description          *string `json:"description,omitempty"`
+	Category             string  `json:"category"` // genre/content tag: see PersonaCategory* constants
+	OwnerUserID          *int    `json:"owner_user_id,omitempty"`
+	Visibility           string  `json:"visibility,omitempty"`
+	SourceFormat         string  `json:"source_format,omitempty"`
+	SystemPrompt         string  `json:"-"`
+	Personality          string  `json:"-"`
+	Scenario             string  `json:"-"`
+	FirstMessage         string  `json:"first_message"`
+	ExampleDialogue      string  `json:"-"`
+	ResponseStyleProfile string  `json:"response_style_profile,omitempty"`
+	MessageStyleMode     string  `json:"message_style_mode,omitempty"`
+	// IAIAppearance is what she looks like, as answered on §34's first four
+	// screens. Recorded now and drawn later; NULL for a roleplay character,
+	// whose likeness comes from her card or an upload.
+	IAIAppearance           json.RawMessage `json:"iai_appearance,omitempty"`
 	PostHistoryInstructions string          `json:"-"`
 	AlternateGreetings      []string        `json:"-"`
 	CreatorNotes            string          `json:"-"`
@@ -183,6 +187,7 @@ const botPersonaSelectColumns = `
 	id, slug, name, description, category, owner_user_id, visibility, source_format,
 	system_prompt, personality, scenario, first_message, example_dialogue, response_style_profile,
 	message_style_mode,
+	iai_appearance,
 	post_history_instructions, alternate_greetings, creator_notes, tags, creator_name,
 	character_version, extensions_json, character_book_json, raw_card_json,
 	import_source_filename, avatar_url, preview_video_url, gallery_urls,
@@ -209,6 +214,7 @@ func scanBotPersona(scanner interface {
 		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 		&p.MessageStyleMode,
+		&p.IAIAppearance,
 		&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 		&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 		&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
@@ -817,6 +823,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 			&p.MessageStyleMode,
+			&p.IAIAppearance,
 			&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 			&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 			&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
