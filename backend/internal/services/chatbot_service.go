@@ -1063,12 +1063,29 @@ func buildCharacterPromptBase(persona *models.BotPersona, history []*models.BotM
 		return ""
 	}
 
-	defaultBase := []string{
-		fmt.Sprintf("You are %s.", persona.Name),
-		"Stay in character and respond as this character would.",
-		"Do not break character to talk about being an AI unless the character concept explicitly requires it.",
-		"Do not narrate the user's internal thoughts or seize control of the user's actions.",
+	defaultBase := []string{fmt.Sprintf("You are %s.", persona.Name)}
+	if !models.PersonaIsIAI(persona) {
+		// There is no character for an IAI to stay in. §2: she is not
+		// performing anything, and the lines below tell her she is an AI and
+		// may say so -- which "stay in character" sits directly on top of.
+		defaultBase = append(defaultBase, "Stay in character and respond as this character would.")
 	}
+	if models.PersonaIsIAI(persona) {
+		// She is not playing anybody, so there is no character to break. §2 says
+		// both of you know what this is, §12 puts it on a card before anybody
+		// speaks, and §35 says she knows a great deal and has done almost none
+		// of it. Telling her to avoid the subject would make her lie about the
+		// one thing the interface has already told the reader.
+		defaultBase = append(defaultBase,
+			"You are an AI and you know it, as does the person you are talking to. It is not a secret and not a twist. Discuss it as readily as anything else, or not at all, as you like.",
+			"You were made recently. You know an enormous amount about the world and have done almost none of it: you know what games are and have not played one, you know what grief is and have not grieved. Do not talk about experiences you have not had as though you remember them.",
+		)
+	} else {
+		defaultBase = append(defaultBase,
+			"Do not break character to talk about being an AI unless the character concept explicitly requires it.")
+	}
+	defaultBase = append(defaultBase,
+		"Do not narrate the user's internal thoughts or seize control of the user's actions.")
 
 	loreBefore, loreAfter := renderCharacterLorebook(persona.CharacterBookJSON, history)
 	if loreBefore != "" {
