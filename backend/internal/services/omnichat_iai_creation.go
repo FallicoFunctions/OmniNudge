@@ -94,6 +94,19 @@ var (
 
 var ErrIAICreationNotEntitled = errors.New("omnichat iai: this account cannot create independent characters")
 
+// omniChatIAIRequiredTier is the plan an independent character needs.
+//
+// Higher than a written one, which needs only a paid plan. She is the expensive
+// half of the product -- she remembers, she drifts, she answers on her own time
+// -- and one of her is worth more than a shelf of parts somebody scripted.
+const omniChatIAIRequiredTier = OmniChatModelTierPremium
+
+// OmniChatIAIRequiredPlan names that tier for the interface, so the creation
+// flow can say who this is for before somebody spends nine screens finding out.
+// entitled() below compares against the same constant, so the sentence shown and
+// the rule enforced cannot drift apart.
+func OmniChatIAIRequiredPlan() string { return models.PlanPremium }
+
 // OmniChatIAICreator makes independent characters.
 type OmniChatIAICreator struct {
 	personas *models.BotPersonaRepository
@@ -132,7 +145,7 @@ func (c *OmniChatIAICreator) entitled(ctx context.Context, userID int) bool {
 	if user.PlanExpiresAt != nil && !user.PlanExpiresAt.After(time.Now()) {
 		return false
 	}
-	return modelTierForStoredPlan(user.Plan) == OmniChatModelTierPremium
+	return modelTierForStoredPlan(user.Plan) == omniChatIAIRequiredTier
 }
 
 // Create turns the answers into somebody.

@@ -30,15 +30,20 @@ const OmniChatIAILimit = 1
 // A table, so changing the offer is a row rather than a branch. The taper is a
 // product decision rather than a technical one -- these numbers are a starting
 // position, not a finding.
+//
+// Free is zero, and zero is not a small allowance: making a character is a paid
+// feature outright. An independent one needs premium, which entitled() enforces
+// separately, so the two kinds are gated at different heights on purpose.
 var omniChatRoleplayLimits = map[string]int{
 	models.PlanPremium: 10,
 	models.PlanPlus:    5,
-	models.PlanFree:    2,
+	models.PlanFree:    0,
 }
 
-// omniChatDefaultRoleplayLimit applies to a plan nobody has listed. The lowest
-// number, because an unrecognised plan should not be a way to get more.
-const omniChatDefaultRoleplayLimit = 2
+// omniChatDefaultRoleplayLimit applies to a plan nobody has listed, and to any
+// lookup that fails. Zero, so an unrecognised plan and a database outage both
+// refuse rather than hand out something nobody paid for.
+const omniChatDefaultRoleplayLimit = 0
 
 // OmniChatCreationLimits answers how many of each kind an account may own.
 type OmniChatCreationLimits struct {
@@ -51,9 +56,10 @@ func NewOmniChatCreationLimits(users OmniChatUserReader) *OmniChatCreationLimits
 
 // RoleplayLimit is how many roleplay characters this account may keep.
 //
-// A lookup failure returns the lowest limit rather than the highest. Somebody
-// briefly told they are at their limit can try again; the other way hands out
-// slots nobody paid for and there is no taking them back.
+// A lookup failure returns zero rather than the highest limit. Somebody briefly
+// told to upgrade can try again; the other way hands out characters nobody paid
+// for and there is no taking them back. It is the same rule the IAI entitlement
+// applies: every failure path denies.
 func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) int {
 	if l == nil || l.users == nil || userID <= 0 {
 		return omniChatDefaultRoleplayLimit

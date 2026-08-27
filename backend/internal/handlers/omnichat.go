@@ -43,6 +43,24 @@ func (h *OmniChatHandler) SetCreationLimits(limits *services.OmniChatCreationLim
 // Unset, it returns zero, which refuses every creation rather than allowing
 // every creation. A handler wired without its limits should stop the feature
 // loudly, not hand out unlimited characters quietly.
+// respondRoleplayLimit tells somebody which refusal this is.
+//
+// A limit of zero is not a full shelf. It is a feature the account does not
+// have, and "delete one to make room" is impossible advice for somebody with
+// none. Making characters is a paid feature outright: free accounts get zero of
+// either kind, and an independent one needs premium on top of that.
+func respondRoleplayLimit(c *gin.Context, limit int) {
+	if limit <= 0 {
+		RespondErrorCoded(c, http.StatusForbidden, "character_creation_requires_upgrade",
+			"Writing your own characters is part of a paid plan.")
+		return
+	}
+	// Coded, so the interface can offer the upgrade or the delete rather than
+	// reporting a failure somebody cannot act on.
+	RespondErrorCoded(c, http.StatusConflict, "character_limit_reached",
+		"You have as many characters as your plan allows. Delete one, or upgrade for more.")
+}
+
 func (h *OmniChatHandler) roleplayLimit(ctx context.Context, userID int) int {
 	if h.creationLimits == nil {
 		return 0

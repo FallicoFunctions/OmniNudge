@@ -69,14 +69,24 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 	return router, userRepo, personaRepo, db.Pool, cleanup
 }
 
+// createOmniChatPersonaTestUser makes somebody who is allowed to write a
+// character, which now means somebody paying.
+//
+// Create does not write the plan column, so it is set here the way a
+// subscription would. Without it these users land on free, free is zero, and
+// every creation test fails on entitlement rather than on what it set out to
+// check.
 func createOmniChatPersonaTestUser(t *testing.T, repo *models.UserRepository, username string) *models.User {
 	t.Helper()
+	ctx := context.Background()
 	user := &models.User{
 		Username:     username,
 		PasswordHash: "test-hash",
 		Role:         "user",
 	}
-	require.NoError(t, repo.Create(context.Background(), user))
+	require.NoError(t, repo.Create(ctx, user))
+	require.NoError(t, repo.UpdatePlan(ctx, user.ID, models.PlanPlus, nil))
+	user.Plan = models.PlanPlus
 	return user
 }
 
@@ -538,4 +548,47 @@ func TestDirectMessageProfileIsNotAvailableToUserPersonas(t *testing.T) {
 	kept, err := normalizeResponseStyleProfile("lean_narrative", nil, "native")
 	require.NoError(t, err)
 	require.Equal(t, models.ResponseStyleProfileLeanNarrative, kept)
+}
+
+func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
+	// The product rule, through the real route and a real database rather than
+	// through the resolver alone. Free is zero of either kind: a roleplay
+	// character needs a paid plan, and an independent one needs premium on top.
+	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	free := &models.User{Username: "persona_free", PasswordHash: "test-hash", Role: "user"}
+	require.NoError(t, userRepo.Create(ctx, free))
+	require.NoError(t, userRepo.UpdatePlan(ctx, free.ID, models.PlanFree, nil))
+
+	body := []byte(`{
+		"name":"Free Bot",
+		"description":"Should not exist",
+		"category":"original",
+		"visibility":"private",
+		"system_prompt":"Be concise.",
+		"personality":"Calm",
+		"scenario":"A quiet room",
+		"first_message":"Hello."
+	}`)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Test-User-ID", strconv.Itoa(free.ID))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "character_creation_requires_upgrade")
+	require.NotContains(t, recorder.Body.String(), "Delete", "there is nothing to delete")
+
+	// And nothing was written on the way to refusing.
+	owned := httptest.NewRequest(http.MethodGet, "/api/v1/omnichat/my-personas", nil)
+	owned.Header.Set("X-Test-User-ID", strconv.Itoa(free.ID))
+	ownedRecorder := httptest.NewRecorder()
+	router.ServeHTTP(ownedRecorder, owned)
+
+	require.Equal(t, http.StatusOK, ownedRecorder.Code)
+	require.NotContains(t, ownedRecorder.Body.String(), "Free Bot")
 }
