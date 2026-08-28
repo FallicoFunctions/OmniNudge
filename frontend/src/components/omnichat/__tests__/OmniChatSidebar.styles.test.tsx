@@ -150,7 +150,11 @@ describe('OmniChatSidebar color utilities', () => {
     const drawer = screen.getByRole('dialog', { name: 'Open menu' });
     expect(drawer).toHaveFocus();
 
-    const lastDrawerButton = within(drawer).getByRole('button', { name: 'Characters' });
+    // Whatever is last, rather than a tab named here. Naming one made this test
+    // about the tab list instead of about the focus trap, so it broke the day a
+    // tab was added after it -- which says nothing about whether Tab wraps.
+    const drawerButtons = within(drawer).getAllByRole('button');
+    const lastDrawerButton = drawerButtons[drawerButtons.length - 1];
     lastDrawerButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(within(drawer).getByRole('button', { name: 'Close menu' })).toHaveFocus();

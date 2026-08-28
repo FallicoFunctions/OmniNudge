@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Compass, ImagePlus, Menu, MessageSquare, PanelsTopLeft, Sparkles, UsersRound, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Compass, ImagePlus, Menu, MessageSquare, PanelsTopLeft, UserPlus, UsersRound, X } from 'lucide-react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type SidebarTab =
@@ -49,7 +49,7 @@ const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLa
   },
   {
     id: 'newCharacter',
-    icon: Sparkles,
+    icon: UserPlus,
     labelKey: 'omnichat.sidebar.newCharacter',
     fallbackLabel: 'New',
   },
