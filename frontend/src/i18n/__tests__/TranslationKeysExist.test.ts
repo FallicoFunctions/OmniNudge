@@ -103,6 +103,34 @@ describe('i18n usage', () => {
     expect(missingKeys()).toEqual([]);
   });
 
+  // t(`omnichat.studio.responseStyles.${profile}.label`) is invisible to the
+  // check above: the key is built at runtime, so no literal ever appears. That
+  // is how 'direct_message' shipped. It was added to the ResponseStyleProfile
+  // union for IAI characters, and the studio rendered
+  // "omnichat.studio.responseStyles.direct_message.description" at anyone who
+  // opened one -- while the select had no matching option, so a single click
+  // would quietly turn an independent character into a roleplay one.
+  //
+  // A union member is a key. Widen the union, widen this.
+  it('every response style in the union has a label and a description', () => {
+    const types = readFileSync(join(process.cwd(), 'src/types/omnichat.ts'), 'utf8');
+    const union = types.match(/export type ResponseStyleProfile =([^;]+);/);
+    expect(union).not.toBeNull();
+
+    const profiles = [...(union as RegExpMatchArray)[1].matchAll(/'([a-z_]+)'/g)].map(
+      (match) => match[1]
+    );
+    expect(profiles.length).toBeGreaterThan(1);
+
+    const absent = profiles.flatMap((profile) =>
+      ['label', 'description']
+        .map((field) => `omnichat.studio.responseStyles.${profile}.${field}`)
+        .filter((key) => !english.has(key))
+    );
+
+    expect(absent).toEqual([]);
+  });
+
   it('reads the keys it can and ignores the ones it cannot', () => {
     expect(literalKeys("t('a.b')")).toEqual(['a.b']);
     expect(literalKeys("t('a.b', { count: 2 })")).toEqual(['a.b']);

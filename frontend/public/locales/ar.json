@@ -4343,7 +4343,8 @@
         "galleryUrlsPlaceholder": "صورة مرفوعة واحدة في كل سطر",
         "characterBookJson": "JSON كتاب الشخصية",
         "extensionsJson": "JSON الإضافات",
-        "galleryUrlsHelp": "أضف ما يصل إلى 4 صور. استخدم الوجه نفسه في كل صورة — فهي تُعلّم مولّد الصور كيف يبدو شخصيتك، والوجوه غير المتطابقة تنتج نتائج غير متسقة. نوّع التعبير والإضاءة والزاوية، وأضف صورة واحدة على الأقل بتعبير محايد وفم مغلق. يُستخدم الوجه فقط، لذا لا تضيف صور الجسم الكامل أكثر من الوجه الذي تحتويه."
+        "galleryUrlsHelp": "أضف ما يصل إلى 4 صور. استخدم الوجه نفسه في كل صورة — فهي تُعلّم مولّد الصور كيف يبدو شخصيتك، والوجوه غير المتطابقة تنتج نتائج غير متسقة. نوّع التعبير والإضاءة والزاوية، وأضف صورة واحدة على الأقل بتعبير محايد وفم مغلق. يُستخدم الوجه فقط، لذا لا تضيف صور الجسم الكامل أكثر من الوجه الذي تحتويه.",
+        "responseStyleFixed": "Set when she was created. It is not a style you choose for her."
       },
       "responseStyles": {
         "inherit": {
@@ -4365,6 +4366,10 @@
         "character_only": {
           "label": "تعليمات الشخصية فقط",
           "description": "لا يطبق طبقة أسلوب OmniChat. مناسب للبطاقات المستوردة ذات الأسلوب الخاص."
+        },
+        "direct_message": {
+          "label": "Direct message",
+          "description": "How an independent character writes to you: no scene, no narration, no opening line written for her. This is set when she is created and cannot be changed here."
         }
       },
       "uploadingField": "جارٍ رفع {{field}}...",

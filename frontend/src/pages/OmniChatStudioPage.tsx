@@ -1141,24 +1141,36 @@ export default function OmniChatStudioPage() {
                 >
                   {t('omnichat.studio.fields.responseStyle')}
                 </label>
-                <select
-                  id="omnichat-response-style"
-                  aria-describedby="omnichat-response-style-description"
-                  value={draft.response_style_profile}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      response_style_profile: event.target.value as ResponseStyleProfile,
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
-                >
-                  {RESPONSE_STYLE_PROFILES.map((profile) => (
-                    <option key={profile} value={profile}>
-                      {t(`omnichat.studio.responseStyles.${profile}.label`)}
-                    </option>
-                  ))}
-                </select>
+                {draft.response_style_profile === 'direct_message' ? (
+                  <p
+                    id="omnichat-response-style"
+                    className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                  >
+                    {t('omnichat.studio.responseStyles.direct_message.label')}
+                    <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
+                      {t('omnichat.studio.fields.responseStyleFixed')}
+                    </span>
+                  </p>
+                ) : (
+                  <select
+                    id="omnichat-response-style"
+                    aria-describedby="omnichat-response-style-description"
+                    value={draft.response_style_profile}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        response_style_profile: event.target.value as ResponseStyleProfile,
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+                  >
+                    {RESPONSE_STYLE_PROFILES.map((profile) => (
+                      <option key={profile} value={profile}>
+                        {t(`omnichat.studio.responseStyles.${profile}.label`)}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <span
                   id="omnichat-response-style-description"
                   className="block text-xs leading-5 text-[var(--color-text-secondary)]"

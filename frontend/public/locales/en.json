@@ -4343,7 +4343,8 @@
         "galleryUrlsPlaceholder": "One uploaded image per line",
         "characterBookJson": "Character Book JSON",
         "extensionsJson": "Extensions JSON",
-        "galleryUrlsHelp": "Add up to 4 photos. Use the same face in every one — these teach the image generator what your character looks like, and mismatched faces produce inconsistent results. Vary the expression, lighting and angle, and include at least one with a neutral, closed-mouth expression. Only the face is used, so full-body shots add nothing beyond the face they contain."
+        "galleryUrlsHelp": "Add up to 4 photos. Use the same face in every one — these teach the image generator what your character looks like, and mismatched faces produce inconsistent results. Vary the expression, lighting and angle, and include at least one with a neutral, closed-mouth expression. Only the face is used, so full-body shots add nothing beyond the face they contain.",
+        "responseStyleFixed": "Set when she was created. It is not a style you choose for her."
       },
       "responseStyles": {
         "inherit": {
@@ -4365,6 +4366,10 @@
         "character_only": {
           "label": "Character instructions only",
           "description": "Applies no OmniChat response-style layer. Useful for imported cards with their own style."
+        },
+        "direct_message": {
+          "label": "Direct message",
+          "description": "How an independent character writes to you: no scene, no narration, no opening line written for her. This is set when she is created and cannot be changed here."
         }
       },
       "uploadingField": "Uploading {{field}}...",

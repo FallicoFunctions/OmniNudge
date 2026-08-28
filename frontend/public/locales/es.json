@@ -4343,7 +4343,8 @@
         "galleryUrlsPlaceholder": "Una imagen subida por línea",
         "characterBookJson": "JSON del libro de personaje",
         "extensionsJson": "JSON de extensiones",
-        "galleryUrlsHelp": "Añade hasta 4 fotos. Usa la misma cara en todas: enseñan al generador de imágenes cómo es tu personaje, y las caras distintas producen resultados inconsistentes. Varía la expresión, la iluminación y el ángulo, e incluye al menos una con expresión neutra y boca cerrada. Solo se usa la cara, así que las fotos de cuerpo entero no aportan más que la cara que contienen."
+        "galleryUrlsHelp": "Añade hasta 4 fotos. Usa la misma cara en todas: enseñan al generador de imágenes cómo es tu personaje, y las caras distintas producen resultados inconsistentes. Varía la expresión, la iluminación y el ángulo, e incluye al menos una con expresión neutra y boca cerrada. Solo se usa la cara, así que las fotos de cuerpo entero no aportan más que la cara que contienen.",
+        "responseStyleFixed": "Set when she was created. It is not a style you choose for her."
       },
       "responseStyles": {
         "inherit": {
@@ -4365,6 +4366,10 @@
         "character_only": {
           "label": "Solo instrucciones del personaje",
           "description": "No aplica el estilo de OmniChat. Útil para tarjetas importadas con estilo propio."
+        },
+        "direct_message": {
+          "label": "Direct message",
+          "description": "How an independent character writes to you: no scene, no narration, no opening line written for her. This is set when she is created and cannot be changed here."
         }
       },
       "uploadingField": "Subiendo {{field}}...",
