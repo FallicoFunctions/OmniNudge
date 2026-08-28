@@ -141,7 +141,7 @@ func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
 		MaximumAge:          maximumAge,
 		MinimumHeightInches: minimumHeight,
 		MaximumHeightInches: maximumHeight,
-		IAILimit:            services.OmniChatIAILimit,
+		IAILimit:            h.iaiLimit(c),
 		IAIRequiredPlan:     services.OmniChatIAIRequiredPlan(),
 		RoleplayLimits:      services.OmniChatRoleplayLimits(),
 	})

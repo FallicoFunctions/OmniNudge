@@ -25,6 +25,11 @@ import (
 // it.
 const OmniChatIAILimit = 1
 
+// OmniChatIAIAdminLimit is the exception, and not unlimited for its own sake:
+// an admin is the only account that has to be able to make a second one to see
+// what the second one does.
+const OmniChatIAIAdminLimit = 1000
+
 // omniChatRoleplayLimits is how many roleplay characters a plan may own.
 //
 // A table, so changing the offer is a row rather than a branch. The taper is a
@@ -85,6 +90,32 @@ func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) 
 		return limit
 	}
 	return omniChatDefaultRoleplayLimit
+}
+
+// IAILimit is how many independent characters this account may keep.
+//
+// One for everybody who has access at all, and that is the rule rather than a
+// shortage: keeping one alive is what makes her memory and her drift mean
+// anything. An admin is the exception, because an admin is the only account
+// that has to be able to make a second one to see what a second one does.
+//
+// The creator works the same number out from its own lookup, since it needs the
+// entitlement from the same read. A test holds the two together rather than a
+// comment claiming they agree.
+func (l *OmniChatCreationLimits) IAILimit(ctx context.Context, userID int) int {
+	if l == nil || l.users == nil || userID <= 0 {
+		return OmniChatIAILimit
+	}
+	user, err := l.users.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		// The count is not an entitlement -- the creator refuses separately --
+		// so a lookup failure reports the ordinary number rather than denying.
+		return OmniChatIAILimit
+	}
+	if strings.EqualFold(strings.TrimSpace(user.Role), "admin") {
+		return OmniChatIAIAdminLimit
+	}
+	return OmniChatIAILimit
 }
 
 // OmniChatRoleplayLimits exposes the table so the interface can say what each

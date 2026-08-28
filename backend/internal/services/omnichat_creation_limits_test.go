@@ -113,3 +113,36 @@ func TestThePlanNamedIsThePlanEnforced(t *testing.T) {
 			"plan %q must not satisfy the independent-character tier", refused)
 	}
 }
+
+func TestTheLimitTheCreatorEnforcesIsTheLimitTheFormIsTold(t *testing.T) {
+	// Two places work this number out: the creator, from the same lookup it uses
+	// for entitlement, and the limits service, for the endpoint that tells the
+	// form. They agreed by coincidence rather than by construction, and the
+	// endpoint used to send the ordinary number to everybody -- so an admin read
+	// "you can keep one" on the review screen while the server let them keep a
+	// thousand.
+	for _, user := range []*models.User{
+		{ID: 1, Plan: models.PlanPremium},
+		{ID: 2, Plan: models.PlanFree, Role: "admin"},
+		{ID: 3, Plan: models.PlanPremium, Role: "admin"},
+	} {
+		creator := &OmniChatIAICreator{users: stubUserReader{user: user}}
+		limits := NewOmniChatCreationLimits(&creationLimitsUserFake{user: user})
+
+		_, fromCreator := creator.allowance(context.Background(), user.ID)
+		fromEndpoint := limits.IAILimit(context.Background(), user.ID)
+
+		require.Equal(t, fromCreator, fromEndpoint,
+			"%s/%s is told one number and held to another", user.Plan, user.Role)
+	}
+}
+
+func TestAnUnknownAccountIsToldTheOrdinaryNumber(t *testing.T) {
+	// The count is not an entitlement. The creator refuses separately, so a
+	// lookup failure here reports what most people get rather than denying --
+	// telling somebody they may keep zero would be a refusal from the one place
+	// that is not allowed to make one.
+	limits := NewOmniChatCreationLimits(&creationLimitsUserFake{err: errors.New("database down")})
+	require.Equal(t, OmniChatIAILimit, limits.IAILimit(context.Background(), 7))
+	require.Equal(t, OmniChatIAILimit, (*OmniChatCreationLimits)(nil).IAILimit(context.Background(), 7))
+}

@@ -161,8 +161,8 @@ func TestOnlyTheTopTierMakesIndependentCharacters(t *testing.T) {
 		creator := &OmniChatIAICreator{users: stubUserReader{
 			user: &models.User{ID: 1, Plan: testCase.plan, Role: testCase.role},
 		}}
-		require.Equal(t, testCase.allowed, creator.entitled(context.Background(), 1),
-			"%s/%s", testCase.plan, testCase.role)
+		entitled, _ := creator.allowance(context.Background(), 1)
+		require.Equal(t, testCase.allowed, entitled, "%s/%s", testCase.plan, testCase.role)
 	}
 }
 
@@ -178,11 +178,14 @@ func TestEveryEntitlementFailurePathRefuses(t *testing.T) {
 			user: &models.User{ID: 1, Plan: models.PlanPremium, PlanExpiresAt: &lapsed},
 		}},
 	} {
-		require.False(t, creator.entitled(context.Background(), 1), name)
+		allowed, limit := creator.allowance(context.Background(), 1)
+		require.False(t, allowed, name)
+		require.Zero(t, limit, "%s: a refusal allows nothing", name)
 	}
 
-	entitled := &OmniChatIAICreator{users: stubUserReader{user: &models.User{ID: 1, Plan: models.PlanPremium}}}
-	require.False(t, entitled.entitled(context.Background(), 0), "an unauthenticated caller is nobody")
+	premium := &OmniChatIAICreator{users: stubUserReader{user: &models.User{ID: 1, Plan: models.PlanPremium}}}
+	allowed, _ := premium.allowance(context.Background(), 0)
+	require.False(t, allowed, "an unauthenticated caller is nobody")
 }
 
 func TestCreationRefusesWhatItCannotMake(t *testing.T) {
@@ -195,4 +198,28 @@ func TestCreationRefusesWhatItCannotMake(t *testing.T) {
 	unavailable := &OmniChatIAICreator{}
 	_, err = unavailable.Create(t.Context(), 1, IAIAnswers{Name: "   "})
 	require.Error(t, err)
+}
+
+func TestAnAdminIsNotHeldToTheOneCharacterLimit(t *testing.T) {
+	// Admins already passed the premium requirement and already got the top
+	// roleplay allowance. The one-character cap was a flat constant that never
+	// asked who was calling, so an admin could clear the entitlement and still
+	// be refused by a limit meant for everybody else -- which makes the one
+	// account that has to be able to test a second character unable to make one.
+	admin := &OmniChatIAICreator{users: stubUserReader{
+		user: &models.User{ID: 1, Plan: models.PlanFree, Role: "admin"},
+	}}
+	allowed, limit := admin.allowance(context.Background(), 1)
+
+	require.True(t, allowed, "and the plan does not matter for an admin")
+	require.Greater(t, limit, OmniChatIAILimit)
+
+	// Everybody else still gets one, which is the rule rather than a shortage:
+	// keeping one alive is what makes her memory and her drift mean anything.
+	paying := &OmniChatIAICreator{users: stubUserReader{
+		user: &models.User{ID: 2, Plan: models.PlanPremium},
+	}}
+	allowedToo, theirLimit := paying.allowance(context.Background(), 2)
+	require.True(t, allowedToo)
+	require.Equal(t, OmniChatIAILimit, theirLimit)
 }

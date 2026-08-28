@@ -43,6 +43,27 @@ func (h *OmniChatHandler) SetCreationLimits(limits *services.OmniChatCreationLim
 // Unset, it returns zero, which refuses every creation rather than allowing
 // every creation. A handler wired without its limits should stop the feature
 // loudly, not hand out unlimited characters quietly.
+// iaiLimit is how many independent characters this caller may keep.
+//
+// Asked per caller rather than served as a constant. The endpoint used to send
+// the ordinary number to everybody, so an admin was told "you can keep one"
+// while the server let them keep a thousand -- the interface stating a rule the
+// server does not enforce, which is the fault this endpoint exists to prevent.
+//
+// An unwired resolver reports the ordinary number rather than nothing. The
+// count is not an entitlement; the creator refuses separately and would refuse
+// this caller too if they were not allowed one at all.
+func (h *OmniChatHandler) iaiLimit(c *gin.Context) int {
+	if h.creationLimits == nil {
+		return services.OmniChatIAILimit
+	}
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return services.OmniChatIAILimit
+	}
+	return h.creationLimits.IAILimit(c.Request.Context(), userID)
+}
+
 // respondRoleplayLimit tells somebody which refusal this is.
 //
 // A limit of zero is not a full shelf. It is a feature the account does not

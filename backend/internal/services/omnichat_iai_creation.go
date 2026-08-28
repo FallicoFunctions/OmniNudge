@@ -190,28 +190,37 @@ func NewOmniChatIAICreator(personas *models.BotPersonaRepository, users OmniChat
 // reader, a missing account or a lookup outage must never hand somebody a
 // character they are not entitled to, and denying costs them a refusal rather
 // than anything they had.
-func (c *OmniChatIAICreator) entitled(ctx context.Context, userID int) bool {
+
+// allowance answers both questions from one lookup: may this account make one,
+// and how many may it keep.
+//
+// They were two functions and the second was a constant, so an admin could pass
+// the entitlement and still be refused by a cap that never asked who they were.
+func (c *OmniChatIAICreator) allowance(ctx context.Context, userID int) (bool, int) {
 	if c == nil || c.users == nil || userID <= 0 {
-		return false
+		return false, 0
 	}
 	user, err := c.users.GetByID(ctx, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Int("user_id", userID).
 			Msg("omnichat iai: entitlement lookup failed; refusing creation")
-		return false
+		return false, 0
 	}
 	if user == nil {
-		return false
+		return false, 0
 	}
 	if strings.EqualFold(strings.TrimSpace(user.Role), "admin") {
-		return true
+		return true, OmniChatIAIAdminLimit
 	}
 	// A lapsed subscription is not a subscription, and §19 excludes free and
 	// the lowest paid tier both.
 	if user.PlanExpiresAt != nil && !user.PlanExpiresAt.After(time.Now()) {
-		return false
+		return false, 0
 	}
-	return modelTierForStoredPlan(user.Plan) == omniChatIAIRequiredTier
+	if modelTierForStoredPlan(user.Plan) != omniChatIAIRequiredTier {
+		return false, 0
+	}
+	return true, OmniChatIAILimit
 }
 
 // Create turns the answers into somebody.
@@ -219,7 +228,8 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 	if c == nil || c.personas == nil {
 		return nil, errors.New("omnichat iai: creation is unavailable")
 	}
-	if !c.entitled(ctx, creatorUserID) {
+	entitled, limit := c.allowance(ctx, creatorUserID)
+	if !entitled {
 		return nil, ErrIAICreationNotEntitled
 	}
 	name := strings.TrimSpace(answers.Name)
@@ -250,7 +260,7 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 		Personality: renderIAIInterests(answers.Interests),
 		Appearance:  encoded,
 		Baseline:    seed.Baseline,
-	}, seed.Relationship, OmniChatIAILimit)
+	}, seed.Relationship, limit)
 }
 
 // omniChatIAINameRunes bounds the one field somebody types into.

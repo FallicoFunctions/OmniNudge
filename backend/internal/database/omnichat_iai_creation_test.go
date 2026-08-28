@@ -121,3 +121,42 @@ func TestNobodyMakesACharacterUnderEighteen(t *testing.T) {
 	})
 	require.ErrorIs(t, err, services.ErrIAIUnderage)
 }
+
+func TestAnAdminCanMakeMoreThanOne(t *testing.T) {
+	// The unit test checks the number the allowance returns. This checks that
+	// the database agrees: the cap is enforced inside the transaction, behind an
+	// advisory lock, and a limit that only existed in Go would be refused there.
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+
+	_, err := db.Pool.Exec(ctx, `UPDATE users SET role = 'admin' WHERE id = $1`, premiumID)
+	require.NoError(t, err)
+
+	first, err := creator.Create(ctx, premiumID, services.IAIAnswers{
+		Name: "First", Temperaments: []string{"warm"}, Feeling: "fond",
+	})
+	require.NoError(t, err)
+
+	second, err := creator.Create(ctx, premiumID, services.IAIAnswers{
+		Name: "Second", Temperaments: []string{"guarded"}, Feeling: "neutral",
+	})
+	require.NoError(t, err, "an admin is the one account that has to be able to make a second")
+	require.NotEqual(t, first.ID, second.ID)
+}
+
+func TestEverybodyElseStillGetsOne(t *testing.T) {
+	// The limit is the rule rather than a shortage. Keeping one alive is what
+	// makes her memory and her drift mean anything.
+	ctx := context.Background()
+	_, creator, premiumID, _ := iaiCreationFixture(t)
+
+	_, err := creator.Create(ctx, premiumID, services.IAIAnswers{
+		Name: "Only", Temperaments: []string{"warm"}, Feeling: "fond",
+	})
+	require.NoError(t, err)
+
+	_, err = creator.Create(ctx, premiumID, services.IAIAnswers{
+		Name: "Another", Temperaments: []string{"warm"}, Feeling: "fond",
+	})
+	require.ErrorIs(t, err, models.ErrIAILimitReached)
+}
