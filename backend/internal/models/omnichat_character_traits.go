@@ -71,6 +71,19 @@ type OmniChatCharacterTraits struct {
 	MoodUpdatedAt time.Time `json:"-"`
 	Trust         float64   `json:"trust"`
 	Warmth        float64   `json:"warmth"`
+
+	// Attachment is how much this person matters to her; attraction is whether
+	// she is drawn to them. Neither is warmth. Somebody can be immediately
+	// infatuated with a person they barely know, and somebody can trust an old
+	// friend completely and feel nothing of the kind -- folding both into
+	// warmth made "close" and "in love with you" the same answer.
+	//
+	// Attraction has a floor of 0. Negative trust is wariness and negative
+	// warmth is dislike, both ordinary; a negative attraction would be
+	// repulsion, which is not the other end of this scale and is not a state
+	// this product models.
+	Attachment float64 `json:"attachment"`
+	Attraction float64 `json:"attraction"`
 }
 
 // MoodAt is the drift mood at a given instant: the stored value pulled toward 0
@@ -95,6 +108,11 @@ func (t OmniChatCharacterTraits) MoodAt(at time.Time) float64 {
 // Mood is decayed to `at` before the episode is added, so the arithmetic is
 // always against what the character actually feels now rather than against a
 // stale reading from whenever it was last written.
+// omniChatTraitAttachmentGain is a third of the warmth gain. Fondness is a
+// reaction; attachment is an accumulation, and it should take many good days
+// rather than one.
+const omniChatTraitAttachmentGain = 0.02
+
 func (t *OmniChatCharacterTraits) Apply(valence float64, at time.Time) {
 	valence = clampTrait(valence)
 
@@ -110,6 +128,19 @@ func (t *OmniChatCharacterTraits) Apply(valence float64, at time.Time) {
 	}
 	t.Trust = clampTrait(t.Trust + valence*trustGain)
 	t.Warmth = clampTrait(t.Warmth + valence*omniChatTraitWarmthGain)
+
+	// Attachment moves more slowly than warmth, in both directions. Liking
+	// somebody more after a good afternoon is ordinary; needing them more is
+	// not, and a character who became devoted over one conversation would be
+	// the thing this whole model exists to avoid.
+	t.Attachment = clampTrait(t.Attachment + valence*omniChatTraitAttachmentGain)
+
+	// Attraction is deliberately untouched. It does not grow out of a pleasant
+	// conversation any more than it does between people -- what moves it is
+	// specific and rare, and nothing here can tell the difference between a
+	// good talk and that. So it starts where the creator set it and stays there
+	// until something is built that has the right to move it. Recording that as
+	// "not yet" rather than as zero movement is the point of the column.
 }
 
 // Clamping is not optional. A long run of painful episodes must leave a
@@ -221,7 +252,8 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth, p.baseline_firmness,
 			p.baseline_talkativeness, p.baseline_expressiveness,
-		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth
+		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth,
+		       t.attachment, t.attraction
 		FROM bot_personas p
 		LEFT JOIN omnichat_character_traits t
 		  ON t.persona_id = p.id AND COALESCE(t.owner_user_id, 0) = ANY($2)
@@ -236,11 +268,11 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		var baselineMood, baselineTrust, baselineWarmth, baselineFirmness *float64
 		var baselineTalkativeness, baselineExpressiveness *float64
 		var owner *int
-		var mood, trust, warmth *float64
+		var mood, trust, warmth, attachment, attraction *float64
 		var moodUpdatedAt *time.Time
 		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth, &baselineFirmness,
 			&baselineTalkativeness, &baselineExpressiveness,
-			&owner, &mood, &moodUpdatedAt, &trust, &warmth); err != nil {
+			&owner, &mood, &moodUpdatedAt, &trust, &warmth, &attachment, &attraction); err != nil {
 			return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 		}
 		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth, baselineFirmness,
@@ -257,6 +289,16 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 			MoodUpdatedAt: *moodUpdatedAt,
 			Trust:         *trust,
 			Warmth:        *warmth,
+		}
+		// Both columns are NOT NULL with a default, so a row that exists always
+		// has them. Read through a pointer anyway: the join can emit a persona
+		// with no tier at all, and a nil here would mean the row was not the
+		// shape this code believes it is.
+		if attachment != nil {
+			traits.Attachment = *attachment
+		}
+		if attraction != nil {
+			traits.Attraction = *attraction
 		}
 		if owner == nil {
 			traits.OwnerUserID = OmniChatMemoryTierSelf
@@ -374,9 +416,11 @@ func applyEpisodeValencesTx(ctx context.Context, q omniChatTraitQuerier, persona
 	if _, err := q.Exec(ctx, `
 		UPDATE omnichat_character_traits
 		SET mood = $3, mood_updated_at = $4, trust = $5, warmth = $6,
+		    attachment = $7, attraction = $8,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = $2
-	`, personaID, ownerUserID, traits.Mood, traits.MoodUpdatedAt, traits.Trust, traits.Warmth); err != nil {
+	`, personaID, ownerUserID, traits.Mood, traits.MoodUpdatedAt, traits.Trust, traits.Warmth,
+		traits.Attachment, traits.Attraction); err != nil {
 		return fmt.Errorf("omnichat traits: update persona %d: %w", personaID, err)
 	}
 	return nil
@@ -391,10 +435,11 @@ func loadTraits(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUse
 	// Scoped on both persona and tier, always. This is the whole reason one
 	// user's private history cannot show up in another user's conversation.
 	err := q.QueryRow(ctx, `
-		SELECT mood, mood_updated_at, trust, warmth
+		SELECT mood, mood_updated_at, trust, warmth, attachment, attraction
 		FROM omnichat_character_traits
 		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = $2
-	`, personaID, ownerUserID).Scan(&traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth)
+	`, personaID, ownerUserID).Scan(&traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth,
+		&traits.Attachment, &traits.Attraction)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return traits, nil
 	}
@@ -424,6 +469,12 @@ type OmniChatDisposition struct {
 	// fields below for why they are not fixed the way firmness is.
 	Talkativeness  float64
 	Expressiveness float64
+
+	// Both come from the relationship alone. There is no such thing as being
+	// attached in general, and a baseline attraction would be a claim about
+	// everybody she has ever met.
+	Attachment float64
+	Attraction float64
 }
 
 // OmniChatDispositionBaseline is who a character was written to be: the resting
@@ -524,6 +575,8 @@ func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, rela
 		Firmness:       clampTrait(baseline.Firmness),
 		Talkativeness:  clampTrait(baseline.Talkativeness + closeness*opening),
 		Expressiveness: clampTrait(baseline.Expressiveness + closeness*opening),
+		Attachment:     clampTrait(relationship.Attachment),
+		Attraction:     clampTrait(relationship.Attraction),
 	}
 }
 

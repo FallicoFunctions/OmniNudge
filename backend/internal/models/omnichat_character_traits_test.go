@@ -828,3 +828,110 @@ func TestAWarmCharacterIsNotCloseToEverybody(t *testing.T) {
 			"a stranger gets exactly what her card says, whoever she is")
 	}
 }
+
+func TestAttachmentGrowsSlowlyAndAttractionDoesNotGrowAtAll(t *testing.T) {
+	// Liking somebody more after a good afternoon is ordinary. Needing them
+	// more is not, and a character who became devoted over one conversation
+	// would be the thing this whole model exists to avoid.
+	traits := OmniChatCharacterTraits{MoodUpdatedAt: time.Now()}
+	before := traits
+
+	traits.Apply(0.9, time.Now())
+
+	require.Greater(t, traits.Warmth, before.Warmth)
+	require.Greater(t, traits.Attachment, before.Attachment, "it does move")
+	require.Less(t, traits.Attachment, traits.Warmth,
+		"but more slowly than fondness, which is a reaction rather than an accumulation")
+
+	// Attraction is deliberately untouched. It does not grow out of a pleasant
+	// conversation any more than it does between people, and nothing here can
+	// tell a good talk apart from the specific and rare thing that would move
+	// it. It starts where the creator set it and waits for something built to
+	// have the right to change it.
+	require.Equal(t, before.Attraction, traits.Attraction)
+
+	bad := OmniChatCharacterTraits{Attraction: 0.8, MoodUpdatedAt: time.Now()}
+	bad.Apply(-0.9, time.Now())
+	require.Less(t, bad.Attachment, 0.0, "attachment falls as well as rises")
+	require.InDelta(t, 0.8, bad.Attraction, 0.0001,
+		"and a bad conversation does not make somebody unattractive")
+}
+
+func TestManyGoodDaysMoveAttachmentWhereOneDoesNot(t *testing.T) {
+	// The shape that matters: it accumulates. A single strong episode barely
+	// registers, and a long run of them adds up to something real.
+	now := time.Now()
+	one := OmniChatCharacterTraits{MoodUpdatedAt: now}
+	one.Apply(0.9, now)
+
+	many := OmniChatCharacterTraits{MoodUpdatedAt: now}
+	for i := 0; i < 30; i++ {
+		many.Apply(0.9, now)
+	}
+
+	require.Less(t, one.Attachment, 0.05, "one good conversation is not devotion")
+	require.Greater(t, many.Attachment, 0.4, "thirty of them are worth something")
+	require.LessOrEqual(t, many.Attachment, 1.0)
+}
+
+func TestAttachmentAndAttractionSurviveTheDatabase(t *testing.T) {
+	// Three new SQL sites -- the upsert, the single load, and the two-tier read
+	// the conversation uses. A wrong parameter index or a column out of order in
+	// any of them passes every unit test in this file and puts one person's
+	// attachment into another person's attraction.
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "bondtrip")
+	repo := NewOmniChatCharacterTraitRepository(pool)
+	ctx := context.Background()
+
+	// Attraction is set the only way anything sets it today: written directly,
+	// because nothing in the drift path has the right to move it.
+	_, err := pool.Exec(ctx, `
+		INSERT INTO omnichat_character_traits (persona_id, owner_user_id, trust, warmth, attachment, attraction)
+		VALUES ($1, $2, 0.3, 0.4, 0.5, 0.7)
+		ON CONFLICT (persona_id, COALESCE(owner_user_id, 0)) DO UPDATE
+		SET trust = 0.3, warmth = 0.4, attachment = 0.5, attraction = 0.7
+	`, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+
+	loaded, err := repo.Load(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+	require.InDelta(t, 0.5, loaded.Attachment, 0.001)
+	require.InDelta(t, 0.7, loaded.Attraction, 0.001, "and not swapped with attachment")
+	require.InDelta(t, 0.4, loaded.Warmth, 0.001, "nor with warmth")
+
+	// The read that actually feeds a conversation.
+	_, _, relationship, err := repo.LoadForConversation(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+	require.InDelta(t, 0.5, relationship.Attachment, 0.001)
+	require.InDelta(t, 0.7, relationship.Attraction, 0.001)
+
+	// And the write path: a good episode moves attachment and leaves attraction
+	// exactly where somebody put it.
+	require.NoError(t, repo.ApplyEpisodeValence(ctx, fixture.personaID, fixture.userID, 0.9))
+	after, err := repo.Load(ctx, fixture.personaID, fixture.userID)
+	require.NoError(t, err)
+	require.Greater(t, after.Attachment, loaded.Attachment)
+	require.InDelta(t, 0.7, after.Attraction, 0.001,
+		"a pleasant conversation does not make somebody more attractive")
+}
+
+func TestTheDatabaseRefusesARepulsion(t *testing.T) {
+	// The floor is 0 in the schema as well as in the phrasing. Negative trust is
+	// wariness and negative warmth is dislike, both ordinary; the other end of
+	// attraction is not a state this product models, and a caller reaching past
+	// the model should not be able to write one either.
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+
+	fixture := seedMemoryFixture(t, pool, "norepulsion")
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO omnichat_character_traits (persona_id, owner_user_id, attraction)
+		VALUES ($1, $2, -0.5)
+	`, fixture.personaID, fixture.userID)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "attraction")
+}

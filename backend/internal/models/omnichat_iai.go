@@ -145,9 +145,11 @@ func (r *BotPersonaRepository) CreateIAI(
 	// conflict target naming the two columns would not match any index and
 	// would fail at plan time on every single creation.)
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO omnichat_character_traits(persona_id, owner_user_id, mood, trust, warmth)
-		VALUES($1, $2, 0, $3, $4)
-	`, created.ID, creatorUserID, relationship.Trust, relationship.Warmth); err != nil {
+		INSERT INTO omnichat_character_traits(persona_id, owner_user_id, mood, trust, warmth,
+			attachment, attraction)
+		VALUES($1, $2, 0, $3, $4, $5, $6)
+	`, created.ID, creatorUserID, relationship.Trust, relationship.Warmth,
+		relationship.Attachment, relationship.Attraction); err != nil {
 		return nil, fmt.Errorf("omnichat iai: seed relationship: %w", err)
 	}
 
