@@ -195,7 +195,8 @@ const answer = () => {
 };
 for (let i = 0; i < 8; i += 1) answer();
 check('the flow reaches the last screen', walk.c.state.step, 9);
-check('the last button is not Continue', walk.render().nextLabel, 'Start talking to her');
+check('the review is where she is made, not the screen before it',
+  walk.render().nextLabel, 'Make her');
 const rows = walk.render().reviewRows;
 check('the review reports every answer', rows.map((r) => r.label),
   ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She likes', 'With you', 'Drawn to you']);
