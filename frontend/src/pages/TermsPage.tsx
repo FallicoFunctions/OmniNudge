@@ -8,7 +8,7 @@ export default function TermsPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormat();
 
-  const effectiveDate = formatDate(new Date(TERMS_EFFECTIVE_DATE_ISO), {
+  const effectiveDate = formatDate(TERMS_EFFECTIVE_DATE_ISO, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

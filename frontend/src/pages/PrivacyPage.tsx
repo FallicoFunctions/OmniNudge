@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormat();
 
-  const effectiveDate = formatDate(new Date(PRIVACY_EFFECTIVE_DATE_ISO), {
+  const effectiveDate = formatDate(PRIVACY_EFFECTIVE_DATE_ISO, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

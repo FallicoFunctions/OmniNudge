@@ -1,6 +1,26 @@
 import { useTranslation } from 'react-i18next';
 import { getBaseLanguage, resolveSupportedLanguage } from '../i18n/languageUtils';
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * '2026-02-01' is a calendar date, not an instant. new Date() reads it as UTC
+ * midnight, so anywhere west of UTC it formats as the day before -- which is
+ * how the CCPA page came to print "Last Updated: January 2026" from the
+ * constant 2026-02-01, and how the Terms page dated itself January 9 from
+ * 2026-01-10. Build those in local time so the day that is written is the day
+ * that is shown. Strings carrying a time are instants and are left alone.
+ */
+function toDate(value: Date | number | string): Date {
+  if (typeof value !== 'string') {
+    return new Date(value);
+  }
+  const parts = DATE_ONLY.exec(value);
+  return parts
+    ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
+    : new Date(value);
+}
+
 /**
  * Hook for localized formatting of dates and numbers
  */
@@ -17,8 +37,7 @@ export function useFormat() {
    * Format a date based on the current locale
    */
   const formatDate = (date: Date | number | string, options?: Intl.DateTimeFormatOptions) => {
-    const d = new Date(date);
-    return new Intl.DateTimeFormat(locale, options).format(d);
+    return new Intl.DateTimeFormat(locale, options).format(toDate(date));
   };
 
   /**

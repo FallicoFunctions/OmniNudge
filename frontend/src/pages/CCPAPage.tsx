@@ -14,7 +14,7 @@ export default function CCPAPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormat();
 
-  const lastUpdated = formatDate(new Date(CCPA_LAST_UPDATED_ISO), {
+  const lastUpdated = formatDate(CCPA_LAST_UPDATED_ISO, {
     year: 'numeric',
     month: 'long',
   });
