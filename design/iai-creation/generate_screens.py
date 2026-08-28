@@ -9,8 +9,8 @@ import sys
 STEP = '"default":1,"min":1'
 GENDER = '"gender":{"editor":"enum","options":["","woman","man"],"default":""'
 
-SCREENS = ["Step1Basics", "Step2Look", "Step3Face", "Step4Build", "Step5Start",
-           "Step6Interests", "Step7Feeling", "Step8Name", "Step9Meet"]
+SCREENS = ["Step1Basics", "Step2Look", "Step3Face", "Step4Build", "Step5Traits",
+           "Step6Interests", "Step7You", "Step8Name", "Step9Meet"]
 
 
 def with_gender(text, gender):
