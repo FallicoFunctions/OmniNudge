@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import CreationFlow from '../components/omnichat/iai/CreationFlow';
+import { translate } from '../components/omnichat/iai/labels';
 import type { CreationRefusal } from '../components/omnichat/iai/refusals';
 import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
 import { omnichatQueryKeys, omnichatService } from '../services/omnichatService';
@@ -58,7 +59,7 @@ export default function OmniChatNewCharacterPage() {
           <CreationFlow onMade={(persona) => openChat.mutate(persona)} onRefused={setRefusal} />
         )}
       </div>
-      <span className="sr-only">{t('omnichat.iai.pageTitle', 'New independent character')}</span>
+      <span className="sr-only">{translate(t, 'omnichat.iai.pageTitle', 'New independent character')}</span>
     </OmniChatShell>
   );
 }
@@ -86,38 +87,35 @@ function RefusalPanel({
   const copy =
     refusal === 'already_has_one'
       ? {
-          title: t('omnichat.iai.refused.existing.title', 'You already have one'),
-          body: t(
-            'omnichat.iai.refused.existing.body',
+          title: translate(t, 'omnichat.iai.refused.existing.title', 'You already have one'),
+          body: translate(t, 'omnichat.iai.refused.existing.body',
             'One independent character at a time. She remembers everything the two of you have done, and that is the whole point of the limit.'
           ),
-          action: t('omnichat.iai.refused.existing.action', 'Open your characters'),
+          action: translate(t, 'omnichat.iai.refused.existing.action', 'Open your characters'),
           onAction: onOpenCharacters,
         }
       : refusal === 'underage'
         ? {
-            title: t('omnichat.iai.refused.underage.title', 'That character will not be made'),
-            body: t(
-              'omnichat.iai.refused.underage.body',
+            title: translate(t, 'omnichat.iai.refused.underage.title', 'That character will not be made'),
+            body: translate(t, 'omnichat.iai.refused.underage.body',
               'Nobody under 18 is made here. Change the age and the rest of your answers are still there.'
             ),
-            action: t('omnichat.iai.refused.underage.action', 'Go back'),
+            action: translate(t, 'omnichat.iai.refused.underage.action', 'Go back'),
             onAction: onDismiss,
           }
         : {
-            title: t('omnichat.iai.refused.upgrade.title', 'This one comes with Premium'),
-            body: t(
-              'omnichat.iai.refused.upgrade.body',
+            title: translate(t, 'omnichat.iai.refused.upgrade.title', 'This one comes with Premium'),
+            body: translate(t, 'omnichat.iai.refused.upgrade.body',
               'Writing your own characters starts on Plus. One who answers for themselves, remembers, and can tell you no comes with Premium.'
             ),
-            action: t('omnichat.iai.refused.upgrade.action', 'See the plans'),
+            action: translate(t, 'omnichat.iai.refused.upgrade.action', 'See the plans'),
             onAction: onSeePlans,
           };
 
   return (
     <div className="flex w-full max-w-[560px] flex-col gap-5 rounded-[30px] border border-white/10 bg-[#0e1017] p-8 shadow-[0_32px_120px_rgba(0,0,0,.72)]">
       <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7da8ff]">
-        {t('omnichat.iai.header', 'New independent character')}
+        {translate(t, 'omnichat.iai.header', 'New independent character')}
       </p>
       <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white">
         {copy.title}
@@ -137,7 +135,7 @@ function RefusalPanel({
             onClick={onDismiss}
             className="omnichat-touch-target rounded-full px-5 text-[14.5px] font-semibold text-white/60 transition hover:text-white"
           >
-            {t('omnichat.iai.refused.back', 'Back')}
+            {translate(t, 'omnichat.iai.refused.back', 'Back')}
           </button>
         )}
       </div>

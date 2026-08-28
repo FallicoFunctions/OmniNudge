@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import OptionGrid from './OptionGrid';
 import AnswerSlider from './AnswerSlider';
 import StepRail from './StepRail';
-import { glossFor, labelFor } from './labels';
+import { glossFor, labelFor, translate } from './labels';
 import { feetAndInches, pronounsFor } from './pronouns';
 import { refusalFrom, type CreationRefusal } from './refusals';
 import {
@@ -30,7 +30,7 @@ interface CreationFlowProps {
 
 export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
   const { t } = useTranslation();
-  const tab = (key: string, fallback: string) => t(`omnichat.iai.tab.${key}`, fallback);
+  const tab = (key: string, fallback: string) => translate(t, `omnichat.iai.tab.${key}`, fallback);
 
   const { data: options, isLoading } = useQuery({
     queryKey: omnichatQueryKeys.iaiOptions,
@@ -96,15 +96,14 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
     switch (step) {
       case 1:
         return {
-          title: t('omnichat.iai.step1.title', 'Who are we making'),
-          sub: t(
-            'omnichat.iai.step1.sub',
+          title: translate(t, 'omnichat.iai.step1.title', 'Who are we making'),
+          sub: translate(t, 'omnichat.iai.step1.sub',
             'The basics first, because everything after this follows from them. Nobody under 18 is made here.'
           ),
         };
       case 2:
         return {
-          title: t('omnichat.iai.step2.title', 'Pick a look'),
+          title: translate(t, 'omnichat.iai.step2.title', 'Pick a look'),
           sub: `This is the world ${p.subj} ${p.is} drawn in. It does not change who ${p.subj} ${p.is}.`,
         };
       case 3:
@@ -179,13 +178,13 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
   // which left the review unreachable -- nine screens, one of them impossible
   // to see, and somebody confirming a summary they were never shown.
   const nextLabel =
-    step === TOTAL_STEPS ? `Make ${p.obj}` : t('omnichat.iai.continue', 'Continue');
+    step === TOTAL_STEPS ? `Make ${p.obj}` : translate(t, 'omnichat.iai.continue', 'Continue');
 
   return (
     <div className="flex h-[740px] w-full max-w-[1060px] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[#0e1017] shadow-[0_32px_120px_rgba(0,0,0,.72)]">
       <header className="flex items-center justify-between gap-5 border-b border-white/10 px-8 py-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7da8ff]">
-          {t('omnichat.iai.header', 'New independent character')}
+          {translate(t, 'omnichat.iai.header', 'New independent character')}
         </p>
       </header>
 
@@ -204,9 +203,9 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
             {step === 1 ? (
               <div className="flex flex-col gap-5">
                 {grid('gender', appearance.gender ?? [], 2, answers.gender, (key) =>
-                  answer('gender', key), t('omnichat.iai.field.gender', 'Woman or man'))}
+                  answer('gender', key), translate(t, 'omnichat.iai.field.gender', 'Woman or man'))}
                 <AnswerSlider
-                  label={t('omnichat.iai.field.age', 'Age')}
+                  label={translate(t, 'omnichat.iai.field.age', 'Age')}
                   value={answers.age}
                   min={options.minimum_age}
                   max={options.maximum_age}
@@ -214,7 +213,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   onChange={(value) => answer('age', value)}
                 />
                 <AnswerSlider
-                  label={t('omnichat.iai.field.height', 'Height')}
+                  label={translate(t, 'omnichat.iai.field.height', 'Height')}
                   value={answers.heightInches}
                   min={options.minimum_height_inches}
                   max={options.maximum_height_inches}
@@ -226,40 +225,40 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
             {step === 2
               ? grid('style', appearance.style ?? [], 2, answers.style, (key) =>
-                  answer('style', key), t('omnichat.iai.field.style', 'Drawn as'))
+                  answer('style', key), translate(t, 'omnichat.iai.field.style', 'Drawn as'))
               : null}
 
             {step === 3 ? (
               <div className="flex flex-col gap-6">
                 {grid('ethnicity', appearance.ethnicity ?? [], 3, answers.ethnicity, (key) =>
-                  answer('ethnicity', key), t('omnichat.iai.field.ethnicity', 'Ethnicity'))}
+                  answer('ethnicity', key), translate(t, 'omnichat.iai.field.ethnicity', 'Ethnicity'))}
                 {grid('hair_length', appearance.hair_length ?? [], 3, answers.hairLength, (key) =>
-                  answer('hairLength', key), t('omnichat.iai.field.hair_length', 'Hair length'))}
+                  answer('hairLength', key), translate(t, 'omnichat.iai.field.hair_length', 'Hair length'))}
                 {grid('hair_texture', appearance.hair_texture ?? [], 4, answers.hairTexture, (key) =>
-                  answer('hairTexture', key), t('omnichat.iai.field.hair_texture', 'Hair texture'))}
+                  answer('hairTexture', key), translate(t, 'omnichat.iai.field.hair_texture', 'Hair texture'))}
                 {grid(
                   'hair_style',
                   hairStyleChoices(options, answers.style, answers.gender, answers.hairTexture),
                   3,
                   answers.hairStyle,
                   (key) => answer('hairStyle', key),
-                  t('omnichat.iai.field.hair_style', 'Hair style')
+                  translate(t, 'omnichat.iai.field.hair_style', 'Hair style')
                 )}
                 {grid('hair_colour', appearance.hair_colour ?? [], 4, answers.hairColour, (key) =>
-                  answer('hairColour', key), t('omnichat.iai.field.hair_colour', 'Hair colour'))}
+                  answer('hairColour', key), translate(t, 'omnichat.iai.field.hair_colour', 'Hair colour'))}
                 {grid('eyes', eyeChoices(options, answers.style), 4, answers.eyes, (key) =>
-                  answer('eyes', key), t('omnichat.iai.field.eyes', 'Eyes'))}
+                  answer('eyes', key), translate(t, 'omnichat.iai.field.eyes', 'Eyes'))}
               </div>
             ) : null}
 
             {step === 4
               ? grid('build', buildChoices(options, answers.gender), 4, answers.build, (key) =>
-                  answer('build', key), t('omnichat.iai.field.build', 'Build'))
+                  answer('build', key), translate(t, 'omnichat.iai.field.build', 'Build'))
               : null}
 
             {step === 5 ? (
               <OptionGrid
-                label={t('omnichat.iai.field.traits', 'Traits')}
+                label={translate(t, 'omnichat.iai.field.traits', 'Traits')}
                 counter={`${answers.temperaments.length} of ${options.temperament_picks}`}
                 counterHighlighted={answers.temperaments.length > 0}
                 columns={2}
@@ -279,19 +278,19 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t('omnichat.iai.search', 'Search')}
-                  aria-label={t('omnichat.iai.searchInterests', 'Search interests')}
+                  placeholder={translate(t, 'omnichat.iai.search', 'Search')}
+                  aria-label={translate(t, 'omnichat.iai.searchInterests', 'Search interests')}
                   className="h-11 w-full max-w-[320px] rounded-xl border border-white/10 bg-white/[0.035] px-3.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
                 />
                 <OptionGrid
-                  label={t('omnichat.iai.field.interests', 'Interests')}
+                  label={translate(t, 'omnichat.iai.field.interests', 'Interests')}
                   counter={`${answers.interests.length} of ${options.interest_picks}`}
                   counterHighlighted={answers.interests.length > 0}
                   columns={3}
                   options={interests.map((key) => ({ key, label: labelFor(t, 'interest', key) }))}
                   isSelected={(key) => answers.interests.includes(key)}
                   onPick={(key) => toggle('interests', key, options.interest_picks)}
-                  empty={t('omnichat.iai.noMatches', 'Nothing matches that.')}
+                  empty={translate(t, 'omnichat.iai.noMatches', 'Nothing matches that.')}
                 />
               </div>
             ) : null}
@@ -310,7 +309,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   onPick={(key) => answer('feeling', key)}
                 />
                 {grid('attraction', options.attractions ?? [], 3, answers.attraction, (key) =>
-                  answer('attraction', key), t('omnichat.iai.field.attraction', 'Drawn to you'))}
+                  answer('attraction', key), translate(t, 'omnichat.iai.field.attraction', 'Drawn to you'))}
               </div>
             ) : null}
 
@@ -329,11 +328,11 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   <button
                     type="button"
                     onClick={shuffle}
-                    aria-label={t('omnichat.iai.shuffle', 'Suggest another name')}
+                    aria-label={translate(t, 'omnichat.iai.shuffle', 'Suggest another name')}
                     className="omnichat-touch-target flex h-14 shrink-0 items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.035] px-4 text-sm font-semibold text-white/75 transition hover:border-[#5d8fff]/60"
                   >
                     <Shuffle size={16} />
-                    {t('omnichat.iai.shuffleLabel', 'Shuffle')}
+                    {translate(t, 'omnichat.iai.shuffleLabel', 'Shuffle')}
                   </button>
                 </div>
                 <p className="text-right text-[11px] tabular-nums text-white/30">
@@ -350,7 +349,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
           <footer className="flex items-center justify-between gap-4 border-t border-white/10 px-8 py-4">
             <p className="text-[12.5px] text-white/35">
               {step === 5 && answers.temperaments.length === 0
-                ? t('omnichat.iai.pickOne', 'Pick at least one to carry on.')
+                ? translate(t, 'omnichat.iai.pickOne', 'Pick at least one to carry on.')
                 : ''}
             </p>
             <div className="ml-auto flex items-center gap-2.5">
@@ -361,7 +360,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   step === 1 ? 'invisible' : ''
                 }`}
               >
-                {t('omnichat.iai.back', 'Back')}
+                {translate(t, 'omnichat.iai.back', 'Back')}
               </button>
               <button
                 type="button"
@@ -394,57 +393,57 @@ function ReviewPanel({
 
   const rows: { label: string; value: string }[] = [
     {
-      label: t('omnichat.iai.review.look', 'Look'),
+      label: translate(t, 'omnichat.iai.review.look', 'Look'),
       value:
         joined([
           said('style', answers.style),
           said('gender', answers.gender),
           String(answers.age),
           feetAndInches(answers.heightInches),
-        ]) || t('omnichat.iai.review.notChosen', 'Not chosen'),
+        ]) || translate(t, 'omnichat.iai.review.notChosen', 'Not chosen'),
     },
     {
-      label: t('omnichat.iai.review.ethnicity', 'Ethnicity'),
-      value: said('ethnicity', answers.ethnicity) || t('omnichat.iai.review.open', 'Left open'),
+      label: translate(t, 'omnichat.iai.review.ethnicity', 'Ethnicity'),
+      value: said('ethnicity', answers.ethnicity) || translate(t, 'omnichat.iai.review.open', 'Left open'),
     },
     {
-      label: t('omnichat.iai.review.hair', 'Hair'),
+      label: translate(t, 'omnichat.iai.review.hair', 'Hair'),
       value:
         joined([
           said('hair_length', answers.hairLength),
           said('hair_texture', answers.hairTexture),
           said('hair_style', answers.hairStyle),
           said('hair_colour', answers.hairColour),
-        ]) || t('omnichat.iai.review.open', 'Left open'),
+        ]) || translate(t, 'omnichat.iai.review.open', 'Left open'),
     },
     {
-      label: t('omnichat.iai.review.eyes', 'Eyes'),
-      value: said('eyes', answers.eyes) || t('omnichat.iai.review.open', 'Left open'),
+      label: translate(t, 'omnichat.iai.review.eyes', 'Eyes'),
+      value: said('eyes', answers.eyes) || translate(t, 'omnichat.iai.review.open', 'Left open'),
     },
     {
-      label: t('omnichat.iai.review.build', 'Build'),
-      value: said('build', answers.build) || t('omnichat.iai.review.open', 'Left open'),
+      label: translate(t, 'omnichat.iai.review.build', 'Build'),
+      value: said('build', answers.build) || translate(t, 'omnichat.iai.review.open', 'Left open'),
     },
     {
       label: `${pronouns.Subj} start${pronouns.s}`,
       value:
         answers.temperaments.map((key) => said('trait', key)).join(', ') ||
-        t('omnichat.iai.review.notChosen', 'Not chosen'),
+        translate(t, 'omnichat.iai.review.notChosen', 'Not chosen'),
     },
     {
       label: `${pronouns.Subj} like${pronouns.s}`,
       value:
         answers.interests.map((key) => said('interest', key)).join(', ') ||
-        t('omnichat.iai.review.nothingYet', 'Nothing yet'),
+        translate(t, 'omnichat.iai.review.nothingYet', 'Nothing yet'),
     },
     {
-      label: t('omnichat.iai.review.withYou', 'With you'),
-      value: said('feeling', answers.feeling) || t('omnichat.iai.review.notChosen', 'Not chosen'),
+      label: translate(t, 'omnichat.iai.review.withYou', 'With you'),
+      value: said('feeling', answers.feeling) || translate(t, 'omnichat.iai.review.notChosen', 'Not chosen'),
     },
     // Its own row. Folding it into the line above would put it back on the
     // ladder it was deliberately taken off.
     {
-      label: t('omnichat.iai.review.drawnTo', 'Drawn to you'),
+      label: translate(t, 'omnichat.iai.review.drawnTo', 'Drawn to you'),
       value: said('attraction', answers.attraction),
     },
   ];
@@ -465,8 +464,7 @@ function ReviewPanel({
         ))}
       </div>
       <p className="text-xs leading-5 text-white/40">
-        {t(
-          'omnichat.iai.review.limit',
+        {translate(t, 'omnichat.iai.review.limit',
           `You can keep ${options.iai_limit === 1 ? 'one independent character' : `${options.iai_limit} independent characters`}. Making another means deleting ${pronouns.obj}, and everything ${pronouns.subj} remember${pronouns.s} goes with ${pronouns.obj}.`
         )}
       </p>

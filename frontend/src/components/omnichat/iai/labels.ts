@@ -217,13 +217,27 @@ const GENDERED_GLOSSES: Record<string, (poss: string, subj: string, s: string) =
   'trait.earnest': (_poss, subj, s) => `Means what ${subj} say${s}`,
 };
 
+/**
+ * t() with a working fallback.
+ *
+ * i18next's own defaultValue does not survive this app's config: a
+ * parseMissingKeyHandler returns the key, which wins over the default, so
+ * t('a.b', 'Something') renders "a.b" on screen. OmniChatSidebar has always
+ * compared the result against the key for this reason; this is the same
+ * comparison in one place.
+ */
+export function translate(t: TFunction, key: string, fallback: string): string {
+  const value = t(key);
+  return value === key ? fallback : value;
+}
+
 export function labelFor(t: TFunction, field: string, key: string, gender?: string): string {
   const id = `${field}.${key}`;
   // The one label the server cannot supply, because it depends on another answer.
   if (id === 'ethnicity.latino' && gender === 'man') {
-    return t('omnichat.iai.ethnicity.latino_man', 'Latino');
+    return translate(t, 'omnichat.iai.ethnicity.latino_man', 'Latino');
   }
-  return t(`omnichat.iai.${id}`, DEFAULTS[id] ?? key);
+  return translate(t, `omnichat.iai.${id}`, DEFAULTS[id] ?? key);
 }
 
 export function glossFor(
@@ -235,8 +249,8 @@ export function glossFor(
   const id = `${field}.${key}`;
   const gendered = GENDERED_GLOSSES[id];
   if (gendered) {
-    return t(`omnichat.iai.gloss.${id}`, gendered(pronouns.poss, pronouns.subj, pronouns.s));
+    return translate(t, `omnichat.iai.gloss.${id}`, gendered(pronouns.poss, pronouns.subj, pronouns.s));
   }
   const plain = GLOSSES[id];
-  return plain ? t(`omnichat.iai.gloss.${id}`, plain) : '';
+  return plain ? translate(t, `omnichat.iai.gloss.${id}`, plain) : '';
 }
