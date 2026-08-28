@@ -246,3 +246,42 @@ func TestCreationUnavailableIsNotACharacterQuietlyNotMade(t *testing.T) {
 	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam"}`)
 	require.Equal(t, http.StatusServiceUnavailable, response.Code)
 }
+
+func TestTheNameShuffleIsGivenAListRatherThanARule(t *testing.T) {
+	// One call when the screen opens; every shuffle after it is local. The blend
+	// is not sent, because how people are named across cultures is a judgement
+	// rather than a detail, and a rule sent to a client is a rule that can
+	// disagree with the server.
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/omnichat/iai/names", (&OmniChatHandler{}).GetIAINames)
+
+	ask := func(query string) []string {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/iai/names"+query, nil))
+		require.Equal(t, http.StatusOK, response.Code)
+		var body IAINameSuggestions
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		return body.Names
+	}
+
+	latina := ask("?ethnicity=latino&gender=woman")
+	require.Equal(t, services.IAINames("latino", "woman"), latina)
+	require.Contains(t, latina, "Camila")
+	require.Contains(t, latina, "Anna", "and a name from anywhere, which is the point")
+	require.NotContains(t, latina, "Mateo", "an answered question still narrows")
+
+	// Asked before those screens, or by something that skipped them. Neither
+	// unanswered question is answered on somebody's behalf.
+	unanswered := ask("")
+	require.Equal(t, services.IAINames("mixed", ""), unanswered)
+	require.Greater(t, len(unanswered), len(latina))
+	require.Contains(t, unanswered, "Camila")
+	require.Contains(t, unanswered, "Mateo")
+
+	// Nothing about the mixing rule is on the wire.
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/iai/names?ethnicity=latino", nil))
+	require.NotContains(t, response.Body.String(), "shared")
+	require.NotContains(t, response.Body.String(), "weight")
+}

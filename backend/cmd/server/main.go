@@ -1420,6 +1420,9 @@ func main() {
 			// The lists the nine screens draw from, so the interface never
 			// keeps its own copy of what the server will accept.
 			protected.GET("/omnichat/iai/options", omniChatHandler.GetIAIOptions)
+			// Names to start her off with. Read once when the screen opens; the
+			// shuffle itself is local, so this is not a per-press endpoint.
+			protected.GET("/omnichat/iai/names", omniChatHandler.GetIAINames)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)

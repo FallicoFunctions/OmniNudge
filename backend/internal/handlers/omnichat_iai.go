@@ -147,6 +147,27 @@ func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
 	})
 }
 
+// IAINameSuggestions is what the shuffle on screen eight draws from.
+type IAINameSuggestions struct {
+	Names []string `json:"names"`
+}
+
+// GetIAINames answers with the whole list, blended, rather than one name.
+//
+// One call when the screen opens; every shuffle after that is instant and
+// offline. A name per press would put a round trip behind a button somebody
+// presses idly, and would make the shuffle a rate-limit surface for nothing.
+//
+// The blend is not sent. The interface picks uniformly from what it is given
+// and never learns the mixing rule, which is a judgement about how people are
+// named rather than a detail -- and a rule sent to a client is a rule that can
+// disagree with the server.
+func (h *OmniChatHandler) GetIAINames(c *gin.Context) {
+	c.JSON(http.StatusOK, IAINameSuggestions{
+		Names: services.IAINames(c.Query("ethnicity"), c.Query("gender")),
+	})
+}
+
 // CreateIAI turns the answers into somebody.
 func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
