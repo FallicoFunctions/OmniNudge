@@ -38,9 +38,6 @@ export default function OmniChatHeader({
               <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">
                 OmniChat
               </span>
-              <span className="mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:block">
-                Stories that answer back
-              </span>
             </span>
           </Link>
 
