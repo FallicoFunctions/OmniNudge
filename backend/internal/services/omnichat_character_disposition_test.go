@@ -302,3 +302,49 @@ func TestSpeechInsideTheDeadbandStillSaysNothing(t *testing.T) {
 		Talkativeness: 0.1, Expressiveness: -0.15,
 	}))
 }
+
+func TestAttachmentAndAttractionAreNotFondness(t *testing.T) {
+	// The three were one number before, which made "close" and "in love with
+	// you" the same answer. Each has to be sayable without the others.
+	attached := renderCharacterDisposition(models.OmniChatDisposition{Attachment: 0.8})
+	require.Contains(t, attached, "fixed points")
+	require.NotContains(t, attached, "drawn to", "attachment is not attraction")
+	require.NotContains(t, attached, "fond of them", "and it is not warmth")
+
+	drawn := renderCharacterDisposition(models.OmniChatDisposition{Attraction: 0.8})
+	require.Contains(t, drawn, "drawn to this person")
+	require.NotContains(t, drawn, "fixed points")
+
+	// The combination the whole split was for.
+	wary := renderCharacterDisposition(models.OmniChatDisposition{Trust: -0.7, Attraction: 0.8})
+	require.Contains(t, wary, "drawn to this person")
+	require.Contains(t, wary, "guarded", "guarded and attracted at the same time")
+}
+
+func TestAttractionHasNoNegativeSide(t *testing.T) {
+	// The column has a floor of 0. Negative trust is wariness and negative
+	// warmth is dislike, both ordinary; the other end of attraction would be
+	// repulsion, which this product does not model and nobody can configure.
+	require.Empty(t, attractionPhrase(-0.9))
+	require.Empty(t, attractionPhrase(-0.5))
+	require.NotEmpty(t, attractionPhrase(0.5))
+}
+
+func TestTheJudgeIsToldWhatAnExchangeCouldCost(t *testing.T) {
+	// The same cool message costs nothing from a stranger and a great deal from
+	// the person who has become one of her fixed points. Without this the
+	// extractor scores both the same.
+	stranger := describeDispositionForJudgement(models.OmniChatDisposition{})
+	bonded := describeDispositionForJudgement(models.OmniChatDisposition{Attachment: 0.8})
+
+	require.Empty(t, stranger)
+	require.Contains(t, bonded, "fixed points")
+	require.NotContains(t, bonded, "not an instruction",
+		"the judge is told about her, never addressed as her")
+}
+
+func TestABondInsideTheDeadbandStillSaysNothing(t *testing.T) {
+	require.Empty(t, renderCharacterDisposition(models.OmniChatDisposition{
+		Attachment: 0.1, Attraction: 0.15,
+	}))
+}

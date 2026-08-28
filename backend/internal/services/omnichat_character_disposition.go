@@ -107,7 +107,17 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	if phrase := expressivenessPhrase(disposition.Expressiveness); phrase != "" {
 		speech = append(speech, phrase)
 	}
-	if mood == "" && firmness == "" && len(toward) == 0 && len(speech) == 0 {
+	// Their own lines, never folded into "with this person you are". Attachment
+	// is about what their absence costs and attraction is about being drawn to
+	// them, and both read as fondness the moment they share a clause with it.
+	bond := make([]string, 0, 2)
+	if phrase := attachmentPhrase(disposition.Attachment); phrase != "" {
+		bond = append(bond, phrase)
+	}
+	if phrase := attractionPhrase(disposition.Attraction); phrase != "" {
+		bond = append(bond, phrase)
+	}
+	if mood == "" && firmness == "" && len(toward) == 0 && len(speech) == 0 && len(bond) == 0 {
 		return ""
 	}
 
@@ -126,6 +136,9 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	// relationship produced, when it is the one part of her that does not move.
 	if firmness != "" {
 		builder.WriteString(firmness + "\n")
+	}
+	for _, phrase := range bond {
+		builder.WriteString(phrase + "\n")
 	}
 	for _, phrase := range speech {
 		builder.WriteString(phrase + "\n")
@@ -176,6 +189,46 @@ func expressivenessPhrase(value float64) string {
 	return ""
 }
 
+// attachmentPhrase says what this person's absence would cost her.
+//
+// Not fondness, which warmth already carries. Somebody can be very fond of a
+// person they would not miss, and can be badly attached to one they are not
+// enjoying. Written about the absence rather than the feeling, because that is
+// the part that shows in what she says.
+func attachmentPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "This person has become one of the fixed points of your life. You notice when they are not there."
+	case bandMildPositive:
+		return "You have got used to them being around, and you would rather they stayed."
+	case bandMildNegative:
+		return "You have been drifting from them without deciding to."
+	case bandStrongNegative:
+		return "You have come loose from this person. They used to matter more to you than they do."
+	}
+	return ""
+}
+
+// attractionPhrase says whether she is drawn to them.
+//
+// Only the positive bands exist: the column has a floor of 0, because negative
+// attraction would be repulsion, which is not the other end of this scale.
+//
+// It is separate from everything else on purpose. Somebody can be immediately
+// taken with a person they do not trust, and can love an old friend without
+// any of this -- and neither of those was expressible while warmth carried it
+// all. The line says she is aware of it and nothing about what she does with
+// it: what she does is hers, and §13 is why nothing here tells her.
+func attractionPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "You are drawn to this person, and it is not a small thing. You are aware of it when you talk to them."
+	case bandMildPositive:
+		return "You find this person attractive. It is there, quietly, whether or not it comes up."
+	}
+	return ""
+}
+
 // firmnessPhrase says what happens when somebody keeps pushing after a no.
 //
 // Deliberately about the behaviour rather than the label. "You are firm" invites
@@ -210,6 +263,13 @@ func describeDispositionForJudgement(disposition models.OmniChatDisposition) str
 		parts = append(parts, phrase)
 	}
 	if phrase := speechDescription(disposition); phrase != "" {
+		parts = append(parts, phrase)
+	}
+	// The judge needs the bond for the same reason it needs the speech: what an
+	// exchange did to somebody depends on what they had to lose. The same cool
+	// message costs nothing from a stranger and a great deal from the person
+	// who has become one of her fixed points.
+	if phrase := bondDescription(disposition); phrase != "" {
 		parts = append(parts, phrase)
 	}
 	return strings.Join(parts, " ")
@@ -353,4 +413,27 @@ func joinClauses(clauses []string) string {
 		return clauses[0]
 	}
 	return strings.Join(clauses[:len(clauses)-1], ", ") + ", and " + clauses[len(clauses)-1]
+}
+
+// bondDescription is the attachment and the attraction, told about her rather
+// than to her.
+func bondDescription(disposition models.OmniChatDisposition) string {
+	var parts []string
+	switch band(disposition.Attachment) {
+	case bandStrongPositive:
+		parts = append(parts, "This person is one of the fixed points of her life.")
+	case bandMildPositive:
+		parts = append(parts, "She has got used to this person being around.")
+	case bandMildNegative:
+		parts = append(parts, "She has been drifting from this person.")
+	case bandStrongNegative:
+		parts = append(parts, "She has come loose from this person.")
+	}
+	switch band(disposition.Attraction) {
+	case bandStrongPositive:
+		parts = append(parts, "She is strongly drawn to them.")
+	case bandMildPositive:
+		parts = append(parts, "She finds them attractive.")
+	}
+	return strings.Join(parts, " ")
 }

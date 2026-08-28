@@ -174,12 +174,19 @@ func (d *OmniChatDispositionBaselineDeriver) Derive(ctx context.Context, persona
 	// earned the benefit of the doubt. Out of range is refused for the same
 	// reason and never clamped -- a model that answered 3.2 did not read the
 	// scale it was given.
-	axes := map[string]*float64{
-		"mood": output.Mood, "trust": output.Trust,
-		"warmth": output.Warmth, "firmness": output.Firmness,
-		"talkativeness": output.Talkativeness, "expressiveness": output.Expressiveness,
+	// A slice rather than a map, so the axis named in the error is the first one
+	// missing rather than whichever the runtime happened to visit first. Two
+	// derivations of the same bad response should not blame different fields.
+	axes := []struct {
+		name  string
+		value *float64
+	}{
+		{"mood", output.Mood}, {"trust", output.Trust},
+		{"warmth", output.Warmth}, {"firmness", output.Firmness},
+		{"talkativeness", output.Talkativeness}, {"expressiveness", output.Expressiveness},
 	}
-	for name, value := range axes {
+	for _, axis := range axes {
+		name, value := axis.name, axis.value
 		if value == nil {
 			return models.OmniChatDispositionBaseline{}, fmt.Errorf("omnichat baseline: derivation for %q left out %s", persona.Name, name)
 		}
@@ -200,8 +207,8 @@ func (d *OmniChatDispositionBaselineDeriver) Derive(ctx context.Context, persona
 	// Six independent judgements landing on exactly 0.0 is not a reading of a
 	// card that has any content. The cost of being wrong is one re-run.
 	unreadable := true
-	for _, value := range axes {
-		if *value != 0 {
+	for _, axis := range axes {
+		if *axis.value != 0 {
 			unreadable = false
 			break
 		}
