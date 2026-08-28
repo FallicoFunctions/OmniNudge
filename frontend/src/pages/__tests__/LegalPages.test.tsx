@@ -84,7 +84,7 @@ describe('legal pages', () => {
         <TermsPage />
       </MemoryRouter>
     );
-    expect(screen.getByText('1. Acceptance of Terms')).toBeInTheDocument();
+    expect(screen.getByText('1. Acceptance')).toBeInTheDocument();
     expect(
       screen.getByText(/OmniNudge is not liable for any indirect, incidental, or consequential/)
     ).toBeInTheDocument();
