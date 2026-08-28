@@ -27,8 +27,9 @@ func TestTheAnswersOnTheFormAreTheOnesTheSpecOffers(t *testing.T) {
 	// Feelings, not histories. §35: she has no past to describe, so the screen
 	// asks how she is rather than what the two of them have been through.
 	require.Equal(t, []string{
-		"indifferent", "curious", "fond", "close", "devoted", "besotted",
+		"guarded", "neutral", "curious", "fond", "close", "devoted",
 	}, IAIFeelingKeys())
+	require.Equal(t, []string{"none", "some", "strong"}, IAIAttractionKeys())
 }
 
 func TestTraitsThatAgreeReinforceAndTraitsThatConflictCancel(t *testing.T) {
@@ -42,8 +43,8 @@ func TestTraitsThatAgreeReinforceAndTraitsThatConflictCancel(t *testing.T) {
 	// So two warm answers now make her warmer than either alone. That is the
 	// point: somebody who picks warm and outgoing and easygoing is asking for a
 	// warm character, and the old arithmetic answered by making her unremarkable.
-	warmAlone := SeedIAI([]string{"warm"}, "fond").Baseline.Warmth
-	bothWarm := SeedIAI([]string{"warm", "outgoing"}, "fond").Baseline.Warmth
+	warmAlone := SeedIAI([]string{"warm"}, "fond", "none").Baseline.Warmth
+	bothWarm := SeedIAI([]string{"warm", "outgoing"}, "fond", "none").Baseline.Warmth
 	warm, _ := findIAITemperament("warm")
 	outgoing, _ := findIAITemperament("outgoing")
 
@@ -52,7 +53,7 @@ func TestTraitsThatAgreeReinforceAndTraitsThatConflictCancel(t *testing.T) {
 		"but not to the whole sum, or three picks would pin every warm character at the top")
 
 	// Conflict still cancels, which is what keeps a contradictory set honest.
-	conflicted := SeedIAI([]string{"warm", "guarded", "quiet"}, "fond").Baseline.Warmth
+	conflicted := SeedIAI([]string{"warm", "guarded", "quiet"}, "fond", "none").Baseline.Warmth
 	require.Less(t, conflicted, 0.2,
 		"warm, guarded and quiet together is not a warm character, and should not read as one")
 }
@@ -65,7 +66,7 @@ func TestNoCombinationCanLeaveTheScale(t *testing.T) {
 	// into silence somewhere downstream.
 	keys := IAITemperamentKeys()
 	check := func(picks []string) {
-		blended := SeedIAI(picks, "fond").Baseline
+		blended := SeedIAI(picks, "fond", "none").Baseline
 		for name, value := range map[string]float64{
 			"mood": blended.Mood, "trust": blended.Trust,
 			"warmth": blended.Warmth, "firmness": blended.Firmness,
@@ -134,19 +135,19 @@ func TestThePairsActuallyPullAgainstEachOther(t *testing.T) {
 func TestPickingOneOrTwoIsAnAnswerNotAnError(t *testing.T) {
 	// Three is a ceiling rather than a quota. Forcing a third makes somebody
 	// choose filler, and filler becomes baseline personality she has to carry.
-	one := SeedIAI([]string{"quiet"}, "fond")
+	one := SeedIAI([]string{"quiet"}, "fond", "none")
 	quiet, _ := findIAITemperament("quiet")
 	require.InDelta(t, quiet.Warmth, one.Baseline.Warmth, 0.0001,
 		"one pick is that trait exactly, undiluted")
 
-	two := SeedIAI([]string{"warm", "playful"}, "fond")
+	two := SeedIAI([]string{"warm", "playful"}, "fond", "none")
 	warm, _ := findIAITemperament("warm")
 	playful, _ := findIAITemperament("playful")
 	require.InDelta(t, (warm.Warmth+playful.Warmth)/math.Sqrt2, two.Baseline.Warmth, 0.0001)
 
 	// And a fourth is still ignored rather than quietly averaged in.
-	four := SeedIAI([]string{"warm", "playful", "quiet", "sharp"}, "fond")
-	three := SeedIAI([]string{"warm", "playful", "quiet"}, "fond")
+	four := SeedIAI([]string{"warm", "playful", "quiet", "sharp"}, "fond", "none")
+	three := SeedIAI([]string{"warm", "playful", "quiet"}, "fond", "none")
 	require.Equal(t, three.Baseline, four.Baseline)
 }
 
@@ -184,4 +185,66 @@ func TestQuietAndReservedAreDifferentWords(t *testing.T) {
 		require.InDelta(t, 0.0, trait.Warmth, 0.0001, "%s is not cold", trait.Key)
 		require.InDelta(t, 0.0, trait.Trust, 0.0001, "%s is not guarded", trait.Key)
 	}
+}
+
+func TestDevotedMeansAttachedToSomebody(t *testing.T) {
+	// The defect this replaced. Every starting state set warmth and trust and
+	// nothing else, so a creator who chose "devoted" got a character attached to
+	// nobody -- the word promising one thing and the record holding another.
+	devoted := SeedIAI(nil, "devoted", "none").Relationship
+	neutral := SeedIAI(nil, "neutral", "none").Relationship
+
+	require.Greater(t, devoted.Attachment, 0.5, "devoted is a word about what her absence would cost")
+	require.Equal(t, 0.0, neutral.Attachment, "and a stranger is attached to nobody, correctly")
+
+	// Attachment rises with the ladder, in step with but not equal to warmth.
+	previous := -1.0
+	for _, key := range IAIFeelingKeys() {
+		state := SeedIAI(nil, key, "none").Relationship
+		require.GreaterOrEqual(t, state.Attachment, previous, "%s went backwards", key)
+		previous = state.Attachment
+	}
+}
+
+func TestAttractionIsAskedSeparatelyFromTheFeeling(t *testing.T) {
+	// The whole reason it is its own answer. On one ladder from indifferent to
+	// besotted, being taken with somebody you do not trust was unsayable.
+	wary := SeedIAI(nil, "guarded", "strong").Relationship
+	require.Less(t, wary.Trust, 0.0, "she does not trust them")
+	require.Greater(t, wary.Attraction, 0.6, "and is drawn to them anyway")
+
+	// And the other way: as close as the flow allows, with none of it.
+	close := SeedIAI(nil, "close", "none").Relationship
+	require.Greater(t, close.Trust, 0.5)
+	require.Equal(t, 0.0, close.Attraction)
+}
+
+func TestBesottedIsGoneAndIndifferentBecameNeutral(t *testing.T) {
+	// Besotted was a word about attraction sitting on a scale about trust, which
+	// is what made the two impossible to tell apart. Indifferent said she does
+	// not care, which is a judgement about somebody she has not met; neutral is
+	// the honest zero.
+	keys := IAIFeelingKeys()
+	require.NotContains(t, keys, "besotted")
+	require.NotContains(t, keys, "indifferent")
+	require.Contains(t, keys, "neutral")
+	require.Contains(t, keys, "guarded", "not trusting somebody yet is a real place to start")
+
+	// A key the form no longer offers seeds nothing rather than erroring, so a
+	// stale client costs a detail and not the character.
+	stale := SeedIAI(nil, "besotted", "none").Relationship
+	require.Equal(t, 0.0, stale.Warmth)
+	require.Equal(t, 0.0, stale.Trust)
+	require.Equal(t, 0.0, stale.Attachment)
+}
+
+func TestNoAttractionLevelIsNegative(t *testing.T) {
+	// The database refuses one and so does the table. Repulsion is not the other
+	// end of this scale.
+	for _, level := range iaiAttractionLevels {
+		require.GreaterOrEqual(t, level.Value, 0.0, "%s", level.Key)
+		require.LessOrEqual(t, level.Value, 1.0, "%s", level.Key)
+	}
+	require.Equal(t, 0.0, SeedIAI(nil, "fond", "nonsense").Relationship.Attraction,
+		"an unrecognised level is none rather than a guess")
 }

@@ -137,7 +137,13 @@ type IAIAnswers struct {
 	Temperaments []string
 	Interests    []string
 	Feeling      string
-	Appearance   IAIAppearance
+
+	// Asked separately from the feeling, on the same screen. Somebody can be
+	// immediately taken with a person they do not trust, and could not say so
+	// while one ladder ran from indifferent to besotted.
+	Attraction string
+
+	Appearance IAIAppearance
 }
 
 var iaiSlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
@@ -237,7 +243,7 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 		}
 	}
 
-	seed := SeedIAI(answers.Temperaments, answers.Feeling)
+	seed := SeedIAI(answers.Temperaments, answers.Feeling, answers.Attraction)
 	return c.personas.CreateIAI(ctx, creatorUserID, models.IAIPersona{
 		SlugBase:    iaiSlugBase(name),
 		Name:        name,

@@ -55,7 +55,11 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 		Name:         "Sam",
 		Temperaments: []string{"warm", "playful", "sharp"},
 		Interests:    []string{"games", "music"},
-		Feeling:      "besotted",
+		// Guarded and drawn to them: the combination that could not be said while
+		// one ladder ran from indifferent to besotted, and the reason attraction
+		// is asked separately.
+		Feeling:    "guarded",
+		Attraction: "strong",
 		Appearance: services.IAIAppearance{
 			Style: "anime", Gender: "woman", Age: 27, HeightInches: 65,
 			HairLength: "long", HairTexture: "curly", HairStyle: "high_ponytail",
@@ -80,7 +84,19 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 		LoadForConversation(ctx, made.ID, premiumID)
 	require.NoError(t, err)
 	require.True(t, baseline.Derived)
-	require.InDelta(t, 0.95, relationship.Warmth, 0.01)
+
+	// Both halves of the answer reach the row, separately. This is the whole
+	// path -- form to seed to insert to read -- and each of those was a place
+	// the second half could have been dropped without anything noticing.
+	require.Less(t, relationship.Trust, 0.0, "guarded: she does not trust him yet")
+	require.Greater(t, relationship.Attraction, 0.6, "and is drawn to him anyway")
+	require.InDelta(t, 0.0, relationship.Attachment, 0.01,
+		"guarded is attached to nobody, which is the honest starting point")
+
+	// And her speech came from the traits she was made with rather than from a
+	// zero nobody chose.
+	require.Greater(t, baseline.Talkativeness, 0.1,
+		"warm and playful are talkative traits, and sharp does not cancel them")
 }
 
 func TestOnlyAnEntitledAccountGetsOne(t *testing.T) {

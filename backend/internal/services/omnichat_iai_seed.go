@@ -132,15 +132,70 @@ type iaiFeeling struct {
 	Key    string
 	Warmth float64
 	Trust  float64
+
+	// Attachment as well, because "devoted" is a word about what this person's
+	// absence would cost her. Setting warmth and trust alone produced a
+	// character whose creator chose devoted and who was attached to nobody.
+	Attachment float64
 }
 
+// Six states rather than one ladder from stranger to love.
+//
+// The old list ran indifferent to besotted and mixed two questions together.
+// "Besotted" is a word about attraction sitting on a scale about trust, which
+// is exactly why attraction is its own answer now -- somebody can be
+// immediately taken with a person they do not trust, and the ladder could not
+// say it.
+//
+// "Neutral" rather than "indifferent". Indifferent says she does not care,
+// which is a judgement about somebody she has not met. Neutral is the honest
+// zero: her opinion has not been formed yet.
 var iaiFeelings = []iaiFeeling{
-	{Key: "indifferent", Warmth: 0.00, Trust: 0.00},
-	{Key: "curious", Warmth: 0.15, Trust: 0.10},
-	{Key: "fond", Warmth: 0.45, Trust: 0.35},
-	{Key: "close", Warmth: 0.65, Trust: 0.60},
-	{Key: "devoted", Warmth: 0.80, Trust: 0.70},
-	{Key: "besotted", Warmth: 0.95, Trust: 0.85},
+	{Key: "guarded", Warmth: -0.15, Trust: -0.40, Attachment: 0.00},
+	{Key: "neutral", Warmth: 0.00, Trust: 0.00, Attachment: 0.00},
+	{Key: "curious", Warmth: 0.15, Trust: 0.10, Attachment: 0.05},
+	{Key: "fond", Warmth: 0.45, Trust: 0.35, Attachment: 0.20},
+	{Key: "close", Warmth: 0.65, Trust: 0.60, Attachment: 0.50},
+	{Key: "devoted", Warmth: 0.80, Trust: 0.70, Attachment: 0.85},
+}
+
+// iaiAttractionLevel is the second answer on the same screen.
+//
+// Three, not a slider. It is the one answer where a scale invites somebody to
+// aim for the top, and the difference between "somewhat" and "very" is the only
+// distinction that changes anything she says.
+//
+// No negative level. Trust goes negative into wariness and warmth into dislike,
+// both ordinary; the other end of this one is repulsion, which the column
+// refuses and the product does not model.
+type iaiAttractionLevel struct {
+	Key   string
+	Value float64
+}
+
+var iaiAttractionLevels = []iaiAttractionLevel{
+	{Key: "none", Value: 0.00},
+	{Key: "some", Value: 0.35},
+	{Key: "strong", Value: 0.75},
+}
+
+// IAIAttractionKeys lists what the form may offer, in the order §34 gives.
+func IAIAttractionKeys() []string {
+	keys := make([]string, 0, len(iaiAttractionLevels))
+	for _, level := range iaiAttractionLevels {
+		keys = append(keys, level.Key)
+	}
+	return keys
+}
+
+func findIAIAttraction(key string) (iaiAttractionLevel, bool) {
+	key = strings.TrimSpace(strings.ToLower(key))
+	for _, level := range iaiAttractionLevels {
+		if level.Key == key {
+			return level, true
+		}
+	}
+	return iaiAttractionLevel{}, false
 }
 
 // IAIFeelingKeys lists what the form may offer, in the order §34 gives.
@@ -172,13 +227,20 @@ type IAISeed struct {
 // before this table does should produce a slightly plainer character, not a
 // failed creation, and dropping her on the floor over an unrecognised string
 // would be the worst possible trade.
-func SeedIAI(temperaments []string, feeling string) IAISeed {
+func SeedIAI(temperaments []string, feeling, attraction string) IAISeed {
 	seed := IAISeed{Baseline: blendTemperaments(temperaments)}
 	if chosen, found := findIAIFeeling(feeling); found {
 		seed.Relationship = models.OmniChatCharacterTraits{
-			Warmth: chosen.Warmth,
-			Trust:  chosen.Trust,
+			Warmth:     chosen.Warmth,
+			Trust:      chosen.Trust,
+			Attachment: chosen.Attachment,
 		}
+	}
+	// Set independently of the feeling, which is the whole reason it is a
+	// separate answer. Guarded and drawn to them is a real starting point, and
+	// close without any of it is another.
+	if level, found := findIAIAttraction(attraction); found {
+		seed.Relationship.Attraction = level.Value
 	}
 	return seed
 }
