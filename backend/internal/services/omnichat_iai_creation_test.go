@@ -17,10 +17,72 @@ func TestTheInterestsOnTheFormAreTheOnesTheSpecOffers(t *testing.T) {
 	// interface renders whatever this returns; if the two drift, somebody picks
 	// something that converts to nothing and gets a blanker character than they
 	// chose, with no error anywhere.
+	keys := IAIInterestKeys()
+	require.Len(t, keys, 40, "nine was too few to describe anybody")
+
+	// Order is the form's, so the grid does not reshuffle itself between loads.
 	require.Equal(t, []string{
-		"games", "music", "film", "reading", "making_things",
-		"fitness", "cooking", "going_out", "staying_in",
-	}, IAIInterestKeys())
+		"games", "anime", "comics", "film", "music", "reading",
+		"horror", "true_crime", "mysteries", "comedy", "theatre",
+		"writing", "poetry", "art", "photography", "crafts", "fashion",
+		"architecture", "cooking", "baking", "coffee",
+		"sports", "fitness", "martial_arts", "dance", "hiking",
+		"nature", "animals", "gardening", "travel", "languages",
+		"history", "mythology", "philosophy", "psychology", "science",
+		"space", "technology", "cars", "current_events",
+	}, keys)
+}
+
+func TestTheThreeThatWereRemovedStayRemoved(t *testing.T) {
+	// "Going out" and "staying in" describe how somebody spends an evening
+	// rather than what they are interested in, and each cost one slot out of
+	// only three to say something a character shows anyway.
+	//
+	// "Being physical" meant exercise, or affection, or sex, or fighting, or
+	// working with your hands, depending on who read it -- and for somebody
+	// with no body at all it meant less than that. Sport and training are two
+	// of those things said plainly.
+	keys := IAIInterestKeys()
+	for _, gone := range []string{"going_out", "staying_in", "making_things"} {
+		require.NotContains(t, keys, gone)
+	}
+	require.Contains(t, keys, "sports")
+	require.Contains(t, keys, "fitness")
+	require.Contains(t, keys, "crafts", "which is what making things actually meant")
+
+	// A key that no longer exists converts to nothing rather than to an error,
+	// so a form left behind by a deploy costs a detail and not the character.
+	require.Empty(t, renderIAIInterests([]string{"going_out"}))
+	require.Equal(t, "Drawn to games.", renderIAIInterests([]string{"going_out", "games"}))
+}
+
+func TestNoTwoInterestsSayTheSameThing(t *testing.T) {
+	// Forty rows written by hand. Two keys sharing a reading would be two
+	// choices producing one character, and the person who picked both would
+	// have spent two of three slots on one idea.
+	seenKey := map[string]bool{}
+	seenReads := map[string]string{}
+	for _, interest := range iaiInterests {
+		require.False(t, seenKey[interest.Key], "%s appears twice", interest.Key)
+		seenKey[interest.Key] = true
+
+		require.NotEmpty(t, interest.Reads, "%s has nothing to say", interest.Key)
+		require.Equal(t, strings.ToLower(interest.Reads), interest.Reads,
+			"%s reads mid-sentence, so it starts lower case", interest.Key)
+
+		// Three picks are joined into one sentence, so a reading carrying its
+		// own conjunction makes the join ambiguous: "games, films and shows and
+		// puzzles and mysteries" has no readable boundary between the items.
+		require.NotContains(t, interest.Reads, " and ",
+			"%s reads as two things; the sentence already supplies the and", interest.Key)
+		require.NotContains(t, interest.Reads, ",",
+			"%s carries its own comma, which is what the join uses", interest.Key)
+		if first, clash := seenReads[interest.Reads]; clash {
+			require.Fail(t, "two interests read the same",
+				"%s and %s both read %q", first, interest.Key, interest.Reads)
+		}
+		seenReads[interest.Reads] = interest.Key
+	}
 }
 
 func TestSheIsDrawnToThingsRatherThanHavingDoneThem(t *testing.T) {

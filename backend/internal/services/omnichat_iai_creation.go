@@ -24,6 +24,12 @@ import (
 // iaiInterest is one of the answers on §34's sixth screen, and how she would
 // say it.
 //
+// One phrase each, never "X and Y". Three picks are joined into a sentence, so
+// a reading with its own "and" in it makes the join unreadable: "drawn to
+// games, films and shows and puzzles and mysteries" gives a reader no way to
+// tell where one interest ends. Measured across all 9,880 three-pick
+// combinations, five such readings garbled 360 of them.
+//
 // Plain nouns, and never a history. §35: she was made recently and has done
 // almost none of what she knows about, so "has played since she was small" is a
 // past she did not have. What she has is an inclination, and the line says only
@@ -39,15 +45,69 @@ type iaiInterest struct {
 }
 
 var iaiInterests = []iaiInterest{
+	// Forty, grouped so a list this long can be read rather than scanned. The
+	// form filters as somebody types; nine was too few to describe anybody, and
+	// three slots out of nine is a third of the whole personality.
+	//
+	// Two are deliberately absent. "Going out" and "staying in" describe how
+	// somebody likes to spend an evening rather than what they are interested
+	// in, and each one cost a slot out of only three to say something a
+	// character shows anyway.
+	//
+	// "Being physical" is gone as well. It meant exercise, or affection, or
+	// sex, or fighting, or working with your hands, depending on who read it --
+	// and for somebody with no body at all it meant less than that. Sport and
+	// training are two of those things said plainly.
+
+	// Watching, reading, playing.
 	{Key: "games", Reads: "games"},
+	{Key: "anime", Reads: "anime"},
+	{Key: "comics", Reads: "comics"},
+	{Key: "film", Reads: "films"},
 	{Key: "music", Reads: "music"},
-	{Key: "film", Reads: "films and shows"},
 	{Key: "reading", Reads: "reading"},
-	{Key: "making_things", Reads: "drawing and making things"},
-	{Key: "fitness", Reads: "being physical"},
+	{Key: "horror", Reads: "frightening stories"},
+	{Key: "true_crime", Reads: "true crime"},
+	{Key: "mysteries", Reads: "mysteries"},
+	{Key: "comedy", Reads: "comedy"},
+	{Key: "theatre", Reads: "theatre"},
+
+	// Making.
+	{Key: "writing", Reads: "writing"},
+	{Key: "poetry", Reads: "poetry"},
+	{Key: "art", Reads: "art"},
+	{Key: "photography", Reads: "photography"},
+	{Key: "crafts", Reads: "making things by hand"},
+	{Key: "fashion", Reads: "fashion"},
+	{Key: "architecture", Reads: "buildings"},
 	{Key: "cooking", Reads: "cooking"},
-	{Key: "going_out", Reads: "going out"},
-	{Key: "staying_in", Reads: "staying in"},
+	{Key: "baking", Reads: "baking"},
+	{Key: "coffee", Reads: "coffee"},
+
+	// Moving.
+	{Key: "sports", Reads: "sport"},
+	{Key: "fitness", Reads: "training"},
+	{Key: "martial_arts", Reads: "martial arts"},
+	{Key: "dance", Reads: "dance"},
+	{Key: "hiking", Reads: "being outdoors"},
+
+	// Living things and places.
+	{Key: "nature", Reads: "the natural world"},
+	{Key: "animals", Reads: "animals"},
+	{Key: "gardening", Reads: "growing things"},
+	{Key: "travel", Reads: "other places"},
+	{Key: "languages", Reads: "languages"},
+
+	// Knowing.
+	{Key: "history", Reads: "history"},
+	{Key: "mythology", Reads: "myths"},
+	{Key: "philosophy", Reads: "ideas about how to live"},
+	{Key: "psychology", Reads: "why people do what they do"},
+	{Key: "science", Reads: "how things work"},
+	{Key: "space", Reads: "space"},
+	{Key: "technology", Reads: "technology"},
+	{Key: "cars", Reads: "cars"},
+	{Key: "current_events", Reads: "what is going on in the world"},
 }
 
 // IAIInterestKeys lists what the form may offer, in the order §34 gives.
