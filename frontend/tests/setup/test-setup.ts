@@ -6,8 +6,6 @@ import { webcrypto } from 'node:crypto';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from '../../public/locales/en.json';
-import es from '../../public/locales/es.json';
-import ar from '../../public/locales/ar.json';
 
 vi.mock('../../src/services/userSettingsService', () => ({
   userSettingsService: {
@@ -39,8 +37,6 @@ if (!i18n.isInitialized) {
     fallbackLng: 'en',
     resources: {
       en: { translation: en },
-      es: { translation: es },
-      ar: { translation: ar },
     },
     interpolation: {
       escapeValue: false,

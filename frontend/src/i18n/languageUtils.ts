@@ -1,11 +1,13 @@
-export const SUPPORTED_LANGUAGES = ['en', 'es', 'ar'] as const;
+// OmniNudge ships English. Spanish and Arabic locale files existed but were
+// never asked for, and the key-parity gate they created turned every English
+// copy fix into a three-file edit. Adding a language back means adding its
+// file and its entry here; nothing else in this module assumes one language.
+export const SUPPORTED_LANGUAGES = ['en'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const LANGUAGE_OPTIONS: Array<{ code: SupportedLanguage; name: string }> = [
   { code: 'en', name: 'English' },
-  { code: 'es', name: 'Español' },
-  { code: 'ar', name: 'العربية' },
 ];
 
 const SUPPORTED_LANGUAGE_SET = new Set<string>(SUPPORTED_LANGUAGES);

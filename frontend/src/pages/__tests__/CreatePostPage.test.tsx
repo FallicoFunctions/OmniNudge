@@ -335,29 +335,6 @@ describe('CreatePostPage', () => {
     );
     consoleError.mockRestore();
   });
-
-  it('preserves translated allowed-file label casing in Spanish', async () => {
-    await i18n.changeLanguage('es');
-
-    const Wrapper = createWrapper([
-      { pathname: '/posts/create', state: { defaultHub: 'testHub' } },
-    ]);
-    render(
-      <Wrapper>
-        <CreatePostPage />
-      </Wrapper>
-    );
-
-    await screen.findByDisplayValue('testHub');
-
-    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
-    expect(fileInput).not.toBeNull();
-
-    const videoFile = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
-    await userEvent.upload(fileInput!, videoFile);
-
-    expect(await screen.findByText('Por favor elige Imagenes.')).toBeInTheDocument();
-  });
 });
 
 describe('CreatePostPage — profile cache invalidation after create', () => {

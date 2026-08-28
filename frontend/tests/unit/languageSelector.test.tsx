@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import { LanguageSelector } from '../../src/components/settings/LanguageSelector';
+import { LANGUAGE_OPTIONS } from '../../src/i18n/languageUtils';
 
 const changeLanguage = vi.fn();
 
@@ -26,10 +27,15 @@ describe('LanguageSelector', () => {
     expect(select).toHaveValue('en');
   });
 
-  it('changes language from dropdown selection', () => {
+  // The picker used to offer Spanish and Arabic. Those locales are gone, so
+  // there is no second option to switch to and no switching case to write.
+  // Add a language back to LANGUAGE_OPTIONS and this asserts it is offered.
+  it('offers exactly the supported languages', () => {
     render(<LanguageSelector />);
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'es' } });
-    expect(changeLanguage).toHaveBeenCalledWith('es');
+    const options = screen.getAllByRole('option').map((option) => ({
+      code: (option as HTMLOptionElement).value,
+      name: option.textContent,
+    }));
+    expect(options).toEqual(LANGUAGE_OPTIONS.map(({ code, name }) => ({ code, name })));
   });
 });

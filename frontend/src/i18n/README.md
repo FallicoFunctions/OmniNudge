@@ -2,9 +2,11 @@
 
 ## Current Locale Files
 
-- `/public/locales/en.json` (fallback + source of key parity)
-- `/public/locales/es.json`
-- `/public/locales/ar.json`
+- `/public/locales/en.json`
+
+English is the only locale. Spanish and Arabic files were removed: nobody asked
+for them, and the key-parity gate they created meant every English copy fix was
+a three-file edit.
 
 ## Component Usage
 
@@ -34,20 +36,24 @@ export function ExampleStats({ count }: { count: number }) {
 }
 ```
 
-## Translation Contribution Workflow
+## Adding Copy
 
 1. Add the new key in `/public/locales/en.json`.
-2. Add the same key in `/public/locales/es.json` and `/public/locales/ar.json`.
-3. Keep interpolation tokens identical across locales.
-4. For plurals, use i18next suffix format:
+2. Never pass the English as a second argument to `t()`. A
+   `parseMissingKeyHandler` returns the key and overrides i18next's
+   `defaultValue`, so `t('a.key', 'Some text')` renders `a.key` to the user.
+   `TranslationKeysExist.test.ts` fails on any key that is not in en.json.
+3. For plurals, use i18next suffix format:
    - `key_one`
    - `key_other`
-5. Run checks:
+4. Run checks:
    - `npm run i18n:check`
    - `npm run i18n:guard`
-6. Run tests: `npm test`
+5. Run tests: `npm test`
 
 ## Adding a New Language
+
+Only do this if somebody actually asks for the language.
 
 1. Copy `/public/locales/en.json` to `/public/locales/{lang}.json`.
 2. Translate values while preserving key structure and interpolation tokens.
