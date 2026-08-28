@@ -22,6 +22,7 @@ export const OMNICHAT_TAB_ROUTES: Record<SidebarTab, string> = {
   explore: '/omnichat/explore',
   characters: '/omnichat/studio',
   search: '/omnichat?search=open',
+  newCharacter: '/omnichat/new-character',
 };
 
 export function useOmniChatNavigation() {

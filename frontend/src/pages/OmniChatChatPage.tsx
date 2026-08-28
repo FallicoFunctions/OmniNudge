@@ -40,6 +40,7 @@ import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetVie
 import OmniChatSpeakButton from '../components/omnichat/OmniChatSpeakButton';
 import OmniChatCallModal from '../components/omnichat/OmniChatCallModal';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
+import { OMNICHAT_TAB_ROUTES } from '../components/omnichat/useOmniChatNavigation';
 import OmniChatModelSelectorModal from '../components/omnichat/OmniChatModelSelectorModal';
 import OmniChatUpgradeModal from '../components/omnichat/OmniChatUpgradeModal';
 import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponseReportModal';
@@ -2093,6 +2094,7 @@ export default function OmniChatChatPage() {
         if (tab === 'characters') navigate('/omnichat/studio');
         if (tab === 'create') navigate('/omnichat/create');
         if (tab === 'explore') navigate('/omnichat/explore');
+        if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
       }}
     >
       <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overflow-hidden bg-[#111114]">

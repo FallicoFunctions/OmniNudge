@@ -5,6 +5,7 @@ import { Download, FileUp, Plus, Trash2, Volume2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
+import { OMNICHAT_TAB_ROUTES } from '../components/omnichat/useOmniChatNavigation';
 import MediaUploadField from '../components/common/MediaUploadField';
 import { Modal } from '../components/common/Modal';
 import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -548,6 +549,7 @@ export default function OmniChatStudioPage() {
     if (tab === 'characters') setSidebarTab('characters');
     if (tab === 'create') navigate('/omnichat/create');
     if (tab === 'explore') navigate('/omnichat/explore');
+    if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
   };
 
   const resetToBlank = () => {

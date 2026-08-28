@@ -13,6 +13,7 @@ import OmniChatShell from '../components/omnichat/OmniChatShell';
 import QuickChatDialog from '../components/omnichat/QuickChatDialog';
 import CharacterRouletteButton from '../components/omnichat/CharacterRouletteButton';
 import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
+import { OMNICHAT_TAB_ROUTES } from '../components/omnichat/useOmniChatNavigation';
 import type { BotConversation, BotMessage, BotPersona } from '../types/omnichat';
 import { loadOmniChatDefaults } from '../utils/omnichatDefaults';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -325,6 +326,7 @@ export default function OmniChatDiscoverPage() {
       }
       if (tab === 'create') navigate('/omnichat/create');
       if (tab === 'explore') navigate('/omnichat/explore');
+      if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
     },
     [handleOpenStudio, isAuthenticated, navigate]
   );
