@@ -47,7 +47,8 @@ func guardedCard() *models.BotPersona {
 }
 
 func TestDeriveBaselineReadsTheCardAndBoundsTheResult(t *testing.T) {
-	client := &stubBaselineClient{response: `{"mood": -0.2, "trust": -0.55, "warmth": -0.1, "firmness": 0.7}`}
+	client := &stubBaselineClient{response: `{"mood": -0.2, "trust": -0.55, "warmth": -0.1, "firmness": 0.7,
+		"talkativeness": -0.4, "expressiveness": -0.3}`}
 
 	baseline, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), guardedCard())
 
@@ -57,6 +58,8 @@ func TestDeriveBaselineReadsTheCardAndBoundsTheResult(t *testing.T) {
 	require.InDelta(t, -0.55, baseline.Trust, 1e-9)
 	require.InDelta(t, -0.1, baseline.Warmth, 1e-9)
 	require.InDelta(t, 0.7, baseline.Firmness, 1e-9)
+	require.InDelta(t, -0.4, baseline.Talkativeness, 1e-9)
+	require.InDelta(t, -0.3, baseline.Expressiveness, 1e-9)
 	require.Equal(t, 1, client.calls)
 	require.Contains(t, client.card, "Scarlett Voss")
 	require.Contains(t, client.card, "Trusts nobody quickly")
@@ -119,7 +122,7 @@ func TestDeriveBaselineBoundsAHugeCard(t *testing.T) {
 	// Any readable answer will do; this test is about what goes up, not what
 	// comes back. All-zero would trip the echo guard for reasons unrelated to
 	// the size of the card.
-	client := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0, "firmness": 0.4}`}
+	client := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0, "firmness": 0.4, "talkativeness": 0.1, "expressiveness": 0.2}`}
 	_, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), persona)
 	require.NoError(t, err)
 	require.Less(t, len([]rune(client.card)), omniChatBaselineCardMaxRunes+2000,
@@ -210,7 +213,7 @@ func TestSelfDispositionSettlesOnTheBaselineNotOnZero(t *testing.T) {
 // character somebody read and found unremarkable.
 func TestDeriveRefusesAnAllZeroReadingAsAnEcho(t *testing.T) {
 	deriver := NewOmniChatDispositionBaselineDeriver(
-		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.0, "warmth": 0.0, "firmness": 0.0}`},
+		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.0, "warmth": 0.0, "firmness": 0.0, "talkativeness": 0.0, "expressiveness": 0.0}`},
 	)
 
 	_, err := deriver.Derive(context.Background(), guardedCard())
@@ -222,7 +225,7 @@ func TestDeriveRefusesAnAllZeroReadingAsAnEcho(t *testing.T) {
 // mood while being emphatic about how immovable she is.
 func TestDeriveAcceptsZeroOnSomeAxes(t *testing.T) {
 	deriver := NewOmniChatDispositionBaselineDeriver(
-		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.2, "warmth": 0.0, "firmness": 0.6}`},
+		&stubBaselineClient{response: `{"mood": 0.0, "trust": 0.2, "warmth": 0.0, "firmness": 0.6, "talkativeness": 0.1, "expressiveness": 0.2}`},
 	)
 
 	baseline, err := deriver.Derive(context.Background(), guardedCard())
@@ -231,4 +234,37 @@ func TestDeriveAcceptsZeroOnSomeAxes(t *testing.T) {
 	require.True(t, baseline.Derived)
 	require.InDelta(t, 0.6, baseline.Firmness, 0.001)
 	require.Zero(t, baseline.Mood)
+}
+
+func TestAMissingAxisIsRefusedRatherThanRecordedAsZero(t *testing.T) {
+	// The failure this file spends most of its words on, arriving by a new
+	// route. Adding an axis is exactly when it happens: a model still answering
+	// on the old four-axis shape decodes cleanly, and the two it never
+	// considered are written down as 0.0 -- afterwards indistinguishable from a
+	// character somebody read and found unremarkable.
+	client := &stubBaselineClient{response: `{"mood": -0.2, "trust": -0.55, "warmth": -0.1, "firmness": 0.7}`}
+
+	_, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), guardedCard())
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "left out")
+	require.Contains(t, err.Error(), "talkativeness")
+}
+
+func TestAnAxisAnsweredAsZeroIsStillAnAnswer(t *testing.T) {
+	// Absent and zero are different. Zero on one axis is a real reading -- the
+	// card says nothing either way -- and only all six at once is a refusal.
+	client := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0, "firmness": 0,
+		"talkativeness": -0.6, "expressiveness": 0}`}
+
+	baseline, err := NewOmniChatDispositionBaselineDeriver(client).Derive(context.Background(), guardedCard())
+
+	require.NoError(t, err)
+	require.InDelta(t, -0.6, baseline.Talkativeness, 1e-9)
+	require.True(t, baseline.Derived)
+
+	all := &stubBaselineClient{response: `{"mood": 0, "trust": 0, "warmth": 0, "firmness": 0,
+		"talkativeness": 0, "expressiveness": 0}`}
+	_, err = NewOmniChatDispositionBaselineDeriver(all).Derive(context.Background(), guardedCard())
+	require.ErrorIs(t, err, ErrOmniChatBaselineUnreadable)
 }

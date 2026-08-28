@@ -241,3 +241,64 @@ func TestJudgementDescriptionIsNotTheCharactersOwnBlock(t *testing.T) {
 func TestJudgementDescriptionIsEmptyForACharacterNobodyHasRead(t *testing.T) {
 	require.Empty(t, describeDispositionForJudgement(models.OmniChatDisposition{}))
 }
+
+func TestQuietIsALengthAndReservedIsATone(t *testing.T) {
+	// The two words that sent this whole axis to the drawing board. Quiet is
+	// how much she writes; reserved is how much of her is in it. If either
+	// produced the other's line, the form would be offering a word the prompt
+	// does not mean.
+	quiet := renderCharacterDisposition(models.OmniChatDisposition{Talkativeness: -0.6, Expressiveness: -0.1})
+	require.Contains(t, quiet, "say very little")
+	require.NotContains(t, quiet, "tone level")
+	require.NotContains(t, quiet, "feel", "quiet is not about hiding anything")
+
+	reserved := renderCharacterDisposition(models.OmniChatDisposition{Talkativeness: 0, Expressiveness: -0.5})
+	require.Contains(t, reserved, "tone level")
+	require.NotContains(t, reserved, "say very little",
+		"reserved can write at length; that is not what the word means")
+}
+
+func TestTheSameCharacterSpeaksDifferentlyToDifferentPeople(t *testing.T) {
+	// The composed value is what reaches the prompt, so this is where the
+	// classroom and the message to somebody she loves actually diverge.
+	quiet := models.OmniChatDispositionBaseline{Talkativeness: -0.5, Warmth: 0.5, Derived: true}
+	now := time.Now()
+
+	stranger := renderCharacterDisposition(models.ComposeOmniChatDisposition(
+		quiet, models.OmniChatCharacterTraits{}, models.OmniChatCharacterTraits{}, now))
+	loved := renderCharacterDisposition(models.ComposeOmniChatDisposition(
+		quiet, models.OmniChatCharacterTraits{},
+		models.OmniChatCharacterTraits{Trust: 0.9, Warmth: 0.9, MoodUpdatedAt: now}, now))
+
+	// A baseline of -0.5 is the mild band, not the strong one, so she reads as
+	// economical with a stranger rather than as barely speaking.
+	require.Contains(t, stranger, "more words than you need")
+	require.NotContains(t, loved, "more words than you need")
+	require.Contains(t, loved, "easy to get talking")
+}
+
+func TestTheJudgeIsToldHowMuchSheNormallySays(t *testing.T) {
+	// A two-word reply from somebody who says very little is an ordinary
+	// message. The same reply from somebody who fills the page is a person who
+	// has gone quiet on you. Without this the extractor reads the second as the
+	// first and records nothing having happened.
+	terse := describeDispositionForJudgement(models.OmniChatDisposition{Talkativeness: -0.6})
+	chatty := describeDispositionForJudgement(models.OmniChatDisposition{Talkativeness: 0.7})
+
+	require.Contains(t, terse, "says very little")
+	require.Contains(t, chatty, "talks a great deal")
+	require.NotContains(t, terse, "not an instruction",
+		"the judge is told about her, never addressed as her")
+}
+
+func TestSpeechInsideTheDeadbandStillSaysNothing(t *testing.T) {
+	// The promise the whole block rests on: a character at rest produces no
+	// block at all, and a prompt that describes rest invites a model to perform
+	// it. Two new axes must not quietly start emitting one for everybody.
+	require.Empty(t, renderCharacterDisposition(models.OmniChatDisposition{
+		Talkativeness: 0.1, Expressiveness: -0.15,
+	}))
+	require.Empty(t, describeDispositionForJudgement(models.OmniChatDisposition{
+		Talkativeness: 0.1, Expressiveness: -0.15,
+	}))
+}

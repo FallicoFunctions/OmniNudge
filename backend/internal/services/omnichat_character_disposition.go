@@ -98,7 +98,16 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 		toward = append(toward, phrase)
 	}
 	firmness := firmnessPhrase(disposition.Firmness)
-	if mood == "" && firmness == "" && len(toward) == 0 {
+	// How she speaks, which is about her and this person both -- so it sits with
+	// firmness, on its own lines, rather than inside "with this person you are".
+	speech := make([]string, 0, 2)
+	if phrase := talkativenessPhrase(disposition.Talkativeness); phrase != "" {
+		speech = append(speech, phrase)
+	}
+	if phrase := expressivenessPhrase(disposition.Expressiveness); phrase != "" {
+		speech = append(speech, phrase)
+	}
+	if mood == "" && firmness == "" && len(toward) == 0 && len(speech) == 0 {
 		return ""
 	}
 
@@ -118,7 +127,53 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	if firmness != "" {
 		builder.WriteString(firmness + "\n")
 	}
+	for _, phrase := range speech {
+		builder.WriteString(phrase + "\n")
+	}
 	return strings.TrimRight(builder.String(), "\n")
+}
+
+// talkativenessPhrase says how much of the space she takes up.
+//
+// About the behaviour, like the others. "You are quiet" invites a character to
+// announce that she is quiet, which is the opposite of being it -- what has to
+// show up in the reply is the length of the reply.
+//
+// This moves with the relationship, so the same character produces a different
+// line here for a stranger and for somebody she has known for a year. That is
+// the point of it: quiet is a fact about her and whoever she is talking to,
+// never about her alone.
+func talkativenessPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "You talk. You send several messages where one would do, and you finish the thought out loud."
+	case bandMildPositive:
+		return "You are easy to get talking, and you tend to give more than you were asked for."
+	case bandMildNegative:
+		return "You do not use more words than you need."
+	case bandStrongNegative:
+		return "You say very little. A few words is usually the whole of it, and you are comfortable leaving it there."
+	}
+	return ""
+}
+
+// expressivenessPhrase says how much of her is in what she writes.
+//
+// Deliberately not warmth. Somebody can be enormously fond of a person and
+// still undemonstrative about it, and a character written as reserved who came
+// out cold would be the wrong character.
+func expressivenessPhrase(value float64) string {
+	switch band(value) {
+	case bandStrongPositive:
+		return "What you feel is plain in how you write. You do not hide much and you do not try to."
+	case bandMildPositive:
+		return "Some of what you feel comes through in how you put things."
+	case bandMildNegative:
+		return "You keep your tone level. What you feel is there, but it is not on the surface."
+	case bandStrongNegative:
+		return "Almost nothing of what you feel reaches the page. You can write at length and give away none of it -- this is not coldness, and you are not hiding."
+	}
+	return ""
 }
 
 // firmnessPhrase says what happens when somebody keeps pushing after a no.
@@ -154,7 +209,45 @@ func describeDispositionForJudgement(disposition models.OmniChatDisposition) str
 	if phrase := firmnessDescription(disposition.Firmness); phrase != "" {
 		parts = append(parts, phrase)
 	}
+	if phrase := speechDescription(disposition); phrase != "" {
+		parts = append(parts, phrase)
+	}
 	return strings.Join(parts, " ")
+}
+
+// speechDescription is how she talks, told about her rather than to her.
+//
+// A reader judging what happened needs it for the same reason the character
+// needs it: a two-word reply from somebody who says very little is an ordinary
+// message, and the same reply from somebody who normally fills the page is a
+// person who has gone quiet on you. Without this the extractor reads the second
+// as the first and records nothing having happened.
+func speechDescription(disposition models.OmniChatDisposition) string {
+	var said []string
+	switch band(disposition.Talkativeness) {
+	case bandStrongPositive:
+		said = append(said, "talks a great deal")
+	case bandMildPositive:
+		said = append(said, "talks readily")
+	case bandMildNegative:
+		said = append(said, "is economical with words")
+	case bandStrongNegative:
+		said = append(said, "says very little")
+	}
+	switch band(disposition.Expressiveness) {
+	case bandStrongPositive:
+		said = append(said, "shows what she feels plainly")
+	case bandMildPositive:
+		said = append(said, "lets some of what she feels through")
+	case bandMildNegative:
+		said = append(said, "keeps her tone level")
+	case bandStrongNegative:
+		said = append(said, "gives almost nothing of what she feels away")
+	}
+	if len(said) == 0 {
+		return ""
+	}
+	return "She " + joinClauses(said) + "."
 }
 
 // firmnessDescription is firmnessPhrase told about her rather than to her.
