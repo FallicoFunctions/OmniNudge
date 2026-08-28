@@ -107,7 +107,12 @@
     "na": "N/A",
     "yes": "Yes",
     "no": "No",
-    "noResultsFound": "No results found."
+    "noResultsFound": "No results found.",
+    "effectiveDate": "Effective date: {{date}}",
+    "lastUpdated": "Last Updated: {{date}}",
+    "unknown": "Unknown",
+    "ok": "OK",
+    "you": "(you)"
   },
   "markdownInput": {
     "emptyPreview": "Nothing to preview yet."
@@ -1598,7 +1603,20 @@
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
-      "userUnavailable": "This user is not available."
+      "userUnavailable": "This user is not available.",
+      "forwardConversationMissing": "Forward target conversation not found.",
+      "forwardLoadParticipantsFailed": "Unable to load conversation participants for forwarding.",
+      "forwardNoParticipants": "No participants found for selected conversation.",
+      "forwardParticipantResolutionFailed": "Unable to resolve conversation participants for forwarding.",
+      "forwardParticipantsMustMatch": "Encrypted forwarding requires conversations with identical participants.",
+      "forwardEncryptedMediaUnsupported": "Encrypted media forwarding is not supported yet. Disable media to continue.",
+      "forwardMissingRecipientKey": "Cannot decrypt this message for forwarding.",
+      "forwardMissingCiphertext": "Message ciphertext is missing.",
+      "forwardRecipientResolutionFailed": "Unable to resolve recipient.",
+      "forwardRecipientKeyFetchFailed": "Missing key for encrypted forward.",
+      "forwardRecipientKeyImportFailed": "Failed to import key for encrypted forward.",
+      "forwardFailed": "Failed to forward message.",
+      "forwardSelectConversation": "Select at least one conversation to forward to."
     },
     "editing": {
       "ariaInput": "Edit message text",
@@ -1739,7 +1757,9 @@
       "deleteError": "Failed to delete folder. Please try again.",
       "previewLabel": "Folder preview: {{name}}",
       "emptyHint": "No folders yet — press + to create one",
-      "modMail": "Mod Mail"
+      "modMail": "Mod Mail",
+      "expand": "Expand",
+      "collapse": "Collapse"
     },
     "chatSettings": "Chat Settings",
     "autoDelete": {
@@ -1754,6 +1774,15 @@
       "applyToAll": "Yes, apply to all my messages",
       "applyNewOnly": "No, new messages only",
       "usingGlobalDefault": "No per-chat override — using your global default."
+    },
+    "forward": {
+      "title": "Forward Message",
+      "subtitle": "Choose up to 10 conversations.",
+      "includeMedia": "Include media",
+      "noEligibleConversations": "No eligible conversations found.",
+      "forwarding": "Forwarding...",
+      "selectionCount_one": "{{count}} selected",
+      "selectionCount_other": "{{count}} selected"
     }
   },
   "posts": {
@@ -1888,7 +1917,8 @@
       "unknownSource": "unknown",
       "user": "User",
       "unknownUser": "Unknown user"
-    }
+    },
+    "loadingMore": "Loading more posts..."
   },
   "comments": {
     "title": "Comments",
@@ -3596,7 +3626,8 @@
         "unban": "Unban",
         "softDelete": "Soft Delete",
         "history": "History",
-        "viewBanHistory": "View Ban History"
+        "viewBanHistory": "View Ban History",
+        "delete": "Delete"
       },
       "details": {
         "redditId": "Reddit ID",
@@ -3950,7 +3981,8 @@
       "low": "Low quality",
       "medium": "Medium quality",
       "high": "High quality"
-    }
+    },
+    "yourVideo": "Your video"
   },
   "friends": {
     "title": "Friends",

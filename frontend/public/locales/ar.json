@@ -107,7 +107,12 @@
     "na": "غير متاح",
     "yes": "نعم",
     "no": "لا",
-    "noResultsFound": "لم يتم العثور على نتائج."
+    "noResultsFound": "لم يتم العثور على نتائج.",
+    "effectiveDate": "Effective date: {{date}}",
+    "lastUpdated": "Last Updated: {{date}}",
+    "unknown": "Unknown",
+    "ok": "OK",
+    "you": "(you)"
   },
   "markdownInput": {
     "emptyPreview": "لا توجد معاينة بعد."
@@ -1598,7 +1603,20 @@
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
       "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
       "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى.",
-      "userUnavailable": "هذا المستخدم غير متاح."
+      "userUnavailable": "هذا المستخدم غير متاح.",
+      "forwardConversationMissing": "Forward target conversation not found.",
+      "forwardLoadParticipantsFailed": "Unable to load conversation participants for forwarding.",
+      "forwardNoParticipants": "No participants found for selected conversation.",
+      "forwardParticipantResolutionFailed": "Unable to resolve conversation participants for forwarding.",
+      "forwardParticipantsMustMatch": "Encrypted forwarding requires conversations with identical participants.",
+      "forwardEncryptedMediaUnsupported": "Encrypted media forwarding is not supported yet. Disable media to continue.",
+      "forwardMissingRecipientKey": "Cannot decrypt this message for forwarding.",
+      "forwardMissingCiphertext": "Message ciphertext is missing.",
+      "forwardRecipientResolutionFailed": "Unable to resolve recipient.",
+      "forwardRecipientKeyFetchFailed": "Missing key for encrypted forward.",
+      "forwardRecipientKeyImportFailed": "Failed to import key for encrypted forward.",
+      "forwardFailed": "Failed to forward message.",
+      "forwardSelectConversation": "Select at least one conversation to forward to."
     },
     "editing": {
       "ariaInput": "تحرير نص الرسالة",
@@ -1739,7 +1757,9 @@
       "deleteError": "فشل حذف المجلد. يرجى المحاولة مرة أخرى.",
       "previewLabel": "معاينة المجلد: {{name}}",
       "emptyHint": "لا توجد مجلدات بعد — اضغط على + لإنشاء مجلد",
-      "modMail": "بريد الإشراف"
+      "modMail": "بريد الإشراف",
+      "expand": "Expand",
+      "collapse": "Collapse"
     },
     "chatSettings": "إعدادات الدردشة",
     "autoDelete": {
@@ -1754,6 +1774,15 @@
       "applyToAll": "نعم، طبّق على جميع رسائلي",
       "applyNewOnly": "لا، للرسائل الجديدة فقط",
       "usingGlobalDefault": "لا يوجد إعداد خاص بهذه المحادثة — يُستخدم إعدادك العام الافتراضي."
+    },
+    "forward": {
+      "title": "Forward Message",
+      "subtitle": "Choose up to 10 conversations.",
+      "includeMedia": "Include media",
+      "noEligibleConversations": "No eligible conversations found.",
+      "forwarding": "Forwarding...",
+      "selectionCount_one": "{{count}} selected",
+      "selectionCount_other": "{{count}} selected"
     }
   },
   "posts": {
@@ -1888,7 +1917,8 @@
       "unknownSource": "غير معروف",
       "user": "مستخدم",
       "unknownUser": "مستخدم غير معروف"
-    }
+    },
+    "loadingMore": "Loading more posts..."
   },
   "comments": {
     "title": "التعليقات",
@@ -3596,7 +3626,8 @@
         "unban": "الغاء الحظر",
         "softDelete": "حذف ناعم",
         "history": "السجل",
-        "viewBanHistory": "عرض سجل الحظر"
+        "viewBanHistory": "عرض سجل الحظر",
+        "delete": "Delete"
       },
       "details": {
         "redditId": "معرف Reddit",
@@ -3950,7 +3981,8 @@
       "low": "جودة منخفضة",
       "medium": "جودة متوسطة",
       "high": "جودة عالية"
-    }
+    },
+    "yourVideo": "Your video"
   },
   "friends": {
     "title": "الأصدقاء",
