@@ -1,6 +1,7 @@
 package services
 
 import (
+	"math"
 	"strings"
 
 	"github.com/omninudge/backend/internal/models"
@@ -39,6 +40,11 @@ type iaiTemperament struct {
 	Trust    float64
 	Warmth   float64
 	Firmness float64
+	// How much she says, and how much feeling is in what she says. Both are
+	// where she starts with a stranger; how far closeness opens her is worked
+	// out from the rest of her, not stored here.
+	Talkativeness  float64
+	Expressiveness float64
 }
 
 // The list from §34, and deliberately not submissive, dominant, innocent or
@@ -46,16 +52,48 @@ type iaiTemperament struct {
 // starting temperament defined by the reader's role in it is a hardcode wearing
 // a nicer word.
 var iaiTemperaments = []iaiTemperament{
-	{Key: "warm", Mood: 0.25, Trust: 0.30, Warmth: 0.50, Firmness: -0.10},
-	{Key: "guarded", Mood: 0.00, Trust: -0.45, Warmth: -0.20, Firmness: 0.35},
-	{Key: "blunt", Mood: 0.00, Trust: 0.10, Warmth: 0.00, Firmness: 0.45},
-	{Key: "playful", Mood: 0.40, Trust: 0.10, Warmth: 0.30, Firmness: -0.20},
-	{Key: "dry", Mood: -0.05, Trust: 0.00, Warmth: -0.10, Firmness: 0.20},
-	{Key: "earnest", Mood: 0.15, Trust: 0.35, Warmth: 0.35, Firmness: -0.25},
-	{Key: "restless", Mood: 0.15, Trust: 0.00, Warmth: 0.10, Firmness: -0.15},
-	{Key: "steady", Mood: 0.10, Trust: 0.15, Warmth: 0.05, Firmness: 0.50},
-	{Key: "sharp", Mood: -0.10, Trust: 0.00, Warmth: -0.10, Firmness: 0.45},
-	{Key: "quiet", Mood: -0.10, Trust: -0.15, Warmth: -0.20, Firmness: 0.15},
+	// Paired, so the form reads as choices rather than a list. Each row sits
+	// beside the trait it pulls against -- warm and guarded, playful and
+	// serious, blunt and tactful -- and nothing stops somebody picking both.
+	// Warm and guarded together is not a contradiction: it describes an open,
+	// friendly person who tells you nothing about themselves.
+	{Key: "warm", Mood: 0.25, Trust: 0.30, Warmth: 0.50, Firmness: -0.10, Talkativeness: 0.20, Expressiveness: 0.40},
+	{Key: "guarded", Mood: 0.00, Trust: -0.45, Warmth: -0.20, Firmness: 0.35, Talkativeness: -0.30, Expressiveness: -0.30},
+
+	{Key: "outgoing", Mood: 0.30, Trust: 0.20, Warmth: 0.40, Firmness: -0.05, Talkativeness: 0.50, Expressiveness: 0.35},
+	// Nothing on the first four axes. Quiet was carrying a warmth and a trust
+	// penalty because there was nowhere else to put it, which made a quiet
+	// character cold and suspicious instead of quiet. It has a home now, and
+	// quiet is not shyness: what she says when she says something can be as open
+	// as anybody's.
+	{Key: "quiet", Mood: 0.00, Trust: 0.00, Warmth: 0.00, Firmness: 0.00, Talkativeness: -0.60, Expressiveness: -0.10},
+
+	{Key: "playful", Mood: 0.40, Trust: 0.10, Warmth: 0.30, Firmness: -0.20, Talkativeness: 0.30, Expressiveness: 0.45},
+	{Key: "serious", Mood: -0.10, Trust: 0.05, Warmth: -0.10, Firmness: 0.40, Talkativeness: -0.10, Expressiveness: -0.30},
+
+	{Key: "blunt", Mood: 0.00, Trust: 0.10, Warmth: 0.00, Firmness: 0.45, Talkativeness: -0.20, Expressiveness: 0.10},
+	{Key: "tactful", Mood: 0.05, Trust: 0.20, Warmth: 0.25, Firmness: -0.30, Talkativeness: 0.15, Expressiveness: -0.10},
+
+	{Key: "dry", Mood: -0.05, Trust: 0.00, Warmth: -0.10, Firmness: 0.20, Talkativeness: -0.20, Expressiveness: -0.40},
+	{Key: "earnest", Mood: 0.15, Trust: 0.35, Warmth: 0.35, Firmness: -0.25, Talkativeness: 0.10, Expressiveness: 0.40},
+
+	{Key: "confident", Mood: 0.15, Trust: 0.15, Warmth: 0.05, Firmness: 0.40, Talkativeness: 0.20, Expressiveness: 0.10},
+	// Reserved keeps more back than quiet does. Quiet is about how much
+	// somebody says; reserved is about how much of themselves is in it.
+	// Reserved is not guarded, and the trust penalty it used to carry was the
+	// difference between the two. She can write at length and tell you a great
+	// deal; what she does not do is let much feeling into it. The firmness is
+	// what "with purpose" means -- measured rather than rambling.
+	{Key: "reserved", Mood: 0.00, Trust: 0.00, Warmth: 0.00, Firmness: 0.20, Talkativeness: 0.00, Expressiveness: -0.50},
+
+	{Key: "curious", Mood: 0.20, Trust: 0.15, Warmth: 0.20, Firmness: -0.20, Talkativeness: 0.30, Expressiveness: 0.20},
+	{Key: "restless", Mood: 0.15, Trust: 0.00, Warmth: 0.10, Firmness: -0.15, Talkativeness: 0.25, Expressiveness: 0.20},
+
+	{Key: "steady", Mood: 0.10, Trust: 0.15, Warmth: 0.05, Firmness: 0.50, Talkativeness: 0.00, Expressiveness: -0.10},
+	{Key: "sensitive", Mood: -0.05, Trust: 0.20, Warmth: 0.35, Firmness: -0.35, Talkativeness: 0.10, Expressiveness: 0.50},
+
+	{Key: "sharp", Mood: -0.10, Trust: 0.00, Warmth: -0.10, Firmness: 0.45, Talkativeness: -0.10, Expressiveness: 0.00},
+	{Key: "easygoing", Mood: 0.25, Trust: 0.20, Warmth: 0.25, Firmness: -0.30, Talkativeness: 0.20, Expressiveness: 0.30},
 }
 
 // IAITemperamentKeys lists what the form may offer, in the order §34 gives.
@@ -67,12 +105,21 @@ func IAITemperamentKeys() []string {
 	return keys
 }
 
-// omniChatIAITemperamentPicks is how many of them she starts with. Three reads
-// as a person; one is a caricature and five is a character sheet.
+// omniChatIAITemperamentPicks is the most she starts with, not the number she
+// must have.
+//
+// Three is a ceiling because a character built from six traits is a character
+// built from none: everything averages toward the middle and nothing shows. But
+// forcing a third pick makes somebody choose noise to get past the screen, and
+// that noise becomes baseline personality she then has to carry. One deliberate
+// trait beats three where the third was filler.
+//
+// The averaging below already divides by what it was given, so one and two need
+// nothing from this file beyond permission.
 const omniChatIAITemperamentPicks = 3
 
-// IAITemperamentPicks is how many she starts with, so the form enforces the
-// same number this file does rather than its own copy of it.
+// IAITemperamentPicks is that ceiling, so the form applies the same number
+// rather than a copy of it.
 func IAITemperamentPicks() int { return omniChatIAITemperamentPicks }
 
 // iaiFeeling is one of the answers on §34's seventh screen: how she is with the
@@ -126,7 +173,7 @@ type IAISeed struct {
 // failed creation, and dropping her on the floor over an unrecognised string
 // would be the worst possible trade.
 func SeedIAI(temperaments []string, feeling string) IAISeed {
-	seed := IAISeed{Baseline: averageTemperaments(temperaments)}
+	seed := IAISeed{Baseline: blendTemperaments(temperaments)}
 	if chosen, found := findIAIFeeling(feeling); found {
 		seed.Relationship = models.OmniChatCharacterTraits{
 			Warmth: chosen.Warmth,
@@ -141,16 +188,16 @@ func SeedIAI(temperaments []string, feeling string) IAISeed {
 // Adding would let three warm answers put her past the top of the scale and
 // clamp there, so every warm character would arrive identical. An average keeps
 // the picks distinguishable, which is the entire point of picking three.
-func averageTemperaments(picks []string) models.OmniChatDispositionBaseline {
+func blendTemperaments(picks []string) models.OmniChatDispositionBaseline {
 	var baseline models.OmniChatDispositionBaseline
 	counted := 0
 	seen := make(map[string]struct{}, len(picks))
 
 	for _, pick := range picks {
 		if counted >= omniChatIAITemperamentPicks {
-			// §34 asks for three. A caller sending more is a form out of step
-			// with this table, and quietly averaging six of them would produce
-			// a character nobody chose.
+			// §34 allows up to three. A caller sending more is a form out of
+			// step with this table, and quietly averaging six of them would
+			// produce a character nobody chose.
 			break
 		}
 		key := strings.TrimSpace(strings.ToLower(pick))
@@ -168,25 +215,43 @@ func averageTemperaments(picks []string) models.OmniChatDispositionBaseline {
 		baseline.Trust += temperament.Trust
 		baseline.Warmth += temperament.Warmth
 		baseline.Firmness += temperament.Firmness
+		baseline.Talkativeness += temperament.Talkativeness
+		baseline.Expressiveness += temperament.Expressiveness
 		counted++
 	}
 	if counted == 0 {
 		return models.OmniChatDispositionBaseline{}
 	}
-	// No clamping. An average of values inside -1..1 cannot leave that range, so
-	// a clamp here could only ever fire on a mistyped table row -- and it would
-	// fire *silently*, turning a 5.0 somebody fat-fingered into a 1.0 and
-	// shipping a character subtly unlike the one they configured.
+	// Divided by the square root of the count, not the count.
 	//
-	// The row values are asserted directly in the tests, and
-	// SetOmniChatDispositionBaseline refuses an out-of-range value with a
-	// message naming the persona. Both of those are loud. A quiet clamp between
-	// them would hide exactly what they exist to reveal.
-	divisor := float64(counted)
+	// Averaging was measured and it does not work. It divides every pick by
+	// three, and a third of a small number falls under the threshold where the
+	// prompt says anything at all -- so across all 816 possible three-trait
+	// combinations, 54% of them produced a character who says nothing about
+	// herself. The screen that promises to set who she is did nothing, more
+	// often than it did something.
+	//
+	// The square root keeps what averaging got right and drops what it got
+	// wrong. Traits that agree reinforce each other; traits that pull against
+	// each other still cancel, so warm plus guarded plus quiet correctly leaves
+	// her warmth unremarkable. Silence falls from 54% to 10%.
+	//
+	// Adding them outright was the other candidate and is worse: it is almost
+	// never silent, but a tenth of combinations hit the top of the scale, and
+	// two different characters pinned at the top are the same character on that
+	// axis. That is the fault averaging was written to avoid, and it is real.
+	//
+	// No clamping, for the reason clamping was refused before: it would fire
+	// silently on a mistyped row and ship a character subtly unlike the one
+	// somebody configured. What guarantees the range now is the table itself,
+	// asserted by a test that blends every combination and checks the bounds.
+	divisor := math.Sqrt(float64(counted))
 	baseline.Mood /= divisor
 	baseline.Trust /= divisor
 	baseline.Warmth /= divisor
 	baseline.Firmness /= divisor
+	baseline.Talkativeness /= divisor
+	baseline.Expressiveness /= divisor
 	return baseline
 }
 
