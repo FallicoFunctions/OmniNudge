@@ -31,6 +31,17 @@ import (
 	"github.com/omninudge/backend/internal/services/openrouter"
 )
 
+// reading is every axis, in the order the prompt asks for them.
+//
+// It reported four for a while after speech was added, so an operator running
+// this could not see two of the six numbers being written -- which is most of
+// what the command is for.
+func reading(b models.OmniChatDispositionBaseline) string {
+	return fmt.Sprintf(
+		"mood %+.2f  trust %+.2f  warmth %+.2f  firmness %+.2f  talk %+.2f  expr %+.2f",
+		b.Mood, b.Trust, b.Warmth, b.Firmness, b.Talkativeness, b.Expressiveness)
+}
+
 func main() {
 	var (
 		dryRun = flag.Bool("dry-run", false, "derive and print without storing anything")
@@ -111,8 +122,7 @@ func main() {
 			continue
 		}
 		if *dryRun {
-			fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f  firmness %+.2f  (dry run, not stored)\n",
-				persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness)
+			fmt.Printf("  %-28s %s  (dry run, not stored)\n", persona.Slug, reading(baseline))
 			continue
 		}
 		stored, err := personas.SetOmniChatDispositionBaseline(ctx, persona.ID, baseline, *force)
@@ -127,8 +137,7 @@ func main() {
 			continue
 		}
 		derived++
-		fmt.Printf("  %-28s mood %+.2f  trust %+.2f  warmth %+.2f  firmness %+.2f\n",
-			persona.Slug, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness)
+		fmt.Printf("  %-28s %s\n", persona.Slug, reading(baseline))
 	}
 
 	fmt.Printf("\n%d derived, %d left alone, %d with no temperament to read, %d failed.\n",
