@@ -18,7 +18,7 @@
 -- the self tier keeps them at 0 for the same reason it holds no opinion about a
 -- person it has not met.
 ALTER TABLE omnichat_character_traits
-    ADD COLUMN attachment REAL NOT NULL DEFAULT 0
+    ADD COLUMN IF NOT EXISTS attachment REAL NOT NULL DEFAULT 0
         CHECK (attachment >= -1 AND attachment <= 1);
 
 -- Attraction has a floor of 0 rather than -1. Negative trust is being wary and
@@ -26,5 +26,5 @@ ALTER TABLE omnichat_character_traits
 -- attraction would be repulsion, which is not the other end of the same scale
 -- and is not a state this product should model or let anybody configure.
 ALTER TABLE omnichat_character_traits
-    ADD COLUMN attraction REAL NOT NULL DEFAULT 0
+    ADD COLUMN IF NOT EXISTS attraction REAL NOT NULL DEFAULT 0
         CHECK (attraction >= 0 AND attraction <= 1);

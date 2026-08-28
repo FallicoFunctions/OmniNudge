@@ -292,3 +292,45 @@ func TestGoingBackAndForwardTwiceIsStable(t *testing.T) {
 	require.Equal(t, firstReturn, run("up"))
 	require.Equal(t, firstReturn, run("up"), "and the same going forward")
 }
+
+func TestTheBaselineMigrationsAreSafeToRunTwice(t *testing.T) {
+	// The state that cost an afternoon: a migration whose effects are in the
+	// database but whose row is not in schema_migrations, so `migrate up`
+	// replays it. 193 could not survive that -- it cleared three of its four
+	// baseline columns and left the fourth set, which is exactly the partial
+	// reading the constraint it then creates refuses.
+	//
+	// The rollback ladder cannot catch this. Rolling back clears everything, so
+	// re-applying always meets NULLs and the partial case never arises.
+	ctx := context.Background()
+
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	users := models.NewUserRepository(db.Pool)
+	owner := &models.User{Username: "iai_replay", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, users.Create(ctx, owner))
+
+	// A character with a complete reading, which is what makes the UPDATE fire.
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO bot_personas (name, slug, description, personality, system_prompt,
+			owner_user_id, response_style_profile,
+			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness,
+			baseline_talkativeness, baseline_expressiveness)
+		VALUES ('Replay', 'replay', 'd', 'p', 'sp', $1, $2, 0.2, 0.3, 0.4, 0.5, -0.1, -0.2)`,
+		owner.ID, models.ResponseStyleProfileDirectMessage)
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"201_baseline_speech",
+		"202_relationship_attachment_attraction",
+	} {
+		statement, err := os.ReadFile(filepath.Join("migrations", name+".up.sql"))
+		require.NoError(t, err)
+		_, err = db.Pool.Exec(ctx, string(statement))
+		require.NoError(t, err, "%s could not be replayed onto its own result", name)
+	}
+}

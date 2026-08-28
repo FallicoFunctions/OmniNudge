@@ -14,7 +14,7 @@
 -- harden or soften with experience, that is a traits column and a separate
 -- decision; there is no evidence for it yet.
 ALTER TABLE bot_personas
-    ADD COLUMN baseline_firmness REAL CHECK (baseline_firmness >= -1 AND baseline_firmness <= 1);
+    ADD COLUMN IF NOT EXISTS baseline_firmness REAL CHECK (baseline_firmness >= -1 AND baseline_firmness <= 1);
 
 -- 184 made the baseline all-or-nothing so that a partial derivation could not
 -- be mistaken for a complete one, and gave readers a single column to test.
@@ -28,7 +28,13 @@ ALTER TABLE bot_personas
 UPDATE bot_personas
 SET baseline_mood = NULL,
     baseline_trust = NULL,
-    baseline_warmth = NULL
+    baseline_warmth = NULL,
+    -- Cleared too. When this migration was written firmness had just been added
+    -- and was always NULL, so leaving it out was harmless. On a database that
+    -- already has the column populated -- one where this ran once without being
+    -- recorded -- clearing three of the four leaves a partial baseline, which is
+    -- exactly what the constraint below refuses.
+    baseline_firmness = NULL
 WHERE baseline_mood IS NOT NULL;
 
 ALTER TABLE bot_personas

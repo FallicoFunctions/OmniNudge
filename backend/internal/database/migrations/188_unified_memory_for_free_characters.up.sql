@@ -44,6 +44,12 @@ $$;
 ALTER TABLE omnichat_memory_episodes
     DROP CONSTRAINT IF EXISTS omnichat_memory_episodes_tier_check;
 
+-- Dropped first, the way 068, 071, 073 and 077 already do it. The
+-- functions above use CREATE OR REPLACE and are re-runnable; these were
+-- plain CREATEs, so a migration that failed after creating one could
+-- never be run again -- the second attempt died on the trigger the first
+-- attempt had left behind.
+DROP TRIGGER IF EXISTS omnichat_memory_episodes_tier_guard ON omnichat_memory_episodes;
 CREATE TRIGGER omnichat_memory_episodes_tier_guard
     BEFORE INSERT OR UPDATE OF owner_user_id, conversation_id, persona_id
     ON omnichat_memory_episodes
@@ -87,6 +93,12 @@ BEGIN
 END;
 $$;
 
+-- Dropped first, the way 068, 071, 073 and 077 already do it. The
+-- functions above use CREATE OR REPLACE and are re-runnable; these were
+-- plain CREATEs, so a migration that failed after creating one could
+-- never be run again -- the second attempt died on the trigger the first
+-- attempt had left behind.
+DROP TRIGGER IF EXISTS bot_personas_memory_tier_change_guard ON bot_personas;
 CREATE TRIGGER bot_personas_memory_tier_change_guard
     BEFORE UPDATE OF response_style_profile
     ON bot_personas

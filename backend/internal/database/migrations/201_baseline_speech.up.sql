@@ -20,10 +20,10 @@
 -- character who stayed terse after four hundred conversations would not be a
 -- quiet person but a broken one.
 ALTER TABLE bot_personas
-    ADD COLUMN baseline_talkativeness REAL
+    ADD COLUMN IF NOT EXISTS baseline_talkativeness REAL
         CHECK (baseline_talkativeness >= -1 AND baseline_talkativeness <= 1);
 ALTER TABLE bot_personas
-    ADD COLUMN baseline_expressiveness REAL
+    ADD COLUMN IF NOT EXISTS baseline_expressiveness REAL
         CHECK (baseline_expressiveness >= -1 AND baseline_expressiveness <= 1);
 
 -- Cleared rather than backfilled, for the reason 193 gave when it added the
@@ -36,7 +36,15 @@ UPDATE bot_personas
 SET baseline_mood = NULL,
     baseline_trust = NULL,
     baseline_warmth = NULL,
-    baseline_firmness = NULL
+    baseline_firmness = NULL,
+    -- All six, including the two added a moment ago. They are NULL on a first
+    -- run so this looks redundant -- and it is exactly what 193 got wrong. On a
+    -- database where this ran once without being recorded, the two new columns
+    -- already hold values, and clearing four of six leaves a partial baseline,
+    -- which is what the constraint below refuses. The migration could then
+    -- never be re-applied.
+    baseline_talkativeness = NULL,
+    baseline_expressiveness = NULL
 WHERE baseline_mood IS NOT NULL;
 
 ALTER TABLE bot_personas
