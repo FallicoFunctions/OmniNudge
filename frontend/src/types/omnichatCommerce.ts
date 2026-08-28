@@ -20,10 +20,18 @@ export interface OmniChatWallet {
   updated_at: string;
 }
 
+/**
+ * The kinds the backend actually writes -- models/omnicredits.go, the
+ * OmniCreditsUsage* constants. Each one needs a label under
+ * omnichat.commerce.usage; the modal builds that key at runtime, so a member
+ * with no label renders the key itself into the usage list.
+ */
+export type OmniChatCreditUsageKind = 'chat' | 'voice' | 'image' | 'video';
+
 export interface OmniChatCreditUsageItem {
   id: number;
   entry_type: string;
-  usage_kind?: string;
+  usage_kind?: OmniChatCreditUsageKind;
   purchased_delta: number;
   subscription_delta: number;
   created_at: string;

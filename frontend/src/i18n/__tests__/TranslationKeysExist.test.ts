@@ -103,32 +103,41 @@ describe('i18n usage', () => {
     expect(missingKeys()).toEqual([]);
   });
 
-  // t(`omnichat.studio.responseStyles.${profile}.label`) is invisible to the
-  // check above: the key is built at runtime, so no literal ever appears. That
-  // is how 'direct_message' shipped. It was added to the ResponseStyleProfile
-  // union for IAI characters, and the studio rendered
-  // "omnichat.studio.responseStyles.direct_message.description" at anyone who
-  // opened one -- while the select had no matching option, so a single click
-  // would quietly turn an independent character into a roleplay one.
+  // A key built at runtime is invisible to the check above: no literal ever
+  // appears in the source. That is how two of these shipped.
   //
-  // A union member is a key. Widen the union, widen this.
-  it('every response style in the union has a label and a description', () => {
-    const types = readFileSync(join(process.cwd(), 'src/types/omnichat.ts'), 'utf8');
-    const union = types.match(/export type ResponseStyleProfile =([^;]+);/);
+  // 'direct_message' went into ResponseStyleProfile for independent characters
+  // and the studio rendered the key at anyone who opened one. 'chat' is the
+  // commonest usage kind the backend writes -- every message debit -- and the
+  // credits panel had no label for it, so the usage list read
+  // "omnichat.commerce.usage.chat" down the page.
+  //
+  // A union member is a key. Widen a union, widen its table here.
+  const UNION_KEYS: { file: string; type: string; keyOf: (member: string) => string[] }[] = [
+    {
+      file: 'src/types/omnichat.ts',
+      type: 'ResponseStyleProfile',
+      keyOf: (member) => [
+        `omnichat.studio.responseStyles.${member}.label`,
+        `omnichat.studio.responseStyles.${member}.description`,
+      ],
+    },
+    {
+      file: 'src/types/omnichatCommerce.ts',
+      type: 'OmniChatCreditUsageKind',
+      keyOf: (member) => [`omnichat.commerce.usage.${member}`],
+    },
+  ];
+
+  it.each(UNION_KEYS)('every member of $type has its translation', ({ file, type, keyOf }) => {
+    const source = readFileSync(join(process.cwd(), file), 'utf8');
+    const union = source.match(new RegExp(`export type ${type} =([^;]+);`));
     expect(union).not.toBeNull();
 
-    const profiles = [...(union as RegExpMatchArray)[1].matchAll(/'([a-z_]+)'/g)].map(
-      (match) => match[1]
-    );
-    expect(profiles.length).toBeGreaterThan(1);
+    const members = [...(union as RegExpMatchArray)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    expect(members.length).toBeGreaterThan(1);
 
-    const absent = profiles.flatMap((profile) =>
-      ['label', 'description']
-        .map((field) => `omnichat.studio.responseStyles.${profile}.${field}`)
-        .filter((key) => !english.has(key))
-    );
-
-    expect(absent).toEqual([]);
+    expect(members.flatMap(keyOf).filter((key) => !english.has(key))).toEqual([]);
   });
 
   it('reads the keys it can and ignores the ones it cannot', () => {

@@ -4074,6 +4074,7 @@
         "priority": "Priority generation"
       },
       "usage": {
+        "chat": "Message",
         "voice": "Voice call",
         "image": "Image generation",
         "video": "Video generation",
