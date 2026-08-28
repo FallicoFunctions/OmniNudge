@@ -4419,5 +4419,172 @@
       "canLeave": "يستطيع {{name}} التوقف عن الحديث معك. الإساءة ستنهي المحادثة لفترة، وتكرارها سينهيها نهائيًا.",
       "saySomething": "لا يعرف {{name}} أن هذه النافذة مفتوحة. لن يحدث شيء حتى ترسل رسالة."
     }
+  },
+  "ccpaPage": {
+    "title": "Your California Privacy Rights",
+    "sections": {
+      "ccpa": {
+        "title": "California Consumer Privacy Act (CCPA)",
+        "body": "If you are a California resident, you have specific rights regarding your personal information under the California Consumer Privacy Act (CCPA)."
+      },
+      "rights": {
+        "title": "Your Rights"
+      },
+      "doNotSell": {
+        "title": "Do Not Sell My Personal Information",
+        "body": "OmniNudge does not sell your personal information to third parties for monetary or other valuable consideration. We share information only as described in our Privacy Policy to provide our services.",
+        "notice": "✓ Your personal information is not sold to third parties"
+      },
+      "collect": {
+        "title": "Information We Collect",
+        "body": "We collect the following categories of personal information:",
+        "items": {
+          "identifiers": "Identifiers (username, email address, IP address)",
+          "networkActivity": "Internet or network activity (posts, comments, messages, browsing behavior)",
+          "geolocation": "Geolocation data (approximate location from IP address)",
+          "inferences": "Inferences drawn from the above to create a profile about your preferences"
+        }
+      },
+      "exercise": {
+        "title": "How to Exercise Your Rights",
+        "body": "To exercise your CCPA rights, you can:",
+        "items": {
+          "exportData": {
+            "label": "Data Export",
+            "prefix": "Go to",
+            "linkText": "Settings → Account → Export Data"
+          },
+          "deleteAccount": {
+            "label": "Delete Account",
+            "prefix": "Go to",
+            "linkText": "Settings → Account → Delete Account"
+          },
+          "otherRequests": {
+            "label": "Other Requests",
+            "prefix": "Contact us at"
+          }
+        },
+        "responseNote": "We will respond to verifiable requests within 45 days. We may request additional information to verify your identity."
+      },
+      "agent": {
+        "title": "Authorized Agent",
+        "body": "You may designate an authorized agent to make a request on your behalf. The agent must provide proof of authorization and we may still require you to verify your identity directly."
+      },
+      "contact": {
+        "title": "Contact Us",
+        "body": "For questions about your California privacy rights, contact us at:",
+        "emailLabel": "Email:",
+        "subjectLabel": "Subject Line:",
+        "subjectValue": "\"California Privacy Rights Request\""
+      }
+    },
+    "rights": {
+      "know": {
+        "label": "Right to Know:",
+        "description": "You can request information about the personal information we collect, use, disclose, and sell."
+      },
+      "delete": {
+        "label": "Right to Delete:",
+        "description": "You can request deletion of your personal information (subject to certain exceptions)."
+      },
+      "optOut": {
+        "label": "Right to Opt-Out:",
+        "description": "You can opt out of the sale of your personal information."
+      },
+      "nonDiscrimination": {
+        "label": "Right to Non-Discrimination:",
+        "description": "We will not discriminate against you for exercising your CCPA rights."
+      }
+    }
+  },
+  "termsPage": {
+    "title": "Terms of Service",
+    "sections": {
+      "acceptance": {
+        "title": "1. Acceptance of Terms",
+        "body": "By accessing or using OmniNudge, you agree to these Terms of Service. If you do not agree, do not use the service."
+      },
+      "whoWeAre": {
+        "title": "2. Who We Are",
+        "body": "OmniNudge is a platform for communities, conversations, and content. We provide on-site hubs, private messaging, and a unified browsing experience that can include Reddit content for convenience."
+      },
+      "notReddit": {
+        "title": "3. Not Reddit",
+        "body": "OmniNudge is not affiliated with Reddit. Content you post to OmniNudge is not posted to Reddit. Any Reddit content shown in OmniNudge is for browsing and context only."
+      },
+      "accounts": {
+        "title": "4. Accounts",
+        "body": "You are responsible for your account and for all activity on it. Provide accurate information and keep your credentials secure. We may suspend or terminate accounts for violations of these terms."
+      },
+      "conduct": {
+        "title": "5. Content and Conduct",
+        "body": "You are responsible for content you submit. Do not post unlawful, harmful, or abusive material, and do not attempt to disrupt the service. We may remove content or restrict access when necessary to protect the platform and its users."
+      },
+      "messaging": {
+        "title": "6. Messaging and File Sharing",
+        "body": "OmniNudge offers encrypted messaging and file sharing. You are responsible for the files you share and for complying with applicable laws. We do not guarantee that encryption will prevent all unauthorized access."
+      },
+      "intellectualProperty": {
+        "title": "7. Intellectual Property",
+        "body": "You retain rights to your content. By posting to OmniNudge, you grant us a license to host, display, and distribute that content within the service."
+      },
+      "availability": {
+        "title": "8. Availability and Changes",
+        "body": "We may update, change, or discontinue any part of OmniNudge at any time. We may update these terms, and continued use of the service means you accept the changes."
+      },
+      "disclaimer": {
+        "title": "9. Disclaimer",
+        "body": "OmniNudge is provided on an \"as is\" and \"as available\" basis without warranties of any kind. Use the service at your own risk."
+      },
+      "limitation": {
+        "title": "10. Limitation of Liability",
+        "body": "To the fullest extent permitted by law, OmniNudge is not liable for any indirect, incidental, or consequential damages arising from your use of the service."
+      },
+      "aiAgents": {
+        "title": "11. A.I. Agents",
+        "body": "During the beta phase, OmniNudge uses A.I. Agents to enhance user experience until the userbase is large enough to support itself without the need of the agents."
+      }
+    }
+  },
+  "privacyPage": {
+    "title": "Privacy Policy",
+    "sections": {
+      "collect": {
+        "title": "1. What We Collect",
+        "body": "We collect account information you provide (such as username and email), content you post, and information related to your use of OmniNudge (such as pages you visit and actions you take). We also collect technical data like IP address, device, and browser details to keep the platform secure and functional."
+      },
+      "use": {
+        "title": "2. How We Use Data",
+        "body": "We use your data to operate OmniNudge, provide features, improve the service, prevent abuse, and communicate with you. We do not sell your personal data."
+      },
+      "reddit": {
+        "title": "3. Reddit Content",
+        "body": "OmniNudge may display Reddit posts and comments for browsing and context. We do not send your posts or comments to Reddit, and we are not affiliated with Reddit."
+      },
+      "messaging": {
+        "title": "4. Messaging and Files",
+        "body": "Direct messages and shared files are encrypted. You are responsible for the content you send and share. We do not guarantee that encryption will prevent all unauthorized access."
+      },
+      "cookies": {
+        "title": "5. Cookies and Local Storage",
+        "body": "We use cookies and local storage to keep you signed in, remember preferences, and improve user experience. You can disable cookies in your browser, but some features may not work correctly."
+      },
+      "sharing": {
+        "title": "6. Sharing and Disclosure",
+        "body": "We may share information with service providers who help us run OmniNudge. We may also disclose information if required by law or to protect users and the platform."
+      },
+      "retention": {
+        "title": "7. Data Retention",
+        "body": "We retain data as long as needed to operate the service, comply with legal obligations, or resolve disputes. You may request account deletion subject to applicable laws."
+      },
+      "choices": {
+        "title": "8. Your Choices",
+        "body": "You can update your profile information, adjust settings, and control some data visibility within the app. You can also request access or deletion of your personal data where applicable."
+      },
+      "changes": {
+        "title": "9. Changes to This Policy",
+        "body": "We may update this Privacy Policy from time to time. Continued use of OmniNudge means you accept the updated policy."
+      }
+    }
   }
 }
