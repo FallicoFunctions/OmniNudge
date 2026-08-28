@@ -69,6 +69,7 @@ func (r *BotPersonaRepository) CreateIAI(
 	}
 	for _, value := range []float64{
 		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
+		persona.Baseline.Talkativeness, persona.Baseline.Expressiveness,
 	} {
 		if value < -1 || value > 1 {
 			return nil, fmt.Errorf("omnichat iai: baseline value %v is outside -1..1", value)
@@ -115,18 +116,20 @@ func (r *BotPersonaRepository) CreateIAI(
 			id, slug, name, category, owner_user_id, visibility, source_format,
 			system_prompt, personality, response_style_profile, is_active,
 			iai_appearance,
-			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness
+			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness,
+			baseline_talkativeness, baseline_expressiveness
 		) VALUES (
 			$1, $2, $3, 'original', $4, 'private', 'native',
 			'', $5, $6, TRUE,
 			$7,
-			$8, $9, $10, $11
+			$8, $9, $10, $11, $12, $13
 		)
 		RETURNING `+botPersonaSelectColumns,
 		personaID, fmt.Sprintf("%s-%d", persona.SlugBase, personaID), persona.Name,
 		creatorUserID, persona.Personality, ResponseStyleProfileDirectMessage,
 		persona.Appearance,
 		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
+		persona.Baseline.Talkativeness, persona.Baseline.Expressiveness,
 	))
 	if err != nil {
 		return nil, fmt.Errorf("omnichat iai: create persona: %w", err)

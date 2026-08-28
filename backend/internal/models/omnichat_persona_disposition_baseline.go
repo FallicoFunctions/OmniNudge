@@ -66,7 +66,8 @@ func (r *BotPersonaRepository) SetOmniChatDispositionBaseline(ctx context.Contex
 	// out of range means the derivation misread its own contract, and the
 	// useful place to find that out is at the call site rather than in a
 	// constraint violation three layers down.
-	for _, value := range []float64{baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness} {
+	for _, value := range []float64{baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness,
+		baseline.Talkativeness, baseline.Expressiveness} {
 		if value < -1 || value > 1 {
 			return false, fmt.Errorf("omnichat baseline: persona %d: value %v is outside -1..1", personaID, value)
 		}
@@ -74,10 +75,12 @@ func (r *BotPersonaRepository) SetOmniChatDispositionBaseline(ctx context.Contex
 
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE bot_personas
-		SET baseline_mood = $2, baseline_trust = $3, baseline_warmth = $4, baseline_firmness = $5
+		SET baseline_mood = $2, baseline_trust = $3, baseline_warmth = $4, baseline_firmness = $5,
+			baseline_talkativeness = $7, baseline_expressiveness = $8
 		WHERE id = $1 AND owner_user_id IS NULL
 		  AND ($6 OR baseline_mood IS NULL)
-	`, personaID, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness, force)
+	`, personaID, baseline.Mood, baseline.Trust, baseline.Warmth, baseline.Firmness, force,
+		baseline.Talkativeness, baseline.Expressiveness)
 	if err != nil {
 		return false, fmt.Errorf("omnichat baseline: store persona %d: %w", personaID, err)
 	}
@@ -88,13 +91,14 @@ func (r *BotPersonaRepository) SetOmniChatDispositionBaseline(ctx context.Contex
 // exists for the derivation command and for tests; the read paths that matter
 // get the baseline alongside the traits they were already reading.
 func (r *BotPersonaRepository) LoadOmniChatDispositionBaseline(ctx context.Context, personaID int) (OmniChatDispositionBaseline, error) {
-	var mood, trust, warmth, firmness *float64
+	var mood, trust, warmth, firmness, talkativeness, expressiveness *float64
 	if err := r.pool.QueryRow(ctx, `
-		SELECT baseline_mood, baseline_trust, baseline_warmth, baseline_firmness
+		SELECT baseline_mood, baseline_trust, baseline_warmth, baseline_firmness,
+			baseline_talkativeness, baseline_expressiveness
 		FROM bot_personas
 		WHERE id = $1
-	`, personaID).Scan(&mood, &trust, &warmth, &firmness); err != nil {
+	`, personaID).Scan(&mood, &trust, &warmth, &firmness, &talkativeness, &expressiveness); err != nil {
 		return OmniChatDispositionBaseline{}, fmt.Errorf("omnichat baseline: load persona %d: %w", personaID, err)
 	}
-	return dispositionBaseline(mood, trust, warmth, firmness), nil
+	return dispositionBaseline(mood, trust, warmth, firmness, talkativeness, expressiveness), nil
 }

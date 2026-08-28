@@ -220,6 +220,7 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth, p.baseline_firmness,
+			p.baseline_talkativeness, p.baseline_expressiveness,
 		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth
 		FROM bot_personas p
 		LEFT JOIN omnichat_character_traits t
@@ -233,14 +234,17 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 
 	for rows.Next() {
 		var baselineMood, baselineTrust, baselineWarmth, baselineFirmness *float64
+		var baselineTalkativeness, baselineExpressiveness *float64
 		var owner *int
 		var mood, trust, warmth *float64
 		var moodUpdatedAt *time.Time
 		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth, &baselineFirmness,
+			&baselineTalkativeness, &baselineExpressiveness,
 			&owner, &mood, &moodUpdatedAt, &trust, &warmth); err != nil {
 			return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 		}
-		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth, baselineFirmness)
+		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth, baselineFirmness,
+			baselineTalkativeness, baselineExpressiveness)
 		// The outer join emits the persona row on its own when no tier
 		// matched, which is a character nobody has met rather than a row to
 		// read.
@@ -272,18 +276,21 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 // written together and constrained all-or-nothing, so a single NULL among them
 // is a character nobody has derived yet -- neutral, and indistinguishable in
 // effect from how she behaved before baselines existed.
-func dispositionBaseline(mood, trust, warmth, firmness *float64) OmniChatDispositionBaseline {
-	// All four or none. The schema enforces it, and a reader that accepted three
+func dispositionBaseline(mood, trust, warmth, firmness, talkativeness, expressiveness *float64) OmniChatDispositionBaseline {
+	// All six or none. The schema enforces it, and a reader that accepted five
 	// would be treating a partial derivation as a complete one.
-	if mood == nil || trust == nil || warmth == nil || firmness == nil {
+	if mood == nil || trust == nil || warmth == nil || firmness == nil ||
+		talkativeness == nil || expressiveness == nil {
 		return OmniChatDispositionBaseline{}
 	}
 	return OmniChatDispositionBaseline{
-		Mood:     clampTrait(*mood),
-		Trust:    clampTrait(*trust),
-		Warmth:   clampTrait(*warmth),
-		Firmness: clampTrait(*firmness),
-		Derived:  true,
+		Mood:           clampTrait(*mood),
+		Trust:          clampTrait(*trust),
+		Warmth:         clampTrait(*warmth),
+		Firmness:       clampTrait(*firmness),
+		Talkativeness:  clampTrait(*talkativeness),
+		Expressiveness: clampTrait(*expressiveness),
+		Derived:        true,
 	}
 }
 
@@ -411,6 +418,12 @@ type OmniChatDisposition struct {
 	// accumulates it -- and travels here anyway so that everything reading a
 	// disposition reads one object rather than two.
 	Firmness float64
+
+	// Talkativeness is how much she says. Expressiveness is how much feeling is
+	// in it. Both are composed rather than passed through: see the baseline
+	// fields below for why they are not fixed the way firmness is.
+	Talkativeness  float64
+	Expressiveness float64
 }
 
 // OmniChatDispositionBaseline is who a character was written to be: the resting
@@ -441,6 +454,21 @@ type OmniChatDispositionBaseline struct {
 	// she likes you, the more you can extract, with nothing on the other side.
 	Firmness float64
 
+	// Talkativeness is length: two words where there could be forty.
+	// Expressiveness is colour: how much feeling shows in whatever she does
+	// write. They are separate because a reserved character can send a long,
+	// careful, exact message with almost nothing of herself in it, and one
+	// number cannot say "many words, little feeling".
+	//
+	// Neither is fixed, and that is the difference between them and firmness.
+	// Whether somebody can be worn down is a property of them. How much they
+	// talk is not a property of them at all -- it is a property of them and
+	// whoever they are talking to. The same person is silent in a lecture and
+	// unstoppable in a message to somebody they love, on the same day. So these
+	// are where she starts, and closeness opens them.
+	Talkativeness  float64
+	Expressiveness float64
+
 	Derived bool
 }
 
@@ -454,13 +482,56 @@ type OmniChatDispositionBaseline struct {
 // described. Adding is what makes them all true at once, and the clamp is what
 // stops the sum running past the scale the wording can express.
 func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, relationship OmniChatCharacterTraits, at time.Time) OmniChatDisposition {
+	trust := clampTrait(baseline.Trust + self.Trust + relationship.Trust)
+	warmth := clampTrait(baseline.Warmth + self.Warmth + relationship.Warmth)
+
+	// How close the two of them actually are, which is what opens her up.
+	//
+	// From the relationship alone, not from the composed figures. Those include
+	// her baseline -- how she is with people in general -- and using them made a
+	// warm character count as close to somebody she had never met, so she opened
+	// up to a stranger on the strength of being a warm person. Closeness is what
+	// has happened between these two, and with a stranger there is none of it.
+	closeness := (relationship.Trust + relationship.Warmth) / 2
+	if closeness < 0 {
+		// Distance does not close her further than she already starts. Her
+		// baseline is already the guarded end of her; subtracting again would
+		// make a mildly quiet character mute with anybody who has not earned it.
+		closeness = 0
+	}
+
+	// How far that closeness carries her is hers, not a constant.
+	//
+	// A quiet person is not a shy one. Quiet is choosing not to talk most of the
+	// time, and what happens with two close friends varies by the person: some
+	// become the loudest in the room, and some stay the quietest. An earlier
+	// version applied one rate to everybody and asserted that nobody could pass
+	// the middle, which decided that question for every character ever made.
+	//
+	// So the rate comes from how warm she is underneath. A quiet, warm character
+	// opens a long way with somebody she loves. A quiet, guarded one barely
+	// moves. "It depends on them" is answerable because the rest of what she was
+	// made from is already here.
+	opening := omniChatSpeechOpening * (1 + baseline.Warmth)
+	if opening < 0 {
+		opening = 0
+	}
+
 	return OmniChatDisposition{
-		Mood:     clampTrait(baseline.Mood + self.MoodAt(at) + relationship.MoodAt(at)),
-		Trust:    clampTrait(baseline.Trust + self.Trust + relationship.Trust),
-		Warmth:   clampTrait(baseline.Warmth + self.Warmth + relationship.Warmth),
-		Firmness: clampTrait(baseline.Firmness),
+		Mood:           clampTrait(baseline.Mood + self.MoodAt(at) + relationship.MoodAt(at)),
+		Trust:          trust,
+		Warmth:         warmth,
+		Firmness:       clampTrait(baseline.Firmness),
+		Talkativeness:  clampTrait(baseline.Talkativeness + closeness*opening),
+		Expressiveness: clampTrait(baseline.Expressiveness + closeness*opening),
 	}
 }
+
+// omniChatSpeechOpening is the rate for a character of average warmth. Warmer
+// than that opens further, cooler opens less, and neither end stops at the
+// middle -- whether a quiet person becomes the loud one among friends is a fact
+// about that person rather than a rule about quiet people.
+const omniChatSpeechOpening = 0.6
 
 // ComposeOmniChatSelfDisposition is the same sum with no second party: who a
 // character was written as plus what has happened to her in the open. It is

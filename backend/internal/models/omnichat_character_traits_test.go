@@ -576,7 +576,8 @@ func TestOmniChatRepeatedWorldEventsCannotPinTheMoodAtTheCeiling(t *testing.T) {
 	// Written wounded and low, the way Sadie Hart is.
 	_, err := pool.Exec(ctx, `
 		UPDATE bot_personas
-		SET baseline_mood = -0.3, baseline_trust = 0, baseline_warmth = 0, baseline_firmness = 0
+		SET baseline_mood = -0.3, baseline_trust = 0, baseline_warmth = 0, baseline_firmness = 0,
+			baseline_talkativeness = 0, baseline_expressiveness = 0
 		WHERE id = $1
 	`, fixture.personaID)
 	require.NoError(t, err)
@@ -725,4 +726,105 @@ func TestOmniChatHabituationLeavesRelationalEpisodesAlone(t *testing.T) {
 		WHERE persona_id = $1 AND owner_user_id = $2 AND recurs_episode_id IS NOT NULL
 	`, fixture.personaID, fixture.userID).Scan(&linked))
 	require.Zero(t, linked, "a conversation's episodes never join a recurrence chain")
+}
+
+func TestHowMuchSheSaysDependsOnWhoSheIsTalkingTo(t *testing.T) {
+	// These two are not fixed the way firmness is. How much somebody talks is
+	// not a property of them on its own; it is a property of them and whoever is
+	// in front of them.
+	quiet := OmniChatDispositionBaseline{
+		Talkativeness: -0.5, Expressiveness: -0.4, Derived: true,
+	}
+	now := time.Now()
+
+	stranger := ComposeOmniChatDisposition(quiet, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, now)
+	require.InDelta(t, -0.5, stranger.Talkativeness, 0.0001,
+		"with nobody she is exactly where her card left her")
+
+	close := ComposeOmniChatDisposition(quiet, OmniChatCharacterTraits{},
+		OmniChatCharacterTraits{Trust: 0.9, Warmth: 0.9, MoodUpdatedAt: now}, now)
+	require.Greater(t, close.Talkativeness, stranger.Talkativeness,
+		"closeness has to open her, or a quiet character is terse forever")
+	require.Greater(t, close.Expressiveness, stranger.Expressiveness)
+}
+
+func TestTwoQuietCharactersNeedNotOpenUpTheSameAmount(t *testing.T) {
+	// Quiet is not shy. It is choosing not to talk most of the time, and what
+	// happens with two close friends varies by the person -- some become the
+	// loudest in the room, some stay the quietest.
+	//
+	// An earlier version applied one rate to everybody and asserted that nobody
+	// could pass the middle. That decided this question for every character
+	// anybody would ever make.
+	now := time.Now()
+	intimate := OmniChatCharacterTraits{Trust: 0.9, Warmth: 0.9, MoodUpdatedAt: now}
+
+	quietAndWarm := ComposeOmniChatDisposition(
+		OmniChatDispositionBaseline{Talkativeness: -0.5, Warmth: 0.5, Derived: true},
+		OmniChatCharacterTraits{}, intimate, now)
+	quietAndGuarded := ComposeOmniChatDisposition(
+		OmniChatDispositionBaseline{Talkativeness: -0.5, Warmth: -0.4, Derived: true},
+		OmniChatCharacterTraits{}, intimate, now)
+
+	require.Greater(t, quietAndWarm.Talkativeness, quietAndGuarded.Talkativeness,
+		"the same starting quietness, two different people, two different endings")
+	require.Greater(t, quietAndWarm.Talkativeness, 0.0,
+		"the warm one can pass the middle -- nothing about being quiet forbids it")
+	require.Less(t, quietAndGuarded.Talkativeness, 0.0,
+		"and the guarded one is still the quietest in the room")
+}
+
+func TestDistanceDoesNotCloseHerFurtherThanSheStarts(t *testing.T) {
+	// Her baseline is already the guarded end of her. Subtracting again for a
+	// relationship that has gone badly would make a mildly quiet character mute
+	// with anybody who has not earned it, which is a different trait.
+	baseline := OmniChatDispositionBaseline{Talkativeness: -0.3, Expressiveness: -0.3, Derived: true}
+	now := time.Now()
+
+	hostile := ComposeOmniChatDisposition(baseline, OmniChatCharacterTraits{},
+		OmniChatCharacterTraits{Trust: -0.9, Warmth: -0.9, MoodUpdatedAt: now}, now)
+
+	require.InDelta(t, -0.3, hostile.Talkativeness, 0.0001)
+	require.InDelta(t, -0.3, hostile.Expressiveness, 0.0001)
+}
+
+func TestFirmnessStillDoesNotMove(t *testing.T) {
+	// The exception stays the exception. Whether she can be worn down is who she
+	// is, and warmth is the pressure -- if closeness moved firmness too, being
+	// fond of somebody would once again be a way to get things out of her.
+	baseline := OmniChatDispositionBaseline{Firmness: 0.4, Derived: true}
+	now := time.Now()
+
+	stranger := ComposeOmniChatDisposition(baseline, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, now)
+	adored := ComposeOmniChatDisposition(baseline, OmniChatCharacterTraits{},
+		OmniChatCharacterTraits{Trust: 1, Warmth: 1, MoodUpdatedAt: now}, now)
+
+	require.Equal(t, stranger.Firmness, adored.Firmness)
+	require.InDelta(t, 0.4, adored.Firmness, 0.0001)
+}
+
+func TestAPartialBaselineIsNotABaseline(t *testing.T) {
+	// Five of six is a reading taken under different instructions. Accepting it
+	// would treat a derivation from before speech existed as a complete one.
+	value := 0.5
+	require.False(t, dispositionBaseline(&value, &value, &value, &value, nil, nil).Derived)
+	require.False(t, dispositionBaseline(&value, &value, &value, &value, &value, nil).Derived)
+	require.True(t, dispositionBaseline(&value, &value, &value, &value, &value, &value).Derived)
+}
+
+func TestAWarmCharacterIsNotCloseToEverybody(t *testing.T) {
+	// Closeness is what has happened between these two, not how she is with
+	// people in general. Composing it from the blended figures folded her
+	// baseline warmth in, so a warm character opened up to a stranger on the
+	// strength of being a warm person -- and no quiet character ever started
+	// the conversation where her card left her.
+	now := time.Now()
+	warm := OmniChatDispositionBaseline{Talkativeness: -0.5, Warmth: 0.5, Derived: true}
+	cool := OmniChatDispositionBaseline{Talkativeness: -0.5, Warmth: -0.4, Derived: true}
+
+	for _, baseline := range []OmniChatDispositionBaseline{warm, cool} {
+		stranger := ComposeOmniChatDisposition(baseline, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, now)
+		require.InDelta(t, baseline.Talkativeness, stranger.Talkativeness, 0.0001,
+			"a stranger gets exactly what her card says, whoever she is")
+	}
 }
