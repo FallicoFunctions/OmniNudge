@@ -518,3 +518,61 @@ export interface OmniChatMemoryList {
   has_more: boolean;
   memories: OmniChatMemory[];
 }
+
+/**
+ * Making an independent character (§34).
+ *
+ * The option lists are fetched rather than held here. Every one of them is a
+ * rule the server enforces, and a copy in the client is a copy that can
+ * disagree with it -- an option offered that the server does not recognise is
+ * dropped on the way in, and somebody gets a blanker character than the one
+ * they chose, with nothing anywhere saying so.
+ */
+export interface IAIOptions {
+  temperaments: string[];
+  temperament_picks: number;
+  feelings: string[];
+  attractions: string[];
+  interests: string[];
+  interest_picks: number;
+  /** Flat lists: style, gender, ethnicity, hair_length, hair_texture, hair_colour. */
+  appearance: Record<string, string[]>;
+  /** Indexed by drawing style: a drawing is not claiming to be a photograph. */
+  eyes: Record<string, string[]>;
+  /** Indexed by gender, because the silhouettes differ. */
+  builds: Record<string, string[]>;
+  /** Drawing style, then gender, then hair texture. Length never narrows it. */
+  hair_styles: Record<string, Record<string, Record<string, string[]>>>;
+  minimum_age: number;
+  maximum_age: number;
+  minimum_height_inches: number;
+  maximum_height_inches: number;
+  iai_limit: number;
+  /** Which plan an independent character needs, so the refusal names the right one. */
+  iai_required_plan: string;
+  roleplay_limits: Record<string, number>;
+}
+
+export interface IAIAppearanceAnswers {
+  style?: string;
+  gender?: string;
+  age?: number;
+  height_inches?: number;
+  ethnicity?: string;
+  hair_length?: string;
+  hair_texture?: string;
+  hair_style?: string;
+  hair_colour?: string;
+  eyes?: string;
+  build?: string;
+}
+
+export interface CreateIAIRequest {
+  request_id: string;
+  name: string;
+  temperaments: string[];
+  interests: string[];
+  feeling: string;
+  attraction: string;
+  appearance: IAIAppearanceAnswers;
+}

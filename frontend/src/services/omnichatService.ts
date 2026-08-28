@@ -11,6 +11,8 @@ import type {
   BotPersonaDefinition,
   ConversationSettings,
   PersonaDefinitionPayload,
+  IAIOptions,
+  CreateIAIRequest,
   PersonaCategory,
   OmniChatGenerationJob,
   OmniChatGenerationRequest,
@@ -336,6 +338,41 @@ export const omnichatService = {
 
   async getPersonaDefinition(personaId: number): Promise<BotPersonaDefinition> {
     const res = await api.get<{ persona: BotPersonaDefinition }>(`/omnichat/personas/${personaId}`);
+    return res.persona;
+  },
+
+  /**
+   * What the creation flow may offer. Fetched once when the flow opens.
+   *
+   * The three lists that depend on an earlier answer arrive already worked out
+   * -- eyes by drawing style, builds by gender, hair shapes by style then
+   * gender then texture -- so the interface looks its answer up and never
+   * applies the rule itself.
+   */
+  async getIAIOptions(): Promise<IAIOptions> {
+    return api.get<IAIOptions>('/omnichat/iai/options');
+  },
+
+  /**
+   * Names to start her off with, already blended.
+   *
+   * One call when the name screen opens; the shuffle is local after that. A
+   * name per press would put a round trip behind a button somebody presses
+   * idly.
+   */
+  async getIAINames(ethnicity: string, gender: string): Promise<string[]> {
+    const query = new URLSearchParams();
+    if (ethnicity) query.set('ethnicity', ethnicity);
+    if (gender) query.set('gender', gender);
+    const suffix = query.toString();
+    const res = await api.get<{ names: string[] }>(
+      `/omnichat/iai/names${suffix ? `?${suffix}` : ''}`
+    );
+    return res.names ?? [];
+  },
+
+  async createIAI(payload: CreateIAIRequest): Promise<BotPersona> {
+    const res = await api.post<{ persona: BotPersona }>('/omnichat/iai', payload);
     return res.persona;
   },
 
@@ -870,6 +907,9 @@ export const omnichatQueryKeys = {
   billingWallet: ['omnichat', 'billing', 'wallet'] as const,
   billingUsage: (limit = 50) => ['omnichat', 'billing', 'usage', limit] as const,
   videoEntitlement: ['omnichat', 'billing', 'video-entitlement'] as const,
+  iaiOptions: ['omnichat', 'iai', 'options'] as const,
+  iaiNames: (ethnicity: string, gender: string) =>
+    ['omnichat', 'iai', 'names', ethnicity || 'any', gender || 'any'] as const,
   explore: (kind?: string) => ['omnichat', 'explore', kind ?? 'all'] as const,
   publication: (id: string) => ['omnichat', 'publication', id] as const,
   publicationComments: (id: string) => ['omnichat', 'publication', id, 'comments'] as const,
