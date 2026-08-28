@@ -57,7 +57,13 @@ class ApiClient {
       }
 
       const err = new Error(error.message || error.error);
-      (err as Error & { status?: number }).status = response.status;
+      const typed = err as Error & { status?: number; code?: string };
+      typed.status = response.status;
+      // The code as well as the status. A handler that answers 409 with
+      // "character_limit_reached" is telling the interface to offer a delete
+      // rather than an upgrade, and that distinction was being dropped here --
+      // every coded refusal arrived as an anonymous message.
+      typed.code = error.code;
       throw err;
     }
 
