@@ -23,7 +23,7 @@ import {
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import { Modal } from '../components/common/Modal';
-import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
+import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
 import type { OmniChatGroupMessage } from '../types/omnichat';
 import type { OmniChatGroup } from '../types/omnichat';
 import {
@@ -784,16 +784,7 @@ function CreateGroupDialog({
 }
 
 export default function OmniChatGroupsPage() {
-  const navigate = useNavigate();
-  const onTabChange = (tab: SidebarTab) => {
-    if (tab === 'discover') navigate('/omnichat');
-    if (tab === 'chat') navigate('/omnichat/chat');
-    if (tab === 'groups') navigate('/omnichat/groups');
-    if (tab === 'create') navigate('/omnichat/create');
-    if (tab === 'explore') navigate('/omnichat/explore');
-    if (tab === 'characters') navigate('/omnichat/studio');
-    if (tab === 'search') navigate('/omnichat?search=open');
-  };
+  const onTabChange = useOmniChatNavigation();
   return (
     <OmniChatShell activeTab="groups" onTabChange={onTabChange}>
       <OmniChatGroupsWorkspace />

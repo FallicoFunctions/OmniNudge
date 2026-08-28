@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
-import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
+import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
 import type { OmniChatPublication, OmniChatPublicationKind } from '../types/omnichat';
 import {
   createOmniChatSocialRequestId,
@@ -50,18 +50,6 @@ function getSafePublicationShareUrl(path: string, publicationId: string): string
   return url.toString();
 }
 
-function useOmniChatNavigation() {
-  const navigate = useNavigate();
-  return (tab: SidebarTab) => {
-    if (tab === 'discover') navigate('/omnichat');
-    if (tab === 'chat') navigate('/omnichat/chat');
-    if (tab === 'groups') navigate('/omnichat/groups');
-    if (tab === 'create') navigate('/omnichat/create');
-    if (tab === 'explore') navigate('/omnichat/explore');
-    if (tab === 'characters') navigate('/omnichat/studio');
-    if (tab === 'search') navigate('/omnichat?search=open');
-  };
-}
 
 export function OmniChatExploreWorkspace() {
   const [filter, setFilter] = useState<ExploreFilter>('all');

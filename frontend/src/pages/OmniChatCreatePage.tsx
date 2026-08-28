@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router';
 import { Film, Image as ImageIcon, ImagePlus, Images, Loader2, Send, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
@@ -9,7 +8,7 @@ import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal'
 import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
 import { Modal } from '../components/common/Modal';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
-import type { SidebarTab } from '../components/omnichat/OmniChatSidebar';
+import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
 import {
   createOmniChatRequestId,
   omnichatQueryKeys,
@@ -648,16 +647,7 @@ function GalleryGrid({
 }
 
 export default function OmniChatCreatePage() {
-  const navigate = useNavigate();
-  const navigateSidebar = (tab: SidebarTab) => {
-    if (tab === 'discover') navigate('/omnichat');
-    if (tab === 'chat') navigate('/omnichat/chat');
-    if (tab === 'groups') navigate('/omnichat/groups');
-    if (tab === 'create') navigate('/omnichat/create');
-    if (tab === 'explore') navigate('/omnichat/explore');
-    if (tab === 'characters') navigate('/omnichat/studio');
-    if (tab === 'search') navigate('/omnichat?search=open');
-  };
+  const navigateSidebar = useOmniChatNavigation();
   return (
     <OmniChatShell activeTab="create" onTabChange={navigateSidebar}>
       <OmniChatCreateWorkspace />
