@@ -53,12 +53,70 @@ const interests = render().groups[0].options;
 check('interests stop at three', c.state.interests.length, 3);
 check('but the screen is skippable', make({ start: 6 }).render().nextDisabled, false);
 
-// --- the age slider ---
+// --- the two sliders on screen one ---
 c.setState({ step: 1 });
-render().setAge({ target: { value: '99' } });
-check('the top of the slider is a real age', render().ageLabel, '99');
-render().setAge({ target: { value: '18' } });
-check('and so is the bottom', render().ageLabel, '18');
+check('screen one carries both', render().sliders.map((s) => s.label), ['Age', 'Height']);
+
+const age = () => render().sliders[0];
+age().onChange({ target: { value: '99' } });
+check('the top of the age slider is a real age', age().display, '99');
+age().onChange({ target: { value: '18' } });
+check('and so is the bottom', age().display, '18');
+
+const height = () => render().sliders[1];
+check('height leads in feet and inches', height().display, "5'6\"");
+check('with centimetres beside it, not instead', height().secondary, '168 cm');
+height().onChange({ target: { value: '84' } });
+check('the top of the height slider', height().display, "7'0\"");
+check('and its centimetres', height().secondary, '213 cm');
+height().onChange({ target: { value: '58' } });
+check('the floor is adult short stature', height().display, "4'10\"");
+height().onChange({ target: { value: '70' } });
+
+// --- the answers that depend on an earlier answer ---
+c.setState({ step: 3 });
+check('screen three asks six things now',
+  render().groups.map((g) => g.label),
+  ['Ethnicity', 'Hair length', 'Hair texture', 'Hair style', 'Hair colour', 'Eyes']);
+
+const shapes = () => render().groups[3].options.map((o) => o.key);
+c.setState({ style: 'realistic', gender: 'woman', hairTexture: 'coily' });
+check('an afro is offered on coily hair', shapes().includes('afro'), true);
+c.setState({ hairTexture: 'straight' });
+check('and not on straight hair, drawn as a person', shapes().includes('afro'), false);
+c.setState({ style: 'anime' });
+check('but anime is not claiming to be a photograph', shapes().includes('afro'), true);
+c.setState({ style: 'realistic' });
+
+check('length never rules a shape out',
+  (() => { c.setState({ gender: 'man', hairTexture: 'straight', hairLength: 'buzzed' });
+           return shapes().includes('man_bun'); })(), true);
+
+// Picking an answer that invalidates a later one clears it, which is what the
+// server does with it anyway.
+// Straight hair, so the afro is only possible while the character is a drawing.
+// On coily hair it survives the switch, correctly, and proves nothing.
+c.setState({ step: 3, style: 'anime', gender: 'woman', hairTexture: 'straight' });
+render().groups[5].options.find((o) => o.key === 'violet').pick();
+check('violet is choosable on anime', c.state.eyes, 'violet');
+render().groups[3].options.find((o) => o.key === 'afro').pick();
+check('and an afro is too', c.state.hairStyle, 'afro');
+
+c.setState({ step: 2 });
+render().styleCards[0].pick();
+check('switching to realistic clears the eyes it no longer offers', c.state.eyes, '');
+check('and the shape that needed a drawing', c.state.hairStyle, '');
+
+c.setState({ step: 4, gender: 'woman' });
+render().groups[0].options.find((o) => o.key === 'curvy').pick();
+check('curvy is hers', c.state.build, 'curvy');
+c.setState({ step: 1 });
+render().groups[0].options.find((o) => o.key === 'man').pick();
+check('and answering man clears it, because his set has no curvy', c.state.build, '');
+c.setState({ step: 4 });
+check("his silhouettes are his own",
+  render().groups[0].options.map((o) => o.key),
+  ['slim', 'lean', 'average', 'athletic', 'muscular', 'stocky', 'heavy']);
 
 // --- the name field respects the server cap ---
 c.setState({ step: 8 });
@@ -95,10 +153,18 @@ for (let i = 0; i < 8; i += 1) answer();
 check('the flow reaches the last screen', walk.c.state.step, 9);
 check('the last button is not Continue', walk.render().nextLabel, 'Start talking to her');
 const rows = walk.render().reviewRows;
-check('the review reports what was chosen', rows.map((r) => r.label),
-  ['Look', 'Face', 'Build', 'She starts', 'She is into', 'With you']);
+check('the review reports every answer', rows.map((r) => r.label),
+  ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She is into', 'With you']);
+check('including the height', rows[0].value.includes("5'6\" (168 cm)"), true);
 check('a screen nobody answered reads as left open', rows[1].value, 'Left open');
 check('the review names her', walk.render().reviewName, 'Nadia');
+
+// Buzzed sides with a bun on top: the combination the old model refused.
+const buzzed = make({ start: 9 });
+buzzed.c.setState({ style: 'realistic', gender: 'man', age: 34, heightInches: 70,
+  hairLength: 'buzzed', hairTexture: 'coily', hairStyle: 'man_bun', hairColour: 'dark_brown' });
+check('a bun above a buzz cut survives to the review',
+  buzzed.render().reviewRows[2].value, 'Buzzed · Coily · Man bun · Dark brown');
 
 
 // --- no screen may use a pronoun the creator did not choose ---

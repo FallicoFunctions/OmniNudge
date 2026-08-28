@@ -95,17 +95,24 @@
             </div>
           </sc-if>
 
-          <sc-if value="{{ showSlider }}" hint-placeholder-val="{{ true }}">
-            <div style="display: flex; flex-direction: column; gap: 14px; max-width: 620px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); padding: 20px 22px;">
-              <div style="display: flex; align-items: baseline; justify-content: space-between;">
-                <p style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.42);">Age</p>
-                <p style="margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: #ffffff; font-variant-numeric: tabular-nums;">{{ ageLabel }}</p>
-              </div>
-              <input type="range" min="18" max="99" step="1" value="{{ age }}" onChange="{{ setAge }}" aria-label="Age" style="width: 100%; height: 24px;">
-              <div style="display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,0.35);">
-                <span>18</span>
-                <span>99</span>
-              </div>
+          <sc-if value="{{ showSliders }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 14px; max-width: 620px;">
+              <sc-for list="{{ sliders }}" as="slider" hint-placeholder-count="2">
+                <div style="display: flex; flex-direction: column; gap: 12px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); padding: 18px 22px;">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px;">
+                    <p style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.42);">{{ slider.label }}</p>
+                    <span style="display: flex; align-items: baseline; gap: 10px;">
+                      <span style="font-size: 30px; font-weight: 600; letter-spacing: -0.02em; color: #ffffff; font-variant-numeric: tabular-nums;">{{ slider.display }}</span>
+                      <span style="{{ slider.secondaryStyle }}">{{ slider.secondary }}</span>
+                    </span>
+                  </div>
+                  <input type="range" min="{{ slider.min }}" max="{{ slider.max }}" step="1" value="{{ slider.value }}" onChange="{{ slider.onChange }}" aria-label="{{ slider.label }}" style="width: 100%; height: 24px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,0.35);">
+                    <span>{{ slider.minLabel }}</span>
+                    <span>{{ slider.maxLabel }}</span>
+                  </div>
+                </div>
+              </sc-for>
             </div>
           </sc-if>
 
@@ -132,7 +139,7 @@
               </div>
               <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: flex; flex-direction: column; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); overflow: hidden;">
-                  <sc-for list="{{ reviewRows }}" as="row" hint-placeholder-count="6">
+                  <sc-for list="{{ reviewRows }}" as="row" hint-placeholder-count="8">
                     <div style="{{ row.style }}">
                       <span style="font-size: 13px; color: rgba(255,255,255,0.45);">{{ row.label }}</span>
                       <span style="font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); text-align: right;">{{ row.value }}</span>
@@ -160,13 +167,28 @@
 </div>
 </x-dc>
 <script data-dc-script data-props='{"start":{"editor":"int","default":1,"min":1,"max":9,"section":"Flow"},"gender":{"editor":"enum","options":["","woman","man"],"default":"","section":"Flow"},"$preview":{"width":1440,"height":900}}'>
+// Said out loud rather than left to be noticed: both of these lists change with
+// an answer given on an earlier screen.
+const hairStyleNote = (state) => {
+  if (state.hairLength === 'shaved' || state.hairLength === 'buzzed') return 'above a shaved head, if you like';
+  if (state.style !== 'anime' && (state.hairTexture === 'straight' || state.hairTexture === 'wavy')) {
+    return 'an afro needs curly or coily hair';
+  }
+  return '';
+};
+const eyeNote = (state) => (state.style === 'anime' ? 'anime adds three' : '');
+
+const feetAndInches = (inches) => Math.floor(inches / 12) + "'" + (inches % 12) + '"';
+const centimetres = (inches) => Math.round(inches * 2.54);
+
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = {
       step: props.start || 1,
-      style: '', gender: props.gender || '', age: 27,
-      ethnicity: '', hair: '', hairColour: '', eyes: '', build: '',
+      style: '', gender: props.gender || '', age: 27, heightInches: 66,
+      ethnicity: '', hairLength: '', hairTexture: '', hairStyle: '',
+      hairColour: '', eyes: '', build: '',
       temperaments: [], interests: [], feeling: '', name: ''
     };
   }
@@ -174,6 +196,91 @@ class Component extends DCLogic {
   componentDidUpdate(prev) {
     if (prev.start !== this.props.start) this.setState({ step: this.props.start || 1 });
     if (prev.gender !== this.props.gender) this.setState({ gender: this.props.gender || '' });
+  }
+
+  // These mirror the server's tables. The real screen fetches them from
+  // GET /omnichat/iai/options, which serves the dependent lists already worked
+  // out; nothing here decides a rule, it only draws one.
+  tables() {
+    return {
+      ethnicity: [
+        ['white', 'White / Caucasian'], ['black', 'Black'], ['east_asian', 'East Asian'],
+        ['south_asian', 'South Asian'], ['southeast_asian', 'Southeast Asian'],
+        ['latino', this.state.gender === 'man' ? 'Latino' : 'Latina'],
+        ['middle_eastern', 'Middle Eastern / Arab'], ['pacific_islander', 'Pacific Islander'],
+        ['indigenous', 'Indigenous / Native'], ['mixed', 'Mixed'], ['other', 'Other']
+      ],
+      hairLength: [
+        ['shaved', 'Shaved'], ['buzzed', 'Buzzed'], ['short', 'Short'],
+        ['medium', 'Medium'], ['long', 'Long'], ['very_long', 'Very long']
+      ],
+      hairTexture: [['straight', 'Straight'], ['wavy', 'Wavy'], ['curly', 'Curly'], ['coily', 'Coily']],
+      hairColour: [
+        ['black', 'Black'], ['dark_brown', 'Dark brown'], ['brown', 'Brown'],
+        ['light_brown', 'Light brown'], ['blonde', 'Blonde'], ['red', 'Red'],
+        ['auburn', 'Auburn'], ['strawberry_blonde', 'Strawberry blonde'],
+        ['gray', 'Gray'], ['white', 'White'], ['platinum_blonde', 'Platinum blonde'],
+        ['pink', 'Pink'], ['purple', 'Purple'], ['blue', 'Blue'], ['green', 'Green'], ['silver', 'Silver']
+      ]
+    };
+  }
+
+  eyeColours(style) {
+    const natural = [
+      ['brown', 'Brown'], ['dark_brown', 'Dark brown'], ['blue', 'Blue'], ['green', 'Green'],
+      ['grey', 'Grey'], ['hazel', 'Hazel'], ['amber', 'Amber']
+    ];
+    // Violet, crimson and gold are a drawing's, not a person's.
+    return style === 'anime'
+      ? natural.concat([['violet', 'Violet'], ['crimson', 'Crimson'], ['gold', 'Gold']])
+      : natural;
+  }
+
+  builds(gender) {
+    if (gender === 'man') {
+      return [['slim', 'Slim'], ['lean', 'Lean'], ['average', 'Average'], ['athletic', 'Athletic'],
+        ['muscular', 'Muscular'], ['stocky', 'Stocky'], ['heavy', 'Heavy']];
+    }
+    return [['slim', 'Slim'], ['average', 'Average'], ['athletic', 'Athletic'],
+      ['curvy', 'Curvy'], ['muscular', 'Muscular'], ['plus_size', 'Plus size']];
+  }
+
+  // Length is not an input. A bun above a buzz cut is an ordinary haircut, so
+  // only gender and -- on a character drawn as a person -- texture rule a shape
+  // out.
+  hairStyles(style, gender, texture) {
+    const shared = [
+      ['natural', 'Natural'], ['middle_part', 'Middle part'], ['side_part', 'Side part'],
+      ['bangs', 'Bangs'], ['ponytail', 'Ponytail'], ['braids', 'Braids'],
+      ['cornrows', 'Cornrows'], ['locs', 'Locs']
+    ];
+    const hers = [
+      ['curtain_bangs', 'Curtain bangs'], ['bob', 'Bob'], ['pixie', 'Pixie'],
+      ['high_ponytail', 'High ponytail'], ['bun', 'Bun'], ['messy_bun', 'Messy bun'],
+      ['half_up', 'Half-up'], ['pigtails', 'Pigtails']
+    ];
+    const his = [
+      ['fringe', 'Fringe'], ['curtains', 'Curtains'], ['textured', 'Textured'],
+      ['slicked_back', 'Slicked back'], ['quiff', 'Quiff'], ['pompadour', 'Pompadour'],
+      ['crew_cut', 'Crew cut'], ['undercut', 'Undercut'], ['fade', 'Fade'], ['man_bun', 'Man bun']
+    ];
+    const afroFits = style === 'anime' || !texture || texture === 'curly' || texture === 'coily';
+    return shared
+      .concat(afroFits ? [['afro', 'Afro']] : [])
+      .concat(gender === 'man' ? his : hers);
+  }
+
+  // An answer that no longer fits what it depends on is cleared rather than
+  // kept, which is what the server does with it anyway.
+  prune(state) {
+    const patch = {};
+    const has = (list, key) => list.some((entry) => entry[0] === key);
+    if (state.build && !has(this.builds(state.gender), state.build)) patch.build = '';
+    if (state.eyes && !has(this.eyeColours(state.style), state.eyes)) patch.eyes = '';
+    if (state.hairStyle && !has(this.hairStyles(state.style, state.gender, state.hairTexture), state.hairStyle)) {
+      patch.hairStyle = '';
+    }
+    return patch;
   }
 
   optionStyle(selected, gloss) {
@@ -202,7 +309,12 @@ class Component extends DCLogic {
     });
   }
 
-  one(field) { return (key) => this.setState({ [field]: key }); }
+  one(field) {
+    return (key) => {
+      const next = Object.assign({}, this.state, { [field]: key });
+      this.setState(Object.assign({ [field]: key }, this.prune(next)));
+    };
+  }
 
   many(field, limit) {
     return (key) => {
@@ -284,18 +396,25 @@ class Component extends DCLogic {
         options: this.chips([['woman', 'A woman', ''], ['man', 'A man', '']], s.gender, this.one('gender')) });
     }
     if (s.step === 3) {
+      const tables = this.tables();
       groups.push({ label: 'Ethnicity', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
-        options: this.chips([['caucasian', 'Caucasian', ''], ['asian', 'Asian', ''], ['black', 'Black', ''], ['latina', 'Latina', ''], ['arab', 'Arab', ''], ['mixed', 'Mixed', '']], s.ethnicity, this.one('ethnicity')) });
-      groups.push({ label: 'Hair', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
-        options: this.chips([['straight', 'Straight', ''], ['bangs', 'Bangs', ''], ['curly', 'Curly', ''], ['bun', 'Bun', ''], ['short', 'Short', ''], ['ponytail', 'Ponytail', '']], s.hair, this.one('hair')) });
-      groups.push({ label: 'Hair colour', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(5, minmax(0, 1fr))',
-        options: this.chips([['brunette', 'Brunette', ''], ['blonde', 'Blonde', ''], ['black', 'Black', ''], ['red', 'Red', ''], ['dyed', 'Dyed', '']], s.hairColour, this.one('hairColour')) });
-      groups.push({ label: 'Eyes', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(5, minmax(0, 1fr))',
-        options: this.chips([['brown', 'Brown', ''], ['blue', 'Blue', ''], ['green', 'Green', ''], ['grey', 'Grey', ''], ['hazel', 'Hazel', '']], s.eyes, this.one('eyes')) });
+        options: this.chips(tables.ethnicity, s.ethnicity, this.one('ethnicity')) });
+      groups.push({ label: 'Hair length', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
+        options: this.chips(tables.hairLength, s.hairLength, this.one('hairLength')) });
+      groups.push({ label: 'Hair texture', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(4, minmax(0, 1fr))',
+        options: this.chips(tables.hairTexture, s.hairTexture, this.one('hairTexture')) });
+      // Shapes, not lengths. A bun above a buzz cut is an ordinary haircut, so
+      // this list narrows on gender and texture and never on how long the hair is.
+      groups.push({ label: 'Hair style', counter: hairStyleNote(s), counterColour: 'rgba(255,255,255,0.35)', columns: 'repeat(3, minmax(0, 1fr))',
+        options: this.chips(this.hairStyles(s.style, s.gender, s.hairTexture), s.hairStyle, this.one('hairStyle')) });
+      groups.push({ label: 'Hair colour', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(4, minmax(0, 1fr))',
+        options: this.chips(tables.hairColour, s.hairColour, this.one('hairColour')) });
+      groups.push({ label: 'Eyes', counter: eyeNote(s), counterColour: '#7da8ff', columns: 'repeat(4, minmax(0, 1fr))',
+        options: this.chips(this.eyeColours(s.style), s.eyes, this.one('eyes')) });
     }
     if (s.step === 4) {
-      groups.push({ label: 'Build', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(5, minmax(0, 1fr))',
-        options: this.chips([['slim', 'Slim', ''], ['athletic', 'Athletic', ''], ['average', 'Average', ''], ['curvy', 'Curvy', ''], ['heavy', 'Heavy', '']], s.build, this.one('build')) });
+      groups.push({ label: 'Build', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(4, minmax(0, 1fr))',
+        options: this.chips(this.builds(s.gender), s.build, this.one('build')) });
     }
     if (s.step === 5) {
       groups.push({ label: 'Where ' + p.subj + ' start' + p.s, counter: s.temperaments.length + ' of 3', counterColour: s.temperaments.length === 3 ? '#7da8ff' : 'rgba(255,255,255,0.4)', columns: 'repeat(2, minmax(0, 1fr))',
@@ -345,23 +464,52 @@ class Component extends DCLogic {
       { key: 'realistic', label: 'Realistic', gloss: 'Photographic, closer to a person you could meet.',
         selected: s.style === 'realistic', style: styleCardStyle(s.style === 'realistic'),
         plateStyle: plate('linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))'), figureFill: 'rgba(255,255,255,0.28)', figureBody: figureBody,
-        pick: () => this.setState({ style: 'realistic' }) },
+        // Through one(), like every other answer, so the eyes and the hair
+        // shape it no longer offers are cleared rather than left invalid.
+        pick: () => this.one('style')('realistic') },
       { key: 'anime', label: 'Anime', gloss: 'Drawn, stylised, brighter than life.',
         selected: s.style === 'anime', style: styleCardStyle(s.style === 'anime'),
         plateStyle: plate('linear-gradient(160deg, rgba(96,165,250,0.16), rgba(59,130,246,0.05))'), figureFill: 'rgba(142,177,255,0.5)', figureBody: figureBody,
-        pick: () => this.setState({ style: 'anime' }) }
+        pick: () => this.one('style')('anime') }
     ];
 
-    const readable = (value, fallback) => value ? value.charAt(0).toUpperCase() + value.slice(1) : fallback;
+    // Labels come from the same tables the grids are drawn from, so the review
+    // says what the person actually clicked rather than a re-derived guess at it.
+    const labelIn = (list, key) => {
+      const found = list.find((entry) => entry[0] === key);
+      return found ? found[1] : '';
+    };
+    const readable = (value, fallback) => value
+      ? value.replace(/_/g, ' ').replace(/^./, (first) => first.toUpperCase())
+      : fallback;
     const rowStyle = (last) => 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px;' +
       (last ? '' : ' border-bottom: 1px solid rgba(255,255,255,0.07);');
-    const lookParts = [readable(s.style, ''), readable(s.gender, ''), String(s.age)].filter(Boolean);
+
+    const tables = this.tables();
+    const joined = (parts) => parts.filter(Boolean).join(' · ');
+    const lookParts = [
+      readable(s.style, ''), readable(s.gender, ''), String(s.age),
+      feetAndInches(s.heightInches) + ' (' + centimetres(s.heightInches) + ' cm)'
+    ];
+    const hairParts = [
+      labelIn(tables.hairLength, s.hairLength),
+      labelIn(tables.hairTexture, s.hairTexture),
+      labelIn(this.hairStyles(s.style, s.gender, s.hairTexture), s.hairStyle),
+      labelIn(tables.hairColour, s.hairColour)
+    ];
+
     const reviewRows = [
-      { label: 'Look', value: lookParts.join(' · ') || 'Not chosen', style: rowStyle(false) },
-      { label: 'Face', value: [readable(s.ethnicity, ''), readable(s.hair, ''), readable(s.hairColour, ''), readable(s.eyes, '')].filter(Boolean).join(' · ') || 'Left open', style: rowStyle(false) },
-      { label: 'Build', value: readable(s.build, 'Left open'), style: rowStyle(false) },
+      { label: 'Look', value: joined(lookParts) || 'Not chosen', style: rowStyle(false) },
+      { label: 'Ethnicity', value: labelIn(tables.ethnicity, s.ethnicity) || 'Left open', style: rowStyle(false) },
+      // Blank here can mean two different things. A shaved head has no shape to
+      // report, and neither does a straight-haired character who could not have
+      // an afro -- so the row says what is there rather than pretending to a
+      // completeness the answers do not have.
+      { label: 'Hair', value: joined(hairParts) || 'Left open', style: rowStyle(false) },
+      { label: 'Eyes', value: labelIn(this.eyeColours(s.style), s.eyes) || 'Left open', style: rowStyle(false) },
+      { label: 'Build', value: labelIn(this.builds(s.gender), s.build) || 'Left open', style: rowStyle(false) },
       { label: p.Subj + ' start' + p.s, value: s.temperaments.length ? s.temperaments.map((k) => readable(k, '')).join(', ') : 'Not chosen', style: rowStyle(false) },
-      { label: p.Subj + ' ' + p.is + ' into', value: s.interests.length ? s.interests.map((k) => readable(k.replace('_', ' '), '')).join(', ') : 'Nothing yet', style: rowStyle(false) },
+      { label: p.Subj + ' ' + p.is + ' into', value: s.interests.length ? s.interests.map((k) => readable(k, '')).join(', ') : 'Nothing yet', style: rowStyle(false) },
       { label: 'With you', value: readable(s.feeling, 'Not chosen'), style: rowStyle(true) }
     ];
 
@@ -376,14 +524,29 @@ class Component extends DCLogic {
       sub: screen.sub,
       showStyleCards: s.step === 2,
       showGroups: groups.length > 0,
-      showSlider: s.step === 1,
+      showSliders: s.step === 1,
       showName: s.step === 8,
       showReview: s.step === 9,
       styleCards: styleCards,
       groups: groups,
-      age: s.age,
-      ageLabel: String(s.age),
-      setAge: (event) => this.setState({ age: Number(event.target.value) }),
+      sliders: [
+        {
+          label: 'Age', value: s.age, min: 18, max: 99,
+          display: String(s.age), secondary: '', secondaryStyle: 'display: none;',
+          minLabel: '18', maxLabel: '99',
+          onChange: (event) => this.setState({ age: Number(event.target.value) })
+        },
+        {
+          // Feet and inches lead. Centimetres sit beside them rather than
+          // instead of them, because the people answering this think in feet.
+          label: 'Height', value: s.heightInches, min: 58, max: 84,
+          display: feetAndInches(s.heightInches),
+          secondary: centimetres(s.heightInches) + ' cm',
+          secondaryStyle: 'font-size: 13px; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums;',
+          minLabel: feetAndInches(58), maxLabel: feetAndInches(84),
+          onChange: (event) => this.setState({ heightInches: Number(event.target.value) })
+        }
+      ],
       name: s.name,
       nameCount: s.name.length + ' / 40',
       setName: (event) => this.setState({ name: event.target.value.slice(0, 40) }),
