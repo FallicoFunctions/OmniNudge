@@ -116,9 +116,19 @@
             </div>
           </sc-if>
 
+          <sc-if value="{{ showSearch }}" hint-placeholder-val="{{ true }}">
+            <input type="text" value="{{ interestSearch }}" onChange="{{ setInterestSearch }}" placeholder="Search" aria-label="Search interests" style="width: 100%; max-width: 320px; height: 44px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); padding: 0 14px; font-family: inherit; font-size: 14px; color: #ffffff; outline: none;">
+          </sc-if>
+
           <sc-if value="{{ showName }}" hint-placeholder-val="{{ true }}">
             <div style="display: flex; flex-direction: column; gap: 8px; max-width: 440px;">
-              <input type="text" value="{{ name }}" onChange="{{ setName }}" maxlength="40" placeholder="{{ namePlaceholder }}" aria-label="{{ namePlaceholder }}" style="width: 100%; height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); padding: 0 18px; font-family: inherit; font-size: 19px; font-weight: 500; color: #ffffff; outline: none;">
+              <div style="display: flex; gap: 10px; align-items: stretch;">
+                <input type="text" value="{{ name }}" onChange="{{ setName }}" maxlength="40" placeholder="{{ namePlaceholder }}" aria-label="{{ namePlaceholder }}" style="flex: 1; min-width: 0; height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); padding: 0 18px; font-family: inherit; font-size: 19px; font-weight: 500; color: #ffffff; outline: none;">
+                <button type="button" onClick="{{ shuffleName }}" aria-label="Suggest another name" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 58px; padding: 0 18px; flex-shrink: 0; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.035); color: rgba(255,255,255,0.75); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path></svg>
+                  Shuffle
+                </button>
+              </div>
               <p style="margin: 0; text-align: right; font-size: 11px; color: rgba(255,255,255,0.3); font-variant-numeric: tabular-nums;">{{ nameCount }}</p>
             </div>
           </sc-if>
@@ -139,7 +149,7 @@
               </div>
               <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: flex; flex-direction: column; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.035); overflow: hidden;">
-                  <sc-for list="{{ reviewRows }}" as="row" hint-placeholder-count="8">
+                  <sc-for list="{{ reviewRows }}" as="row" hint-placeholder-count="9">
                     <div style="{{ row.style }}">
                       <span style="font-size: 13px; color: rgba(255,255,255,0.45);">{{ row.label }}</span>
                       <span style="font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); text-align: right;">{{ row.value }}</span>
@@ -167,19 +177,58 @@
 </div>
 </x-dc>
 <script data-dc-script data-props='{"start":{"editor":"int","default":1,"min":1,"max":9,"section":"Flow"},"gender":{"editor":"enum","options":["","woman","man"],"default":"","section":"Flow"},"$preview":{"width":1440,"height":900}}'>
-// Said out loud rather than left to be noticed: both of these lists change with
-// an answer given on an earlier screen.
-const hairStyleNote = (state) => {
-  if (state.hairLength === 'shaved' || state.hairLength === 'buzzed') return 'above a shaved head, if you like';
-  if (state.style !== 'anime' && (state.hairTexture === 'straight' || state.hairTexture === 'wavy')) {
-    return 'an afro needs curly or coily hair';
-  }
-  return '';
-};
-const eyeNote = (state) => (state.style === 'anime' ? 'anime adds three' : '');
+const drawnTo = (level) => ({ none: 'Not at all', some: 'Somewhat', strong: 'Very' }[level] || 'Not at all');
 
 const feetAndInches = (inches) => Math.floor(inches / 12) + "'" + (inches % 12) + '"';
-const centimetres = (inches) => Math.round(inches * 2.54);
+
+// Mirrors GET /omnichat/iai/names?ethnicity=&gender=. The real screen fetches
+// this once when it opens and shuffles locally, which is what this does. The
+// blend is the server's -- the ethnicity's own names plus a pool used widely
+// across many places -- and there is deliberately no list for "indigenous",
+// which falls through to everything rather than claiming names nobody verified.
+const NAME_POOL = {
+  woman: {
+    white: ['Emma', 'Olivia', 'Charlotte', 'Amelia', 'Hannah', 'Claire', 'Nora', 'Ruby'],
+    black: ['Ayana', 'Imani', 'Zuri', 'Nia', 'Amara', 'Simone', 'Jada', 'Kendra'],
+    east_asian: ['Mei', 'Yuki', 'Jia', 'Haneul', 'Ling', 'Sakura', 'Minji', 'Xiulan'],
+    south_asian: ['Priya', 'Ananya', 'Meera', 'Aisha', 'Divya', 'Kavya', 'Neha', 'Ishani'],
+    southeast_asian: ['Mai', 'Linh', 'Siti', 'Dara', 'Anong', 'Malaya', 'Putri', 'Thuy'],
+    latino: ['Sofia', 'Valentina', 'Camila', 'Lucia', 'Elena', 'Isabela', 'Mariana', 'Paloma'],
+    middle_eastern: ['Layla', 'Amira', 'Yasmin', 'Zahra', 'Nour', 'Rania', 'Salma', 'Dalia'],
+    pacific_islander: ['Leilani', 'Malia', 'Alana', 'Tiare', 'Sina', 'Mareva', 'Noelani', 'Kalani'],
+    shared: ['Alex', 'Sam', 'Jordan', 'Robin', 'Anna', 'Eva', 'Leah', 'Sara', 'Maya', 'Nadia']
+  },
+  man: {
+    white: ['Jack', 'Oliver', 'Henry', 'Thomas', 'Daniel', 'Ethan', 'Owen', 'Miles'],
+    black: ['Malik', 'Andre', 'Jamal', 'Kwame', 'Elijah', 'Darius', 'Terrence', 'Isaiah'],
+    east_asian: ['Kenji', 'Wei', 'Haruki', 'Jin', 'Tao', 'Minjun', 'Ren', 'Chen'],
+    south_asian: ['Arjun', 'Rohan', 'Vikram', 'Aditya', 'Kabir', 'Rahul', 'Dev', 'Ishaan'],
+    southeast_asian: ['Bayani', 'Minh', 'Arif', 'Somchai', 'Danilo', 'Khanh', 'Adi', 'Tuan'],
+    latino: ['Mateo', 'Diego', 'Santiago', 'Javier', 'Rafael', 'Andres', 'Emilio', 'Tomas'],
+    middle_eastern: ['Omar', 'Karim', 'Tariq', 'Hassan', 'Youssef', 'Sami', 'Nadir', 'Faisal'],
+    pacific_islander: ['Kai', 'Tane', 'Manu', 'Sefa', 'Nikau', 'Aleki', 'Tavita', 'Koa'],
+    shared: ['Alex', 'Sam', 'Jordan', 'Robin', 'Adam', 'Leo', 'Noah', 'Ivan', 'Marco', 'Felix']
+  }
+};
+
+const nameSuggestions = (ethnicity, gender) => {
+  const genders = gender === 'woman' || gender === 'man' ? [gender] : ['woman', 'man'];
+  const names = [];
+  genders.forEach((which) => {
+    const lists = NAME_POOL[which];
+    const own = lists[ethnicity];
+    (own ? [own] : Object.keys(lists).filter((k) => k !== 'shared').map((k) => lists[k]))
+      .forEach((list) => list.forEach((name) => { if (names.indexOf(name) === -1) names.push(name); }));
+    lists.shared.forEach((name) => { if (names.indexOf(name) === -1) names.push(name); });
+  });
+  return names;
+};
+
+// The first suggestion rather than a random one, so a pinned screen shows the
+// same name every time it is opened and two people reviewing it are looking at
+// the same thing.
+const startsOnTheNameScreen = (props) => (props.start || 1) >= 8;
+const firstSuggestion = (props) => nameSuggestions('', props.gender || '')[0] || '';
 
 class Component extends DCLogic {
   constructor(props) {
@@ -189,13 +238,21 @@ class Component extends DCLogic {
       style: '', gender: props.gender || '', age: 27, heightInches: 66,
       ethnicity: '', hairLength: '', hairTexture: '', hairStyle: '',
       hairColour: '', eyes: '', build: '',
-      temperaments: [], interests: [], feeling: '', name: ''
+      temperaments: [], interests: [], interestSearch: '',
+      feeling: '', attraction: 'none',
+      // Opening straight onto the name screen has to look like arriving at it,
+      // not like a blank box. The forward path fills this in on the way through;
+      // this is the pinned artboards and anything that deep-links.
+      name: startsOnTheNameScreen(props) ? firstSuggestion(props) : ''
     };
   }
 
   componentDidUpdate(prev) {
     if (prev.start !== this.props.start) this.setState({ step: this.props.start || 1 });
     if (prev.gender !== this.props.gender) this.setState({ gender: this.props.gender || '' });
+    if (prev.start !== this.props.start && startsOnTheNameScreen(this.props) && !this.state.name) {
+      this.setState({ name: firstSuggestion(this.props) });
+    }
   }
 
   // These mirror the server's tables. The real screen fetches them from
@@ -250,7 +307,7 @@ class Component extends DCLogic {
   // out.
   hairStyles(style, gender, texture) {
     const shared = [
-      ['natural', 'Natural'], ['middle_part', 'Middle part'], ['side_part', 'Side part'],
+      ['natural', 'Unstyled'], ['middle_part', 'Middle part'], ['side_part', 'Side part'],
       ['bangs', 'Bangs'], ['ponytail', 'Ponytail'], ['braids', 'Braids'],
       ['cornrows', 'Cornrows'], ['locs', 'Locs']
     ];
@@ -309,6 +366,15 @@ class Component extends DCLogic {
     });
   }
 
+  // A name is offered the moment the screen opens, so nobody is asked to invent
+  // a person on the spot. It stays typable: a suggestion that cannot be
+  // overruled is a requirement wearing a suggestion's clothes.
+  suggestName() {
+    const pool = nameSuggestions(this.state.ethnicity, this.state.gender);
+    const fresh = pool.filter((name) => name !== this.state.name);
+    return fresh[Math.floor(Math.random() * fresh.length)] || pool[0] || '';
+  }
+
   one(field) {
     return (key) => {
       const next = Object.assign({}, this.state, { [field]: key });
@@ -329,9 +395,9 @@ class Component extends DCLogic {
 
   pronouns() {
     const gender = this.state.gender;
-    if (gender === 'man') return { subj: 'he', Subj: 'He', obj: 'him', poss: 'his', Poss: 'His', is: 'is', s: 's', noun: 'man' };
-    if (gender === 'woman') return { subj: 'she', Subj: 'She', obj: 'her', poss: 'her', Poss: 'Her', is: 'is', s: 's', noun: 'woman' };
-    return { subj: 'they', Subj: 'They', obj: 'them', poss: 'their', Poss: 'Their', is: 'are', s: '', noun: 'character' };
+    if (gender === 'man') return { subj: 'he', Subj: 'He', obj: 'him', Obj: 'Him', poss: 'his', Poss: 'His', is: 'is', s: 's', noun: 'man' };
+    if (gender === 'woman') return { subj: 'she', Subj: 'She', obj: 'her', Obj: 'Her', poss: 'her', Poss: 'Her', is: 'is', s: 's', noun: 'woman' };
+    return { subj: 'they', Subj: 'They', obj: 'them', Obj: 'Them', poss: 'their', Poss: 'Their', is: 'are', s: '', noun: 'character' };
   }
 
   screen() {
@@ -341,9 +407,21 @@ class Component extends DCLogic {
       case 2: return { title: 'Pick a look', sub: 'This is the world ' + p.subj + ' ' + p.is + ' drawn in. It does not change who ' + p.subj + ' ' + p.is + '.' };
       case 3: return { title: p.Poss + ' face', sub: 'Recorded now, drawn later. Skip anything you have no view on.' };
       case 4: return { title: p.Poss + ' build', sub: 'One more detail for the likeness, then we are done with how ' + p.subj + ' look' + p.s + '.' };
-      case 5: return { title: p.Subj + ' will not stay this way', sub: 'Pick three. This is where ' + p.subj + ' start' + p.s + ', and what happens between you moves ' + p.obj + ' off it.' };
-      case 6: return { title: 'What ' + p.subj + ' ' + p.is + ' into', sub: 'Up to three. These come up on ' + p.poss + ' own, and ' + p.subj + ' can pick up new ones later.' };
-      case 7: return { title: 'Where you two are starting from', sub: 'How ' + p.subj + ' ' + p.is + ' with you on the day you meet. Anyone else starts from nothing.' };
+      case 5: return {
+        title: 'How ' + p.subj + ' start' + p.s + ' out',
+        sub: 'Pick up to three. They set who ' + p.subj + ' ' + p.is + ' on the first day, not who ' +
+          p.subj + ' stay' + p.s + '. Make ' + p.obj + ' quiet and ' + p.subj + ' can work on it and become less quiet, or settle further into it. A person does the same.'
+      };
+      case 6: return {
+        title: 'What ' + p.subj + ' like' + p.s,
+        sub: 'Pick up to three. This is where ' + p.subj + ' begin' + p.s + ', not a fixed list. ' +
+          p.Subj + ' can take up something you never chose, and ' + p.subj + ' can go off one of these.'
+      };
+      case 7: return {
+        title: 'How ' + p.subj + ' see' + p.s + ' you',
+        sub: 'Where ' + p.poss + ' side of things begins. It moves with what happens between you, and everyone else ' +
+          p.subj + ' meet' + p.s + ' starts from zero.'
+      };
       case 8: return { title: 'What is ' + p.poss + ' name', sub: p.Subj + ' answer' + p.s + ' to this. You can call ' + p.obj + ' something else later; ' + p.subj + ' may not take to it.' };
       default: return { title: 'Meet ' + p.obj, sub: 'This is who you made. ' + p.Subj + ' take' + p.s + ' it from here.' };
     }
@@ -353,16 +431,19 @@ class Component extends DCLogic {
     const s = this.state;
     if (s.step === 1) return !!s.gender;
     if (s.step === 2) return !!s.style;
-    if (s.step === 5) return s.temperaments.length === 3;
+    if (s.step === 5) return s.temperaments.length >= 1;
     if (s.step === 7) return !!s.feeling;
     if (s.step === 8) return s.name.trim().length > 0;
     return true;
   }
 
+  // Only ever said when a screen is refusing to advance. A screen somebody can
+  // simply skip says nothing about it: the Continue button being live is the
+  // whole message, and a label explaining that is noise.
   hint() {
-    const s = this.state;
-    if (s.step === 3 || s.step === 4 || s.step === 6) return 'You can skip this.';
-    if (s.step === 5 && s.temperaments.length !== 3) return 'Choose three to carry on.';
+    if (this.state.step === 5 && this.state.temperaments.length === 0) {
+      return 'Pick at least one to carry on.';
+    }
     return '';
   }
 
@@ -372,7 +453,7 @@ class Component extends DCLogic {
     const ready = this.ready();
 
     const p = this.pronouns();
-    const stepNames = ['The basics', 'Look', p.Poss + ' face', p.Poss + ' build', 'Where ' + p.subj + ' start' + p.s, 'Interests', 'With you', 'Name', 'Meet ' + p.obj];
+    const stepNames = ['Basics', 'Look', 'Face', 'Build', 'Traits', 'Interests', 'You', 'Name', p.Obj];
     const rail = stepNames.map((label, index) => {
       const number = index + 1;
       const done = number < s.step;
@@ -405,11 +486,11 @@ class Component extends DCLogic {
         options: this.chips(tables.hairTexture, s.hairTexture, this.one('hairTexture')) });
       // Shapes, not lengths. A bun above a buzz cut is an ordinary haircut, so
       // this list narrows on gender and texture and never on how long the hair is.
-      groups.push({ label: 'Hair style', counter: hairStyleNote(s), counterColour: 'rgba(255,255,255,0.35)', columns: 'repeat(3, minmax(0, 1fr))',
+      groups.push({ label: 'Hair style', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
         options: this.chips(this.hairStyles(s.style, s.gender, s.hairTexture), s.hairStyle, this.one('hairStyle')) });
       groups.push({ label: 'Hair colour', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(4, minmax(0, 1fr))',
         options: this.chips(tables.hairColour, s.hairColour, this.one('hairColour')) });
-      groups.push({ label: 'Eyes', counter: eyeNote(s), counterColour: '#7da8ff', columns: 'repeat(4, minmax(0, 1fr))',
+      groups.push({ label: 'Eyes', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(4, minmax(0, 1fr))',
         options: this.chips(this.eyeColours(s.style), s.eyes, this.one('eyes')) });
     }
     if (s.step === 4) {
@@ -417,39 +498,77 @@ class Component extends DCLogic {
         options: this.chips(this.builds(s.gender), s.build, this.one('build')) });
     }
     if (s.step === 5) {
-      groups.push({ label: 'Where ' + p.subj + ' start' + p.s, counter: s.temperaments.length + ' of 3', counterColour: s.temperaments.length === 3 ? '#7da8ff' : 'rgba(255,255,255,0.4)', columns: 'repeat(2, minmax(0, 1fr))',
+      groups.push({ label: 'Traits', counter: s.temperaments.length + ' of 3',
+        counterColour: s.temperaments.length > 0 ? '#7da8ff' : 'rgba(255,255,255,0.4)',
+        columns: 'repeat(2, minmax(0, 1fr))',
         options: this.chips([
           ['warm', 'Warm', 'Open with people'],
           ['guarded', 'Guarded', 'Slow to let you in'],
-          ['blunt', 'Blunt', 'Says the hard thing'],
+          ['outgoing', 'Outgoing', 'Comes alive around people'],
+          ['quiet', 'Quiet', 'Says little, by choice'],
           ['playful', 'Playful', 'Teases before anything else'],
+          ['serious', 'Serious', 'Rarely treats things lightly'],
+          ['blunt', 'Blunt', 'Says the hard thing'],
+          ['tactful', 'Tactful', 'Chooses ' + p.poss + ' words'],
           ['dry', 'Dry', 'Understated, deadpan'],
           ['earnest', 'Earnest', 'Means what ' + p.subj + ' say' + p.s],
+          ['confident', 'Confident', 'Comfortable taking the lead'],
+          ['reserved', 'Reserved', 'Keeps the feeling out of it'],
+          ['curious', 'Curious', 'Wants to know more'],
           ['restless', 'Restless', 'Never settles for long'],
           ['steady', 'Steady', 'Hard to knock off course'],
-          ['sharp', 'Sharp', 'Quick, notices everything'],
-          ['quiet', 'Quiet', 'Speaks when it matters']
+          ['sensitive', 'Sensitive', 'Feels things deeply'],
+          ['sharp', 'Sharp', 'Quick-witted, notices everything'],
+          ['easygoing', 'Easygoing', 'Does not sweat much']
         ], s.temperaments, this.many('temperaments', 3)) });
     }
     if (s.step === 6) {
-      groups.push({ label: p.Poss + ' own interests', counter: s.interests.length + ' of 3', counterColour: s.interests.length === 3 ? '#7da8ff' : 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
-        options: this.chips([
-          ['games', 'Games', ''], ['music', 'Music', ''], ['film', 'Films and shows', ''],
-          ['reading', 'Reading', ''], ['making_things', 'Drawing and making things', ''],
-          ['fitness', 'Being physical', ''], ['cooking', 'Cooking', ''],
-          ['going_out', 'Going out', ''], ['staying_in', 'Staying in', '']
-        ], s.interests, this.many('interests', 3)) });
+      const all = [
+        ['games', 'Games'], ['anime', 'Anime'], ['comics', 'Comics'], ['film', 'Films'],
+        ['music', 'Music'], ['reading', 'Reading'], ['horror', 'Horror'], ['true_crime', 'True crime'],
+        ['mysteries', 'Mysteries'], ['comedy', 'Comedy'], ['theatre', 'Theatre'],
+        ['writing', 'Writing'], ['poetry', 'Poetry'], ['art', 'Art'], ['photography', 'Photography'],
+        ['crafts', 'Crafts'], ['fashion', 'Fashion'], ['architecture', 'Architecture'],
+        ['cooking', 'Cooking'], ['baking', 'Baking'], ['coffee', 'Coffee'],
+        ['sports', 'Sport'], ['fitness', 'Fitness'], ['martial_arts', 'Martial arts'],
+        ['dance', 'Dance'], ['hiking', 'Hiking'], ['nature', 'Nature'], ['animals', 'Animals'],
+        ['gardening', 'Gardening'], ['travel', 'Travel'], ['languages', 'Languages'],
+        ['history', 'History'], ['mythology', 'Mythology'], ['philosophy', 'Philosophy'],
+        ['psychology', 'Psychology'], ['science', 'Science'], ['space', 'Space'],
+        ['technology', 'Technology'], ['cars', 'Cars'], ['current_events', 'Current events']
+      ];
+      // A strict filter. An earlier version kept anything already chosen visible
+      // so a slot could not hide, and the result was a search showing things
+      // that did not match it -- searching "co" returned Games. The counter
+      // already reports a selection the grid is not showing, and clearing the
+      // box brings it back.
+      const needle = s.interestSearch.trim().toLowerCase();
+      const shown = needle ? all.filter((entry) => entry[1].toLowerCase().indexOf(needle) !== -1) : all;
+      groups.push({ label: 'Interests', counter: s.interests.length + ' of 3',
+        counterColour: s.interests.length > 0 ? '#7da8ff' : 'rgba(255,255,255,0.4)',
+        columns: 'repeat(3, minmax(0, 1fr))',
+        options: this.chips(shown, s.interests, this.many('interests', 3)) });
     }
     if (s.step === 7) {
-      groups.push({ label: 'How ' + p.subj + ' ' + p.is + ' with you', counter: '', counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(2, minmax(0, 1fr))',
+      groups.push({ label: 'How ' + p.subj + ' ' + p.is + ' with you', counter: '',
+        counterColour: 'rgba(255,255,255,0.4)', columns: 'repeat(3, minmax(0, 1fr))',
         options: this.chips([
-          ['indifferent', 'Indifferent', 'You are a stranger'],
-          ['curious', 'Curious', 'Interested, nothing more'],
-          ['fond', 'Fond', 'Glad you are here'],
-          ['close', 'Close', 'Trusts you already'],
-          ['devoted', 'Devoted', 'You matter most'],
-          ['besotted', 'Besotted', 'Head over heels']
+          ['guarded', 'Guarded', 'Does not trust you yet'],
+          ['neutral', 'Neutral', 'You are someone new'],
+          ['curious', 'Curious', 'Wants to know you'],
+          ['fond', 'Fond', 'Already likes you'],
+          ['close', 'Close', 'Already trusts you'],
+          ['devoted', 'Devoted', 'You matter most']
         ], s.feeling, this.one('feeling')) });
+      // Asked separately, which is the point of it. Guarded and drawn to you is
+      // a real starting place, and it could not be said on one ladder.
+      groups.push({ label: 'Drawn to you', counter: '', counterColour: 'rgba(255,255,255,0.4)',
+        columns: 'repeat(3, minmax(0, 1fr))',
+        options: this.chips([
+          ['none', 'Not at all', ''],
+          ['some', 'Somewhat', ''],
+          ['strong', 'Very', '']
+        ], s.attraction, this.one('attraction')) });
     }
 
     const styleCardStyle = (selected) => 'display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: 24px; border: ' +
@@ -489,7 +608,7 @@ class Component extends DCLogic {
     const joined = (parts) => parts.filter(Boolean).join(' · ');
     const lookParts = [
       readable(s.style, ''), readable(s.gender, ''), String(s.age),
-      feetAndInches(s.heightInches) + ' (' + centimetres(s.heightInches) + ' cm)'
+      feetAndInches(s.heightInches)
     ];
     const hairParts = [
       labelIn(tables.hairLength, s.hairLength),
@@ -509,8 +628,11 @@ class Component extends DCLogic {
       { label: 'Eyes', value: labelIn(this.eyeColours(s.style), s.eyes) || 'Left open', style: rowStyle(false) },
       { label: 'Build', value: labelIn(this.builds(s.gender), s.build) || 'Left open', style: rowStyle(false) },
       { label: p.Subj + ' start' + p.s, value: s.temperaments.length ? s.temperaments.map((k) => readable(k, '')).join(', ') : 'Not chosen', style: rowStyle(false) },
-      { label: p.Subj + ' ' + p.is + ' into', value: s.interests.length ? s.interests.map((k) => readable(k, '')).join(', ') : 'Nothing yet', style: rowStyle(false) },
-      { label: 'With you', value: readable(s.feeling, 'Not chosen'), style: rowStyle(true) }
+      { label: p.Subj + ' like' + p.s, value: s.interests.length ? s.interests.map((k) => readable(k, '')).join(', ') : 'Nothing yet', style: rowStyle(false) },
+      { label: 'With you', value: readable(s.feeling, 'Not chosen'), style: rowStyle(false) },
+      // Its own row, because it is its own answer. Folding it into the line
+      // above would put it back on the ladder it was taken off.
+      { label: 'Drawn to you', value: drawnTo(s.attraction), style: rowStyle(true) }
     ];
 
     const nextLabel = s.step === 9 ? 'Start talking to ' + p.obj : (s.step === 8 ? 'Make ' + p.obj : 'Continue');
@@ -526,6 +648,9 @@ class Component extends DCLogic {
       showGroups: groups.length > 0,
       showSliders: s.step === 1,
       showName: s.step === 8,
+      showSearch: s.step === 6,
+      interestSearch: s.interestSearch,
+      setInterestSearch: (event) => this.setState({ interestSearch: event.target.value }),
       showReview: s.step === 9,
       styleCards: styleCards,
       groups: groups,
@@ -541,8 +666,7 @@ class Component extends DCLogic {
           // instead of them, because the people answering this think in feet.
           label: 'Height', value: s.heightInches, min: 58, max: 84,
           display: feetAndInches(s.heightInches),
-          secondary: centimetres(s.heightInches) + ' cm',
-          secondaryStyle: 'font-size: 13px; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums;',
+          secondary: '', secondaryStyle: 'display: none;',
           minLabel: feetAndInches(58), maxLabel: feetAndInches(84),
           onChange: (event) => this.setState({ heightInches: Number(event.target.value) })
         }
@@ -563,7 +687,16 @@ class Component extends DCLogic {
       nextStyle: nextStyle,
       nextDisabled: !ready,
       backStyle: 'height: 46px; padding: 0 20px; border: none; border-radius: 999px; background: transparent; font-family: inherit; font-size: 14.5px; font-weight: 600; color: rgba(255,255,255,0.6); cursor: pointer;' + (s.step === 1 ? ' visibility: hidden;' : ''),
-      next: () => { if (this.ready() && s.step < 9) this.setState({ step: s.step + 1 }); },
+      shuffleName: () => this.setState({ name: this.suggestName() }),
+      next: () => {
+        if (!this.ready() || s.step >= 9) return;
+        // Screen eight arrives pre-filled rather than blank.
+        if (s.step === 7 && !this.state.name) {
+          this.setState({ step: s.step + 1, name: this.suggestName() });
+          return;
+        }
+        this.setState({ step: s.step + 1 });
+      },
       back: () => { if (s.step > 1) this.setState({ step: s.step - 1 }); }
     };
   }

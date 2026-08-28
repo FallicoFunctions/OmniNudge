@@ -5,6 +5,9 @@ class DCLogic {
 }
 global.DCLogic = DCLogic;
 const Component = require('./flow_logic.js');
+// Exported alongside the component so this file is self-contained. It was being
+// patched in by hand after every copy, which is a step that silently vanishes.
+const nameSuggestions = Component.nameSuggestions;
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -27,12 +30,14 @@ check('answering unblocks it', render().nextDisabled, false);
 
 // --- pronouns follow the answer, including verb agreement ---
 c.setState({ step: 5 });
-check('woman -> she', render().title, 'She will not stay this way');
+check('woman -> she', render().title, 'How she starts out');
 c.setState({ gender: 'man' });
-check('man -> he', render().title, 'He will not stay this way');
+check('man -> he', render().title, 'How he starts out');
 c.setState({ gender: '' });
-check('unanswered -> they, with plural agreement', render().title, 'They will not stay this way');
-check('agnostic rail label too', render().rail[2].label, 'Their face');
+check('unanswered -> they, with plural agreement', render().title, 'How they start out');
+check('the tabs are one word each',
+  render().rail.map((r) => r.label),
+  ['Basics', 'Look', 'Face', 'Build', 'Traits', 'Interests', 'You', 'Name', 'Them']);
 c.setState({ gender: 'woman' });
 
 // --- the pick limits actually hold ---
@@ -43,9 +48,12 @@ check('the counter says so', render().groups[0].counter, '3 of 3');
 check('and the screen is ready', render().nextDisabled, false);
 render().groups[0].options[0].pick();            // deselect
 check('deselecting drops back to two', c.state.temperaments.length, 2);
-check('which blocks again', render().nextDisabled, true);
-check('with a hint saying why', render().hint, 'Choose three to carry on.');
-[0].forEach((i) => render().groups[0].options[i].pick());
+check('two is still an answer, because three is a ceiling not a quota', render().nextDisabled, false);
+[0, 1].forEach(() => render().groups[0].options.find((o) => o.selected).pick());
+check('but none of them is not', render().nextDisabled, true);
+check('and it says why, which is the only time this screen says anything',
+  render().hint, 'Pick at least one to carry on.');
+render().groups[0].options[0].pick();
 
 c.setState({ step: 6 });
 const interests = render().groups[0].options;
@@ -65,15 +73,42 @@ check('and so is the bottom', age().display, '18');
 
 const height = () => render().sliders[1];
 check('height leads in feet and inches', height().display, "5'6\"");
-check('with centimetres beside it, not instead', height().secondary, '168 cm');
+check('and no centimetres beside it', height().secondary, '');
 height().onChange({ target: { value: '84' } });
 check('the top of the height slider', height().display, "7'0\"");
-check('and its centimetres', height().secondary, '213 cm');
+check('still none at the top', height().secondary, '');
 height().onChange({ target: { value: '58' } });
 check('the floor is adult short stature', height().display, "4'10\"");
 height().onChange({ target: { value: '70' } });
 
 // --- the answers that depend on an earlier answer ---
+c.setState({ step: 3 });
+check('eighteen traits, not ten',
+  (() => { c.setState({ step: 5, gender: 'woman' }); return render().groups[0].options.length; })(), 18);
+check('forty interests, not nine',
+  (() => { c.setState({ step: 6 }); return render().groups[0].options.length; })(), 40);
+check('and they filter as you type',
+  (() => { c.setState({ interestSearch: 'co' }); return render().groups[0].options.map((o) => o.label); })(),
+  ['Comics', 'Comedy', 'Cooking', 'Coffee']);
+check('a chosen interest that does not match is hidden, not shown out of place',
+  (() => { c.setState({ interestSearch: '', interests: ['space'] });
+           c.setState({ interestSearch: 'co' });
+           return render().groups[0].options.some((o) => o.key === 'space'); })(), false);
+check('and the counter still reports it, so the slot cannot hide',
+  render().groups[0].counter, '1 of 3');
+c.setState({ interestSearch: '', interests: [] });
+
+check('the you screen asks two questions',
+  (() => { c.setState({ step: 7 }); return render().groups.map((g) => g.label); })(),
+  ['How she is with you', 'Drawn to you']);
+check('besotted is gone and neutral replaced indifferent',
+  render().groups[0].options.map((o) => o.key),
+  ['guarded', 'neutral', 'curious', 'fond', 'close', 'devoted']);
+check('and attraction is answered separately',
+  (() => { render().groups[0].options.find((o) => o.key === 'guarded').pick();
+           render().groups[1].options.find((o) => o.key === 'strong').pick();
+           return [c.state.feeling, c.state.attraction]; })(), ['guarded', 'strong']);
+
 c.setState({ step: 3 });
 check('screen three asks six things now',
   render().groups.map((g) => g.label),
@@ -119,6 +154,15 @@ check("his silhouettes are his own",
   ['slim', 'lean', 'average', 'athletic', 'muscular', 'stocky', 'heavy']);
 
 // --- the name field respects the server cap ---
+c.setState({ step: 7, ethnicity: 'latino', gender: 'woman', name: '' });
+render().next();
+check('screen eight arrives with a name already in it', c.state.name.length > 0, true);
+const suggested = c.state.name;
+render().shuffleName();
+check('and the shuffle gives a different one', c.state.name !== suggested, true);
+check('which is still one the server would offer',
+  nameSuggestions('latino', 'woman').includes(c.state.name), true);
+
 c.setState({ step: 8 });
 render().setName({ target: { value: 'x'.repeat(60) } });
 check('a name over 40 is cut to 40', c.state.name.length, 40);
@@ -142,7 +186,7 @@ const answer = () => {
   if (v.nextDisabled) {
     if (v.showStyleCards) v.styleCards[0].pick();
     else if (v.groups.length) {
-      const need = walk.c.state.step === 5 ? 3 : 1;
+      const need = 1;
       for (let i = 0; i < need; i += 1) walk.render().groups[0].options[i].pick();
     }
     if (walk.render().showName) walk.render().setName({ target: { value: 'Nadia' } });
@@ -154,10 +198,12 @@ check('the flow reaches the last screen', walk.c.state.step, 9);
 check('the last button is not Continue', walk.render().nextLabel, 'Start talking to her');
 const rows = walk.render().reviewRows;
 check('the review reports every answer', rows.map((r) => r.label),
-  ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She is into', 'With you']);
-check('including the height', rows[0].value.includes("5'6\" (168 cm)"), true);
+  ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She likes', 'With you', 'Drawn to you']);
+check('the height has no centimetres beside it', rows[0].value.includes("5'6\""), true);
+check('and none anywhere on the screen', JSON.stringify(walk.render()).includes(' cm'), false);
 check('a screen nobody answered reads as left open', rows[1].value, 'Left open');
-check('the review names her', walk.render().reviewName, 'Nadia');
+check('the review names her, from the name the flow offered',
+  nameSuggestions('', 'woman').includes(walk.render().reviewName), true);
 
 // Buzzed sides with a bun on top: the combination the old model refused.
 const buzzed = make({ start: 9 });
@@ -166,6 +212,16 @@ buzzed.c.setState({ style: 'realistic', gender: 'man', age: 34, heightInches: 70
 check('a bun above a buzz cut survives to the review',
   buzzed.render().reviewRows[2].value, 'Buzzed · Coily · Man bun · Dark brown');
 
+
+// --- the pinned screens, which are what actually gets reviewed ---
+const pinned8 = new Component({ start: 8, gender: 'woman' });
+check('a screen opened straight onto the name is not blank', pinned8.state.name.length > 0, true);
+check('and it is a name the flow would have offered',
+  nameSuggestions('', 'woman').includes(pinned8.state.name), true);
+check('the same one every time, so two people review the same screen',
+  new Component({ start: 8, gender: 'woman' }).state.name, pinned8.state.name);
+check('earlier screens are still blank, because nothing has been suggested yet',
+  new Component({ start: 1 }).state.name, '');
 
 // --- no screen may use a pronoun the creator did not choose ---
 const CSSISH = /style|columns|Colour|figure|plate|Style/;
