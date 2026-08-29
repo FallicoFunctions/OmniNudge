@@ -91,6 +91,12 @@ type OmniChatCharacterTraits struct {
 	// EndedAt is set when the relationship ended -- she left, or the person who
 	// made her deleted her. The row is kept because what those years moved in
 	// her is who she now is, but nothing may move it again.
+	//
+	// Nothing clears it yet, and one thing eventually must. §20: leaving "is not
+	// permanent, because §15 already provides the way back: she can reach out
+	// first." There is one row per pair, so a relationship that resumes is this
+	// row resuming -- whoever builds reaching out clears this field, and every
+	// number those years moved is still here waiting to carry on from.
 	EndedAt *time.Time `json:"ended_at,omitempty"`
 
 	// Kind is what the two of them are to each other: friend, situationship,
