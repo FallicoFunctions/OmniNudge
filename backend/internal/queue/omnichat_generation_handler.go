@@ -439,6 +439,20 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		}
 	}()
 	if phase.submit {
+		// The one server-owned decision that changes what comes back and is
+		// invisible afterwards. job.EffectivePrompt is written once at request
+		// time and never updated -- deliberately, because a retry reloads it and
+		// rebuilds the spec, so writing the amended prompt back would append the
+		// directive again on every attempt.
+		//
+		// The decision is recorded rather than the prompt. A prompt carries
+		// somebody's own scene text, and copying that into logs to answer a
+		// question about the medium is a poor trade.
+		zlog.Info().
+			Str("job_id", job.ID.String()).
+			Str("render_style", job.IdentityProfile.RenderStyle).
+			Str("mode", string(job.Mode)).
+			Msg("submitting omnichat media job")
 		submitted, err := h.provider.Submit(ctx, phase.spec.EndpointID, phase.spec.Input)
 		if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
 			return nil, permanentGenerationFailure("provider_unavailable", err)
@@ -1002,6 +1016,16 @@ func selectRunPodMediaResult(kind models.OmniChatMediaKind, result *runpod.Resul
 	return nil, errors.New("provider result kind is invalid")
 }
 
+// renderMediumDirective is the sentence that tells the model which medium to
+// render in. Empty is photorealistic: that is every persona that existed before
+// the field, and the whole roster still.
+func renderMediumDirective(renderStyle string) string {
+	if renderStyle == models.OmniChatRenderStyleAnime {
+		return "Render the image as anime artwork, not as a photograph."
+	}
+	return "Render the image photorealistically."
+}
+
 // appendDirective adds a server-owned sentence to a prompt.
 //
 // Contextual prompts are built ending in a full stop, so plain concatenation
@@ -1111,11 +1135,7 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		// stored. That column is internal (json:"-") and never reaches a
 		// client, but somebody reading it to work out why an image came back
 		// wrong will not see this sentence in it.
-		if job.IdentityProfile.RenderStyle == models.OmniChatRenderStyleAnime {
-			input["prompt"] = appendDirective(prompt, "Render the image as anime artwork, not as a photograph.")
-		} else {
-			input["prompt"] = appendDirective(prompt, "Render the image photorealistically.")
-		}
+		input["prompt"] = appendDirective(prompt, renderMediumDirective(job.IdentityProfile.RenderStyle))
 	}
 	for key, value := range identityInput {
 		input[key] = value
