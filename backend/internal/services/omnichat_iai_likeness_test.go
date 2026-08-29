@@ -199,3 +199,44 @@ func TestNothingAnsweredStoresNothing(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(some), "A woman.")
 }
+
+func TestTheLikenessPromptNeverContradictsItsOwnMedium(t *testing.T) {
+	// The scene prompt had this fault and I wrote it again here: an opening
+	// line calling the output a photograph, and a closing line saying it is not
+	// one. Reading the prompt is what caught it both times.
+	anime := BuildIAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		RenderStyle: models.OmniChatRenderStyleAnime,
+		Appearance:  "A 22-year-old woman with long pink hair and violet eyes.",
+	})
+	require.Contains(t, anime, "anime artwork")
+	require.NotContains(t, anime, "photograph of")
+	require.NotContains(t, anime, "photorealistically")
+
+	realistic := BuildIAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	})
+	require.Contains(t, realistic, "photorealistically")
+	require.NotContains(t, realistic, "anime")
+}
+
+func TestTheLikenessAsksForWhatThreeThingsNeed(t *testing.T) {
+	// The picked image is what somebody chose, the reference every later render
+	// is conditioned on, and the one forward-facing full-body input the
+	// 2D-to-3D pipeline takes. The framing has to serve all three, so it is
+	// asserted rather than left to the model.
+	prompt := BuildIAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	})
+	for _, required := range []string{
+		"Full body from head to feet", "facing the camera directly",
+		"plain seamless background", "no props and no other people",
+	} {
+		require.Contains(t, prompt, required)
+	}
+}
+
+func TestACharacterNobodyDescribedStillRendersSomebody(t *testing.T) {
+	prompt := BuildIAILikenessPrompt(models.OmniChatMediaIdentityProfile{})
+	require.Contains(t, prompt, "An adult.")
+	require.NotContains(t, prompt, "person. an adult")
+}
