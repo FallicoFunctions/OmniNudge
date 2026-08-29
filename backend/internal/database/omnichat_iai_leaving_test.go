@@ -507,3 +507,45 @@ func TestACharacterNobodyDescribedGetsNoDescription(t *testing.T) {
 	require.Equal(t, "A person.", profile.Appearance)
 	_ = db
 }
+
+func TestTheMediumSheWasMadeInSurvivesToTheRender(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	answers := answersFor("Nadia")
+	answers.Appearance = services.IAIAppearance{
+		Style: "anime", Gender: "woman", Age: 22, HeightInches: 63, Eyes: "violet",
+	}
+	made, err := creator.Create(ctx, premiumID, answers)
+	require.NoError(t, err)
+
+	// Creation to storage to the resolver the render reads. Every earlier test
+	// of this path used a realistic character, so the one answer that changes
+	// how she is drawn was never carried end to end.
+	stored, err := personas.GetByID(ctx, made.ID)
+	require.NoError(t, err)
+	profile := services.ResolveOmniChatMediaIdentityProfile(stored)
+	require.Equal(t, models.OmniChatRenderStyleAnime, profile.RenderStyle)
+
+	// And it is beside her description, not inside it.
+	require.NotContains(t, profile.Appearance, "anime")
+	require.Contains(t, profile.Appearance, "violet eyes")
+}
+
+func TestARealisticCharacterCarriesNoMedium(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	answers := answersFor("Nadia")
+	answers.Appearance = services.IAIAppearance{Style: "realistic", Gender: "woman", Age: 30}
+	made, err := creator.Create(ctx, premiumID, answers)
+	require.NoError(t, err)
+
+	stored, err := personas.GetByID(ctx, made.ID)
+	require.NoError(t, err)
+	// Absence is photorealistic, which is what the whole existing roster is.
+	require.Empty(t, services.ResolveOmniChatMediaIdentityProfile(stored).RenderStyle)
+	_ = db
+}

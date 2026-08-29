@@ -231,7 +231,12 @@ func buildOmniChatEffectivePrompt(request models.OmniChatGenerationRequest) stri
 			"Two subjects are in frame: the reference subject, and the viewer whose body is partly visible in the foreground from their own point of view. Crop the viewer's face out of frame. Add no one else.")
 	} else {
 		parts = append(parts,
-			"The reference subject is the only subject in frame, photographed from the viewer's point of view. Do not add the viewer's body and do not add anyone else.")
+			// "photographed" asserts a medium, in a prompt that may end with
+			// "Render the image as anime artwork, not as a photograph." Two
+			// contradicting instructions, and only reading the assembled
+			// prompt shows it. "Seen" says the same thing about viewpoint and
+			// nothing about the medium.
+			"The reference subject is the only subject in frame, seen from the viewer's point of view. Do not add the viewer's body and do not add anyone else.")
 	}
 	appendField := func(label, value string) {
 		if value != "" {

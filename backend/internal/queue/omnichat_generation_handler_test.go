@@ -803,3 +803,36 @@ func TestAnAnimeCharacterIsNotRenderedAsAPhotograph(t *testing.T) {
 	require.Contains(t, realistic.Input["prompt"], "photorealistically")
 	require.NotContains(t, realistic.Input["prompt"], "anime")
 }
+
+func TestThePromptNeverContradictsItselfAboutTheMedium(t *testing.T) {
+	// Found by printing the whole assembled prompt and reading it, rather than
+	// asserting the substring that had just been added. The scene line said the
+	// subject was "photographed from the viewer's point of view" in a prompt
+	// ending "Render the image as anime artwork, not as a photograph."
+	request, err := services.NormalizeOmniChatGenerationRequest(models.OmniChatGenerationRequest{
+		Kind:           models.OmniChatMediaKindImage,
+		Mode:           models.OmniChatGenerationModeContextual,
+		PersonaID:      1,
+		ConversationID: func() *int { v := 1; return &v }(),
+		Prompt:         "her at the park",
+		Scene:          models.OmniChatSceneState{Location: "the park"},
+	})
+	require.NoError(t, err)
+
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindImage,
+		Mode:            models.OmniChatGenerationModeContextual,
+		EffectivePrompt: request.EffectivePrompt,
+		Scene:           request.Scene,
+		IdentityProfile: models.OmniChatMediaIdentityProfile{
+			RenderStyle: models.OmniChatRenderStyleAnime,
+		},
+	}, []string{"https://cdn.example.test/nadia.png"})
+	require.NoError(t, err)
+
+	prompt, ok := spec.Input["prompt"].(string)
+	require.True(t, ok)
+	require.Contains(t, prompt, "anime artwork")
+	require.NotContains(t, prompt, "photographed",
+		"the prompt tells the model to photograph her and not to photograph her")
+}
