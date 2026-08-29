@@ -1018,6 +1018,18 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	if prompt == "" {
 		return nil, errors.New("generation prompt is unavailable")
 	}
+	// The medium, stated where the persona is known.
+	//
+	// The prompt is built when the request arrives and cannot know it: an anime
+	// character rendered through a prompt that says "photorealistic" comes back
+	// as a photograph, contradicting the answer she was made with. Empty is
+	// photorealistic, which is every persona that existed before this and the
+	// whole roster still.
+	if job.IdentityProfile.RenderStyle == models.OmniChatRenderStyleAnime {
+		prompt += " Render the image as anime artwork, not as a photograph."
+	} else {
+		prompt += " Render the image photorealistically."
+	}
 	normalizedReferences := make([]string, 0, len(referenceURLs))
 	for _, rawURL := range referenceURLs {
 		rawURL = strings.TrimSpace(rawURL)

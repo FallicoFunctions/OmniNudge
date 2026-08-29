@@ -213,7 +213,11 @@ func buildOmniChatEffectivePrompt(request models.OmniChatGenerationRequest) stri
 	// describes "the subject" and lets the reference decide what that is.
 	// Asserting a human here would fight a legitimate non-human request.
 	parts := []string{
-		"Create one photorealistic environmental scene image, not a headshot or selfie, with the same subject identity as the supplied reference.",
+		// The medium is not asserted here. This prompt is built when the
+		// request arrives, and which medium a character is drawn in is a
+		// property of the persona, resolved later where the identity profile
+		// is loaded. It is appended there.
+		"Create one environmental scene image, not a headshot or selfie, with the same subject identity as the supplied reference.",
 		"The requested location, activity, outfit, pose, expression, mood, and camera direction are authoritative and must replace the reference background.",
 		"Use the reference only for the subject's identity and appearance; do not copy its background, crop, lighting, or pose.",
 		"Use medium or full-body framing unless the requested view explicitly asks for a close-up.",

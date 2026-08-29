@@ -34,12 +34,24 @@ type OmniChatMediaIdentityProfile struct {
 	// bot_personas.gallery_urls is the wrong home for them: it is serialized on
 	// every public persona response and rendered in the persona details UI, so
 	// body-reference photos placed there would be visible to all users.
+	// RenderStyle is the medium she is drawn in: "realistic" or "anime".
+	//
+	// Empty means photorealistic, which is what every persona rendered as
+	// before this field existed and what the roster still is. It is separate
+	// from Appearance because identity survives the medium -- the same person
+	// drawn or photographed is the same description -- and because the prompt
+	// asserts the medium in a different sentence from the subject.
+	RenderStyle    string   `json:"render_style,omitempty"`
 	ReferenceURLs  []string `json:"reference_urls,omitempty"`
 	ReferenceLimit int      `json:"reference_limit"`
 	LoraModelID    string   `json:"lora_model_id,omitempty"`
 	LoraWeightName string   `json:"lora_weight_name,omitempty"`
 	LoraScale      float64  `json:"lora_scale,omitempty"`
 }
+
+// OmniChatRenderStyleAnime is the one medium that is not the default. Stated
+// once here rather than as a string literal in the prompt and the creator.
+const OmniChatRenderStyleAnime = "anime"
 
 // DefaultOmniChatMediaIdentityProfile is deliberately usable without any
 // persona-specific configuration. A newly created default or user persona can
@@ -82,6 +94,12 @@ func NormalizeOmniChatMediaIdentityProfile(profile OmniChatMediaIdentityProfile)
 	}
 	if profile.LoraScale < 0.1 || profile.LoraScale > 1.5 {
 		profile.LoraScale = defaults.LoraScale
+	}
+	// An unrecognised style is photorealistic rather than a refusal. A persona
+	// carrying a medium this build does not know renders as everything else
+	// does, which is a plainer picture and not a failed one.
+	if profile.RenderStyle != OmniChatRenderStyleAnime {
+		profile.RenderStyle = ""
 	}
 	profile.Appearance = boundProvenanceText(profile.Appearance, omniChatMaxAppearanceRunes)
 	// Bound the private reference list the same way the public gallery is

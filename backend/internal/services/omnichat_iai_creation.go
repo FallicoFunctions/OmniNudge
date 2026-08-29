@@ -347,9 +347,18 @@ func encodeIAIIdentity(appearance IAIAppearance) (json.RawMessage, error) {
 	if described == "" {
 		return nil, nil
 	}
+	// The medium is recorded beside the description and not inside it. She is
+	// the same person either way; only the rendering differs.
+	style := ""
+	if strings.EqualFold(strings.TrimSpace(appearance.Style), models.OmniChatRenderStyleAnime) {
+		style = models.OmniChatRenderStyleAnime
+	}
 	encoded, err := json.Marshal(struct {
 		OmniChatMedia models.OmniChatMediaIdentityProfile `json:"omnichat_media"`
-	}{OmniChatMedia: models.OmniChatMediaIdentityProfile{Appearance: described}})
+	}{OmniChatMedia: models.OmniChatMediaIdentityProfile{
+		Appearance:  described,
+		RenderStyle: style,
+	}})
 	if err != nil {
 		return nil, fmt.Errorf("omnichat iai: encode identity: %w", err)
 	}

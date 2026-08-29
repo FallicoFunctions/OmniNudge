@@ -773,3 +773,33 @@ func TestOmniChatGenerationHandlerReturnsPersistenceErrorWhenTerminalFailureCann
 }
 
 var _ services.StorageService = (*unusedGenerationStorageFake)(nil)
+
+func TestAnAnimeCharacterIsNotRenderedAsAPhotograph(t *testing.T) {
+	// The prompt is built when the request arrives, and the medium a character
+	// is drawn in is a property of the persona, resolved here. It used to open
+	// with "Create one photorealistic environmental scene image", so an anime
+	// character came back as a photograph contradicting the answer she was made
+	// with -- and nothing anywhere would have said so.
+	job := func(style string) *models.OmniChatGenerationJob {
+		return &models.OmniChatGenerationJob{
+			Kind:            models.OmniChatMediaKindImage,
+			Mode:            models.OmniChatGenerationModeContextual,
+			EffectivePrompt: "Nadia at the park",
+			IdentityProfile: models.OmniChatMediaIdentityProfile{RenderStyle: style},
+		}
+	}
+
+	anime, err := BuildImageSpec(omniChatMediaTestConfig(), job(models.OmniChatRenderStyleAnime),
+		[]string{"https://cdn.example.test/nadia.png"})
+	require.NoError(t, err)
+	require.Contains(t, anime.Input["prompt"], "anime artwork")
+	require.NotContains(t, anime.Input["prompt"], "photorealistically")
+
+	// Absence is photorealistic, so every persona that existed before this
+	// field renders exactly as it did.
+	realistic, err := BuildImageSpec(omniChatMediaTestConfig(), job(""),
+		[]string{"https://cdn.example.test/sadie.png"})
+	require.NoError(t, err)
+	require.Contains(t, realistic.Input["prompt"], "photorealistically")
+	require.NotContains(t, realistic.Input["prompt"], "anime")
+}

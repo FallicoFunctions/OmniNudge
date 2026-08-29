@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/omninudge/backend/internal/models"
 )
 
 func TestSheIsDescribedTheWayAPersonWouldBe(t *testing.T) {
@@ -148,4 +150,36 @@ func TestAShavedHeadHasNoTexture(t *testing.T) {
 		require.Contains(t, sentence, length)
 		require.Contains(t, sentence, "black")
 	}
+}
+
+func TestTheMediumIsRecordedBesideHerDescriptionNotInsideIt(t *testing.T) {
+	// She is the same person drawn or photographed, so the medium is not part
+	// of what she looks like. It is recorded so the render can state it, and
+	// stated in a different sentence from the subject.
+	anime, err := encodeIAIIdentity(IAIAppearance{
+		Style: "anime", Gender: "woman", Age: 22, Eyes: "violet",
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(anime), `"render_style":"anime"`)
+	require.NotContains(t, string(anime), `anime woman`)
+
+	// Realistic is the default and is written as absence, so every persona made
+	// before this field existed reads the same as one made after.
+	realistic, err := encodeIAIIdentity(IAIAppearance{
+		Style: "realistic", Gender: "woman", Age: 22,
+	})
+	require.NoError(t, err)
+	require.NotContains(t, string(realistic), "render_style")
+}
+
+func TestAnUnknownMediumIsPhotorealisticRatherThanARefusal(t *testing.T) {
+	// A persona carrying a medium this build does not know renders like
+	// everything else rather than failing.
+	profile := models.NormalizeOmniChatMediaIdentityProfile(
+		models.OmniChatMediaIdentityProfile{RenderStyle: "claymation"})
+	require.Empty(t, profile.RenderStyle)
+
+	kept := models.NormalizeOmniChatMediaIdentityProfile(
+		models.OmniChatMediaIdentityProfile{RenderStyle: models.OmniChatRenderStyleAnime})
+	require.Equal(t, models.OmniChatRenderStyleAnime, kept.RenderStyle)
 }
