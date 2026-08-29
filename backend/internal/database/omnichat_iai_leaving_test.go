@@ -477,7 +477,7 @@ func TestHerDescriptionReachesTheImagePipeline(t *testing.T) {
 	profile := services.ResolveOmniChatMediaIdentityProfile(stored)
 	require.Equal(t,
 		`A 27-year-old East Asian woman, 5'6" tall, with long curly black hair `+
-			`worn in a high ponytail, brown eyes and an athletic build.`,
+			`in a high ponytail, brown eyes and an athletic build.`,
 		profile.Appearance)
 
 	// The rest of the profile is the resolver's defaults rather than anything
