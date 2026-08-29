@@ -88,6 +88,11 @@ type OmniChatCharacterTraits struct {
 	// OmniChatRelationshipKindFriend is what an unset relationship means. The
 	// column refuses an empty string, and every caller that does not ask the
 	// question is describing a friendship rather than nothing.
+	// EndedAt is set when the relationship ended -- she left, or the person who
+	// made her deleted her. The row is kept because what those years moved in
+	// her is who she now is, but nothing may move it again.
+	EndedAt *time.Time `json:"ended_at,omitempty"`
+
 	// Kind is what the two of them are to each other: friend, situationship,
 	// partner or spouse. It is not a number because it is not a quantity -- a
 	// spouse and a situationship can sit at the same attraction and are not the
@@ -427,6 +432,18 @@ func applyEpisodeValencesTx(ctx context.Context, q omniChatTraitQuerier, persona
 		return err
 	}
 
+	// A relationship that ended does not keep moving.
+	//
+	// Extraction is queued and debounced, so a job enqueued just before somebody
+	// deleted their character runs minutes after she has left. Without this it
+	// applies that conversation's valences to the sealed row and rewrites the
+	// record of who she was with him -- the very thing keeping the row instead
+	// of deleting it was meant to preserve. Measured: trust moved 0.60 -> 0.54
+	// on a relationship that had already ended.
+	if traits.EndedAt != nil {
+		return nil
+	}
+
 	// Each episode still lands on its own. Batching changes when the row is
 	// touched and nothing about what it ends up holding: the threshold, the
 	// asymmetry of trust and the clamp all still apply once per episode, and a
@@ -459,11 +476,11 @@ func loadTraits(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUse
 	// Scoped on both persona and tier, always. This is the whole reason one
 	// user's private history cannot show up in another user's conversation.
 	err := q.QueryRow(ctx, `
-		SELECT mood, mood_updated_at, trust, warmth, attachment, attraction, relationship_kind
+		SELECT mood, mood_updated_at, trust, warmth, attachment, attraction, relationship_kind, ended_at
 		FROM omnichat_character_traits
 		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = $2
 	`, personaID, ownerUserID).Scan(&traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth,
-		&traits.Attachment, &traits.Attraction, &traits.Kind)
+		&traits.Attachment, &traits.Attraction, &traits.Kind, &traits.EndedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return traits, nil
 	}

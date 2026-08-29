@@ -397,3 +397,57 @@ func TestAnEndedRelationshipIsNotWhatSheSpeaksFrom(t *testing.T) {
 	require.Equal(t, 1, kept)
 	_ = db
 }
+
+func TestARelationshipThatEndedDoesNotKeepMoving(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+	traits := models.NewOmniChatCharacterTraitRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+
+	var before float64
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT trust FROM omnichat_character_traits WHERE persona_id=$1 AND owner_user_id=$2`,
+		made.ID, premiumID).Scan(&before))
+
+	// Extraction is queued and debounced, so a job enqueued moments before
+	// somebody deleted their character runs minutes after she has left. It used
+	// to apply that conversation's valences to the sealed row: trust went
+	// 0.60 -> 0.54 on a relationship that had already ended, quietly rewriting
+	// the record that keeping the row instead of deleting it exists to protect.
+	require.NoError(t, traits.ApplyEpisodeValence(ctx, made.ID, premiumID, -1))
+
+	var after float64
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT trust FROM omnichat_character_traits WHERE persona_id=$1 AND owner_user_id=$2`,
+		made.ID, premiumID).Scan(&after))
+	require.Equal(t, before, after)
+}
+
+func TestALivingRelationshipStillMoves(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	traits := models.NewOmniChatCharacterTraitRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+
+	var before float64
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT trust FROM omnichat_character_traits WHERE persona_id=$1 AND owner_user_id=$2`,
+		made.ID, premiumID).Scan(&before))
+
+	// The control on the control. A guard that stopped every relationship
+	// moving would pass the test above and break the entire product.
+	require.NoError(t, traits.ApplyEpisodeValence(ctx, made.ID, premiumID, -1))
+
+	var after float64
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT trust FROM omnichat_character_traits WHERE persona_id=$1 AND owner_user_id=$2`,
+		made.ID, premiumID).Scan(&after))
+	require.Less(t, after, before, "a relationship nobody ended still responds to what happens in it")
+}

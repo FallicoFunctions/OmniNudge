@@ -592,3 +592,63 @@ func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
 	require.Equal(t, http.StatusOK, ownedRecorder.Code)
 	require.NotContains(t, ownedRecorder.Body.String(), "Free Bot")
 }
+
+// Deleting an independent character goes down a different path from deleting a
+// roleplay one, and the dispatch between them had no test at all. Getting it
+// wrong is quiet in both directions: an IAI through the ordinary soft delete
+// stays owned by somebody who can no longer reach her and keeps his one slot,
+// and a roleplay character down the leaving path would not be deleted at all.
+func TestDeletingAnIndependentCharacterIsNotTheOrdinaryDelete(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	owner := createOmniChatPersonaTestUser(t, userRepo, "iai_owner")
+
+	var iaiID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (name, slug, description, personality, system_prompt,
+			owner_user_id, response_style_profile, visibility, nursery_home, is_active)
+		VALUES ('Nadia', 'nadia-h', 'd', 'p', '', $1, 'direct_message', 'private', 'home', TRUE)
+		RETURNING id`, owner.ID).Scan(&iaiID))
+
+	var roleplayID int
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (name, slug, description, personality, system_prompt,
+			owner_user_id, response_style_profile, visibility, is_active)
+		VALUES ('Card', 'card-h', 'd', 'p', '', $1, 'natural_dialogue', 'private', TRUE)
+		RETURNING id`, owner.ID).Scan(&roleplayID))
+
+	deleteAs := func(personaID int) int {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/omnichat/personas/"+strconv.Itoa(personaID), nil)
+		setOmniChatPersonaTestUser(req, owner.ID)
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder.Code
+	}
+
+	require.Equal(t, http.StatusOK, deleteAs(iaiID))
+	var home string
+	var iaiOwner *int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT nursery_home, owner_user_id FROM bot_personas WHERE id = $1`, iaiID).
+		Scan(&home, &iaiOwner))
+	require.Equal(t, "review", home, "she left rather than being soft deleted")
+	require.Nil(t, iaiOwner, "which is what frees his one slot")
+
+	// The roleplay character takes the ordinary path and is simply gone.
+	require.Equal(t, http.StatusOK, deleteAs(roleplayID))
+	card, err := personaRepo.GetByID(ctx, roleplayID)
+	require.NoError(t, err)
+	if card != nil {
+		require.False(t, card.IsActive, "a card is deleted, it does not leave")
+	}
+
+	// Somebody else's character is not theirs to delete down either path.
+	stranger := createOmniChatPersonaTestUser(t, userRepo, "iai_stranger")
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/omnichat/personas/"+strconv.Itoa(iaiID), nil)
+	setOmniChatPersonaTestUser(req, stranger.ID)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+}
