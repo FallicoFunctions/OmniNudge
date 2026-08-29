@@ -73,6 +73,11 @@ export default function PersonaDetailsModal({
     enabled: isOpen,
   });
 
+  // An independent character is not deleted, she leaves -- and Omni may keep
+  // her. What that means for somebody is different enough from removing a card
+  // that they should not be shown the card's sentence.
+  const isIndependent = persona.response_style_profile === 'direct_message';
+
   const deleteMutation = useMutation({
     mutationFn: (personaId: number) => omnichatService.deletePersona(personaId),
     onSuccess: async (_, personaId) => {
@@ -286,7 +291,9 @@ export default function PersonaDetailsModal({
                         {t('omnichat.personaDetails.dangerZone.title')}
                       </h3>
                       <p className="mt-1 text-sm text-red-200/80">
-                        {t('omnichat.personaDetails.dangerZone.description')}
+                        {isIndependent
+                          ? t('omnichat.personaDetails.dangerZone.independentDescription')
+                          : t('omnichat.personaDetails.dangerZone.description')}
                       </p>
                     </div>
                     {!isConfirmingDelete ? (

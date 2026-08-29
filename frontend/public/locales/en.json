@@ -4424,7 +4424,8 @@
         "description": "Delete this character and remove it from your private persona library.",
         "delete": "Delete Character",
         "confirmDelete": "Confirm Delete",
-        "deleteError": "Unable to delete this character."
+        "deleteError": "Unable to delete this character.",
+        "independentDescription": "She is removed from your characters. OmniNudge may keep her and move her into the general nursery, where the public characters live."
       }
     },
     "memories": {

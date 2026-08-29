@@ -147,3 +147,58 @@ describe('PersonaDetailsModal', () => {
     expect(screen.queryByRole('button', { name: 'Delete Character' })).not.toBeInTheDocument();
   });
 });
+
+describe('deleting an independent character', () => {
+  const definition = (profile: string) => ({
+    id: 31, slug: 'nadia', name: 'Nadia', description: 'x', category: 'original',
+    owner_user_id: 1, visibility: 'private', system_prompt: '', personality: 'p',
+    scenario: '', first_message: '', example_dialogue: '', post_history_instructions: '',
+    alternate_greetings: [], creator_notes: '', tags: [], creator_name: '',
+    character_version: '', response_style_profile: profile,
+  });
+
+  const renderFor = (profile: string) => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <PersonaDetailsModal
+          isOpen
+          onClose={() => undefined}
+          persona={{
+            id: 31, slug: 'nadia', name: 'Nadia', category: 'original',
+            is_nsfw: false, is_active: true,
+            created_at: '2026-07-01T10:00:00Z', updated_at: '2026-07-01T10:00:00Z',
+            response_style_profile: profile,
+          } as never}
+        />
+      </QueryClientProvider>
+    );
+  };
+
+  it('says what happens to her, and claims nothing about her memory', async () => {
+    mockGetPersonaDefinition.mockResolvedValue(definition('direct_message'));
+    renderFor('direct_message');
+
+    // Her conversation memories are self tier -- persona-global, and untouched
+    // by leaving. Telling somebody they were deleted would be false, and would
+    // contradict the notice this product already shows: she remembers across
+    // everyone and may repeat what you said. So the screen says neither.
+    const copy = await screen.findByText(/removed from your characters/);
+    expect(copy).toBeInTheDocument();
+    expect(copy.textContent).toMatch(/general nursery/);
+    expect(screen.queryByText(/memor/i)).toBeNull();
+    expect(screen.queryByText(/forget/i)).toBeNull();
+
+    // Nor does it promise they can never speak again. If she is kept and joins
+    // the community, they can -- as somebody she has no relationship with.
+    expect(screen.queryByText(/never (talk|speak)/i)).toBeNull();
+  });
+
+  it('leaves a roleplay character with the wording for a card', async () => {
+    mockGetPersonaDefinition.mockResolvedValue(definition('natural_dialogue'));
+    renderFor('natural_dialogue');
+
+    expect(await screen.findByText(/private persona library/)).toBeInTheDocument();
+    expect(screen.queryByText(/general nursery/)).toBeNull();
+  });
+});
