@@ -96,6 +96,11 @@ type IAIOptions struct {
 	MinimumHeightInches int            `json:"minimum_height_inches"`
 	MaximumHeightInches int            `json:"maximum_height_inches"`
 	IAILimit            int            `json:"iai_limit"`
+
+	// How many the caller already keeps, so the interface can refuse before it
+	// asks rather than after. The server refuses again at creation regardless:
+	// this is what somebody is shown, not what enforces anything.
+	IAIOwned            int            `json:"iai_owned"`
 	IAIRequiredPlan     string         `json:"iai_required_plan"`
 	RoleplayLimits      map[string]int `json:"roleplay_limits"`
 }
@@ -142,6 +147,7 @@ func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
 		MinimumHeightInches: minimumHeight,
 		MaximumHeightInches: maximumHeight,
 		IAILimit:            h.iaiLimit(c),
+		IAIOwned:            h.iaiOwned(c),
 		IAIRequiredPlan:     services.OmniChatIAIRequiredPlan(),
 		RoleplayLimits:      services.OmniChatRoleplayLimits(),
 	})

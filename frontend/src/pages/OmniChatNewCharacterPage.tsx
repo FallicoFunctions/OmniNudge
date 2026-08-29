@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
+import { Loader2 } from 'lucide-react';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import CreationFlow from '../components/omnichat/iai/CreationFlow';
 import { translate } from '../components/omnichat/iai/labels';
@@ -22,6 +23,25 @@ export default function OmniChatNewCharacterPage() {
   const onTabChange = useOmniChatNavigation();
   const queryClient = useQueryClient();
   const [refusal, setRefusal] = useState<CreationRefusal>(null);
+
+  /**
+   * Asked before the questions start, not after them.
+   *
+   * Somebody already keeping one was answering ten screens and being refused on
+   * the last, which is a form that wastes your time and then tells you it was
+   * never going to work. Same query key and staleTime as the flow's own, so
+   * this is the one request either way.
+   *
+   * The server still refuses at creation. This decides what somebody is shown;
+   * it does not enforce anything, and a count that failed reads as none rather
+   * than locking somebody out of a page they are entitled to.
+   */
+  const { data: options, isLoading } = useQuery({
+    queryKey: omnichatQueryKeys.iaiOptions,
+    queryFn: () => omnichatService.getIAIOptions(),
+    staleTime: Infinity,
+  });
+  const atTheLimit = Boolean(options && options.iai_owned >= options.iai_limit);
 
   /**
    * Straight into the conversation. The flow ends by meeting her, and a
@@ -48,9 +68,11 @@ export default function OmniChatNewCharacterPage() {
   return (
     <OmniChatShell activeTab="newCharacter" onTabChange={onTabChange}>
       <div className="flex min-h-full items-center justify-center p-6">
-        {refusal ? (
+        {isLoading ? (
+          <Loader2 className="animate-spin text-white/40" size={22} />
+        ) : refusal || atTheLimit ? (
           <RefusalPanel
-            refusal={refusal}
+            refusal={refusal ?? 'already_has_one'}
             onDismiss={() => setRefusal(null)}
             onSeePlans={() => navigate('/omnichat?upgrade=1')}
             onOpenCharacters={() => navigate('/omnichat/studio')}

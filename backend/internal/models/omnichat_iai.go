@@ -396,3 +396,27 @@ func iaiSelfPronouns(gender *string) (subject, possessive string) {
 	}
 	return "they", "their"
 }
+
+// CountIAIOwnedBy is how many independent characters this person keeps.
+//
+// The same count the creator enforces with, asked before the questions start
+// rather than after them. Somebody at their limit was answering ten screens and
+// being refused on the last one, which is a form that wastes your time and then
+// tells you it was never going to work.
+//
+// Ownership is the whole condition, exactly as it is at creation. A character
+// who has left is nobody's and does not count, which is what makes the slot
+// free the moment she goes.
+func (r *BotPersonaRepository) CountIAIOwnedBy(ctx context.Context, userID int) (int, error) {
+	if userID < 1 {
+		return 0, nil
+	}
+	var owned int
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM bot_personas
+		WHERE owner_user_id = $1 AND response_style_profile = $2
+	`, userID, ResponseStyleProfileDirectMessage).Scan(&owned); err != nil {
+		return 0, fmt.Errorf("omnichat iai: count owned by %d: %w", userID, err)
+	}
+	return owned, nil
+}

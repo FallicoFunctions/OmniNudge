@@ -53,6 +53,7 @@ const options: IAIOptions = {
   minimum_height_inches: 58,
   maximum_height_inches: 84,
   iai_limit: 1,
+  iai_owned: 0,
   iai_required_plan: 'premium',
   roleplay_limits: { free: 0, plus: 5, premium: 10 },
 };

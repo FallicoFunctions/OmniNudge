@@ -548,6 +548,7 @@ export interface IAIOptions {
   minimum_height_inches: number;
   maximum_height_inches: number;
   iai_limit: number;
+  iai_owned: number;
   /** Which plan an independent character needs, so the refusal names the right one. */
   iai_required_plan: string;
   roleplay_limits: Record<string, number>;

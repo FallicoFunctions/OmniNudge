@@ -53,6 +53,25 @@ func (h *OmniChatHandler) SetCreationLimits(limits *services.OmniChatCreationLim
 // An unwired resolver reports the ordinary number rather than nothing. The
 // count is not an entitlement; the creator refuses separately and would refuse
 // this caller too if they were not allowed one at all.
+// iaiOwned is how many independent characters the caller already keeps. A
+// failure to count reads as none: the creation flow refusing to open because a
+// count query failed would be worse than opening and being refused at the end,
+// which is where the real enforcement is.
+func (h *OmniChatHandler) iaiOwned(c *gin.Context) int {
+	if h.personaRepo == nil {
+		return 0
+	}
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return 0
+	}
+	owned, err := h.personaRepo.CountIAIOwnedBy(c.Request.Context(), userID)
+	if err != nil {
+		return 0
+	}
+	return owned
+}
+
 func (h *OmniChatHandler) iaiLimit(c *gin.Context) int {
 	if h.creationLimits == nil {
 		return services.OmniChatIAILimit
