@@ -3,7 +3,7 @@ import { TOTAL_STEPS } from './useCreationFlow';
 import type { Pronouns } from './pronouns';
 
 /**
- * Nine steps down the left, which is what the desktop width buys.
+ * Ten steps down the left, which is what the desktop width buys.
  *
  * It goes back and never forward. Jumping ahead would land somebody on a screen
  * whose options depend on answers they have not given, and the flow narrows as
@@ -20,6 +20,7 @@ export interface StepRailProps {
 export default function StepRail({ step, pronouns, onJump, label }: StepRailProps) {
   // One word each. The last is the character, so it follows the answer.
   const names = [
+    label('start', 'Start'),
     label('basics', 'Basics'),
     label('look', 'Look'),
     label('face', 'Face'),

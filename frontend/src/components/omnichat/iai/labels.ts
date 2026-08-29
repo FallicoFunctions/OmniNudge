@@ -180,9 +180,22 @@ const DEFAULTS: Record<string, string> = {
   'feeling.fond': 'Fond',
   'feeling.close': 'Close',
   'feeling.devoted': 'Devoted',
-  'attraction.none': 'Not at all',
-  'attraction.some': 'Somewhat',
-  'attraction.strong': 'Very',
+  'relationship.friend': 'Friend',
+  'relationship.situationship': 'Situationship',
+  'relationship.partner': 'Partner',
+  'relationship.spouse': 'Spouse',
+};
+
+/**
+ * Labels that depend on the gender answer.
+ *
+ * There was one of these written as an if-statement in labelFor, and adding
+ * three more would have made four. A table takes a row instead of a branch.
+ */
+const GENDERED_LABELS: Record<string, { man: string; woman: string }> = {
+  'ethnicity.latino': { man: 'Latino', woman: 'Latina' },
+  'relationship.partner': { man: 'Boyfriend', woman: 'Girlfriend' },
+  'relationship.spouse': { man: 'Husband', woman: 'Wife' },
 };
 
 /** Glosses, only where the word alone does not say enough. */
@@ -233,9 +246,10 @@ export function translate(t: TFunction, key: string, fallback: string): string {
 
 export function labelFor(t: TFunction, field: string, key: string, gender?: string): string {
   const id = `${field}.${key}`;
-  // The one label the server cannot supply, because it depends on another answer.
-  if (id === 'ethnicity.latino' && gender === 'man') {
-    return translate(t, 'omnichat.iai.ethnicity.latino_man', 'Latino');
+  // The labels the server cannot supply, because they depend on another answer.
+  const gendered = GENDERED_LABELS[id];
+  if (gendered && (gender === 'man' || gender === 'woman')) {
+    return translate(t, `omnichat.iai.${id}_${gender}`, gendered[gender]);
   }
   return translate(t, `omnichat.iai.${id}`, DEFAULTS[id] ?? key);
 }

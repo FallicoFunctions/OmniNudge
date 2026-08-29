@@ -532,7 +532,7 @@ export interface IAIOptions {
   temperaments: string[];
   temperament_picks: number;
   feelings: string[];
-  attractions: string[];
+  relationships: string[];
   interests: string[];
   interest_picks: number;
   /** Flat lists: style, gender, ethnicity, hair_length, hair_texture, hair_colour. */
@@ -573,6 +573,6 @@ export interface CreateIAIRequest {
   temperaments: string[];
   interests: string[];
   feeling: string;
-  attraction: string;
+  relationship: string;
   appearance: IAIAppearanceAnswers;
 }

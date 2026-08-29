@@ -25,11 +25,32 @@ export interface CreationAnswers {
   temperaments: string[];
   interests: string[];
   feeling: string;
-  attraction: string;
+  relationship: string;
   name: string;
 }
 
-export const TOTAL_STEPS = 9;
+/**
+ * The screens by name.
+ *
+ * They were bare numbers, and every one of them appeared in a `step === 4` in
+ * the markup, the rail and the tests. Adding a screen at the front meant
+ * renumbering all of them by hand and hoping. Now inserting one is an edit to
+ * this table.
+ */
+export const STEP = {
+  intro: 1,
+  basics: 2,
+  look: 3,
+  face: 4,
+  build: 5,
+  traits: 6,
+  interests: 7,
+  you: 8,
+  name: 9,
+  review: 10,
+} as const;
+
+export const TOTAL_STEPS = STEP.review;
 
 /** omniChatIAINameRunes on the server. Counted in code points, not UTF-16 units,
  *  so a name written in characters outside the basic plane is not cut early. */
@@ -59,9 +80,9 @@ function emptyAnswers(options: IAIOptions | undefined): CreationAnswers {
     eyes: '', build: '',
     temperaments: [], interests: [],
     feeling: '',
-    // "None" is the honest default rather than an unanswered state: the column
-    // has no negative side, so nothing is the bottom of the scale.
-    attraction: 'none',
+    // Friendship is the honest default rather than an unanswered state, and it
+    // is what the column carries. Nobody is handed a romance they did not pick.
+    relationship: 'friend',
     name: '',
   };
 }
@@ -165,18 +186,20 @@ export function useCreationFlow(options: IAIOptions | undefined) {
 
   const ready = useMemo(() => {
     switch (step) {
-      case 1:
+      case STEP.basics:
         return Boolean(answers.gender);
-      case 2:
+      case STEP.look:
         return Boolean(answers.style);
       // Three is a ceiling rather than a quota: forcing a third pick makes
       // somebody choose filler, and filler becomes personality she carries.
-      case 5:
+      case STEP.traits:
         return answers.temperaments.length >= 1;
-      case 7:
+      case STEP.you:
         return Boolean(answers.feeling);
-      case 8:
+      case STEP.name:
         return answers.name.trim().length > 0;
+      // The intro asks nothing, and the screens with no required answer let
+      // somebody through without one on purpose.
       default:
         return true;
     }

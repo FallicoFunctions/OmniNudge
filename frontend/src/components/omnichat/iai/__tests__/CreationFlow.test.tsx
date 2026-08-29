@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CreationFlow from '../CreationFlow';
+import { STEP } from '../useCreationFlow';
 import { omnichatService } from '../../../../services/omnichatService';
 import type { IAIOptions } from '../../../../types/omnichat';
 
@@ -24,7 +25,7 @@ const options: IAIOptions = {
   temperaments: ['warm', 'guarded', 'quiet'],
   temperament_picks: 3,
   feelings: ['guarded', 'neutral', 'fond'],
-  attractions: ['none', 'some', 'strong'],
+  relationships: ['friend', 'situationship', 'partner', 'spouse'],
   interests: ['games', 'cooking', 'coffee', 'space'],
   interest_picks: 3,
   appearance: {
@@ -75,6 +76,21 @@ function renderFlow() {
 const user = userEvent.setup({ delay: null });
 const clickText = async (text: string | RegExp) => user.click(await screen.findByText(text));
 
+/**
+ * Render, and step past the intro onto the first question.
+ *
+ * The intro screen states what an independent character is and asks nothing, so
+ * every test that is about a question starts on the other side of it. The two
+ * tests that are about the intro itself do not use this.
+ */
+async function renderAtBasics() {
+  const handles = renderFlow();
+  await screen.findByText('An independent character');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByText('Who are we making');
+  return handles;
+}
+
 beforeEach(() => {
   vi.mocked(omnichatService.getIAIOptions).mockResolvedValue(options);
   vi.mocked(omnichatService.getIAINames).mockResolvedValue(['Camila', 'Anna', 'Sofia']);
@@ -87,16 +103,14 @@ afterEach(() => {
 
 describe('the creation flow, rendered', () => {
   it('says nothing about her until it has asked', async () => {
-    renderFlow();
-    await screen.findByText('Who are we making');
+    await renderAtBasics();
     // Screen one is the only screen that renders before gender is answered.
     expect(screen.queryByText(/\bshe\b/i)).toBeNull();
     expect(screen.queryByText(/\bhe\b/i)).toBeNull();
   });
 
   it('refuses to advance until the screen is answered', async () => {
-    renderFlow();
-    await screen.findByText('Who are we making');
+    await renderAtBasics();
     const advance = screen.getByRole('button', { name: 'Continue' });
     expect(advance).toBeDisabled();
 
@@ -107,7 +121,7 @@ describe('the creation flow, rendered', () => {
   it('takes its pronouns from the answer', async () => {
     // The look page used to carry the sentence this asserted. The headings do
     // the same job and outlive copy changes: "His face", not "Her face".
-    renderFlow();
+    await renderAtBasics();
     await clickText('A man');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Pick a look');
@@ -119,7 +133,7 @@ describe('the creation flow, rendered', () => {
   });
 
   it('offers a hair shape by texture, and clears it when the style changes', async () => {
-    renderFlow();
+    await renderAtBasics();
     await clickText('A woman');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await clickText('Anime');
@@ -144,54 +158,99 @@ describe('the creation flow, rendered', () => {
   });
 
   it('will not let the rail skip ahead', async () => {
-    renderFlow();
-    await screen.findByText('Who are we making');
+    await renderAtBasics();
     expect(screen.getByRole('button', { name: /Traits/ })).toBeDisabled();
   });
 });
 
 /** Walk to a given step, answering only what each screen insists on. */
+// Keyed by name rather than by number. This was a map of bare step numbers and
+// every one of them moved when the intro screen went in front.
 async function walkTo(target: number) {
   const answers: Record<number, string> = {
-    1: 'A woman',
-    2: 'Realistic',
-    5: 'Warm',
-    7: 'Fond',
+    [STEP.basics]: 'A woman',
+    [STEP.look]: 'Realistic',
+    [STEP.traits]: 'Warm',
+    [STEP.you]: 'Fond',
   };
-  for (let step = 1; step < target; step += 1) {
+  for (let step = STEP.basics; step < target; step += 1) {
     if (answers[step]) await clickText(answers[step]);
     await user.click(screen.getByRole('button', { name: /Continue|Make/ }));
   }
 }
 
+describe('the intro screen', () => {
+  it('says what they are making before it asks anything', async () => {
+    renderFlow();
+    await screen.findByText('An independent character');
+
+    // The facts that used to be spread through the later screens as asides.
+    expect(screen.getByText(/not playing a part/i)).toBeInTheDocument();
+    expect(screen.getByText(/where they start, not a rule/i)).toBeInTheDocument();
+    expect(screen.getByText(/can stop talking to you/i)).toBeInTheDocument();
+    expect(screen.getByText(/You can keep one/i)).toBeInTheDocument();
+  });
+
+  it('asks nothing, so it never blocks the way forward', async () => {
+    renderFlow();
+    await screen.findByText('An independent character');
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it('says "they", because gender is the next question', async () => {
+    renderFlow();
+    await screen.findByText('An independent character');
+    expect(screen.queryByText(/\bshe\b/i)).toBeNull();
+    expect(screen.queryByText(/\bhe\b/i)).toBeNull();
+  });
+});
+
+describe('what the two of them are', () => {
+  it('asks the relationship instead of how drawn to you she is', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.you);
+
+    expect(screen.getByText('What you are to each other')).toBeInTheDocument();
+    // The question that made somebody building a friend answer about attraction.
+    expect(screen.queryByText('Drawn to you')).toBeNull();
+  });
+
+  it('speaks the gendered words for the character being made', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.you);
+
+    // A woman was picked in the walk, so these are her words.
+    expect(screen.getByRole('button', { name: 'Girlfriend' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wife' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Husband' })).toBeNull();
+  });
+});
+
 describe('the last two screens', () => {
   it('shows the review before anything is made', async () => {
-    renderFlow();
-    await screen.findByText('Who are we making');
-    await walkTo(9);
+    await renderAtBasics();
+    await walkTo(STEP.review);
 
     // Every answer, one last time, above the sentence about what deleting her
     // costs. Committing before showing it would be asking somebody to confirm a
     // thing they were never shown.
     await screen.findByText('Meet her');
-    expect(screen.getByText('Drawn to you')).toBeInTheDocument();
+    expect(screen.getByText('What you are')).toBeInTheDocument();
     expect(omnichatService.createIAI).not.toHaveBeenCalled();
   });
 
   it('makes her from the review screen', async () => {
     vi.mocked(omnichatService.createIAI).mockResolvedValue({ id: 7 } as never);
-    const { onMade } = renderFlow();
-    await screen.findByText('Who are we making');
-    await walkTo(9);
+    const { onMade } = await renderAtBasics();
+    await walkTo(STEP.review);
 
     await user.click(screen.getByRole('button', { name: /Make her/ }));
     await waitFor(() => expect(onMade).toHaveBeenCalled());
   });
 
   it('lets somebody clear the suggested name and type their own', async () => {
-    renderFlow();
-    await screen.findByText('Who are we making');
-    await walkTo(8);
+    await renderAtBasics();
+    await walkTo(STEP.name);
 
     const field = await screen.findByRole('textbox', { name: /name/i });
     // One of the three, not a particular one: the suggestion is picked at

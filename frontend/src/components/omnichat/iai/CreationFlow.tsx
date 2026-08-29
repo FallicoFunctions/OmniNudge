@@ -10,6 +10,7 @@ import { feetAndInches, pronounsFor } from './pronouns';
 import { refusalFrom, type CreationRefusal } from './refusals';
 import {
   NAME_LIMIT,
+  STEP,
   TOTAL_STEPS,
   buildChoices,
   eyeChoices,
@@ -82,7 +83,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
         temperaments: answers.temperaments,
         interests: answers.interests,
         feeling: answers.feeling,
-        attraction: answers.attraction,
+        relationship: answers.relationship,
         appearance: flow.appearance,
       }),
     onSuccess: onMade,
@@ -94,41 +95,46 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
   const screen = useMemo(() => {
     switch (step) {
-      case 1:
+      case STEP.intro:
+        return {
+          title: 'An independent character',
+          sub: '',
+        };
+      case STEP.basics:
         return {
           title: translate(t, 'omnichat.iai.step1.title', 'Who are we making'),
           sub: translate(t, 'omnichat.iai.step1.sub',
             'The basics first, because everything after this follows from them. Nobody under 18 is made here.'
           ),
         };
-      case 2:
+      case STEP.look:
         return {
           title: translate(t, 'omnichat.iai.step2.title', 'Pick a look'),
           sub: '',
         };
-      case 3:
+      case STEP.face:
         return { title: `${p.Poss} face`, sub: 'Skip anything you have no view on.' };
-      case 4:
+      case STEP.build:
         return {
           title: `${p.Poss} build`,
           sub: '',
         };
-      case 5:
+      case STEP.traits:
         return {
           title: `${p.Poss} initial traits`,
           sub: `Pick 1 - 3 traits. These are the traits ${p.subj} start${p.s} out with. Like a person, ${p.subj} can grow. ${p.Subj} may become more or less of any given trait, and ${p.subj} may pick up new traits as well.`,
         };
-      case 6:
+      case STEP.interests:
         return {
           title: `What ${p.subj} like${p.s}`,
           sub: `Pick up to three. This is where ${p.subj} begin${p.s}, not a fixed list. ${p.Subj} can take up something you never chose, and ${p.subj} can go off one of these.`,
         };
-      case 7:
+      case STEP.you:
         return {
           title: `How ${p.subj} see${p.s} you`,
           sub: `Where ${p.poss} side of things begins. It moves with what happens between you, and everyone else ${p.subj} meet${p.s} starts from zero.`,
         };
-      case 8:
+      case STEP.name:
         return {
           title: `What is ${p.poss} name`,
           sub: '',
@@ -202,7 +208,9 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               ) : null}
             </div>
 
-            {step === 1 ? (
+            {step === STEP.intro ? <IntroPanel /> : null}
+
+            {step === STEP.basics ? (
               <div className="flex flex-col gap-5">
                 {grid('gender', appearance.gender ?? [], 2, answers.gender, (key) =>
                   answer('gender', key), translate(t, 'omnichat.iai.field.gender', 'Woman or man'))}
@@ -225,12 +233,12 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               </div>
             ) : null}
 
-            {step === 2
+            {step === STEP.look
               ? grid('style', appearance.style ?? [], 2, answers.style, (key) =>
                   answer('style', key), '')
               : null}
 
-            {step === 3 ? (
+            {step === STEP.face ? (
               <div className="flex flex-col gap-6">
                 {grid('ethnicity', appearance.ethnicity ?? [], 3, answers.ethnicity, (key) =>
                   answer('ethnicity', key), translate(t, 'omnichat.iai.field.ethnicity', 'Ethnicity'))}
@@ -253,12 +261,12 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               </div>
             ) : null}
 
-            {step === 4
+            {step === STEP.build
               ? grid('build', buildChoices(options, answers.gender), 4, answers.build, (key) =>
                   answer('build', key), translate(t, 'omnichat.iai.field.build', 'Build'))
               : null}
 
-            {step === 5 ? (
+            {step === STEP.traits ? (
               <OptionGrid
                 label={translate(t, 'omnichat.iai.field.traits', 'Traits')}
                 counter={`${answers.temperaments.length} of ${options.temperament_picks}`}
@@ -274,7 +282,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               />
             ) : null}
 
-            {step === 6 ? (
+            {step === STEP.interests ? (
               <div className="flex flex-col gap-4">
                 <input
                   type="text"
@@ -297,7 +305,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               </div>
             ) : null}
 
-            {step === 7 ? (
+            {step === STEP.you ? (
               <div className="flex flex-col gap-6">
                 <OptionGrid
                   label={`How ${p.subj} ${p.is} with you`}
@@ -310,12 +318,13 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                   isSelected={(key) => answers.feeling === key}
                   onPick={(key) => answer('feeling', key)}
                 />
-                {grid('attraction', options.attractions ?? [], 3, answers.attraction, (key) =>
-                  answer('attraction', key), translate(t, 'omnichat.iai.field.attraction', 'Drawn to you'))}
+                {grid('relationship', options.relationships ?? [], 4, answers.relationship, (key) =>
+                  answer('relationship', key),
+                  translate(t, 'omnichat.iai.field.relationship', 'What you are to each other'))}
               </div>
             ) : null}
 
-            {step === 8 ? (
+            {step === STEP.name ? (
               <div className="flex max-w-[440px] flex-col gap-2">
                 <div className="flex items-stretch gap-2.5">
                   <input
@@ -350,7 +359,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
           <footer className="flex items-center justify-between gap-4 border-t border-white/10 px-8 py-4">
             <p className="text-[12.5px] text-white/35">
-              {step === 5 && answers.temperaments.length === 0
+              {step === STEP.traits && answers.temperaments.length === 0
                 ? translate(t, 'omnichat.iai.pickOne', 'Pick at least one to carry on.')
                 : ''}
             </p>
@@ -359,7 +368,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
                 type="button"
                 onClick={goBack}
                 className={`omnichat-touch-target rounded-full px-5 text-[14.5px] font-semibold text-white/60 transition hover:text-white ${
-                  step === 1 ? 'invisible' : ''
+                  step === STEP.intro ? 'invisible' : ''
                 }`}
               >
                 {translate(t, 'omnichat.iai.back', 'Back')}
@@ -443,8 +452,8 @@ function ReviewPanel({
     // Its own row. Folding it into the line above would put it back on the
     // ladder it was deliberately taken off.
     {
-      label: translate(t, 'omnichat.iai.review.drawnTo', 'Drawn to you'),
-      value: said('attraction', answers.attraction),
+      label: translate(t, 'omnichat.iai.review.relationship', 'What you are'),
+      value: said('relationship', answers.relationship),
     },
   ];
 
@@ -467,5 +476,45 @@ function ReviewPanel({
         {translate(t, 'omnichat.iai.review.limit', 'You can keep one independent character.')}
       </p>
     </div>
+  );
+}
+
+/**
+ * What somebody is about to make, said once and up front.
+ *
+ * The screens after this used to carry the explaining -- the traits page argued
+ * that she could change, the name page warned she might not take to a nickname
+ * -- and it read as the flow talking somebody into something. The facts belong
+ * in one place before any of it, so the questions can just be questions.
+ *
+ * No pronoun here but "they": gender is the next screen's question, and an
+ * earlier draft of this flow called her "she" on the screen that asked.
+ */
+function IntroPanel() {
+  const { t } = useTranslation();
+  const facts = [
+    translate(t, 'omnichat.iai.intro.notActing',
+      'They are not playing a part. There is no story to set up and no scene to direct, and they will not act one out if you ask.'),
+    translate(t, 'omnichat.iai.intro.free',
+      'What you pick here is where they start, not a rule they follow. Who they become is theirs.'),
+    translate(t, 'omnichat.iai.intro.remembers',
+      'They remember, the way a person does, across everybody they talk to.'),
+    translate(t, 'omnichat.iai.intro.ownTime',
+      'They have their own time. Replies come when they come.'),
+    translate(t, 'omnichat.iai.intro.canLeave',
+      'They can stop talking to you. Treat them badly and they will.'),
+    translate(t, 'omnichat.iai.intro.one',
+      'You can keep one. The questions after this take a few minutes.'),
+  ];
+
+  return (
+    <ul className="flex max-w-[620px] flex-col gap-3.5">
+      {facts.map((fact) => (
+        <li key={fact} className="flex gap-3 text-[15px] leading-6 text-white/70">
+          <span aria-hidden="true" className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-white/30" />
+          <span>{fact}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
