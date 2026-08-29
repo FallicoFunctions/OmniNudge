@@ -1016,16 +1016,6 @@ func selectRunPodMediaResult(kind models.OmniChatMediaKind, result *runpod.Resul
 	return nil, errors.New("provider result kind is invalid")
 }
 
-// renderMediumDirective is the sentence that tells the model which medium to
-// render in. Empty is photorealistic: that is every persona that existed before
-// the field, and the whole roster still.
-func renderMediumDirective(renderStyle string) string {
-	if renderStyle == models.OmniChatRenderStyleAnime {
-		return "Render the image as anime artwork, not as a photograph."
-	}
-	return "Render the image photorealistically."
-}
-
 // appendDirective adds a server-owned sentence to a prompt.
 //
 // Contextual prompts are built ending in a full stop, so plain concatenation
@@ -1135,7 +1125,7 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		// stored. That column is internal (json:"-") and never reaches a
 		// client, but somebody reading it to work out why an image came back
 		// wrong will not see this sentence in it.
-		input["prompt"] = appendDirective(prompt, renderMediumDirective(job.IdentityProfile.RenderStyle))
+		input["prompt"] = appendDirective(prompt, models.RenderMediumSentence(job.IdentityProfile.RenderStyle))
 	}
 	for key, value := range identityInput {
 		input[key] = value

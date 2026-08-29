@@ -51,19 +51,6 @@ func BuildIAILikenessPrompt(profile models.OmniChatMediaIdentityProfile) string 
 		"Full-body reference image of one person.",
 		subject,
 		iaiLikenessFraming,
-		renderMediumSentence(profile.RenderStyle),
+		models.RenderMediumSentence(profile.RenderStyle),
 	}, " ")
-}
-
-// renderMediumSentence is the likeness's own copy of the medium decision.
-//
-// It says "image" where the scene directive says "the image" because this one
-// opens the prompt's subject rather than qualifying an existing sentence, and
-// the two are free to diverge: one describes a scene somebody asked for, the
-// other a reference photograph the server asked for.
-func renderMediumSentence(renderStyle string) string {
-	if renderStyle == models.OmniChatRenderStyleAnime {
-		return "Render as anime artwork, not as a photograph."
-	}
-	return "Render photorealistically."
 }

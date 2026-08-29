@@ -53,6 +53,24 @@ type OmniChatMediaIdentityProfile struct {
 // once here rather than as a string literal in the prompt and the creator.
 const OmniChatRenderStyleAnime = "anime"
 
+// RenderMediumSentence is the sentence that tells an image model which medium
+// to work in. Empty is photorealistic: that is every persona that existed
+// before the field, and the whole roster still.
+//
+// It lives beside the constant it reads because two callers need it -- the
+// scene prompt, assembled in the queue where the persona is finally known, and
+// the likeness prompt, assembled in services because a likeness is not a scene
+// and never goes through the scene path. Written twice they were one sentence
+// apart ("Render the image photorealistically" against "Render
+// photorealistically") and a third medium would have had to be remembered in
+// both.
+func RenderMediumSentence(renderStyle string) string {
+	if renderStyle == OmniChatRenderStyleAnime {
+		return "Render as anime artwork, not as a photograph."
+	}
+	return "Render photorealistically."
+}
+
 // DefaultOmniChatMediaIdentityProfile is deliberately usable without any
 // persona-specific configuration. A newly created default or user persona can
 // therefore generate media immediately from its avatar/gallery references.

@@ -868,8 +868,8 @@ func TestADirectiveIsItsOwnSentence(t *testing.T) {
 func TestTheMediumDirectiveIsOneDecisionInOnePlace(t *testing.T) {
 	// It was written twice, in two branches of the same if. One place means a
 	// third medium is a row here rather than a branch to remember.
-	require.Contains(t, renderMediumDirective(models.OmniChatRenderStyleAnime), "anime artwork")
-	require.Contains(t, renderMediumDirective(""), "photorealistically")
-	require.Equal(t, renderMediumDirective(""), renderMediumDirective("claymation"),
+	require.Contains(t, models.RenderMediumSentence(models.OmniChatRenderStyleAnime), "anime artwork")
+	require.Contains(t, models.RenderMediumSentence(""), "photorealistically")
+	require.Equal(t, models.RenderMediumSentence(""), models.RenderMediumSentence("claymation"),
 		"an unrecognised medium renders like everything else")
 }
