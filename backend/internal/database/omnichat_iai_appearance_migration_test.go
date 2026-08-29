@@ -329,6 +329,7 @@ func TestTheBaselineMigrationsAreSafeToRunTwice(t *testing.T) {
 		"202_relationship_attachment_attraction",
 		"203_relationship_kind",
 		"204_nursery_home",
+		"205_relationship_ended",
 	} {
 		statement, err := os.ReadFile(filepath.Join("migrations", name+".up.sql"))
 		require.NoError(t, err)

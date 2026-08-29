@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -48,13 +49,27 @@ func TestDeletingHerIsHerLeaving(t *testing.T) {
 	require.Equal(t, "review", *home, "she left his house and awaits a decision")
 	require.Nil(t, owner, "and belongs to nobody in the meantime")
 
-	// His half is gone, which is the privacy exit and the reason he cannot go
-	// on talking to her after making another.
-	var traits int
+	// She still knows him. Deleting the relationship would edit who she is --
+	// what those years moved in her is not a record of him, it is her -- and it
+	// would close the door §20 leaves open for her to reach out first.
+	var ended *time.Time
+	var trust float64
 	require.NoError(t, db.Pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
-		made.ID, premiumID).Scan(&traits))
-	require.Zero(t, traits, "she does not know him any more")
+		`SELECT ended_at, trust FROM omnichat_character_traits
+		 WHERE persona_id = $1 AND owner_user_id = $2`,
+		made.ID, premiumID).Scan(&ended, &trust))
+	require.NotNil(t, ended, "the relationship ended")
+	require.Greater(t, trust, 0.0, "and what it made of her is still there")
+
+	// He cannot reach her through it. Her conversations with him are closed and
+	// she belongs to nobody, which is what stops him talking to her after
+	// making another.
+	var open int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM bot_conversations
+		 WHERE persona_id = $1 AND user_id = $2 AND archived_at IS NULL`,
+		made.ID, premiumID).Scan(&open))
+	require.Zero(t, open)
 }
 
 func TestTheSlotIsFreeTheMomentSheLeaves(t *testing.T) {
@@ -105,9 +120,10 @@ func TestSheKeepsWhatIsNotHis(t *testing.T) {
 
 	var others, self int
 	require.NoError(t, db.Pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
+		`SELECT COUNT(*) FROM omnichat_character_traits
+		 WHERE persona_id = $1 AND owner_user_id = $2 AND ended_at IS NULL`,
 		made.ID, otherID).Scan(&others))
-	require.Equal(t, 1, others, "what she is to other people is not his to delete")
+	require.Equal(t, 1, others, "somebody else's relationship with her did not end")
 
 	require.NoError(t, db.Pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id IS NULL`,
@@ -258,4 +274,56 @@ func TestTheQueueIsOldestFirst(t *testing.T) {
 	require.Len(t, waiting, 1)
 	require.Equal(t, second.ID, waiting[0].PersonaID)
 	_ = db
+}
+
+func TestLeavingDoesNotEditWhoSheIs(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+
+	// Years of it, as far as this test is concerned.
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, title, summary)
+		VALUES ($1, $2, 'The night it rained', 'They talked until it got light.')`,
+		made.ID, premiumID)
+	require.NoError(t, err)
+
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+
+	// The first version of this deleted both, and it was wrong on the design's
+	// own terms. A tier is about who she recalls something with, not whether she
+	// holds it: she is not amnesiac about him, she is discreet about him. And
+	// §20 leaves her a door -- she can reach out first -- which nothing can do
+	// if the relationship it would reach back into was destroyed.
+	var episodes int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id = $2`,
+		made.ID, premiumID).Scan(&episodes))
+	require.Equal(t, 1, episodes, "she remembers the night it rained")
+
+	var relationships int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
+		made.ID, premiumID).Scan(&relationships))
+	require.Equal(t, 1, relationships, "and what it made of her is still hers")
+}
+
+func TestOnlyARealRelationshipCanEnd(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+
+	// The self tier belongs to nobody, so there is nobody for it to have ended
+	// with. The schema refuses it rather than trusting a caller.
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO omnichat_character_traits (persona_id, owner_user_id, ended_at)
+		VALUES ($1, NULL, NOW())`, made.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ended_is_relational")
 }

@@ -179,11 +179,15 @@ var ErrNotAnIAI = errors.New("omnichat iai: this is not an independent character
 // LeaveCreator is what happens when somebody deletes their independent
 // character, and it is deliberately not a delete.
 //
-// The split is the one the memory tiers already draw. Her life and her
-// relationships with everybody else are self tier and survive. His own
-// conversations with her are relational tier, and they go -- which is his
-// privacy exit, and is also what makes this safe: he cannot delete her, make
-// another, and go on talking to the first one, because she no longer knows him.
+// Her memory of him is kept and locked, not erased. §21: a tier is about who
+// she recalls something with, not whether she holds it -- "she is not amnesiac
+// about him; she is discreet about him". And §20 leaves a door open, because she
+// can reach out first, which is impossible if the relationship was destroyed.
+// What those years moved in her is who she now is, and deleting it would edit
+// her rather than end a relationship.
+//
+// He cannot reach her through it: the relationship is marked ended, his
+// conversations are archived, and she is nobody's until somebody decides.
 //
 // She moves out of his house into 'review'. She is not relocated into the
 // nursery; she was always in it. Whether she then joins the community is a
@@ -228,13 +232,17 @@ func (r *BotPersonaRepository) LeaveCreator(ctx context.Context, userID, persona
 		return false, err
 	}
 
-	// His half of her, in the order that leaves nothing pointing at something
-	// gone. Everything here is scoped to this one person: what she remembers of
-	// anybody else is untouched, and so is everything the self tier holds about
-	// who those years made her.
+	// His half of her is locked, not destroyed.
+	//
+	// Deleting it was the first version of this and it was wrong on the design's
+	// own terms: a tier is about who she recalls something with, not whether she
+	// holds it, and leaving is reversible because she can reach out first. She
+	// cannot reach back into a relationship that no longer exists, and what
+	// those years moved in her is who she now is. So every episode and every
+	// number stays, and the relationship is marked ended.
 	for _, statement := range []string{
-		`DELETE FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id = $2`,
-		`DELETE FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
+		`UPDATE omnichat_character_traits SET ended_at = NOW(), updated_at = CURRENT_TIMESTAMP
+		  WHERE persona_id = $1 AND owner_user_id = $2 AND ended_at IS NULL`,
 		`UPDATE bot_conversations SET archived_at = NOW() WHERE persona_id = $1 AND user_id = $2 AND archived_at IS NULL`,
 		`UPDATE omnichat_generation_jobs
 		    SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW(),
