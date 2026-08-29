@@ -105,11 +105,17 @@ describe('the creation flow, rendered', () => {
   });
 
   it('takes its pronouns from the answer', async () => {
+    // The look page used to carry the sentence this asserted. The headings do
+    // the same job and outlive copy changes: "His face", not "Her face".
     renderFlow();
     await clickText('A man');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Pick a look');
-    expect(screen.getByText(/he is drawn in/)).toBeInTheDocument();
+    await clickText('Realistic');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByText('His face')).toBeInTheDocument();
+    expect(screen.queryByText('Her face')).toBeNull();
   });
 
   it('offers a hair shape by texture, and clears it when the style changes', async () => {

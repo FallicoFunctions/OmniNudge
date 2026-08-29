@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
  * pattern, which is where this vocabulary already exists in the app.
  */
 export interface OptionGridProps {
+  /** Empty when the choice needs no heading above it. */
   label: string;
   /** Shown right-aligned beside the label. Empty when the question has no count. */
   counter?: string;
@@ -32,18 +33,20 @@ export default function OptionGrid({
 }: OptionGridProps) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex max-w-[620px] items-baseline justify-between gap-4">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/40">{label}</p>
-        {counter ? (
-          <p
-            className={`text-xs font-semibold tabular-nums ${
-              counterHighlighted ? 'text-[#7da8ff]' : 'text-white/40'
-            }`}
-          >
-            {counter}
-          </p>
-        ) : null}
-      </div>
+      {label || counter ? (
+        <div className="flex max-w-[620px] items-baseline justify-between gap-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/40">{label}</p>
+          {counter ? (
+            <p
+              className={`text-xs font-semibold tabular-nums ${
+                counterHighlighted ? 'text-[#7da8ff]' : 'text-white/40'
+              }`}
+            >
+              {counter}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {options.length === 0 && empty ? (
         <p className="max-w-[620px] text-sm text-white/40">{empty}</p>

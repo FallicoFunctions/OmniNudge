@@ -104,19 +104,19 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
       case 2:
         return {
           title: translate(t, 'omnichat.iai.step2.title', 'Pick a look'),
-          sub: `This is the world ${p.subj} ${p.is} drawn in. It does not change who ${p.subj} ${p.is}.`,
+          sub: '',
         };
       case 3:
-        return { title: `${p.Poss} face`, sub: 'Recorded now, drawn later. Skip anything you have no view on.' };
+        return { title: `${p.Poss} face`, sub: 'Skip anything you have no view on.' };
       case 4:
         return {
           title: `${p.Poss} build`,
-          sub: `One more detail for the likeness, then we are done with how ${p.subj} look${p.s}.`,
+          sub: '',
         };
       case 5:
         return {
-          title: `How ${p.subj} start${p.s} out`,
-          sub: `Pick up to three. They set who ${p.subj} ${p.is} on the first day, not who ${p.subj} stay${p.s}. Make ${p.obj} quiet and ${p.subj} can work on it and become less quiet, or settle further into it. A person does the same.`,
+          title: `${p.Poss} initial traits`,
+          sub: `Pick 1 - 3 traits. These are the traits ${p.subj} start${p.s} out with. Like a person, ${p.subj} can grow. ${p.Subj} may become more or less of any given trait, and ${p.subj} may pick up new traits as well.`,
         };
       case 6:
         return {
@@ -131,12 +131,12 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
       case 8:
         return {
           title: `What is ${p.poss} name`,
-          sub: `${p.Subj} answer${p.s} to this. You can call ${p.obj} something else later; ${p.subj} may not take to it.`,
+          sub: '',
         };
       default:
         return {
           title: `Meet ${p.obj}`,
-          sub: `This is who you made. ${p.Subj} take${p.s} it from here.`,
+          sub: '',
         };
     }
   }, [step, p, t]);
@@ -197,7 +197,9 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
               <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white">
                 {screen.title}
               </h1>
-              <p className="text-[15px] leading-6 text-white/55">{screen.sub}</p>
+              {screen.sub ? (
+                <p className="text-[15px] leading-6 text-white/55">{screen.sub}</p>
+              ) : null}
             </div>
 
             {step === 1 ? (
@@ -225,7 +227,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
             {step === 2
               ? grid('style', appearance.style ?? [], 2, answers.style, (key) =>
-                  answer('style', key), translate(t, 'omnichat.iai.field.style', 'Drawn as'))
+                  answer('style', key), '')
               : null}
 
             {step === 3 ? (
@@ -342,7 +344,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
             ) : null}
 
             {step === TOTAL_STEPS ? (
-              <ReviewPanel answers={answers} options={options} pronouns={p} />
+              <ReviewPanel answers={answers} pronouns={p} />
             ) : null}
           </div>
 
@@ -380,11 +382,9 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
 function ReviewPanel({
   answers,
-  options,
   pronouns,
 }: {
   answers: ReturnType<typeof useCreationFlow>['answers'];
-  options: import('../../../types/omnichat').IAIOptions;
   pronouns: ReturnType<typeof pronounsFor>;
 }) {
   const { t } = useTranslation();
@@ -464,9 +464,7 @@ function ReviewPanel({
         ))}
       </div>
       <p className="text-xs leading-5 text-white/40">
-        {translate(t, 'omnichat.iai.review.limit',
-          `You can keep ${options.iai_limit === 1 ? 'one independent character' : `${options.iai_limit} independent characters`}. Making another means deleting ${pronouns.obj}, and everything ${pronouns.subj} remember${pronouns.s} goes with ${pronouns.obj}.`
-        )}
+        {translate(t, 'omnichat.iai.review.limit', 'You can keep one independent character.')}
       </p>
     </div>
   );
