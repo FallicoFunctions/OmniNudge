@@ -132,7 +132,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
       case STEP.you:
         return {
           title: `How ${p.subj} see${p.s} you`,
-          sub: `Where ${p.poss} side of things begins. It moves with what happens between you, and everyone else ${p.subj} meet${p.s} starts from zero.`,
+          sub: `How ${p.subj} feel${p.s} about you on the first day, and what the two of you are to each other.`,
         };
       case STEP.name:
         return {
@@ -263,7 +263,7 @@ export default function CreationFlow({ onMade, onRefused }: CreationFlowProps) {
 
             {step === STEP.build
               ? grid('build', buildChoices(options, answers.gender), 4, answers.build, (key) =>
-                  answer('build', key), translate(t, 'omnichat.iai.field.build', 'Build'))
+                  answer('build', key), '')
               : null}
 
             {step === STEP.traits ? (

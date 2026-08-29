@@ -215,6 +215,21 @@ describe('what the two of them are', () => {
     expect(screen.queryByText('Drawn to you')).toBeNull();
   });
 
+  it('does not explain the relationship back at somebody', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.you);
+
+    // The screen used to say "Where his side of things begins. It moves with
+    // what happens between you, and everyone else he meets starts from zero."
+    // Three claims, none of them a question, and the reader has to work out
+    // which one they are being asked about.
+    expect(screen.queryByText(/side of things begins/)).toBeNull();
+    expect(screen.queryByText(/starts from zero/)).toBeNull();
+    expect(
+      screen.getByText(/feels about you on the first day, and what the two of you are/)
+    ).toBeInTheDocument();
+  });
+
   it('speaks the gendered words for the character being made', async () => {
     await renderAtBasics();
     await walkTo(STEP.you);
