@@ -327,3 +327,73 @@ func TestOnlyARealRelationshipCanEnd(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ended_is_relational")
 }
+
+func TestSheLivesInHerCreatorsHouseFromTheStart(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+
+	// NULL means not a resident at all, which is what roleplay characters are.
+	// She lives in the nursery from the moment she exists.
+	var home *string
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT nursery_home FROM bot_personas WHERE id = $1`, made.ID).Scan(&home))
+	require.NotNil(t, home, "a new independent character is a resident")
+	require.Equal(t, "home", *home)
+}
+
+func TestKeepingHerIsWhatMakesHerFindable(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+	_, err = personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+
+	// Discovery asks for an ownerless public persona. Moving her into the
+	// community while leaving her private would put her among the public
+	// characters where nobody could find her.
+	var findable bool
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT owner_user_id IS NULL AND visibility = 'public' AND is_active
+		FROM bot_personas WHERE id = $1`, made.ID).Scan(&findable))
+	require.True(t, findable, "keeping her has to actually put her in front of people")
+}
+
+func TestAnEndedRelationshipIsNotWhatSheSpeaksFrom(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+	_, err = personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+
+	// She was made his spouse. Keeping the relationship is right -- deleting it
+	// would edit who she is -- but reading it back as current means she meets
+	// the person who deleted her still married to him.
+	_, _, relationship, err := models.NewOmniChatCharacterTraitRepository(db.Pool).
+		LoadForConversation(ctx, made.ID, premiumID)
+	require.NoError(t, err)
+	require.Empty(t, relationship.Kind, "she is not still his wife")
+	require.Zero(t, relationship.Trust)
+	require.Zero(t, relationship.Attraction)
+
+	// And it is still there, because she is not amnesiac about him.
+	var kept int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_character_traits
+		 WHERE persona_id = $1 AND owner_user_id = $2 AND ended_at IS NOT NULL`,
+		made.ID, premiumID).Scan(&kept))
+	require.Equal(t, 1, kept)
+	_ = db
+}

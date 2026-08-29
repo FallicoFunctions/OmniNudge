@@ -270,6 +270,12 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		FROM bot_personas p
 		LEFT JOIN omnichat_character_traits t
 		  ON t.persona_id = p.id AND COALESCE(t.owner_user_id, 0) = ANY($2)
+		  -- An ended relationship is kept, not read. She still holds every
+		  -- episode and every number those years moved -- deleting them would
+		  -- edit who she is -- but they are no longer what she speaks from.
+		  -- Without this she meets the person who deleted her still married to
+		  -- him: kind 'spouse', his trust, his attraction, all of it current.
+		 AND t.ended_at IS NULL
 		WHERE p.id = $1
 	`, personaID, tiers)
 	if err != nil {

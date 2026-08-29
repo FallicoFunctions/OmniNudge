@@ -117,12 +117,15 @@ func (r *BotPersonaRepository) CreateIAI(
 		INSERT INTO bot_personas (
 			id, slug, name, category, owner_user_id, visibility, source_format,
 			system_prompt, personality, response_style_profile, is_active,
-			iai_appearance,
+			nursery_home, iai_appearance,
 			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness,
 			baseline_talkativeness, baseline_expressiveness
 		) VALUES (
+			-- 'home': she lives in the nursery from the moment she exists, in
+			-- her creator's house, where she meets nobody and does not roam.
+			-- NULL here would read as not a resident at all.
 			$1, $2, $3, 'original', $4, 'private', 'native',
-			'', $5, $6, TRUE,
+			'', $5, $6, TRUE, 'home',
 			$7,
 			$8, $9, $10, $11, $12, $13
 		)
@@ -337,9 +340,14 @@ func (r *BotPersonaRepository) Commandeer(ctx context.Context, personaID int) (b
 		return false, err
 	}
 
+	// Public as well as active. The community is where the public characters
+	// live, and discovery asks for an ownerless public persona -- so without
+	// this she joins them and nobody can find her, which is the whole point of
+	// keeping her.
 	if _, err = tx.Exec(ctx, `
 		UPDATE bot_personas
-		SET nursery_home = 'community', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+		SET nursery_home = 'community', is_active = TRUE, visibility = 'public',
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 	`, personaID); err != nil {
 		return false, err
