@@ -230,6 +230,21 @@ func (h *OmniChatHandler) DeletePersona(c *gin.Context) {
 		return
 	}
 
+	// An independent character is not deleted, she leaves. Her life and what
+	// she is to everybody else survive; his half of her does not. Trying the
+	// leaving path first is what keeps the two apart -- routing an IAI through
+	// the ordinary soft delete would leave her owned by somebody who cannot
+	// reach her, holding the one slot he has.
+	left, err := h.personaRepo.LeaveCreator(c.Request.Context(), userID, personaID)
+	if err != nil && !errors.Is(err, models.ErrNotAnIAI) {
+		RespondError(c, http.StatusInternalServerError, "Failed to delete persona")
+		return
+	}
+	if left {
+		c.JSON(http.StatusOK, gin.H{"message": "persona deleted"})
+		return
+	}
+
 	deleted, err := h.personaRepo.DeleteOwned(c.Request.Context(), userID, personaID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to delete persona")

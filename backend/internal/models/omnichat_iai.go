@@ -170,3 +170,83 @@ func relationshipKindOrFriend(kind string) string {
 	}
 	return kind
 }
+
+// ErrNotAnIAI is a roleplay character sent down the leaving path. They are not
+// nursery residents and have no house to leave.
+var ErrNotAnIAI = errors.New("omnichat iai: this is not an independent character")
+
+// LeaveCreator is what happens when somebody deletes their independent
+// character, and it is deliberately not a delete.
+//
+// The split is the one the memory tiers already draw. Her life and her
+// relationships with everybody else are self tier and survive. His own
+// conversations with her are relational tier, and they go -- which is his
+// privacy exit, and is also what makes this safe: he cannot delete her, make
+// another, and go on talking to the first one, because she no longer knows him.
+//
+// She moves out of his house into 'review'. She is not relocated into the
+// nursery; she was always in it. Whether she then joins the community is a
+// decision somebody makes later, and until then she is nobody's.
+//
+// The slot frees immediately. Making somebody wait on a review they cannot see
+// the progress of, before they may make anything at all, is a worse product
+// than the risk of him making a second character while the first awaits a
+// decision.
+func (r *BotPersonaRepository) LeaveCreator(ctx context.Context, userID, personaID int) (bool, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var style string
+	err = tx.QueryRow(ctx, `
+		SELECT response_style_profile FROM bot_personas
+		WHERE id = $1 AND owner_user_id = $2 AND is_active
+		FOR UPDATE
+	`, personaID, userID).Scan(&style)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if style != ResponseStyleProfileDirectMessage {
+		return false, ErrNotAnIAI
+	}
+
+	// Ownerless and awaiting a decision. Clearing the owner is what frees the
+	// slot: the creation count asks for characters owned by this person, and she
+	// is no longer one of them.
+	if _, err = tx.Exec(ctx, `
+		UPDATE bot_personas
+		SET owner_user_id = NULL, nursery_home = 'review', is_active = FALSE,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, personaID); err != nil {
+		return false, err
+	}
+
+	// His half of her, in the order that leaves nothing pointing at something
+	// gone. Everything here is scoped to this one person: what she remembers of
+	// anybody else is untouched, and so is everything the self tier holds about
+	// who those years made her.
+	for _, statement := range []string{
+		`DELETE FROM omnichat_memory_episodes WHERE persona_id = $1 AND owner_user_id = $2`,
+		`DELETE FROM omnichat_character_traits WHERE persona_id = $1 AND owner_user_id = $2`,
+		`UPDATE bot_conversations SET archived_at = NOW() WHERE persona_id = $1 AND user_id = $2 AND archived_at IS NULL`,
+		`UPDATE omnichat_generation_jobs
+		    SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW(),
+		        error_code = 'persona_deleted'
+		  WHERE persona_id = $1 AND owner_user_id = $2 AND status IN ('queued', 'running')`,
+	} {
+		if _, err = tx.Exec(ctx, statement, personaID, userID); err != nil {
+			return false, fmt.Errorf("omnichat iai: leave creator: %w", err)
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
