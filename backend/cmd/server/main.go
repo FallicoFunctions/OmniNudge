@@ -832,6 +832,7 @@ func main() {
 		SetBilling(omniChatBilling)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
+	adminOmniChatNurseryHandler := handlers.NewAdminOmniChatNurseryHandler(botPersonaRepo)
 	omniChatMediaRateLimiter := middleware.OmniChatMediaGenerationRateLimiter(cache)
 	omniChatMessageRateLimiter := middleware.OmniChatRateLimiter(cache)
 	omniChatSocialRateLimiter := middleware.OmniChatSocialRateLimiter(cache)
@@ -1769,6 +1770,12 @@ func main() {
 				// judgment and the record has to stay able to say whose it was.
 				admin.GET("/omnichat/blocks", adminOmniChatBlockHandler.List)
 				admin.POST("/omnichat/blocks/:id/overturn", adminOmniChatBlockHandler.Overturn)
+				// Characters whose creators let them go. Keeping one moves her
+				// into the community; refusing one is not here, because that
+				// destroys her self tier and is the only irreversible act in
+				// this area.
+				admin.GET("/omnichat/nursery/awaiting-review", adminOmniChatNurseryHandler.ListAwaitingReview)
+				admin.POST("/omnichat/nursery/:id/commandeer", adminOmniChatNurseryHandler.Commandeer)
 				admin.GET("/omnichat/publication-reports", omniChatSocialHandler.ListReports)
 				admin.PATCH("/omnichat/publication-reports/:report_id", omniChatSocialHandler.ResolveReport)
 

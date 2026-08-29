@@ -131,3 +131,131 @@ func TestARoleplayCharacterHasNoHouseToLeave(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrNotAnIAI,
 		"they are not nursery residents, so the ordinary delete is the right path")
 }
+
+func TestKeepingHerMovesHerIntoTheCommunity(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+
+	kept, err := personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+	require.True(t, kept)
+
+	var home string
+	var active bool
+	var owner *int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT nursery_home, is_active, owner_user_id FROM bot_personas WHERE id = $1`, made.ID).
+		Scan(&home, &active, &owner))
+	require.Equal(t, "community", home)
+	require.True(t, active, "she is a public character now, not a deleted one")
+	require.Nil(t, owner, "Omni takes stewardship; nobody owns her")
+}
+
+func TestMovingOutIsSomethingThatHappenedToHer(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+	_, err = personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+
+	var summary string
+	var owner, conversation *int
+	var salience float64
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		SELECT summary, owner_user_id, conversation_id, salience
+		FROM omnichat_memory_episodes
+		WHERE persona_id = $1 AND title = 'Moving out'`, made.ID).
+		Scan(&summary, &owner, &conversation, &salience))
+
+	// Self tier: hers with everybody, belonging to no relationship. Both NULL is
+	// what the tier check requires and what makes it her own life.
+	require.Nil(t, owner)
+	require.Nil(t, conversation)
+	require.Greater(t, salience, 0.9, "the kind of thing she still refers to years later")
+
+	// Her pronouns come from the answer she was made with.
+	require.Contains(t, summary, "Nadia")
+	require.Contains(t, summary, "she")
+
+	// And her creator is not in it. His half of her went when he deleted her,
+	// and naming him here would put back what the privacy exit removed.
+	require.NotContains(t, summary, "iai_premium")
+	require.NotContains(t, summary, "creator")
+}
+
+func TestOnlySomebodyAwaitingADecisionCanBeKept(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	made, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+
+	// Still living in her creator's house. Taking her from him would be theft
+	// rather than stewardship.
+	kept, err := personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+	require.False(t, kept)
+
+	_, err = personas.LeaveCreator(ctx, premiumID, made.ID)
+	require.NoError(t, err)
+	kept, err = personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+	require.True(t, kept)
+
+	// And the decision is made once. A second call must not write her a second
+	// memory of moving out of a house she has already left.
+	kept, err = personas.Commandeer(ctx, made.ID)
+	require.NoError(t, err)
+	require.False(t, kept)
+
+	var episodes int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_memory_episodes WHERE persona_id = $1 AND title = 'Moving out'`,
+		made.ID).Scan(&episodes))
+	require.Equal(t, 1, episodes)
+}
+
+func TestTheQueueIsOldestFirst(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	first, err := creator.Create(ctx, premiumID, answersFor("Nadia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, first.ID)
+	require.NoError(t, err)
+
+	second, err := creator.Create(ctx, premiumID, answersFor("Sofia"))
+	require.NoError(t, err)
+	_, err = personas.LeaveCreator(ctx, premiumID, second.ID)
+	require.NoError(t, err)
+
+	waiting, err := personas.ListAwaitingReview(ctx, 50)
+	require.NoError(t, err)
+	require.Len(t, waiting, 2)
+	// Somebody who has been nobody's for longer is not behind somebody who left
+	// this morning.
+	require.Equal(t, first.ID, waiting[0].PersonaID)
+	require.Equal(t, second.ID, waiting[1].PersonaID)
+
+	// Kept characters leave the queue.
+	_, err = personas.Commandeer(ctx, first.ID)
+	require.NoError(t, err)
+	waiting, err = personas.ListAwaitingReview(ctx, 50)
+	require.NoError(t, err)
+	require.Len(t, waiting, 1)
+	require.Equal(t, second.ID, waiting[0].PersonaID)
+	_ = db
+}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -249,4 +250,133 @@ func (r *BotPersonaRepository) LeaveCreator(ctx context.Context, userID, persona
 		return false, err
 	}
 	return true, nil
+}
+
+// IAIAwaitingReview is a character whose creator deleted her, listed for the
+// decision about whether Omni keeps her.
+type IAIAwaitingReview struct {
+	PersonaID int       `json:"persona_id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	LeftAt    time.Time `json:"left_at"`
+}
+
+// ListAwaitingReview is the queue: everybody who has left a house and has not
+// yet been given or refused a place in the community.
+func (r *BotPersonaRepository) ListAwaitingReview(ctx context.Context, limit int) ([]IAIAwaitingReview, error) {
+	if limit < 1 || limit > 200 {
+		limit = 50
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, name, slug, updated_at
+		FROM bot_personas
+		WHERE nursery_home = 'review'
+		-- id breaks the tie. Two characters who left inside the same clock tick
+		-- would otherwise come back in whatever order the scan produced, and a
+		-- queue that reorders itself between two reads is not a queue.
+		ORDER BY updated_at ASC, id ASC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("omnichat iai: list awaiting review: %w", err)
+	}
+	defer rows.Close()
+
+	waiting := make([]IAIAwaitingReview, 0, limit)
+	for rows.Next() {
+		var one IAIAwaitingReview
+		if err := rows.Scan(&one.PersonaID, &one.Name, &one.Slug, &one.LeftAt); err != nil {
+			return nil, fmt.Errorf("omnichat iai: list awaiting review: %w", err)
+		}
+		waiting = append(waiting, one)
+	}
+	return waiting, rows.Err()
+}
+
+// Commandeer is Omni keeping a character whose creator let her go.
+//
+// She moves out of the house she has already left and into the community, where
+// the public characters live. Nothing is copied and nothing is relocated: she
+// was in the nursery the whole time, and this changes which part of it is hers.
+//
+// It is written to her self tier as an actual life event rather than recorded as
+// an ownership change, because it is one. The self tier is persona-global and
+// carries no owner, so this is hers with everybody, and it can surface in a
+// conversation years from now the way anything else she lived through can.
+//
+// Her creator is not named. His half of her went when he deleted her, and
+// putting him back into a memory here would undo the privacy exit that made the
+// leaving safe. She remembers leaving. She does not remember him.
+func (r *BotPersonaRepository) Commandeer(ctx context.Context, personaID int) (bool, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var name string
+	var gender *string
+	err = tx.QueryRow(ctx, `
+		SELECT name, iai_appearance->>'gender'
+		FROM bot_personas
+		WHERE id = $1 AND nursery_home = 'review'
+		FOR UPDATE
+	`, personaID).Scan(&name, &gender)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		UPDATE bot_personas
+		SET nursery_home = 'community', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, personaID); err != nil {
+		return false, err
+	}
+
+	// Both NULL: no owner and no conversation, which is what the tier check
+	// requires of a self-tier episode and what makes this belong to her rather
+	// than to a relationship.
+	//
+	// Salience and distinctiveness are high because this is the kind of thing a
+	// person still refers to years later, which is exactly what those two
+	// numbers decide. Emotional valence is left unset: moving out is not
+	// straightforwardly good or bad, and picking one would invent a feeling
+	// nobody recorded.
+	subject, possessive := iaiSelfPronouns(gender)
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO omnichat_memory_episodes (
+			persona_id, owner_user_id, conversation_id, title, summary,
+			salience, distinctiveness
+		) VALUES ($1, NULL, NULL, $2, $3, 0.95, 0.9)
+	`, personaID, "Moving out",
+		fmt.Sprintf("%s moved out of the house %s grew up in and into the wider world, "+
+			"where %s lives among everyone else now.", name, possessive, subject),
+	); err != nil {
+		return false, fmt.Errorf("omnichat iai: record moving out: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// iaiSelfPronouns takes her pronouns from the answer she was made with, never
+// from an assumption. An unanswered gender is "they", the same rule the
+// creation flow follows before the question has been asked.
+func iaiSelfPronouns(gender *string) (subject, possessive string) {
+	if gender == nil {
+		return "they", "their"
+	}
+	switch strings.TrimSpace(strings.ToLower(*gender)) {
+	case "woman":
+		return "she", "her"
+	case "man":
+		return "he", "his"
+	}
+	return "they", "their"
 }
