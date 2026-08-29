@@ -48,6 +48,14 @@ type IAIPersona struct {
 	// into a list of options.
 	Personality string
 	Baseline    OmniChatDispositionBaseline
+	// Extensions carries her identity profile: the same answers said in words,
+	// which is what the image prompt reads. Nothing draws her yet, and the words
+	// are what keep every scene of her consistent until something does.
+	//
+	// Written at creation because it is derived from answers that cannot change
+	// afterwards, and because a character generating her first scene should not
+	// depend on a backfill having run.
+	Extensions json.RawMessage
 }
 
 // CreateIAI writes a new independent character owned by her creator, together
@@ -117,7 +125,7 @@ func (r *BotPersonaRepository) CreateIAI(
 		INSERT INTO bot_personas (
 			id, slug, name, category, owner_user_id, visibility, source_format,
 			system_prompt, personality, response_style_profile, is_active,
-			nursery_home, iai_appearance,
+			nursery_home, iai_appearance, extensions_json,
 			baseline_mood, baseline_trust, baseline_warmth, baseline_firmness,
 			baseline_talkativeness, baseline_expressiveness
 		) VALUES (
@@ -126,13 +134,13 @@ func (r *BotPersonaRepository) CreateIAI(
 			-- NULL here would read as not a resident at all.
 			$1, $2, $3, 'original', $4, 'private', 'native',
 			'', $5, $6, TRUE, 'home',
-			$7,
-			$8, $9, $10, $11, $12, $13
+			$7, COALESCE($8, '{}'::jsonb),
+			$9, $10, $11, $12, $13, $14
 		)
 		RETURNING `+botPersonaSelectColumns,
 		personaID, fmt.Sprintf("%s-%d", persona.SlugBase, personaID), persona.Name,
 		creatorUserID, persona.Personality, ResponseStyleProfileDirectMessage,
-		persona.Appearance,
+		persona.Appearance, persona.Extensions,
 		persona.Baseline.Mood, persona.Baseline.Trust, persona.Baseline.Warmth, persona.Baseline.Firmness,
 		persona.Baseline.Talkativeness, persona.Baseline.Expressiveness,
 	))

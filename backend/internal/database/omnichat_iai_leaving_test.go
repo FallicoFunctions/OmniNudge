@@ -451,3 +451,59 @@ func TestALivingRelationshipStillMoves(t *testing.T) {
 		made.ID, premiumID).Scan(&after))
 	require.Less(t, after, before, "a relationship nobody ended still responds to what happens in it")
 }
+
+func TestHerDescriptionReachesTheImagePipeline(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	answers := answersFor("Nadia")
+	answers.Appearance = services.IAIAppearance{
+		Style: "realistic", Gender: "woman", Age: 27, HeightInches: 66,
+		Ethnicity: "east_asian", HairLength: "long", HairTexture: "curly",
+		HairStyle: "high_ponytail", HairColour: "black", Eyes: "brown", Build: "athletic",
+	}
+	made, err := creator.Create(ctx, premiumID, answers)
+	require.NoError(t, err)
+
+	// The whole path: five screens of answers, through creation, into the blob
+	// the identity resolver reads, and out as the description the image prompt
+	// is given. Nothing draws her yet -- this is what keeps every scene of her
+	// consistent until something does.
+	stored, err := personas.GetByID(ctx, made.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+
+	profile := services.ResolveOmniChatMediaIdentityProfile(stored)
+	require.Equal(t,
+		`A 27-year-old East Asian woman, 5'6" tall, with long curly black hair `+
+			`worn in a high ponytail, brown eyes and an athletic build.`,
+		profile.Appearance)
+
+	// The rest of the profile is the resolver's defaults rather than anything
+	// creation wrote, so tuning the adapter is one place and not two.
+	defaults := models.DefaultOmniChatMediaIdentityProfile()
+	require.Equal(t, defaults.Adapter, profile.Adapter)
+	require.Equal(t, defaults.AdapterScale, profile.AdapterScale)
+	require.Equal(t, defaults.ReferenceLimit, profile.ReferenceLimit)
+}
+
+func TestACharacterNobodyDescribedGetsNoDescription(t *testing.T) {
+	ctx := context.Background()
+	db, creator, premiumID, _ := iaiCreationFixture(t)
+	personas := models.NewBotPersonaRepository(db.Pool)
+
+	answers := answersFor("Nadia")
+	answers.Appearance = services.IAIAppearance{}
+	made, err := creator.Create(ctx, premiumID, answers)
+	require.NoError(t, err)
+
+	stored, err := personas.GetByID(ctx, made.ID)
+	require.NoError(t, err)
+	profile := services.ResolveOmniChatMediaIdentityProfile(stored)
+
+	// "A person." is not a description worth conditioning an image on, but it
+	// is also not wrong, and inventing detail would be. It is what she is.
+	require.Equal(t, "A person.", profile.Appearance)
+	_ = db
+}

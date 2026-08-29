@@ -256,11 +256,20 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 
 	seed := SeedIAI(answers.Temperaments, answers.Feeling, answers.Relationship)
 	seed.Relationship.Kind = seed.Kind
+
+	// The words half of her likeness, written now. Nothing can draw her yet, but
+	// the image prompt reads this rather than the answers, and a scene generated
+	// before any picture exists still has to look like her.
+	extensions, err := encodeIAIIdentity(appearance)
+	if err != nil {
+		return nil, err
+	}
 	return c.personas.CreateIAI(ctx, creatorUserID, models.IAIPersona{
 		SlugBase:    iaiSlugBase(name),
 		Name:        name,
 		Personality: renderIAIInterests(answers.Interests),
 		Appearance:  encoded,
+		Extensions:  extensions,
 		Baseline:    seed.Baseline,
 	}, seed.Relationship, limit)
 }
@@ -325,4 +334,24 @@ func joinWithAnd(values []string) string {
 	default:
 		return strings.Join(values[:len(values)-1], ", ") + " and " + values[len(values)-1]
 	}
+}
+
+// encodeIAIIdentity puts her description where the image pipeline looks for it:
+// the persona's extensions blob, under the key the identity resolver reads.
+//
+// Only the appearance is written. Everything else on that profile -- the
+// adapter, its scale, the reference limit -- has defaults that the resolver
+// applies, and repeating them here would be two places to change one number.
+func encodeIAIIdentity(appearance IAIAppearance) (json.RawMessage, error) {
+	described := RenderIAIAppearance(appearance)
+	if described == "" {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(struct {
+		OmniChatMedia models.OmniChatMediaIdentityProfile `json:"omnichat_media"`
+	}{OmniChatMedia: models.OmniChatMediaIdentityProfile{Appearance: described}})
+	if err != nil {
+		return nil, fmt.Errorf("omnichat iai: encode identity: %w", err)
+	}
+	return encoded, nil
 }
