@@ -343,10 +343,16 @@ func joinWithAnd(values []string) string {
 // adapter, its scale, the reference limit -- has defaults that the resolver
 // applies, and repeating them here would be two places to change one number.
 func encodeIAIIdentity(appearance IAIAppearance) (json.RawMessage, error) {
-	described := RenderIAIAppearance(appearance)
-	if described == "" {
+	// The same rule the appearance column follows: nothing answered means
+	// nothing stored. RenderIAIAppearance always produces a sentence -- an
+	// unanswered appearance renders as "A person." -- so guarding on the
+	// sentence being empty guarded against a case that cannot happen, and every
+	// character with no appearance at all was given "A person." as her
+	// description while the column beside it was correctly left NULL.
+	if !appearance.described() {
 		return nil, nil
 	}
+	described := RenderIAIAppearance(appearance)
 	// The medium is recorded beside the description and not inside it. She is
 	// the same person either way; only the rendering differs.
 	style := ""

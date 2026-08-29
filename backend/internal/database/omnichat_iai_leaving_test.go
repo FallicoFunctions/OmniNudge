@@ -502,9 +502,17 @@ func TestACharacterNobodyDescribedGetsNoDescription(t *testing.T) {
 	require.NoError(t, err)
 	profile := services.ResolveOmniChatMediaIdentityProfile(stored)
 
-	// "A person." is not a description worth conditioning an image on, but it
-	// is also not wrong, and inventing detail would be. It is what she is.
-	require.Equal(t, "A person.", profile.Appearance)
+	// This asserted "A person." and I have reversed that. It is not wrong, but
+	// the appearance column beside it is deliberately left NULL in this case --
+	// "rather than stored as an empty object that would read later as asked and
+	// declined" -- and the two should not disagree about the same silence.
+	//
+	// It also is not free. subject_appearance reaches the worker as structured
+	// state, and telling a model conditioned on a reference photo that its
+	// subject is "A person." asserts genericness where saying nothing asserts
+	// nothing. Empty means the prompt carries no subject line, which is what
+	// every roster persona without a description already does.
+	require.Empty(t, profile.Appearance)
 	_ = db
 }
 

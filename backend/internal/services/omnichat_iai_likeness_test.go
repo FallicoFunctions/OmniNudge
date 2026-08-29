@@ -183,3 +183,19 @@ func TestAnUnknownMediumIsPhotorealisticRatherThanARefusal(t *testing.T) {
 		models.OmniChatMediaIdentityProfile{RenderStyle: models.OmniChatRenderStyleAnime})
 	require.Equal(t, models.OmniChatRenderStyleAnime, kept.RenderStyle)
 }
+
+func TestNothingAnsweredStoresNothing(t *testing.T) {
+	// The appearance column is left NULL when nobody answered, "rather than
+	// stored as an empty object that would read later as asked and declined".
+	// The identity blob guarded on the rendered sentence being empty instead --
+	// and it never is, because an unanswered appearance renders as "A person."
+	// So every such character was given that as her description.
+	empty, err := encodeIAIIdentity(IAIAppearance{})
+	require.NoError(t, err)
+	require.Nil(t, empty)
+
+	// One answer is still an answer.
+	some, err := encodeIAIIdentity(IAIAppearance{Gender: "woman"})
+	require.NoError(t, err)
+	require.Contains(t, string(some), "A woman.")
+}
