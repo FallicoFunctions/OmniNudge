@@ -836,3 +836,20 @@ func TestThePromptNeverContradictsItselfAboutTheMedium(t *testing.T) {
 	require.NotContains(t, prompt, "photographed",
 		"the prompt tells the model to photograph her and not to photograph her")
 }
+
+func TestCreateModeKeepsSomebodysOwnWords(t *testing.T) {
+	// The medium directive was appended to every image job, so the Create
+	// experience answered "a watercolour painting of a lighthouse" with
+	// "Render the image photorealistically." A contextual scene is of a
+	// particular character and her medium governs it; a Create prompt is
+	// somebody's own words and nothing may override them.
+	spec, err := BuildImageSpec(omniChatMediaTestConfig(), &models.OmniChatGenerationJob{
+		Kind:            models.OmniChatMediaKindImage,
+		Mode:            models.OmniChatGenerationModeCreate,
+		EffectivePrompt: "a watercolour painting of a lighthouse",
+	}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "a watercolour painting of a lighthouse", spec.Input["prompt"])
+	require.NotContains(t, spec.Input["prompt"], "photorealistically")
+	require.NotContains(t, spec.Input["prompt"], "anime")
+}

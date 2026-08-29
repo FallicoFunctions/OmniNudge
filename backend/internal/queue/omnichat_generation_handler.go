@@ -1018,18 +1018,7 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	if prompt == "" {
 		return nil, errors.New("generation prompt is unavailable")
 	}
-	// The medium, stated where the persona is known.
-	//
-	// The prompt is built when the request arrives and cannot know it: an anime
-	// character rendered through a prompt that says "photorealistic" comes back
-	// as a photograph, contradicting the answer she was made with. Empty is
-	// photorealistic, which is every persona that existed before this and the
-	// whole roster still.
-	if job.IdentityProfile.RenderStyle == models.OmniChatRenderStyleAnime {
-		prompt += " Render the image as anime artwork, not as a photograph."
-	} else {
-		prompt += " Render the image photorealistically."
-	}
+
 	normalizedReferences := make([]string, 0, len(referenceURLs))
 	for _, rawURL := range referenceURLs {
 		rawURL = strings.TrimSpace(rawURL)
@@ -1090,6 +1079,21 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		// Keep structured scene state separate from the prose prompt so the
 		// worker can use the latest physical events without parsing/truncation.
 		input["scene"] = job.Scene
+
+		// The medium, stated where the persona is known. The prompt is built
+		// when the request arrives and cannot know it: an anime character
+		// rendered through a prompt that says "photorealistic" comes back as a
+		// photograph, contradicting the answer she was made with.
+		//
+		// Contextual only. This is a scene of a particular character, and her
+		// medium governs it. A Create-mode prompt is somebody's own words --
+		// appending this there answered "a watercolour painting of a
+		// lighthouse" with "Render the image photorealistically."
+		if job.IdentityProfile.RenderStyle == models.OmniChatRenderStyleAnime {
+			input["prompt"] = prompt + " Render the image as anime artwork, not as a photograph."
+		} else {
+			input["prompt"] = prompt + " Render the image photorealistically."
+		}
 	}
 	for key, value := range identityInput {
 		input[key] = value
