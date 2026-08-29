@@ -142,10 +142,14 @@ type iaiFeeling struct {
 // Six states rather than one ladder from stranger to love.
 //
 // The old list ran indifferent to besotted and mixed two questions together.
-// "Besotted" is a word about attraction sitting on a scale about trust, which
-// is exactly why attraction is its own answer now -- somebody can be
-// immediately taken with a person they do not trust, and the ladder could not
-// say it.
+// "Besotted" is a word about attraction sitting on a scale about trust, and the
+// two are not the same measurement -- somebody can be immediately taken with a
+// person they do not trust, and one ladder could not say it. Attraction now
+// comes from what the two of them are to each other, so this scale is free to
+// be only what it says: how she feels about the person in front of her.
+//
+// All six stay available whatever the relationship is. A devoted friend is an
+// ordinary thing, and so is a guarded spouse.
 //
 // "Neutral" rather than "indifferent". Indifferent says she does not care,
 // which is a judgement about somebody she has not met. Neutral is the honest
@@ -159,44 +163,6 @@ var iaiFeelings = []iaiFeeling{
 	{Key: "devoted", Warmth: 0.80, Trust: 0.70, Attachment: 0.85},
 }
 
-// iaiAttractionLevel is the second answer on the same screen.
-//
-// Three, not a slider. It is the one answer where a scale invites somebody to
-// aim for the top, and the difference between "somewhat" and "very" is the only
-// distinction that changes anything she says.
-//
-// No negative level. Trust goes negative into wariness and warmth into dislike,
-// both ordinary; the other end of this one is repulsion, which the column
-// refuses and the product does not model.
-type iaiAttractionLevel struct {
-	Key   string
-	Value float64
-}
-
-var iaiAttractionLevels = []iaiAttractionLevel{
-	{Key: "none", Value: 0.00},
-	{Key: "some", Value: 0.35},
-	{Key: "strong", Value: 0.75},
-}
-
-// IAIAttractionKeys lists what the form may offer, in the order §34 gives.
-func IAIAttractionKeys() []string {
-	keys := make([]string, 0, len(iaiAttractionLevels))
-	for _, level := range iaiAttractionLevels {
-		keys = append(keys, level.Key)
-	}
-	return keys
-}
-
-func findIAIAttraction(key string) (iaiAttractionLevel, bool) {
-	key = strings.TrimSpace(strings.ToLower(key))
-	for _, level := range iaiAttractionLevels {
-		if level.Key == key {
-			return level, true
-		}
-	}
-	return iaiAttractionLevel{}, false
-}
 
 // IAIFeelingKeys lists what the form may offer, in the order §34 gives.
 func IAIFeelingKeys() []string {
@@ -219,6 +185,10 @@ type IAISeed struct {
 	// Relationship is where she starts with the person who made her, and with
 	// nobody else.
 	Relationship models.OmniChatCharacterTraits
+	// Kind is what the two of them are to each other. Stored beside the numbers
+	// because a spouse and a situationship can sit at the same attraction and
+	// are not the same relationship.
+	Kind string
 }
 
 // SeedIAI converts the creation answers.
@@ -227,7 +197,7 @@ type IAISeed struct {
 // before this table does should produce a slightly plainer character, not a
 // failed creation, and dropping her on the floor over an unrecognised string
 // would be the worst possible trade.
-func SeedIAI(temperaments []string, feeling, attraction string) IAISeed {
+func SeedIAI(temperaments []string, feeling, relationship string) IAISeed {
 	seed := IAISeed{Baseline: blendTemperaments(temperaments)}
 	if chosen, found := findIAIFeeling(feeling); found {
 		seed.Relationship = models.OmniChatCharacterTraits{
@@ -236,11 +206,24 @@ func SeedIAI(temperaments []string, feeling, attraction string) IAISeed {
 			Attachment: chosen.Attachment,
 		}
 	}
-	// Set independently of the feeling, which is the whole reason it is a
-	// separate answer. Guarded and drawn to them is a real starting point, and
-	// close without any of it is another.
-	if level, found := findIAIAttraction(attraction); found {
-		seed.Relationship.Attraction = level.Value
+
+	// Attraction comes from what they are to each other rather than from its own
+	// question. Asking somebody who just said "she is my wife" how drawn to him
+	// she is asks the same thing twice, and asking somebody making a friend asks
+	// it for no reason at all.
+	kind, found := findIAIRelationshipKind(relationship)
+	if !found {
+		kind, _ = findIAIRelationshipKind(IAIDefaultRelationshipKind)
+	}
+	seed.Kind = kind.Key
+	seed.Relationship.Attraction = kind.Attraction
+
+	// The feeling still owns attachment; the relationship only raises its floor.
+	// Somebody guarded toward their husband is a marriage in a bad month, not a
+	// stranger, and taking the higher of the two says that without erasing the
+	// answer they gave.
+	if kind.Attachment > seed.Relationship.Attachment {
+		seed.Relationship.Attachment = kind.Attachment
 	}
 	return seed
 }

@@ -35,7 +35,7 @@ type OmniChatCreateIAIRequest struct {
 	Temperaments []string  `json:"temperaments"`
 	Interests    []string  `json:"interests"`
 	Feeling      string    `json:"feeling"`
-	Attraction   string    `json:"attraction"`
+	Relationship string    `json:"relationship"`
 	// Appearance is recorded now and drawn later (§34). Nothing renders her
 	// yet, and the answers are kept so nobody has to give them twice.
 	Appearance services.IAIAppearance `json:"appearance"`
@@ -73,7 +73,7 @@ type IAIOptions struct {
 	Temperaments     []string            `json:"temperaments"`
 	TemperamentPicks int                 `json:"temperament_picks"`
 	Feelings         []string            `json:"feelings"`
-	Attractions      []string            `json:"attractions"`
+	Relationships    []string            `json:"relationships"`
 	Interests        []string            `json:"interests"`
 	InterestPicks    int                 `json:"interest_picks"`
 	Appearance       map[string][]string `json:"appearance"`
@@ -129,7 +129,7 @@ func (h *OmniChatHandler) GetIAIOptions(c *gin.Context) {
 		Temperaments:     services.IAITemperamentKeys(),
 		TemperamentPicks: services.IAITemperamentPicks(),
 		Feelings:         services.IAIFeelingKeys(),
-		Attractions:      services.IAIAttractionKeys(),
+		Relationships:    services.IAIRelationshipKeys(),
 		Interests:        services.IAIInterestKeys(),
 		InterestPicks:    services.IAIInterestPicks(),
 		Appearance:       appearance,
@@ -198,8 +198,8 @@ func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 		Temperaments []string `json:"temperaments"`
 		Interests    []string `json:"interests"`
 		Feeling      string   `json:"feeling"`
-		Attraction   string   `json:"attraction"`
-	}{request.Name, request.Temperaments, request.Interests, request.Feeling, request.Attraction})
+		Relationship string   `json:"relationship"`
+	}{request.Name, request.Temperaments, request.Interests, request.Feeling, request.Relationship})
 	if !ok {
 		return
 	}
@@ -219,7 +219,7 @@ func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 		Temperaments: request.Temperaments,
 		Interests:    request.Interests,
 		Feeling:      request.Feeling,
-		Attraction:   request.Attraction,
+		Relationship: request.Relationship,
 		Appearance:   request.Appearance,
 	})
 	if err != nil {

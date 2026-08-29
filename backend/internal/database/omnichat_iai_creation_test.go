@@ -55,11 +55,12 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 		Name:         "Sam",
 		Temperaments: []string{"warm", "playful", "sharp"},
 		Interests:    []string{"games", "music"},
-		// Guarded and drawn to them: the combination that could not be said while
-		// one ladder ran from indifferent to besotted, and the reason attraction
-		// is asked separately.
-		Feeling:    "guarded",
-		Attraction: "strong",
+		// Guarded toward the person she is married to: a marriage in a bad month,
+		// and the combination that could not be said while one ladder ran from
+		// indifferent to besotted. The feeling still owns how she feels; the
+		// relationship says what they are.
+		Feeling:      "guarded",
+		Relationship: "spouse",
 		Appearance: services.IAIAppearance{
 			Style: "anime", Gender: "woman", Age: 27, HeightInches: 65,
 			HairLength: "long", HairTexture: "curly", HairStyle: "high_ponytail",
@@ -89,9 +90,10 @@ func TestTheWholeCreationPathMakesSomebody(t *testing.T) {
 	// path -- form to seed to insert to read -- and each of those was a place
 	// the second half could have been dropped without anything noticing.
 	require.Less(t, relationship.Trust, 0.0, "guarded: she does not trust him yet")
-	require.Greater(t, relationship.Attraction, 0.6, "and is drawn to him anyway")
-	require.InDelta(t, 0.0, relationship.Attachment, 0.01,
-		"guarded is attached to nobody, which is the honest starting point")
+	require.Greater(t, relationship.Attraction, 0.6, "and is married to him anyway")
+	require.Equal(t, "spouse", relationship.Kind, "the word survives the whole path")
+	require.InDelta(t, 0.50, relationship.Attachment, 0.01,
+		"a spouse starts past the part where you become attached")
 
 	// And her speech came from the traits she was made with rather than from a
 	// zero nobody chose.

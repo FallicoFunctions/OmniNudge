@@ -138,10 +138,11 @@ type IAIAnswers struct {
 	Interests    []string
 	Feeling      string
 
-	// Asked separately from the feeling, on the same screen. Somebody can be
-	// immediately taken with a person they do not trust, and could not say so
-	// while one ladder ran from indifferent to besotted.
-	Attraction string
+	// What the two of them are to each other: friend, situationship, partner,
+	// spouse. Attraction is read off this rather than asked for its own sake,
+	// because asking somebody making a friend how drawn to them she is asks a
+	// question they did not come here for.
+	Relationship string
 
 	Appearance IAIAppearance
 }
@@ -253,7 +254,8 @@ func (c *OmniChatIAICreator) Create(ctx context.Context, creatorUserID int, answ
 		}
 	}
 
-	seed := SeedIAI(answers.Temperaments, answers.Feeling, answers.Attraction)
+	seed := SeedIAI(answers.Temperaments, answers.Feeling, answers.Relationship)
+	seed.Relationship.Kind = seed.Kind
 	return c.personas.CreateIAI(ctx, creatorUserID, models.IAIPersona{
 		SlugBase:    iaiSlugBase(name),
 		Name:        name,

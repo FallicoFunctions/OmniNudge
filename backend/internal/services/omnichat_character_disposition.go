@@ -110,7 +110,14 @@ func renderCharacterDisposition(disposition models.OmniChatDisposition) string {
 	// Their own lines, never folded into "with this person you are". Attachment
 	// is about what their absence costs and attraction is about being drawn to
 	// them, and both read as fondness the moment they share a clause with it.
-	bond := make([]string, 0, 2)
+	bond := make([]string, 0, 3)
+	// First, because it is the fact the rest is felt about. A character told she
+	// is very drawn to somebody, with no word for who they are to her, has to
+	// guess -- and the guess is what put a romance in front of people who asked
+	// for a friend.
+	if phrase := relationshipPhraseToHer(disposition.Kind); phrase != "" {
+		bond = append(bond, phrase)
+	}
 	if phrase := attachmentPhrase(disposition.Attachment); phrase != "" {
 		bond = append(bond, phrase)
 	}
@@ -269,6 +276,9 @@ func describeDispositionForJudgement(disposition models.OmniChatDisposition) str
 	// exchange did to somebody depends on what they had to lose. The same cool
 	// message costs nothing from a stranger and a great deal from the person
 	// who has become one of her fixed points.
+	if phrase := relationshipPhrase(disposition.Kind); phrase != "" {
+		parts = append(parts, phrase)
+	}
 	if phrase := bondDescription(disposition); phrase != "" {
 		parts = append(parts, phrase)
 	}
@@ -413,6 +423,40 @@ func joinClauses(clauses []string) string {
 		return clauses[0]
 	}
 	return strings.Join(clauses[:len(clauses)-1], ", ") + ", and " + clauses[len(clauses)-1]
+}
+
+// relationshipPhrase is the word for what the two of them are.
+//
+// The numbers cannot say it. A spouse and a situationship can sit at the same
+// attraction, and reading only the numbers gives a character who is very taken
+// with somebody and has no idea she married them. "friend" is deliberately
+// silent: it is the default every relationship carries, so saying it would put
+// a sentence in front of her on every conversation to declare the ordinary.
+func relationshipPhrase(kind string) string {
+	switch strings.TrimSpace(strings.ToLower(kind)) {
+	case "situationship":
+		return "The two of them are seeing each other without having named it."
+	case "partner":
+		return "This person is her partner."
+	case "spouse":
+		return "This person is her husband or wife."
+	}
+	return ""
+}
+
+// relationshipPhraseToHer is the same fact addressed to the character. The
+// prompt speaks to her in the second person, and "This person is her husband"
+// inside a block that says "you are" reads as a third party in the room.
+func relationshipPhraseToHer(kind string) string {
+	switch strings.TrimSpace(strings.ToLower(kind)) {
+	case "situationship":
+		return "You and this person are seeing each other without having named it."
+	case "partner":
+		return "This person is your partner."
+	case "spouse":
+		return "This person is your husband or wife."
+	}
+	return ""
 }
 
 // bondDescription is the attachment and the attraction, told about her rather

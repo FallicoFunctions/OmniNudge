@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -146,10 +147,14 @@ func (r *BotPersonaRepository) CreateIAI(
 	// would fail at plan time on every single creation.)
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO omnichat_character_traits(persona_id, owner_user_id, mood, trust, warmth,
-			attachment, attraction)
-		VALUES($1, $2, 0, $3, $4, $5, $6)
+			attachment, attraction, relationship_kind)
+		VALUES($1, $2, 0, $3, $4, $5, $6, $7)
 	`, created.ID, creatorUserID, relationship.Trust, relationship.Warmth,
-		relationship.Attachment, relationship.Attraction); err != nil {
+		relationship.Attachment, relationship.Attraction,
+		// The column refuses an empty string. A caller that never asked what
+		// they are to each other is describing a friendship, and answering that
+		// here beats failing a creation over a question nobody was asked.
+		relationshipKindOrFriend(relationship.Kind)); err != nil {
 		return nil, fmt.Errorf("omnichat iai: seed relationship: %w", err)
 	}
 
@@ -157,4 +162,11 @@ func (r *BotPersonaRepository) CreateIAI(
 		return nil, fmt.Errorf("omnichat iai: commit: %w", err)
 	}
 	return created, nil
+}
+
+func relationshipKindOrFriend(kind string) string {
+	if strings.TrimSpace(kind) == "" {
+		return OmniChatRelationshipKindFriend
+	}
+	return kind
 }

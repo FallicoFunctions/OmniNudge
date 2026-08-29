@@ -84,7 +84,20 @@ type OmniChatCharacterTraits struct {
 	// this product models.
 	Attachment float64 `json:"attachment"`
 	Attraction float64 `json:"attraction"`
+
+	// OmniChatRelationshipKindFriend is what an unset relationship means. The
+	// column refuses an empty string, and every caller that does not ask the
+	// question is describing a friendship rather than nothing.
+	// Kind is what the two of them are to each other: friend, situationship,
+	// partner or spouse. It is not a number because it is not a quantity -- a
+	// spouse and a situationship can sit at the same attraction and are not the
+	// same relationship, and only the word says which.
+	Kind string `json:"relationship_kind"`
 }
+
+// OmniChatRelationshipKindFriend is the default the column carries and the
+// reading of any relationship nobody named.
+const OmniChatRelationshipKindFriend = "friend"
 
 // MoodAt is the drift mood at a given instant: the stored value pulled toward 0
 // by one half-life every OmniChatTraitMoodHalfLife. Exponential decay
@@ -253,7 +266,7 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		SELECT p.baseline_mood, p.baseline_trust, p.baseline_warmth, p.baseline_firmness,
 			p.baseline_talkativeness, p.baseline_expressiveness,
 		       t.owner_user_id, t.mood, t.mood_updated_at, t.trust, t.warmth,
-		       t.attachment, t.attraction
+		       t.attachment, t.attraction, t.relationship_kind
 		FROM bot_personas p
 		LEFT JOIN omnichat_character_traits t
 		  ON t.persona_id = p.id AND COALESCE(t.owner_user_id, 0) = ANY($2)
@@ -269,10 +282,12 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		var baselineTalkativeness, baselineExpressiveness *float64
 		var owner *int
 		var mood, trust, warmth, attachment, attraction *float64
+		var relationshipKind *string
 		var moodUpdatedAt *time.Time
 		if err := rows.Scan(&baselineMood, &baselineTrust, &baselineWarmth, &baselineFirmness,
 			&baselineTalkativeness, &baselineExpressiveness,
-			&owner, &mood, &moodUpdatedAt, &trust, &warmth, &attachment, &attraction); err != nil {
+			&owner, &mood, &moodUpdatedAt, &trust, &warmth, &attachment, &attraction,
+			&relationshipKind); err != nil {
 			return OmniChatDispositionBaseline{}, OmniChatCharacterTraits{}, OmniChatCharacterTraits{}, fmt.Errorf("omnichat traits: load persona %d: %w", personaID, err)
 		}
 		baseline = dispositionBaseline(baselineMood, baselineTrust, baselineWarmth, baselineFirmness,
@@ -299,6 +314,9 @@ func (r *OmniChatCharacterTraitRepository) LoadForConversation(ctx context.Conte
 		}
 		if attraction != nil {
 			traits.Attraction = *attraction
+		}
+		if relationshipKind != nil {
+			traits.Kind = *relationshipKind
 		}
 		if owner == nil {
 			traits.OwnerUserID = OmniChatMemoryTierSelf
@@ -435,11 +453,11 @@ func loadTraits(ctx context.Context, q omniChatTraitQuerier, personaID, ownerUse
 	// Scoped on both persona and tier, always. This is the whole reason one
 	// user's private history cannot show up in another user's conversation.
 	err := q.QueryRow(ctx, `
-		SELECT mood, mood_updated_at, trust, warmth, attachment, attraction
+		SELECT mood, mood_updated_at, trust, warmth, attachment, attraction, relationship_kind
 		FROM omnichat_character_traits
 		WHERE persona_id = $1 AND COALESCE(owner_user_id, 0) = $2
 	`, personaID, ownerUserID).Scan(&traits.Mood, &traits.MoodUpdatedAt, &traits.Trust, &traits.Warmth,
-		&traits.Attachment, &traits.Attraction)
+		&traits.Attachment, &traits.Attraction, &traits.Kind)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return traits, nil
 	}
@@ -475,6 +493,11 @@ type OmniChatDisposition struct {
 	// everybody she has ever met.
 	Attachment float64
 	Attraction float64
+
+	// Kind is what the two of them are to each other, carried through so the
+	// prompt can say the word. The numbers cannot: a spouse and a situationship
+	// can sit at the same attraction, and only the word tells them apart.
+	Kind string
 }
 
 // OmniChatDispositionBaseline is who a character was written to be: the resting
@@ -577,6 +600,7 @@ func ComposeOmniChatDisposition(baseline OmniChatDispositionBaseline, self, rela
 		Expressiveness: clampTrait(baseline.Expressiveness + closeness*opening),
 		Attachment:     clampTrait(relationship.Attachment),
 		Attraction:     clampTrait(relationship.Attraction),
+		Kind:           relationship.Kind,
 	}
 }
 

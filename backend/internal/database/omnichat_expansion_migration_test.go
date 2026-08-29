@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"203_relationship_kind",
 		"202_relationship_attachment_attraction",
 		"201_baseline_speech",
 		"200_iai_appearance_schema",
@@ -267,6 +268,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"203_relationship_kind",
 		"202_relationship_attachment_attraction",
 		"201_baseline_speech",
 		"200_iai_appearance_schema",

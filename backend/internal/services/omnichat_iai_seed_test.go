@@ -29,7 +29,7 @@ func TestTheAnswersOnTheFormAreTheOnesTheSpecOffers(t *testing.T) {
 	require.Equal(t, []string{
 		"guarded", "neutral", "curious", "fond", "close", "devoted",
 	}, IAIFeelingKeys())
-	require.Equal(t, []string{"none", "some", "strong"}, IAIAttractionKeys())
+	require.Equal(t, []string{"friend", "situationship", "partner", "spouse"}, IAIRelationshipKeys())
 }
 
 func TestTraitsThatAgreeReinforceAndTraitsThatConflictCancel(t *testing.T) {
@@ -206,17 +206,41 @@ func TestDevotedMeansAttachedToSomebody(t *testing.T) {
 	}
 }
 
-func TestAttractionIsAskedSeparatelyFromTheFeeling(t *testing.T) {
-	// The whole reason it is its own answer. On one ladder from indifferent to
-	// besotted, being taken with somebody you do not trust was unsayable.
-	wary := SeedIAI(nil, "guarded", "strong").Relationship
-	require.Less(t, wary.Trust, 0.0, "she does not trust them")
-	require.Greater(t, wary.Attraction, 0.6, "and is drawn to them anyway")
+func TestAttractionComesFromTheRelationshipNotItsOwnQuestion(t *testing.T) {
+	// The You screen used to ask how drawn to you she is beside how she feels
+	// about you, so somebody making a friend was handed a question about
+	// attraction they had not come for. Naming the relationship answers it.
+	friend := SeedIAI(nil, "close", "friend").Relationship
+	require.Greater(t, friend.Trust, 0.5, "as close as the flow allows")
+	require.Equal(t, 0.0, friend.Attraction, "and nothing romantic is invented")
 
-	// And the other way: as close as the flow allows, with none of it.
-	close := SeedIAI(nil, "close", "none").Relationship
-	require.Greater(t, close.Trust, 0.5)
-	require.Equal(t, 0.0, close.Attraction)
+	spouse := SeedIAI(nil, "close", "spouse").Relationship
+	require.Greater(t, spouse.Attraction, 0.6)
+
+	// The feeling still owns how she feels. A guarded spouse is a marriage in a
+	// bad month, and the answer survives the relationship being named.
+	wary := SeedIAI(nil, "guarded", "spouse").Relationship
+	require.Less(t, wary.Trust, 0.0, "she does not trust him")
+	require.Greater(t, wary.Attraction, 0.6, "and is married to him anyway")
+}
+
+func TestTheRelationshipOnlyRaisesTheAttachmentFloor(t *testing.T) {
+	// A husband starts past the part where you become attached, but naming him
+	// must not overwrite a feeling that already said more than he does.
+	guarded := SeedIAI(nil, "guarded", "spouse").Relationship
+	require.InDelta(t, 0.50, guarded.Attachment, 0.001, "the relationship lifts a low feeling")
+
+	devoted := SeedIAI(nil, "devoted", "spouse").Relationship
+	require.InDelta(t, 0.85, devoted.Attachment, 0.001, "and never lowers a high one")
+}
+
+func TestAnUnknownRelationshipIsFriendship(t *testing.T) {
+	// Silence is friendship. A form that gains an option before this table does
+	// should make a plainer relationship, not a romance nobody asked for.
+	seed := SeedIAI(nil, "fond", "nonsense")
+	require.Equal(t, "friend", seed.Kind)
+	require.Equal(t, 0.0, seed.Relationship.Attraction)
+	require.Equal(t, "friend", NormaliseIAIRelationshipKind(""))
 }
 
 func TestBesottedIsGoneAndIndifferentBecameNeutral(t *testing.T) {
@@ -232,19 +256,19 @@ func TestBesottedIsGoneAndIndifferentBecameNeutral(t *testing.T) {
 
 	// A key the form no longer offers seeds nothing rather than erroring, so a
 	// stale client costs a detail and not the character.
-	stale := SeedIAI(nil, "besotted", "none").Relationship
+	stale := SeedIAI(nil, "besotted", "friend").Relationship
 	require.Equal(t, 0.0, stale.Warmth)
 	require.Equal(t, 0.0, stale.Trust)
 	require.Equal(t, 0.0, stale.Attachment)
 }
 
-func TestNoAttractionLevelIsNegative(t *testing.T) {
+func TestNoRelationshipSeedsANegativeAttraction(t *testing.T) {
 	// The database refuses one and so does the table. Repulsion is not the other
 	// end of this scale.
-	for _, level := range iaiAttractionLevels {
-		require.GreaterOrEqual(t, level.Value, 0.0, "%s", level.Key)
-		require.LessOrEqual(t, level.Value, 1.0, "%s", level.Key)
+	for _, kind := range iaiRelationshipKinds {
+		require.GreaterOrEqual(t, kind.Attraction, 0.0, "%s", kind.Key)
+		require.LessOrEqual(t, kind.Attraction, 1.0, "%s", kind.Key)
+		require.GreaterOrEqual(t, kind.Attachment, 0.0, "%s", kind.Key)
+		require.LessOrEqual(t, kind.Attachment, 1.0, "%s", kind.Key)
 	}
-	require.Equal(t, 0.0, SeedIAI(nil, "fond", "nonsense").Relationship.Attraction,
-		"an unrecognised level is none rather than a guess")
 }
