@@ -1002,6 +1002,23 @@ func selectRunPodMediaResult(kind models.OmniChatMediaKind, result *runpod.Resul
 	return nil, errors.New("provider result kind is invalid")
 }
 
+// appendDirective adds a server-owned sentence to a prompt.
+//
+// Contextual prompts are built ending in a full stop, so plain concatenation
+// reads correctly today. It is one sentence away from not doing: a prompt
+// ending without punctuation would produce "...at the park Render the image
+// photorealistically", which is one sentence to a model rather than two.
+func appendDirective(prompt, directive string) string {
+	prompt = strings.TrimRight(strings.TrimSpace(prompt), " ")
+	if prompt == "" {
+		return directive
+	}
+	if last := prompt[len(prompt)-1]; last != '.' && last != '!' && last != '?' {
+		prompt += "."
+	}
+	return prompt + " " + directive
+}
+
 // BuildImageSpec is the provider adapter boundary for image renders. Domain
 // requests do not leak RunPod endpoint details into handlers, persistence, or
 // frontend code. The worker receives this stable input contract and owns
@@ -1089,10 +1106,15 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		// medium governs it. A Create-mode prompt is somebody's own words --
 		// appending this there answered "a watercolour painting of a
 		// lighthouse" with "Render the image photorealistically."
+		//
+		// What is sent therefore differs from job.EffectivePrompt, which is
+		// stored. That column is internal (json:"-") and never reaches a
+		// client, but somebody reading it to work out why an image came back
+		// wrong will not see this sentence in it.
 		if job.IdentityProfile.RenderStyle == models.OmniChatRenderStyleAnime {
-			input["prompt"] = prompt + " Render the image as anime artwork, not as a photograph."
+			input["prompt"] = appendDirective(prompt, "Render the image as anime artwork, not as a photograph.")
 		} else {
-			input["prompt"] = prompt + " Render the image photorealistically."
+			input["prompt"] = appendDirective(prompt, "Render the image photorealistically.")
 		}
 	}
 	for key, value := range identityInput {

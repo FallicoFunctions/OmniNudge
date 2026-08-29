@@ -853,3 +853,14 @@ func TestCreateModeKeepsSomebodysOwnWords(t *testing.T) {
 	require.NotContains(t, spec.Input["prompt"], "photorealistically")
 	require.NotContains(t, spec.Input["prompt"], "anime")
 }
+
+func TestADirectiveIsItsOwnSentence(t *testing.T) {
+	// Contextual prompts are built ending in a full stop, so concatenation
+	// reads correctly today and this is about not depending on that. A prompt
+	// ending without punctuation ran the two together: "...at the park Render
+	// the image photorealistically" is one sentence to a model, not two.
+	require.Equal(t, "Nadia at the park. Render it.", appendDirective("Nadia at the park", "Render it."))
+	require.Equal(t, "Nadia at the park. Render it.", appendDirective("Nadia at the park.", "Render it."))
+	require.Equal(t, "Is she there? Render it.", appendDirective("Is she there?", "Render it."))
+	require.Equal(t, "Render it.", appendDirective("   ", "Render it."))
+}
