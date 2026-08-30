@@ -1085,6 +1085,13 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	if providerMode == "" {
 		providerMode = string(models.OmniChatGenerationModeCreate)
 	}
+	// The provider knows three modes and a likeness is not a fourth. It is a
+	// plain text-to-image with a server-built prompt, so it goes as create;
+	// sending a word the worker has never seen would be a contract change for
+	// something that needs no new behaviour from it.
+	if providerMode == string(models.OmniChatGenerationModeLikeness) {
+		providerMode = string(models.OmniChatGenerationModeCreate)
+	}
 	if providerMode == string(models.OmniChatGenerationModeImageToVideo) {
 		return nil, errors.New("image-to-video is not an image render mode")
 	}

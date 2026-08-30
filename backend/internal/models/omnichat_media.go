@@ -29,6 +29,19 @@ const (
 	OmniChatGenerationModeCreate       OmniChatGenerationMode = "create"
 	OmniChatGenerationModeContextual   OmniChatGenerationMode = "contextual"
 	OmniChatGenerationModeImageToVideo OmniChatGenerationMode = "image_to_video"
+
+	// OmniChatGenerationModeLikeness is her first picture: one of the four a
+	// creator chooses her face from.
+	//
+	// Its own mode because nothing else about it is like a scene. There is no
+	// conversation, no scene state and no prompt of somebody's own -- the whole
+	// instruction is built by the server from her description -- and it must not
+	// produce a gallery asset, because three of the four are discarded.
+	//
+	// The provider is never told this word. It knows create, contextual and
+	// image_to_video, and a likeness is a plain text-to-image, so it is sent as
+	// create. This mode is how *this* system tells its own paths apart.
+	OmniChatGenerationModeLikeness OmniChatGenerationMode = "likeness"
 )
 
 type OmniChatGenerationStatus string
@@ -485,6 +498,7 @@ type omniChatGenerationJobRow struct {
 	ConversationID  *int
 	SourceMessageID *int
 	Kind            OmniChatMediaKind
+	Mode            string
 	Prompt          string
 	SceneJSON       []byte
 }
@@ -495,12 +509,12 @@ type omniChatGenerationJobRow struct {
 func lockRunningGenerationJob(ctx context.Context, tx pgx.Tx, jobID uuid.UUID) (*omniChatGenerationJobRow, error) {
 	job := &omniChatGenerationJobRow{}
 	err := tx.QueryRow(ctx, `
-		SELECT owner_user_id, persona_id, conversation_id, source_message_id, kind, prompt, scene_snapshot
+		SELECT owner_user_id, persona_id, conversation_id, source_message_id, kind, mode, prompt, scene_snapshot
 		FROM omnichat_generation_jobs
 		WHERE id = $1 AND status = 'running'
 		FOR UPDATE
 	`, jobID).Scan(&job.OwnerUserID, &job.PersonaID, &job.ConversationID, &job.SourceMessageID,
-		&job.Kind, &job.Prompt, &job.SceneJSON)
+		&job.Kind, &job.Mode, &job.Prompt, &job.SceneJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -512,14 +526,18 @@ func lockRunningGenerationJob(ctx context.Context, tx pgx.Tx, jobID uuid.UUID) (
 // kind is a parameter rather than the job's own kind because the intermediate
 // still of a video job is an image. Reading it off the job row would label the
 // PNG a video and hand the gallery an asset the player cannot open.
-func insertGeneratedAsset(
+// insertGeneratedMediaFile charges the render against the owner's storage quota
+// and records the file.
+//
+// Split out because a likeness candidate needs exactly this and nothing after
+// it: three of the four are discarded, so a candidate has no asset row and
+// never reaches the gallery. The quota still applies -- four renders occupy
+// four files' worth of storage whatever becomes of them.
+func insertGeneratedMediaFile(
 	ctx context.Context,
 	tx pgx.Tx,
-	jobID uuid.UUID,
 	job *omniChatGenerationJobRow,
 	media *MediaFile,
-	asset *OmniChatMediaAsset,
-	kind OmniChatMediaKind,
 	freeTierBytes, proTierBytes int64,
 ) error {
 	if media.UserID != job.OwnerUserID {
@@ -564,6 +582,23 @@ func insertGeneratedAsset(
 		media.Duration, media.UsedInMessageID, media.ScanStatus,
 	).Scan(&media.ID, &media.UploadedAt, &media.ScanStatus)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func insertGeneratedAsset(
+	ctx context.Context,
+	tx pgx.Tx,
+	jobID uuid.UUID,
+	job *omniChatGenerationJobRow,
+	media *MediaFile,
+	asset *OmniChatMediaAsset,
+	kind OmniChatMediaKind,
+	freeTierBytes, proTierBytes int64,
+) error {
+	if err := insertGeneratedMediaFile(ctx, tx, job, media, freeTierBytes, proTierBytes); err != nil {
 		return err
 	}
 

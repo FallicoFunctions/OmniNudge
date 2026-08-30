@@ -110,6 +110,36 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 	return request, nil
 }
 
+// NormalizeOmniChatLikenessRequest prepares her first picture.
+//
+// The mode allowlist above is the public contract and deliberately does not
+// include likeness. A caller who could ask for it would get a path built for a
+// server-written prompt -- no scene, no conversation, and no gallery asset at
+// the end of it -- and would pay for a picture they could never see. So the
+// mode is applied here, after the request has been validated as what it
+// actually is to every length and shape rule: a create.
+//
+// Billing is off. The first set of four is included in what making an
+// independent character already costs, and a job that carried a reservation
+// would have to release it four times over for a choice where three renders are
+// discarded by design. Re-rolls are charged by the caller that asks for them,
+// not here.
+func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) (models.OmniChatGenerationRequest, error) {
+	request.Mode = models.OmniChatGenerationModeCreate
+	request.ConversationID = nil
+	request.Scene = models.OmniChatSceneState{}
+
+	normalized, err := NormalizeOmniChatGenerationRequest(request)
+	if err != nil {
+		return request, err
+	}
+
+	normalized.Mode = models.OmniChatGenerationModeLikeness
+	free := false
+	normalized.BillingRequired = &free
+	return normalized, nil
+}
+
 // NormalizeOmniChatSceneState prevents unbounded context and strips control
 // characters before the scene is persisted or sent to a provider.
 func NormalizeOmniChatSceneState(input models.OmniChatSceneState) (models.OmniChatSceneState, error) {
