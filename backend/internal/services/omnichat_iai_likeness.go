@@ -26,12 +26,12 @@ import (
 // own, or that are spoken differently by gender. Anything absent is its key with
 // the underscores opened out, which is already correct for most of them.
 var iaiSpokenEthnicity = map[string]map[string]string{
-	"latino":     {"woman": "Latina", "man": "Latino", "": "Latino"},
-	"white":      {"": "white"},
-	"east_asian": {"": "East Asian"},
-	"south_asian": {"": "South Asian"},
-	"southeast_asian": {"": "Southeast Asian"},
-	"middle_eastern":  {"": "Middle Eastern"},
+	"latino":           {"woman": "Latina", "man": "Latino", "": "Latino"},
+	"white":            {"": "white"},
+	"east_asian":       {"": "East Asian"},
+	"south_asian":      {"": "South Asian"},
+	"southeast_asian":  {"": "Southeast Asian"},
+	"middle_eastern":   {"": "Middle Eastern"},
 	"pacific_islander": {"": "Pacific Islander"},
 	"indigenous":       {"": "Indigenous"},
 	"mixed":            {"": "mixed-race"},

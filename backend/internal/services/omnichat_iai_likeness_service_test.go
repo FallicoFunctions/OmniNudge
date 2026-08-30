@@ -44,7 +44,7 @@ func likenessPersona(t *testing.T) *models.BotPersona {
 	return &models.BotPersona{
 		ID: 31, Name: "Nadia", OwnerUserID: &owner,
 		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
-		ExtensionsJSON: []byte(`{"omnichat_media":{"appearance":"A 27-year-old woman with long black hair.","render_style":"anime"}}`),
+		ExtensionsJSON:       []byte(`{"omnichat_media":{"appearance":"A 27-year-old woman with long black hair.","render_style":"anime"}}`),
 	}
 }
 

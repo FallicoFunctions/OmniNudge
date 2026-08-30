@@ -163,7 +163,6 @@ var iaiFeelings = []iaiFeeling{
 	{Key: "devoted", Warmth: 0.80, Trust: 0.70, Attachment: 0.85},
 }
 
-
 // IAIFeelingKeys lists what the form may offer, in the order §34 gives.
 func IAIFeelingKeys() []string {
 	keys := make([]string, 0, len(iaiFeelings))
