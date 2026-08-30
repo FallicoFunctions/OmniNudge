@@ -35,21 +35,60 @@ func (r *OmniChatMediaRepository) PickLikeness(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// The whole open choice is locked, in id order, before anything moves.
+	//
+	// Locking only the chosen row was enough for one caller and deadlocked two:
+	// each transaction held its own candidate and then reached for the files
+	// behind the others, which is a lock-order inversion, and Postgres broke the
+	// cycle by killing one with SQLSTATE 40P01. A double-click is the ordinary
+	// way to produce that, and a deadlock reaches somebody as a server error
+	// rather than as "that choice is already made".
+	//
+	// Taking every row gives the second caller nothing to invert: it waits on
+	// the set the first is holding, and once that commits it finds no choice
+	// open. Proved by restoring the single-row lock, which brings the deadlock
+	// straight back.
+	//
+	// ORDER BY is belt and braces rather than the fix -- removing it does not
+	// reproduce the deadlock, because both callers scan the same small set the
+	// same way. It stays because "the same order every time" is what makes a
+	// cycle impossible rather than merely unobserved, and a plan change should
+	// not be able to reintroduce this.
+	rows, err := tx.Query(ctx, `
+		SELECT c.id, c.generation_job_id, c.media_file_id, mf.storage_url
+		FROM omnichat_iai_likeness_candidates c
+		JOIN media_files mf ON mf.id = c.media_file_id
+		WHERE c.persona_id = $1 AND c.owner_user_id = $2
+		ORDER BY c.id
+		FOR UPDATE OF c
+	`, personaID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+
 	var jobID uuid.UUID
 	var mediaFileID int
 	var storageURL string
-	err = tx.QueryRow(ctx, `
-		SELECT c.generation_job_id, c.media_file_id, mf.storage_url
-		FROM omnichat_iai_likeness_candidates c
-		JOIN media_files mf ON mf.id = c.media_file_id
-		WHERE c.id = $1 AND c.persona_id = $2 AND c.owner_user_id = $3
-		FOR UPDATE OF c
-	`, candidateID, personaID, ownerUserID).Scan(&jobID, &mediaFileID, &storageURL)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrLikenessCandidateNotFound
+	found := false
+	for rows.Next() {
+		var id int64
+		var candidateJob uuid.UUID
+		var candidateFile int
+		var candidateURL string
+		if err := rows.Scan(&id, &candidateJob, &candidateFile, &candidateURL); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if id == candidateID {
+			jobID, mediaFileID, storageURL, found = candidateJob, candidateFile, candidateURL, true
+		}
 	}
-	if err != nil {
+	rows.Close()
+	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, ErrLikenessCandidateNotFound
 	}
 
 	asset := &OmniChatMediaAsset{ID: uuid.New()}

@@ -873,11 +873,24 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 			-- every later render is conditioned on: removing it would take the
 			-- character's appearance with it, and nothing downstream would know
 			-- why she had stopped looking like herself.
+			--
+			-- Two ways of asking, because avatar_url alone is not enough to
+			-- trust. It is writable through UpdateMedia, and storage_url is not
+			-- one shape -- some rows hold /uploads/... and others an absolute
+			-- CDN address -- so an edit that changed its form would silently
+			-- disarm this and let her face be deleted. The identity reference
+			-- list is written by the pick and by nothing else, and it is what
+			-- renders are actually conditioned on.
 			SELECT 1
 			FROM omnichat_media_assets a
 			JOIN media_files mf ON mf.id = a.media_file_id
 			JOIN bot_personas p ON p.id = a.persona_id
-			WHERE a.id = $1 AND p.avatar_url = mf.storage_url
+			WHERE a.id = $1
+			  AND (
+			    p.avatar_url = mf.storage_url
+			    OR COALESCE(p.extensions_json #> '{omnichat_media,reference_urls}', '[]'::jsonb)
+			         @> to_jsonb(mf.storage_url)
+			  )
 		)
 	`, id).Scan(&shared)
 	if err != nil {

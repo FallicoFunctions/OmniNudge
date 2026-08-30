@@ -3,6 +3,7 @@ package models_test
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -182,11 +183,94 @@ func TestAnOrdinaryPictureIsStillDeletable(t *testing.T) {
 	asset, err := repo.PickLikeness(ctx, personaID, ownerID, candidate.ID)
 	require.NoError(t, err)
 
-	// She stops wearing it, so it is an ordinary picture again.
-	_, err = db.Pool.Exec(ctx, `UPDATE bot_personas SET avatar_url = NULL WHERE id = $1`, personaID)
+	// She stops wearing it, so it is an ordinary picture again -- which means
+	// both: not her avatar and not what renders are conditioned on. Clearing
+	// only the avatar left it still her identity reference, and the refusal
+	// rightly held, which is how this test learned that "she stopped wearing
+	// it" was two facts rather than one.
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE bot_personas
+		   SET avatar_url = NULL,
+		       extensions_json = jsonb_set(extensions_json, '{omnichat_media,reference_urls}', '[]'::jsonb)
+		 WHERE id = $1`, personaID)
 	require.NoError(t, err)
 
 	deleted, err := repo.DeleteMediaAssetOwned(ctx, asset.ID, ownerID)
 	require.NoError(t, err)
 	require.True(t, deleted)
+}
+
+func TestTwoPressesAtOnceDoNotDeadlock(t *testing.T) {
+	// A double-click is the ordinary way to produce two picks at once, and it
+	// used to deadlock: each transaction held its own candidate and reached for
+	// the files behind the others. Postgres broke the cycle with SQLSTATE
+	// 40P01, which reaches somebody as a server error rather than as "that
+	// choice is already made".
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+	candidates := fourCandidates(t, ctx, db, repo, ownerID, personaID)
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	start := make(chan struct{})
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			<-start
+			_, err := repo.PickLikeness(ctx, personaID, ownerID, candidates[n].ID)
+			errs[n] = err
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	winners := 0
+	for _, err := range errs {
+		if err == nil {
+			winners++
+			continue
+		}
+		require.ErrorIs(t, err, models.ErrLikenessCandidateNotFound,
+			"the loser is told the choice is closed, not handed a database error")
+		require.NotContains(t, err.Error(), "deadlock")
+	}
+	require.Equal(t, 1, winners, "exactly one press decides her face")
+
+	var assets, open int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_media_assets WHERE persona_id = $1`, personaID).Scan(&assets))
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM omnichat_iai_likeness_candidates WHERE persona_id = $1`,
+		personaID).Scan(&open))
+	require.Equal(t, 1, assets)
+	require.Zero(t, open)
+}
+
+func TestChangingHerAvatarDoesNotDisarmTheRefusal(t *testing.T) {
+	// avatar_url is writable through UpdateMedia, and storage_url is not one
+	// shape -- some rows hold /uploads/..., others an absolute CDN address. A
+	// refusal keyed on that string alone is one edit away from silently letting
+	// her face be deleted. The identity reference list is written by the pick
+	// and by nothing else.
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+	candidates := fourCandidates(t, ctx, db, repo, ownerID, personaID)
+
+	asset, err := repo.PickLikeness(ctx, personaID, ownerID, candidates[0].ID)
+	require.NoError(t, err)
+
+	// The same picture, written a different way. Renders still condition on it.
+	_, err = db.Pool.Exec(ctx,
+		`UPDATE bot_personas SET avatar_url = 'https://cdn.omninudge.com/rewritten.png' WHERE id = $1`,
+		personaID)
+	require.NoError(t, err)
+
+	_, err = repo.DeleteMediaAssetOwned(ctx, asset.ID, ownerID)
+	require.ErrorIs(t, err, models.ErrOmniChatMediaInUse)
+
+	var kept int
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM media_files WHERE id = $1`, asset.MediaFileID).Scan(&kept))
+	require.Equal(t, 1, kept)
 }
