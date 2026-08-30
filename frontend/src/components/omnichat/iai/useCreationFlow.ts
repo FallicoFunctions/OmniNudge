@@ -71,14 +71,21 @@ const clamp = (value: number, low: number, high: number) => Math.min(high, Math.
 
 function emptyAnswers(options: IAIOptions | undefined): CreationAnswers {
   return {
-    style: '', gender: '',
+    style: '',
+    gender: '',
     age: options ? clamp(DEFAULT_AGE, options.minimum_age, options.maximum_age) : DEFAULT_AGE,
     heightInches: options
       ? clamp(DEFAULT_HEIGHT_INCHES, options.minimum_height_inches, options.maximum_height_inches)
       : DEFAULT_HEIGHT_INCHES,
-    ethnicity: '', hairLength: '', hairTexture: '', hairStyle: '', hairColour: '',
-    eyes: '', build: '',
-    temperaments: [], interests: [],
+    ethnicity: '',
+    hairLength: '',
+    hairTexture: '',
+    hairStyle: '',
+    hairColour: '',
+    eyes: '',
+    build: '',
+    temperaments: [],
+    interests: [],
     feeling: '',
     // Friendship is the honest default rather than an unanswered state, and it
     // is what the column carries. Nobody is handed a romance they did not pick.
@@ -162,27 +169,21 @@ export function useCreationFlow(options: IAIOptions | undefined) {
    * over this length, and a form that accepts forty-one characters and fails on
    * submit is a form arguing with itself two screens later.
    */
-  const setName = useCallback(
-    (value: string) => {
-      setAnswers((current) => ({ ...current, name: [...value].slice(0, NAME_LIMIT).join('') }));
-    },
-    []
-  );
+  const setName = useCallback((value: string) => {
+    setAnswers((current) => ({ ...current, name: [...value].slice(0, NAME_LIMIT).join('') }));
+  }, []);
 
   /** Add or remove one of a capped set. Picking past the cap does nothing. */
-  const toggle = useCallback(
-    (field: 'temperaments' | 'interests', key: string, cap: number) => {
-      setAnswers((current) => {
-        const chosen = current[field];
-        if (chosen.includes(key)) {
-          return { ...current, [field]: chosen.filter((entry) => entry !== key) };
-        }
-        if (chosen.length >= cap) return current;
-        return { ...current, [field]: [...chosen, key] };
-      });
-    },
-    []
-  );
+  const toggle = useCallback((field: 'temperaments' | 'interests', key: string, cap: number) => {
+    setAnswers((current) => {
+      const chosen = current[field];
+      if (chosen.includes(key)) {
+        return { ...current, [field]: chosen.filter((entry) => entry !== key) };
+      }
+      if (chosen.length >= cap) return current;
+      return { ...current, [field]: [...chosen, key] };
+    });
+  }, []);
 
   const ready = useMemo(() => {
     switch (step) {
@@ -227,7 +228,16 @@ export function useCreationFlow(options: IAIOptions | undefined) {
   }, [answers]);
 
   return {
-    step, answers, setAnswers, answer, setName, toggle,
-    ready, goBack, goForward, jumpTo, appearance,
+    step,
+    answers,
+    setAnswers,
+    answer,
+    setName,
+    toggle,
+    ready,
+    goBack,
+    goForward,
+    jumpTo,
+    appearance,
   };
 }

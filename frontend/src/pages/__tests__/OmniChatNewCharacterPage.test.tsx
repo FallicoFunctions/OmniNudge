@@ -27,15 +27,30 @@ vi.mock('../../components/omnichat/useOmniChatNavigation', () => ({
 }));
 
 const options = {
-  temperaments: ['warm'], temperament_picks: 3,
-  feelings: ['fond'], relationships: ['friend'],
-  interests: ['music'], interest_picks: 3,
-  appearance: { style: ['realistic'], gender: ['woman', 'man'], ethnicity: ['white'],
-    hair_length: ['short'], hair_texture: ['straight'], hair_colour: ['black'] },
-  eyes: { realistic: ['brown'] }, builds: { woman: ['slim'], man: ['lean'] },
+  temperaments: ['warm'],
+  temperament_picks: 3,
+  feelings: ['fond'],
+  relationships: ['friend'],
+  interests: ['music'],
+  interest_picks: 3,
+  appearance: {
+    style: ['realistic'],
+    gender: ['woman', 'man'],
+    ethnicity: ['white'],
+    hair_length: ['short'],
+    hair_texture: ['straight'],
+    hair_colour: ['black'],
+  },
+  eyes: { realistic: ['brown'] },
+  builds: { woman: ['slim'], man: ['lean'] },
   hair_styles: { realistic: { woman: { straight: ['loose'] }, man: { straight: ['loose'] } } },
-  minimum_age: 18, maximum_age: 99, minimum_height_inches: 58, maximum_height_inches: 84,
-  iai_limit: 1, iai_owned: 0, iai_required_plan: 'premium',
+  minimum_age: 18,
+  maximum_age: 99,
+  minimum_height_inches: 58,
+  maximum_height_inches: 84,
+  iai_limit: 1,
+  iai_owned: 0,
+  iai_required_plan: 'premium',
   roleplay_limits: { free: 0, plus: 5, premium: 10 },
 } as unknown as IAIOptions;
 

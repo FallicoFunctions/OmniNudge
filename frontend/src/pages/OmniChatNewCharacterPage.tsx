@@ -81,7 +81,9 @@ export default function OmniChatNewCharacterPage() {
           <CreationFlow onMade={(persona) => openChat.mutate(persona)} onRefused={setRefusal} />
         )}
       </div>
-      <span className="sr-only">{translate(t, 'omnichat.iai.pageTitle', 'New independent character')}</span>
+      <span className="sr-only">
+        {translate(t, 'omnichat.iai.pageTitle', 'New independent character')}
+      </span>
     </OmniChatShell>
   );
 }
@@ -110,7 +112,9 @@ function RefusalPanel({
     refusal === 'already_has_one'
       ? {
           title: translate(t, 'omnichat.iai.refused.existing.title', 'You already have one'),
-          body: translate(t, 'omnichat.iai.refused.existing.body',
+          body: translate(
+            t,
+            'omnichat.iai.refused.existing.body',
             'One independent character at a time. She remembers everything the two of you have done, and that is the whole point of the limit.'
           ),
           action: translate(t, 'omnichat.iai.refused.existing.action', 'Open your characters'),
@@ -118,16 +122,28 @@ function RefusalPanel({
         }
       : refusal === 'underage'
         ? {
-            title: translate(t, 'omnichat.iai.refused.underage.title', 'That character will not be made'),
-            body: translate(t, 'omnichat.iai.refused.underage.body',
+            title: translate(
+              t,
+              'omnichat.iai.refused.underage.title',
+              'That character will not be made'
+            ),
+            body: translate(
+              t,
+              'omnichat.iai.refused.underage.body',
               'Nobody under 18 is made here. Change the age and the rest of your answers are still there.'
             ),
             action: translate(t, 'omnichat.iai.refused.underage.action', 'Go back'),
             onAction: onDismiss,
           }
         : {
-            title: translate(t, 'omnichat.iai.refused.upgrade.title', 'This one comes with Premium'),
-            body: translate(t, 'omnichat.iai.refused.upgrade.body',
+            title: translate(
+              t,
+              'omnichat.iai.refused.upgrade.title',
+              'This one comes with Premium'
+            ),
+            body: translate(
+              t,
+              'omnichat.iai.refused.upgrade.body',
               'Writing your own characters starts on Plus. One who answers for themselves, remembers, and can tell you no comes with Premium.'
             ),
             action: translate(t, 'omnichat.iai.refused.upgrade.action', 'See the plans'),

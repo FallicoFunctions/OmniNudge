@@ -263,7 +263,11 @@ export function glossFor(
   const id = `${field}.${key}`;
   const gendered = GENDERED_GLOSSES[id];
   if (gendered) {
-    return translate(t, `omnichat.iai.gloss.${id}`, gendered(pronouns.poss, pronouns.subj, pronouns.s));
+    return translate(
+      t,
+      `omnichat.iai.gloss.${id}`,
+      gendered(pronouns.poss, pronouns.subj, pronouns.s)
+    );
   }
   const plain = GLOSSES[id];
   return plain ? translate(t, `omnichat.iai.gloss.${id}`, plain) : '';

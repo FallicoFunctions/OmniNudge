@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Compass, ImagePlus, Menu, MessageSquare, PanelsTopLeft, UserPlus, UsersRound, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  ImagePlus,
+  Menu,
+  MessageSquare,
+  PanelsTopLeft,
+  UserPlus,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type SidebarTab =

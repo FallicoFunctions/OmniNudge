@@ -150,11 +150,25 @@ describe('PersonaDetailsModal', () => {
 
 describe('deleting an independent character', () => {
   const definition = (profile: string) => ({
-    id: 31, slug: 'nadia', name: 'Nadia', description: 'x', category: 'original',
-    owner_user_id: 1, visibility: 'private', system_prompt: '', personality: 'p',
-    scenario: '', first_message: '', example_dialogue: '', post_history_instructions: '',
-    alternate_greetings: [], creator_notes: '', tags: [], creator_name: '',
-    character_version: '', response_style_profile: profile,
+    id: 31,
+    slug: 'nadia',
+    name: 'Nadia',
+    description: 'x',
+    category: 'original',
+    owner_user_id: 1,
+    visibility: 'private',
+    system_prompt: '',
+    personality: 'p',
+    scenario: '',
+    first_message: '',
+    example_dialogue: '',
+    post_history_instructions: '',
+    alternate_greetings: [],
+    creator_notes: '',
+    tags: [],
+    creator_name: '',
+    character_version: '',
+    response_style_profile: profile,
   });
 
   const renderFor = (profile: string) => {
@@ -164,12 +178,19 @@ describe('deleting an independent character', () => {
         <PersonaDetailsModal
           isOpen
           onClose={() => undefined}
-          persona={{
-            id: 31, slug: 'nadia', name: 'Nadia', category: 'original',
-            is_nsfw: false, is_active: true,
-            created_at: '2026-07-01T10:00:00Z', updated_at: '2026-07-01T10:00:00Z',
-            response_style_profile: profile,
-          } as never}
+          persona={
+            {
+              id: 31,
+              slug: 'nadia',
+              name: 'Nadia',
+              category: 'original',
+              is_nsfw: false,
+              is_active: true,
+              created_at: '2026-07-01T10:00:00Z',
+              updated_at: '2026-07-01T10:00:00Z',
+              response_style_profile: profile,
+            } as never
+          }
         />
       </QueryClientProvider>
     );

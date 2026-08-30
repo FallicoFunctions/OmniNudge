@@ -36,7 +36,12 @@ export function importedIcons(source: string): string[] {
   while (match) {
     match[1]
       .split(',')
-      .map((entry) => entry.trim().split(/\s+as\s+/)[0].trim())
+      .map((entry) =>
+        entry
+          .trim()
+          .split(/\s+as\s+/)[0]
+          .trim()
+      )
       .filter(Boolean)
       .forEach((name) => names.push(name));
     match = importPattern.exec(source);
@@ -67,6 +72,8 @@ describe('icon policy', () => {
   });
 
   it('reads a renamed import by its real name', () => {
-    expect(importedIcons("import { Sparkles as Shiny } from 'lucide-react';")).toEqual(['Sparkles']);
+    expect(importedIcons("import { Sparkles as Shiny } from 'lucide-react';")).toEqual([
+      'Sparkles',
+    ]);
   });
 });

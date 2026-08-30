@@ -87,11 +87,7 @@ export interface ConversationSettings {
 export type OmniChatAccountTier = 'free' | 'plus' | 'premium';
 
 /** User-facing conversation profiles. Provider and reasoning settings remain server-side. */
-export type OmniChatModelKey =
-  | 'standard'
-  | 'plus'
-  | 'premium_quick'
-  | 'premium_deep';
+export type OmniChatModelKey = 'standard' | 'plus' | 'premium_quick' | 'premium_deep';
 export type OmniChatModelScope = 'this_chat' | 'all_chats';
 
 export interface OmniChatModelSelection {

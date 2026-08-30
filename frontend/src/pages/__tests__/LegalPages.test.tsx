@@ -88,7 +88,9 @@ describe('legal pages', () => {
     expect(
       screen.getByText(/OmniNudge is not liable for any indirect, incidental, or consequential/)
     ).toBeInTheDocument();
-    expect(screen.getByText(/During the beta phase, OmniNudge uses A\.I\. Agents/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/During the beta phase, OmniNudge uses A\.I\. Agents/)
+    ).toBeInTheDocument();
   });
 
   it('the privacy policy still says it does not sell personal data', () => {
