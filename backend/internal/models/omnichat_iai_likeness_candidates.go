@@ -20,8 +20,14 @@ type OmniChatIAILikenessCandidate struct {
 	PersonaID   int       `json:"persona_id"`
 	JobID       uuid.UUID `json:"generation_job_id"`
 	MediaFileID int       `json:"media_file_id"`
-	StorageURL  string    `json:"storage_url"`
+	StorageURL  string    `json:"-"`
 	StoragePath string    `json:"-"`
+
+	// What streaming one needs. A candidate has no asset row, so it cannot be
+	// served through the media content route, which is keyed on an asset id --
+	// the picker would have had nothing to display.
+	FileType   string `json:"-"`
+	ScanStatus string `json:"-"`
 }
 
 // AttachLikenessCandidate stores a finished likeness render.
@@ -114,7 +120,7 @@ func (r *OmniChatMediaRepository) ListLikenessCandidates(
 ) ([]*OmniChatIAILikenessCandidate, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT c.id, c.persona_id, c.generation_job_id, c.media_file_id,
-		       mf.storage_url, mf.storage_path
+		       mf.storage_url, mf.storage_path, mf.file_type, mf.scan_status
 		FROM omnichat_iai_likeness_candidates c
 		JOIN media_files mf ON mf.id = c.media_file_id
 		WHERE c.persona_id = $1 AND c.owner_user_id = $2
@@ -129,10 +135,37 @@ func (r *OmniChatMediaRepository) ListLikenessCandidates(
 	for rows.Next() {
 		one := &OmniChatIAILikenessCandidate{}
 		if err := rows.Scan(&one.ID, &one.PersonaID, &one.JobID, &one.MediaFileID,
-			&one.StorageURL, &one.StoragePath); err != nil {
+			&one.StorageURL, &one.StoragePath, &one.FileType, &one.ScanStatus); err != nil {
 			return nil, fmt.Errorf("scan likeness candidate: %w", err)
 		}
 		candidates = append(candidates, one)
 	}
 	return candidates, rows.Err()
+}
+
+// LikenessCandidateForOwner reads one of her open candidates, for streaming it
+// to the person choosing.
+//
+// Scoped on persona and owner rather than on the candidate id alone: a bare id
+// would let anybody who guessed a number look at somebody else's character
+// before they had even seen her themselves.
+func (r *OmniChatMediaRepository) LikenessCandidateForOwner(
+	ctx context.Context, personaID, ownerUserID int, candidateID int64,
+) (*OmniChatIAILikenessCandidate, error) {
+	one := &OmniChatIAILikenessCandidate{}
+	err := r.pool.QueryRow(ctx, `
+		SELECT c.id, c.persona_id, c.generation_job_id, c.media_file_id,
+		       mf.storage_url, mf.storage_path, mf.file_type, mf.scan_status
+		FROM omnichat_iai_likeness_candidates c
+		JOIN media_files mf ON mf.id = c.media_file_id
+		WHERE c.id = $1 AND c.persona_id = $2 AND c.owner_user_id = $3
+	`, candidateID, personaID, ownerUserID).Scan(&one.ID, &one.PersonaID, &one.JobID,
+		&one.MediaFileID, &one.StorageURL, &one.StoragePath, &one.FileType, &one.ScanStatus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrLikenessCandidateNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read likeness candidate: %w", err)
+	}
+	return one, nil
 }
