@@ -261,16 +261,31 @@ func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 		return
 	}
 
-	// Her picture is asked for after she exists, and its failure is reported
-	// rather than raised. She is made whether or not a provider is reachable,
-	// and a render outage must not fail the ten screens somebody just answered.
-	if h.likeness != nil {
-		started, likenessErr := h.likeness.Start(c.Request.Context(), persona)
-		if likenessErr != nil {
-			zlog.Error().Err(likenessErr).Int("user_id", userID).Int("persona_id", persona.ID).
-				Int("started", len(started)).
-				Msg("omnichat iai: could not ask for every likeness candidate")
-		}
+	// Her picture is asked for after she exists, off the request.
+	//
+	// Detached and in the background for the reason memory extraction already
+	// is: this creates four job rows and puts four tasks on a queue, and a
+	// Redis stall would otherwise hold up a creation that has already
+	// succeeded. On the request's own context it was worse than slow -- a
+	// client that disconnected cancelled it, and nothing ever asks again, so
+	// somebody would be left with a character who has no face and no way to
+	// get one.
+	//
+	// Its failure is logged rather than raised either way. She is made whether
+	// or not a provider is reachable.
+	if starter := h.likeness; starter != nil {
+		detached := context.WithoutCancel(c.Request.Context())
+		personaForRender := persona
+		go func() {
+			renderCtx, cancel := context.WithTimeout(detached, omniChatLikenessStartTimeout)
+			defer cancel()
+			started, likenessErr := starter.Start(renderCtx, personaForRender)
+			if likenessErr != nil {
+				zlog.Error().Err(likenessErr).Int("user_id", userID).
+					Int("persona_id", personaForRender.ID).Int("started", len(started)).
+					Msg("omnichat iai: could not ask for every likeness candidate")
+			}
+		}()
 	}
 
 	payload, marshalErr := json.Marshal(persona)

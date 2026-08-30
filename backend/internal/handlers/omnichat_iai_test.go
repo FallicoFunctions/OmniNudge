@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -34,18 +36,50 @@ func (f *iaiMakerFake) Create(_ context.Context, _ int, answers services.IAIAnsw
 // pictures. It records the call and can refuse, which is the case that matters:
 // a provider outage must not cost somebody the character they just made.
 type likenessStarterFake struct {
+	mu      sync.Mutex
 	calls   int
 	persona *models.BotPersona
 	err     error
+	// called closes when Start has run. The handler asks for her pictures in
+	// the background, so a test that read calls straight after the response
+	// would be racing the goroutine rather than checking it.
+	called chan struct{}
+	// release, when non-nil, holds Start until the test lets it go. That is how
+	// "creation does not wait for the render queue" is checked: if the handler
+	// were on the request path, the response could not arrive first.
+	release chan struct{}
+}
+
+func newLikenessStarterFake(err error) *likenessStarterFake {
+	return &likenessStarterFake{err: err, called: make(chan struct{})}
 }
 
 func (f *likenessStarterFake) Start(_ context.Context, persona *models.BotPersona) ([]uuid.UUID, error) {
+	f.mu.Lock()
 	f.calls++
 	f.persona = persona
+	f.mu.Unlock()
+	close(f.called)
+	if f.release != nil {
+		<-f.release
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
 	return []uuid.UUID{uuid.New()}, nil
+}
+
+// waitForStart blocks until her pictures have been asked for, or fails.
+func (f *likenessStarterFake) waitForStart(t *testing.T) {
+	t.Helper()
+	select {
+	case <-f.called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("her picture was never asked for")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	require.Equal(t, 1, f.calls)
 }
 
 func newIAITestRouter(maker OmniChatIAIMaker, claims OmniChatRequestIdempotencyStore) *gin.Engine {
@@ -318,7 +352,7 @@ func TestARenderOutageDoesNotCostSomebodyTheirCharacter(t *testing.T) {
 	// anything can draw her, so a provider that is down must not fail the ten
 	// screens somebody just answered.
 	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
-	likeness := &likenessStarterFake{err: errors.New("runpod is unreachable")}
+	likeness := newLikenessStarterFake(errors.New("runpod is unreachable"))
 	router := newIAITestRouterWithLikeness(maker, &omniChatRequestIdempotencyFake{}, likeness)
 
 	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
@@ -328,19 +362,19 @@ func TestARenderOutageDoesNotCostSomebodyTheirCharacter(t *testing.T) {
 	var created models.BotPersona
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &created))
 	require.Equal(t, "sam-12", created.Slug)
-	require.Equal(t, 1, likeness.calls, "and her picture was still asked for")
+	likeness.waitForStart(t)
 }
 
 func TestHerPictureIsAskedForWithHer(t *testing.T) {
 	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
-	likeness := &likenessStarterFake{}
+	likeness := newLikenessStarterFake(nil)
 	router := newIAITestRouterWithLikeness(maker, &omniChatRequestIdempotencyFake{}, likeness)
 
 	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
 		"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
 
 	require.Equal(t, http.StatusCreated, response.Code)
-	require.Equal(t, 1, likeness.calls)
+	likeness.waitForStart(t)
 	require.NotNil(t, likeness.persona)
 	require.Equal(t, 12, likeness.persona.ID, "for the character that was just made")
 }
@@ -355,4 +389,36 @@ func TestCreationSurvivesHavingNothingToDrawWith(t *testing.T) {
 		"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
 
 	require.Equal(t, http.StatusCreated, response.Code)
+}
+
+func TestCreationDoesNotWaitForTheRenderQueue(t *testing.T) {
+	// The control for the previous version of this was blind: putting the call
+	// back on the request path still passed, because the test only checked that
+	// it happened. A queue that stalls would have held up a creation that had
+	// already succeeded, and a client that disconnected would have cancelled
+	// her pictures outright.
+	//
+	// So the starter is held open here. If the handler waited for it, the
+	// response could not arrive.
+	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	likeness := newLikenessStarterFake(nil)
+	likeness.release = make(chan struct{})
+	router := newIAITestRouterWithLikeness(maker, &omniChatRequestIdempotencyFake{}, likeness)
+
+	responded := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		responded <- postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
+			"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
+	}()
+
+	select {
+	case response := <-responded:
+		require.Equal(t, http.StatusCreated, response.Code)
+	case <-time.After(2 * time.Second):
+		close(likeness.release)
+		t.Fatal("creation waited for the render queue")
+	}
+
+	close(likeness.release)
+	likeness.waitForStart(t)
 }

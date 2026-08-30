@@ -33,6 +33,12 @@ type OmniChatHandler struct {
 	likeness       OmniChatLikenessStarter
 }
 
+// omniChatLikenessStartTimeout bounds the background start so a stalled queue
+// cannot leave the goroutine alive indefinitely. It covers four job rows and
+// four enqueues, not the renders themselves, which take minutes and are the
+// worker's business.
+const omniChatLikenessStartTimeout = 15 * time.Second
+
 // OmniChatLikenessStarter asks for the pictures somebody chooses her face from.
 //
 // An interface, and nil-tolerant at the call site, because a character is made
