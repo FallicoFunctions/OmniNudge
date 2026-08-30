@@ -867,6 +867,17 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 			SELECT 1
 			FROM omnichat_group_message_attachments
 			WHERE asset_id = $1
+			UNION ALL
+			-- Her face. A likeness is a picture in the gallery like any other
+			-- and can be deleted like any other, right up until it is the one
+			-- every later render is conditioned on: removing it would take the
+			-- character's appearance with it, and nothing downstream would know
+			-- why she had stopped looking like herself.
+			SELECT 1
+			FROM omnichat_media_assets a
+			JOIN media_files mf ON mf.id = a.media_file_id
+			JOIN bot_personas p ON p.id = a.persona_id
+			WHERE a.id = $1 AND p.avatar_url = mf.storage_url
 		)
 	`, id).Scan(&shared)
 	if err != nil {
