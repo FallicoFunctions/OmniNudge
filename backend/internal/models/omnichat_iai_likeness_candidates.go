@@ -56,6 +56,12 @@ func (r *OmniChatMediaRepository) AttachLikenessCandidate(
 	if err != nil {
 		return nil, err
 	}
+	if job.Kind != OmniChatMediaKindImage {
+		// Defence at the boundary as well as at the request. A clip stored here
+		// would be offered as one of the four pictures somebody picks a face
+		// from, and nothing downstream would notice it could not be one.
+		return nil, fmt.Errorf("generation job %s is not an image", jobID)
+	}
 	if job.Mode != string(OmniChatGenerationModeLikeness) {
 		// A scene render arriving here would be stored where nobody can see it
 		// and silently lost. Refusing says which path was wrong.

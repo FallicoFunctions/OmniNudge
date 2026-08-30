@@ -240,3 +240,45 @@ func TestACharacterNobodyDescribedStillRendersSomebody(t *testing.T) {
 	require.Contains(t, prompt, "An adult.")
 	require.NotContains(t, prompt, "person. an adult")
 }
+
+func TestALikenessOwnsItsOwnRequest(t *testing.T) {
+	conversation := 7
+	// Everything a caller might set that a likeness must not inherit. Found by
+	// printing what the normaliser produced rather than reading it: a video was
+	// accepted, the frame came back square while the prompt asks for head to
+	// feet, and SFW was false only because nothing had set it.
+	out, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind:            models.OmniChatMediaKindVideo,
+		DurationSeconds: 5,
+		PersonaID:       1,
+		Prompt:          "Full-body reference image of one person.",
+		AspectRatio:     "16:9",
+		ConversationID:  &conversation,
+		Scene:           models.OmniChatSceneState{Location: "the park"},
+		AllowNSFW:       true,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, models.OmniChatMediaKindImage, out.Kind, "a clip cannot be an identity anchor")
+	require.Zero(t, out.DurationSeconds)
+	require.Equal(t, "9:16", out.AspectRatio, "a standing figure head to feet wants the tallest frame")
+	require.Nil(t, out.ConversationID, "she has no conversation when this runs")
+	require.Empty(t, out.Scene.Location)
+	require.False(t, out.AllowNSFW, "a neutral reference photograph is not an entitlement to spend")
+
+	require.Equal(t, models.OmniChatGenerationModeLikeness, out.Mode)
+	require.NotNil(t, out.BillingRequired)
+	require.False(t, *out.BillingRequired, "the first set is part of what making her costs")
+}
+
+func TestTheModeIsNotSomethingACallerCanAskFor(t *testing.T) {
+	// The public allowlist is the contract. Somebody who could ask for likeness
+	// mode directly would get a path built for a server-written prompt and pay
+	// for a picture they could never see, because it never becomes an asset.
+	_, err := NormalizeOmniChatGenerationRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeLikeness,
+		PersonaID: 1, Prompt: "give me one",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "mode is invalid")
+}

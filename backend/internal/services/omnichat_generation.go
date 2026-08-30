@@ -20,6 +20,10 @@ const (
 	omniChatMaxAccessories           = 8
 )
 
+// omniChatLikenessAspectRatio is the tallest frame the provider accepts, which
+// is what a standing figure photographed head to feet wants.
+const omniChatLikenessAspectRatio = "9:16"
+
 var omniChatAspectRatios = map[string]struct{}{
 	"1:1": {}, "3:4": {}, "4:3": {}, "4:5": {}, "5:4": {}, "9:16": {}, "16:9": {},
 }
@@ -129,12 +133,33 @@ func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) 
 	request.ConversationID = nil
 	request.Scene = models.OmniChatSceneState{}
 
+	// A likeness is a still. Nothing about a clip can be an identity anchor or
+	// the single forward-facing input the 3D pipeline takes, and a video asked
+	// for here would be stored as one of the four pictures somebody chooses
+	// their character's face from.
+	request.Kind = models.OmniChatMediaKindImage
+	request.DurationSeconds = 0
+
+	// The frame is the likeness's own, not the caller's. The prompt asks for
+	// the whole figure from head to feet against a plain background; a square
+	// crops that badly and a landscape one wastes most of the picture on
+	// backdrop. The tallest frame available puts the most of her in it, which
+	// serves the picker, the identity reference and the 3D input alike.
+	request.AspectRatio = omniChatLikenessAspectRatio
+
 	normalized, err := NormalizeOmniChatGenerationRequest(request)
 	if err != nil {
 		return request, err
 	}
 
 	normalized.Mode = models.OmniChatGenerationModeLikeness
+
+	// Said rather than left false. AllowNSFW is resolved from the caller's plan
+	// on the ordinary path, so a Premium account would otherwise follow its
+	// entitlement onto the explicit endpoint -- for a standing neutral
+	// reference photograph, which nobody asked to be explicit.
+	normalized.AllowNSFW = false
+
 	free := false
 	normalized.BillingRequired = &free
 	return normalized, nil
