@@ -261,6 +261,18 @@ func (h *OmniChatHandler) CreateIAI(c *gin.Context) {
 		return
 	}
 
+	// Her picture is asked for after she exists, and its failure is reported
+	// rather than raised. She is made whether or not a provider is reachable,
+	// and a render outage must not fail the ten screens somebody just answered.
+	if h.likeness != nil {
+		started, likenessErr := h.likeness.Start(c.Request.Context(), persona)
+		if likenessErr != nil {
+			zlog.Error().Err(likenessErr).Int("user_id", userID).Int("persona_id", persona.ID).
+				Int("started", len(started)).
+				Msg("omnichat iai: could not ask for every likeness candidate")
+		}
+	}
+
 	payload, marshalErr := json.Marshal(persona)
 	if marshalErr == nil {
 		marshalErr = h.completeOmniChatRequest(userID, request.RequestID, payload)

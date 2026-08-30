@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,9 +30,35 @@ func (f *iaiMakerFake) Create(_ context.Context, _ int, answers services.IAIAnsw
 	return f.persona, f.err
 }
 
+// likenessStarterFake stands in for what asks a render provider for her
+// pictures. It records the call and can refuse, which is the case that matters:
+// a provider outage must not cost somebody the character they just made.
+type likenessStarterFake struct {
+	calls   int
+	persona *models.BotPersona
+	err     error
+}
+
+func (f *likenessStarterFake) Start(_ context.Context, persona *models.BotPersona) ([]uuid.UUID, error) {
+	f.calls++
+	f.persona = persona
+	if f.err != nil {
+		return nil, f.err
+	}
+	return []uuid.UUID{uuid.New()}, nil
+}
+
 func newIAITestRouter(maker OmniChatIAIMaker, claims OmniChatRequestIdempotencyStore) *gin.Engine {
+	return newIAITestRouterWithLikeness(maker, claims, nil)
+}
+
+func newIAITestRouterWithLikeness(maker OmniChatIAIMaker, claims OmniChatRequestIdempotencyStore,
+	likeness OmniChatLikenessStarter) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	handler := (&OmniChatHandler{}).SetRequestIdempotency(claims).SetIAICreator(maker)
+	if likeness != nil {
+		handler = handler.SetLikenessStarter(likeness)
+	}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_id", 9)
@@ -284,4 +311,48 @@ func TestTheNameShuffleIsGivenAListRatherThanARule(t *testing.T) {
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/iai/names?ethnicity=latino", nil))
 	require.NotContains(t, response.Body.String(), "shared")
 	require.NotContains(t, response.Body.String(), "weight")
+}
+
+func TestARenderOutageDoesNotCostSomebodyTheirCharacter(t *testing.T) {
+	// The property this wiring exists to have. She is made whether or not
+	// anything can draw her, so a provider that is down must not fail the ten
+	// screens somebody just answered.
+	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	likeness := &likenessStarterFake{err: errors.New("runpod is unreachable")}
+	router := newIAITestRouterWithLikeness(maker, &omniChatRequestIdempotencyFake{}, likeness)
+
+	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
+		"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
+
+	require.Equal(t, http.StatusCreated, response.Code, "she exists either way")
+	var created models.BotPersona
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &created))
+	require.Equal(t, "sam-12", created.Slug)
+	require.Equal(t, 1, likeness.calls, "and her picture was still asked for")
+}
+
+func TestHerPictureIsAskedForWithHer(t *testing.T) {
+	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	likeness := &likenessStarterFake{}
+	router := newIAITestRouterWithLikeness(maker, &omniChatRequestIdempotencyFake{}, likeness)
+
+	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
+		"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
+
+	require.Equal(t, http.StatusCreated, response.Code)
+	require.Equal(t, 1, likeness.calls)
+	require.NotNil(t, likeness.persona)
+	require.Equal(t, 12, likeness.persona.ID, "for the character that was just made")
+}
+
+func TestCreationSurvivesHavingNothingToDrawWith(t *testing.T) {
+	// No likeness starter installed at all, which is a deployment with no
+	// render provider configured. Creation is not allowed to depend on it.
+	maker := &iaiMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	router := newIAITestRouter(maker, &omniChatRequestIdempotencyFake{})
+
+	response := postIAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
+		"temperaments":["warm"],"interests":["games"],"feeling":"fond"}`)
+
+	require.Equal(t, http.StatusCreated, response.Code)
 }

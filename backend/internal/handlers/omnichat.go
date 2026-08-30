@@ -30,6 +30,22 @@ type OmniChatHandler struct {
 	replies        *services.OmniChatReplyScheduler
 	iaiCreator     OmniChatIAIMaker
 	creationLimits *services.OmniChatCreationLimits
+	likeness       OmniChatLikenessStarter
+}
+
+// OmniChatLikenessStarter asks for the pictures somebody chooses her face from.
+//
+// An interface, and nil-tolerant at the call site, because a character is made
+// whether or not anything can draw her yet: creation must not depend on a
+// render provider being configured.
+type OmniChatLikenessStarter interface {
+	Start(ctx context.Context, persona *models.BotPersona) ([]uuid.UUID, error)
+}
+
+// SetLikenessStarter installs what asks for her candidates.
+func (h *OmniChatHandler) SetLikenessStarter(starter OmniChatLikenessStarter) *OmniChatHandler {
+	h.likeness = starter
+	return h
 }
 
 // SetCreationLimits installs how many characters a plan may keep.

@@ -796,6 +796,14 @@ func main() {
 	).SetBilling(omniChatBilling).SetMessageWriter(botMessageRepo).SetConversationWriter(botConversationRepo).
 		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient)).
 		SetContentEntitlement(omniChatContentEntitlement)
+	omniChatLikenessService := services.NewOmniChatIAILikenessService(
+		omniChatMediaRepo, omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
+	)
+	// Installed after construction because the generation enqueuer it needs is
+	// built below the handler. A character is made whether or not this is set,
+	// which is the point: creation does not depend on anything being able to
+	// draw her.
+	omniChatHandler.SetLikenessStarter(omniChatLikenessService)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
