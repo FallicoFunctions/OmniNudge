@@ -169,3 +169,27 @@ func (r *OmniChatMediaRepository) LikenessCandidateForOwner(
 	}
 	return one, nil
 }
+
+// PendingLikenessCount is how many of her pictures have not arrived yet.
+//
+// A list of three is otherwise two different situations the picker cannot tell
+// apart: a fourth still rendering, and a fourth that failed and never will.
+// Without this it would either spin forever or settle for three while one was
+// seconds away.
+//
+// Queued and running only. A failed render is not pending -- nothing will ever
+// deliver it -- and saying so is what lets the picker stop waiting.
+func (r *OmniChatMediaRepository) PendingLikenessCount(
+	ctx context.Context, personaID, ownerUserID int,
+) (int, error) {
+	var pending int
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM omnichat_generation_jobs
+		WHERE persona_id = $1 AND owner_user_id = $2
+		  AND mode = $3 AND status IN ('queued', 'running')
+	`, personaID, ownerUserID, string(OmniChatGenerationModeLikeness)).Scan(&pending); err != nil {
+		return 0, fmt.Errorf("count pending likeness renders: %w", err)
+	}
+	return pending, nil
+}

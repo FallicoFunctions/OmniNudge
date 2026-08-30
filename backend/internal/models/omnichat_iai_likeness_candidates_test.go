@@ -168,3 +168,66 @@ func TestASceneRenderCannotBeStoredAsALikeness(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not a likeness")
 }
+
+func TestOnlyRendersStillOnTheirWayCountAsPending(t *testing.T) {
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+
+	// Four asked for; two have landed.
+	jobs := make([]*models.OmniChatGenerationJob, 0, 4)
+	for nth := 1; nth <= 4; nth++ {
+		jobs = append(jobs, runningLikenessJob(t, ctx, db, repo, ownerID, personaID, nth))
+	}
+	for _, job := range jobs[:2] {
+		_, err := repo.AttachLikenessCandidate(ctx, job.ID, likenessMediaFor(ownerID, job),
+			1<<30, 50<<30, models.OmniChatGenerationProvenance{})
+		require.NoError(t, err)
+	}
+
+	pending, err := repo.PendingLikenessCount(ctx, personaID, ownerID)
+	require.NoError(t, err)
+	require.Equal(t, 2, pending, "two are still running")
+
+	// One fails. It is not pending: nothing will ever deliver it, and saying so
+	// is what lets the picker stop waiting.
+	_, err = db.Pool.Exec(ctx,
+		`UPDATE omnichat_generation_jobs SET status = 'failed', completed_at = NOW() WHERE id = $1`,
+		jobs[2].ID)
+	require.NoError(t, err)
+
+	pending, err = repo.PendingLikenessCount(ctx, personaID, ownerID)
+	require.NoError(t, err)
+	require.Equal(t, 1, pending)
+
+	// Scoped to her owner, like everything else about her.
+	none, err := repo.PendingLikenessCount(ctx, personaID, ownerID+1000)
+	require.NoError(t, err)
+	require.Zero(t, none)
+}
+
+func TestAScenesRenderIsNotOneOfHerPictures(t *testing.T) {
+	// The count asks for likeness jobs. A scene generating at the same moment
+	// would otherwise read as a picture still on its way and the picker would
+	// wait for something that was never going to appear in it.
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+
+	conversations := models.NewBotConversationRepository(db.Pool)
+	conversation, err := conversations.Create(ctx, ownerID, personaID, nil, nil)
+	require.NoError(t, err)
+
+	normalized, err := services.NormalizeOmniChatGenerationRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeContextual,
+		PersonaID: personaID, ConversationID: &conversation.ID, Prompt: "her at the park",
+	})
+	require.NoError(t, err)
+	job, err := repo.CreateGenerationJob(ctx, ownerID,
+		withGenerationBillingReservation(t, ctx, db.Pool, ownerID, normalized), "test")
+	require.NoError(t, err)
+	_, err = repo.MarkGenerationJobRunning(ctx, job.ID, "req-scene")
+	require.NoError(t, err)
+
+	pending, err := repo.PendingLikenessCount(ctx, personaID, ownerID)
+	require.NoError(t, err)
+	require.Zero(t, pending)
+}

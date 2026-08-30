@@ -22,6 +22,12 @@ type likenessStoreFake struct {
 	pickedID   int64
 	pickedFor  int
 	scopedTo   int
+	pending    int
+	pendingErr error
+}
+
+func (f *likenessStoreFake) PendingLikenessCount(_ context.Context, personaID, ownerUserID int) (int, error) {
+	return f.pending, f.pendingErr
 }
 
 func (f *likenessStoreFake) ListLikenessCandidates(_ context.Context, personaID, ownerUserID int) ([]*models.OmniChatIAILikenessCandidate, error) {
@@ -168,4 +174,39 @@ func TestBadIdentifiersAreRefusedRatherThanGuessed(t *testing.T) {
 func TestAnUnconfiguredPickerSaysSoRatherThanPanicking(t *testing.T) {
 	response := callLikeness(newLikenessRouter(nil), http.MethodGet, "/api/v1/omnichat/iai/31/likeness")
 	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+}
+
+func TestThePickerIsToldHowManyAreStillComing(t *testing.T) {
+	// Three candidates is otherwise two situations the picker cannot tell
+	// apart: a fourth still rendering, and a fourth that failed and never will.
+	// Without this it either spins forever or settles for three while one is
+	// seconds away.
+	arrived := []*models.OmniChatIAILikenessCandidate{
+		{ID: 21, ScanStatus: models.MediaScanStatusClean},
+		{ID: 22, ScanStatus: models.MediaScanStatusClean},
+		{ID: 23, ScanStatus: models.MediaScanStatusClean},
+	}
+
+	waiting := callLikeness(newLikenessRouter(&likenessStoreFake{candidates: arrived, pending: 1}),
+		http.MethodGet, "/api/v1/omnichat/iai/31/likeness")
+	require.Contains(t, waiting.Body.String(), `"pending":1`, "keep waiting")
+
+	// A failed render is not pending. Nothing will ever deliver it, and saying
+	// so is what lets the picker stop.
+	settled := callLikeness(newLikenessRouter(&likenessStoreFake{candidates: arrived, pending: 0}),
+		http.MethodGet, "/api/v1/omnichat/iai/31/likeness")
+	require.Contains(t, settled.Body.String(), `"pending":0`, "three is all there will be")
+}
+
+func TestNotKnowingHowManyAreComingStillShowsWhatArrived(t *testing.T) {
+	// A failure to count is not a failure to choose. The number only decides
+	// whether to keep waiting, so losing it must not cost somebody the screen.
+	store := &likenessStoreFake{
+		candidates: []*models.OmniChatIAILikenessCandidate{{ID: 21, ScanStatus: models.MediaScanStatusClean}},
+		pendingErr: errors.New("database is down"),
+	}
+	response := callLikeness(newLikenessRouter(store), http.MethodGet, "/api/v1/omnichat/iai/31/likeness")
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), `"id":21`)
+	require.Contains(t, response.Body.String(), `"pending":0`)
 }

@@ -21,6 +21,7 @@ type omniChatLikenessStore interface {
 	ListLikenessCandidates(ctx context.Context, personaID, ownerUserID int) ([]*models.OmniChatIAILikenessCandidate, error)
 	LikenessCandidateForOwner(ctx context.Context, personaID, ownerUserID int, candidateID int64) (*models.OmniChatIAILikenessCandidate, error)
 	PickLikeness(ctx context.Context, personaID, ownerUserID int, candidateID int64) (*models.OmniChatMediaAsset, error)
+	PendingLikenessCount(ctx context.Context, personaID, ownerUserID int) (int, error)
 }
 
 // OmniChatLikenessHandler serves the four pictures somebody chooses her face
@@ -71,7 +72,19 @@ func (h *OmniChatLikenessHandler) List(c *gin.Context) {
 			Ready: candidate.ScanStatus == models.MediaScanStatusClean,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"candidates": views})
+	// How many are still coming. Three candidates is otherwise two situations
+	// the picker cannot tell apart -- a fourth still rendering, and a fourth
+	// that failed and never will -- so it would either spin forever or settle
+	// for three while one was seconds away.
+	//
+	// A failure to count is not a failure to choose. It reports none pending,
+	// which shows what has arrived rather than refusing the whole screen over a
+	// number that only decides whether to keep waiting.
+	pending, err := h.store.PendingLikenessCount(c.Request.Context(), personaID, ownerUserID)
+	if err != nil {
+		pending = 0
+	}
+	c.JSON(http.StatusOK, gin.H{"candidates": views, "pending": pending})
 }
 
 // Content streams one candidate to the person choosing.
