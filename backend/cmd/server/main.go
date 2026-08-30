@@ -804,6 +804,7 @@ func main() {
 	// which is the point: creation does not depend on anything being able to
 	// draw her.
 	omniChatHandler.SetLikenessStarter(omniChatLikenessService)
+	omniChatLikenessHandler := handlers.NewOmniChatLikenessHandler(omniChatMediaRepo, storageService)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
@@ -1432,6 +1433,14 @@ func main() {
 			// Names to start her off with. Read once when the screen opens; the
 			// shuffle itself is local, so this is not a per-press endpoint.
 			protected.GET("/omnichat/iai/names", omniChatHandler.GetIAINames)
+
+			// The four pictures somebody chooses her face from. Candidates are
+			// not gallery assets, so they cannot be served through the media
+			// content route -- which is keyed on an asset id -- and get their
+			// own, scoped to her owner.
+			protected.GET("/omnichat/iai/:id/likeness", omniChatLikenessHandler.List)
+			protected.GET("/omnichat/iai/:id/likeness/:candidate_id/content", omniChatLikenessHandler.Content)
+			protected.POST("/omnichat/iai/:id/likeness/:candidate_id", omniChatLikenessHandler.Pick)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)
