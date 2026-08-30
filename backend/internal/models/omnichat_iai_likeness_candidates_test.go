@@ -27,9 +27,11 @@ func newLikenessFixture(t *testing.T, ctx context.Context) (*database.Database, 
 	var personaID int
 	require.NoError(t, db.Pool.QueryRow(ctx, `
 		INSERT INTO bot_personas (slug, name, category, system_prompt, visibility,
-			source_format, is_active, owner_user_id, response_style_profile, nursery_home)
+			source_format, is_active, owner_user_id, response_style_profile, nursery_home,
+			extensions_json)
 		VALUES ('nadia-l', 'Nadia', 'original', '', 'private', 'native', TRUE, $1,
-			'direct_message', 'home')
+			'direct_message', 'home',
+			'{"omnichat_media":{"appearance":"A 27-year-old woman with long black hair.","render_style":"anime"}}'::jsonb)
 		RETURNING id`, owner.ID).Scan(&personaID))
 
 	return db, models.NewOmniChatMediaRepository(db.Pool), owner.ID, personaID
