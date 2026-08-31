@@ -153,9 +153,31 @@ class GeneratorInputSecurityTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"OMNICHAT_LONG_PROMPT": "1"}, clear=True):
             full = build_image_prompt("Show the scene.", "contextual", scene)
-        self.assertGreater(len(full.split()), 58)
+        # Against the truncated prompt rather than against 58. The budget is the
+        # thing under test, and a bare number made this depend on the incidental
+        # word count of the opening clause: dropping one word from it put this
+        # fixture exactly on the boundary and failed a change that had nothing
+        # to do with budgeting.
+        self.assertGreater(len(full.split()), len(truncated.split()))
+        self.assertLessEqual(len(full.split()), 150)
         self.assertIn("hooks holding toys, whips, ropes, and chains", full)
         self.assertIn("gold hoop earrings", full)
+
+    def test_a_scene_does_not_assert_a_medium_either(self):
+        """The highest-weight position in a tag prompt cannot claim a medium.
+
+        This opened "photorealistic full-body photograph" while the backend
+        appends "Render the image as anime artwork, not as a photograph" for a
+        character drawn that way -- so every scene of one contradicted itself,
+        with the contradiction stated first. The composition still has to be
+        asserted here: it is what keeps a scene coming back as a full body
+        rather than a headshot.
+        """
+        scene = {"location": "a bedroom", "activity": "reading"}
+        prompt = build_image_prompt("Show the scene.", "contextual", scene)
+        self.assertNotIn("photorealistic", prompt)
+        self.assertNotIn("photograph", prompt)
+        self.assertIn("full-body", prompt)
 
     def test_worn_accessories_outrank_held_props_within_the_budget(self):
         # The accessory list is capped, and held props previously crowded out

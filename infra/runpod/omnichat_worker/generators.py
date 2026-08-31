@@ -226,7 +226,7 @@ def build_image_prompt(
     scene: dict[str, Any] | None = None,
     has_reference: bool = True,
 ) -> str:
-    """Turn structured scene state into an environment-forward photographic shot.
+    """Turn structured scene state into an environment-forward composition.
 
     Contextual requests are serialized from the ``scene`` dict the backend
     sends. The backend owns what the scene contains, including how many people
@@ -312,7 +312,15 @@ def _budgeted_contextual_prompt(scene: dict[str, Any]) -> str:
     # than to prose, and full sentences spend the scarce 77-token window on
     # grammar. Gender-neutral throughout: the reference may be anime art or an
     # object, and "she/her" would fight a legitimate non-human request.
-    clauses: list[str] = ["photorealistic full-body photograph"]
+    # Framing, not medium. This opened "photorealistic full-body photograph",
+    # which is the highest-weight position in a tag-style prompt -- and the
+    # backend appends "Render the image as anime artwork, not as a photograph"
+    # for a character drawn that way, so every scene of one contradicted itself
+    # with the contradiction stated first.
+    #
+    # The composition still has to be asserted here: it is what keeps a scene
+    # from coming back as a headshot. Only the claim about the medium goes.
+    clauses: list[str] = ["full-body shot"]
     if scene.get("include_user_body"):
         # Only stated when the tracked interaction actually puts the viewer in
         # frame. High priority because it changes the composition.
