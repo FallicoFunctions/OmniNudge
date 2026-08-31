@@ -69,10 +69,18 @@ vi.mock('../../components/omnichat/OmniChatShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('../../services/omnichatService', () => ({
+// importOriginal rather than a bare object: this listed every export it wanted
+// and nothing else, so the first component to reach for a new one -- the
+// likeness picker, and omnichatQueryKeys -- got undefined and took the page
+// down with it. Spreading keeps that from being a trap for the next addition.
+vi.mock('../../services/omnichatService', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createOmniChatRequestId: () => mockCreateOmniChatRequestId(),
   createOmniChatSocialRequestId: () => 'social-request-id',
   omnichatService: {
+    // Her pictures are not what these tests are about; the picker renders
+    // nothing when there is no choice open.
+    getLikenessCandidates: async () => ({ candidates: [], pending: 0 }),
     listPersonas: (...args: unknown[]) => mockListPersonas(...args),
     listConversations: (...args: unknown[]) => mockListConversations(...args),
     getConversation: (...args: unknown[]) => mockGetConversation(...args),
@@ -102,6 +110,7 @@ vi.mock('../../services/omnichatService', () => ({
     createBillingCheckout: vi.fn(),
   },
   omnichatQueryKeys: {
+    iaiLikeness: (personaId: number) => ['omnichat', 'iai', 'likeness', personaId],
     personas: () => ['omnichat', 'personas'],
     conversations: ['omnichat', 'conversations'],
     conversation: (id: number) => ['omnichat', 'conversation', id],
@@ -1357,18 +1366,18 @@ describe('OmniChatChatPage', () => {
     mockSendMessage
       .mockRejectedValueOnce(new Error('temporary network failure'))
       .mockImplementationOnce(async () => {
-      queueMicrotask(() =>
-        deliverAssistantReply({
-          id: 8,
-          conversation_id: 42,
-          role: 'assistant',
-          content: 'The safely replayed reply.',
-          failed: false,
-          created_at: '2026-07-02T10:17:00Z',
-        })
-      );
-      return { accepted: true };
-    });
+        queueMicrotask(() =>
+          deliverAssistantReply({
+            id: 8,
+            conversation_id: 42,
+            role: 'assistant',
+            content: 'The safely replayed reply.',
+            failed: false,
+            created_at: '2026-07-02T10:17:00Z',
+          })
+        );
+        return { accepted: true };
+      });
     renderPage();
 
     const composer = await screen.findByPlaceholderText('Say or do something...');
@@ -1393,31 +1402,31 @@ describe('OmniChatChatPage', () => {
       .mockReturnValueOnce('second-send-id');
     mockSendMessage
       .mockImplementationOnce(async () => {
-      queueMicrotask(() =>
-        deliverAssistantReply({
-          id: 7,
-          conversation_id: 42,
-          role: 'assistant',
-          content: 'First acknowledgment.',
-          failed: false,
-          created_at: '2026-07-02T10:16:00Z',
-        })
-      );
-      return { accepted: true };
-    })
+        queueMicrotask(() =>
+          deliverAssistantReply({
+            id: 7,
+            conversation_id: 42,
+            role: 'assistant',
+            content: 'First acknowledgment.',
+            failed: false,
+            created_at: '2026-07-02T10:16:00Z',
+          })
+        );
+        return { accepted: true };
+      })
       .mockImplementationOnce(async () => {
-      queueMicrotask(() =>
-        deliverAssistantReply({
-          id: 8,
-          conversation_id: 42,
-          role: 'assistant',
-          content: 'Second acknowledgment.',
-          failed: false,
-          created_at: '2026-07-02T10:17:00Z',
-        })
-      );
-      return { accepted: true };
-    });
+        queueMicrotask(() =>
+          deliverAssistantReply({
+            id: 8,
+            conversation_id: 42,
+            role: 'assistant',
+            content: 'Second acknowledgment.',
+            failed: false,
+            created_at: '2026-07-02T10:17:00Z',
+          })
+        );
+        return { accepted: true };
+      });
     mockGetConversation.mockResolvedValue({
       conversation: {
         id: 42,
