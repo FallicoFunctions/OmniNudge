@@ -76,8 +76,33 @@ class GeneratorInputSecurityTests(unittest.TestCase):
 
     def test_create_mode_passes_the_request_through(self):
         prompt = build_image_prompt("Sadie standing on the beach in a red bikini")
-        self.assertTrue(prompt.startswith("A single coherent photorealistic image."))
+        self.assertTrue(prompt.startswith("A single coherent image."))
         self.assertIn("Sadie standing on the beach in a red bikini", prompt)
+
+    def test_no_medium_is_asserted_over_the_caller(self):
+        """The backend states the medium for every render it owns.
+
+        This line used to open "A single coherent photorealistic image", which
+        contradicted a likeness that ends "Render as anime artwork, not as a
+        photograph" -- and answered somebody asking for a watercolour with a
+        demand for a photograph.
+        """
+        prompt = build_image_prompt("a watercolour painting of a lighthouse")
+        self.assertNotIn("photorealistic", prompt)
+        self.assertIn("a watercolour painting of a lighthouse", prompt)
+
+    def test_no_reference_is_claimed_when_there_is_none(self):
+        """A likeness is a character's first picture and has no reference.
+
+        Telling the model to use a supplied reference when none was supplied is
+        an instruction about something that is not there.
+        """
+        without = build_image_prompt("one person, full body", has_reference=False)
+        self.assertNotIn("supplied reference", without)
+        self.assertIn("one person, full body", without)
+
+        with_reference = build_image_prompt("one person, full body", has_reference=True)
+        self.assertIn("supplied reference", with_reference)
 
     def test_contextual_prompt_serializes_structured_scene_state(self):
         scene = {

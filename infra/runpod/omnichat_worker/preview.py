@@ -80,7 +80,7 @@ def render(payload: dict[str, Any]) -> str:
         )
     lines.append("")
     lines.append("--- rendered prompt ---")
-    lines.append(build_image_prompt(prompt, mode, scene))
+    lines.append(build_image_prompt(prompt, mode, scene, has_reference=bool(payload.get("reference_image_urls"))))
     lines.append("")
     lines.append("--- rendered negative prompt ---")
     lines.append(build_image_negative_prompt(negative, mode, prompt, scene))

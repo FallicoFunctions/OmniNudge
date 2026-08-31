@@ -224,6 +224,7 @@ def build_image_prompt(
     request_prompt: str,
     mode: str = "create",
     scene: dict[str, Any] | None = None,
+    has_reference: bool = True,
 ) -> str:
     """Turn structured scene state into an environment-forward photographic shot.
 
@@ -239,14 +240,33 @@ def build_image_prompt(
     """
     prompt = " ".join(request_prompt.split()).strip().rstrip(".")
     if mode.strip().lower() != "contextual":
-        # The reference may be a person, anime art, or an object. Describing it
-        # as "the subject" lets the reference decide; asserting a human here
-        # would fight a legitimate request such as "chair on a mountain".
-        return (
-            "A single coherent photorealistic image. Use the supplied reference only "
-            "for the subject's identity and appearance; do not copy "
-            f"its background, crop, lighting, or framing. {prompt}."
-        )
+        # No medium is asserted here.
+        #
+        # This used to open "A single coherent photorealistic image", which the
+        # backend then contradicted: a likeness of an anime character ends with
+        # "Render as anime artwork, not as a photograph", and this said the
+        # opposite first. It also overrode somebody's own words in the Create
+        # experience -- "a watercolour painting of a lighthouse" was answered
+        # with a demand for a photograph.
+        #
+        # The backend states the medium for every render it owns, and a Create
+        # prompt is the caller's to decide, so there is nothing left for this
+        # line to usefully claim.
+        clauses = ["A single coherent image."]
+        if has_reference:
+            # Only when there is one. A likeness is the first picture of a
+            # character and by definition has no reference, so this told the
+            # model to use something that was not there.
+            #
+            # The reference may be a person, anime art, or an object. Describing
+            # it as "the subject" lets the reference decide; asserting a human
+            # would fight a legitimate request such as "chair on a mountain".
+            clauses.append(
+                "Use the supplied reference only for the subject's identity and "
+                "appearance; do not copy its background, crop, lighting, or framing."
+            )
+        clauses.append(f"{prompt}.")
+        return " ".join(clauses)
 
     scene = scene or {}
     return _budgeted_contextual_prompt(scene)
@@ -1063,7 +1083,12 @@ class ImageGenerator:
         steps, guidance_scale, strength = image_pipeline_settings(self.model_id)
         if request.mode == "contextual":
             strength = contextual_image_strength(self.model_id)
-        rendered_prompt = build_image_prompt(request.prompt, request.mode, request.scene)
+        rendered_prompt = build_image_prompt(
+            request.prompt,
+            request.mode,
+            request.scene,
+            has_reference=bool(request.reference_image_urls),
+        )
         rendered_negative_prompt = build_image_negative_prompt(
             request.negative_prompt,
             request.mode,
