@@ -21,11 +21,9 @@ import { pronounsFor } from './pronouns';
 export default function LikenessPicker({
   personaId,
   gender,
-  onChosen,
 }: {
   personaId: number;
   gender: string;
-  onChosen?: () => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -51,9 +49,15 @@ export default function LikenessPicker({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.iaiLikeness(personaId) });
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
-      onChosen?.();
     },
   });
+
+  // Choosing settles it, even though the panel is still on screen: the refetch
+  // that removes it has not landed yet, and until it does the pictures were
+  // still pressable. A second press reached the server, was refused because the
+  // choice was already made, and told somebody their pick had failed when it
+  // had in fact worked.
+  const settled = pick.isPending || pick.isSuccess;
 
   const data = choice.data;
   // Nothing to choose and nothing coming: she was made before this existed, or
@@ -86,7 +90,7 @@ export default function LikenessPicker({
           <button
             key={candidate.id}
             type="button"
-            disabled={!candidate.ready || pick.isPending}
+            disabled={!candidate.ready || settled}
             onClick={() => pick.mutate(candidate.id)}
             className="group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/10 bg-black/30 disabled:cursor-not-allowed"
           >
@@ -117,7 +121,7 @@ export default function LikenessPicker({
         ))}
       </div>
 
-      {pick.isError ? (
+      {pick.isError && !pick.isSuccess ? (
         <p className="mt-3 text-[13px] text-red-300">
           {translate(
             t,

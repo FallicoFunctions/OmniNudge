@@ -121,4 +121,37 @@ describe('choosing her face', () => {
       );
     });
   });
+
+  it('cannot be pressed again once a choice is made', async () => {
+    // The panel is still on screen after choosing, because the refetch that
+    // removes it has not landed. Until this, the pictures were still pressable:
+    // a second press reached the server, was refused because the choice was
+    // already made, and told somebody their pick had failed when it had worked.
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(screen.getAllByRole('button')[0]);
+    await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalledTimes(1));
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toBeDisabled();
+    }
+    await user.click(screen.getAllByRole('button')[1]);
+    expect(omnichatService.pickLikeness).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not claim the picture failed after it was kept', async () => {
+    // A stale error from an earlier press must not outlive a pick that worked.
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(screen.getAllByRole('button')[0]);
+    await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalled());
+
+    expect(screen.queryByText(/could not be kept/)).toBeNull();
+  });
 });
