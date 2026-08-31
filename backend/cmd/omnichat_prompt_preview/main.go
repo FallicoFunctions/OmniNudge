@@ -35,6 +35,26 @@ import (
 // the payload must still carry a well-formed HTTPS reference.
 const placeholderReferenceURL = "https://storage.googleapis.com/omnichat-preview/persona-reference.png"
 
+// placeholderEndpointID stands in for a RunPod endpoint that is not configured.
+//
+// Same reasoning as the reference URL above: this command exists to read the
+// prompt without GPU access, and BuildImageSpec refuses an empty endpoint id --
+// so a machine with no RunPod credentials, which is exactly the machine this is
+// most useful on, could not run it at all. The id is only ever printed.
+const placeholderEndpointID = "endpoint-not-configured"
+
+// withPreviewEndpoints fills in whatever the deployment has not configured, so
+// the payload can be built and read anywhere.
+func withPreviewEndpoints(media config.OmniChatMediaConfig) config.OmniChatMediaConfig {
+	if strings.TrimSpace(media.RunPodImageEndpointID) == "" {
+		media.RunPodImageEndpointID = placeholderEndpointID
+	}
+	if strings.TrimSpace(media.RunPodVideoEndpointID) == "" {
+		media.RunPodVideoEndpointID = placeholderEndpointID
+	}
+	return media
+}
+
 // placeholderSourceStillURL stands in for the still the image phase has not
 // rendered yet. A video preview is about the motion prompt and the request
 // shape, neither of which depends on the actual frame.
@@ -51,14 +71,24 @@ func run() error {
 	conversationID := flag.Int("conversation", 0, "conversation id to preview")
 	ownerUserID := flag.Int("owner", 0, "owning user id for the conversation")
 	personaID := flag.Int("persona", 0, "persona id (defaults to the conversation's persona)")
-	mode := flag.String("mode", string(models.OmniChatGenerationModeContextual), "generation mode: contextual or create")
+	mode := flag.String("mode", string(models.OmniChatGenerationModeContextual), "generation mode: contextual, create, or likeness")
 	kind := flag.String("kind", string(models.OmniChatMediaKindImage), "media kind: image or video")
 	prompt := flag.String("prompt", "", "requested view; defaults to the Scene photo button's prompt")
 	aspect := flag.String("aspect", "4:5", "aspect ratio")
 	asJSON := flag.Bool("json", false, "emit the raw provider payload as JSON only")
 	flag.Parse()
 
-	if *conversationID < 1 || *ownerUserID < 1 {
+	// A likeness is her first picture and happens before any conversation
+	// exists, so it needs a persona and nothing else. Previewing it is the only
+	// way to read that prompt without a GPU, and it is the one prompt nothing
+	// else in this command could reach.
+	previewingLikeness := models.OmniChatGenerationMode(strings.ToLower(strings.TrimSpace(*mode))) ==
+		models.OmniChatGenerationModeLikeness
+	if previewingLikeness {
+		if *personaID < 1 || *ownerUserID < 1 {
+			return errors.New("--persona and --owner are required for a likeness")
+		}
+	} else if *conversationID < 1 || *ownerUserID < 1 {
 		return errors.New("--conversation and --owner are required")
 	}
 	mediaKind := models.OmniChatMediaKind(strings.ToLower(strings.TrimSpace(*kind)))
@@ -84,7 +114,7 @@ func run() error {
 	personas := models.NewBotPersonaRepository(db.Pool)
 
 	resolvedPersonaID := *personaID
-	if resolvedPersonaID < 1 {
+	if resolvedPersonaID < 1 && !previewingLikeness {
 		resolvedPersonaID, err = conversationPersonaID(ctx, db, *conversationID, *ownerUserID)
 		if err != nil {
 			return err
@@ -96,6 +126,13 @@ func run() error {
 	}
 	if persona == nil {
 		return fmt.Errorf("persona %d is not accessible to user %d", resolvedPersonaID, *ownerUserID)
+	}
+
+	// Her whole instruction is built by the server from her description, so a
+	// likeness preview ignores --prompt entirely rather than pretending a
+	// caller has a say in it.
+	if previewingLikeness {
+		return previewLikeness(cfg, persona, *ownerUserID, *asJSON)
 	}
 
 	requestedPrompt := strings.TrimSpace(*prompt)
@@ -154,7 +191,7 @@ func run() error {
 	}
 	// The image spec is what a Scene photo sends, and it is also the first
 	// phase of a video job: the queue renders this still, then animates it.
-	imageSpec, err := queue.BuildImageSpec(cfg.OmniChatMedia, job, []string{placeholderReferenceURL})
+	imageSpec, err := queue.BuildImageSpec(withPreviewEndpoints(cfg.OmniChatMedia), job, []string{placeholderReferenceURL})
 	if err != nil {
 		return fmt.Errorf("build image spec: %w", err)
 	}
@@ -163,7 +200,7 @@ func run() error {
 		// The still does not exist yet at preview time, so its signed URL is
 		// stood in for. Everything else -- the motion-only prompt, the mode,
 		// the absence of references -- is exactly what the queue will send.
-		videoSpec, err := queue.BuildVideoSpec(cfg.OmniChatMedia, job, placeholderSourceStillURL)
+		videoSpec, err := queue.BuildVideoSpec(withPreviewEndpoints(cfg.OmniChatMedia), job, placeholderSourceStillURL)
 		if err != nil {
 			return fmt.Errorf("build video spec: %w", err)
 		}
@@ -224,4 +261,67 @@ func conversationPersonaID(ctx context.Context, db *database.DB, conversationID,
 		return 0, fmt.Errorf("load conversation persona: %w", err)
 	}
 	return personaID, nil
+}
+
+// previewLikeness prints exactly what her first picture would send.
+//
+// It builds the request the same way the likeness service does, so the framing,
+// the medium and the description are read from the same code that would run for
+// real. Nothing is submitted and nothing is written.
+func previewLikeness(cfg *config.Config, persona *models.BotPersona, ownerUserID int, asJSON bool) error {
+	profile := services.ResolveOmniChatMediaIdentityProfile(persona)
+	request, err := services.NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind:      models.OmniChatMediaKindImage,
+		PersonaID: persona.ID,
+		Prompt:    services.BuildIAILikenessPrompt(profile),
+	})
+	if err != nil {
+		return fmt.Errorf("normalize likeness request: %w", err)
+	}
+
+	job := &models.OmniChatGenerationJob{
+		OwnerUserID:     ownerUserID,
+		PersonaID:       persona.ID,
+		Kind:            request.Kind,
+		Mode:            request.Mode,
+		Prompt:          request.Prompt,
+		EffectivePrompt: request.EffectivePrompt,
+		AspectRatio:     request.AspectRatio,
+		IdentityProfile: profile,
+	}
+	spec, err := queue.BuildImageSpec(withPreviewEndpoints(cfg.OmniChatMedia), job, nil)
+	if err != nil {
+		return fmt.Errorf("build likeness spec: %w", err)
+	}
+
+	if asJSON {
+		encoded, err := json.MarshalIndent(spec.Input, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(encoded))
+		return nil
+	}
+
+	fmt.Printf("persona      %d (%s)\n", persona.ID, persona.Name)
+	fmt.Printf("described    %s\n", orNone(profile.Appearance))
+	fmt.Printf("medium       %s\n", orDefault(profile.RenderStyle, "photorealistic"))
+	fmt.Printf("aspect       %v\n", spec.Input["aspect_ratio"])
+	fmt.Printf("references   %d (none yet: this is what makes her one)\n", len(profile.ReferenceURLs))
+	fmt.Printf("\nprompt\n%s\n", spec.Input["prompt"])
+	return nil
+}
+
+func orNone(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "(nobody described her)"
+	}
+	return value
+}
+
+func orDefault(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
