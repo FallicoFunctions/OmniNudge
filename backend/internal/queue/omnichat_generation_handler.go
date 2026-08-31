@@ -1089,7 +1089,8 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	// plain text-to-image with a server-built prompt, so it goes as create;
 	// sending a word the worker has never seen would be a contract change for
 	// something that needs no new behaviour from it.
-	if providerMode == string(models.OmniChatGenerationModeLikeness) {
+	if providerMode == string(models.OmniChatGenerationModeLikeness) ||
+		providerMode == string(models.OmniChatGenerationModeLikenessReference) {
 		providerMode = string(models.OmniChatGenerationModeCreate)
 	}
 	if providerMode == string(models.OmniChatGenerationModeImageToVideo) {

@@ -129,7 +129,7 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 // discarded by design. Re-rolls are charged by the caller that asks for them,
 // not here.
 func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) (models.OmniChatGenerationRequest, error) {
-	return normalizeIAIRenderRequest(request, omniChatLikenessAspectRatio)
+	return normalizeIAIRenderRequest(request, models.OmniChatGenerationModeLikeness, omniChatLikenessAspectRatio)
 }
 
 // NormalizeOmniChatReferenceRequest prepares one of the supporting references.
@@ -146,11 +146,13 @@ func NormalizeOmniChatReferenceRequest(
 	if !found {
 		return request, fmt.Errorf("omnichat likeness: no such reference variant %q", variantKey)
 	}
-	return normalizeIAIRenderRequest(request, aspect)
+	return normalizeIAIRenderRequest(request, models.OmniChatGenerationModeLikenessReference, aspect)
 }
 
 func normalizeIAIRenderRequest(
-	request models.OmniChatGenerationRequest, aspectRatio string,
+	request models.OmniChatGenerationRequest,
+	mode models.OmniChatGenerationMode,
+	aspectRatio string,
 ) (models.OmniChatGenerationRequest, error) {
 	request.Mode = models.OmniChatGenerationModeCreate
 	request.ConversationID = nil
@@ -173,7 +175,11 @@ func normalizeIAIRenderRequest(
 		return request, err
 	}
 
-	normalized.Mode = models.OmniChatGenerationModeLikeness
+	// The mode is what tells the completion whether this becomes one of four
+	// somebody chooses from or one of six the adapter is conditioned on. It was
+	// hardcoded to likeness here, so every reference arrived claiming to be a
+	// candidate and was refused by the path that stores them.
+	normalized.Mode = mode
 
 	// Said rather than left false. AllowNSFW is resolved from the caller's plan
 	// on the ordinary path, so a Premium account would otherwise follow its

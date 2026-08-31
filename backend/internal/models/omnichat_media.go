@@ -42,6 +42,15 @@ const (
 	// image_to_video, and a likeness is a plain text-to-image, so it is sent as
 	// create. This mode is how *this* system tells its own paths apart.
 	OmniChatGenerationModeLikeness OmniChatGenerationMode = "likeness"
+
+	// OmniChatGenerationModeLikenessReference is one of the five supporting
+	// pictures made once somebody has chosen her face.
+	//
+	// It shares everything with a likeness except how it ends. A likeness
+	// becomes one of four somebody picks from; a reference becomes one of the
+	// six the adapter is conditioned on, and nobody is ever shown it. The
+	// provider is told "create" for both.
+	OmniChatGenerationModeLikenessReference OmniChatGenerationMode = "likeness_reference"
 )
 
 type OmniChatGenerationStatus string

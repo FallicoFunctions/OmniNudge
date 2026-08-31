@@ -113,7 +113,9 @@ func TestAReferenceRequestTakesItsFrameFromItsVariant(t *testing.T) {
 
 	// And it keeps everything the likeness owns: still, no billing, SFW.
 	require.Equal(t, models.OmniChatMediaKindImage, request.Kind)
-	require.Equal(t, models.OmniChatGenerationModeLikeness, request.Mode)
+	// Its own mode: this is what tells the completion it becomes one of the six
+	// the adapter is conditioned on rather than one of four somebody picks from.
+	require.Equal(t, models.OmniChatGenerationModeLikenessReference, request.Mode)
 	require.False(t, request.AllowNSFW)
 	require.NotNil(t, request.BillingRequired)
 	require.False(t, *request.BillingRequired)
