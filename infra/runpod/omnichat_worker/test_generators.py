@@ -262,8 +262,13 @@ class GeneratorInputSecurityTests(unittest.TestCase):
         negative = build_image_negative_prompt("")
         self.assertEqual(negative, DEFAULT_IMAGE_NEGATIVE_PROMPT)
         self.assertIn("contact sheet", negative)
-        self.assertIn("close-up portrait", negative)
         self.assertIn("reference image background", negative)
+
+        # Framing suppression is a scene's business and nobody else's. It used
+        # to reach every render, which told the Create experience that somebody
+        # asking for a portrait did not want one.
+        self.assertNotIn("close-up portrait", negative)
+        self.assertIn("close-up portrait", build_image_negative_prompt("", "contextual", "", {}))
         self.assertIn("plastic skin", build_image_negative_prompt("plastic skin"))
         indoor = build_image_negative_prompt("", "contextual", "", {"location": "a bedroom"})
         self.assertIn("forest", indoor)

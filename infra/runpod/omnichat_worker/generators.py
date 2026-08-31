@@ -22,14 +22,24 @@ class ModelError(RuntimeError):
     pass
 
 
+# Rendering defects, true of any image whatever it is of.
 DEFAULT_IMAGE_NEGATIVE_PROMPT = (
     "text, captions, words, letters, subtitles, speech bubbles, logo, watermark, signature, "
     "collage, contact sheet, multiple panels, distorted face, "
     "deformed hands, blurry, low quality, overexposed, underexposed, compression artifacts, "
-    "close-up portrait, headshot, selfie, avatar framing, copied reference background, "
+    "copied reference background, "
     "reference image background, double face, split face, duplicate head, cloned person, "
     "double exposure"
 )
+
+# Framing suppression, true of a scene and of nothing else.
+#
+# This used to sit in the defaults above and reached every render. A scene is
+# meant to be environmental, so pushing it away from a headshot is right there
+# -- but it also told the Create experience that somebody asking for a portrait
+# did not want one, and it would have fought the portrait references a likeness
+# needs, which exist precisely to carry facial detail.
+SCENE_FRAMING_NEGATIVE_PROMPT = "close-up portrait, headshot, selfie, avatar framing"
 
 DEFAULT_IP_ADAPTER_MODEL_ID = "h94/IP-Adapter"
 DEFAULT_IP_ADAPTER_SUBFOLDER = "sdxl_models"
@@ -138,6 +148,7 @@ def build_image_negative_prompt(
     parts = [DEFAULT_IMAGE_NEGATIVE_PROMPT]
     scene = scene or {}
     if mode.strip().lower() == "contextual":
+        parts.append(SCENE_FRAMING_NEGATIVE_PROMPT)
         location = _scene_text(scene, "location").lower()
         if location and any(term in location for term in _INDOOR_TERMS):
             parts.append("forest, trees, foliage, outdoor landscape, sky, campsite, park background")
