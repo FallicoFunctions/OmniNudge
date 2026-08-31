@@ -24,6 +24,12 @@ export interface BotPersona {
   owner_user_id?: number;
   visibility?: 'public' | 'private' | 'unlisted';
   source_format?: string;
+  /**
+   * What she looks like, as answered when she was made. Present only on an
+   * independent character, and only the gender is read here -- the picker needs
+   * her pronouns, and nothing on the client should be describing her.
+   */
+  iai_appearance?: { gender?: string };
   response_style_profile?: ResponseStyleProfile;
   avatar_url?: string;
   preview_video_url?: string;
@@ -572,4 +578,27 @@ export interface CreateIAIRequest {
   feeling: string;
   relationship: string;
   appearance: IAIAppearanceAnswers;
+}
+
+/** One of the four pictures somebody chooses her face from. */
+export interface IAILikenessCandidate {
+  id: number;
+  /**
+   * Where to load it from. A candidate is not a gallery asset, so it is served
+   * through its own route rather than by a storage URL -- a picture nobody has
+   * chosen should not be linkable by anyone who learns the address.
+   */
+  content_url: string;
+  /** False while the render has landed but the virus scan has not. */
+  ready: boolean;
+}
+
+export interface IAILikenessChoice {
+  candidates: IAILikenessCandidate[];
+  /**
+   * How many renders are still on their way. Without it, three pictures is two
+   * situations the picker cannot tell apart: a fourth still coming, and a
+   * fourth that failed and never will.
+   */
+  pending: number;
 }

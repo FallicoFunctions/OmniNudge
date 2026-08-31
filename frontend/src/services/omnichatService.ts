@@ -33,6 +33,7 @@ import type {
   OmniChatResponseFeedbackRequest,
   OmniChatMemoryList,
   OmniChatAcceptedTurn,
+  IAILikenessChoice,
 } from '../types/omnichat';
 import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from './authSession';
@@ -374,6 +375,21 @@ export const omnichatService = {
   async createIAI(payload: CreateIAIRequest): Promise<BotPersona> {
     const res = await api.post<{ persona: BotPersona }>('/omnichat/iai', payload);
     return res.persona;
+  },
+
+  /**
+   * The four pictures somebody chooses her face from.
+   *
+   * `pending` is how many have not arrived yet. Three candidates and one
+   * pending is a fourth still rendering; three and none pending is all there
+   * will be, because a render that failed is not coming back.
+   */
+  async getLikenessCandidates(personaId: number): Promise<IAILikenessChoice> {
+    return api.get<IAILikenessChoice>(`/omnichat/iai/${personaId}/likeness`);
+  },
+
+  async pickLikeness(personaId: number, candidateId: number): Promise<{ asset_id: string }> {
+    return api.post<{ asset_id: string }>(`/omnichat/iai/${personaId}/likeness/${candidateId}`, {});
   },
 
   async createPersona(payload: PersonaDefinitionPayload): Promise<BotPersonaDefinition> {
@@ -908,6 +924,7 @@ export const omnichatQueryKeys = {
   billingUsage: (limit = 50) => ['omnichat', 'billing', 'usage', limit] as const,
   videoEntitlement: ['omnichat', 'billing', 'video-entitlement'] as const,
   iaiOptions: ['omnichat', 'iai', 'options'] as const,
+  iaiLikeness: (personaId: number) => ['omnichat', 'iai', 'likeness', personaId] as const,
   iaiNames: (ethnicity: string, gender: string) =>
     ['omnichat', 'iai', 'names', ethnicity || 'any', gender || 'any'] as const,
   explore: (kind?: string) => ['omnichat', 'explore', kind ?? 'all'] as const,

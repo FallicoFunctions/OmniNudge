@@ -47,6 +47,7 @@ import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponse
 import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
 import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
 import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
+import LikenessPicker from '../components/omnichat/iai/LikenessPicker';
 import {
   personaHasSceneMedia,
   personaIsSharedWithOthers,
@@ -2483,19 +2484,35 @@ export default function OmniChatChatPage() {
               {isLoadingConversation && (
                 <LoadingMessage>{t('omnichat.chat.loading')}</LoadingMessage>
               )}
-              {!isLoadingConversation && personaShowsIntroNotice(activePersona) && activePersona && (
-                <DirectCharacterNotice
-                  name={activePersona.name}
-                  isShared={personaIsSharedWithOthers(activePersona)}
-                />
-              )}
+              {!isLoadingConversation &&
+                personaShowsIntroNotice(activePersona) &&
+                activePersona && (
+                  <DirectCharacterNotice
+                    name={activePersona.name}
+                    isShared={personaIsSharedWithOthers(activePersona)}
+                  />
+                )}
+              {/* Her pictures arrive after she does, so the choice is made here
+                  rather than at the end of the creation flow. Anyone who is not
+                  her owner gets an empty choice from the server and sees
+                  nothing, so this needs no ownership check of its own. */}
+              {!isLoadingConversation &&
+                personaShowsIntroNotice(activePersona) &&
+                activePersona && (
+                  <div className="pb-4">
+                    <LikenessPicker
+                      personaId={activePersona.id}
+                      gender={activePersona.iai_appearance?.gender ?? ''}
+                    />
+                  </div>
+                )}
               {!isLoadingConversation &&
                 activeMessages.length === 0 &&
                 !personaShowsIntroNotice(activePersona) && (
-                <div className="flex h-full items-center justify-center text-white/35">
-                  {t('omnichat.chat.emptyWorkspace')}
-                </div>
-              )}
+                  <div className="flex h-full items-center justify-center text-white/35">
+                    {t('omnichat.chat.emptyWorkspace')}
+                  </div>
+                )}
 
               <div className="space-y-4">
                 {activeMessages.map((message) => {
@@ -2701,73 +2718,73 @@ export default function OmniChatChatPage() {
                 activePersona &&
                 selectedConversationId &&
                 personaHasSceneMedia(activePersona) && (
-                <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => generateCurrentScene('image')}
-                    disabled={
-                      mediaGenerationMutation.isPending ||
-                      mediaCommandMutation.isPending ||
-                      Boolean(
-                        activeMediaJob &&
-                        !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
-                      )
-                    }
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
-                  >
-                    <ImageIcon size={14} /> Scene photo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => generateCurrentScene('video')}
-                    disabled={
-                      mediaGenerationMutation.isPending ||
-                      mediaCommandMutation.isPending ||
-                      Boolean(
-                        activeMediaJob &&
-                        !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
-                      )
-                    }
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
-                  >
-                    <Film size={14} /> Scene video
-                  </button>
-                  {activeMediaJob &&
-                    !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status) && (
-                      <span className="flex items-center gap-1.5 text-xs text-blue-300/75">
-                        <Loader2 size={13} className="animate-spin" />
-                        {mediaJobProgressLabel(activeMediaJob, mediaJobNow)}
+                  <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                    <button
+                      type="button"
+                      onClick={() => generateCurrentScene('image')}
+                      disabled={
+                        mediaGenerationMutation.isPending ||
+                        mediaCommandMutation.isPending ||
+                        Boolean(
+                          activeMediaJob &&
+                          !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+                        )
+                      }
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                    >
+                      <ImageIcon size={14} /> Scene photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generateCurrentScene('video')}
+                      disabled={
+                        mediaGenerationMutation.isPending ||
+                        mediaCommandMutation.isPending ||
+                        Boolean(
+                          activeMediaJob &&
+                          !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
+                        )
+                      }
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                    >
+                      <Film size={14} /> Scene video
+                    </button>
+                    {activeMediaJob &&
+                      !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status) && (
+                        <span className="flex items-center gap-1.5 text-xs text-blue-300/75">
+                          <Loader2 size={13} className="animate-spin" />
+                          {mediaJobProgressLabel(activeMediaJob, mediaJobNow)}
+                        </span>
+                      )}
+                    {activeMediaJob?.status === 'succeeded' && (
+                      <span className="text-xs text-emerald-300/75">
+                        Scene added to the chat and gallery
                       </span>
                     )}
-                  {activeMediaJob?.status === 'succeeded' && (
-                    <span className="text-xs text-emerald-300/75">
-                      Scene added to the chat and gallery
+                    {mediaGenerationError && (
+                      <div className="flex items-center gap-2 text-xs text-rose-300">
+                        <span>{mediaGenerationError}</span>
+                        {(pendingMediaGenerationRef.current || pendingMediaCommandRef.current) && (
+                          <button
+                            type="button"
+                            onClick={retryMediaGeneration}
+                            disabled={
+                              mediaGenerationMutation.isPending || mediaCommandMutation.isPending
+                            }
+                            className="rounded-full border border-rose-300/30 px-2 py-1 font-semibold text-rose-100 transition hover:bg-rose-300/10 disabled:opacity-50"
+                          >
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <span className="basis-full px-1 text-[11px] text-white/35">
+                      Use <code className="rounded bg-white/10 px-1">/photo</code> or{' '}
+                      <code className="rounded bg-white/10 px-1">/video</code> followed by a
+                      description of the character or scene to generate photos or videos.
                     </span>
-                  )}
-                  {mediaGenerationError && (
-                    <div className="flex items-center gap-2 text-xs text-rose-300">
-                      <span>{mediaGenerationError}</span>
-                      {(pendingMediaGenerationRef.current || pendingMediaCommandRef.current) && (
-                        <button
-                          type="button"
-                          onClick={retryMediaGeneration}
-                          disabled={
-                            mediaGenerationMutation.isPending || mediaCommandMutation.isPending
-                          }
-                          className="rounded-full border border-rose-300/30 px-2 py-1 font-semibold text-rose-100 transition hover:bg-rose-300/10 disabled:opacity-50"
-                        >
-                          Retry
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <span className="basis-full px-1 text-[11px] text-white/35">
-                    Use <code className="rounded bg-white/10 px-1">/photo</code> or{' '}
-                    <code className="rounded bg-white/10 px-1">/video</code> followed by a
-                    description of the character or scene to generate photos or videos.
-                  </span>
-                </div>
-              )}
+                  </div>
+                )}
               {allowance && !allowance.unlimited && (
                 <div
                   className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-xs ${
