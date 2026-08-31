@@ -1,18 +1,23 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 )
 
 type likenessStoreFake struct {
@@ -209,4 +214,119 @@ func TestNotKnowingHowManyAreComingStillShowsWhatArrived(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Contains(t, response.Body.String(), `"id":21`)
 	require.Contains(t, response.Body.String(), `"pending":0`)
+}
+
+// likenessStorageFake serves one object. Only Download and GetObjectSize are
+// reached by the content route; the rest satisfy the interface.
+type likenessStorageFake struct {
+	body      []byte
+	size      int64
+	sizeSet   bool
+	sizeErr   error
+	downErr   error
+	askedPath string
+}
+
+func (f *likenessStorageFake) Download(_ context.Context, key string) (io.ReadCloser, error) {
+	f.askedPath = key
+	if f.downErr != nil {
+		return nil, f.downErr
+	}
+	return io.NopCloser(bytes.NewReader(f.body)), nil
+}
+
+func (f *likenessStorageFake) GetObjectSize(_ context.Context, _ string) (int64, error) {
+	if f.sizeErr != nil {
+		return 0, f.sizeErr
+	}
+	if f.sizeSet {
+		return f.size, nil
+	}
+	return int64(len(f.body)), nil
+}
+
+func (f *likenessStorageFake) Upload(context.Context, string, io.Reader, string) (string, error) {
+	return "", nil
+}
+func (f *likenessStorageFake) Delete(context.Context, string) error { return nil }
+func (f *likenessStorageFake) GetSignedURL(context.Context, string, time.Duration) (string, error) {
+	return "", nil
+}
+func (f *likenessStorageFake) List(context.Context, string) ([]string, error) { return nil, nil }
+func (f *likenessStorageFake) GeneratePresignedPutURL(context.Context, string, string, time.Duration) (string, error) {
+	return "", nil
+}
+func (f *likenessStorageFake) PublicURL(string) string { return "" }
+
+func newLikenessRouterWithStorage(store omniChatLikenessStore, storage services.StorageService) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	handler := NewOmniChatLikenessHandler(store, storage)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.GET("/api/v1/omnichat/iai/:id/likeness/:candidate_id/content", handler.Content)
+	return router
+}
+
+func cleanCandidate(fileType string) *likenessStoreFake {
+	return &likenessStoreFake{candidates: []*models.OmniChatIAILikenessCandidate{
+		{ID: 11, FileType: fileType, StoragePath: "omnichat/generated/9/a.png",
+			ScanStatus: models.MediaScanStatusClean},
+	}}
+}
+
+func TestAChosenPictureIsActuallyStreamed(t *testing.T) {
+	// Every guard around this was tested and the copy itself was not, because
+	// the fixture had no storage: the content type check, the size bounds and
+	// the body were all unreachable.
+	pixels := []byte("\x89PNG\r\n\x1a\nnot really a png but enough bytes")
+	storage := &likenessStorageFake{body: pixels}
+	response := callLikeness(
+		newLikenessRouterWithStorage(cleanCandidate("image/png"), storage),
+		http.MethodGet, "/api/v1/omnichat/iai/31/likeness/11/content")
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, pixels, response.Body.Bytes())
+	require.Equal(t, "image/png", response.Header().Get("Content-Type"))
+	require.Equal(t, strconv.Itoa(len(pixels)), response.Header().Get("Content-Length"))
+	require.Equal(t, "omnichat/generated/9/a.png", storage.askedPath,
+		"the stored path comes from the record, never from the request")
+
+	// A picture nobody has chosen should not be cached anywhere, and a browser
+	// must not be allowed to guess its type.
+	require.Equal(t, "private, no-store", response.Header().Get("Cache-Control"))
+	require.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
+	require.Contains(t, response.Header().Get("Content-Disposition"), "candidate-11.png")
+}
+
+func TestAPictureThatIsNotAnImageIsNotStreamed(t *testing.T) {
+	// A likeness is a still. A clip arriving here is a render that went down
+	// the wrong path, and streaming it would be the first anybody knew.
+	for _, fileType := range []string{"video/mp4", "application/pdf", ""} {
+		response := callLikeness(
+			newLikenessRouterWithStorage(cleanCandidate(fileType), &likenessStorageFake{body: []byte("x")}),
+			http.MethodGet, "/api/v1/omnichat/iai/31/likeness/11/content")
+		require.Equal(t, http.StatusConflict, response.Code, "file type %q", fileType)
+	}
+}
+
+func TestAnImplausiblySizedPictureIsRefused(t *testing.T) {
+	// Zero means the object is not really there; past the cap means something
+	// other than a render is behind that path.
+	for _, size := range []int64{0, -1, (25 << 20) + 1} {
+		response := callLikeness(
+			newLikenessRouterWithStorage(cleanCandidate("image/png"),
+				&likenessStorageFake{body: []byte("x"), size: size, sizeSet: true}),
+			http.MethodGet, "/api/v1/omnichat/iai/31/likeness/11/content")
+		require.Equal(t, http.StatusConflict, response.Code, "size %d", size)
+	}
+}
+
+func TestAMissingObjectIsNotFoundRatherThanEmpty(t *testing.T) {
+	// Answering 200 with nothing would render as a broken picture the picker
+	// could not explain.
+	response := callLikeness(
+		newLikenessRouterWithStorage(cleanCandidate("image/png"),
+			&likenessStorageFake{sizeErr: errors.New("no such object")}),
+		http.MethodGet, "/api/v1/omnichat/iai/31/likeness/11/content")
+	require.Equal(t, http.StatusNotFound, response.Code)
 }
