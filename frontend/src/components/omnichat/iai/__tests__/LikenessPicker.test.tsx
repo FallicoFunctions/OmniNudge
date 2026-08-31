@@ -154,4 +154,23 @@ describe('choosing her face', () => {
 
     expect(screen.queryByText(/could not be kept/)).toBeNull();
   });
+
+  it('names every picture, because a screen reader has nothing else to go on', async () => {
+    // The picture is the only content in each button and it cannot be
+    // described -- nothing here knows what a render came back as. Without a
+    // name the whole choice was four buttons called "button", on a decision
+    // that cannot be undone.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue({
+      candidates: [
+        { id: 11, content_url: '/c/11', ready: true },
+        { id: 12, content_url: '/c/12', ready: false },
+      ],
+      pending: 0,
+    });
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    expect(screen.getByRole('button', { name: 'Choose picture 1' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Picture 2, still arriving' })).toBeDisabled();
+  });
 });

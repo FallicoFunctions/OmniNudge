@@ -71,10 +71,10 @@ export default function LikenessPicker({
 
   return (
     <section
-      aria-label={translate(t, 'omnichat.iai.likeness.title', `Choose how ${p.subj} looks`)}
+      aria-labelledby="omnichat-likeness-title"
       className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
     >
-      <h3 className="text-[15px] font-semibold text-white/90">
+      <h3 id="omnichat-likeness-title" className="text-[15px] font-semibold text-white/90">
         {translate(t, 'omnichat.iai.likeness.title', `Choose how ${p.subj} looks`)}
       </h3>
       <p className="mt-1 text-[13px] leading-5 text-white/50">
@@ -86,12 +86,25 @@ export default function LikenessPicker({
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {data.candidates.map((candidate) => (
+        {data.candidates.map((candidate, index) => (
           <button
             key={candidate.id}
             type="button"
             disabled={!candidate.ready || settled}
             onClick={() => pick.mutate(candidate.id)}
+            // Without this the whole choice is four buttons with no name: the
+            // picture is the only content and it cannot be described, since
+            // nothing here knows what a render came back as. Position is what
+            // is honestly available, and it is enough to tell them apart.
+            aria-label={
+              candidate.ready
+                ? translate(t, 'omnichat.iai.likeness.choose', `Choose picture ${index + 1}`)
+                : translate(
+                    t,
+                    'omnichat.iai.likeness.arriving',
+                    `Picture ${index + 1}, still arriving`
+                  )
+            }
             className="group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/10 bg-black/30 disabled:cursor-not-allowed"
           >
             {candidate.ready ? (
