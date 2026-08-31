@@ -141,19 +141,31 @@ func (r *OmniChatMediaRepository) PickLikeness(
 	return asset, nil
 }
 
-// adoptLikenessReference points her at the picture and records it as the
-// identity reference renders condition on.
-func adoptLikenessReference(ctx context.Context, tx pgx.Tx, personaID int, storageURL string) error {
+// lockIdentityProfile reads her identity for update, and hands back the blob it
+// came from so the rest of it survives being written again.
+//
+// Locked because the five supporting references land independently, and this is
+// a read-modify-write: two workers finishing together would otherwise each read
+// the same list, append their own, and one would be lost.
+//
+// In practice they are already serialized before reaching here -- the storage
+// quota check takes a row lock on the owner, and all five share one owner -- so
+// removing this lock does not reproduce the loss, and a test cannot tell the
+// two apart. It stays because the invariant belongs to this row, not to an
+// incidental side effect of counting somebody's storage.
+func lockIdentityProfile(
+	ctx context.Context, tx pgx.Tx, personaID int,
+) (OmniChatMediaIdentityProfile, map[string]json.RawMessage, error) {
 	var extensions []byte
 	if err := tx.QueryRow(ctx,
 		`SELECT COALESCE(extensions_json, '{}'::jsonb) FROM bot_personas WHERE id = $1 FOR UPDATE`,
 		personaID).Scan(&extensions); err != nil {
-		return err
+		return OmniChatMediaIdentityProfile{}, nil, err
 	}
 
 	var blob map[string]json.RawMessage
 	if err := json.Unmarshal(extensions, &blob); err != nil {
-		return fmt.Errorf("omnichat likeness: read her identity: %w", err)
+		return OmniChatMediaIdentityProfile{}, nil, fmt.Errorf("omnichat likeness: read her identity: %w", err)
 	}
 	if blob == nil {
 		blob = map[string]json.RawMessage{}
@@ -162,14 +174,18 @@ func adoptLikenessReference(ctx context.Context, tx pgx.Tx, personaID int, stora
 	profile := OmniChatMediaIdentityProfile{}
 	if raw, found := blob["omnichat_media"]; found {
 		if err := json.Unmarshal(raw, &profile); err != nil {
-			return fmt.Errorf("omnichat likeness: read her identity profile: %w", err)
+			return OmniChatMediaIdentityProfile{}, nil, fmt.Errorf("omnichat likeness: read her identity profile: %w", err)
 		}
 	}
-	// First and only. A likeness replaces whatever was there rather than
-	// appending: these references are what she looks like, and a picture from a
-	// choice somebody has since remade is not.
-	profile.ReferenceURLs = []string{storageURL}
+	return profile, blob, nil
+}
 
+// writeIdentityProfile puts the profile back without disturbing anything else
+// the extensions blob holds.
+func writeIdentityProfile(
+	ctx context.Context, tx pgx.Tx, personaID int,
+	profile OmniChatMediaIdentityProfile, blob map[string]json.RawMessage,
+) error {
 	encoded, err := json.Marshal(profile)
 	if err != nil {
 		return fmt.Errorf("omnichat likeness: write her identity profile: %w", err)
@@ -179,12 +195,36 @@ func adoptLikenessReference(ctx context.Context, tx pgx.Tx, personaID int, stora
 	if err != nil {
 		return fmt.Errorf("omnichat likeness: write her identity: %w", err)
 	}
-
 	if _, err := tx.Exec(ctx, `
 		UPDATE bot_personas
-		   SET avatar_url = $2, extensions_json = $3, updated_at = CURRENT_TIMESTAMP
+		   SET extensions_json = $2, updated_at = CURRENT_TIMESTAMP
 		 WHERE id = $1
-	`, personaID, storageURL, merged); err != nil {
+	`, personaID, merged); err != nil {
+		return fmt.Errorf("omnichat likeness: write her identity: %w", err)
+	}
+	return nil
+}
+
+// adoptLikenessReference points her at the picture and records it as the first
+// identity reference renders condition on.
+func adoptLikenessReference(ctx context.Context, tx pgx.Tx, personaID int, storageURL string) error {
+	profile, blob, err := lockIdentityProfile(ctx, tx, personaID)
+	if err != nil {
+		return err
+	}
+	// First and only. A pick replaces whatever was there rather than appending:
+	// these references are what she looks like, and pictures made for a choice
+	// somebody has since remade are not. The five supporting ones are rendered
+	// after this and append to it.
+	profile.ReferenceURLs = []string{storageURL}
+	if err := writeIdentityProfile(ctx, tx, personaID, profile, blob); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE bot_personas
+		   SET avatar_url = $2, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $1
+	`, personaID, storageURL); err != nil {
 		return fmt.Errorf("omnichat likeness: give her the picture: %w", err)
 	}
 	return nil
