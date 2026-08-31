@@ -159,3 +159,60 @@ func TestALikenessCannotBeStoredAsAReference(t *testing.T) {
 	require.Contains(t, err.Error(), "not a likeness reference")
 	require.Empty(t, referencesOf(t, ctx, db, personaID))
 }
+
+func TestAReferenceForAFaceNobodyKeptCannotLand(t *testing.T) {
+	// Choosing again is what a re-roll is. Before this, a reference still
+	// rendering for the previous choice landed afterwards and appended to the
+	// new anchor's list -- so she was conditioned on one picture of the person
+	// somebody chose and one of somebody else, silently.
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+
+	first := fourCandidates(t, ctx, db, repo, ownerID, personaID)
+	_, err := repo.PickLikeness(ctx, personaID, ownerID, first[0].ID)
+	require.NoError(t, err)
+	stale := runningReferenceJob(t, ctx, db, repo, ownerID, personaID, 1)
+
+	second := fourCandidates(t, ctx, db, repo, ownerID, personaID)
+	anchor := second[0]
+	_, err = repo.PickLikeness(ctx, personaID, ownerID, anchor.ID)
+	require.NoError(t, err)
+
+	// The render for the face nobody kept finally arrives.
+	err = repo.AttachLikenessReference(ctx, stale.ID, likenessMediaFor(ownerID, stale),
+		1<<30, 50<<30, models.OmniChatGenerationProvenance{})
+	require.Error(t, err, "a cancelled render has nothing to attach to")
+
+	require.Equal(t, []string{anchor.StorageURL}, referencesOf(t, ctx, db, personaID),
+		"she is conditioned only on the face somebody actually kept")
+
+	var status string
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT status FROM omnichat_generation_jobs WHERE id = $1`, stale.ID).Scan(&status))
+	require.Equal(t, "cancelled", status)
+}
+
+func TestChoosingDoesNotRetireAnotherCharactersReferences(t *testing.T) {
+	// The cancellation is scoped to her. A creator with two characters must not
+	// lose one's pictures by settling the other's face.
+	ctx := context.Background()
+	db, repo, ownerID, personaID := newLikenessFixture(t, ctx)
+
+	var otherPersonaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, category, system_prompt, visibility,
+			source_format, is_active, owner_user_id, response_style_profile, nursery_home)
+		VALUES ('sofia-l', 'Sofia', 'original', '', 'private', 'native', TRUE, $1,
+			'direct_message', 'home')
+		RETURNING id`, ownerID).Scan(&otherPersonaID))
+	otherRender := runningReferenceJob(t, ctx, db, repo, ownerID, otherPersonaID, 1)
+
+	candidates := fourCandidates(t, ctx, db, repo, ownerID, personaID)
+	_, err := repo.PickLikeness(ctx, personaID, ownerID, candidates[0].ID)
+	require.NoError(t, err)
+
+	var status string
+	require.NoError(t, db.Pool.QueryRow(ctx,
+		`SELECT status FROM omnichat_generation_jobs WHERE id = $1`, otherRender.ID).Scan(&status))
+	require.Equal(t, "running", status, "the other character's render is untouched")
+}

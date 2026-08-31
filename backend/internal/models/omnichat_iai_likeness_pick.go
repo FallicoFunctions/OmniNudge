@@ -128,6 +128,27 @@ func (r *OmniChatMediaRepository) PickLikeness(
 		return nil, fmt.Errorf("omnichat likeness: discard the rest: %w", err)
 	}
 
+	// Any reference still rendering was made for a face nobody kept.
+	//
+	// Choosing again -- which is what a re-roll is -- otherwise lets those land
+	// afterwards and append to the new anchor's list, so she would be
+	// conditioned on one picture of the person somebody chose and several of
+	// somebody else. Measured before this existed: the stale reference stored
+	// without error and without complaint.
+	//
+	// Cancelling closes both halves. A queued job never runs, and one already
+	// running cannot attach, because storing a reference requires the job to
+	// still be running and this is what stops it being.
+	if _, err := tx.Exec(ctx, `
+		UPDATE omnichat_generation_jobs
+		   SET status = 'cancelled', cancelled_at = NOW(), completed_at = NOW(),
+		       error_code = 'likeness_rechosen'
+		 WHERE persona_id = $1 AND owner_user_id = $2
+		   AND mode = $3 AND status IN ('queued', 'running')
+	`, personaID, ownerUserID, string(OmniChatGenerationModeLikenessReference)); err != nil {
+		return nil, fmt.Errorf("omnichat likeness: retire the previous references: %w", err)
+	}
+
 	// The choice is closed, so the row describing it goes too. A chosen
 	// candidate is not a candidate.
 	if _, err := tx.Exec(ctx,
