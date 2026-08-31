@@ -28,15 +28,22 @@ type iaiReferenceVariant struct {
 	// Framing is what changes between them. Everything else about her comes
 	// from the description and from the picture they are conditioned on.
 	Framing string
+
+	// Aspect follows the framing. The anchor's tall frame is right for a
+	// standing figure and wrong for a face: a head-and-shoulders shot in 9:16
+	// is a face in a narrow band with the rest of the picture empty.
+	Aspect string
 }
 
 var iaiReferenceVariants = []iaiReferenceVariant{
 	{
 		Key:     "portrait_neutral",
+		Aspect:  "3:4",
 		Framing: "Head and shoulders, facing the camera, neutral expression.",
 	},
 	{
-		Key: "portrait_smiling",
+		Key:    "portrait_smiling",
+		Aspect: "3:4",
 		// Expression variety is half of what the portraits are for. A set that
 		// only ever shows one face teaches the adapter that face and nothing
 		// about how she looks when she is not holding it.
@@ -44,14 +51,17 @@ var iaiReferenceVariants = []iaiReferenceVariant{
 	},
 	{
 		Key:     "portrait_three_quarter",
+		Aspect:  "3:4",
 		Framing: "Head and shoulders, turned three-quarters away from the camera, neutral expression.",
 	},
 	{
 		Key:     "full_body_three_quarter",
+		Aspect:  "9:16",
 		Framing: "Full body from head to feet, standing, turned three-quarters away from the camera.",
 	},
 	{
-		Key: "full_body_relaxed",
+		Key:    "full_body_relaxed",
+		Aspect: "9:16",
 		// A second full-length at a different stance. Proportions read
 		// differently on a body that is not standing to attention, and a scene
 		// almost never wants the anchor's pose.
@@ -101,4 +111,13 @@ func findIAIReferenceVariant(key string) (iaiReferenceVariant, bool) {
 		}
 	}
 	return iaiReferenceVariant{}, false
+}
+
+// IAIReferenceVariantAspect is the frame one variant is rendered in.
+func IAIReferenceVariantAspect(key string) (string, bool) {
+	variant, found := findIAIReferenceVariant(key)
+	if !found {
+		return "", false
+	}
+	return variant.Aspect, true
 }

@@ -129,6 +129,29 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 // discarded by design. Re-rolls are charged by the caller that asks for them,
 // not here.
 func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) (models.OmniChatGenerationRequest, error) {
+	return normalizeIAIRenderRequest(request, omniChatLikenessAspectRatio)
+}
+
+// NormalizeOmniChatReferenceRequest prepares one of the supporting references.
+//
+// Same rules as the likeness, different frame. The anchor is a standing figure
+// head to feet and wants the tallest frame available; a head-and-shoulders
+// portrait in that frame is a face in a narrow band with the rest of the
+// picture empty. The variant decides, because the variant is what knows whether
+// it is asking for a face or a body.
+func NormalizeOmniChatReferenceRequest(
+	request models.OmniChatGenerationRequest, variantKey string,
+) (models.OmniChatGenerationRequest, error) {
+	aspect, found := IAIReferenceVariantAspect(variantKey)
+	if !found {
+		return request, fmt.Errorf("omnichat likeness: no such reference variant %q", variantKey)
+	}
+	return normalizeIAIRenderRequest(request, aspect)
+}
+
+func normalizeIAIRenderRequest(
+	request models.OmniChatGenerationRequest, aspectRatio string,
+) (models.OmniChatGenerationRequest, error) {
 	request.Mode = models.OmniChatGenerationModeCreate
 	request.ConversationID = nil
 	request.Scene = models.OmniChatSceneState{}
@@ -140,12 +163,10 @@ func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) 
 	request.Kind = models.OmniChatMediaKindImage
 	request.DurationSeconds = 0
 
-	// The frame is the likeness's own, not the caller's. The prompt asks for
-	// the whole figure from head to feet against a plain background; a square
-	// crops that badly and a landscape one wastes most of the picture on
-	// backdrop. The tallest frame available puts the most of her in it, which
-	// serves the picker, the identity reference and the 3D input alike.
-	request.AspectRatio = omniChatLikenessAspectRatio
+	// The frame is the render's own, not the caller's. A standing figure from
+	// head to feet wants the tallest frame available; a face wants something
+	// closer to square. Either way it is decided here rather than accepted.
+	request.AspectRatio = aspectRatio
 
 	normalized, err := NormalizeOmniChatGenerationRequest(request)
 	if err != nil {

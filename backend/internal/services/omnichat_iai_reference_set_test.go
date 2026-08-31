@@ -83,3 +83,46 @@ func TestAnUnknownVariantIsNothingRatherThanAGuess(t *testing.T) {
 	require.Empty(t, BuildIAIReferencePrompt(referenceProfile(), "underwater"))
 	require.Empty(t, BuildIAIReferencePrompt(referenceProfile(), ""))
 }
+
+func TestAFaceIsNotRenderedInTheFrameBuiltForABody(t *testing.T) {
+	// The anchor takes the tallest frame available, which is right for a
+	// standing figure head to feet. Reusing it for a head-and-shoulders
+	// portrait puts a face in a narrow band with the rest of the picture empty,
+	// and reading the assembled payload is what showed it: every reference came
+	// back 9:16 because they went through the likeness normaliser.
+	for _, key := range IAIReferenceVariantKeys() {
+		aspect, found := IAIReferenceVariantAspect(key)
+		require.True(t, found, key)
+
+		prompt := BuildIAIReferencePrompt(referenceProfile(), key)
+		if strings.Contains(prompt, "Head and shoulders") {
+			require.Equal(t, "3:4", aspect, "%s is a face", key)
+			continue
+		}
+		require.Equal(t, "9:16", aspect, "%s is a body", key)
+	}
+}
+
+func TestAReferenceRequestTakesItsFrameFromItsVariant(t *testing.T) {
+	request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 1, Prompt: "a face",
+		AspectRatio: "16:9",
+	}, "portrait_neutral")
+	require.NoError(t, err)
+	require.Equal(t, "3:4", request.AspectRatio, "the caller does not choose the frame")
+
+	// And it keeps everything the likeness owns: still, no billing, SFW.
+	require.Equal(t, models.OmniChatMediaKindImage, request.Kind)
+	require.Equal(t, models.OmniChatGenerationModeLikeness, request.Mode)
+	require.False(t, request.AllowNSFW)
+	require.NotNil(t, request.BillingRequired)
+	require.False(t, *request.BillingRequired)
+}
+
+func TestAnUnknownVariantCannotBeRendered(t *testing.T) {
+	_, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 1, Prompt: "a face",
+	}, "underwater")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such reference variant")
+}
