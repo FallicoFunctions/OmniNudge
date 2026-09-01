@@ -256,6 +256,25 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 				"Characters must be 18 or older.")
 			return
 		}
+		if errors.Is(err, services.ErrOmniAINameRequired) {
+			RespondErrorCoded(c, http.StatusBadRequest, "omniai_name_required",
+				"She needs a name.")
+			return
+		}
+		if errors.Is(err, services.ErrOmniAINameTooLong) {
+			RespondErrorCoded(c, http.StatusBadRequest, "omniai_name_too_long",
+				"That name is too long.")
+			return
+		}
+		if errors.Is(err, services.ErrOmniAINameInvalid) {
+			// Told plainly, for the reason stated above the underage branch: a
+			// name refused behind "cannot be created as described" leaves
+			// somebody editing her appearance to find out what was wrong with
+			// her name.
+			RespondErrorCoded(c, http.StatusBadRequest, "omniai_name_invalid",
+				"A name can use letters, digits, spaces, apostrophes and hyphens.")
+			return
+		}
 		if isOmniChatOmniAIRequestFault(err) {
 			RespondError(c, http.StatusBadRequest, "That character cannot be created as described")
 			return
@@ -314,5 +333,7 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 // did. A missing name is theirs; a database that would not write is ours, and
 // answering 400 to our own outage sends somebody to fix a form that is fine.
 func isOmniChatOmniAIRequestFault(err error) bool {
-	return errors.Is(err, services.ErrOmniAINameRequired) || errors.Is(err, services.ErrOmniAINameTooLong)
+	return errors.Is(err, services.ErrOmniAINameRequired) ||
+		errors.Is(err, services.ErrOmniAINameTooLong) ||
+		errors.Is(err, services.ErrOmniAINameInvalid)
 }
