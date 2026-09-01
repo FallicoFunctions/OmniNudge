@@ -275,10 +275,6 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 				"A name can use letters, digits, spaces, apostrophes and hyphens.")
 			return
 		}
-		if isOmniChatOmniAIRequestFault(err) {
-			RespondError(c, http.StatusBadRequest, "That character cannot be created as described")
-			return
-		}
 		zlog.Error().Err(err).Int("user_id", userID).Msg("omnichat omniai: creation failed")
 		RespondError(c, http.StatusInternalServerError, "Failed to create the character")
 		return
@@ -327,13 +323,4 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, persona)
-}
-
-// isOmniChatOmniAIRequestFault separates what the caller got wrong from what we
-// did. A missing name is theirs; a database that would not write is ours, and
-// answering 400 to our own outage sends somebody to fix a form that is fine.
-func isOmniChatOmniAIRequestFault(err error) bool {
-	return errors.Is(err, services.ErrOmniAINameRequired) ||
-		errors.Is(err, services.ErrOmniAINameTooLong) ||
-		errors.Is(err, services.ErrOmniAINameInvalid)
 }
