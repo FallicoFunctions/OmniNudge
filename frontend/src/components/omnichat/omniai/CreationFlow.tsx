@@ -7,7 +7,8 @@ import AnswerSlider from './AnswerSlider';
 import StepRail from './StepRail';
 import { glossFor, labelFor, translate } from './labels';
 import { feetAndInches, pronounsFor } from './pronouns';
-import { refusalFrom, type CreationRefusal } from './refusals';
+import { refusalFrom, serverErrorFrom, type CreationRefusal } from './refusals';
+import { normalizeOmniAIName } from './name';
 import {
   NAME_LIMIT,
   STEP,
@@ -69,6 +70,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
 
   const [search, setSearch] = useState('');
   const [requestId] = useState(() => createOmniChatRequestId());
+  const [failure, setFailure] = useState('');
 
   const make = useMutation({
     mutationFn: () =>
@@ -84,9 +86,31 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
     onSuccess: onMade,
     onError: (error) => {
       const refusal = refusalFrom(error);
-      if (refusal) onRefused(refusal);
+      if (refusal) {
+        onRefused(refusal);
+        return;
+      }
+      // A refusal the screen cannot turn into an offer still has to be said.
+      // Dropping it left the button enabled and nothing on the screen, so
+      // pressing it looked like it had done nothing at all.
+      setFailure(
+        serverErrorFrom(error).message?.trim() ||
+          translate(t, 'omnichat.omniai.createFailed', 'She could not be made just now.')
+      );
     },
   });
+
+  // Only once they have typed something. Telling somebody their empty name is
+  // wrong before they have written it is scolding them for not having finished.
+  const nameProblem = useMemo(() => {
+    const { problem } = normalizeOmniAIName(answers.name);
+    if (problem !== 'invalid') return '';
+    return translate(
+      t,
+      'omnichat.omniai.nameInvalid',
+      'A name can use letters, digits, spaces, apostrophes and hyphens.'
+    );
+  }, [answers.name, t]);
 
   const screen = useMemo(() => {
     switch (step) {
@@ -388,9 +412,12 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                     {translate(t, 'omnichat.omniai.shuffleLabel', 'Shuffle')}
                   </button>
                 </div>
-                <p className="text-right text-[11px] tabular-nums text-white/30">
-                  {`${[...answers.name].length} / ${NAME_LIMIT}`}
-                </p>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[11px] text-[#ff9c8a]">{nameProblem}</p>
+                  <p className="text-right text-[11px] tabular-nums text-white/30">
+                    {`${[...answers.name].length} / ${NAME_LIMIT}`}
+                  </p>
+                </div>
               </div>
             ) : null}
 
@@ -398,11 +425,17 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
           </div>
 
           <footer className="flex items-center justify-between gap-4 border-t border-white/10 px-8 py-4">
-            <p className="text-[12.5px] text-white/35">
-              {step === STEP.traits && answers.temperaments.length === 0
-                ? translate(t, 'omnichat.omniai.pickOne', 'Pick at least one to carry on.')
-                : ''}
-            </p>
+            {failure ? (
+              <p role="alert" className="text-[12.5px] text-[#ff9c8a]">
+                {failure}
+              </p>
+            ) : (
+              <p className="text-[12.5px] text-white/35">
+                {step === STEP.traits && answers.temperaments.length === 0
+                  ? translate(t, 'omnichat.omniai.pickOne', 'Pick at least one to carry on.')
+                  : ''}
+              </p>
+            )}
             <div className="ml-auto flex items-center gap-2.5">
               <button
                 type="button"
@@ -416,7 +449,11 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
               <button
                 type="button"
                 disabled={!ready || make.isPending}
-                onClick={() => (step === TOTAL_STEPS ? make.mutate() : goForward())}
+                onClick={() => {
+                  setFailure('');
+                  if (step === TOTAL_STEPS) make.mutate();
+                  else goForward();
+                }}
                 className="omnichat-touch-target min-w-[168px] rounded-full bg-[#426fc4] px-6 text-[14.5px] font-semibold text-white transition hover:bg-[#527fd3] disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-white/30"
               >
                 {make.isPending ? (
