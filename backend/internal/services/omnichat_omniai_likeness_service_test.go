@@ -113,3 +113,74 @@ func TestAnUnconfiguredLikenessSaysSoRatherThanPanicking(t *testing.T) {
 	_, err = NewOmniChatOmniAILikenessService(nil, nil, "").Start(context.Background(), likenessPersona(t))
 	require.Error(t, err)
 }
+
+func TestSheIsAskedForFiveSupportingPictures(t *testing.T) {
+	jobs, queue := &recordingJobStore{}, &recordingEnqueuer{}
+	started, err := NewOmniChatOmniAILikenessService(jobs, queue, "runpod").
+		StartReferences(context.Background(), likenessPersona(t), "/uploads/omnichat/generated/9/anchor.png")
+
+	require.NoError(t, err)
+	require.Len(t, started, len(OmniAIReferenceVariantKeys()))
+
+	// Three faces and two bodies: facial detail and proportions are different
+	// jobs, and one frame cannot do both.
+	faces, bodies := 0, 0
+	for _, request := range jobs.requests {
+		require.Equal(t, models.OmniChatGenerationModeLikenessReference, request.Mode)
+		require.False(t, request.AllowNSFW)
+		require.NotNil(t, request.BillingRequired)
+		require.False(t, *request.BillingRequired)
+		require.Contains(t, request.Prompt, "A 27-year-old woman with long black hair.")
+
+		switch request.AspectRatio {
+		case "3:4":
+			faces++
+			require.Contains(t, request.Prompt, "Head and shoulders")
+		case "9:16":
+			bodies++
+			require.Contains(t, request.Prompt, "Full body")
+		default:
+			t.Fatalf("unexpected frame %q", request.AspectRatio)
+		}
+	}
+	require.Equal(t, 3, faces)
+	require.Equal(t, 2, bodies)
+}
+
+func TestSupportingPicturesNeedSomethingToLookLike(t *testing.T) {
+	// Without the chosen picture there is nothing to condition on, and five
+	// unconditioned renders would be five more strangers rather than five more
+	// looks at her.
+	jobs, queue := &recordingJobStore{}, &recordingEnqueuer{}
+	_, err := NewOmniChatOmniAILikenessService(jobs, queue, "runpod").
+		StartReferences(context.Background(), likenessPersona(t), "   ")
+
+	require.Error(t, err)
+	require.Empty(t, jobs.requests)
+	require.Zero(t, queue.enqueued)
+}
+
+func TestAPartialSupportingSetIsKeptToo(t *testing.T) {
+	// Every one of these is optional by construction: six is better than two
+	// and two is better than one. Throwing away the ones that started because a
+	// later one could not would leave her worse off.
+	jobs, queue := &recordingJobStore{}, &recordingEnqueuer{failOn: 3}
+	started, err := NewOmniChatOmniAILikenessService(jobs, queue, "runpod").
+		StartReferences(context.Background(), likenessPersona(t), "/uploads/anchor.png")
+
+	require.Error(t, err)
+	require.Len(t, started, 2)
+	require.Equal(t, 2, queue.enqueued)
+}
+
+func TestARoleplayCardGetsNoSupportingPictures(t *testing.T) {
+	owner := 9
+	card := &models.BotPersona{ID: 32, Name: "Card", OwnerUserID: &owner,
+		ResponseStyleProfile: "natural_dialogue"}
+	jobs, queue := &recordingJobStore{}, &recordingEnqueuer{}
+	_, err := NewOmniChatOmniAILikenessService(jobs, queue, "runpod").
+		StartReferences(context.Background(), card, "/uploads/anchor.png")
+
+	require.Error(t, err)
+	require.Empty(t, jobs.requests)
+}

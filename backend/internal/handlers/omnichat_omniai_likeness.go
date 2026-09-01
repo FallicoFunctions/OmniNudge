@@ -8,13 +8,21 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
+
+// omniChatReferenceStartTimeout bounds the background start so a stalled queue
+// cannot leave the goroutine alive indefinitely. It covers five job rows and
+// five enqueues, not the renders themselves.
+const omniChatReferenceStartTimeout = 15 * time.Second
 
 // omniChatLikenessStore is the choice, read and settled.
 type omniChatLikenessStore interface {
@@ -26,9 +34,37 @@ type omniChatLikenessStore interface {
 
 // OmniChatLikenessHandler serves the four pictures somebody chooses her face
 // from, and settles which one she keeps.
+// omniChatLikenessPersonaReader loads the character a pick belongs to, so her
+// supporting references can be conditioned on what somebody just chose.
+type omniChatLikenessPersonaReader interface {
+	GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*models.BotPersona, error)
+}
+
+// omniChatReferenceStarter asks for the five pictures that make her look like
+// herself in a scene.
+type omniChatReferenceStarter interface {
+	StartReferences(ctx context.Context, persona *models.BotPersona, anchorURL string) ([]uuid.UUID, error)
+}
+
 type OmniChatLikenessHandler struct {
-	store   omniChatLikenessStore
-	storage services.StorageService
+	store    omniChatLikenessStore
+	storage  services.StorageService
+	personas omniChatLikenessPersonaReader
+	starter  omniChatReferenceStarter
+}
+
+// SetReferenceStarter installs what asks for her supporting pictures once a
+// face has been chosen.
+//
+// Both halves are optional and nil-tolerant. A pick must never fail because a
+// render could not be queued: she is already wearing the face somebody chose,
+// and the supporting set only makes her more consistent in scenes.
+func (h *OmniChatLikenessHandler) SetReferenceStarter(
+	personas omniChatLikenessPersonaReader, starter omniChatReferenceStarter,
+) *OmniChatLikenessHandler {
+	h.personas = personas
+	h.starter = starter
+	return h
 }
 
 func NewOmniChatLikenessHandler(store omniChatLikenessStore, storage services.StorageService) *OmniChatLikenessHandler {
@@ -172,6 +208,7 @@ func (h *OmniChatLikenessHandler) Pick(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to keep that picture")
 		return
 	}
+	h.startSupportingReferences(c, personaID, ownerUserID, asset.StorageURL)
 	c.JSON(http.StatusOK, gin.H{"asset_id": asset.ID})
 }
 
@@ -199,4 +236,41 @@ func (h *OmniChatLikenessHandler) candidateID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return candidateID, true
+}
+
+// startSupportingReferences asks for the other five, off the request.
+//
+// Detached and in the background for the same reason creation's first four are:
+// this creates five job rows and puts five tasks on a queue, and a stalled
+// queue would otherwise hold up a choice that has already been made. On the
+// request's own context a client that disconnected would cancel them, and
+// nothing would ever ask again.
+//
+// Every failure is logged rather than raised. The pick has committed, she is
+// wearing the picture, and a missing supporting reference costs consistency in
+// scenes rather than correctness.
+func (h *OmniChatLikenessHandler) startSupportingReferences(
+	c *gin.Context, personaID, ownerUserID int, anchorURL string,
+) {
+	if h.personas == nil || h.starter == nil {
+		return
+	}
+	detached := context.WithoutCancel(c.Request.Context())
+	starter, personas := h.starter, h.personas
+	go func() {
+		renderCtx, cancel := context.WithTimeout(detached, omniChatReferenceStartTimeout)
+		defer cancel()
+
+		persona, err := personas.GetAccessibleByID(renderCtx, personaID, &ownerUserID)
+		if err != nil || persona == nil {
+			zlog.Error().Err(err).Int("persona_id", personaID).
+				Msg("omnichat likeness: could not load the character to support her picture")
+			return
+		}
+		started, err := starter.StartReferences(renderCtx, persona, anchorURL)
+		if err != nil {
+			zlog.Error().Err(err).Int("persona_id", personaID).Int("started", len(started)).
+				Msg("omnichat likeness: could not ask for every supporting reference")
+		}
+	}()
 }

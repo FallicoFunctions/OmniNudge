@@ -805,7 +805,8 @@ func main() {
 	// which is the point: creation does not depend on anything being able to
 	// draw her.
 	omniChatHandler.SetLikenessStarter(omniChatLikenessService)
-	omniChatLikenessHandler := handlers.NewOmniChatLikenessHandler(omniChatMediaRepo, storageService)
+	omniChatLikenessHandler := handlers.NewOmniChatLikenessHandler(omniChatMediaRepo, storageService).
+		SetReferenceStarter(botPersonaRepo, omniChatLikenessService)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)

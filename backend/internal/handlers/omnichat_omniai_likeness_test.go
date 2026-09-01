@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -57,7 +58,11 @@ func (f *likenessStoreFake) PickLikeness(_ context.Context, personaID, ownerUser
 	if f.pickErr != nil {
 		return nil, f.pickErr
 	}
-	return &models.OmniChatMediaAsset{ID: uuid.New()}, nil
+	// The chosen picture's URL comes back with the asset: the supporting
+	// renders are conditioned on it.
+	return &models.OmniChatMediaAsset{
+		ID: uuid.New(), StorageURL: "/uploads/omnichat/generated/9/anchor.png",
+	}, nil
 }
 
 func newLikenessRouter(store omniChatLikenessStore) *gin.Engine {
@@ -329,4 +334,126 @@ func TestAMissingObjectIsNotFoundRatherThanEmpty(t *testing.T) {
 			&likenessStorageFake{sizeErr: errors.New("no such object")}),
 		http.MethodGet, "/api/v1/omnichat/omniai/31/likeness/11/content")
 	require.Equal(t, http.StatusNotFound, response.Code)
+}
+
+type referenceStarterFake struct {
+	mu      sync.Mutex
+	calls   int
+	persona *models.BotPersona
+	anchor  string
+	err     error
+	called  chan struct{}
+	release chan struct{}
+}
+
+func newReferenceStarterFake(err error) *referenceStarterFake {
+	return &referenceStarterFake{err: err, called: make(chan struct{})}
+}
+
+func (f *referenceStarterFake) StartReferences(_ context.Context, persona *models.BotPersona, anchorURL string) ([]uuid.UUID, error) {
+	f.mu.Lock()
+	f.calls++
+	f.persona, f.anchor = persona, anchorURL
+	f.mu.Unlock()
+	close(f.called)
+	if f.release != nil {
+		<-f.release
+	}
+	return nil, f.err
+}
+
+func (f *referenceStarterFake) waitForStart(t *testing.T) {
+	t.Helper()
+	select {
+	case <-f.called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("her supporting pictures were never asked for")
+	}
+}
+
+type likenessPersonaReaderFake struct {
+	persona *models.BotPersona
+	err     error
+}
+
+func (f *likenessPersonaReaderFake) GetAccessibleByID(_ context.Context, _ int, _ *int) (*models.BotPersona, error) {
+	return f.persona, f.err
+}
+
+func newPickRouter(store omniChatLikenessStore, personas omniChatLikenessPersonaReader, starter omniChatReferenceStarter) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	handler := NewOmniChatLikenessHandler(store, nil).SetReferenceStarter(personas, starter)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.POST("/api/v1/omnichat/omniai/:id/likeness/:candidate_id", handler.Pick)
+	return router
+}
+
+func TestChoosingAsksForTheSupportingPictures(t *testing.T) {
+	owner := 9
+	persona := &models.BotPersona{ID: 31, Name: "Nadia", OwnerUserID: &owner}
+	store := &likenessStoreFake{}
+	starter := newReferenceStarterFake(nil)
+
+	response := callLikeness(newPickRouter(store, &likenessPersonaReaderFake{persona: persona}, starter),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12")
+	require.Equal(t, http.StatusOK, response.Code)
+
+	starter.waitForStart(t)
+	require.Equal(t, 31, starter.persona.ID)
+	require.NotEmpty(t, starter.anchor, "conditioned on the picture that was chosen")
+}
+
+func TestChoosingDoesNotWaitForTheRenderQueue(t *testing.T) {
+	// A pick has committed by the time this runs: she is already wearing the
+	// face. Holding the response on five enqueues would make a stalled queue
+	// look like a failed choice.
+	owner := 9
+	starter := newReferenceStarterFake(nil)
+	starter.release = make(chan struct{})
+	router := newPickRouter(&likenessStoreFake{},
+		&likenessPersonaReaderFake{persona: &models.BotPersona{ID: 31, OwnerUserID: &owner}}, starter)
+
+	responded := make(chan int, 1)
+	go func() {
+		responded <- callLikeness(router, http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code
+	}()
+
+	select {
+	case code := <-responded:
+		require.Equal(t, http.StatusOK, code)
+	case <-time.After(2 * time.Second):
+		close(starter.release)
+		t.Fatal("choosing waited for the render queue")
+	}
+	close(starter.release)
+	starter.waitForStart(t)
+}
+
+func TestAPickSurvivesTheRenderQueueBeingDown(t *testing.T) {
+	// The supporting set costs consistency in scenes, never the choice itself.
+	owner := 9
+	starter := newReferenceStarterFake(errors.New("redis is unreachable"))
+	response := callLikeness(newPickRouter(&likenessStoreFake{},
+		&likenessPersonaReaderFake{persona: &models.BotPersona{ID: 31, OwnerUserID: &owner}}, starter),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12")
+
+	require.Equal(t, http.StatusOK, response.Code)
+	starter.waitForStart(t)
+}
+
+func TestAPickSurvivesHavingNothingToStartRendersWith(t *testing.T) {
+	// Unwired, or the character could not be loaded. Either way the choice
+	// stands.
+	owner := 9
+	require.Equal(t, http.StatusOK, callLikeness(
+		newPickRouter(&likenessStoreFake{}, nil, nil),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code)
+
+	starter := newReferenceStarterFake(nil)
+	require.Equal(t, http.StatusOK, callLikeness(
+		newPickRouter(&likenessStoreFake{},
+			&likenessPersonaReaderFake{err: errors.New("gone")}, starter),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code)
+	_ = owner
 }

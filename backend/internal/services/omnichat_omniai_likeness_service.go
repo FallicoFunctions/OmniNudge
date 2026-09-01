@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -84,6 +85,70 @@ func (s *OmniChatOmniAILikenessService) Start(ctx context.Context, persona *mode
 			// hidden: a candidate that never renders is a gap in the choice,
 			// and the caller decides whether to say so.
 			failed = fmt.Errorf("omnichat likeness: enqueue job %s: %w", job.ID, err)
+			break
+		}
+		started = append(started, job.ID)
+	}
+	return started, failed
+}
+
+// StartReferences asks for the supporting pictures once somebody has chosen.
+//
+// One reference reproduces identity only weakly, which is why the profile's
+// limit is six rather than one. These are the other five: three portraits for
+// facial detail and two more full-length for proportions, each conditioned on
+// the picture that was actually picked.
+//
+// Called after the pick has committed rather than inside it. A pick must not
+// fail because a render could not be queued -- she is already wearing the face
+// somebody chose, and the supporting set only makes her more consistent in
+// scenes. The same reason creation does not fail when her first four cannot be
+// queued.
+//
+// A partial set is kept, again. Every one of these is optional by construction:
+// six is better than two and two is better than one, and throwing away the ones
+// that started because a later one could not would leave her worse off.
+func (s *OmniChatOmniAILikenessService) StartReferences(
+	ctx context.Context, persona *models.BotPersona, anchorURL string,
+) ([]uuid.UUID, error) {
+	if s == nil || s.jobs == nil || s.enqueuer == nil {
+		return nil, errors.New("omnichat likeness: service is not configured")
+	}
+	if persona == nil || persona.OwnerUserID == nil {
+		return nil, errors.New("omnichat likeness: an owned persona is required")
+	}
+	if models.PersonaPerformsAScene(persona) {
+		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
+	}
+	if strings.TrimSpace(anchorURL) == "" {
+		// Without the picked picture there is nothing to condition on, and five
+		// unconditioned renders would be five more strangers rather than five
+		// more looks at her.
+		return nil, errors.New("omnichat likeness: the chosen picture is required")
+	}
+
+	profile := ResolveOmniChatMediaIdentityProfile(persona)
+	variants := OmniAIReferenceVariantKeys()
+	started := make([]uuid.UUID, 0, len(variants))
+	var failed error
+
+	for _, variant := range variants {
+		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+			Kind:      models.OmniChatMediaKindImage,
+			PersonaID: persona.ID,
+			Prompt:    BuildOmniAIReferencePrompt(profile, variant),
+		}, variant)
+		if err != nil {
+			return started, fmt.Errorf("omnichat likeness: prepare %s: %w", variant, err)
+		}
+
+		job, err := s.jobs.CreateGenerationJob(ctx, *persona.OwnerUserID, request, s.provider)
+		if err != nil {
+			failed = fmt.Errorf("omnichat likeness: create %s: %w", variant, err)
+			break
+		}
+		if err := s.enqueuer.EnqueueOmniChatGeneration(ctx, job.ID); err != nil {
+			failed = fmt.Errorf("omnichat likeness: enqueue %s (%s): %w", variant, job.ID, err)
 			break
 		}
 		started = append(started, job.ID)
