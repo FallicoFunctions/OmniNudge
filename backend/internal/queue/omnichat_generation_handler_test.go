@@ -873,3 +873,85 @@ func TestTheMediumDirectiveIsOneDecisionInOnePlace(t *testing.T) {
 	require.Equal(t, models.RenderMediumSentence(""), models.RenderMediumSentence("claymation"),
 		"an unrecognised medium renders like everything else")
 }
+
+func (*cancelledGenerationStoreFake) AttachLikenessCandidate(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
+	return nil, errors.New("not expected")
+}
+
+func (*cancelledGenerationStoreFake) AttachLikenessReference(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) error {
+	return errors.New("not expected")
+}
+
+func (*generationClaimStoreFake) AttachLikenessCandidate(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
+	return nil, errors.New("not expected")
+}
+
+func (*generationClaimStoreFake) AttachLikenessReference(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) error {
+	return errors.New("not expected")
+}
+
+// commitDestinationFake records which of the three destinations a finished
+// render was handed to.
+type commitDestinationFake struct{ destination string }
+
+func (f *commitDestinationFake) GetGenerationJobForProcessing(context.Context, uuid.UUID) (*models.OmniChatGenerationJob, error) {
+	return nil, errors.New("not expected")
+}
+func (f *commitDestinationFake) GetMediaAssetOwned(context.Context, uuid.UUID, int) (*models.OmniChatMediaAsset, error) {
+	return nil, errors.New("not expected")
+}
+func (f *commitDestinationFake) DeleteMediaAssetOwned(context.Context, uuid.UUID, int) (bool, error) {
+	return false, errors.New("not expected")
+}
+func (f *commitDestinationFake) MarkGenerationJobRunning(context.Context, uuid.UUID, string) (bool, error) {
+	return false, errors.New("not expected")
+}
+func (f *commitDestinationFake) StartGenerationSecondPhase(context.Context, uuid.UUID, string) (bool, error) {
+	return false, errors.New("not expected")
+}
+func (f *commitDestinationFake) UpdateGenerationProgress(context.Context, uuid.UUID, int) error {
+	return errors.New("not expected")
+}
+func (f *commitDestinationFake) MarkGenerationJobFailed(context.Context, uuid.UUID, string, string) (bool, error) {
+	return false, errors.New("not expected")
+}
+func (f *commitDestinationFake) AttachIntermediateAsset(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatMediaKind, int64, int64, models.OmniChatGenerationProvenance) error {
+	return errors.New("not expected")
+}
+func (f *commitDestinationFake) CompleteGenerationJob(context.Context, uuid.UUID, *models.MediaFile, *models.OmniChatMediaAsset, int64, int64, models.OmniChatGenerationProvenance) error {
+	f.destination = "asset"
+	return nil
+}
+func (f *commitDestinationFake) AttachLikenessCandidate(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
+	f.destination = "candidate"
+	return &models.OmniChatOmniAILikenessCandidate{}, nil
+}
+func (f *commitDestinationFake) AttachLikenessReference(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) error {
+	f.destination = "reference"
+	return nil
+}
+
+func TestAFinishedRenderGoesWhereItsModeSays(t *testing.T) {
+	// A likeness and a reference are pictures of her that nobody owns. Only an
+	// ordinary render writes the gallery asset that says otherwise.
+	for _, mode := range []struct {
+		mode models.OmniChatGenerationMode
+		want string
+	}{
+		{models.OmniChatGenerationModeCreate, "asset"},
+		{models.OmniChatGenerationModeContextual, "asset"},
+		{models.OmniChatGenerationModeImageToVideo, "asset"},
+		{models.OmniChatGenerationModeLikeness, "candidate"},
+		{models.OmniChatGenerationModeLikenessReference, "reference"},
+	} {
+		t.Run(string(mode.mode), func(t *testing.T) {
+			store := &commitDestinationFake{}
+			handler := &OmniChatGenerationHandler{jobs: store}
+			commit := handler.commitFor(context.Background(),
+				&models.OmniChatGenerationJob{ID: uuid.New(), Mode: mode.mode})
+
+			require.NoError(t, commit(&models.MediaFile{}, &models.OmniChatMediaAsset{}, models.OmniChatGenerationProvenance{}))
+			require.Equal(t, mode.want, store.destination)
+		})
+	}
+}

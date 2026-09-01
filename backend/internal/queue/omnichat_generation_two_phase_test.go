@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -480,4 +481,12 @@ func TestASucceededJobKeepsItsStill(t *testing.T) {
 	require.NoError(t, handler.recordGenerationFailure(context.Background(), job.ID, "provider_failed"))
 
 	require.Empty(t, store.deletedAssets)
+}
+
+func (f *twoPhaseStoreFake) AttachLikenessCandidate(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
+	return nil, errors.New("not expected")
+}
+
+func (f *twoPhaseStoreFake) AttachLikenessReference(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) error {
+	return errors.New("not expected")
 }

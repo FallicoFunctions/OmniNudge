@@ -71,6 +71,8 @@ type omniChatGenerationJobStore interface {
 	MarkGenerationJobFailed(ctx context.Context, id uuid.UUID, safeCode, providerError string) (bool, error)
 	AttachIntermediateAsset(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, kind models.OmniChatMediaKind, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 	CompleteGenerationJob(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
+	AttachLikenessCandidate(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error)
+	AttachLikenessReference(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 }
 
 type omniChatPersonaReader interface {
@@ -340,10 +342,7 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 		return nil
 	}
 
-	_, stopped, err := h.persistGeneratedMedia(ctx, job, job.Kind, phase, result,
-		func(media *models.MediaFile, asset *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
-			return h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro(), provenance)
-		})
+	_, stopped, err := h.persistGeneratedMedia(ctx, job, job.Kind, phase, result, h.commitFor(ctx, job))
 	if err != nil {
 		return err
 	}
@@ -587,6 +586,37 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 //
 // A true "stopped" return means the job went terminal mid-flight; the caller
 // must stop without treating it as a failure.
+// commitFor picks where a finished render is stored.
+//
+// Three destinations, and the job's mode is what decides. Only the ordinary one
+// writes a gallery asset: a likeness and its supporting references are pictures
+// of her that the account does not own yet, or ever. The mode is checked again
+// inside each repository call, so a mistake here fails loudly rather than
+// putting a picture somewhere nobody reads it.
+func (h *OmniChatGenerationHandler) commitFor(
+	ctx context.Context, job *models.OmniChatGenerationJob,
+) func(*models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatGenerationProvenance) error {
+	switch job.Mode {
+	case models.OmniChatGenerationModeLikeness:
+		return func(media *models.MediaFile, _ *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
+			// One of the four somebody chooses from. No asset: three of them are
+			// about to be deleted, and the fourth only becomes hers on the pick.
+			_, err := h.jobs.AttachLikenessCandidate(ctx, job.ID, media, h.configQuotaFree(), h.configQuotaPro(), provenance)
+			return err
+		}
+	case models.OmniChatGenerationModeLikenessReference:
+		return func(media *models.MediaFile, _ *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
+			// One of the six the adapter is conditioned on. Nobody is ever shown
+			// it, so it is neither a candidate nor an asset.
+			return h.jobs.AttachLikenessReference(ctx, job.ID, media, h.configQuotaFree(), h.configQuotaPro(), provenance)
+		}
+	default:
+		return func(media *models.MediaFile, asset *models.OmniChatMediaAsset, provenance models.OmniChatGenerationProvenance) error {
+			return h.jobs.CompleteGenerationJob(ctx, job.ID, media, asset, h.configQuotaFree(), h.configQuotaPro(), provenance)
+		}
+	}
+}
+
 func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	ctx context.Context,
 	job *models.OmniChatGenerationJob,
