@@ -105,6 +105,9 @@ func (r *OmniChatMediaRepository) PickLikeness(
 		return nil, fmt.Errorf("omnichat likeness: record the chosen picture: %w", err)
 	}
 	asset.OwnerUserID, asset.PersonaID, asset.MediaFileID = ownerUserID, personaID, mediaFileID
+	// Carried back so the caller can condition the supporting renders on the
+	// picture that was actually chosen, without reading it again.
+	asset.StorageURL = storageURL
 	asset.Kind, asset.Visibility = OmniChatMediaKindImage, OmniChatAssetVisibilityPrivate
 
 	// She wears it, and it becomes what every later render is conditioned on.
