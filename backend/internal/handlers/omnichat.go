@@ -90,7 +90,14 @@ func (h *OmniChatHandler) omniAIState(c *gin.Context) (bool, int) {
 	if !ok {
 		return false, services.OmniChatOmniAILimit
 	}
-	return h.creationLimits.OmniAIState(c.Request.Context(), userID)
+	allowed, limit, err := h.creationLimits.OmniAIState(c.Request.Context(), userID)
+	if err != nil {
+		// The resolver already logged why and answered with the refusing
+		// defaults. Repeating them here says the refusal is deliberate rather
+		// than a value that happened to come back.
+		return false, services.OmniChatOmniAILimit
+	}
+	return allowed, limit
 }
 
 // respondRoleplayLimit tells somebody which refusal this is.
