@@ -273,7 +273,7 @@ func previewLikeness(cfg *config.Config, persona *models.BotPersona, ownerUserID
 	request, err := services.NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 		Kind:      models.OmniChatMediaKindImage,
 		PersonaID: persona.ID,
-		Prompt:    services.BuildIAILikenessPrompt(profile),
+		Prompt:    services.BuildOmniAILikenessPrompt(profile),
 	})
 	if err != nil {
 		return fmt.Errorf("normalize likeness request: %w", err)

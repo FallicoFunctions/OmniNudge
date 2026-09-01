@@ -17,7 +17,7 @@ import (
 // self tier along with her, which is the one irreversible thing in this whole
 // area, and it does not belong on the same surface as the reversible half.
 type adminNurseryStore interface {
-	ListAwaitingReview(ctx context.Context, limit int) ([]models.IAIAwaitingReview, error)
+	ListAwaitingReview(ctx context.Context, limit int) ([]models.OmniAIAwaitingReview, error)
 	Commandeer(ctx context.Context, personaID int) (bool, error)
 }
 

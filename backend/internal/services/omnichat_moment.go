@@ -27,13 +27,13 @@ import (
 // personaLivesHere reports whether a character exists in the same world the
 // clock measures.
 //
-// An IAI does. A roleplay character is a part being played, and her scene may be
+// An OmniAI does. A roleplay character is a part being played, and her scene may be
 // set somewhere the real date would contradict -- telling a character in a
 // medieval scenario that it is 2026 breaks the thing her creator built. Same
 // predicate as the direct-message kind today, named for what it means here so
 // that extending it later is one edit rather than a hunt.
 func personaLivesHere(persona *models.BotPersona) bool {
-	return models.PersonaIsIAI(persona)
+	return models.PersonaIsOmniAI(persona)
 }
 
 // renderCurrentMoment is what she knows about when this is happening.

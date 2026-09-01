@@ -16,7 +16,7 @@ func TestOnlyACharacterWhoChoosesHerOwnShapeArrivesInPieces(t *testing.T) {
 		separate bool
 		why      string
 	}{
-		{models.ResponseStyleProfileDirectMessage, true, "an IAI writes the breaks and means them"},
+		{models.ResponseStyleProfileDirectMessage, true, "an OmniAI writes the breaks and means them"},
 		{models.ResponseStyleProfileNaturalDialogue, false, "her creator has not chosen this yet"},
 		{models.ResponseStyleProfileLeanNarrative, false, "narration is not a burst of texts"},
 		{models.ResponseStyleProfileCharacterOnly, false, "an imported card is left alone"},

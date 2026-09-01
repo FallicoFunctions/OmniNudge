@@ -388,7 +388,7 @@ var reciprocalTurnBodyParts = []string{
 // when personal mode was switched on, which made a rule about *style* a
 // property of a bundle that also carries scene state and narration. Who decides
 // the shape differs by kind of character: a roleplay character's creator picks
-// it, and an IAI is offered the notation and no count at all (13).
+// it, and an OmniAI is offered the notation and no count at all (13).
 type messageShape struct {
 	minBlocks       int
 	maxBlocks       int

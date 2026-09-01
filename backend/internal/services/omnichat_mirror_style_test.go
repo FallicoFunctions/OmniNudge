@@ -115,7 +115,7 @@ func TestOnlyARoleplayCharacterMirrors(t *testing.T) {
 		MessageStyleMode:     models.MessageStyleModeDefault,
 	}))
 	// The schema refuses this row; refusing it here too means a bad row cannot
-	// make the platform choose an IAI's style for her.
+	// make the platform choose an OmniAI's style for her.
 	require.False(t, personaMirrorsUser(&models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
 		MessageStyleMode:     models.MessageStyleModeMirror,

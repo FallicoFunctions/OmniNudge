@@ -426,7 +426,7 @@ func TestExportOmniChatConversationsReportsCompleteWhenWithinCaps(t *testing.T) 
 	require.Equal(t, false, out["truncated"])
 }
 
-// What a free character keeps from a conversation is hers, not this user's, and
+// What an OmniAI keeps from a conversation is hers, not this user's, and
 // it stays out of the download even though it came from something they said.
 // That is a deliberate call: shared memory is backend-only.
 func TestExportOmniChatMemoryExcludesSharedMemories(t *testing.T) {
@@ -434,21 +434,21 @@ func TestExportOmniChatMemoryExcludesSharedMemories(t *testing.T) {
 	fixture := seedOmniChatExport(t, pool, "memoryshared")
 	ctx := context.Background()
 
-	var freePersonaID int
+	var omniAIPersonaID int
 	require.NoError(t, pool.QueryRow(ctx, `
 		INSERT INTO bot_personas (slug, name, system_prompt, response_style_profile)
-		VALUES ($1, 'Free', 'You are Free.', 'direct_message') RETURNING id`,
-		"exp-free-memoryshared").Scan(&freePersonaID))
+		VALUES ($1, 'Nova', 'You are Nova.', 'direct_message') RETURNING id`,
+		"exp-omniai-memoryshared").Scan(&omniAIPersonaID))
 
 	for _, userID := range []int{fixture.userID, fixture.otherUserID} {
 		var conversationID int
 		require.NoError(t, pool.QueryRow(ctx,
 			`INSERT INTO bot_conversations (user_id, persona_id) VALUES ($1, $2) RETURNING id`,
-			userID, freePersonaID).Scan(&conversationID))
+			userID, omniAIPersonaID).Scan(&conversationID))
 		_, err := pool.Exec(ctx, `
 			INSERT INTO omnichat_memory_episodes (persona_id, owner_user_id, conversation_id, title, summary)
 			VALUES ($1, NULL, $2, 'Something said to her', 'Kept as her own.')`,
-			freePersonaID, conversationID)
+			omniAIPersonaID, conversationID)
 		require.NoError(t, err)
 	}
 

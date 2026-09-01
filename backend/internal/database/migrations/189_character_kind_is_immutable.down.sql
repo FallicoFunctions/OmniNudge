@@ -17,7 +17,7 @@ BEGIN
 
         IF shared_episodes > 0 THEN
             RAISE EXCEPTION
-                'omnichat memory: persona % holds % conversation-derived shared episodes and cannot leave the free profile while they exist',
+                'omnichat memory: persona % holds % conversation-derived shared episodes and cannot leave the OmniAI profile while they exist',
                 NEW.id, shared_episodes
                 USING ERRCODE = 'check_violation';
         END IF;

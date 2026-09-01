@@ -18,7 +18,7 @@ func TestOnlyACharacterWhoseShapeSomebodyChoseIsHeldToOne(t *testing.T) {
 		{models.ResponseStyleProfileNaturalDialogue, true, "a roleplay character's shape was picked for her"},
 		{models.ResponseStyleProfileProfessional, true, "same, in a different register"},
 		{models.ResponseStyleProfileInherit, true, "inherit resolves to natural dialogue"},
-		{models.ResponseStyleProfileDirectMessage, false, "an IAI is offered the notation and no count"},
+		{models.ResponseStyleProfileDirectMessage, false, "an OmniAI is offered the notation and no count"},
 		{models.ResponseStyleProfileLeanNarrative, false, "never carried the count"},
 		{models.ResponseStyleProfileCharacterOnly, false, "an imported card is left alone"},
 	} {

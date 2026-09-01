@@ -40,18 +40,18 @@ const (
 
 // How a character decides the way she writes. Default means the way she was
 // made to; mirror means the way the person she is talking to writes. Only a
-// roleplay character may mirror -- an IAI already writes however she wants, and
+// roleplay character may mirror -- an OmniAI already writes however she wants, and
 // telling her to copy somebody would be us choosing her style.
 const (
 	MessageStyleModeDefault = "default"
 	MessageStyleModeMirror  = "mirror"
 )
 
-// PersonaIsIAI reports whether this row describes an Independent AI rather than
+// PersonaIsOmniAI reports whether this row describes an OmniAI rather than
 // a part somebody wrote. It is the one place that knows how that is spelled, so
 // callers can ask the question without each keeping their own copy of the
 // answer.
-func PersonaIsIAI(persona *BotPersona) bool {
+func PersonaIsOmniAI(persona *BotPersona) bool {
 	return personaIsDirectMessage(persona)
 }
 
@@ -102,10 +102,10 @@ type BotPersona struct {
 	ExampleDialogue      string  `json:"-"`
 	ResponseStyleProfile string  `json:"response_style_profile,omitempty"`
 	MessageStyleMode     string  `json:"message_style_mode,omitempty"`
-	// IAIAppearance is what she looks like, as answered on §34's first four
+	// OmniAIAppearance is what she looks like, as answered on §34's first four
 	// screens. Recorded now and drawn later; NULL for a roleplay character,
 	// whose likeness comes from her card or an upload.
-	IAIAppearance           json.RawMessage `json:"iai_appearance,omitempty"`
+	OmniAIAppearance        json.RawMessage `json:"omniai_appearance,omitempty"`
 	PostHistoryInstructions string          `json:"-"`
 	AlternateGreetings      []string        `json:"-"`
 	CreatorNotes            string          `json:"-"`
@@ -187,7 +187,7 @@ const botPersonaSelectColumns = `
 	id, slug, name, description, category, owner_user_id, visibility, source_format,
 	system_prompt, personality, scenario, first_message, example_dialogue, response_style_profile,
 	message_style_mode,
-	iai_appearance,
+	omniai_appearance,
 	post_history_instructions, alternate_greetings, creator_notes, tags, creator_name,
 	character_version, extensions_json, character_book_json, raw_card_json,
 	import_source_filename, avatar_url, preview_video_url, gallery_urls,
@@ -214,7 +214,7 @@ func scanBotPersona(scanner interface {
 		&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 		&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 		&p.MessageStyleMode,
-		&p.IAIAppearance,
+		&p.OmniAIAppearance,
 		&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 		&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 		&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,
@@ -859,7 +859,7 @@ func (r *BotConversationRepository) ListByUserID(ctx context.Context, userID, li
 			&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.OwnerUserID, &p.Visibility, &p.SourceFormat,
 			&p.SystemPrompt, &p.Personality, &p.Scenario, &p.FirstMessage, &p.ExampleDialogue, &p.ResponseStyleProfile,
 			&p.MessageStyleMode,
-			&p.IAIAppearance,
+			&p.OmniAIAppearance,
 			&p.PostHistoryInstructions, &p.AlternateGreetings, &p.CreatorNotes, &p.Tags, &p.CreatorName,
 			&p.CharacterVersion, &p.ExtensionsJSON, &p.CharacterBookJSON, &p.RawCardJSON,
 			&p.ImportSourceFilename, &p.AvatarURL, &p.PreviewVideoURL, &p.GalleryURLs,

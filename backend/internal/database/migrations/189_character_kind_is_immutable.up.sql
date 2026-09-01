@@ -1,5 +1,5 @@
--- A character is roleplay or free, it is chosen when she is created, and it is
--- never changed afterwards.
+-- A character is roleplay or an OmniAI, chosen when she is created, and that
+-- category is never changed afterwards.
 --
 -- 188 refused only the direction that would strand shared memories, and only
 -- while some existed. That was too narrow. The kind is not a setting; it decides
@@ -20,7 +20,7 @@ BEGIN
        IS DISTINCT FROM
        (NEW.response_style_profile = 'direct_message') THEN
         RAISE EXCEPTION
-            'omnichat: persona % cannot change between free and roleplay; the kind is fixed at creation',
+            'omnichat: persona % cannot change between OmniAI and roleplay; the kind is fixed at creation',
             NEW.id
             USING ERRCODE = 'check_violation';
     END IF;

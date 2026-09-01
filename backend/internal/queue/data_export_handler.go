@@ -675,7 +675,7 @@ func exportOmniChatPersonasData(ctx context.Context, db *pgxpool.Pool, userID in
 // memory and belongs to no user, and the WHERE clause excludes it.
 //
 // That now covers two different things, deliberately. One is a character's own
-// life, which was never anybody's record. The other is what a free character
+// life, which was never anybody's record. The other is what an OmniAI
 // kept from a conversation: hers, because she has one memory across everyone,
 // which the chat window states before anyone speaks. Neither is exposed to
 // players -- shared memory is ours, visible in the backend and nowhere else.

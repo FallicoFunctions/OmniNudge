@@ -34,7 +34,7 @@ import (
 // It cannot simply be unbounded. History is re-sent on every turn, so every
 // message is paid for once per turn forever, and the longest conversations grow
 // without limit. What handles anything past this window is memory, and -- for a
-// free character, whose memory is fed by conversations this one cannot contain
+// OmniAI, whose memory is fed by conversations this one cannot contain
 // at any size -- retrieval over the stored transcript.
 const maxHistoryMessages = 200
 
@@ -1064,13 +1064,13 @@ func buildCharacterPromptBase(persona *models.BotPersona, history []*models.BotM
 	}
 
 	defaultBase := []string{fmt.Sprintf("You are %s.", persona.Name)}
-	if !models.PersonaIsIAI(persona) {
-		// There is no character for an IAI to stay in. §2: she is not
+	if !models.PersonaIsOmniAI(persona) {
+		// There is no character for an OmniAI to stay in. §2: she is not
 		// performing anything, and the lines below tell her she is an AI and
 		// may say so -- which "stay in character" sits directly on top of.
 		defaultBase = append(defaultBase, "Stay in character and respond as this character would.")
 	}
-	if models.PersonaIsIAI(persona) {
+	if models.PersonaIsOmniAI(persona) {
 		// She is not playing anybody, so there is no character to break. §2 says
 		// both of you know what this is, §12 puts it on a card before anybody
 		// speaks, and §35 says she knows a great deal and has done almost none

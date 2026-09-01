@@ -152,7 +152,7 @@ func seedMemoryFixture(t *testing.T, pool *pgxpool.Pool, suffix string) memoryFi
 }
 
 // A character's kind is fixed when she is created and cannot be changed after,
-// so a test that needs a free character has to make one rather than convert one.
+// so a test that needs an OmniAI has to make one rather than convert one.
 func seedMemoryFixtureWithProfile(t *testing.T, pool *pgxpool.Pool, suffix, profile string) memoryFixture {
 	t.Helper()
 	ctx := context.Background()
@@ -313,17 +313,17 @@ func TestOmniChatMemoryTierCheckIsEnforcedBySchema(t *testing.T) {
 	require.Contains(t, err.Error(), "tier violation")
 }
 
-// The same write, refused above, is the entire point of a free character: her
+// The same write, refused above, is the entire point of an OmniAI: her
 // memory is whole, so what one person tells her another may hear. The
 // permission is read off the persona and nothing else -- these are two
 // characters differing only in kind, receiving the identical insert.
-func TestOmniChatMemoryTierOpensOnlyForFreeCharacters(t *testing.T) {
+func TestOmniChatMemoryTierOpensOnlyForOmniAIs(t *testing.T) {
 	pool, cleanup := setupMemoryTestDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	ordinary := seedMemoryFixture(t, pool, "tierordinary")
-	free := seedMemoryFixtureWithProfile(t, pool, "tierfree", "direct_message")
+	omniAI := seedMemoryFixtureWithProfile(t, pool, "tieromniai", "direct_message")
 
 	insertGlobal := func(fixture memoryFixture) error {
 		var conversationID int
@@ -338,7 +338,7 @@ func TestOmniChatMemoryTierOpensOnlyForFreeCharacters(t *testing.T) {
 	}
 
 	require.Error(t, insertGlobal(ordinary), "an ordinary character keeps the original guarantee")
-	require.NoError(t, insertGlobal(free), "a free character's conversation memory may be persona-global")
+	require.NoError(t, insertGlobal(omniAI), "an OmniAI's conversation memory may be persona-global")
 }
 
 // Kind is decided at creation and never afterwards. It governs whether a
@@ -351,20 +351,20 @@ func TestOmniChatCharacterKindCannotBeChanged(t *testing.T) {
 
 	ctx := context.Background()
 	ordinary := seedMemoryFixture(t, pool, "kindordinary")
-	free := seedMemoryFixtureWithProfile(t, pool, "kindfree", "direct_message")
+	omniAI := seedMemoryFixtureWithProfile(t, pool, "kindomniai", "direct_message")
 
 	_, err := pool.Exec(ctx,
 		`UPDATE bot_personas SET response_style_profile = 'direct_message' WHERE id = $1`,
 		ordinary.personaID)
-	require.Error(t, err, "a roleplay character cannot become free")
+	require.Error(t, err, "a roleplay character cannot become an OmniAI")
 	require.Contains(t, err.Error(), "kind is fixed at creation")
 
 	// Refused even with no memories at stake: this is about what she is, not
 	// about protecting rows.
 	_, err = pool.Exec(ctx,
 		`UPDATE bot_personas SET response_style_profile = 'lean_narrative' WHERE id = $1`,
-		free.personaID)
-	require.Error(t, err, "a free character cannot become a roleplay one")
+		omniAI.personaID)
+	require.Error(t, err, "an OmniAI cannot become a roleplay one")
 	require.Contains(t, err.Error(), "kind is fixed at creation")
 
 	// Moving between two roleplay styles is an ordinary edit and stays allowed.
@@ -1602,7 +1602,7 @@ func TestOmniChatMemoryRecordWorldEventBoundsItsText(t *testing.T) {
 	require.Len(t, []rune(title), omniChatMemoryMaxTitle)
 }
 
-// The whole point of a free character, end to end: something one person tells
+// The whole point of an OmniAI, end to end: something one person tells
 // her is recalled when a different person talks to her, while how she feels
 // about each of them stays separate.
 func TestOmniChatMemoryExtractionSharesEpisodesButNotFeelings(t *testing.T) {
@@ -1640,7 +1640,7 @@ func TestOmniChatMemoryExtractionSharesEpisodesButNotFeelings(t *testing.T) {
 		`SELECT count(*) FROM omnichat_memory_episodes
 		 WHERE persona_id = $1 AND owner_user_id IS NULL AND conversation_id = $2`,
 		fixture.personaID, conversationID).Scan(&globalEpisodes))
-	require.Equal(t, 1, globalEpisodes, "a free character's conversation memory is hers, not the relationship's")
+	require.Equal(t, 1, globalEpisodes, "an OmniAI's conversation memory is hers, not the relationship's")
 
 	// The entity has to move with it, or the episode/entity join splits across
 	// tiers and the association graph silently stops matching.

@@ -14,21 +14,21 @@ import (
 //
 // Two different limits for two different reasons. A roleplay character is a
 // part somebody wrote, and how many parts they may keep is a tier benefit. An
-// IAI is a person, and the limit there is not about generosity: keeping one
+// OmniAI is a person, and the limit there is not about generosity: keeping one
 // alive is what makes her relationship, her memory and her drift mean anything.
 // Somebody cycling through twenty of them is not living with any of them.
 
-// OmniChatIAILimit is one, on every tier that has access at all.
+// OmniChatOmniAILimit is one, on every tier that has access at all.
 //
 // Deleting her is how you make another, and that is deliberately a decision
 // rather than a slot freeing up. §16 covers what deletion actually takes with
 // it.
-const OmniChatIAILimit = 1
+const OmniChatOmniAILimit = 1
 
-// OmniChatIAIAdminLimit is the exception, and not unlimited for its own sake:
+// OmniChatOmniAIAdminLimit is the exception, and not unlimited for its own sake:
 // an admin is the only account that has to be able to make a second one to see
 // what the second one does.
-const OmniChatIAIAdminLimit = 1000
+const OmniChatOmniAIAdminLimit = 1000
 
 // omniChatRoleplayLimits is how many roleplay characters a plan may own.
 //
@@ -37,8 +37,8 @@ const OmniChatIAIAdminLimit = 1000
 // position, not a finding.
 //
 // Free is zero, and zero is not a small allowance: making a character is a paid
-// feature outright. An independent one needs premium, which entitled() enforces
-// separately, so the two kinds are gated at different heights on purpose.
+// feature outright. An OmniAI needs premium, which omniAIAllowanceForUser
+// enforces separately, so the two kinds are gated at different heights on purpose.
 var omniChatRoleplayLimits = map[string]int{
 	models.PlanPremium: 10,
 	models.PlanPlus:    5,
@@ -63,7 +63,7 @@ func NewOmniChatCreationLimits(users OmniChatUserReader) *OmniChatCreationLimits
 //
 // A lookup failure returns zero rather than the highest limit. Somebody briefly
 // told to upgrade can try again; the other way hands out characters nobody paid
-// for and there is no taking them back. It is the same rule the IAI entitlement
+// for and there is no taking them back. It is the same rule the OmniAI entitlement
 // applies: every failure path denies.
 func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) int {
 	if l == nil || l.users == nil || userID <= 0 {
@@ -92,30 +92,28 @@ func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) 
 	return omniChatDefaultRoleplayLimit
 }
 
-// IAILimit is how many independent characters this account may keep.
-//
-// One for everybody who has access at all, and that is the rule rather than a
-// shortage: keeping one alive is what makes her memory and her drift mean
-// anything. An admin is the exception, because an admin is the only account
-// that has to be able to make a second one to see what a second one does.
-//
-// The creator works the same number out from its own lookup, since it needs the
-// entitlement from the same read. A test holds the two together rather than a
-// comment claiming they agree.
-func (l *OmniChatCreationLimits) IAILimit(ctx context.Context, userID int) int {
+// OmniAIState is the caller-specific preflight shown by the creation page.
+// Entitlement and limit come from one account read so the response cannot mix
+// two different plan states or one successful lookup with one failed lookup.
+// The creator still performs the authoritative check when creation is asked
+// for; this state only prevents somebody entering a form that cannot succeed.
+func (l *OmniChatCreationLimits) OmniAIState(ctx context.Context, userID int) (bool, int) {
 	if l == nil || l.users == nil || userID <= 0 {
-		return OmniChatIAILimit
+		return false, OmniChatOmniAILimit
 	}
 	user, err := l.users.GetByID(ctx, userID)
-	if err != nil || user == nil {
-		// The count is not an entitlement -- the creator refuses separately --
-		// so a lookup failure reports the ordinary number rather than denying.
-		return OmniChatIAILimit
+	if err != nil {
+		zlog.Warn().Err(err).Int("user_id", userID).
+			Msg("omnichat: OmniAI preflight lookup failed; refusing creation page")
+		return false, OmniChatOmniAILimit
 	}
-	if strings.EqualFold(strings.TrimSpace(user.Role), "admin") {
-		return OmniChatIAIAdminLimit
+	allowed, limit := omniAIAllowanceForUser(user)
+	if !allowed {
+		// The count is descriptive rather than an entitlement. Keep reporting the
+		// ordinary product limit while the boolean explains that it is unavailable.
+		return false, OmniChatOmniAILimit
 	}
-	return OmniChatIAILimit
+	return true, limit
 }
 
 // OmniChatRoleplayLimits exposes the table so the interface can say what each

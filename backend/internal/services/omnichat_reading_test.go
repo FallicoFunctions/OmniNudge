@@ -261,7 +261,7 @@ func TestHerReadingIsInSomeOrderRatherThanNone(t *testing.T) {
 	// Each topic returns newest-first, so glueing the two lists together would
 	// put a three-day-old game headline above this morning's news, in an order
 	// no reader could account for.
-	items := recentReadingFor(context.Background(), twoTopicReader{}, iaiPersona())
+	items := recentReadingFor(context.Background(), twoTopicReader{}, omniAIPersona())
 
 	require.Len(t, items, 2)
 	require.Equal(t, "This morning", items[0].Title)
@@ -301,7 +301,7 @@ func TestNothingReadMeansNoBlockAtAll(t *testing.T) {
 func TestTheReadingReachesThePromptAndOnlyWhenThereIsSome(t *testing.T) {
 	// The render and the load are tested apart; this is the wire between them,
 	// which is the part that silently does nothing if it is ever unhooked.
-	persona := iaiPersona()
+	persona := omniAIPersona()
 	persona.SystemPrompt = "You are someone."
 
 	without := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil,
@@ -334,7 +334,7 @@ func (r *stubFeedReader) Recent(_ context.Context, topic string, _ time.Duration
 func TestOnlyACharacterWhoLivesHereReadsAnything(t *testing.T) {
 	reader := &stubFeedReader{}
 
-	require.NotEmpty(t, recentReadingFor(context.Background(), reader, iaiPersona()))
+	require.NotEmpty(t, recentReadingFor(context.Background(), reader, omniAIPersona()))
 
 	// A roleplay character's scene may be set anywhere, and this morning's
 	// headlines would break it -- same reason the clock is hers alone.
@@ -342,11 +342,11 @@ func TestOnlyACharacterWhoLivesHereReadsAnything(t *testing.T) {
 	require.Empty(t, recentReadingFor(context.Background(),
 		reader, &models.BotPersona{ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue}))
 	require.Equal(t, before, reader.calls, "and she is not even asked")
-	require.Empty(t, recentReadingFor(context.Background(), nil, iaiPersona()))
+	require.Empty(t, recentReadingFor(context.Background(), nil, omniAIPersona()))
 }
 
 func TestAFeedOutageMeansSheHasNotReadTheNewsToday(t *testing.T) {
 	// Which is a thing that happens to people, and not a reason to fail a reply.
 	reader := &stubFeedReader{err: errors.New("database unavailable")}
-	require.Empty(t, recentReadingFor(context.Background(), reader, iaiPersona()))
+	require.Empty(t, recentReadingFor(context.Background(), reader, omniAIPersona()))
 }

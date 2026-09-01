@@ -28,7 +28,7 @@ type OmniChatHandler struct {
 	allowance      *services.OmniChatAllowance
 	idempotency    OmniChatRequestIdempotencyStore
 	replies        *services.OmniChatReplyScheduler
-	iaiCreator     OmniChatIAIMaker
+	omniAICreator  OmniChatOmniAIMaker
 	creationLimits *services.OmniChatCreationLimits
 	likeness       OmniChatLikenessStarter
 }
@@ -60,26 +60,11 @@ func (h *OmniChatHandler) SetCreationLimits(limits *services.OmniChatCreationLim
 	return h
 }
 
-// roleplayLimit is how many roleplay characters this account may own.
-//
-// Unset, it returns zero, which refuses every creation rather than allowing
-// every creation. A handler wired without its limits should stop the feature
-// loudly, not hand out unlimited characters quietly.
-// iaiLimit is how many independent characters this caller may keep.
-//
-// Asked per caller rather than served as a constant. The endpoint used to send
-// the ordinary number to everybody, so an admin was told "you can keep one"
-// while the server let them keep a thousand -- the interface stating a rule the
-// server does not enforce, which is the fault this endpoint exists to prevent.
-//
-// An unwired resolver reports the ordinary number rather than nothing. The
-// count is not an entitlement; the creator refuses separately and would refuse
-// this caller too if they were not allowed one at all.
-// iaiOwned is how many independent characters the caller already keeps. A
+// omniAIOwned is how many OmniAIs the caller already keeps. A
 // failure to count reads as none: the creation flow refusing to open because a
 // count query failed would be worse than opening and being refused at the end,
 // which is where the real enforcement is.
-func (h *OmniChatHandler) iaiOwned(c *gin.Context) int {
+func (h *OmniChatHandler) omniAIOwned(c *gin.Context) int {
 	if h.personaRepo == nil {
 		return 0
 	}
@@ -87,22 +72,25 @@ func (h *OmniChatHandler) iaiOwned(c *gin.Context) int {
 	if !ok {
 		return 0
 	}
-	owned, err := h.personaRepo.CountIAIOwnedBy(c.Request.Context(), userID)
+	owned, err := h.personaRepo.CountOmniAIOwnedBy(c.Request.Context(), userID)
 	if err != nil {
 		return 0
 	}
 	return owned
 }
 
-func (h *OmniChatHandler) iaiLimit(c *gin.Context) int {
+// omniAIState gets entitlement and limit together. An unwired resolver denies
+// access while reporting the ordinary descriptive limit; creation independently
+// enforces both values when the request arrives.
+func (h *OmniChatHandler) omniAIState(c *gin.Context) (bool, int) {
 	if h.creationLimits == nil {
-		return services.OmniChatIAILimit
+		return false, services.OmniChatOmniAILimit
 	}
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		return services.OmniChatIAILimit
+		return false, services.OmniChatOmniAILimit
 	}
-	return h.creationLimits.IAILimit(c.Request.Context(), userID)
+	return h.creationLimits.OmniAIState(c.Request.Context(), userID)
 }
 
 // respondRoleplayLimit tells somebody which refusal this is.
@@ -110,7 +98,7 @@ func (h *OmniChatHandler) iaiLimit(c *gin.Context) int {
 // A limit of zero is not a full shelf. It is a feature the account does not
 // have, and "delete one to make room" is impossible advice for somebody with
 // none. Making characters is a paid feature outright: free accounts get zero of
-// either kind, and an independent one needs premium on top of that.
+// either kind, and an OmniAI needs premium on top of that.
 func respondRoleplayLimit(c *gin.Context, limit int) {
 	if limit <= 0 {
 		RespondErrorCoded(c, http.StatusForbidden, "character_creation_requires_upgrade",
@@ -123,6 +111,11 @@ func respondRoleplayLimit(c *gin.Context, limit int) {
 		"You have as many characters as your plan allows. Delete one, or upgrade for more.")
 }
 
+// roleplayLimit is how many roleplay characters this account may own.
+//
+// Unset, it returns zero, which refuses every creation rather than allowing
+// every creation. A handler wired without its limits should stop the feature
+// loudly, not hand out unlimited characters quietly.
 func (h *OmniChatHandler) roleplayLimit(ctx context.Context, userID int) int {
 	if h.creationLimits == nil {
 		return 0

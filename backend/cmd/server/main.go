@@ -780,7 +780,7 @@ func main() {
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
 		SetReplyScheduler(omniChatReplyScheduler).
-		SetIAICreator(services.NewOmniChatIAICreator(botPersonaRepo, userRepo)).
+		SetOmniAICreator(services.NewOmniChatOmniAICreator(botPersonaRepo, userRepo)).
 		SetCreationLimits(services.NewOmniChatCreationLimits(userRepo))
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
@@ -796,7 +796,7 @@ func main() {
 	).SetBilling(omniChatBilling).SetMessageWriter(botMessageRepo).SetConversationWriter(botConversationRepo).
 		SetPromptModerator(services.NewOpenRouterOmniChatMediaModerator(openrouterClient)).
 		SetContentEntitlement(omniChatContentEntitlement)
-	omniChatLikenessService := services.NewOmniChatIAILikenessService(
+	omniChatLikenessService := services.NewOmniChatOmniAILikenessService(
 		omniChatMediaRepo, omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
 	)
 	// Installed after construction because the generation enqueuer it needs is
@@ -1426,21 +1426,21 @@ func main() {
 			// Separate from the line above on purpose. §13: these are two
 			// different kinds of thing, and the writer under this one has no
 			// column to put an instruction in.
-			protected.POST("/omnichat/iai", omniChatHandler.CreateIAI)
+			protected.POST("/omnichat/omniai", omniChatHandler.CreateOmniAI)
 			// The lists the nine screens draw from, so the interface never
 			// keeps its own copy of what the server will accept.
-			protected.GET("/omnichat/iai/options", omniChatHandler.GetIAIOptions)
+			protected.GET("/omnichat/omniai/options", omniChatHandler.GetOmniAIOptions)
 			// Names to start her off with. Read once when the screen opens; the
 			// shuffle itself is local, so this is not a per-press endpoint.
-			protected.GET("/omnichat/iai/names", omniChatHandler.GetIAINames)
+			protected.GET("/omnichat/omniai/names", omniChatHandler.GetOmniAINames)
 
 			// The four pictures somebody chooses her face from. Candidates are
 			// not gallery assets, so they cannot be served through the media
 			// content route -- which is keyed on an asset id -- and get their
 			// own, scoped to her owner.
-			protected.GET("/omnichat/iai/:id/likeness", omniChatLikenessHandler.List)
-			protected.GET("/omnichat/iai/:id/likeness/:candidate_id/content", omniChatLikenessHandler.Content)
-			protected.POST("/omnichat/iai/:id/likeness/:candidate_id", omniChatLikenessHandler.Pick)
+			protected.GET("/omnichat/omniai/:id/likeness", omniChatLikenessHandler.List)
+			protected.GET("/omnichat/omniai/:id/likeness/:candidate_id/content", omniChatLikenessHandler.Content)
+			protected.POST("/omnichat/omniai/:id/likeness/:candidate_id", omniChatLikenessHandler.Pick)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)

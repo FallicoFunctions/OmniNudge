@@ -10,7 +10,7 @@
 -- teaches it instead, by example, without being asked.
 --
 -- Only a roleplay character may mirror, and the CHECK says so rather than a
--- comment. An IAI already writes however she wants: telling her to copy
+-- comment. An OmniAI already writes however she wants: telling her to copy
 -- somebody would be the platform deciding her style, which is the thing §13
 -- stops us doing.
 ALTER TABLE bot_personas

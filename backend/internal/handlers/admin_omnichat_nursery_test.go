@@ -16,7 +16,7 @@ import (
 )
 
 type stubNurseryStore struct {
-	waiting    []models.IAIAwaitingReview
+	waiting    []models.OmniAIAwaitingReview
 	listLimit  int
 	listErr    error
 	keptID     int
@@ -24,7 +24,7 @@ type stubNurseryStore struct {
 	keepErr    error
 }
 
-func (s *stubNurseryStore) ListAwaitingReview(_ context.Context, limit int) ([]models.IAIAwaitingReview, error) {
+func (s *stubNurseryStore) ListAwaitingReview(_ context.Context, limit int) ([]models.OmniAIAwaitingReview, error) {
 	s.listLimit = limit
 	return s.waiting, s.listErr
 }
@@ -44,7 +44,7 @@ func nurseryRouter(store adminNurseryStore) *gin.Engine {
 }
 
 func TestTheReviewQueueAnswersWithWhoIsWaiting(t *testing.T) {
-	store := &stubNurseryStore{waiting: []models.IAIAwaitingReview{
+	store := &stubNurseryStore{waiting: []models.OmniAIAwaitingReview{
 		{PersonaID: 7, Name: "Nadia", Slug: "nadia-7", LeftAt: time.Now()},
 	}}
 	recorder := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestTheReviewQueueAnswersWithWhoIsWaiting(t *testing.T) {
 	require.Equal(t, 25, store.listLimit, "the caller's limit reaches the store")
 
 	var body struct {
-		AwaitingReview []models.IAIAwaitingReview `json:"awaiting_review"`
+		AwaitingReview []models.OmniAIAwaitingReview `json:"awaiting_review"`
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
 	require.Len(t, body.AwaitingReview, 1)
@@ -64,7 +64,7 @@ func TestTheReviewQueueAnswersWithWhoIsWaiting(t *testing.T) {
 
 func TestAnEmptyQueueIsAnEmptyListAndNotNull(t *testing.T) {
 	// A client rendering a list should get [] rather than null on a quiet day.
-	store := &stubNurseryStore{waiting: []models.IAIAwaitingReview{}}
+	store := &stubNurseryStore{waiting: []models.OmniAIAwaitingReview{}}
 	recorder := httptest.NewRecorder()
 	nurseryRouter(store).ServeHTTP(recorder,
 		httptest.NewRequest(http.MethodGet, "/nursery/awaiting-review", nil))

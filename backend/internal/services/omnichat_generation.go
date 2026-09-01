@@ -124,12 +124,12 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 // actually is to every length and shape rule: a create.
 //
 // Billing is off. The first set of four is included in what making an
-// independent character already costs, and a job that carried a reservation
+// OmniAI already costs, and a job that carried a reservation
 // would have to release it four times over for a choice where three renders are
 // discarded by design. Re-rolls are charged by the caller that asks for them,
 // not here.
 func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) (models.OmniChatGenerationRequest, error) {
-	return normalizeIAIRenderRequest(request, models.OmniChatGenerationModeLikeness, omniChatLikenessAspectRatio)
+	return normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikeness, omniChatLikenessAspectRatio)
 }
 
 // NormalizeOmniChatReferenceRequest prepares one of the supporting references.
@@ -142,14 +142,14 @@ func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) 
 func NormalizeOmniChatReferenceRequest(
 	request models.OmniChatGenerationRequest, variantKey string,
 ) (models.OmniChatGenerationRequest, error) {
-	aspect, found := IAIReferenceVariantAspect(variantKey)
+	aspect, found := OmniAIReferenceVariantAspect(variantKey)
 	if !found {
 		return request, fmt.Errorf("omnichat likeness: no such reference variant %q", variantKey)
 	}
-	return normalizeIAIRenderRequest(request, models.OmniChatGenerationModeLikenessReference, aspect)
+	return normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikenessReference, aspect)
 }
 
-func normalizeIAIRenderRequest(
+func normalizeOmniAIRenderRequest(
 	request models.OmniChatGenerationRequest,
 	mode models.OmniChatGenerationMode,
 	aspectRatio string,

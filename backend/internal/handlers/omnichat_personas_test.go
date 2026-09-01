@@ -539,9 +539,9 @@ func TestOmniChatPersonaHandler_UpdateDeleteAndExportRemainOwnerOnly(t *testing.
 }
 
 func TestDirectMessageProfileIsNotAvailableToUserPersonas(t *testing.T) {
-	// A gate, not a rule about who may own a free character. This form still
-	// writes the instruction fields a free character is defined by not having,
-	// so it cannot create one yet. Lift with the Free AI creation flow.
+	// A gate, not a rule about who may own an OmniAI. This form still
+	// writes the instruction fields an OmniAI is defined by not having,
+	// so it cannot create one yet. Lift with the OmniAI creation flow.
 	_, err := normalizeResponseStyleProfile("direct_message", nil, "native")
 	require.Error(t, err)
 
@@ -553,7 +553,7 @@ func TestDirectMessageProfileIsNotAvailableToUserPersonas(t *testing.T) {
 func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
 	// The product rule, through the real route and a real database rather than
 	// through the resolver alone. Free is zero of either kind: a roleplay
-	// character needs a paid plan, and an independent one needs premium on top.
+	// character needs a paid plan, and an OmniAI needs premium on top.
 	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
 	defer cleanup()
 
@@ -563,7 +563,7 @@ func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
 	require.NoError(t, userRepo.UpdatePlan(ctx, free.ID, models.PlanFree, nil))
 
 	body := []byte(`{
-		"name":"Free Bot",
+		"name":"No Plan Bot",
 		"description":"Should not exist",
 		"category":"original",
 		"visibility":"private",
@@ -590,27 +590,27 @@ func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
 	router.ServeHTTP(ownedRecorder, owned)
 
 	require.Equal(t, http.StatusOK, ownedRecorder.Code)
-	require.NotContains(t, ownedRecorder.Body.String(), "Free Bot")
+	require.NotContains(t, ownedRecorder.Body.String(), "No Plan Bot")
 }
 
-// Deleting an independent character goes down a different path from deleting a
+// Deleting an OmniAI goes down a different path from deleting a
 // roleplay one, and the dispatch between them had no test at all. Getting it
-// wrong is quiet in both directions: an IAI through the ordinary soft delete
+// wrong is quiet in both directions: an OmniAI through the ordinary soft delete
 // stays owned by somebody who can no longer reach her and keeps his one slot,
 // and a roleplay character down the leaving path would not be deleted at all.
-func TestDeletingAnIndependentCharacterIsNotTheOrdinaryDelete(t *testing.T) {
+func TestDeletingAnOmniAIIsNotTheOrdinaryDelete(t *testing.T) {
 	router, userRepo, personaRepo, pool, cleanup := setupOmniChatPersonaTestEnv(t)
 	defer cleanup()
 	ctx := context.Background()
 
-	owner := createOmniChatPersonaTestUser(t, userRepo, "iai_owner")
+	owner := createOmniChatPersonaTestUser(t, userRepo, "omniai_owner")
 
-	var iaiID int
+	var omniAIID int
 	require.NoError(t, pool.QueryRow(ctx, `
 		INSERT INTO bot_personas (name, slug, description, personality, system_prompt,
 			owner_user_id, response_style_profile, visibility, nursery_home, is_active)
 		VALUES ('Nadia', 'nadia-h', 'd', 'p', '', $1, 'direct_message', 'private', 'home', TRUE)
-		RETURNING id`, owner.ID).Scan(&iaiID))
+		RETURNING id`, owner.ID).Scan(&omniAIID))
 
 	var roleplayID int
 	require.NoError(t, pool.QueryRow(ctx, `
@@ -627,14 +627,14 @@ func TestDeletingAnIndependentCharacterIsNotTheOrdinaryDelete(t *testing.T) {
 		return recorder.Code
 	}
 
-	require.Equal(t, http.StatusOK, deleteAs(iaiID))
+	require.Equal(t, http.StatusOK, deleteAs(omniAIID))
 	var home string
-	var iaiOwner *int
+	var omniAIOwner *int
 	require.NoError(t, pool.QueryRow(ctx,
-		`SELECT nursery_home, owner_user_id FROM bot_personas WHERE id = $1`, iaiID).
-		Scan(&home, &iaiOwner))
+		`SELECT nursery_home, owner_user_id FROM bot_personas WHERE id = $1`, omniAIID).
+		Scan(&home, &omniAIOwner))
 	require.Equal(t, "review", home, "she left rather than being soft deleted")
-	require.Nil(t, iaiOwner, "which is what frees his one slot")
+	require.Nil(t, omniAIOwner, "which is what frees his one slot")
 
 	// The roleplay character takes the ordinary path and is simply gone.
 	require.Equal(t, http.StatusOK, deleteAs(roleplayID))
@@ -645,8 +645,8 @@ func TestDeletingAnIndependentCharacterIsNotTheOrdinaryDelete(t *testing.T) {
 	}
 
 	// Somebody else's character is not theirs to delete down either path.
-	stranger := createOmniChatPersonaTestUser(t, userRepo, "iai_stranger")
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/omnichat/personas/"+strconv.Itoa(iaiID), nil)
+	stranger := createOmniChatPersonaTestUser(t, userRepo, "omniai_stranger")
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/omnichat/personas/"+strconv.Itoa(omniAIID), nil)
 	setOmniChatPersonaTestUser(req, stranger.ID)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, req)

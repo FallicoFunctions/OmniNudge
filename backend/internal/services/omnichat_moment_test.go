@@ -10,12 +10,12 @@ import (
 	"github.com/omninudge/backend/internal/models"
 )
 
-func iaiPersona() *models.BotPersona {
+func omniAIPersona() *models.BotPersona {
 	return &models.BotPersona{ResponseStyleProfile: models.ResponseStyleProfileDirectMessage}
 }
 
 func TestSheIsToldTheDayTheDateAndTheTime(t *testing.T) {
-	moment := renderCurrentMoment(iaiPersona(), time.Date(2026, time.August, 26, 15, 37, 0, 0, time.UTC))
+	moment := renderCurrentMoment(omniAIPersona(), time.Date(2026, time.August, 26, 15, 37, 0, 0, time.UTC))
 
 	require.Contains(t, moment, "[Right Now]")
 	require.Contains(t, moment, "Wednesday")
@@ -32,7 +32,7 @@ func TestThePromptOnlyCarriesAClockWhenSomebodyHandsItOne(t *testing.T) {
 	// differently every minute: the approval gate becomes unapprovable and every
 	// test asserting prompt text fails one run in sixty. It passes today only
 	// because no companion fixture is direct_message, which is not a guarantee.
-	persona := iaiPersona()
+	persona := omniAIPersona()
 	persona.SystemPrompt = "You are someone."
 
 	first := buildConversationSystemPrompt(persona, nil, nil)
@@ -52,7 +52,7 @@ func TestThePromptOnlyCarriesAClockWhenSomebodyHandsItOne(t *testing.T) {
 func TestOnlyACharacterWhoLivesHereIsToldTheDate(t *testing.T) {
 	now := time.Date(2026, time.August, 26, 15, 0, 0, 0, time.UTC)
 
-	require.NotEmpty(t, renderCurrentMoment(iaiPersona(), now))
+	require.NotEmpty(t, renderCurrentMoment(omniAIPersona(), now))
 
 	// A roleplay character's scene may be set somewhere 2026 contradicts, and
 	// handing her the real date would break what her creator built.
@@ -71,14 +71,14 @@ func TestOnlyACharacterWhoLivesHereIsToldTheDate(t *testing.T) {
 func TestAClockThatIsNotSetSaysNothing(t *testing.T) {
 	// Better to say nothing than to tell her it is the first of January in the
 	// year one with complete confidence.
-	require.Empty(t, renderCurrentMoment(iaiPersona(), time.Time{}))
+	require.Empty(t, renderCurrentMoment(omniAIPersona(), time.Time{}))
 }
 
 func TestSheCanTellSixFiftyFiveFromSevenThirty(t *testing.T) {
 	// The case §5 is built on: she has an arrangement at seven and it is nearly
 	// seven, so she says so. A block that only knew "the evening" could not.
-	before := renderCurrentMoment(iaiPersona(), time.Date(2026, time.August, 26, 18, 55, 0, 0, time.UTC))
-	after := renderCurrentMoment(iaiPersona(), time.Date(2026, time.August, 26, 19, 30, 0, 0, time.UTC))
+	before := renderCurrentMoment(omniAIPersona(), time.Date(2026, time.August, 26, 18, 55, 0, 0, time.UTC))
+	after := renderCurrentMoment(omniAIPersona(), time.Date(2026, time.August, 26, 19, 30, 0, 0, time.UTC))
 
 	require.Contains(t, before, "6:55pm")
 	require.Contains(t, after, "7:30pm")
@@ -88,7 +88,7 @@ func TestSheCanTellSixFiftyFiveFromSevenThirty(t *testing.T) {
 func TestTheTimeIsHersRatherThanTheReaders(t *testing.T) {
 	// We do not know where he is. Inventing his timezone would have her saying
 	// good morning at his midnight, with total confidence.
-	moment := renderCurrentMoment(iaiPersona(), time.Date(2026, time.August, 26, 9, 0, 0, 0, time.UTC))
+	moment := renderCurrentMoment(omniAIPersona(), time.Date(2026, time.August, 26, 9, 0, 0, 0, time.UTC))
 	require.True(t, strings.Contains(moment, "where you are"),
 		"the line has to say whose clock this is, or it reads as a claim about his")
 }

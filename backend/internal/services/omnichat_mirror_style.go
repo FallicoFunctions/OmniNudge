@@ -131,7 +131,7 @@ func firstLetter(content string) rune {
 }
 
 // personaMirrorsUser reports whether this character takes her format from the
-// person she is talking to. The schema already refuses mirror on an IAI; this
+// person she is talking to. The schema already refuses mirror on an OmniAI; this
 // refuses it again rather than trusting a row.
 func personaMirrorsUser(persona *models.BotPersona) bool {
 	if persona == nil || personaDeliversSeparateMessages(persona) {

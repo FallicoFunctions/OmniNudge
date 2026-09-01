@@ -230,13 +230,14 @@ func (h *OmniChatHandler) DeletePersona(c *gin.Context) {
 		return
 	}
 
-	// An independent character is not deleted, she leaves. Her life and what
-	// she is to everybody else survive; his half of her does not. Trying the
-	// leaving path first is what keeps the two apart -- routing an IAI through
+	// An OmniAI is not deleted, she leaves. Her life and what
+	// she is to everybody else survive; her relationship with her creator ends
+	// and is no longer accessible to him. Trying the leaving path first is what
+	// keeps the two apart -- routing an OmniAI through
 	// the ordinary soft delete would leave her owned by somebody who cannot
 	// reach her, holding the one slot he has.
 	left, err := h.personaRepo.LeaveCreator(c.Request.Context(), userID, personaID)
-	if err != nil && !errors.Is(err, models.ErrNotAnIAI) {
+	if err != nil && !errors.Is(err, models.ErrNotAnOmniAI) {
 		RespondError(c, http.StatusInternalServerError, "Failed to delete persona")
 		return
 	}
@@ -594,16 +595,16 @@ func normalizeResponseStyleProfile(raw string, existing *models.BotPersona, sour
 		models.ResponseStyleProfileCharacterOnly:
 		return profile, nil
 	case models.ResponseStyleProfileDirectMessage:
-		// Not because a user's character may not be free -- one kept private
-		// still is -- but because this form cannot yet create a free one. It
+		// Not because a user's character may not be an OmniAI -- one kept private
+		// still is -- but because this form cannot create an OmniAI. It
 		// writes system_prompt, scenario, and post_history_instructions, which
-		// exist to make behaviour binding. A free character is defined by not
+		// exist to make behaviour binding. An OmniAI is defined by not
 		// having them: her backstory becomes starting disposition and seed
 		// memories, so "you will never leave him" has nowhere to be put.
 		//
 		// Opening this before that path exists would ship a character with no
 		// scene and no greeting who is nonetheless fully scriptable, which is
-		// worse than either state. Lift it with the Free AI creation flow.
+		// worse than either state. Lift it with the OmniAI creation flow.
 		return "", fmt.Errorf("response style profile is invalid")
 	default:
 		return "", fmt.Errorf("response style profile is invalid")

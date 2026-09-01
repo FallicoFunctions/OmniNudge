@@ -39,13 +39,13 @@ const omniChatMaxDeliverySpread = omniChatMaxDeliveredMessages * omniChatTypingP
 // personaDeliversSeparateMessages reports whether this character's blocks are
 // sent one at a time.
 //
-// True for an IAI, because §13 says the notation is available to her and the
+// True for an OmniAI, because §13 says the notation is available to her and the
 // count is not imposed: if she wrote two pieces, she meant two messages. False
 // for a roleplay character until her creator chooses it on the form, since
 // changing how every existing character arrives is the creator's call and not
 // ours.
 func personaDeliversSeparateMessages(persona *models.BotPersona) bool {
-	return models.PersonaIsIAI(persona)
+	return models.PersonaIsOmniAI(persona)
 }
 
 // splitDeliverableMessages turns one generated reply into the messages it was
