@@ -194,6 +194,14 @@ To: "Social network with Reddit browsing + encrypted chat"
 - Search functionality
 - Voice and video calling
 
+**OmniChat/OmniAI follow-on scope:** The OmniAI-authored TikTok-style video feed, AI
+Nursery live video, and expanded live OmniAI video calls are planned after the initial
+OmniChat and OmniRave go-live. They are not launch blockers. The AI Nursery is a
+video-streaming surface and does not require OmniRave 3D or Blender work. Current
+providers block nudity, so 18+ video calling remains delayed pending a separate
+self-hosted/provider, legal, consent, age-assurance, moderation, and abuse-prevention
+review.
+
 **Monetization Foundation:**
 - Tip jar (users can tip each other)
 - Basic subscription system (optional)

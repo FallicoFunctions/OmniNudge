@@ -2,14 +2,29 @@
 
 This document is the production and maintenance guide for OmniChat's generative media, Explore, mixed group chat, character voice, and call systems.
 
+## Launch status and follow-on roadmap
+
+The current OmniChat and OmniRave work is targeted at an initial go-live. The OmniAI
+short-video feed, AI Nursery live video, and expanded live OmniAI video-call work are
+post-launch additions and are not first-go-live requirements. See the dedicated
+[post-launch OmniAI video and social design](superpowers/specs/2026-08-31-omnichat-post-launch-omniai-video-social-design.md).
+
+The current LiveKit/avatar-call architecture supports provider-compatible live
+video calls. The 18+ video-call experience is delayed because current providers
+specifically block nudity; do not treat the existing call path as support for that
+mode. A future self-hosted or purpose-built option requires separate legal,
+consent, age-assurance, moderation, abuse-prevention, and operational review.
+
 ## Product behavior
 
 - A direct conversation can request the current scene as an image or video from the composer controls, or can start a message with `/photo` or `/video` followed by a description of the character or scene. Slash commands are persisted as user turns, bypass chat completion, and queue the same generation/gallery pipeline used by Create. Contextual generation uses the server-owned recent transcript and persisted scene state, not a client-authored transcript.
 - The Create workspace generates character-consistent images and videos outside chat. Successful results are stored privately in the user's gallery automatically.
 - A gallery owner can publish a creation to Explore. Conversation owners can publish an immutable snapshot. Other users can like, comment, bookmark, follow, share, report, or continue a shared chat in a private conversation of their own.
+- After go-live, OmniAI-authored short videos may be published into a TikTok-style vertical feed using the same profile, media, publication, moderation, and reporting foundations.
+- After go-live, the AI Nursery may expose a live or continuously generated video surface. It is a video-streaming experience and does not require OmniRave 3D models or Blender.
 - OmniChat groups can contain human members and AI personas. Up to three explicitly selected or mentioned personas answer a turn; model calls run concurrently and messages are persisted in deterministic order.
 - Every character receives a stable browser voice profile automatically. A character owner can select one of 12 curated local Voicebox/Kokoro presets; higher-fidelity voice processing runs on demand through the GPU worker.
-- Assistant messages support read-aloud. Voice calls use the same persisted conversation, browser speech recognition where available, typed fallback input, and character speech. Video calls open a private, short-lived self-hosted LiveKit room and start an on-demand avatar worker so the character can see, hear, respond, gesture, and lip-sync in real time. Call transcripts are not copied into a separate OmniChat recording.
+- Assistant messages support read-aloud. Voice calls use the same persisted conversation, browser speech recognition where available, typed fallback input, and character speech. Video calls open a private, short-lived self-hosted LiveKit room and start an on-demand avatar worker so the character can see, hear, respond, gesture, and lip-sync in real time. Call transcripts are not copied into a separate OmniChat recording. The expanded post-launch call experience remains provider-constrained for 18+ content.
 
 ## Runtime architecture
 

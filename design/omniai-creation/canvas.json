@@ -35,7 +35,7 @@
       "y": 0,
       "w": 1440,
       "h": 900,
-      "title": "Refused \u00b7 tier has no IAI (403)",
+      "title": "Refused \u00b7 tier has no OmniAI (403)",
       "page": "page-1"
     },
     {
@@ -154,7 +154,7 @@
       "y": -300,
       "w": 660,
       "page": "page-1",
-      "text": "Deliberately absent: no free-text interest, and no name list for \"indigenous\". The server collects a name, up to three traits, up to three interests, a starting state, an attraction and eight appearance answers. Every list here is the server's, checked against it."
+      "text": "Deliberately absent: no free-text interest, and no name list for \"indigenous\". The server collects a name, up to three traits, up to three interests, a starting feeling, a relationship, and the appearance answers. Every list here is the server's, checked against it."
     },
     {
       "id": "pronoun-note",

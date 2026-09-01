@@ -1,13 +1,27 @@
 // Drive the creation flow the way the runtime would: act, then re-render.
+const fs = require('fs');
+
 class DCLogic {
   constructor(props) { this.props = props || {}; this.state = {}; }
   setState(patch) { this.state = Object.assign({}, this.state, patch); }
 }
-global.DCLogic = DCLogic;
-const Component = require('./flow_logic.js');
-// Exported alongside the component so this file is self-contained. It was being
-// patched in by hand after every copy, which is a step that silently vanishes.
-const nameSuggestions = Component.nameSuggestions;
+
+// Main.dc.html is the source of truth. Loading its component script here keeps
+// this harness runnable after regeneration instead of depending on a hand-made
+// flow_logic.js copy that can be absent or silently stale.
+const source = fs.readFileSync(__dirname + '/Main.dc.html', 'utf8');
+const marker = '<script data-dc-script';
+const markerAt = source.indexOf(marker);
+const scriptAt = source.indexOf('>', markerAt) + 1;
+const scriptEnd = source.indexOf('</script>', scriptAt);
+if (markerAt < 0 || scriptAt === 0 || scriptEnd < 0) {
+  throw new Error('Main.dc.html does not contain one data-dc component script');
+}
+const loadComponent = new Function(
+  'DCLogic',
+  source.slice(scriptAt, scriptEnd) + '\nreturn { Component, nameSuggestions };'
+);
+const { Component, nameSuggestions } = loadComponent(DCLogic);
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -100,14 +114,14 @@ c.setState({ interestSearch: '', interests: [] });
 
 check('the you screen asks two questions',
   (() => { c.setState({ step: 7 }); return render().groups.map((g) => g.label); })(),
-  ['How she is with you', 'Drawn to you']);
+  ['How she is with you', 'What you are to each other']);
 check('besotted is gone and neutral replaced indifferent',
   render().groups[0].options.map((o) => o.key),
   ['guarded', 'neutral', 'curious', 'fond', 'close', 'devoted']);
-check('and attraction is answered separately',
+check('and the relationship is answered directly',
   (() => { render().groups[0].options.find((o) => o.key === 'guarded').pick();
-           render().groups[1].options.find((o) => o.key === 'strong').pick();
-           return [c.state.feeling, c.state.attraction]; })(), ['guarded', 'strong']);
+           render().groups[1].options.find((o) => o.key === 'spouse').pick();
+           return [c.state.feeling, c.state.relationship]; })(), ['guarded', 'spouse']);
 
 c.setState({ step: 3 });
 check('screen three asks six things now',
@@ -199,7 +213,9 @@ check('the review is where she is made, not the screen before it',
   walk.render().nextLabel, 'Make her');
 const rows = walk.render().reviewRows;
 check('the review reports every answer', rows.map((r) => r.label),
-  ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She likes', 'With you', 'Drawn to you']);
+  ['Look', 'Ethnicity', 'Hair', 'Eyes', 'Build', 'She starts', 'She likes', 'With you', 'What you are']);
+check('the review states the limit without claiming her memory is erased',
+  walk.render().deletionNote, 'You can keep one OmniAI.');
 check('the height has no centimetres beside it', rows[0].value.includes("5'6\""), true);
 check('and none anywhere on the screen', JSON.stringify(walk.render()).includes(' cm'), false);
 check('a screen nobody answered reads as left open', rows[1].value, 'Left open');

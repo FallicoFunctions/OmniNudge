@@ -21,7 +21,7 @@
   <div style="width: 1060px; height: 740px; display: flex; flex-direction: column; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); background: #0e1017; box-shadow: 0 32px 120px rgba(0,0,0,0.72); overflow: hidden;">
 
     <header style="display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 22px 32px;">
-      <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #7da8ff;">New independent character</p>
+      <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #7da8ff;">New OmniAI</p>
       <button type="button" aria-label="Close" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px; border: none; border-radius: 999px; background: transparent; color: rgba(255,255,255,0.55); cursor: pointer;">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg>
       </button>
@@ -177,11 +177,9 @@
 </div>
 </x-dc>
 <script data-dc-script data-props='{"start":{"editor":"int","default":1,"min":1,"max":9,"section":"Flow"},"gender":{"editor":"enum","options":["","woman","man"],"default":"","section":"Flow"},"$preview":{"width":1440,"height":900}}'>
-const drawnTo = (level) => ({ none: 'Not at all', some: 'Somewhat', strong: 'Very' }[level] || 'Not at all');
-
 const feetAndInches = (inches) => Math.floor(inches / 12) + "'" + (inches % 12) + '"';
 
-// Mirrors GET /omnichat/iai/names?ethnicity=&gender=. The real screen fetches
+// Mirrors GET /omnichat/omniai/names?ethnicity=&gender=. The real screen fetches
 // this once when it opens and shuffles locally, which is what this does. The
 // blend is the server's -- the ethnicity's own names plus a pool used widely
 // across many places -- and there is deliberately no list for "indigenous",
@@ -239,7 +237,7 @@ class Component extends DCLogic {
       ethnicity: '', hairLength: '', hairTexture: '', hairStyle: '',
       hairColour: '', eyes: '', build: '',
       temperaments: [], interests: [], interestSearch: '',
-      feeling: '', attraction: 'none',
+      feeling: '', relationship: 'friend',
       // Opening straight onto the name screen has to look like arriving at it,
       // not like a blank box. The forward path fills this in on the way through;
       // this is the pinned artboards and anything that deep-links.
@@ -256,7 +254,7 @@ class Component extends DCLogic {
   }
 
   // These mirror the server's tables. The real screen fetches them from
-  // GET /omnichat/iai/options, which serves the dependent lists already worked
+  // GET /omnichat/omniai/options, which serves the dependent lists already worked
   // out; nothing here decides a rule, it only draws one.
   tables() {
     return {
@@ -560,15 +558,14 @@ class Component extends DCLogic {
           ['close', 'Close', 'Already trusts you'],
           ['devoted', 'Devoted', 'You matter most']
         ], s.feeling, this.one('feeling')) });
-      // Asked separately, which is the point of it. Guarded and drawn to you is
-      // a real starting place, and it could not be said on one ladder.
-      groups.push({ label: 'Drawn to you', counter: '', counterColour: 'rgba(255,255,255,0.4)',
-        columns: 'repeat(3, minmax(0, 1fr))',
+      groups.push({ label: 'What you are to each other', counter: '', counterColour: 'rgba(255,255,255,0.4)',
+        columns: 'repeat(4, minmax(0, 1fr))',
         options: this.chips([
-          ['none', 'Not at all', ''],
-          ['some', 'Somewhat', ''],
-          ['strong', 'Very', '']
-        ], s.attraction, this.one('attraction')) });
+          ['friend', 'Friend', ''],
+          ['situationship', 'Situationship', ''],
+          ['partner', s.gender === 'man' ? 'Boyfriend' : 'Girlfriend', ''],
+          ['spouse', s.gender === 'man' ? 'Husband' : 'Wife', '']
+        ], s.relationship, this.one('relationship')) });
     }
 
     const styleCardStyle = (selected) => 'display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: 24px; border: ' +
@@ -630,9 +627,11 @@ class Component extends DCLogic {
       { label: p.Subj + ' start' + p.s, value: s.temperaments.length ? s.temperaments.map((k) => readable(k, '')).join(', ') : 'Not chosen', style: rowStyle(false) },
       { label: p.Subj + ' like' + p.s, value: s.interests.length ? s.interests.map((k) => readable(k, '')).join(', ') : 'Nothing yet', style: rowStyle(false) },
       { label: 'With you', value: readable(s.feeling, 'Not chosen'), style: rowStyle(false) },
-      // Its own row, because it is its own answer. Folding it into the line
-      // above would put it back on the ladder it was taken off.
-      { label: 'Drawn to you', value: drawnTo(s.attraction), style: rowStyle(true) }
+      { label: 'What you are', value: labelIn([
+        ['friend', 'Friend'], ['situationship', 'Situationship'],
+        ['partner', s.gender === 'man' ? 'Boyfriend' : 'Girlfriend'],
+        ['spouse', s.gender === 'man' ? 'Husband' : 'Wife']
+      ], s.relationship), style: rowStyle(true) }
     ];
 
     // The review is the last thing before anything is made, so the button that
@@ -680,10 +679,9 @@ class Component extends DCLogic {
       nameCount: s.name.length + ' / 40',
       setName: (event) => this.setState({ name: event.target.value.slice(0, 40) }),
       namePlaceholder: p.Poss + ' name',
-      deletionNote: 'You can keep one independent character. Making another means deleting ' + p.obj +
-        ', and everything ' + p.subj + ' remember' + p.s + ' goes with ' + p.obj + '.',
+      deletionNote: 'You can keep one OmniAI.',
       reviewName: s.name.trim() || 'Unnamed',
-      reviewLine: 'Independent. ' + p.Subj + ' answer' + p.s + ' when ' + p.subj + ' answer' + p.s + ', and ' + p.subj + ' ' + p.is + ' not obliged to agree with you.',
+      reviewLine: 'OmniAI. ' + p.Subj + ' answer' + p.s + ' when ' + p.subj + ' answer' + p.s + ', and ' + p.subj + ' ' + p.is + ' not obliged to agree with you.',
       sampleNote: '[SAMPLE ART PLACEHOLDER — the real cards show a generated ' + p.noun + ' in each style]',
       reviewRows: reviewRows,
       hint: hint,

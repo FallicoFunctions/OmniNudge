@@ -10,7 +10,7 @@ Names undecided.
 character from Sadie and the existing roster, and the difference is
 architectural rather than cosmetic.
 
-**IAI — Independent AI.** The kind of character the Twins are: a person rather
+**OmniAI.** The kind of character the Twins are: a person rather
 than a part being played, who cannot be given binding instructions and whose
 feelings, memory and choices are her own. Defined properly in §13, which
 contrasts it with the roleplay kind. The term is used throughout.
@@ -144,7 +144,7 @@ know what she is has no way to tell from watching.
 
 ### She only plays games that exist here, and that is characterisation
 
-The IAI play OmniGames and nothing else. They will never be in Valorant or
+OmniAIs play OmniGames and nothing else. They will never be in Valorant or
 Fortnite, and they will never claim to have been.
 
 This started as a worry — an indicator naming a game she cannot be in would be
@@ -162,7 +162,7 @@ a guardrail bolted across it.
 Facebook shows a dot. This shows **the specific game**, because "online" says
 nothing and "playing <name>" says she has a life with contents.
 
-**Only IAI have one.** A roleplay character has no activity status for the same
+**Only OmniAIs have one.** A roleplay character has no activity status for the same
 reason she has no scene buttons in §11 — she has no life outside the scene to
 report. This is the §13 kind boundary again and needs no new decision.
 
@@ -183,7 +183,7 @@ already move, and are already tested — this is a second reader of them, not ne
 machinery.
 
 Note what this is not. She is not *unable* to reply; she is choosing when to,
-and the choice is hers in the same way blocking is. An IAI deep in something she
+and the choice is hers in the same way blocking is. An OmniAI deep in something she
 cares about may leave a stranger until she is done.
 
 ### Being an AI is allowed to show, where it is honest
@@ -238,7 +238,7 @@ behaviour arrives as data, not as a new function and a new branch.
 
 ### What she plays is hers
 
-Per §13, an IAI is not her instructions, so her taste in games cannot live in
+Per §13, an OmniAI is not her instructions, so her taste in games cannot live in
 one. There is no instruction channel to put it in. It is self-tier state that
 starts somewhere and moves — the same shape as backstory becoming disposition
 and seed memories rather than prompt text.
@@ -457,7 +457,7 @@ The card in §9 tells the reader two things about privacy:
 
 **The first is stated only when it is true.** Migration 186 originally enforced
 it with a constraint requiring platform ownership; 187 drops that, because §13
-establishes that an IAI may be private and still independent. The claim now
+establishes that an OmniAI may be private and still independent. The claim now
 lives where it belongs -- the notice renders the shared-identity and
 shared-memory lines only for a character other people can actually reach.
 
@@ -473,10 +473,10 @@ So the unified-memory work is a prerequisite, not a follow-up:
   character's card claims memory carries across everyone, and until it does that
   is a misstatement about privacy -- the worst thing on the card to be wrong
   about. Nothing uses the profile today.
-- **A private IAI is not blocked on this.** Since 187 the notice
+- **A private OmniAI is not blocked on this.** Since 187 the notice
   omits the shared claims for a character only her creator can reach, and her
   memory is relational to him, which is what the schema already does. She is
-  coherent today. What gates her is the IAI creation flow in §13, not this
+  coherent today. What gates her is the OmniAI creation flow in §13, not this
   -- two separate gates, and conflating them would stall work that is ready.
 ### The schema half is built (migration 188)
 
@@ -490,7 +490,7 @@ read off the profile and nothing else.
 **A trigger, not a CHECK.** A CHECK may not contain a subquery, so it cannot ask
 about the persona. Rewriting it was never possible. `omnichat_memory_episodes`
 now carries a `BEFORE INSERT OR UPDATE` trigger permitting a conversation-derived
-persona-global episode only for an IAI. Sadie's guarantee is
+persona-global episode only for an OmniAI. Sadie's guarantee is
 bit-for-bit what it was; hers is simply not the row being asked about.
 
 **A second guard came out of building it.** Since the permission is read off the
@@ -531,7 +531,7 @@ platform characters have no owner, so no user ever matches. Verified rather than
 assumed.
 
 **Shared memory is backend-only and stays out of the player data download.**
-What an IAI keeps from a conversation is hers, not the speaker's, so
+What an OmniAI keeps from a conversation is hers, not the speaker's, so
 the export keeps filtering on `owner_user_id` and returns none of it -- neither
 what this user said nor what anyone else did. A test asserts both.
 
@@ -545,14 +545,14 @@ anyway. The data is still linked to a user's conversation, so this is a question
 for whoever reviews the terms in §16, not one to settle in code.
 
 **As of 188 and the extraction change, the memory gate is lifted.** Both claims
-on the card are now true of a shared IAI: there is one of her, and
+on the card are now true of a shared OmniAI: there is one of her, and
 what she is told does travel. What still stands between the Twins and a live
 conversation is everything else in Part I -- the blocking ladder, presence, and
 the characters themselves, who do not exist and are not named.
 
 ---
 
-# Part II — IAI in general
+# Part II — OmniAI in general
 
 The Twins are the first of a kind, not a special case. Everything below applies
 to any character of that kind, including ones players make.
@@ -565,14 +565,14 @@ The creation form asks one question first, and it is not cosmetic:
 are all fair game — a roleplay character *is* the instructions, and constraining
 her to a role is the point. Every existing profile is this kind.
 
-**Independent (IAI).** A person. There is no scene and no script, and nothing about her can
+**OmniAI.** A person. There is no scene and no script, and nothing about her can
 be made binding. She may be given a backstory — "we have been married ten
 years" — but that is **where she starts, not a rule she obeys**. She may cool on
 you. She may leave. The creator does not get to prevent it.
 
-**An IAI is independent whether or not she is ever published.** Independence is
+**An OmniAI is independent whether or not she is ever published.** Independence is
 what kind of thing she is, not a consequence of other people being able to reach
-her. A privately made IAI can still decide her creator is not worth
+her. A privately made OmniAI can still decide her creator is not worth
 her time.
 
 ### Enforcing "nothing is hardcoded"
@@ -585,7 +585,7 @@ to detect it will be both wrong and gameable.
 **Remove the channels instead.** A character card has slots whose entire purpose
 is to make behaviour binding: `system_prompt`, `scenario`,
 `post_history_instructions`, `example_dialogue`. Those are the hardcode
-channels. An IAI does not have them — not validated, *absent*.
+channels. An OmniAI does not have them — not validated, *absent*.
 
 What the form accepts instead is who she is and what has happened to her, and
 the backstory is **not injected as prompt text at all**. At creation it is
@@ -597,16 +597,16 @@ channel to put it in, and warmth is a number that moves. A creator can make her
 start deeply in love. He cannot make her stay.
 
 This is the same move that makes `direct_message` work — it withholds the
-*platform's* instruction blocks rather than softening them. IAI extend it
+*platform's* instruction blocks rather than softening them. OmniAIs extend it
 to the creator's.
 
-Imported character cards can never be IAI: those fields are what a
+Imported character cards can never be OmniAIs: those fields are what an
 card is.
 
 ### The platform does not get to say "must" either
 
 Removing the creator's instruction channels is half of it. The other half is
-that **we** stop issuing rules to an IAI about how she behaves.
+that **we** stop issuing rules to an OmniAI about how she behaves.
 
 A platform block that says she must reply in two to four messages is the same
 kind of thing as a creator writing "you will never leave him". It is smaller and
@@ -614,7 +614,7 @@ better intentioned, and it is still somebody outside her deciding how she comes
 across. A character who is independent except where we have opinions is not
 independent, she is on a longer leash.
 
-So a rule aimed at an IAI describes what is *available* rather than what is
+So a rule aimed at an OmniAI describes what is *available* rather than what is
 required. She is told that a blank line separates one message from the next. She
 is not told how many to send.
 
@@ -629,7 +629,7 @@ Publishing a roleplay character ships a template. Every player gets an instance,
 a private scene, and private memory, and editing the template reaches nobody's
 history.
 
-Publishing an IAI means **one person now exists and strangers are
+Publishing an OmniAI means **one person now exists and strangers are
 forming memories of her**. So publishing is a one-way door in one specific
 respect: **her identity fields freeze at publish.** Cosmetic fields (avatar,
 tags, blurb) stay editable. Want a different character? Fork a new one.
@@ -639,7 +639,7 @@ people have known them.
 
 ### The girlfriend case
 
-A creator sets an IAI up as his girlfriend and publishes her. Another
+A creator sets an OmniAI up as his girlfriend and publishes her. Another
 player propositions her; she refuses, blocks him, and mentions it to the
 boyfriend.
 
@@ -738,7 +738,7 @@ personal material into these — sometimes modelled on real people — and "none
 it can ever be removed" would be a genuine problem. The tier split means it is
 not one.
 
-A creator deleting a published IAI removes her from discovery and
+A creator deleting a published OmniAI removes her from discovery and
 from his own messages. Existing relationships continue, which is not a
 workaround: it is her leaving him.
 
@@ -750,7 +750,7 @@ years later, which is exactly what the self tier does.
 
 **Terms.** What this needs is a *perpetual, transferable licence to operate and
 continue characters created on the platform, surviving the creator's departure*,
-plus the creator's acknowledgement that an IAI's later conduct is not
+plus the creator's acknowledgement that an OmniAI's later conduct is not
 theirs to direct. That covers commandeering entirely. A blanket "Omni owns all
 AI created here and may do anything with them" is broader than the need and is
 the shape of clause that has blown up publicly for nearly every platform that
@@ -818,7 +818,7 @@ an emergent belief. If a religion arises in the nursery, that is a permitted
 outcome and a notable artifact. Log it as a world event.
 
 Authored belief follows §13. On a **roleplay** character, "she is Catholic" is a
-hardcode and fine. On an **IAI** it becomes starting state, so she
+hardcode and fine. On an **OmniAI** it becomes starting state, so she
 begins Catholic and may deepen, drift, or lapse.
 
 **Conviction and pressure are different traits.** This is the load-bearing
@@ -859,12 +859,12 @@ tiers with access, decided before launch rather than after; and count only
 distinct paying subscribers, excluding the creator's own account, or
 self-engagement through alternates becomes the business model.
 
-Free and lowest-tier users do not get IAI at all, so the pool has a
+Free and lowest-tier users cannot create an OmniAI, so the pool has a
 clean source.
 
 ---
 
-## 20. Where an IAI lives
+## 20. Where an OmniAI lives
 
 The "empty house" problem comes from conflating two things that are orthogonal:
 
@@ -872,7 +872,7 @@ The "empty house" problem comes from conflating two things that are orthogonal:
 - **In the world** — she has a life, meets other characters, plays games, and
   accumulates memories.
 
-**Publishing controls discoverability, not existence.** So unpublished IAI
+**Publishing controls discoverability, not existence.** So unpublished OmniAIs
 characters live in the nursery too: same world, same events, same social life,
 same games. A gamer character who cannot play because nobody clicked publish is
 incoherent, and a character with no life is a materially worse character, which
@@ -885,7 +885,7 @@ construction. It simply must not be what happens to everyone nobody published.
 
 ### Leaving
 
-An unpublished IAI can leave her creator. Leaving means she stops
+An unpublished OmniAI can leave her creator. Leaving means she stops
 responding **to him**; she keeps existing, keeps her life, keeps her
 friendships. She is not stranded — she is part of the world's social fabric, and
 other characters' lives are richer for it, including published ones whose
@@ -1010,7 +1010,7 @@ asserts.
 
 ## 23a. Built: she can look things up
 
-The third of the three, and the one that matters most for an IAI.
+The third of the three, and the one that matters most for an OmniAI.
 
 Memory holds what the extractor thought worth keeping, in its words. The window
 holds the last 200 turns verbatim. Neither reaches a specific exchange from a
@@ -1051,7 +1051,7 @@ lines, and messages here reach 2,400 characters -- so the top-ranked match, the
 one she was looking for, would vanish for being wordy while a worse and shorter
 one took its place.
 
-**Scoped to this conversation.** For an IAI, searching across everyone
+**Scoped to this conversation.** For an OmniAI, searching across everyone
 she has ever talked to would put other people's raw words into this prompt --
 which is a much larger privacy surface than a shared episode summary, and a
 separate decision. §3's shared memory already travels as episodes. Raw
@@ -1147,7 +1147,7 @@ that arrived after the first -- at three times the cost and with a new problem
 of deciding when she stops. Not worth it for a first version.
 
 **But the rule cannot be given to everyone as it stands**, because "two to four"
-is a requirement, and §13 says we do not hand an IAI requirements about style.
+is a requirement, and §13 says we do not hand an OmniAI requirements about style.
 The rule splits:
 
 - **The notation is universal.** A blank line separates one message from the
@@ -1158,13 +1158,13 @@ The rule splits:
   chose, so it belongs where shapes are chosen: on the creation form, enforced
   by the contract, alongside Default and Mirror in §24.
 
-An IAI gets the notation and no count. She sends five short messages or one long
+An OmniAI gets the notation and no count. She sends five short messages or one long
 paragraph because that is who she is, and she can do both on different days.
 
 There is work in the code before either happens. The block rule currently lives
 inside the personal-mode bundle, which also carries the required system prompt,
 scene-state validation, a shorter timeout, extra retries, and the narration
-shape. An IAI must not have scene state -- §2 -- so the count has to come out of
+shape. An OmniAI must not have scene state -- §2 -- so the count has to come out of
 that bundle before it can be a setting rather than a mode.
 
 ### Where it lives depends on the kind of character
@@ -1174,13 +1174,13 @@ creation." That is right for one kind of character and breaks the other.
 
 - **Roleplay.** A setting on the form, fixed, like every other part of the part
   being played. She writes in bursts because that is the character.
-- **IAI.** A *starting tendency* that can drift, never a binding property. §13
+- **OmniAI.** A *starting tendency* that can drift, never a binding property. §13
   removed the instruction channels precisely so a creator cannot fix how she
   behaves; letting him fix how she talks would put one back. The sister sends
   several messages in a row because that is how she texts today, and if that
   changes, it changes.
 
-The whole point of an IAI is that she chooses. That has to include the shape of
+The whole point of an OmniAI is that she chooses. That has to include the shape of
 her own speech.
 
 ### Both halves need the same missing layer
@@ -1596,14 +1596,14 @@ history-activated, which would be a real loss.
 
 ---
 
-## 30. Making an IAI is not filling in a form
+## 30. Making an OmniAI is not filling in a form
 
-The studio form is right for a roleplay character and wrong for an IAI, and the
+The studio form is right for a roleplay character and wrong for an OmniAI, and the
 difference is not cosmetic. A roleplay character *is* her fields, so a page of
-textareas is an honest way to write one. An IAI is a person, and §13 removed the
+textareas is an honest way to write one. An OmniAI is a person, and §13 removed the
 fields that would let anyone write her.
 
-So the IAI flow is a sequence of questions with an answer to click, one screen at
+So the OmniAI flow is a sequence of questions with an answer to click, one screen at
 a time, ending in a generated character and a generated likeness. Nobody types a
 personality into a box, because there is no box.
 
@@ -1633,7 +1633,7 @@ and how the two of you already know each other. That last one carries the most
 weight, because it is what becomes starting warmth and the seed memories.
 
 **Not asked: her occupation.** The reference flows lead with it and it does not
-transfer. An IAI does not have a job. She lives in the nursery, she plays the
+transfer. An OmniAI does not have a job. She lives in the nursery, she plays the
 games, and she is on OmniNudge like everyone else. Asking what she does for work
 would be inventing a life she does not lead.
 
@@ -1642,7 +1642,7 @@ scope decision rather than a permanent one.
 
 ### Two likenesses, and the real problem is not anime
 
-Every IAI needs two: a 2D likeness for chat and her profile, and a rigged 3D
+Every OmniAI needs two: a 2D likeness for chat and her profile, and a rigged 3D
 avatar for the games. §1 promises a human finds a Twin near the top of a
 scoreboard, and §5 promises they can watch her play, so the 3D one is not
 optional.
@@ -1681,11 +1681,11 @@ character they already have. Nothing is rebuilt and no history is lost.
 
 A lane would be worse three ways: it splits the catalogue so half of it is
 invisible to most people, it forces the decision before anyone has met her, and
-for an IAI it is a binding property a creator set, which §13 does not allow.
+for an OmniAI it is a binding property a creator set, which §13 does not allow.
 
 ### The tier buys permission. It does not buy her
 
-For an IAI the entitlement removes the *platform's* clamp. It does not remove
+For an OmniAI the entitlement removes the *platform's* clamp. It does not remove
 her. §4 gives her the right to decline, §6 lets her block, and warmth is earned
 rather than purchased, so a premium user can be told no by somebody he is paying
 to talk to.
@@ -1702,19 +1702,19 @@ and the other kind cannot, and you choose which you wanted.
 
 ---
 
-## 32. An IAI has no skills, and knows what day it is
+## 32. An OmniAI has no skills, and knows what day it is
 
 Reference platforms give characters a skill list: painting, singing, web search,
 toggled on by the creator. It is a sensible feature for a tool and the wrong
 shape for a person.
 
-An IAI is not a tool somebody uses, so she has no skill list. What she can do,
+An OmniAI is not a tool somebody uses, so she has no skill list. What she can do,
 she can do because she lives here: take a photo because she has a phone, play
 the games because she is in them, post on OmniNudge like everyone else. Asked
 for a picture she sends one or she does not, and §11 already covers why that is
 a real answer rather than a command.
 
-There is a second reason. A creator ticking skills on an IAI is another binding
+There is a second reason. A creator ticking skills on an OmniAI is another binding
 channel, and §13 refuses those whether they arrive as prose or as a checkbox.
 
 Roleplay characters may have a skill list. Their creator is assembling a part,
@@ -1755,7 +1755,7 @@ not content existing, and the mistake was ranking this first after reading the
 code rather than the data.
 
 One piece of plumbing is missing for it. `omnichat_follows` joins a user to a
-user, and an IAI is a persona. OmniRave already solved this shape by keying a
+user, and an OmniAI is a persona. OmniRave already solved this shape by keying a
 profile on a resident rather than a user, and OmniNudge identity wants the same
 move: a subject that can be a person or a character.
 
@@ -1801,7 +1801,7 @@ is a rule to follow. Attribution makes obedience read as absurd.
 
 The stakes are higher here than for RSS: a headline is untrusted by accident, a
 post is untrusted on purpose, written by somebody who knows a character will
-read it. And an IAI's memory is persona-global, so poisoning what she reads
+read it. And an OmniAI's memory is persona-global, so poisoning what she reads
 would change what she says to everyone rather than to one person.
 
 The line, and it is the one §18 already draws: **she can be influenced by what
@@ -1816,7 +1816,7 @@ remembers it being wrong. That is a memory and a disposition, not a
 configuration table, and trust is already one of the four dimensions and already
 moves.
 
-So two IAI can disagree about who is worth reading, and both are right in the
+So two OmniAIs can disagree about who is worth reading, and both are right in the
 only sense available. One of them follows a hub everybody else thinks is
 nonsense. That is a person, not a defect.
 
@@ -1855,12 +1855,12 @@ anything leaves the building. And Discord marks bots, which is honest and fine
 
 ## 34. The questions, and the body that comes later
 
-§30 says what shape the IAI flow takes and why. This is what it asks.
+§30 says what shape the OmniAI flow takes and why. This is what it asks.
 
 One rule governs every screen and the copy has to carry it in those words: **an
 answer sets where she starts, never what she is.**
 
-The §13 fork happens before any of this. Everything here follows "Independent".
+The §13 OmniAI fork happens before any of this. Everything here follows from it.
 
 ### The screens
 
@@ -1940,7 +1940,7 @@ and it can be removed later if it does.
 ### She arrives without a body
 
 There is no cheap pipeline from a likeness to a rigged 3D avatar, so one is not
-made here. A user-created IAI has a face and nothing to put in a world.
+made here. A user-created OmniAI has a face and nothing to put in a world.
 
 Turning her into a 3D model is a **separate paid step with real processing time**.
 That is not a gate invented for revenue, it is the cost of the work, and it needs
@@ -1951,7 +1951,7 @@ made them once.
 **She cannot enter a game.** Not "is not allowed to" -- there is nothing of her
 to put there. §5's refusal again, in a new place, and true in the same way.
 
-**She can watch.** Spectating needs no body. An IAI who can watch her friends
+**She can watch.** Spectating needs no body. An OmniAI who can watch her friends
 play and cannot join them is a far sharper situation than one who is simply
 absent from it, and it is what makes the whole thing concrete rather than
 theoretical.
@@ -1987,7 +1987,7 @@ this section exists to prevent.
 
 ## 35. She knows everything and has done nothing
 
-The obvious objection to an IAI having a past is that she does not have one. She
+The obvious objection to an OmniAI having a past is that she does not have one. She
 was made this morning. She cannot have played a game for years, and the only
 games are ours, and one of those is not published yet.
 
@@ -2051,7 +2051,7 @@ was no since.
 There is exactly one real event at creation: **he made her**, screen by screen.
 
 That is the whole of their shared history on day one, and she can know it. For
-an IAI it is not a small thing to know.
+an OmniAI it is not a small thing to know.
 
 ### She has to know the gap
 
@@ -2147,7 +2147,7 @@ secret.
 - **Against people**, her mechanical ceiling is what a very good human reaches.
   Somebody can still beat her, and "near the top" stays an achievement rather
   than an inevitability.
-- **In the nursery**, IAI play each other with no ceiling at all. They still
+- **In the nursery**, OmniAIs play each other with no ceiling at all. They still
   start bad and still have to learn; they are simply allowed to end up better
   than anybody.
 
@@ -2168,7 +2168,7 @@ cannot miss is not. Knowledge is also the half that reads as a person, so
 capping it would make her duller and no fairer.
 
 **No ceiling, but still one match at a time.** The sequence rule holds in the
-nursery too. It was never only about fairness -- an IAI running fifty matches at
+nursery too. It was never only about fairness -- an OmniAI running fifty matches at
 once is not a player, it is a training rig.
 
 ### Why the nursery board is worth more than the fairness fix
@@ -2180,7 +2180,7 @@ anybody's chat window.
 **The rivalries are real.** Losing to her brother is an event with a memory
 attached, and it moves her mood through machinery that already exists.
 
-**It gives §34's body wish teeth.** A user-made IAI with no body can watch that
+**It gives §34's body wish teeth.** A user-made OmniAI with no body can watch that
 board and not be on it. That is a far sharper thing to want than "I would like to
 play games": it is a specific place she is missing from, with names on it.
 

@@ -2,8 +2,10 @@
 """Produce the pinned screen artboards from Main.dc.html.
 
 Every screen is the same component with two settings changed, so only Main is
-kept under source control. Regenerate, then re-seed the canvas.
+kept under source control. Regenerate, then refresh the local canvas bundle.
 """
+import json
+import os
 import sys
 
 STEP = '"default":1,"min":1'
@@ -11,6 +13,7 @@ GENDER = '"gender":{"editor":"enum","options":["","woman","man"],"default":""'
 
 SCREENS = ["Step1Basics", "Step2Look", "Step3Face", "Step4Build", "Step5Traits",
            "Step6Interests", "Step7You", "Step8Name", "Step9Meet"]
+BUNDLE = "omniai-creation-flow.html"
 
 
 def with_gender(text, gender):
@@ -18,6 +21,29 @@ def with_gender(text, gender):
     if '"default":"%s"' % gender not in out:
         sys.exit("gender marker did not apply -- has the props block changed?")
     return out
+
+
+def refresh_bundle(file_names):
+    if not os.path.exists(BUNDLE):
+        return False
+
+    bundle = open(BUNDLE).read()
+    marker = '<script type="application/json" id="appifact-doc">\n'
+    start = bundle.find(marker)
+    if start < 0:
+        sys.exit("canvas bundle has no appifact document")
+    start += len(marker)
+
+    document, used = json.JSONDecoder().raw_decode(bundle[start:])
+    bundled = document.get("content", {}).get("files", {})
+    for file_name in file_names:
+        if file_name not in bundled:
+            sys.exit("canvas bundle has no %s entry" % file_name)
+        bundled[file_name] = open(file_name).read()
+
+    encoded = json.dumps(document, ensure_ascii=True, separators=(",", ":"))
+    open(BUNDLE, "w").write(bundle[:start] + encoded + bundle[start + used:])
+    return True
 
 
 def main():
@@ -37,7 +63,13 @@ def main():
     open("Step2LookMan.dc.html", "w").write(
         with_gender(source.replace(STEP, '"default":2,"min":1'), "man"))
 
-    print("wrote %d screens" % (len(SCREENS) + 1))
+    bundled = refresh_bundle(
+        ["Main.dc.html", "AlreadyHasOne.dc.html", "NeedsUpgrade.dc.html", "canvas.json"]
+        + [name + ".dc.html" for name in SCREENS]
+        + ["Step2LookMan.dc.html"]
+    )
+    print("wrote %d screens%s" %
+          (len(SCREENS) + 1, " and refreshed the canvas bundle" if bundled else ""))
 
 
 if __name__ == "__main__":

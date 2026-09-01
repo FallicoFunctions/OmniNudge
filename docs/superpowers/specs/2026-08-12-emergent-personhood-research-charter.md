@@ -1,10 +1,10 @@
-# IAI Research Charter v0.1
+# Emergent Personhood Research Charter v0.1
 
 **Date:** 2026-08-12
 
 **Status:** Draft for review
 
-**Goal:** Define what Independent Artificial Intelligence (IAI) means for this project, what would and would not count as evidence of it, and the boundaries between the three systems that touch it — the Habitat, the Agent Nursery, and the IAI Observatory.
+**Goal:** Define the project's emergent-personhood research question, what would and would not count as evidence, and the boundaries between the three systems that touch it — the Habitat, the Agent Nursery, and the Emergence Observatory.
 
 This charter governs work in more than one worktree. It lives on `main` for the same reason `2026-06-01-omnirave-design.md` does: OmniChat and OmniGame are developed on separate branches, and a rule that binds both cannot live on either one.
 
@@ -14,13 +14,13 @@ This document constrains method, not ambition. It exists so that in ten years ev
 
 ## 1. Terminology
 
-By the standard computer-science definition, today's LLMs are AI. That definition is not the one this project cares about, and arguing over the word wastes time.
+By the standard computer-science definition, today's LLMs are AI. Product naming and research evidence answer different questions, and this charter keeps them separate.
 
-**IAI — Independent Artificial Intelligence** — names the thing actually being looked for: a persistent, autonomous, self-developing entity whose existence is not reducible to running a model over the latest prompt. A digital person rather than a capable function.
+**OmniAI** — the product name for OmniNudge's persistent, non-roleplay AI characters. An OmniAI has durable identity, memory, relationships, and room to develop instead of following a creator-written roleplay script. The name is a product category, not a claim of consciousness or proof that the character's current model is substrate-independent.
 
-Using a distinct term avoids a recurring failure mode where "is it AI?" gets debated instead of "what would we have to observe?"
+**Emergent personhood** — the research hypothesis actually being investigated: a persistent, autonomous, self-developing entity whose existence is not reducible to running a model over the latest prompt. This is an evidentiary threshold, not another product tier or character type.
 
-**Cognitive substrate** — whatever produces an entity's behavior: a hosted LLM, a local model, a custom architecture, a future IAI, eventually a whole-brain emulation, or a human driving an avatar. The rest of the system is designed not to care which.
+**Cognitive substrate** — whatever produces an entity's behavior: a hosted LLM, a local model, a custom architecture, eventually a whole-brain emulation, or a human driving an avatar. The rest of the system is designed not to care which.
 
 ---
 
@@ -32,7 +32,7 @@ This is an artificial-life hypothesis, and it is falsifiable only in the weak se
 
 Its practical consequence is the project's central methodological commitment:
 
-> **Discovery, not manufacture.** This project builds places where artificial agents can exist, and instruments them. It does not attempt to cause IAI.
+> **Discovery, not manufacture.** This project builds places where OmniAIs and other artificial agents can exist, and instruments them. It does not attempt to cause emergent personhood.
 
 That commitment is what section 4's firewall exists to protect. Without it, "discovery" degrades into engineering toward the indicator being measured, and any positive result becomes uninterpretable.
 
@@ -47,9 +47,9 @@ These are deliberately separate. Collapsing any two of them destroys the experim
                           │
          ┌────────────────┼────────────────┐
          ▼                ▼                ▼
-     HABITAT         AGENT NURSERY    IAI OBSERVATORY
-  where they live   where ordinary   watches for
-                    agents develop   something new
+     HABITAT         AGENT NURSERY    EMERGENCE OBSERVATORY
+  where they live   where OmniAIs    watches for
+                    develop          something new
                           │                ▲
                           └── telemetry ───┘
                                  one way only
@@ -63,15 +63,15 @@ The Habitat is built because humans and agents have reasons to use it. **Its fea
 
 ### 3.2 Agent Nursery
 
-The developmental infrastructure that lets ordinary LLM-backed characters become experienced individuals: accumulating skills, preferences, relationships, and an autobiographical history through continuous participation.
+The developmental infrastructure that lets LLM-backed OmniAIs become experienced individuals: accumulating skills, preferences, relationships, and an autobiographical history through continuous participation.
 
-The Nursery is **not** trying to produce IAI. It is trying to make the characters this product already ships better and more particular. Two agents on the same base model with different histories should become recognizably different people; that is the goal, and it is a product goal.
+The Nursery is **not** trying to produce evidence of consciousness or emergent personhood. It is trying to make the OmniAIs this product ships better and more particular. Two OmniAIs on the same base model with different histories should become recognizably different people; that is the goal, and it is a product goal.
 
 **The Nursery may optimize:** game-playing skill, memory quality, navigation, cooperation, social ability, planning, tool use.
 
 **The Nursery must not optimize:** consciousness indicators, self-preservation, autonomy for its own sake, claims of sentience, or any Observatory metric.
 
-### 3.3 IAI Observatory
+### 3.3 Emergence Observatory
 
 A strictly observational system that watches the agent population for evidence that something qualitatively new has appeared.
 
@@ -81,7 +81,7 @@ The Observatory reads. It does not write.
 
 ## 4. The firewall
 
-**Observatory findings must never feed back into agent development for the purpose of making agents more IAI-like.**
+**Observatory findings must never feed back into agent development for the purpose of making agents more personhood-like.**
 
 ```
 Agents ──────────────▶ Observatory          (allowed)
@@ -172,10 +172,12 @@ A resident of the universe is an identity with history, memory, relationships, p
                      │
    ┌─────────────────┼─────────────────┐
    │                 │                 │
-  LLM               IAI       Human Emulation
+  LLM           Custom Agent     Human Emulation
 ```
 
 An identity must survive a substrate change. A character running today's model and the same character running a different architecture in five years is the same person, because the person is the history and not the checkpoint.
+
+OmniAI does not appear as a substrate in this diagram because it is the identity using the substrate. A product OmniAI may run on today's LLM, a later custom architecture, or another compatible implementation without changing who the character is.
 
 This is the one design decision that connects all three long-term goals, and it is cheap to honor now and expensive to retrofit later.
 
@@ -190,7 +192,7 @@ Neither was built for this charter. Both are compatible with it, which is the po
 
 ## 7. Experimental designs worth running
 
-These are Nursery experiments about ordinary agents. None is an attempt to produce IAI.
+These are Nursery experiments about product OmniAIs. None is an attempt to produce emergent personhood.
 
 ### 7.1 Genre discovery
 
@@ -245,4 +247,4 @@ Without that, "AI beats humans at X" is uninterpretable — an agent reading exa
 
 Nothing in this charter is scheduled. No Observatory exists, and none should be built before the Habitat has a population worth observing.
 
-What this document is for, today, is to keep ordinary product decisions from quietly foreclosing the long-term question — and to make sure that if something unexpected ever does appear in this universe, the record of how it got there was being kept the whole time.
+What this document is for, today, is to keep ordinary OmniAI product decisions from quietly foreclosing the long-term question — and to make sure that if something unexpected ever does appear in this universe, the record of how it got there was being kept the whole time.

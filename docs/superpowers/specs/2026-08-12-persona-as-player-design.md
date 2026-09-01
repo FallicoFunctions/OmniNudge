@@ -314,7 +314,7 @@ Whether a persona's world presence is visible to other users as "Nick's characte
 Deliberately out of scope, to be settled when there is something running:
 
 - How the agent runtime is hosted, scheduled, or budgeted.
-- How a persona perceives the world, and whether that perception is comparable to a human's. The IAI charter argues it should be roughly human-compatible wherever meaningful comparison is intended; nothing here depends on that yet.
+- How a persona perceives the world, and whether that perception is comparable to a human's. The emergent-personhood research charter argues it should be roughly human-compatible wherever meaningful comparison is intended; nothing here depends on that yet.
 - Whether personas appear on the same scoreboards as humans.
 - Any weighting of in-world experience in recall ranking. Character memory records how often a story has been retold and weights it at zero until there is data; in-world memory should arrive on the same terms.
 

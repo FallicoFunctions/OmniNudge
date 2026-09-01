@@ -19,6 +19,8 @@ Use this directory for maintained setup, architecture, and feature references.
 ## Feature References
 
 - `FILE_SHARING_FEATURE.md` - file sharing behavior and UX
+- `OMNICHAT_EXPANSION.md` - OmniChat media, social, groups, voice, and calls
+- `superpowers/specs/2026-08-31-omnichat-post-launch-omniai-video-social-design.md` - planned post-launch OmniAI video feed, AI Nursery, and live-call expansion
 - `REDDIT_INTEGRATION.md` - Reddit integration notes
 - `USER_SETTINGS.md` - settings behavior
 - `PROFILE_SYSTEM.md` - profile system behavior
