@@ -8,8 +8,37 @@
  */
 export type CreationRefusal = 'already_has_one' | 'needs_upgrade' | 'underage' | null;
 
+/**
+ * What the server actually said, out of what axios actually throws.
+ *
+ * The rejected value is a raw AxiosError: its own `code` is "ERR_BAD_REQUEST"
+ * and its `message` is "Request failed with status code 400". Ours are in the
+ * response body. Reading the top level found neither, so every coded refusal
+ * fell through to the status fallback -- and two 400s, an underage character
+ * and an unusable name, are indistinguishable there.
+ *
+ * A flat shape is still accepted, because a caller that has already unwrapped
+ * the body should not have to wrap it again.
+ */
+export function serverErrorFrom(error: unknown): { code?: string; status?: number; message?: string } {
+  const typed = error as
+    | {
+        code?: string;
+        status?: number;
+        message?: string;
+        response?: { status?: number; data?: { code?: string; message?: string; error?: string } };
+      }
+    | undefined;
+  const body = typed?.response?.data;
+  return {
+    code: body?.code ?? (typed?.response ? undefined : typed?.code),
+    status: typed?.response?.status ?? typed?.status,
+    message: body?.message ?? body?.error ?? (typed?.response ? undefined : typed?.message),
+  };
+}
+
 export function refusalFrom(error: unknown): CreationRefusal {
-  const typed = error as { code?: string; status?: number } | undefined;
+  const typed = serverErrorFrom(error);
   switch (typed?.code) {
     case 'omniai_already_exists':
       return 'already_has_one';
