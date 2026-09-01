@@ -326,7 +326,7 @@ export default function OmniChatDiscoverPage() {
       }
       if (tab === 'create') navigate('/omnichat/create');
       if (tab === 'explore') navigate('/omnichat/explore');
-      if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
+      if (tab === 'newOmniAI') navigate(OMNICHAT_TAB_ROUTES.newOmniAI);
     },
     [handleOpenStudio, isAuthenticated, navigate]
   );

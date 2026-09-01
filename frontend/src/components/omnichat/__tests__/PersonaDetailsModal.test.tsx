@@ -148,7 +148,7 @@ describe('PersonaDetailsModal', () => {
   });
 });
 
-describe('deleting an independent character', () => {
+describe('deleting an OmniAI', () => {
   const definition = (profile: string) => ({
     id: 31,
     slug: 'nadia',

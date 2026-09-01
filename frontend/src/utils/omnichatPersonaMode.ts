@@ -32,7 +32,7 @@ export function personaSpeaksFirst(
 
 /**
  * Whether anyone other than the creator can reach this character, which is what
- * makes the notice's shared-identity and shared-memory lines true. A Free AI
+ * makes the notice's shared-identity and shared-memory lines true. An OmniAI
  * kept private is still free -- she can cool on you and leave -- but she is not
  * one-of-them-for-everyone, and must not claim to be.
  *

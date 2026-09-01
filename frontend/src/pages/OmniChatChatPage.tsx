@@ -47,7 +47,7 @@ import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponse
 import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
 import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
 import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
-import LikenessPicker from '../components/omnichat/iai/LikenessPicker';
+import LikenessPicker from '../components/omnichat/omniai/LikenessPicker';
 import {
   personaHasSceneMedia,
   personaIsSharedWithOthers,
@@ -2095,7 +2095,7 @@ export default function OmniChatChatPage() {
         if (tab === 'characters') navigate('/omnichat/studio');
         if (tab === 'create') navigate('/omnichat/create');
         if (tab === 'explore') navigate('/omnichat/explore');
-        if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
+        if (tab === 'newOmniAI') navigate(OMNICHAT_TAB_ROUTES.newOmniAI);
       }}
     >
       <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overflow-hidden bg-[#111114]">
@@ -2502,7 +2502,7 @@ export default function OmniChatChatPage() {
                   <div className="pb-4">
                     <LikenessPicker
                       personaId={activePersona.id}
-                      gender={activePersona.iai_appearance?.gender ?? ''}
+                      gender={activePersona.omniai_appearance?.gender ?? ''}
                     />
                   </div>
                 )}

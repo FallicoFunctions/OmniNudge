@@ -110,7 +110,7 @@ vi.mock('../../services/omnichatService', async (importOriginal) => ({
     createBillingCheckout: vi.fn(),
   },
   omnichatQueryKeys: {
-    iaiLikeness: (personaId: number) => ['omnichat', 'iai', 'likeness', personaId],
+    omniAILikeness: (personaId: number) => ['omnichat', 'omniai', 'likeness', personaId],
     personas: () => ['omnichat', 'personas'],
     conversations: ['omnichat', 'conversations'],
     conversation: (id: number) => ['omnichat', 'conversation', id],

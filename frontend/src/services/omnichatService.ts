@@ -11,8 +11,8 @@ import type {
   BotPersonaDefinition,
   ConversationSettings,
   PersonaDefinitionPayload,
-  IAIOptions,
-  CreateIAIRequest,
+  OmniAIOptions,
+  CreateOmniAIRequest,
   PersonaCategory,
   OmniChatGenerationJob,
   OmniChatGenerationRequest,
@@ -33,7 +33,7 @@ import type {
   OmniChatResponseFeedbackRequest,
   OmniChatMemoryList,
   OmniChatAcceptedTurn,
-  IAILikenessChoice,
+  OmniAILikenessChoice,
 } from '../types/omnichat';
 import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from './authSession';
@@ -350,8 +350,8 @@ export const omnichatService = {
    * gender then texture -- so the interface looks its answer up and never
    * applies the rule itself.
    */
-  async getIAIOptions(): Promise<IAIOptions> {
-    return api.get<IAIOptions>('/omnichat/iai/options');
+  async getOmniAIOptions(): Promise<OmniAIOptions> {
+    return api.get<OmniAIOptions>('/omnichat/omniai/options');
   },
 
   /**
@@ -361,20 +361,19 @@ export const omnichatService = {
    * name per press would put a round trip behind a button somebody presses
    * idly.
    */
-  async getIAINames(ethnicity: string, gender: string): Promise<string[]> {
+  async getOmniAINames(ethnicity: string, gender: string): Promise<string[]> {
     const query = new URLSearchParams();
     if (ethnicity) query.set('ethnicity', ethnicity);
     if (gender) query.set('gender', gender);
     const suffix = query.toString();
     const res = await api.get<{ names: string[] }>(
-      `/omnichat/iai/names${suffix ? `?${suffix}` : ''}`
+      `/omnichat/omniai/names${suffix ? `?${suffix}` : ''}`
     );
     return res.names ?? [];
   },
 
-  async createIAI(payload: CreateIAIRequest): Promise<BotPersona> {
-    const res = await api.post<{ persona: BotPersona }>('/omnichat/iai', payload);
-    return res.persona;
+  async createOmniAI(payload: CreateOmniAIRequest): Promise<BotPersona> {
+    return api.post<BotPersona>('/omnichat/omniai', payload);
   },
 
   /**
@@ -384,12 +383,12 @@ export const omnichatService = {
    * pending is a fourth still rendering; three and none pending is all there
    * will be, because a render that failed is not coming back.
    */
-  async getLikenessCandidates(personaId: number): Promise<IAILikenessChoice> {
-    return api.get<IAILikenessChoice>(`/omnichat/iai/${personaId}/likeness`);
+  async getLikenessCandidates(personaId: number): Promise<OmniAILikenessChoice> {
+    return api.get<OmniAILikenessChoice>(`/omnichat/omniai/${personaId}/likeness`);
   },
 
   async pickLikeness(personaId: number, candidateId: number): Promise<{ asset_id: string }> {
-    return api.post<{ asset_id: string }>(`/omnichat/iai/${personaId}/likeness/${candidateId}`, {});
+    return api.post<{ asset_id: string }>(`/omnichat/omniai/${personaId}/likeness/${candidateId}`, {});
   },
 
   async createPersona(payload: PersonaDefinitionPayload): Promise<BotPersonaDefinition> {
@@ -923,10 +922,12 @@ export const omnichatQueryKeys = {
   billingWallet: ['omnichat', 'billing', 'wallet'] as const,
   billingUsage: (limit = 50) => ['omnichat', 'billing', 'usage', limit] as const,
   videoEntitlement: ['omnichat', 'billing', 'video-entitlement'] as const,
-  iaiOptions: ['omnichat', 'iai', 'options'] as const,
-  iaiLikeness: (personaId: number) => ['omnichat', 'iai', 'likeness', personaId] as const,
-  iaiNames: (ethnicity: string, gender: string) =>
-    ['omnichat', 'iai', 'names', ethnicity || 'any', gender || 'any'] as const,
+  // The payload includes the caller's entitlement, limit and current count.
+  // Keep it outside every other account's cache partition.
+  omniAIOptions: (userId: number) => ['omnichat', 'omniai', 'options', userId] as const,
+  omniAILikeness: (personaId: number) => ['omnichat', 'omniai', 'likeness', personaId] as const,
+  omniAINames: (ethnicity: string, gender: string) =>
+    ['omnichat', 'omniai', 'names', ethnicity || 'any', gender || 'any'] as const,
   explore: (kind?: string) => ['omnichat', 'explore', kind ?? 'all'] as const,
   publication: (id: string) => ['omnichat', 'publication', id] as const,
   publicationComments: (id: string) => ['omnichat', 'publication', id, 'comments'] as const,

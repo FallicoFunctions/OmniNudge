@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * This app sets a parseMissingKeyHandler that returns the key, and that wins
  * over i18next's defaultValue -- so the second argument is ignored and the key
  * itself renders. Nine screens shipped that way: every heading, label and
- * button read "omnichat.iai.step1.title" and the like, while the compiler, the
+ * button read "omnichat.omniai.step1.title" and the like, while the compiler, the
  * linter, 830 tests and both i18n checks stayed green.
  *
  * That handler is deliberate and should stay. With fallbackLng 'en', a missing
@@ -84,7 +84,7 @@ describe('i18n usage', () => {
 
   it('no OmniChat screen asks for a key that does not exist', () => {
     // Strict where the work is. This is the fault that shipped nine screens
-    // reading "omnichat.iai.step1.title" instead of a heading.
+    // reading "omnichat.omniai.step1.title" instead of a heading.
     const offenders = missingKeys().filter(
       (entry) => entry.includes('/omnichat/') || entry.includes('OmniChat')
     );
@@ -106,7 +106,7 @@ describe('i18n usage', () => {
   // A key built at runtime is invisible to the check above: no literal ever
   // appears in the source. That is how two of these shipped.
   //
-  // 'direct_message' went into ResponseStyleProfile for independent characters
+  // 'direct_message' went into ResponseStyleProfile for OmniAIs
   // and the studio rendered the key at anyone who opened one. 'chat' is the
   // commonest usage kind the backend writes -- every message debit -- and the
   // credits panel had no label for it, so the usage list read

@@ -30,7 +30,7 @@ export default function LikenessPicker({
   const p = pronounsFor(gender);
 
   const choice = useQuery({
-    queryKey: omnichatQueryKeys.iaiLikeness(personaId),
+    queryKey: omnichatQueryKeys.omniAILikeness(personaId),
     queryFn: () => omnichatService.getLikenessCandidates(personaId),
     // Her pictures arrive from a render queue, so this polls until none are
     // outstanding. A candidate that has landed but is not scanned yet is also
@@ -47,7 +47,7 @@ export default function LikenessPicker({
   const pick = useMutation({
     mutationFn: (candidateId: number) => omnichatService.pickLikeness(personaId, candidateId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.iaiLikeness(personaId) });
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.omniAILikeness(personaId) });
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
     },
   });
@@ -75,12 +75,12 @@ export default function LikenessPicker({
       className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
     >
       <h3 id="omnichat-likeness-title" className="text-[15px] font-semibold text-white/90">
-        {translate(t, 'omnichat.iai.likeness.title', `Choose how ${p.subj} looks`)}
+        {translate(t, 'omnichat.omniai.likeness.title', `Choose how ${p.subj} looks`)}
       </h3>
       <p className="mt-1 text-[13px] leading-5 text-white/50">
         {translate(
           t,
-          'omnichat.iai.likeness.subtitle',
+          'omnichat.omniai.likeness.subtitle',
           `This is the one you keep. It becomes ${p.poss} picture everywhere ${p.subj} appears.`
         )}
       </p>
@@ -98,10 +98,10 @@ export default function LikenessPicker({
             // is honestly available, and it is enough to tell them apart.
             aria-label={
               candidate.ready
-                ? translate(t, 'omnichat.iai.likeness.choose', `Choose picture ${index + 1}`)
+                ? translate(t, 'omnichat.omniai.likeness.choose', `Choose picture ${index + 1}`)
                 : translate(
                     t,
-                    'omnichat.iai.likeness.arriving',
+                    'omnichat.omniai.likeness.arriving',
                     `Picture ${index + 1}, still arriving`
                   )
             }
@@ -138,7 +138,7 @@ export default function LikenessPicker({
         <p className="mt-3 text-[13px] text-red-300">
           {translate(
             t,
-            'omnichat.iai.likeness.failed',
+            'omnichat.omniai.likeness.failed',
             'That picture could not be kept. Try another.'
           )}
         </p>

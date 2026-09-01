@@ -26,10 +26,10 @@ export interface BotPersona {
   source_format?: string;
   /**
    * What she looks like, as answered when she was made. Present only on an
-   * independent character, and only the gender is read here -- the picker needs
+   * OmniAI, and only the gender is read here -- the picker needs
    * her pronouns, and nothing on the client should be describing her.
    */
-  iai_appearance?: { gender?: string };
+  omniai_appearance?: { gender?: string };
   response_style_profile?: ResponseStyleProfile;
   avatar_url?: string;
   preview_video_url?: string;
@@ -522,7 +522,7 @@ export interface OmniChatMemoryList {
 }
 
 /**
- * Making an independent character (§34).
+ * Making an OmniAI (§34).
  *
  * The option lists are fetched rather than held here. Every one of them is a
  * rule the server enforces, and a copy in the client is a copy that can
@@ -530,7 +530,7 @@ export interface OmniChatMemoryList {
  * dropped on the way in, and somebody gets a blanker character than the one
  * they chose, with nothing anywhere saying so.
  */
-export interface IAIOptions {
+export interface OmniAIOptions {
   temperaments: string[];
   temperament_picks: number;
   feelings: string[];
@@ -549,14 +549,16 @@ export interface IAIOptions {
   maximum_age: number;
   minimum_height_inches: number;
   maximum_height_inches: number;
-  iai_limit: number;
-  iai_owned: number;
-  /** Which plan an independent character needs, so the refusal names the right one. */
-  iai_required_plan: string;
+  omniai_limit: number;
+  omniai_owned: number;
+  /** Server-derived entitlement for the current caller; display guidance only. */
+  omniai_allowed: boolean;
+  /** Which plan an OmniAI needs, so the refusal names the right one. */
+  omniai_required_plan: string;
   roleplay_limits: Record<string, number>;
 }
 
-export interface IAIAppearanceAnswers {
+export interface OmniAIAppearanceAnswers {
   style?: string;
   gender?: string;
   age?: number;
@@ -570,18 +572,18 @@ export interface IAIAppearanceAnswers {
   build?: string;
 }
 
-export interface CreateIAIRequest {
+export interface CreateOmniAIRequest {
   request_id: string;
   name: string;
   temperaments: string[];
   interests: string[];
   feeling: string;
   relationship: string;
-  appearance: IAIAppearanceAnswers;
+  appearance: OmniAIAppearanceAnswers;
 }
 
 /** One of the four pictures somebody chooses her face from. */
-export interface IAILikenessCandidate {
+export interface OmniAILikenessCandidate {
   id: number;
   /**
    * Where to load it from. A candidate is not a gallery asset, so it is served
@@ -593,8 +595,8 @@ export interface IAILikenessCandidate {
   ready: boolean;
 }
 
-export interface IAILikenessChoice {
-  candidates: IAILikenessCandidate[];
+export interface OmniAILikenessChoice {
+  candidates: OmniAILikenessCandidate[];
   /**
    * How many renders are still on their way. Without it, three pictures is two
    * situations the picker cannot tell apart: a fourth still coming, and a

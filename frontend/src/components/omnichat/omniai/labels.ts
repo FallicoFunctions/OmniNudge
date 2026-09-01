@@ -249,9 +249,9 @@ export function labelFor(t: TFunction, field: string, key: string, gender?: stri
   // The labels the server cannot supply, because they depend on another answer.
   const gendered = GENDERED_LABELS[id];
   if (gendered && (gender === 'man' || gender === 'woman')) {
-    return translate(t, `omnichat.iai.${id}_${gender}`, gendered[gender]);
+    return translate(t, `omnichat.omniai.${id}_${gender}`, gendered[gender]);
   }
-  return translate(t, `omnichat.iai.${id}`, DEFAULTS[id] ?? key);
+  return translate(t, `omnichat.omniai.${id}`, DEFAULTS[id] ?? key);
 }
 
 export function glossFor(
@@ -265,10 +265,10 @@ export function glossFor(
   if (gendered) {
     return translate(
       t,
-      `omnichat.iai.gloss.${id}`,
+      `omnichat.omniai.gloss.${id}`,
       gendered(pronouns.poss, pronouns.subj, pronouns.s)
     );
   }
   const plain = GLOSSES[id];
-  return plain ? translate(t, `omnichat.iai.gloss.${id}`, plain) : '';
+  return plain ? translate(t, `omnichat.omniai.gloss.${id}`, plain) : '';
 }

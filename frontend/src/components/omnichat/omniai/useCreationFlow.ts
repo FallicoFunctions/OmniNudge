@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { IAIOptions, IAIAppearanceAnswers } from '../../../types/omnichat';
+import type { OmniAIOptions, OmniAIAppearanceAnswers } from '../../../types/omnichat';
 
 /**
  * The answers, and the rules about which of them are still valid.
@@ -52,7 +52,7 @@ export const STEP = {
 
 export const TOTAL_STEPS = STEP.review;
 
-/** omniChatIAINameRunes on the server. Counted in code points, not UTF-16 units,
+/** omniChatOmniAINameRunes on the server. Counted in code points, not UTF-16 units,
  *  so a name written in characters outside the basic plane is not cut early. */
 export const NAME_LIMIT = 40;
 
@@ -69,7 +69,7 @@ const DEFAULT_HEIGHT_INCHES = 66;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-function emptyAnswers(options: IAIOptions | undefined): CreationAnswers {
+function emptyAnswers(options: OmniAIOptions | undefined): CreationAnswers {
   return {
     style: '',
     gender: '',
@@ -95,12 +95,12 @@ function emptyAnswers(options: IAIOptions | undefined): CreationAnswers {
 }
 
 /** What this character's eyes may be, given the drawing style. */
-export function eyeChoices(options: IAIOptions | undefined, style: string): string[] {
+export function eyeChoices(options: OmniAIOptions | undefined, style: string): string[] {
   return options?.eyes?.[style] ?? options?.eyes?.realistic ?? [];
 }
 
 /** The silhouettes offered for this gender. */
-export function buildChoices(options: IAIOptions | undefined, gender: string): string[] {
+export function buildChoices(options: OmniAIOptions | undefined, gender: string): string[] {
   return options?.builds?.[gender] ?? [];
 }
 
@@ -109,7 +109,7 @@ export function buildChoices(options: IAIOptions | undefined, gender: string): s
  * above a buzz cut is an ordinary haircut, and the server takes the same view.
  */
 export function hairStyleChoices(
-  options: IAIOptions | undefined,
+  options: OmniAIOptions | undefined,
   style: string,
   gender: string,
   texture: string
@@ -132,7 +132,7 @@ export function hairStyleChoices(
   return everything;
 }
 
-export function useCreationFlow(options: IAIOptions | undefined) {
+export function useCreationFlow(options: OmniAIOptions | undefined) {
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<CreationAnswers>(() => emptyAnswers(options));
 
@@ -213,8 +213,8 @@ export function useCreationFlow(options: IAIOptions | undefined) {
     setStep((current) => (target <= current ? target : current));
   }, []);
 
-  const appearance = useMemo((): IAIAppearanceAnswers => {
-    const payload: IAIAppearanceAnswers = { age: answers.age, height_inches: answers.heightInches };
+  const appearance = useMemo((): OmniAIAppearanceAnswers => {
+    const payload: OmniAIAppearanceAnswers = { age: answers.age, height_inches: answers.heightInches };
     if (answers.style) payload.style = answers.style;
     if (answers.gender) payload.gender = answers.gender;
     if (answers.ethnicity) payload.ethnicity = answers.ethnicity;

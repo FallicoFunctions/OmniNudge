@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildChoices, eyeChoices, hairStyleChoices, NAME_LIMIT } from '../useCreationFlow';
-import type { IAIOptions } from '../../../../types/omnichat';
+import type { OmniAIOptions } from '../../../../types/omnichat';
 
 /**
  * The rules the server enforces, checked on the client that draws from it.
@@ -36,7 +36,7 @@ const options = {
              curly: ['natural', 'afro'], coily: ['natural', 'afro'] },
     },
   },
-} as unknown as IAIOptions;
+} as unknown as OmniAIOptions;
 
 describe('what the flow may offer', () => {
   it('offers unnatural eyes to a drawing and not to a person', () => {

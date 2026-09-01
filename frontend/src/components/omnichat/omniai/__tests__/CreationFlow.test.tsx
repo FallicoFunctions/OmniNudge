@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CreationFlow from '../CreationFlow';
 import { STEP } from '../useCreationFlow';
 import { omnichatService } from '../../../../services/omnichatService';
-import type { IAIOptions } from '../../../../types/omnichat';
+import type { OmniAIOptions } from '../../../../types/omnichat';
 
 vi.mock('../../../../services/omnichatService', async () => {
   const actual = await vi.importActual<typeof import('../../../../services/omnichatService')>(
@@ -14,14 +14,13 @@ vi.mock('../../../../services/omnichatService', async () => {
   return {
     ...actual,
     omnichatService: {
-      getIAIOptions: vi.fn(),
-      getIAINames: vi.fn(),
-      createIAI: vi.fn(),
+      getOmniAINames: vi.fn(),
+      createOmniAI: vi.fn(),
     },
   };
 });
 
-const options: IAIOptions = {
+const options: OmniAIOptions = {
   temperaments: ['warm', 'guarded', 'quiet'],
   temperament_picks: 3,
   feelings: ['guarded', 'neutral', 'fond'],
@@ -52,9 +51,10 @@ const options: IAIOptions = {
   maximum_age: 99,
   minimum_height_inches: 58,
   maximum_height_inches: 84,
-  iai_limit: 1,
-  iai_owned: 0,
-  iai_required_plan: 'premium',
+  omniai_limit: 1,
+  omniai_owned: 0,
+  omniai_allowed: true,
+  omniai_required_plan: 'premium',
   roleplay_limits: { free: 0, plus: 5, premium: 10 },
 };
 
@@ -64,7 +64,7 @@ function renderFlow() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <CreationFlow onMade={onMade} onRefused={onRefused} />
+      <CreationFlow options={options} onMade={onMade} onRefused={onRefused} />
     </QueryClientProvider>
   );
   return { onMade, onRefused };
@@ -80,21 +80,20 @@ const clickText = async (text: string | RegExp) => user.click(await screen.findB
 /**
  * Render, and step past the intro onto the first question.
  *
- * The intro screen states what an independent character is and asks nothing, so
+ * The intro screen states what an OmniAI is and asks nothing, so
  * every test that is about a question starts on the other side of it. The two
  * tests that are about the intro itself do not use this.
  */
 async function renderAtBasics() {
   const handles = renderFlow();
-  await screen.findByText('An independent character');
+  await screen.findByText('An OmniAI');
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   await screen.findByText('Who are we making');
   return handles;
 }
 
 beforeEach(() => {
-  vi.mocked(omnichatService.getIAIOptions).mockResolvedValue(options);
-  vi.mocked(omnichatService.getIAINames).mockResolvedValue(['Camila', 'Anna', 'Sofia']);
+  vi.mocked(omnichatService.getOmniAINames).mockResolvedValue(['Camila', 'Anna', 'Sofia']);
 });
 
 afterEach(() => {
@@ -183,7 +182,7 @@ async function walkTo(target: number) {
 describe('the intro screen', () => {
   it('says what they are making before it asks anything', async () => {
     renderFlow();
-    await screen.findByText('An independent character');
+    await screen.findByText('An OmniAI');
 
     // The facts that used to be spread through the later screens as asides.
     expect(screen.getByText(/not playing a part/i)).toBeInTheDocument();
@@ -194,13 +193,13 @@ describe('the intro screen', () => {
 
   it('asks nothing, so it never blocks the way forward', async () => {
     renderFlow();
-    await screen.findByText('An independent character');
+    await screen.findByText('An OmniAI');
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 
   it('says "they", because gender is the next question', async () => {
     renderFlow();
-    await screen.findByText('An independent character');
+    await screen.findByText('An OmniAI');
     expect(screen.queryByText(/\bshe\b/i)).toBeNull();
     expect(screen.queryByText(/\bhe\b/i)).toBeNull();
   });
@@ -252,11 +251,11 @@ describe('the last two screens', () => {
     // thing they were never shown.
     await screen.findByText('Meet her');
     expect(screen.getByText('What you are')).toBeInTheDocument();
-    expect(omnichatService.createIAI).not.toHaveBeenCalled();
+    expect(omnichatService.createOmniAI).not.toHaveBeenCalled();
   });
 
   it('makes her from the review screen', async () => {
-    vi.mocked(omnichatService.createIAI).mockResolvedValue({ id: 7 } as never);
+    vi.mocked(omnichatService.createOmniAI).mockResolvedValue({ id: 7 } as never);
     const { onMade } = await renderAtBasics();
     await walkTo(STEP.review);
 

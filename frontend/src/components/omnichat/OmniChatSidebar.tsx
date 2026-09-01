@@ -22,7 +22,7 @@ export type SidebarTab =
   | 'create'
   | 'explore'
   | 'characters'
-  | 'newCharacter';
+  | 'newOmniAI';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
@@ -59,10 +59,10 @@ const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLa
     fallbackLabel: 'Characters',
   },
   {
-    id: 'newCharacter',
+    id: 'newOmniAI',
     icon: UserPlus,
-    labelKey: 'omnichat.sidebar.newCharacter',
-    fallbackLabel: 'New',
+    labelKey: 'omnichat.sidebar.newOmniAI',
+    fallbackLabel: 'New OmniAI',
   },
 ];
 

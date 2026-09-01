@@ -119,6 +119,25 @@ describe('omnichatService response feedback', () => {
   });
 });
 
+describe('omnichatService OmniAI creation', () => {
+  it('returns the persona object sent directly by the creation endpoint', async () => {
+    const payload = {
+      request_id: '123e4567-e89b-42d3-a456-426614174000',
+      name: 'Sam',
+      temperaments: ['warm'],
+      interests: ['games'],
+      feeling: 'fond',
+      relationship: 'friend',
+      appearance: { gender: 'woman', age: 27 },
+    };
+    const persona = { id: 12, name: 'Sam', slug: 'sam-12' };
+    const post = vi.spyOn(api, 'post').mockResolvedValue(persona);
+
+    await expect(omnichatService.createOmniAI(payload)).resolves.toBe(persona);
+    expect(post).toHaveBeenCalledWith('/omnichat/omniai', payload);
+  });
+});
+
 describe('omnichatService billing adapters', () => {
   it('maps the catalog, wallet, usage, and video entitlement response envelopes', async () => {
     const get = vi.spyOn(api, 'get');

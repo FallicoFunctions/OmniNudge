@@ -549,7 +549,7 @@ export default function OmniChatStudioPage() {
     if (tab === 'characters') setSidebarTab('characters');
     if (tab === 'create') navigate('/omnichat/create');
     if (tab === 'explore') navigate('/omnichat/explore');
-    if (tab === 'newCharacter') navigate(OMNICHAT_TAB_ROUTES.newCharacter);
+    if (tab === 'newOmniAI') navigate(OMNICHAT_TAB_ROUTES.newOmniAI);
   };
 
   const resetToBlank = () => {

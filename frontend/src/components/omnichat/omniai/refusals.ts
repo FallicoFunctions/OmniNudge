@@ -11,12 +11,12 @@ export type CreationRefusal = 'already_has_one' | 'needs_upgrade' | 'underage' |
 export function refusalFrom(error: unknown): CreationRefusal {
   const typed = error as { code?: string; status?: number } | undefined;
   switch (typed?.code) {
-    case 'iai_already_exists':
+    case 'omniai_already_exists':
       return 'already_has_one';
-    case 'iai_requires_upgrade':
+    case 'omniai_requires_upgrade':
     case 'character_creation_requires_upgrade':
       return 'needs_upgrade';
-    case 'iai_underage':
+    case 'omniai_underage':
       return 'underage';
     default:
       break;

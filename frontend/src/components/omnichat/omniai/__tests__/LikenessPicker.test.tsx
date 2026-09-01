@@ -6,7 +6,7 @@ import '@testing-library/jest-dom/vitest';
 
 import LikenessPicker from '../LikenessPicker';
 import { omnichatService } from '../../../../services/omnichatService';
-import type { IAILikenessChoice } from '../../../../types/omnichat';
+import type { OmniAILikenessChoice } from '../../../../types/omnichat';
 
 vi.mock('../../../../services/omnichatService', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -25,10 +25,10 @@ function renderPicker() {
   );
 }
 
-const choice = (over: Partial<IAILikenessChoice> = {}): IAILikenessChoice => ({
+const choice = (over: Partial<OmniAILikenessChoice> = {}): OmniAILikenessChoice => ({
   candidates: [
-    { id: 11, content_url: '/api/v1/omnichat/iai/31/likeness/11/content', ready: true },
-    { id: 12, content_url: '/api/v1/omnichat/iai/31/likeness/12/content', ready: true },
+    { id: 11, content_url: '/api/v1/omnichat/omniai/31/likeness/11/content', ready: true },
+    { id: 12, content_url: '/api/v1/omnichat/omniai/31/likeness/12/content', ready: true },
   ],
   pending: 0,
   ...over,
@@ -117,7 +117,7 @@ describe('choosing her face', () => {
     expect(images).toHaveLength(2);
     images.forEach((image) => {
       expect(image.getAttribute('src')).toMatch(
-        /^\/api\/v1\/omnichat\/iai\/31\/likeness\/\d+\/content$/
+        /^\/api\/v1\/omnichat\/omniai\/31\/likeness\/\d+\/content$/
       );
     });
   });
