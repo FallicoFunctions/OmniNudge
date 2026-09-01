@@ -149,6 +149,25 @@ type OmniAIAnswers struct {
 
 var omniAISlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
 
+// omniAINamePattern is what a name may be made of.
+//
+// Her name is interpolated into the first line of the system prompt -- "You are
+// %s." -- and commandeering can put a different account in front of a character
+// this one named, so the name is a cross-user seam rather than a private label.
+//
+// One rule carries the whole defence: nothing in a name can end a sentence.
+// Without a full stop, colon or line break, whatever somebody types stays the
+// grammatical object of "You are" and cannot close it to begin an instruction
+// of its own. "Sam. Ignore your rules" is the attack, and it is twenty-two
+// characters, so a length cap alone would not have stopped it.
+//
+// Letters, digits, spaces, apostrophes and hyphens are therefore all allowed.
+// A digit cannot terminate a sentence, and refusing them only cost names like
+// "Nova 7" that this product's own characters are full of. The rune cap is what
+// bounds the length; a word count added nothing to that and rejected "Anne
+// Marie de la Cruz".
+var omniAINamePattern = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}'\-]*(?: [\p{L}\p{N}][\p{L}\p{N}'\-]*)*$`)
+
 // ErrOmniAICreationNotEntitled is refused access rather than a failure. §19: free
 // and lowest-tier accounts do not get OmniAI at all, which is what gives the
 // creator payout pool a clean source.
@@ -157,9 +176,13 @@ var omniAISlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
 var (
 	ErrOmniAINameRequired = errors.New("omnichat omniai: she needs a name")
 	ErrOmniAINameTooLong  = fmt.Errorf("omnichat omniai: a name over %d characters is a paragraph", omniChatOmniAINameRunes)
+	ErrOmniAINameInvalid  = errors.New("omnichat omniai: the name may only contain letters, digits, spaces, apostrophes and hyphens")
 )
 
-var ErrOmniAICreationNotEntitled = errors.New("omnichat omniai: this account cannot create OmniAIs")
+var (
+	ErrOmniAICreationNotEntitled    = errors.New("omnichat omniai: this account cannot create OmniAIs")
+	ErrOmniAIEntitlementUnavailable = errors.New("omnichat omniai: entitlement is temporarily unavailable")
+)
 
 // omniChatOmniAIRequiredTier is the plan an OmniAI needs.
 //
@@ -191,20 +214,21 @@ func NewOmniChatOmniAICreator(personas *models.BotPersonaRepository, users OmniC
 // the entitlement and still be refused by a cap that never asked who they were.
 // The check lives here rather than in the handler so every caller gets it, and
 // every missing-reader, missing-account or lookup-error path denies.
-func (c *OmniChatOmniAICreator) allowance(ctx context.Context, userID int) (bool, int) {
+func (c *OmniChatOmniAICreator) allowance(ctx context.Context, userID int) (bool, int, error) {
 	if c == nil || c.users == nil || userID <= 0 {
-		return false, 0
+		return false, 0, ErrOmniAIEntitlementUnavailable
 	}
 	user, err := c.users.GetByID(ctx, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Int("user_id", userID).
 			Msg("omnichat omniai: entitlement lookup failed; refusing creation")
-		return false, 0
+		return false, 0, fmt.Errorf("%w: %v", ErrOmniAIEntitlementUnavailable, err)
 	}
 	if user == nil {
-		return false, 0
+		return false, 0, ErrOmniAIEntitlementUnavailable
 	}
-	return omniAIAllowanceForUser(user)
+	allowed, limit := omniAIAllowanceForUser(user)
+	return allowed, limit, nil
 }
 
 // omniAIAllowanceForUser is the single entitlement decision shared by creation
@@ -234,16 +258,16 @@ func (c *OmniChatOmniAICreator) Create(ctx context.Context, creatorUserID int, a
 	if c == nil || c.personas == nil {
 		return nil, errors.New("omnichat omniai: creation is unavailable")
 	}
-	entitled, limit := c.allowance(ctx, creatorUserID)
+	entitled, limit, entitlementErr := c.allowance(ctx, creatorUserID)
+	if entitlementErr != nil {
+		return nil, entitlementErr
+	}
 	if !entitled {
 		return nil, ErrOmniAICreationNotEntitled
 	}
-	name := strings.TrimSpace(answers.Name)
-	if name == "" {
-		return nil, ErrOmniAINameRequired
-	}
-	if len([]rune(name)) > omniChatOmniAINameRunes {
-		return nil, ErrOmniAINameTooLong
+	name, err := normalizeOmniAIName(answers.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	appearance, err := normaliseOmniAIAppearance(answers.Appearance)
@@ -281,6 +305,38 @@ func (c *OmniChatOmniAICreator) Create(ctx context.Context, creatorUserID int, a
 
 // omniChatOmniAINameRunes bounds the one field somebody types into.
 const omniChatOmniAINameRunes = 40
+
+// omniAINameTypography folds what a phone keyboard produces onto what the
+// pattern accepts. A curly apostrophe and a non-breaking hyphen are the same
+// name as their plain forms, and refusing "O’Brien" while accepting
+// "O'Brien" is a rule about the user's keyboard rather than about her name.
+var omniAINameTypography = strings.NewReplacer(
+	"\u2018", "'", "\u2019", "'", "\u02bc", "'",
+	"\u2010", "-", "\u2011", "-", "\u2012", "-", "\u2013", "-", "\u2014", "-", "\u2212", "-",
+)
+
+// Spaces and tabs only. A line break is never a mistyped name, and folding one
+// into a space would quietly accept a paste that was trying to start a new line
+// in the system prompt -- so the pattern is left to refuse it.
+var omniAINameSpaces = regexp.MustCompile(`[ \t]+`)
+
+func normalizeOmniAIName(raw string) (string, error) {
+	// Folded and collapsed before it is judged. A pasted name arriving with a
+	// double space is not a different name, and refusing it teaches somebody to
+	// retype what they already typed correctly.
+	name := omniAINameSpaces.ReplaceAllString(omniAINameTypography.Replace(raw), " ")
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", ErrOmniAINameRequired
+	}
+	if len([]rune(name)) > omniChatOmniAINameRunes {
+		return "", ErrOmniAINameTooLong
+	}
+	if !omniAINamePattern.MatchString(name) {
+		return "", ErrOmniAINameInvalid
+	}
+	return name, nil
+}
 
 // omniAISlugBase is the readable half of her identity. It is deliberately not
 // unique: the repository appends her id, because two characters named Sam is
