@@ -43,7 +43,7 @@ func BuildOmniAILikenessPrompt(profile models.OmniChatMediaIdentityProfile) stri
 	// The description is a sentence about a person ("A 27-year-old woman with
 	// long black hair."). Opening with it and then stating the framing reads as
 	// two instructions rather than one run-on subject.
-	return strings.Join([]string{
+	return joinOmniAIPromptSentences(
 		// "image", not "photograph". This prompt can end with "Render as anime
 		// artwork, not as a photograph", and the scene prompt had exactly this
 		// contradiction two commits ago -- one sentence telling the model to
@@ -52,5 +52,28 @@ func BuildOmniAILikenessPrompt(profile models.OmniChatMediaIdentityProfile) stri
 		subject,
 		omniAILikenessFraming,
 		models.RenderMediumSentence(profile.RenderStyle),
-	}, " ")
+	)
+}
+
+// joinOmniAIPromptSentences puts a prompt together out of whole sentences.
+//
+// The appearance description is written by a model and arrives with whatever
+// punctuation it felt like ending on. Joining on a space alone produced
+// "freckles across her nose Head and shoulders, facing the camera" -- two
+// instructions fused into one run-on that a diffusion model reads as a single
+// clause. Every piece is terminated before the next one starts, for the same
+// reason appendDirective does it on the contextual path.
+func joinOmniAIPromptSentences(sentences ...string) string {
+	assembled := make([]string, 0, len(sentences))
+	for _, sentence := range sentences {
+		sentence = strings.TrimRight(strings.TrimSpace(sentence), " ")
+		if sentence == "" {
+			continue
+		}
+		if last := sentence[len(sentence)-1]; last != '.' && last != '!' && last != '?' {
+			sentence += "."
+		}
+		assembled = append(assembled, sentence)
+	}
+	return strings.Join(assembled, " ")
 }

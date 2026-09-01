@@ -94,13 +94,18 @@ func BuildOmniAIReferencePrompt(profile models.OmniChatMediaIdentityProfile, var
 		subject = omniAILikenessFallbackSubject
 	}
 
-	return strings.Join([]string{
-		"Reference image of one person, the same person as the supplied reference.",
+	return joinOmniAIPromptSentences(
+		// It does not claim a reference was supplied. The worker adds that
+		// clause itself and only when there actually is one; saying it here as
+		// well made every reference prompt assert a picture that a failed
+		// avatar lookup would have left out, which is the same fault the worker
+		// was fixed for.
+		"Reference image of one person.",
 		subject,
 		variant.Framing,
 		"Plain seamless background, even diffuse lighting with no strong shadows, no props and no other people.",
 		models.RenderMediumSentence(profile.RenderStyle),
-	}, " ")
+	)
 }
 
 func findOmniAIReferenceVariant(key string) (omniAIReferenceVariant, bool) {

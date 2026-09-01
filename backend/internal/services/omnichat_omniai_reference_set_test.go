@@ -56,7 +56,6 @@ func TestEveryReferenceSaysWhoSheIsRatherThanRelyingOnThePicture(t *testing.T) {
 	for _, key := range OmniAIReferenceVariantKeys() {
 		prompt := BuildOmniAIReferencePrompt(profile, key)
 		require.Contains(t, prompt, "27-year-old East Asian woman", key)
-		require.Contains(t, prompt, "the same person as the supplied reference", key)
 	}
 }
 
@@ -127,4 +126,42 @@ func TestAnUnknownVariantCannotBeRendered(t *testing.T) {
 	}, "underwater")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no such reference variant")
+}
+
+func TestADescriptionNeverRunsIntoTheFraming(t *testing.T) {
+	// A model writes the appearance and ends it however it likes. Joined on a
+	// space alone this read "...freckles across her nose Head and shoulders,
+	// facing the camera" -- one clause instead of two instructions.
+	profile := models.OmniChatMediaIdentityProfile{
+		Appearance: "a woman with freckles across her nose",
+	}
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		require.Contains(t, prompt, "freckles across her nose. ",
+			"the description has to end before the framing starts")
+		require.NotContains(t, prompt, "nose Full")
+		require.NotContains(t, prompt, "nose Head")
+	}
+
+	anchor := BuildOmniAILikenessPrompt(profile)
+	require.Contains(t, anchor, "freckles across her nose. Full body from head to feet")
+}
+
+func TestADescriptionThatEndsItselfIsNotPunctuatedTwice(t *testing.T) {
+	prompt := BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A woman with freckles.",
+	}, "portrait_neutral")
+	require.Contains(t, prompt, "freckles. Head and shoulders")
+	require.NotContains(t, prompt, "..")
+}
+
+func TestAReferencePromptDoesNotClaimAReferenceItMayNotHave(t *testing.T) {
+	// The worker states this itself, and only when one was actually supplied.
+	// Saying it here too asserted a picture that a failed avatar lookup would
+	// have left out of the render.
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		require.NotContains(t,
+			BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, variant),
+			"supplied reference")
+	}
 }
