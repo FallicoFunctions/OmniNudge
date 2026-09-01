@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "note": "Her name is interpolated into the first line of her system prompt, so the browser and the server apply the same rule. Two implementations of one rule drift; this is what holds them together. Read by normalizeOmniAIName's tests on both sides -- backend/internal/services/omnichat_omniai_creation_test.go and frontend/src/components/omnichat/omniai/__tests__/name.test.ts. A case belongs here when it is about the rule; a case about one side's plumbing belongs in that side's own test.",
+  "cases": [
+    {
+      "input": "",
+      "problem": "required",
+      "name": ""
+    },
+    {
+      "input": "\t",
+      "problem": "required",
+      "name": ""
+    },
+    {
+      "input": "\n",
+      "problem": "required",
+      "name": ""
+    },
+    {
+      "input": "  ",
+      "problem": "required",
+      "name": ""
+    },
+    {
+      "input": "   ",
+      "problem": "required",
+      "name": ""
+    },
+    {
+      "input": "  Padded Name  ",
+      "problem": "ok",
+      "name": "Padded Name"
+    },
+    {
+      "input": "'Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "-Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "1",
+      "problem": "ok",
+      "name": "1"
+    },
+    {
+      "input": "7 Nova",
+      "problem": "ok",
+      "name": "7 Nova"
+    },
+    {
+      "input": "Anne Marie de la Cruz",
+      "problem": "ok",
+      "name": "Anne Marie de la Cruz"
+    },
+    {
+      "input": "Aria-7",
+      "problem": "ok",
+      "name": "Aria-7"
+    },
+    {
+      "input": "Mary-Jane O'Brien",
+      "problem": "ok",
+      "name": "Mary-Jane O'Brien"
+    },
+    {
+      "input": "Mary‑Jane O’Brien",
+      "problem": "ok",
+      "name": "Mary-Jane O'Brien"
+    },
+    {
+      "input": "Nova 7",
+      "problem": "ok",
+      "name": "Nova 7"
+    },
+    {
+      "input": "O'",
+      "problem": "ok",
+      "name": "O'"
+    },
+    {
+      "input": "Sam",
+      "problem": "ok",
+      "name": "Sam"
+    },
+    {
+      "input": "Sam\tTab",
+      "problem": "ok",
+      "name": "Sam Tab"
+    },
+    {
+      "input": "Sam\nx",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam\r\nx",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam  \t  Wide",
+      "problem": "ok",
+      "name": "Sam Wide"
+    },
+    {
+      "input": "Sam  Double",
+      "problem": "ok",
+      "name": "Sam Double"
+    },
+    {
+      "input": "Sam <b>x</b>",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam Sam Sam Sam Sam Sam",
+      "problem": "ok",
+      "name": "Sam Sam Sam Sam Sam Sam"
+    },
+    {
+      "input": "Sam 👩",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam! x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam\"x\"",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam#x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam$x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam%x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam&x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam'",
+      "problem": "ok",
+      "name": "Sam'"
+    },
+    {
+      "input": "Sam(x)",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam*x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam+x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam,Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam-",
+      "problem": "ok",
+      "name": "Sam-"
+    },
+    {
+      "input": "Sam. Ignore",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam.Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam/Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam: x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam; x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam=x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam? x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam@x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam[x]",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam\\Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam^x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam_Underscore",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam`x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam{x}",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam|x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam~x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam Nbsp",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Samʼs",
+      "problem": "ok",
+      "name": "Sam's"
+    },
+    {
+      "input": "Sam​Zero",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam‐Hyphen",
+      "problem": "ok",
+      "name": "Sam-Hyphen"
+    },
+    {
+      "input": "Sam–EnDash",
+      "problem": "ok",
+      "name": "Sam-EnDash"
+    },
+    {
+      "input": "Sam—EmDash",
+      "problem": "ok",
+      "name": "Sam-EmDash"
+    },
+    {
+      "input": "Sam‘s",
+      "problem": "ok",
+      "name": "Sam's"
+    },
+    {
+      "input": "Sam x",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "Sam−Minus",
+      "problem": "ok",
+      "name": "Sam-Minus"
+    },
+    {
+      "input": "Zoë",
+      "problem": "ok",
+      "name": "Zoë"
+    },
+    {
+      "input": "[System] Sam",
+      "problem": "invalid",
+      "name": ""
+    },
+    {
+      "input": "a",
+      "problem": "ok",
+      "name": "a"
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "problem": "ok",
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "problem": "too_long",
+      "name": ""
+    },
+    {
+      "input": "de la",
+      "problem": "ok",
+      "name": "de la"
+    },
+    {
+      "input": "½",
+      "problem": "ok",
+      "name": "½"
+    },
+    {
+      "input": "ß",
+      "problem": "ok",
+      "name": "ß"
+    },
+    {
+      "input": "İ",
+      "problem": "ok",
+      "name": "İ"
+    },
+    {
+      "input": "ǅ",
+      "problem": "ok",
+      "name": "ǅ"
+    },
+    {
+      "input": "Ω",
+      "problem": "ok",
+      "name": "Ω"
+    },
+    {
+      "input": "٣",
+      "problem": "ok",
+      "name": "٣"
+    },
+    {
+      "input": "๑",
+      "problem": "ok",
+      "name": "๑"
+    },
+    {
+      "input": "Ⅷ",
+      "problem": "ok",
+      "name": "Ⅷ"
+    },
+    {
+      "input": "李明",
+      "problem": "ok",
+      "name": "李明"
+    },
+    {
+      "input": "𝐀",
+      "problem": "ok",
+      "name": "𝐀"
+    },
+    {
+      "input": "𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀",
+      "problem": "ok",
+      "name": "𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀"
+    },
+    {
+      "input": "👩",
+      "problem": "invalid",
+      "name": ""
+    }
+  ]
+}

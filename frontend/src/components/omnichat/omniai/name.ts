@@ -34,8 +34,11 @@ export function normalizeOmniAIName(raw: string): { name: string; problem: NameP
   for (const [pattern, replacement] of TYPOGRAPHY) name = name.replace(pattern, replacement);
   name = name.replace(/[ \t]+/g, ' ').trim();
 
-  if (name === '') return { name, problem: 'required' };
-  if ([...name].length > NAME_LIMIT) return { name, problem: 'too_long' };
-  if (!SHAPE.test(name)) return { name, problem: 'invalid' };
+  // A refused name comes back empty, the way the server's does. There is no
+  // half-accepted name to hand on, and returning one invites a caller to use
+  // it.
+  if (name === '') return { name: '', problem: 'required' };
+  if ([...name].length > NAME_LIMIT) return { name: '', problem: 'too_long' };
+  if (!SHAPE.test(name)) return { name: '', problem: 'invalid' };
   return { name, problem: null };
 }

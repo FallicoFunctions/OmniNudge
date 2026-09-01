@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -314,4 +317,48 @@ func TestANameStillHasToBeThere(t *testing.T) {
 	stored, err := normalizeOmniAIName(strings.Repeat("a", omniChatOmniAINameRunes))
 	require.NoError(t, err)
 	require.Len(t, []rune(stored), omniChatOmniAINameRunes)
+}
+
+// sharedOmniAINameCase is one row of shared/omniai/name-cases.json.
+type sharedOmniAINameCase struct {
+	Input   string `json:"input"`
+	Problem string `json:"problem"`
+	Name    string `json:"name"`
+}
+
+func TestTheBrowserAndTheServerAgreeOnHerName(t *testing.T) {
+	// The rule is written twice, once per language, because refusing a name
+	// only at the end of a ten-screen flow is its own defect. Two
+	// implementations of one rule drift, and the drift that matters is the
+	// browser accepting what the server refuses -- which is the bug the client
+	// rule was added to prevent, arriving back through the other door.
+	//
+	// The same file drives the test on the browser side.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "shared", "omniai", "name-cases.json"))
+	require.NoError(t, err)
+
+	var fixture struct {
+		SchemaVersion int                    `json:"schema_version"`
+		Cases         []sharedOmniAINameCase `json:"cases"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &fixture))
+	require.Equal(t, 1, fixture.SchemaVersion)
+	require.NotEmpty(t, fixture.Cases)
+
+	for _, testCase := range fixture.Cases {
+		name, nameErr := normalizeOmniAIName(testCase.Input)
+		problem := "ok"
+		switch {
+		case errors.Is(nameErr, ErrOmniAINameRequired):
+			problem = "required"
+		case errors.Is(nameErr, ErrOmniAINameTooLong):
+			problem = "too_long"
+		case errors.Is(nameErr, ErrOmniAINameInvalid):
+			problem = "invalid"
+		case nameErr != nil:
+			problem = "other"
+		}
+		require.Equal(t, testCase.Problem, problem, "%q", testCase.Input)
+		require.Equal(t, testCase.Name, name, "%q", testCase.Input)
+	}
 }
