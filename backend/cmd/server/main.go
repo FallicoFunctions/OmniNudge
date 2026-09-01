@@ -814,7 +814,8 @@ func main() {
 		services.NewOpenRouterOmniChatModerator(openrouterClient),
 	)
 	omniChatSocialHandler := handlers.NewOmniChatSocialHandler(omniChatSocialService, omniChatSocialRepo, storageService)
-	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub, omniChatModelRouter)
+	omniChatGroupService := services.NewOmniChatGroupService(omniChatGroupRepo, openrouterClient, hub, omniChatModelRouter).
+		SetContentEntitlement(omniChatContentEntitlement)
 	omniChatGroupHandler := handlers.NewOmniChatGroupHandler(omniChatGroupService, omniChatGroupRepo, omniChatAllowance)
 	voiceProviders := map[string]speech.Synthesizer{
 		"elevenlabs": elevenlabs.NewClient(cfg.OmniChatVoice.ElevenLabsAPIKey, cfg.OmniChatVoice.ElevenLabsBaseURL, cfg.OmniChatVoice.ElevenLabsEnableLogging),

@@ -337,3 +337,45 @@ func TestAssistantOutputHygieneAllowsNaturalNeedStatement(t *testing.T) {
 
 	require.True(t, valid, detail)
 }
+
+// groupCompletionSpy keeps the system prompt a group reply was generated from.
+type groupCompletionSpy struct {
+	systemPrompt string
+}
+
+func (c *groupCompletionSpy) Generate(_ context.Context, messages []openrouter.Message, _ openrouter.StreamCallback) (string, error) {
+	for _, message := range messages {
+		if message.Role == openrouter.RoleSystem {
+			c.systemPrompt = message.Content
+		}
+	}
+	return "ok", nil
+}
+
+func TestAGroupClampsLikeEveryOtherSurface(t *testing.T) {
+	// A group was the one surface that never asked. A character in one answered
+	// explicitly for anybody -- whatever their plan, whatever their own
+	// preference, and whatever the product-wide switch said -- because the
+	// prompt was the persona's plus a group block and nothing else.
+	persona := &models.BotPersona{ID: 1, Name: "Sadie", SystemPrompt: "You are Sadie."}
+	history := []*models.OmniChatGroupMessage{
+		{SenderType: "user", SenderName: "Nick", Content: "hello"},
+	}
+
+	clamped := &groupCompletionSpy{}
+	_, _ = generateGroupPersonaReply(context.Background(), clamped, persona, history, false)
+	require.Contains(t, clamped.systemPrompt, omniChatSFWClamp)
+	require.True(t, strings.HasPrefix(clamped.systemPrompt, "You are Sadie."),
+		"appended last, so a persona cannot license it away")
+
+	entitled := &groupCompletionSpy{}
+	_, _ = generateGroupPersonaReply(context.Background(), entitled, persona, history, true)
+	require.NotContains(t, entitled.systemPrompt, omniChatSFWClamp)
+}
+
+func TestAnUnwiredGroupEntitlementClampsRatherThanExposes(t *testing.T) {
+	// Losing the wiring should cost tone, never containment.
+	var service *OmniChatGroupService
+	service = &OmniChatGroupService{}
+	require.False(t, service.entitlement.AllowsExplicit(context.Background(), 7))
+}
