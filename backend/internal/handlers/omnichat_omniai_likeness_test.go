@@ -354,8 +354,11 @@ func (f *referenceStarterFake) StartReferences(_ context.Context, persona *model
 	f.mu.Lock()
 	f.calls++
 	f.persona, f.anchor = persona, anchorURL
+	first := f.calls == 1
 	f.mu.Unlock()
-	close(f.called)
+	if first {
+		close(f.called)
+	}
 	if f.release != nil {
 		<-f.release
 	}
@@ -445,7 +448,6 @@ func TestAPickSurvivesTheRenderQueueBeingDown(t *testing.T) {
 func TestAPickSurvivesHavingNothingToStartRendersWith(t *testing.T) {
 	// Unwired, or the character could not be loaded. Either way the choice
 	// stands.
-	owner := 9
 	require.Equal(t, http.StatusOK, callLikeness(
 		newPickRouter(&likenessStoreFake{}, nil, nil),
 		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code)
@@ -455,5 +457,4 @@ func TestAPickSurvivesHavingNothingToStartRendersWith(t *testing.T) {
 		newPickRouter(&likenessStoreFake{},
 			&likenessPersonaReaderFake{err: errors.New("gone")}, starter),
 		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code)
-	_ = owner
 }
