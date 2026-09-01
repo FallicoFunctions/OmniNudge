@@ -132,9 +132,11 @@ func TestTheLimitTheCreatorEnforcesIsTheLimitTheFormIsTold(t *testing.T) {
 		creator := &OmniChatOmniAICreator{users: stubUserReader{user: user}}
 		limits := NewOmniChatCreationLimits(&creationLimitsUserFake{user: user})
 
-		allowedByCreator, fromCreator := creator.allowance(context.Background(), user.ID)
-		allowedOnPage, fromEndpoint := limits.OmniAIState(context.Background(), user.ID)
+		allowedByCreator, fromCreator, creatorErr := creator.allowance(context.Background(), user.ID)
+		allowedOnPage, fromEndpoint, endpointErr := limits.OmniAIState(context.Background(), user.ID)
 
+		require.NoError(t, creatorErr)
+		require.NoError(t, endpointErr)
 		require.Equal(t, allowedByCreator, allowedOnPage,
 			"%s/%s is shown questions the creator would refuse", user.Plan, user.Role)
 		if allowedByCreator {
@@ -144,15 +146,15 @@ func TestTheLimitTheCreatorEnforcesIsTheLimitTheFormIsTold(t *testing.T) {
 	}
 }
 
-func TestAnUnknownAccountIsToldTheOrdinaryNumber(t *testing.T) {
-	// Failure denies eligibility, while the descriptive count remains the
-	// ordinary product limit. The boolean is the gate; zero would incorrectly
-	// describe the product rather than the unavailable account state.
+func TestAnUnavailableEntitlementStoreIsNotCalledAnUpgrade(t *testing.T) {
 	limits := NewOmniChatCreationLimits(&creationLimitsUserFake{err: errors.New("database down")})
-	allowed, limit := limits.OmniAIState(context.Background(), 7)
+	allowed, limit, err := limits.OmniAIState(context.Background(), 7)
 	require.False(t, allowed)
 	require.Equal(t, OmniChatOmniAILimit, limit)
-	allowed, limit = (*OmniChatCreationLimits)(nil).OmniAIState(context.Background(), 7)
+	require.ErrorIs(t, err, ErrOmniAIEntitlementUnavailable)
+
+	allowed, limit, err = (*OmniChatCreationLimits)(nil).OmniAIState(context.Background(), 7)
 	require.False(t, allowed, "an entitlement lookup failure must not open a form the creator will refuse")
 	require.Equal(t, OmniChatOmniAILimit, limit)
+	require.ErrorIs(t, err, ErrOmniAIEntitlementUnavailable)
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -97,23 +98,26 @@ func (l *OmniChatCreationLimits) RoleplayLimit(ctx context.Context, userID int) 
 // two different plan states or one successful lookup with one failed lookup.
 // The creator still performs the authoritative check when creation is asked
 // for; this state only prevents somebody entering a form that cannot succeed.
-func (l *OmniChatCreationLimits) OmniAIState(ctx context.Context, userID int) (bool, int) {
+func (l *OmniChatCreationLimits) OmniAIState(ctx context.Context, userID int) (bool, int, error) {
 	if l == nil || l.users == nil || userID <= 0 {
-		return false, OmniChatOmniAILimit
+		return false, OmniChatOmniAILimit, ErrOmniAIEntitlementUnavailable
 	}
 	user, err := l.users.GetByID(ctx, userID)
 	if err != nil {
 		zlog.Warn().Err(err).Int("user_id", userID).
 			Msg("omnichat: OmniAI preflight lookup failed; refusing creation page")
-		return false, OmniChatOmniAILimit
+		return false, OmniChatOmniAILimit, fmt.Errorf("%w: %v", ErrOmniAIEntitlementUnavailable, err)
+	}
+	if user == nil {
+		return false, OmniChatOmniAILimit, ErrOmniAIEntitlementUnavailable
 	}
 	allowed, limit := omniAIAllowanceForUser(user)
 	if !allowed {
 		// The count is descriptive rather than an entitlement. Keep reporting the
 		// ordinary product limit while the boolean explains that it is unavailable.
-		return false, OmniChatOmniAILimit
+		return false, OmniChatOmniAILimit, nil
 	}
-	return true, limit
+	return true, limit, nil
 }
 
 // OmniChatRoleplayLimits exposes the table so the interface can say what each
