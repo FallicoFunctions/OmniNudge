@@ -149,6 +149,10 @@ func NormalizeOmniChatReferenceRequest(
 	return normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikenessReference, aspect)
 }
 
+// omniAIRenderNegativePrompt keeps everyone else out of her reference photos.
+const omniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
+	"crowd, bystander, group photo, another woman, another man"
+
 func normalizeOmniAIRenderRequest(
 	request models.OmniChatGenerationRequest,
 	mode models.OmniChatGenerationMode,
@@ -180,6 +184,25 @@ func normalizeOmniAIRenderRequest(
 	// hardcoded to likeness here, so every reference arrived claiming to be a
 	// candidate and was refused by the path that stores them.
 	normalized.Mode = mode
+
+	// The one render nobody can re-take.
+	//
+	// Every "only one person in frame" negative the worker knows is gated on
+	// contextual mode, and these go as create -- so a likeness and its
+	// references got the defaults, which suppress a doubled head but not a
+	// second person. Stating it positively is not enough on an adult-tuned
+	// checkpoint; that is why the scene path defends the same thing from the
+	// negative side.
+	//
+	// It matters more here than in a scene. A scene can be rendered again. The
+	// anchor is the face somebody chose, the input the 3D pipeline takes, and
+	// what every later render is conditioned on, so a bystander in it is a
+	// bystander in her.
+	//
+	// Set here rather than in the worker because the worker is told create for
+	// both, deliberately, and must not put this on somebody's own Create prompt
+	// that asked for two people.
+	normalized.NegativePrompt = omniAIRenderNegativePrompt
 
 	// Said rather than left false. AllowNSFW is resolved from the caller's plan
 	// on the ordinary path, so a Premium account would otherwise follow its

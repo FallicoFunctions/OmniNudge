@@ -165,3 +165,41 @@ func TestAReferencePromptDoesNotClaimAReferenceItMayNotHave(t *testing.T) {
 			"supplied reference")
 	}
 }
+
+func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
+	// The worker gates every "one person only" negative on contextual mode, and
+	// these go as create. Without this they carried the defaults, which suppress
+	// a doubled head but not a second person standing next to her -- in the one
+	// picture that becomes her face, her 3D input, and the conditioning for
+	// every render after it.
+	profile := referenceProfile()
+
+	anchor, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+		Prompt: BuildOmniAILikenessPrompt(profile),
+	})
+	require.NoError(t, err)
+	require.Contains(t, anchor.NegativePrompt, "second subject")
+	require.Contains(t, anchor.NegativePrompt, "bystander")
+
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+		}, variant)
+		require.NoError(t, err)
+		require.Equal(t, anchor.NegativePrompt, request.NegativePrompt, variant)
+	}
+}
+
+func TestACallerCannotSmuggleANegativePromptIntoHerLikeness(t *testing.T) {
+	// The same reason the mode, the frame and the billing are decided here: a
+	// server-owned render takes nothing from the caller but the character.
+	request, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+		Prompt:         BuildOmniAILikenessPrompt(referenceProfile()),
+		NegativePrompt: "clothes, clothing, dressed",
+	})
+	require.NoError(t, err)
+	require.NotContains(t, request.NegativePrompt, "clothes")
+}
