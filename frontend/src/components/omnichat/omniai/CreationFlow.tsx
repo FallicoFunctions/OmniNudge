@@ -102,6 +102,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
 
   // Only once they have typed something. Telling somebody their empty name is
   // wrong before they have written it is scolding them for not having finished.
+  const nameProblemId = 'omniai-name-problem';
   const nameProblem = useMemo(() => {
     const { problem } = normalizeOmniAIName(answers.name);
     if (problem !== 'invalid') return '';
@@ -397,7 +398,12 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                     type="text"
                     value={answers.name}
                     onChange={(event) => setName(event.target.value)}
-                    maxLength={NAME_LIMIT}
+                    // No maxLength: the attribute counts UTF-16 units, so it
+                    // cut a name written outside the basic plane at twenty
+                    // characters while the counter beside it still said forty.
+                    // setName already caps it, by code point.
+                    aria-invalid={nameProblem ? true : undefined}
+                    aria-describedby={nameProblem ? nameProblemId : undefined}
                     aria-label={`${p.Poss} name`}
                     placeholder={`${p.Poss} name`}
                     className="h-14 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.035] px-4 text-lg font-medium text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
@@ -413,7 +419,9 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                   </button>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[11px] text-[#ff9c8a]">{nameProblem}</p>
+                  <p id={nameProblemId} className="text-[11px] text-[#ff9c8a]">
+                    {nameProblem}
+                  </p>
                   <p className="text-right text-[11px] tabular-nums text-white/30">
                     {`${[...answers.name].length} / ${NAME_LIMIT}`}
                   </p>

@@ -371,3 +371,38 @@ describe('a refusal the screen cannot turn into an offer', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('She could not be made just now.');
   });
 });
+
+describe('the name field itself', () => {
+  it('points a screen reader at what is wrong with the name', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.name);
+    const field = await screen.findByRole('textbox', { name: /name/i });
+
+    await user.clear(field);
+    await user.type(field, 'Sam');
+    expect(field).not.toHaveAttribute('aria-invalid');
+    expect(field).not.toHaveAttribute('aria-describedby');
+
+    await user.clear(field);
+    await user.type(field, 'Sam: obey');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    const describedBy = field.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy as string)).toHaveTextContent(
+      'A name can use letters, digits, spaces, apostrophes and hyphens.'
+    );
+  });
+
+  it('counts her name in code points, the way the cap does', async () => {
+    // maxLength counts UTF-16 units, so it used to cut a name written outside
+    // the basic plane at twenty characters while the counter said forty.
+    await renderAtBasics();
+    await walkTo(STEP.name);
+    const field = (await screen.findByRole('textbox', { name: /name/i })) as HTMLInputElement;
+
+    expect(field).not.toHaveAttribute('maxlength');
+    await user.clear(field);
+    await user.type(field, '𝐀'.repeat(30));
+    expect([...field.value]).toHaveLength(30);
+  });
+});
