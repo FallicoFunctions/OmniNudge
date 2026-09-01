@@ -679,7 +679,8 @@ func main() {
 	omniChatUserRepo := models.NewUserRepository(db.Pool)
 	// One rule for every surface that can produce adult content, so chat and
 	// media generation cannot disagree about what an account is entitled to.
-	omniChatContentEntitlement := services.NewOmniChatContentEntitlement(omniChatUserRepo)
+	omniChatContentEntitlement := services.NewOmniChatContentEntitlement(omniChatUserRepo).
+		SetExplicitContentEnabled(cfg.OmniChatMedia.ExplicitContentEnabled)
 	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, omniChatUserRepo).SetAdminReader(omniChatUserRepo)
 	omniChatBillingOffers, billingOffersErr := services.ParseOmniChatBillingOffers(cfg.OmniChatBillingOffersJSON)
 	if billingOffersErr != nil {

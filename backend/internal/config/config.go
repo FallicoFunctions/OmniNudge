@@ -117,7 +117,18 @@ type OmniChatMediaConfig struct {
 	// animation of a still that already exists -- so this one split covers both
 	// media kinds and no separate NSFW video endpoint is needed. Empty falls
 	// back to the standard image endpoint.
-	RunPodNSFWImageEndpointID   string
+	RunPodNSFWImageEndpointID string
+
+	// ExplicitContentEnabled is the switch for adult content across OmniChat.
+	//
+	// Off for launch by decision, and off by default so a deployment that has
+	// not thought about it cannot produce any. Administrators are unaffected --
+	// they still need the entitlement and their own preference set -- so the
+	// feature stays exercisable while nobody else can reach it.
+	//
+	// Nothing is removed when this is off. It is one boolean between the
+	// product and everything already built.
+	ExplicitContentEnabled      bool
 	RunPodVideoEndpointID       string
 	RunPodInputHosts            []string
 	RunPodOutputHosts           []string
@@ -417,6 +428,7 @@ func Load() (*Config, error) {
 		OmniChatMedia: OmniChatMediaConfig{
 			Provider:                    getEnv("OMNICHAT_MEDIA_PROVIDER", "runpod"),
 			RunPodAPIKey:                getEnv("RUNPOD_API_KEY", ""),
+			ExplicitContentEnabled:      getEnvAsBool("OMNICHAT_EXPLICIT_CONTENT_ENABLED", false),
 			RunPodBaseURL:               getEnv("RUNPOD_BASE_URL", "https://api.runpod.ai/v2"),
 			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
 			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),

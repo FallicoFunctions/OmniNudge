@@ -131,7 +131,10 @@ func newEntitlementService(store *generationStoreFake, users OmniChatUserReader)
 		&generationEnqueuerFake{},
 		"runpod",
 	).SetBilling(generationServiceBillingFake{}).
-		SetContentEntitlement(NewOmniChatContentEntitlement(users))
+		// Switched on: these cases are about which plan is entitled, not about
+		// the launch switch that currently denies everybody. The switch has its
+		// own tests.
+		SetContentEntitlement(NewOmniChatContentEntitlement(users).SetExplicitContentEnabled(true))
 }
 
 func createEntitlementJob(t *testing.T, service *OmniChatGenerationService) *models.OmniChatGenerationJob {
