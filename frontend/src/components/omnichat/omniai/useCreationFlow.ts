@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { OmniAIOptions, OmniAIAppearanceAnswers } from '../../../types/omnichat';
+import { NAME_LIMIT, normalizeOmniAIName } from './name';
 
 /**
  * The answers, and the rules about which of them are still valid.
@@ -53,8 +54,10 @@ export const STEP = {
 export const TOTAL_STEPS = STEP.review;
 
 /** omniChatOmniAINameRunes on the server. Counted in code points, not UTF-16 units,
- *  so a name written in characters outside the basic plane is not cut early. */
-export const NAME_LIMIT = 40;
+ *  so a name written in characters outside the basic plane is not cut early.
+ *  Declared with the rest of the name rule and re-exported here, because two
+ *  copies of a limit are two limits. */
+export { NAME_LIMIT };
 
 /**
  * Where the two sliders start.
@@ -197,8 +200,10 @@ export function useCreationFlow(options: OmniAIOptions | undefined) {
         return answers.temperaments.length >= 1;
       case STEP.you:
         return Boolean(answers.feeling);
+      // The same rule the server applies, so a name it will refuse cannot be
+      // carried through the rest of the flow and refused at the end.
       case STEP.name:
-        return answers.name.trim().length > 0;
+        return normalizeOmniAIName(answers.name).problem === null;
       // The intro asks nothing, and the screens with no required answer let
       // somebody through without one on purpose.
       default:
