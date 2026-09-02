@@ -7,6 +7,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -130,6 +132,36 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 // not here.
 func NormalizeOmniChatLikenessRequest(request models.OmniChatGenerationRequest) (models.OmniChatGenerationRequest, error) {
 	return normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikeness, omniChatLikenessAspectRatio)
+}
+
+// NormalizeOmniChatRerollRequest prepares one picture of a set somebody paid for.
+//
+// Identical to the first four in every way that reaches a model -- same mode,
+// same frame, same prompt, same refusal to take a negative prompt or an
+// entitlement from the caller. The only difference is that it carries a credit
+// reservation, so the worker captures on success and refunds on failure through
+// the machinery every other billed render already uses.
+//
+// One operation per picture rather than one for the set. Four renders is four
+// image charges, and a set where the third fails should refund the third, not
+// the set.
+func NormalizeOmniChatRerollRequest(
+	request models.OmniChatGenerationRequest, operationID uuid.UUID,
+) (models.OmniChatGenerationRequest, error) {
+	normalized, err := normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikeness, omniChatLikenessAspectRatio)
+	if err != nil {
+		return normalized, err
+	}
+	if operationID == uuid.Nil {
+		// An admin renders free, so there is no reservation to carry and the
+		// job must not claim one: a capture against a nil operation is a write
+		// nobody can account for.
+		return normalized, nil
+	}
+	billed := true
+	normalized.BillingRequired = &billed
+	normalized.BillingOperationID = &operationID
+	return normalized, nil
 }
 
 // NormalizeOmniChatReferenceRequest prepares one of the supporting references.
