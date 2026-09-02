@@ -50,11 +50,18 @@ emits it, look at the output, then delete the throwaway.
 
 **Build each control.** Edit the file to undo the fix, `git diff >
 .review/controls/<id>.patch`, then `git checkout` the file. Confirm by hand that
-the named tests fail with it applied.
+the named tests fail with it applied -- and that they fail as tests, with a real
+assertion failure, not because the patch stopped the code compiling.
 
-**Write the ledger** to `.review/<head-sha>.json`. The shape is in
-`.review/ledger.schema.json`. Keep the test selectors narrow -- the hook runs
-every one of them.
+**Write the ledger** to `.review/<base-sha>.json` -- the commit the review
+started from, which does not move as the review commits. The shape is in
+`.review/ledger.schema.json`.
+
+Keep the test selectors narrow: the hook runs each one **twice**, once at HEAD
+and once with the patch applied. It requires the test to pass at HEAD and then
+to produce a real failure -- so a control patch must revert a fix, not break the
+build. A patch that stops the package compiling is rejected, because a suite
+that cannot run is not a test that failed.
 
 **Commit in scopes**, then finish. The hook replays every control in a throwaway
 git worktree and blocks the stop if any still passes.

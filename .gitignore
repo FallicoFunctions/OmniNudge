@@ -105,6 +105,12 @@ source-render-*.png
 .claude/skills/*
 !.claude/skills/review/
 !.claude/settings.json
+
+# Review runtime markers. The ledgers and control patches beside them are
+# tracked on purpose; these two are per-run state and would dirty the tree
+# mid-review, or be swept into a commit by a broad `git add .review/`.
+.review/active
+.review/.attempts
 node_modules/
 **/node_modules/
 **/.vite/

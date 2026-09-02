@@ -48,7 +48,7 @@ LEDGER=".review/${HEAD_SHA}.json"
 if [ ! -f "$LEDGER" ]; then
   LEDGER=$(ls -t .review/*.json 2>/dev/null | grep -vE 'instruments|ledger\.schema' | head -1)
 fi
-[ -n "$LEDGER" ] && [ -f "$LEDGER" ] || block "No ledger found. Write .review/${HEAD_SHA}.json before finishing."
+[ -n "$LEDGER" ] && [ -f "$LEDGER" ] || block "No ledger found. Write one to .review/<base-sha>.json before finishing -- the commit the review started from, which does not move as the review commits."
 
 jq empty "$LEDGER" 2>/dev/null || block "$LEDGER is not valid JSON."
 
@@ -77,7 +77,7 @@ NOCTRL=$(jq -r '.findings[]?
 [ -n "$PROBLEMS" ] && block "$PROBLEMS"
 
 # --- 3. replay each control in a throwaway worktree -------------------------
-COUNT=$(jq -r '.findings | length' "$LEDGER")
+COUNT=$(jq -r '(.findings // []) | length' "$LEDGER")
 if [ "$COUNT" -gt 0 ]; then
   WTBASE=$(mktemp -d "${TMPDIR:-/tmp}/review-replay.XXXXXX")
   WT="$WTBASE/wt"
@@ -90,6 +90,31 @@ if [ "$COUNT" -gt 0 ]; then
     || block "Could not create a worktree to replay the controls in:\n$WT_ERR"
   [ -d frontend/node_modules ] && ln -s "$ROOT/frontend/node_modules" "$WT/frontend/node_modules" 2>/dev/null
 
+  RUNLOG="$WTBASE/run.log"
+
+  # run_control_tests RUNNER SELECTOR -> exit status, output in $RUNLOG.
+  run_control_tests() {
+    case "$1" in
+      go)     ( cd "$WT/backend"  && eval "go test $2 -count=1" ) >"$RUNLOG" 2>&1 ;;
+      vitest) ( cd "$WT/frontend" && eval "npx vitest run $2" )   >"$RUNLOG" 2>&1 ;;
+      *)      return 127 ;;
+    esac
+  }
+
+  # A non-zero exit is not proof a test failed. A package that will not compile
+  # and a suite that cannot start both exit non-zero too, and a control patch
+  # that mangles a file rather than reverting a fix would otherwise be accepted
+  # as though it had proved something. So the output has to show a real test
+  # failing: Go prints "--- FAIL:" only for an actual failing test (a build
+  # error prints "[build failed]" instead), and vitest's summary counts them.
+  saw_a_real_failure() {
+    case "$1" in
+      go)     grep -q -- "--- FAIL:" "$RUNLOG" ;;
+      vitest) grep -qE "Tests .*[0-9]+ failed" "$RUNLOG" ;;
+      *)      return 1 ;;
+    esac
+  }
+
   BLIND=""
   for i in $(seq 0 $((COUNT - 1))); do
     FID=$(jq -r ".findings[$i].id" "$LEDGER")
@@ -98,27 +123,46 @@ if [ "$COUNT" -gt 0 ]; then
 
     [ -f "$PATCHFILE" ] || { BLIND="${BLIND}  - ${FID}: control patch ${PATCHFILE} does not exist\n"; continue; }
 
-    if ! git -C "$WT" apply "$ROOT/$PATCHFILE" 2>/dev/null; then
-      BLIND="${BLIND}  - ${FID}: control patch does not apply to ${HEAD_SHA:0:9}\n"
-      continue
-    fi
-
     while IFS= read -r SEL; do
       [ -z "$SEL" ] && continue
-      case "$RUNNER" in
-        go)     ( cd "$WT/backend" && eval "go test $SEL -count=1" ) >/dev/null 2>&1 ;;
-        vitest) ( cd "$WT/frontend" && eval "npx vitest run $SEL" ) >/dev/null 2>&1 ;;
-        *)      BLIND="${BLIND}  - ${FID}: unknown runner '${RUNNER}'\n"; continue ;;
-      esac
-      if [ $? -eq 0 ]; then
+
+      # Both sides, and the baseline first.
+      #
+      # Without it, "the test failed" and "the test could not run" are the same
+      # exit status, so a patch that breaks the build -- or a frontend whose
+      # node_modules link did not resolve -- looked exactly like a control that
+      # held. That accepted a control proving nothing, which is the one outcome
+      # this hook exists to prevent.
+      run_control_tests "$RUNNER" "$SEL"
+      BASELINE=$?
+      if [ "$BASELINE" -eq 127 ]; then
+        BLIND="${BLIND}  - ${FID}: unknown runner '${RUNNER}'\n"
+        continue
+      fi
+      if [ "$BASELINE" -ne 0 ]; then
+        BLIND="${BLIND}  - ${FID}: '${SEL}' does not pass at ${HEAD_SHA:0:9} before the patch is applied, so a failure afterwards would prove nothing (broken selector, or the test cannot build or run here)\n"
+        continue
+      fi
+
+      if ! git -C "$WT" apply "$ROOT/$PATCHFILE" 2>/dev/null; then
+        BLIND="${BLIND}  - ${FID}: control patch does not apply to ${HEAD_SHA:0:9}\n"
+        continue
+      fi
+      run_control_tests "$RUNNER" "$SEL"
+      PATCHED=$?
+      # Reversed rather than checked out, so a patch that adds a file is undone
+      # too and nothing leaks into the next finding.
+      git -C "$WT" apply -R "$ROOT/$PATCHFILE" 2>/dev/null
+
+      if [ "$PATCHED" -eq 0 ]; then
         BLIND="${BLIND}  - ${FID}: '${SEL}' still PASSES with the fix reverted -- it is not testing the fix\n"
+      elif ! saw_a_real_failure "$RUNNER"; then
+        BLIND="${BLIND}  - ${FID}: '${SEL}' did not pass with the patch applied, but no test actually failed -- the patch breaks the build or stops the suite starting rather than reverting a fix, so it proves nothing\n"
       fi
     done < <(jq -r ".findings[$i].control.tests[]" "$LEDGER")
-
-    git -C "$WT" checkout -- . 2>/dev/null
   done
 
-  [ -n "$BLIND" ] && block "Controls replayed against ${HEAD_SHA:0:9}. These did not hold:\n${BLIND}\nA control passes only when the test FAILS with its fix reverted."
+  [ -n "$BLIND" ] && block "Controls replayed against ${HEAD_SHA:0:9}. These did not hold:\n${BLIND}\nA control passes only when the test PASSES at HEAD and FAILS with its fix reverted."
 fi
 
 rm -f .review/active .review/.attempts
