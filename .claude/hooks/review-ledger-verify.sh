@@ -39,6 +39,16 @@ mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; 
 # satisfied ends the turn and says so rather than looping.
 MAX_BLOCKS=5
 
+# The hook is given 900 seconds by settings.json. A hook that is killed never
+# exits 2, so the stop proceeds -- running out of time would be one more way to
+# pass. Both bounds are its own, well inside that, so it decides rather than
+# being decided for. A single hung test is bounded too: the overall check
+# happens between runs and would never be reached by a test that never returns.
+RUN_LIMIT=${REVIEW_RUN_LIMIT:-180}
+DEADLINE=${REVIEW_DEADLINE:-600}
+STARTED_AT=$(date +%s)
+elapsed() { echo $(( $(date +%s) - STARTED_AT )); }
+
 block() {
   echo "$(( ATTEMPTS + 1 )) ${LEDGER:-none} ${STARTED:-0}" > .review/active
   if [ "$ATTEMPTS" -ge "$MAX_BLOCKS" ]; then
@@ -167,7 +177,7 @@ if [ "$COUNT" -gt 0 ]; then
   WT="$WTBASE/wt"
   # shellcheck disable=SC2329  # invoked by the EXIT trap below
   cleanup() { git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$WTBASE"; git worktree prune >/dev/null 2>&1; }
-  trap cleanup EXIT
+  trap cleanup EXIT INT TERM
 
   # LFS smudge is skipped: a control replays source, and one missing LFS
   # object on the server would otherwise fail the whole checkout.
@@ -177,12 +187,29 @@ if [ "$COUNT" -gt 0 ]; then
 
   RUNLOG="$WTBASE/run.log"
 
+  # run_bounded SECONDS CMD... -> exit status, 124 if it had to be stopped.
+  # There is no timeout(1) on a stock macOS, so this is it.
+  run_bounded() {
+    local limit="$1"; shift
+    "$@" >"$RUNLOG" 2>&1 &
+    local pid=$! waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$waited" -ge "$limit" ]; then
+        kill -TERM "$pid" 2>/dev/null; sleep 1; kill -KILL "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        return 124
+      fi
+      sleep 1; waited=$((waited + 1))
+    done
+    wait "$pid"
+  }
+
   # run_control_tests RUNNER SELECTOR -> exit status, output in $RUNLOG.
   run_control_tests() {
     case "$1" in
-      go)     ( cd "$WT/backend"  && eval "go test $2 -count=1" )  >"$RUNLOG" 2>&1 ;;
-      vitest) ( cd "$WT/frontend" && eval "npx vitest run $2" )    >"$RUNLOG" 2>&1 ;;
-      pytest) ( cd "$WT"          && eval "python3 -m pytest -q $2" ) >"$RUNLOG" 2>&1 ;;
+      go)     run_bounded "$RUN_LIMIT" bash -c "cd '$WT/backend'  && go test $2 -count=1" ;;
+      vitest) run_bounded "$RUN_LIMIT" bash -c "cd '$WT/frontend' && npx vitest run $2" ;;
+      pytest) run_bounded "$RUN_LIMIT" bash -c "cd '$WT'          && python3 -m pytest -q $2" ;;
       *)      return 127 ;;
     esac
   }
@@ -233,8 +260,16 @@ if [ "$COUNT" -gt 0 ]; then
       # node_modules link did not resolve -- looked exactly like a control that
       # held. That accepted a control proving nothing, which is the one outcome
       # this hook exists to prevent.
+      if [ "$(elapsed)" -ge "$DEADLINE" ]; then
+        block "Verification ran past ${DEADLINE}s and stopped at ${FID}. It refuses rather than being killed part-way with nothing decided. Narrow the test selectors, or split the review."
+      fi
+
       run_control_tests "$RUNNER" "$SEL"
       BASELINE=$?
+      if [ "$BASELINE" -eq 124 ]; then
+        BLIND="${BLIND}  - ${FID}: '${SEL}' was still running after ${RUN_LIMIT}s at HEAD and was stopped, so nothing can be concluded from it\n"
+        continue
+      fi
       if [ "$BASELINE" -eq 127 ]; then
         BLIND="${BLIND}  - ${FID}: unknown runner '${RUNNER}'\n"
         continue
@@ -250,6 +285,11 @@ if [ "$COUNT" -gt 0 ]; then
       fi
       run_control_tests "$RUNNER" "$SEL"
       PATCHED=$?
+      if [ "$PATCHED" -eq 124 ]; then
+        git -C "$WT" apply -R "$ROOT/$PATCHFILE" 2>/dev/null
+        BLIND="${BLIND}  - ${FID}: '${SEL}' was still running after ${RUN_LIMIT}s with the patch applied and was stopped -- a test that hangs is not a test that failed\n"
+        continue
+      fi
       # Reversed rather than checked out, so a patch that adds a file is undone
       # too and nothing leaks into the next finding.
       # If the revert fails the patch stays applied, and the next finding is

@@ -62,6 +62,8 @@ open_review() {
 }
 
 # expect NAME EXPECTED_EXIT [SUBSTRING]
+# expect NAME EXPECTED_EXIT [SUBSTRING]; honours REVIEW_DEADLINE / REVIEW_RUN_LIMIT
+# set in front of the call, so the bounds can be driven without waiting them out.
 expect() {
   local name="$1" want="$2" needle="${3:-}"
   local out code
@@ -194,6 +196,15 @@ open_review; ledger ".review/${H}.json" "$(instruments)" \
      '[{id:"A",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}},
        {id:"B",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}}]')"
 expect "two findings sharing a patch both hold (the revert works)" 0 "2 control(s)"
+
+echo
+echo "running out of time is not a way to pass"
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-real.patch go './internal/services/ -run TestADescriptionNeverRunsIntoTheFraming')"
+REVIEW_DEADLINE=0 expect "an overall deadline refuses instead of overrunning" 2 "ran past"
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-real.patch go './internal/services/ -run TestADescriptionNeverRunsIntoTheFraming')"
+REVIEW_RUN_LIMIT=1 expect "a test that will not finish is stopped, not believed" 2 "was still running"
 
 echo
 echo "the bounded escape"
