@@ -40,10 +40,10 @@ consumer receives, not the code that makes it.
 
 **Open the review.** `: > .review/active` -- truncated, not touched, so the
 attempt count starts clean. The Stop hook will not let the session finish until
-the ledger is complete and the controls hold. It blocks five times; on the
-sixth it releases the review and tells you to report that it was never
-verified, so a ledger you cannot satisfy ends the turn honestly instead of
-looping.
+the ledger is complete and the controls hold. Each refusal says which attempt
+it is; after the last one it releases the review and tells you to report that
+it was never verified, so a ledger you cannot satisfy ends the turn honestly
+instead of looping.
 
 **Work the list.** For each instrument in `.review/instruments.json`, ask its
 question. Record what you did and what it showed. Instruments B1-B4 mean *print
@@ -61,8 +61,8 @@ assertion failure, not because the patch stopped the code compiling.
 started from, which does not move as the review commits. The shape is in
 `.review/ledger.schema.json`.
 
-Keep the test selectors narrow: the hook runs each one **twice**, once at HEAD
-and once with the patch applied. It requires the test to pass at HEAD and then
+Runners are `go`, `vitest` and `pytest`. Keep the test selectors narrow: the
+hook runs each one **twice**, once at HEAD and once with the patch applied. It requires the test to pass at HEAD and then
 to produce a real failure -- so a control patch must revert a fix, not break the
 build. A patch that stops the package compiling is rejected, because a suite
 that cannot run is not a test that failed.

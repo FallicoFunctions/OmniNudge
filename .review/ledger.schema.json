@@ -3,17 +3,17 @@
   "required": {
     "schema_version": "1",
     "head": "the commit the review covers",
-    "base": "the commit it starts from",
+    "base": "the commit it starts from; the ledger is named <base>.json",
     "scope": {"files": "[]", "boundaries": "[] -- every seam the change crosses"},
     "prior_ledgers_read": "[] -- ledgers consulted for already-known findings",
-    "instruments": "[] -- one row per id in instruments.json: {id, status: applied|na, evidence|why}",
-    "findings": "[] -- {id, summary, fix_commit, control}",
+    "instruments": "[] (array) -- one row per id in instruments.json: {id, status: applied|na, evidence|why}",
+    "findings": "[] (array, may be absent) -- {id, summary, fix_commit, control}",
     "gates": "{} -- build, vet, lint, types, tests"
   },
   "control": {
-    "patch": "path to a patch that REVERTS this fix",
-    "runner": "go | vitest",
-    "tests": "[] -- narrow selectors; these must FAIL with the patch applied",
+    "patch": "repo-relative path under .review/controls/ to a patch that REVERTS this fix",
+    "runner": "go | vitest | pytest",
+    "tests": "[] -- narrow selectors. Each is run TWICE: it must PASS at HEAD, then produce a real test failure with the patch applied. A patch that breaks the build is refused, because a suite that cannot run is not a test that failed.",
     "observed": "what was seen when it was run by hand"
   }
 }

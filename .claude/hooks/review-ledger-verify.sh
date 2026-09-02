@@ -78,6 +78,20 @@ fi
 
 jq empty "$LEDGER" 2>/dev/null || block "$LEDGER is not valid JSON."
 
+# Shape before content.
+#
+# Every content check below reads a jq expression into a variable and treats an
+# empty result as "nothing wrong". When the ledger had a shape jq could not
+# walk -- instruments as an object, or the whole file a bare array -- jq errored
+# to stderr, the variable came back empty, and the review passed on the strength
+# of a question that was never answered.
+jq -e 'type == "object"' "$LEDGER" >/dev/null 2>&1 \
+  || block "$LEDGER must be a JSON object."
+jq -e '(.instruments | type) == "array"' "$LEDGER" >/dev/null 2>&1 \
+  || block "$LEDGER needs an \"instruments\" array, one row per id in .review/instruments.json."
+jq -e '((.findings // []) | type) == "array"' "$LEDGER" >/dev/null 2>&1 \
+  || block "$LEDGER needs \"findings\" to be an array (or absent when there were none)."
+
 # The count lives in the marker and is scoped to the ledger it was counting.
 #
 # It used to live in its own file, and a count left behind by an abandoned
@@ -133,6 +147,7 @@ NOCTRL=$(jq -r '.findings[]?
 # --- 3. replay each control in a throwaway worktree -------------------------
 COUNT=$(jq -r '(.findings // []) | length' "$LEDGER")
 if [ "$COUNT" -gt 0 ]; then
+  git worktree prune >/dev/null 2>&1
   WTBASE=$(mktemp -d "${TMPDIR:-/tmp}/review-replay.XXXXXX")
   WT="$WTBASE/wt"
   cleanup() { git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$WTBASE"; git worktree prune >/dev/null 2>&1; }
@@ -149,8 +164,9 @@ if [ "$COUNT" -gt 0 ]; then
   # run_control_tests RUNNER SELECTOR -> exit status, output in $RUNLOG.
   run_control_tests() {
     case "$1" in
-      go)     ( cd "$WT/backend"  && eval "go test $2 -count=1" ) >"$RUNLOG" 2>&1 ;;
-      vitest) ( cd "$WT/frontend" && eval "npx vitest run $2" )   >"$RUNLOG" 2>&1 ;;
+      go)     ( cd "$WT/backend"  && eval "go test $2 -count=1" )  >"$RUNLOG" 2>&1 ;;
+      vitest) ( cd "$WT/frontend" && eval "npx vitest run $2" )    >"$RUNLOG" 2>&1 ;;
+      pytest) ( cd "$WT"          && eval "python3 -m pytest -q $2" ) >"$RUNLOG" 2>&1 ;;
       *)      return 127 ;;
     esac
   }
@@ -165,6 +181,10 @@ if [ "$COUNT" -gt 0 ]; then
     case "$1" in
       go)     grep -q -- "--- FAIL:" "$RUNLOG" ;;
       vitest) grep -qE "Tests .*[0-9]+ failed" "$RUNLOG" ;;
+      # pytest counts "1 failed" for a real assertion failure and "1 error" for
+      # a file it could not import or collect, so a patch that breaks the module
+      # never reads as a test that failed. Checked against pytest 8.4.
+      pytest) grep -qE "[0-9]+ failed" "$RUNLOG" ;;
       *)      return 1 ;;
     esac
   }
