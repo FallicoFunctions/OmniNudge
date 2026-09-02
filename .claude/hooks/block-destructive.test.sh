@@ -47,6 +47,41 @@ blocks 'rm -fr /'
 blocks 'sudo rm -rf /'
 
 echo
+echo "the same directory, spelled differently"
+# Found by asking the guard about shapes nobody had written down. A rule that
+# depends on how a path is spelled is not a rule about the path.
+blocks 'rm -rf "$HOME"'
+blocks "rm -rf '\$HOME'"
+blocks 'rm -rf ${HOME}'
+blocks 'rm -rf $PWD'
+blocks 'rm -rf ${PWD}'
+blocks 'rm -rf "/"'
+blocks 'rm -rf /tmp/../'
+blocks 'rm -rf ~/"Documents"'
+# Written out in full, the way a tool that resolved the path would write it.
+# Without a case here the rule that folds it back to ~ could be deleted and
+# nothing would notice -- which a mutation run is exactly how I found out.
+blocks "rm -rf $HOME/Documents"
+blocks "rm -rf '$HOME/Documents'"
+allows "rm -rf $HOME/Documents/Personal_Projects/scratch-output"
+
+echo
+echo "walking somewhere fatal first"
+# The glob is harmless where you are and fatal where the cd puts you, so the
+# pair is what matters rather than either half.
+blocks 'cd / && rm -rf *'
+blocks 'cd ~ && rm -rf *'
+blocks 'cd $HOME; rm -rf *'
+allows 'cd backend && rm -rf tmp-output'
+allows 'cd /tmp/scratch && rm -rf *'
+
+echo
+echo "force pushing by another name"
+blocks 'git push origin +main'
+blocks 'git push --mirror origin'
+allows 'git push origin feature/reroll'
+
+echo
 echo "deleting one ordinary file"
 allows 'rm -f /tmp/scratch.txt'
 allows 'rm -rf /tmp/review-replay.abc123'
