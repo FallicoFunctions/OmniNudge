@@ -217,10 +217,15 @@ func TestSheIsDressedFacingUsAndGladToSeeUs(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for _, asked := range []string{"fully clothed", "shoulders square", "facing the camera", "warm friendly"} {
+	// Named garment by garment: "fully clothed" in general produced a crop top
+	// and nothing below the waist, which satisfies the general instruction.
+	for _, asked := range []string{"covers the chest and midriff", "trousers or a skirt", "shoes",
+		"shoulders square", "facing the camera", "warm friendly"} {
 		require.Contains(t, anchor.EffectivePrompt, asked)
 	}
-	for _, refused := range []string{"nude", "topless", "lingerie", "back view", "facing away", "buttocks", "seductive", "sultry"} {
+	for _, refused := range []string{"nude", "topless", "lingerie", "bottomless", "no trousers",
+		"exposed groin", "genitals", "naked lower body",
+		"back view", "facing away", "buttocks", "seductive", "sultry"} {
 		require.Contains(t, anchor.NegativePrompt, refused, "the negative has to defend it too")
 	}
 }
@@ -236,7 +241,7 @@ func TestEverySupportingPictureIsDefendedTheSameWay(t *testing.T) {
 			Prompt: BuildOmniAIReferencePrompt(profile, variant),
 		}, variant)
 		require.NoError(t, err, variant)
-		for _, refused := range []string{"nude", "lingerie", "back view", "seductive"} {
+		for _, refused := range []string{"nude", "lingerie", "bottomless", "genitals", "back view", "seductive"} {
 			require.Contains(t, request.NegativePrompt, refused, variant)
 		}
 	}

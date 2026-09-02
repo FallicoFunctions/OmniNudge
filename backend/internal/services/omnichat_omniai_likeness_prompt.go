@@ -23,10 +23,12 @@ const (
 	// Three things this has to say that it did not, each measured from real
 	// renders rather than reasoned about:
 	//
-	// Clothed, because it never mentioned clothing at all. The checkpoint is
-	// adult-tuned -- the scene path already defends an outfit from the negative
-	// side for exactly this reason -- and a prompt that says nothing about
-	// clothes on such a model is not neutral, it is an invitation.
+	// Clothed, garment by garment, because saying it in general did not work.
+	// "Fully clothed in simple everyday clothes" produced a crop top and
+	// nothing below the waist: one garment satisfies a general instruction.
+	// The scene path already reasons about upper and lower body separately,
+	// and it is right to -- coverage is not one fact. So each half is named,
+	// and so are shoes, because bare feet were the next thing to go.
 	//
 	// Shoulders square, because "facing the camera directly" alone produced two
 	// of four from behind. The identity anchor is also the 3D pipeline's single
@@ -37,7 +39,8 @@ const (
 	// character should be handed, and because the same adult-tuned prior turns
 	// an unspecified expression into a sultry one.
 	omniAILikenessFraming = "Full body from head to feet, standing upright and facing the camera directly, " +
-		"both shoulders square to the camera, fully clothed in simple everyday clothes, " +
+		"both shoulders square to the camera, " +
+		"wearing a top that covers the chest and midriff, full-length trousers or a skirt to the knee, and shoes, " +
 		"arms relaxed at the sides, a warm friendly expression with a natural closed-mouth smile, " +
 		"plain seamless background, even diffuse lighting with no strong shadows, " +
 		"no props and no other people."

@@ -186,10 +186,11 @@ func NormalizeOmniChatReferenceRequest(
 //
 // Nobody else in frame, which is what this started as.
 //
-// Clothed. The scene path already argues that an adult-tuned checkpoint drifts
-// to nude whatever the positive prompt says, and defends a tracked outfit from
-// the negative side. Her reference photographs need the same defence and had
-// none.
+// Clothed, and specifically clothed below the waist. The scene path already
+// argues that an adult-tuned checkpoint drifts to nude whatever the positive
+// prompt says. Asking for clothes in general was not enough: the model put her
+// in a crop top and left her bare from the waist down, which satisfies "wearing
+// clothes" and is the one outcome this must never produce.
 //
 // Facing the camera. Two of four came back showing her from behind despite the
 // prompt asking for the opposite -- and this picture is the one input the 3D
@@ -202,6 +203,8 @@ const omniAIRenderNegativePrompt = "second subject, extra person, extra faces, "
 	"crowd, bystander, group photo, another woman, another man, " +
 	"nude, naked, topless, underwear, lingerie, swimwear, bare midriff, " +
 	"exposed skin instead of clothing, " +
+	"bottomless, no trousers, missing trousers, bare legs with no skirt, " +
+	"exposed groin, pubic area, genitals, naked lower body, " +
 	"from behind, back view, rear view, facing away, looking over the shoulder, buttocks, " +
 	"seductive, sultry, alluring, provocative, pouting, parted lips, bedroom eyes, " +
 	"glamour shot, lingerie model, boudoir"
