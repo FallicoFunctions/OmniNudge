@@ -95,6 +95,11 @@ type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 
+	// ImageDataURLs are pictures the model should look at, each a complete
+	// data: URI. They are never logged: the only caller is a safety classifier
+	// inspecting private media, and the bytes are the thing being protected.
+	ImageDataURLs []string `json:"-"`
+
 	// CacheBreakpoint asks the provider to cache everything up to and including
 	// this message and reuse it on the next call.
 	//
@@ -125,12 +130,53 @@ type cacheControl struct {
 	Type string `json:"type"`
 }
 
+// imagePart carries a picture alongside the text of a message.
+//
+// The wire format already accepts an array of parts -- that is how a cache
+// breakpoint is marked -- so an image is another kind of part rather than a
+// different request shape.
+type imagePart struct {
+	Type     string       `json:"type"`
+	ImageURL imagePartURL `json:"image_url"`
+}
+
+type imagePartURL struct {
+	URL string `json:"url"`
+}
+
+// contentPart is either of the two shapes a part can take, written by hand
+// because the two have no fields in common and an interface would lose the
+// omitempty behaviour each needs.
+type contentPart struct {
+	Type         string        `json:"type"`
+	Text         string        `json:"text,omitempty"`
+	ImageURL     *imagePartURL `json:"image_url,omitempty"`
+	CacheControl *cacheControl `json:"cache_control,omitempty"`
+}
+
 // MarshalJSON keeps unmarked messages in the plain string form every provider
 // accepts, and only switches to the array form where a marker has to be
 // carried. Sending every message as an array would be equivalent for
 // well-behaved providers and is not worth the risk with the less well-behaved
 // ones.
 func (m Message) MarshalJSON() ([]byte, error) {
+	// A message carrying pictures is always the array form: there is no string
+	// shape that can hold one.
+	if len(m.ImageDataURLs) > 0 {
+		parts := make([]contentPart, 0, len(m.ImageDataURLs)+1)
+		if strings.TrimSpace(m.Content) != "" {
+			parts = append(parts, contentPart{Type: "text", Text: m.Content})
+		}
+		for _, dataURL := range m.ImageDataURLs {
+			parts = append(parts, contentPart{
+				Type: "image_url", ImageURL: &imagePartURL{URL: dataURL},
+			})
+		}
+		return json.Marshal(struct {
+			Role    string        `json:"role"`
+			Content []contentPart `json:"content"`
+		}{Role: m.Role, Content: parts})
+	}
 	if !m.CacheBreakpoint {
 		return json.Marshal(struct {
 			Role    string `json:"role"`
