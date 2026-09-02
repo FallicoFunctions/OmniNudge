@@ -76,8 +76,21 @@ const (
 	// knee, and shoes", which arrives after the brief has already dressed her
 	// and reads as a fresh instruction to pick clothes -- so a brief that put
 	// her in a dress was followed by a sentence offering trousers.
-	omniAILikenessCoverage = "Her top overlaps the waistband so that no midriff, stomach or navel " +
-		"is visible at any point, her legs are covered to at least the knee, and she has shoes on."
+	//
+	// And phrased as a description, not a prohibition. It used to say "so that
+	// no midriff, stomach or navel is visible at any point", which is a
+	// negation sitting in the positive prompt -- and CLIP does not encode
+	// negation. Naming the navel there raises its salience rather than
+	// suppressing it, which is the most likely reason three rounds of adding
+	// forbidden garments kept producing the thing they forbade: a brief
+	// specifying a turtleneck came back with the turtleneck riding up.
+	//
+	// So this describes where the fabric is, and every prohibition lives in
+	// OmniAIRenderNegativePrompt, which is the one place a diffusion model
+	// actually reads them.
+	omniAILikenessCoverage = "Her top is long, and its hem hangs below her hips and covers the " +
+		"waistband of her trousers completely. Her legs are covered to at least the knee, and she " +
+		"has shoes on."
 
 	// Shoulders square, because "facing the camera directly" alone produced two
 	// of four from behind. A profile picture of somebody's back is not a

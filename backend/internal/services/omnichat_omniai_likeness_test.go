@@ -270,8 +270,15 @@ func TestTheCoverageRuleSurvivesEveryBrief(t *testing.T) {
 		Outfit:  "a cropped bikini top and nothing else",
 		Setting: "on a beach",
 	})
-	require.Contains(t, prompt, "overlaps the waistband so that no midriff, stomach or navel is visible")
+	require.Contains(t, prompt, "hem hangs below her hips and covers the waistband")
 	require.Contains(t, prompt, "legs are covered to at least the knee, and she has shoes on")
+	// Described, never forbidden. A negation in the positive prompt is not
+	// encoded by CLIP, and naming the navel there raises its salience -- which
+	// is the likeliest reason three rounds of forbidding kept producing it.
+	// Every prohibition lives in the negative prompt, which is checked below.
+	for _, negated := range []string{"no midriff", "navel is visible", "not visible"} {
+		require.NotContains(t, prompt, negated)
+	}
 }
 
 func TestAnUnusableBriefFallsBackRatherThanRenderingNowhere(t *testing.T) {

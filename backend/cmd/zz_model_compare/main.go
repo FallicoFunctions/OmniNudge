@@ -98,6 +98,7 @@ func main() {
 	sheet := flag.Bool("sheet", false, "build the comparison page from directories already rendered, and render nothing")
 	dryRun := flag.String("dry-run", "", "write the payloads to this file and submit nothing")
 	personality := flag.String("personality", "", "her personality, in prose. Set it to write the four briefs for real instead of reusing one fixed brief.")
+	briefsFrom := flag.String("briefs-from", "", "reuse the briefs from an earlier run's manifest.json, so a prompt change is the only thing that differs")
 	timeout := flag.Duration("timeout", 8*time.Minute, "how long to wait for one render")
 	flag.Parse()
 
@@ -114,12 +115,12 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if err := run(*label, *out, *appearance, *personality, seeds, *timeout, *dryRun); err != nil {
+	if err := run(*label, *out, *appearance, *personality, *briefsFrom, seeds, *timeout, *dryRun); err != nil {
 		fail(err)
 	}
 }
 
-func run(label, out, appearance, personality string, seeds []int64, timeout time.Duration, dryRun string) error {
+func run(label, out, appearance, personality, briefsFrom string, seeds []int64, timeout time.Duration, dryRun string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -134,7 +135,7 @@ func run(label, out, appearance, personality string, seeds []int64, timeout time
 	}
 
 	profile := models.OmniChatMediaIdentityProfile{Appearance: appearance}
-	briefs, err := briefsFor(cfg, personality, appearance, len(seeds))
+	briefs, err := briefsFor(cfg, personality, briefsFrom, len(seeds))
 	if err != nil {
 		return err
 	}
@@ -242,7 +243,31 @@ func run(label, out, appearance, personality string, seeds []int64, timeout time
 // one fixed brief is repeated, which is what a model comparison wants: a brief
 // that varied per seed would make the clothes another thing that changed
 // between two checkpoints, and there would be nothing left that did not.
-func briefsFor(cfg *config.Config, personality, appearance string, count int) ([]services.OmniAICandidateBrief, error) {
+func briefsFor(cfg *config.Config, personality, briefsFrom string, count int) ([]services.OmniAICandidateBrief, error) {
+	// Reused from an earlier run when asked. Writing fresh briefs would make the
+	// clothes change alongside the prompt, and there would be nothing left to
+	// attribute a different result to.
+	if strings.TrimSpace(briefsFrom) != "" {
+		raw, err := os.ReadFile(briefsFrom)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", briefsFrom, err)
+		}
+		var earlier manifest
+		if err := json.Unmarshal(raw, &earlier); err != nil {
+			return nil, fmt.Errorf("%s: %w", briefsFrom, err)
+		}
+		reused := make([]services.OmniAICandidateBrief, 0, count)
+		for _, entry := range earlier.Candidates {
+			reused = append(reused, entry.Brief)
+		}
+		if len(reused) != count {
+			return nil, fmt.Errorf("%s holds %d briefs and %d seeds were asked for",
+				briefsFrom, len(reused), count)
+		}
+		fmt.Printf("briefs reused from %s\n\n", briefsFrom)
+		return reused, nil
+	}
+
 	repeated := make([]services.OmniAICandidateBrief, count)
 	for i := range repeated {
 		repeated[i] = defaultBrief

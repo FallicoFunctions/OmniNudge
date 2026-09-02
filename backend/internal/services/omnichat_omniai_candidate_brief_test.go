@@ -115,9 +115,15 @@ func TestTheBriefInstructionOpensTheWardrobeAndClosesTheAbdomen(t *testing.T) {
 		require.Contains(t, omniAICandidateBriefSystemPrompt, open)
 	}
 	for _, closed := range []string{
-		"cover her torso completely", "no stomach or navel shows",
+		"hem hangs below the hips", "covers the waistband",
 		"full-length trousers", "Nothing sexual",
 	} {
+		require.Contains(t, omniAICandidateBriefSystemPrompt, closed)
+	}
+	// Stated as what to choose, not only as what to avoid: the writer is
+	// picking a garment, and a list of forbidden ones is an invitation to think
+	// about them.
+	for _, closed := range []string{"naturally long or worn layered", "untucked jumper"} {
 		require.Contains(t, omniAICandidateBriefSystemPrompt, closed)
 	}
 	// Her description is user-supplied prose reaching a model that writes into

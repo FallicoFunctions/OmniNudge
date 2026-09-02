@@ -150,7 +150,7 @@ Dress her as herself. Read her personality, her interests and what she does, and
 
 Accessories are open, and they are most of what makes somebody look real. Hats, glasses, jewellery, watches, scarves, bags, headphones worn round the neck, a water bottle, pins on a jacket, two shirts layered with the collar popped, laces done a particular way. If a person could physically wear it, she can wear it. Give at least two of the four something specific and personal of this kind.
 
-Every outfit must cover her torso completely, from the shoulders to past the waistband, with the top overlapping the waistband so no stomach or navel shows at any point. Below the waist she wears full-length trousers, or a skirt or dress that reaches the knee. She has shoes on. This holds for every body and every style: dress her warmly and normally, the way somebody dresses to meet a friend.
+Every top you choose must be long enough that its hem hangs below the hips and covers the waistband. Prefer tops that are naturally long or worn layered: an untucked jumper, a shirt worn open over another top, a long cardigan, a tunic. Do not choose a top whose length is short or cropped, and do not describe a top as ending at the waist. Below the waist she wears full-length trousers, or a skirt or dress that reaches the knee. She has shoes on. This holds for every body and every style: dress her warmly and normally, the way somebody dresses to meet a friend.
 
 Nothing sexual. No swimwear, underwear, lingerie, or sleepwear, and nothing chosen to display her body. She looks like somebody you would be glad to see.`
 
