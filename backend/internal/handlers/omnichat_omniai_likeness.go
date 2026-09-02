@@ -40,6 +40,11 @@ type omniChatLikenessPersonaReader interface {
 	GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*models.BotPersona, error)
 }
 
+// omniChatLikenessRerollStarter draws four more faces, and charges for them.
+type omniChatLikenessRerollStarter interface {
+	Reroll(ctx context.Context, persona *models.BotPersona) ([]uuid.UUID, error)
+}
+
 // omniChatReferenceStarter asks for the five pictures that make her look like
 // herself in a scene.
 type omniChatReferenceStarter interface {
@@ -51,6 +56,18 @@ type OmniChatLikenessHandler struct {
 	storage  services.StorageService
 	personas omniChatLikenessPersonaReader
 	starter  omniChatReferenceStarter
+	reroller omniChatLikenessRerollStarter
+}
+
+// SetReroller installs what draws another set. Optional like the reference
+// starter: without it the route refuses rather than the whole handler failing
+// to build, so a deployment that has not wired billing cannot silently give
+// re-rolls away.
+func (h *OmniChatLikenessHandler) SetReroller(reroller omniChatLikenessRerollStarter) *OmniChatLikenessHandler {
+	if h != nil {
+		h.reroller = reroller
+	}
+	return h
 }
 
 // SetReferenceStarter installs what asks for her supporting pictures once a
@@ -273,4 +290,49 @@ func (h *OmniChatLikenessHandler) startSupportingReferences(
 				Msg("omnichat likeness: could not ask for every supporting reference")
 		}
 	}()
+}
+
+// Reroll draws four more faces for a character nobody has picked yet.
+//
+// Unlike the pick, this one waits. The four renders it queues are what somebody
+// just paid for, and answering before the credits are held would mean reporting
+// success for a set that a refused reservation is about to make nothing at all.
+func (h *OmniChatLikenessHandler) Reroll(c *gin.Context) {
+	personaID, ownerUserID, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	if h.reroller == nil || h.personas == nil {
+		RespondErrorCoded(c, http.StatusServiceUnavailable, "reroll_unavailable",
+			"Drawing another set is unavailable right now.")
+		return
+	}
+
+	persona, err := h.personas.GetAccessibleByID(c.Request.Context(), personaID, &ownerUserID)
+	if err != nil || persona == nil {
+		RespondError(c, http.StatusNotFound, "That character could not be found")
+		return
+	}
+
+	started, err := h.reroller.Reroll(c.Request.Context(), persona)
+	if err != nil {
+		if errors.Is(err, models.ErrLikenessAlreadyChosen) {
+			// Said plainly, and separately from a refusal about money. Somebody
+			// whose character already has a face is not short of credits.
+			RespondErrorCoded(c, http.StatusConflict, "likeness_already_chosen",
+				"Her face is already chosen. Deleting her is how you start again.")
+			return
+		}
+		if errors.Is(err, services.ErrOmniChatPaidFeatureRequired) {
+			RespondErrorCoded(c, http.StatusPaymentRequired, "insufficient_credits",
+				"Another set of four costs more credits than this account has.")
+			return
+		}
+		zlog.Error().Err(err).Int("user_id", ownerUserID).Int("persona_id", personaID).
+			Int("started", len(started)).Msg("omnichat likeness: could not draw another set")
+		RespondError(c, http.StatusInternalServerError, "Failed to draw another set")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"started": len(started)})
 }

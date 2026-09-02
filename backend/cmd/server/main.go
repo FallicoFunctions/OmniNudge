@@ -799,14 +799,15 @@ func main() {
 		SetContentEntitlement(omniChatContentEntitlement)
 	omniChatLikenessService := services.NewOmniChatOmniAILikenessService(
 		omniChatMediaRepo, omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
-	)
+	).SetRerollDependencies(omniChatBilling, omniChatMediaRepo)
 	// Installed after construction because the generation enqueuer it needs is
 	// built below the handler. A character is made whether or not this is set,
 	// which is the point: creation does not depend on anything being able to
 	// draw her.
 	omniChatHandler.SetLikenessStarter(omniChatLikenessService)
 	omniChatLikenessHandler := handlers.NewOmniChatLikenessHandler(omniChatMediaRepo, storageService).
-		SetReferenceStarter(botPersonaRepo, omniChatLikenessService)
+		SetReferenceStarter(botPersonaRepo, omniChatLikenessService).
+		SetReroller(omniChatLikenessService)
 	omniChatMediaHandler := handlers.NewOmniChatMediaHandler(omniChatGenerationService, omniChatMediaRepo, storageService).
 		SetBilling(omniChatBilling).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo)
@@ -1444,6 +1445,7 @@ func main() {
 			protected.GET("/omnichat/omniai/:id/likeness", omniChatLikenessHandler.List)
 			protected.GET("/omnichat/omniai/:id/likeness/:candidate_id/content", omniChatLikenessHandler.Content)
 			protected.POST("/omnichat/omniai/:id/likeness/:candidate_id", omniChatLikenessHandler.Pick)
+			protected.POST("/omnichat/omniai/:id/likeness/reroll", omniChatLikenessHandler.Reroll)
 			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)

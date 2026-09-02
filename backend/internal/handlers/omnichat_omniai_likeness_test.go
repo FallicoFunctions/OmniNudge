@@ -458,3 +458,90 @@ func TestAPickSurvivesHavingNothingToStartRendersWith(t *testing.T) {
 			&likenessPersonaReaderFake{err: errors.New("gone")}, starter),
 		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/12").Code)
 }
+
+type rerollerFake struct {
+	calls   int
+	err     error
+	started []uuid.UUID
+}
+
+func (f *rerollerFake) Reroll(context.Context, *models.BotPersona) ([]uuid.UUID, error) {
+	f.calls++
+	return f.started, f.err
+}
+
+func newRerollRouter(personas omniChatLikenessPersonaReader, reroller omniChatLikenessRerollStarter) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	handler := NewOmniChatLikenessHandler(&likenessStoreFake{}, nil).
+		SetReferenceStarter(personas, nil).
+		SetReroller(reroller)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.POST("/api/v1/omnichat/omniai/:id/likeness/reroll", handler.Reroll)
+	return router
+}
+
+func rerollOwner() *likenessPersonaReaderFake {
+	owner := 9
+	return &likenessPersonaReaderFake{persona: &models.BotPersona{ID: 31, OwnerUserID: &owner}}
+}
+
+func codeOf(t *testing.T, response *httptest.ResponseRecorder) string {
+	t.Helper()
+	var body struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	return body.Code
+}
+
+func TestDrawingAnotherSetAnswersWithWhatItStarted(t *testing.T) {
+	// Unlike a pick, this one waits: the four renders are what somebody just
+	// paid for, and answering early would report success for a set a refused
+	// reservation is about to make nothing at all.
+	reroller := &rerollerFake{started: []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New()}}
+	response := callLikeness(newRerollRouter(rerollOwner(), reroller),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, 1, reroller.calls)
+	require.Contains(t, response.Body.String(), `"started":4`)
+}
+
+func TestAnAlreadyChosenFaceIsRefusedAsItsOwnThing(t *testing.T) {
+	// Not as a money problem. Somebody whose character already has a face is
+	// not short of credits, and telling them to buy more is the wrong advice.
+	response := callLikeness(newRerollRouter(rerollOwner(),
+		&rerollerFake{err: models.ErrLikenessAlreadyChosen}),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+
+	require.Equal(t, http.StatusConflict, response.Code)
+	require.Equal(t, "likeness_already_chosen", codeOf(t, response))
+}
+
+func TestNotEnoughCreditsIsSaidAsNotEnoughCredits(t *testing.T) {
+	response := callLikeness(newRerollRouter(rerollOwner(),
+		&rerollerFake{err: services.ErrOmniChatPaidFeatureRequired}),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+
+	require.Equal(t, http.StatusPaymentRequired, response.Code)
+	require.Equal(t, "insufficient_credits", codeOf(t, response))
+}
+
+func TestAnUnwiredRerollRefusesRatherThanDrawingForFree(t *testing.T) {
+	// A deployment that has not wired billing must not hand out four renders.
+	response := callLikeness(newRerollRouter(rerollOwner(), nil),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.Equal(t, "reroll_unavailable", codeOf(t, response))
+}
+
+func TestSomebodyElsesCharacterCannotBeRedrawn(t *testing.T) {
+	reroller := &rerollerFake{}
+	response := callLikeness(newRerollRouter(&likenessPersonaReaderFake{}, reroller),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+
+	require.Equal(t, http.StatusNotFound, response.Code)
+	require.Zero(t, reroller.calls, "nothing is drawn for a character they cannot reach")
+}
