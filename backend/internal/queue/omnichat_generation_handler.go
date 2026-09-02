@@ -76,6 +76,22 @@ type omniChatGenerationJobStore interface {
 	AttachLikenessReference(ctx context.Context, jobID uuid.UUID, media *models.MediaFile, freeTierBytes, proTierBytes int64, provenance models.OmniChatGenerationProvenance) error
 }
 
+// omniChatRenderedImageReviewer looks at a picture before it becomes an asset.
+// Optional: a deployment without one falls back to failClosed, so leaving it
+// unset is a decision that has to be made rather than a silent gap.
+type omniChatRenderedImageReviewer interface {
+	ReviewRenderedImage(ctx context.Context, path, contentType string) (bool, error)
+}
+
+// SetRenderedImageReview installs it. Off the constructor because the review
+// needs a chat client that is built after this handler.
+func (h *OmniChatGenerationHandler) SetRenderedImageReview(review omniChatRenderedImageReviewer) *OmniChatGenerationHandler {
+	if h != nil {
+		h.imageReview = review
+	}
+	return h
+}
+
 type omniChatPersonaReader interface {
 	GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*models.BotPersona, error)
 }
@@ -104,6 +120,7 @@ type OmniChatGenerationHandler struct {
 	provider         runPodGenerationClient
 	config           config.OmniChatMediaConfig
 	failClosed       bool
+	imageReview      omniChatRenderedImageReviewer
 	storageQuotaFree int64
 	storageQuotaPro  int64
 	// downloadMedia fetches a finished artifact from the provider. It is a
@@ -618,6 +635,37 @@ func (h *OmniChatGenerationHandler) commitFor(
 	}
 }
 
+// refuseExplicitRender stops an explicit picture becoming an asset.
+//
+// Unavailable is refused, not allowed. The prompt moderator beside this one
+// fails open on purpose -- it guards a rare category, and a third party having
+// a bad day should not break generation for everybody. This guards the common
+// case, and the two costs are not comparable: being wrong the permissive way
+// puts an explicit picture in front of somebody who did not ask for one, and
+// being wrong the cautious way costs a render that is retried and refunded.
+func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, path, contentType string) error {
+	if h.imageReview == nil {
+		if h.failClosed {
+			return permanentGenerationFailure("image_review_unavailable",
+				errors.New("rendered image review is not configured"))
+		}
+		return nil
+	}
+	explicit, err := h.imageReview.ReviewRenderedImage(ctx, path, contentType)
+	if err != nil {
+		zlog.Error().Err(err).Msg("omnichat: could not review a rendered image")
+		return permanentGenerationFailure("image_review_unavailable", err)
+	}
+	if explicit {
+		// Permanent rather than retryable: the same prompt and the same seed
+		// produce the same picture, so a retry is the same refusal at the same
+		// cost.
+		return permanentGenerationFailure("explicit_content_refused",
+			errors.New("the rendered image was explicit and explicit content is not permitted here"))
+	}
+	return nil
+}
+
 func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	ctx context.Context,
 	job *models.OmniChatGenerationJob,
@@ -663,6 +711,22 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 			}
 		} else if scanResult.Infected {
 			return nil, false, permanentGenerationFailure("malware_detected", errors.New("generated media failed security scanning"))
+		}
+	}
+
+	// What came back, not what was asked for.
+	//
+	// Every other control governs the request. This is the only one that looks
+	// at the picture, and it runs exactly where the virus scan does and for the
+	// same reason: the file is in hand and nothing has been committed, so a
+	// refusal costs a retry and leaves nothing behind.
+	//
+	// Only where explicit output would be a defect. A render the account is
+	// entitled to make explicit is not this check's business, so it neither
+	// waits nor charges on that path.
+	if !job.AllowNSFW && kind == models.OmniChatMediaKindImage {
+		if err := h.refuseExplicitRender(ctx, download.Path, download.ContentType); err != nil {
+			return nil, false, err
 		}
 	}
 

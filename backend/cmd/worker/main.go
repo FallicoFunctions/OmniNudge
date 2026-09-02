@@ -146,6 +146,16 @@ func main() {
 		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
 		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 			SetAdminReader(workerOmniChatUserRepo))
+	// Looks at what the provider returned, on the paths where explicit output
+	// would be a defect. Without it the handler falls back to failClosed, so an
+	// unset review is a refusal rather than a silent gap.
+	if imageReviewModel := strings.TrimSpace(cfg.OpenRouter.ImageReviewModel); imageReviewModel != "" && strings.TrimSpace(cfg.OpenRouter.APIKey) != "" {
+		omniChatGenerationWorker = omniChatGenerationWorker.SetRenderedImageReview(
+			services.NewOpenRouterRenderedImageReview(
+				openrouter.NewClient(cfg.OpenRouter.APIKey, imageReviewModel),
+			),
+		)
+	}
 	// Character memory extraction. This is the only place the extraction model
 	// is called, which is what keeps a 20-second reasoning pass off the send
 	// path entirely.

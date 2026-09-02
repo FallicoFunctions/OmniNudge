@@ -97,6 +97,11 @@ type OpenRouterConfig struct {
 	// all seven scenarios repeatedly. See TestLiveCommitmentResolution.
 	ExtractionModel string // OMNICHAT_MODEL_EXTRACTION
 
+	// ImageReviewModel looks at a rendered picture before it becomes an asset.
+	// It has to be a model that accepts images; a text-only one refuses every
+	// render, which fails closed and is at least loud.
+	ImageReviewModel string // OMNICHAT_MODEL_IMAGE_REVIEW
+
 	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
 	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
 	PremiumQuickModel string // OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY
@@ -420,6 +425,7 @@ func Load() (*Config, error) {
 			// the extraction distinctions, at a third of Sonnet's input price.
 			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.5-flash-lite"),
 			ExtractionModel:   getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3.5-flash-lite"),
+			ImageReviewModel:  getEnv("OMNICHAT_MODEL_IMAGE_REVIEW", "google/gemini-3.5-flash-lite"),
 			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "google/gemini-3-flash-preview"),
 			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "google/gemini-3.5-flash-lite"),
 			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "google/gemini-3.5-flash-lite"),

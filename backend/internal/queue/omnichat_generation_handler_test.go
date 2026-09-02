@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -1005,4 +1007,143 @@ func TestASeedIsSomethingTheWorkerWillAccept(t *testing.T) {
 		seed := seedForJob(uuid.New())
 		require.GreaterOrEqual(t, seed, int64(0))
 	}
+}
+
+type imageReviewFake struct {
+	calls    int
+	explicit bool
+	err      error
+}
+
+func (f *imageReviewFake) ReviewRenderedImage(context.Context, string, string) (bool, error) {
+	f.calls++
+	return f.explicit, f.err
+}
+
+func reviewingHandler(review omniChatRenderedImageReviewer, failClosed bool) *OmniChatGenerationHandler {
+	return (&OmniChatGenerationHandler{failClosed: failClosed}).SetRenderedImageReview(review)
+}
+
+func TestAnExplicitRenderNeverBecomesAnAsset(t *testing.T) {
+	// The reason this exists: a likeness rendered with AllowNSFW false, the
+	// entitlement off, and "nude" and "topless" both in the negative prompt,
+	// and came back exposed. Wording shifts a distribution; this draws a line.
+	review := &imageReviewFake{explicit: true}
+	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "explicit")
+	require.Equal(t, 1, review.calls)
+}
+
+func TestACleanRenderPassesStraightThrough(t *testing.T) {
+	review := &imageReviewFake{explicit: false}
+	require.NoError(t, reviewingHandler(review, true).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png"))
+	require.Equal(t, 1, review.calls)
+}
+
+func TestAReviewThatCannotAnswerRefuses(t *testing.T) {
+	// The opposite posture to the prompt moderator beside it, on purpose. That
+	// one fails open because it guards a rare category and an outage should not
+	// break generation for everybody. This guards the common case, and the two
+	// costs are not comparable: a retry against an explicit picture reaching
+	// somebody who did not ask for one.
+	review := &imageReviewFake{err: errors.New("openrouter is unreachable")}
+	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+
+	require.Error(t, err, "unavailable is not permission")
+	require.Contains(t, err.Error(), "unreachable")
+}
+
+func TestAnUnwiredReviewRefusesWhenTheDeploymentSaysFailClosed(t *testing.T) {
+	// Leaving the review out has to be a decision somebody made, not a gap
+	// nobody noticed.
+	err := reviewingHandler(nil, true).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not configured")
+
+	require.NoError(t, reviewingHandler(nil, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png"),
+		"a deployment that has chosen to fail open still may")
+}
+
+// persistFixture is enough of a handler to run persistGeneratedMedia without a
+// provider, a network or a database.
+type persistStorageFake struct {
+	unusedGenerationStorageFake
+	uploaded int
+}
+
+func (f *persistStorageFake) Upload(context.Context, string, io.Reader, string) (string, error) {
+	f.uploaded++
+	return "stored", nil
+}
+
+func (f *persistStorageFake) Delete(context.Context, string) error { return nil }
+
+// persistJobStoreFake answers the one question persistGeneratedMedia asks of
+// the store: is this job still live? It is, always.
+type persistJobStoreFake struct{ commitDestinationFake }
+
+func (f *persistJobStoreFake) GetGenerationJobForProcessing(_ context.Context, id uuid.UUID) (*models.OmniChatGenerationJob, error) {
+	return &models.OmniChatGenerationJob{ID: id, Status: models.OmniChatGenerationStatusRunning}, nil
+}
+
+func persistingHandler(t *testing.T, review omniChatRenderedImageReviewer) (*OmniChatGenerationHandler, *persistStorageFake) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "render.png")
+	require.NoError(t, os.WriteFile(path, []byte("not really a png"), 0o600))
+
+	storage := &persistStorageFake{}
+	h := &OmniChatGenerationHandler{
+		jobs:    &persistJobStoreFake{},
+		storage: storage,
+		config:  config.OmniChatMediaConfig{MaxImageBytes: 1 << 20},
+		downloadMedia: func(context.Context, string, modelsMediaKind, int64, ...string) (*generatedMediaDownload, func(), error) {
+			return &generatedMediaDownload{
+				Path: path, Size: 16, ContentType: "image/png", Extension: ".png",
+			}, func() {}, nil
+		},
+	}
+	return h.SetRenderedImageReview(review), storage
+}
+
+func persistOnce(t *testing.T, h *OmniChatGenerationHandler, allowNSFW bool) error {
+	t.Helper()
+	job := &models.OmniChatGenerationJob{
+		ID: uuid.New(), OwnerUserID: 1, Kind: models.OmniChatMediaKindImage,
+		Mode: models.OmniChatGenerationModeLikeness, AllowNSFW: allowNSFW,
+	}
+	phase := &providerPhase{kind: models.OmniChatMediaKindImage, spec: &RunPodGenerationSpec{}}
+	result := &runpod.Result{Images: []runpod.MediaFile{{URL: "https://example.invalid/x.png"}}}
+	_, _, err := h.persistGeneratedMedia(context.Background(), job, models.OmniChatMediaKindImage, phase, result,
+		func(*models.MediaFile, *models.OmniChatMediaAsset, models.OmniChatGenerationProvenance) error {
+			return nil
+		})
+	return err
+}
+
+func TestTheReviewIsActuallyReachedOnTheWayToStorage(t *testing.T) {
+	// The refusal was tested and the call site was not, so deleting the call
+	// left every test green. This is the test that notices.
+	review := &imageReviewFake{explicit: true}
+	h, storage := persistingHandler(t, review)
+
+	err := persistOnce(t, h, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "explicit")
+	require.Equal(t, 1, review.calls, "the picture was looked at")
+	require.Zero(t, storage.uploaded, "and never reached storage")
+}
+
+func TestAnEntitledRenderIsNotReviewed(t *testing.T) {
+	// Explicit output is what an entitled render is for, so the review neither
+	// waits nor charges on that path.
+	review := &imageReviewFake{explicit: true}
+	h, storage := persistingHandler(t, review)
+
+	require.NoError(t, persistOnce(t, h, true))
+	require.Zero(t, review.calls, "nothing to review when explicit is permitted")
+	require.Equal(t, 1, storage.uploaded)
 }
