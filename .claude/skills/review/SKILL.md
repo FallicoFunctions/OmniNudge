@@ -68,7 +68,9 @@ it was never verified, so a ledger you cannot satisfy ends the turn honestly
 instead of looping.
 
 **Work the list.** For each instrument in `.review/instruments.json`, ask its
-question. Record what you did and what it showed. Instruments B1-B4 mean *print
+question. B5 is the one that cannot be done from a desk: if the thing produces
+output through a model or another system, run it for real and look at what came
+back, side by side. A payload can be correct and the picture still wrong. Record what you did and what it showed. Instruments B1-B4 mean *print
 the real artifact and read it* -- write a throwaway test or a small script that
 emits it, look at the output, then delete the throwaway.
 

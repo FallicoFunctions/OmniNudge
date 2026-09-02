@@ -151,6 +151,12 @@
       "name": "What did this pass do that the list does not name?",
       "trigger": "every pass that found something",
       "asks": "Which technique found it, and is that technique a row here yet? If not, add it."
+    },
+    {
+      "id": "B5",
+      "name": "Run it against the real thing and compare the outputs to each other",
+      "trigger": "anything whose output is produced by a model, a provider, or another system",
+      "asks": "Not just: is each output correct? Also: are the outputs different from each other in the ways the feature promises, and does anyone looking at them agree they are what was asked for?"
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
