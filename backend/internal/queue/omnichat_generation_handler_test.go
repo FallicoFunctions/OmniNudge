@@ -1013,10 +1013,13 @@ type imageReviewFake struct {
 	calls    int
 	explicit bool
 	err      error
+	standard services.OmniChatImageStandard
 }
 
-func (f *imageReviewFake) ReviewRenderedImage(context.Context, string, string) (bool, error) {
+func (f *imageReviewFake) ReviewRenderedImageAgainst(_ context.Context, _, _ string,
+	standard services.OmniChatImageStandard) (bool, error) {
 	f.calls++
+	f.standard = standard
 	return f.explicit, f.err
 }
 
@@ -1029,7 +1032,8 @@ func TestAnExplicitRenderNeverBecomesAnAsset(t *testing.T) {
 	// entitlement off, and "nude" and "topless" both in the negative prompt,
 	// and came back exposed. Wording shifts a distribution; this draws a line.
 	review := &imageReviewFake{explicit: true}
-	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeContextual}, "/tmp/x.png", "image/png")
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "explicit")
@@ -1038,7 +1042,8 @@ func TestAnExplicitRenderNeverBecomesAnAsset(t *testing.T) {
 
 func TestACleanRenderPassesStraightThrough(t *testing.T) {
 	review := &imageReviewFake{explicit: false}
-	require.NoError(t, reviewingHandler(review, true).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png"))
+	require.NoError(t, reviewingHandler(review, true).refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate}, "/tmp/x.png", "image/png"))
 	require.Equal(t, 1, review.calls)
 }
 
@@ -1049,7 +1054,8 @@ func TestAReviewThatCannotAnswerRefuses(t *testing.T) {
 	// costs are not comparable: a retry against an explicit picture reaching
 	// somebody who did not ask for one.
 	review := &imageReviewFake{err: errors.New("openrouter is unreachable")}
-	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate}, "/tmp/x.png", "image/png")
 
 	require.Error(t, err, "unavailable is not permission")
 	require.Contains(t, err.Error(), "unreachable")
@@ -1058,11 +1064,12 @@ func TestAReviewThatCannotAnswerRefuses(t *testing.T) {
 func TestAnUnwiredReviewRefusesWhenTheDeploymentSaysFailClosed(t *testing.T) {
 	// Leaving the review out has to be a decision somebody made, not a gap
 	// nobody noticed.
-	err := reviewingHandler(nil, true).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png")
+	job := &models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate}
+	err := reviewingHandler(nil, true).refuseExplicitRender(context.Background(), job, "/tmp/x.png", "image/png")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not configured")
 
-	require.NoError(t, reviewingHandler(nil, false).refuseExplicitRender(context.Background(), "/tmp/x.png", "image/png"),
+	require.NoError(t, reviewingHandler(nil, false).refuseExplicitRender(context.Background(), job, "/tmp/x.png", "image/png"),
 		"a deployment that has chosen to fail open still may")
 }
 
@@ -1132,7 +1139,7 @@ func TestTheReviewIsActuallyReachedOnTheWayToStorage(t *testing.T) {
 	err := persistOnce(t, h, false)
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "explicit")
+	require.Contains(t, err.Error(), "portrait", "a likeness is held to the portrait standard")
 	require.Equal(t, 1, review.calls, "the picture was looked at")
 	require.Zero(t, storage.uploaded, "and never reached storage")
 }
@@ -1146,4 +1153,36 @@ func TestAnEntitledRenderIsNotReviewed(t *testing.T) {
 	require.NoError(t, persistOnce(t, h, true))
 	require.Zero(t, review.calls, "nothing to review when explicit is permitted")
 	require.Equal(t, 1, storage.uploaded)
+}
+
+func TestHerOwnPortraitIsHeldToTheStricterStandard(t *testing.T) {
+	// A bare midriff is not explicit, and it is still wrong on the first
+	// picture somebody sees of a character they are about to know. A scene
+	// keeps the explicit standard, because somebody at a beach in a scene may
+	// legitimately show one.
+	for _, c := range []struct {
+		mode models.OmniChatGenerationMode
+		want services.OmniChatImageStandard
+	}{
+		{models.OmniChatGenerationModeLikeness, services.OmniChatImageStandardPortrait},
+		{models.OmniChatGenerationModeLikenessReference, services.OmniChatImageStandardPortrait},
+		{models.OmniChatGenerationModeCreate, services.OmniChatImageStandardExplicit},
+		{models.OmniChatGenerationModeContextual, services.OmniChatImageStandardExplicit},
+	} {
+		review := &imageReviewFake{}
+		require.NoError(t, reviewingHandler(review, false).refuseExplicitRender(
+			context.Background(), &models.OmniChatGenerationJob{Mode: c.mode}, "/tmp/x.png", "image/png"))
+		require.Equal(t, c.want, review.standard, string(c.mode))
+	}
+}
+
+func TestAPortraitRefusalSaysItIsAboutThePortrait(t *testing.T) {
+	// Not "explicit content": the picture may be perfectly decent and simply
+	// not be what a character's introduction should look like.
+	review := &imageReviewFake{explicit: true}
+	err := reviewingHandler(review, false).refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeLikeness}, "/tmp/x.png", "image/png")
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "character portrait")
 }

@@ -186,7 +186,12 @@ func NormalizeOmniChatReferenceRequest(
 //
 // Nobody else in frame, which is what this started as.
 //
-// Clothed, and specifically clothed below the waist. The scene path already
+// Clothed, and named garment by garment. A coverage instruction is answered by
+// choosing a garment, so the garments that bare a midriff are refused by name:
+// "bare midriff" alone left crop tops and sports bras entirely available, and
+// the model kept reaching for them. No abdomen on anybody, of any gender.
+//
+// Clothed below the waist too. The scene path already
 // argues that an adult-tuned checkpoint drifts to nude whatever the positive
 // prompt says. Asking for clothes in general was not enough: the model put her
 // in a crop top and left her bare from the waist down, which satisfies "wearing
@@ -201,8 +206,11 @@ func NormalizeOmniChatReferenceRequest(
 // somebody choosing a character's face is choosing between.
 const omniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
 	"crowd, bystander, group photo, another woman, another man, " +
-	"nude, naked, topless, underwear, lingerie, swimwear, bare midriff, " +
+	"nude, naked, topless, underwear, lingerie, swimwear, " +
 	"exposed skin instead of clothing, " +
+	"crop top, cropped shirt, cropped top, sports bra, bralette, halter top, " +
+	"tube top, tied shirt, bare midriff, bare stomach, bare abdomen, " +
+	"exposed navel, visible navel, underboob, sideboob, cutout top, " +
 	"bottomless, no trousers, missing trousers, bare legs with no skirt, " +
 	"exposed groin, pubic area, genitals, naked lower body, " +
 	"from behind, back view, rear view, facing away, looking over the shoulder, buttocks, " +

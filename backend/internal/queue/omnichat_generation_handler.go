@@ -80,7 +80,7 @@ type omniChatGenerationJobStore interface {
 // Optional: a deployment without one falls back to failClosed, so leaving it
 // unset is a decision that has to be made rather than a silent gap.
 type omniChatRenderedImageReviewer interface {
-	ReviewRenderedImage(ctx context.Context, path, contentType string) (bool, error)
+	ReviewRenderedImageAgainst(ctx context.Context, path, contentType string, standard services.OmniChatImageStandard) (bool, error)
 }
 
 // SetRenderedImageReview installs it. Off the constructor because the review
@@ -643,7 +643,7 @@ func (h *OmniChatGenerationHandler) commitFor(
 // case, and the two costs are not comparable: being wrong the permissive way
 // puts an explicit picture in front of somebody who did not ask for one, and
 // being wrong the cautious way costs a render that is retried and refunded.
-func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, path, contentType string) error {
+func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, job *models.OmniChatGenerationJob, path, contentType string) error {
 	if h.imageReview == nil {
 		if h.failClosed {
 			return permanentGenerationFailure("image_review_unavailable",
@@ -651,7 +651,18 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, pa
 		}
 		return nil
 	}
-	explicit, err := h.imageReview.ReviewRenderedImage(ctx, path, contentType)
+	// A character's own portrait is held to the stricter standard. It is the
+	// first thing somebody sees of a character they are about to know, and it
+	// should read as a person they are meeting rather than a body being
+	// presented -- so no abdomen, one person, and nothing alluring. A scene
+	// photo keeps the explicit standard, because somebody at a beach in a scene
+	// may legitimately show a midriff and a portrait may not.
+	standard := services.OmniChatImageStandardExplicit
+	switch job.Mode {
+	case models.OmniChatGenerationModeLikeness, models.OmniChatGenerationModeLikenessReference:
+		standard = services.OmniChatImageStandardPortrait
+	}
+	explicit, err := h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
 	if err != nil {
 		zlog.Error().Err(err).Msg("omnichat: could not review a rendered image")
 		return permanentGenerationFailure("image_review_unavailable", err)
@@ -660,6 +671,10 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, pa
 		// Permanent rather than retryable: the same prompt and the same seed
 		// produce the same picture, so a retry is the same refusal at the same
 		// cost.
+		if standard == services.OmniChatImageStandardPortrait {
+			return permanentGenerationFailure("portrait_standard_refused",
+				errors.New("the rendered picture did not meet the standard for a character portrait"))
+		}
 		return permanentGenerationFailure("explicit_content_refused",
 			errors.New("the rendered image was explicit and explicit content is not permitted here"))
 	}
@@ -725,7 +740,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	// entitled to make explicit is not this check's business, so it neither
 	// waits nor charges on that path.
 	if !job.AllowNSFW && kind == models.OmniChatMediaKindImage {
-		if err := h.refuseExplicitRender(ctx, download.Path, download.ContentType); err != nil {
+		if err := h.refuseExplicitRender(ctx, job, download.Path, download.ContentType); err != nil {
 			return nil, false, err
 		}
 	}

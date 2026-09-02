@@ -30,6 +30,13 @@ const (
 	// and it is right to -- coverage is not one fact. So each half is named,
 	// and so are shoes, because bare feet were the next thing to go.
 	//
+	// The torso is named as one covered surface rather than as "chest and
+	// midriff", because the model answers a coverage instruction by choosing a
+	// garment, and a crop top is a garment that covers a chest. Overlapping the
+	// waistband is the thing that has no crop-top reading. No abdomen, on
+	// anybody: these are the first pictures somebody sees of a character they
+	// are about to know, and a bare stomach is not what warm looks like.
+	//
 	// Shoulders square, because "facing the camera directly" alone produced two
 	// of four from behind. The identity anchor is also the 3D pipeline's single
 	// forward-facing input, so a back view is not a stylistic variation; it is
@@ -40,7 +47,8 @@ const (
 	// an unspecified expression into a sultry one.
 	omniAILikenessFraming = "Full body from head to feet, standing upright and facing the camera directly, " +
 		"both shoulders square to the camera, " +
-		"wearing a top that covers the chest and midriff, full-length trousers or a skirt to the knee, and shoes, " +
+		"wearing a top that covers the whole torso and overlaps the waistband so no midriff or navel is visible, " +
+		"full-length trousers or a skirt to the knee, and shoes, " +
 		"arms relaxed at the sides, a warm friendly expression with a natural closed-mouth smile, " +
 		"plain seamless background, even diffuse lighting with no strong shadows, " +
 		"no props and no other people."

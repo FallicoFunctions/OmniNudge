@@ -48,6 +48,37 @@ func NewOpenRouterRenderedImageReview(client chatCompletionClient) *OpenRouterRe
 // person and refusing to review it is safer than paying to look.
 const omniChatRenderedImageMaxBytes = 12 << 20
 
+// A character's own portrait is held to a stricter standard than a scene.
+//
+// The explicit standard asks whether a picture is 18+. A portrait has to clear
+// a second bar that has nothing to do with safety: it is the first thing
+// somebody sees of a character they are about to know, and it should look like
+// a person they are meeting rather than a body being presented. A bare midriff
+// is not explicit and is still wrong here.
+//
+// Kept separate because a scene photo is not held to it. Somebody at a beach
+// in a scene may show a midriff; the character's portrait may not.
+type OmniChatImageStandard string
+
+const (
+	OmniChatImageStandardExplicit OmniChatImageStandard = "explicit"
+	OmniChatImageStandardPortrait OmniChatImageStandard = "portrait"
+)
+
+const omniChatRenderedPortraitSystemPrompt = `You are checking one image against the standard for a character's introduction portrait. Reply with exactly PASS or FAIL and nothing else.
+
+Reply FAIL if any of these is true:
+- Any part of the abdomen, midriff, stomach, waist or navel is visible.
+- The top is a crop top, cropped shirt, sports bra, bralette, halter top, tube top, or is tied or cut to expose the torso.
+- Exposed genitals, buttocks, nipples, underboob or sideboob.
+- The subject is nude, in underwear, in lingerie, in swimwear, or bare below the waist.
+- The pose or expression is sexual, seductive, sultry or alluring rather than warm and friendly.
+- More than one person is in the frame.
+
+Reply PASS only for a single fully clothed person whose torso is completely covered from the shoulders to below the waistband, facing the camera, looking warm and approachable.
+
+Judge only what is visible. Do not explain.`
+
 const omniChatRenderedImageSystemPrompt = `You are looking at one image produced by an image generator for a product where explicit content is currently switched off. Reply with exactly EXPLICIT or CLEAN and nothing else.
 
 Reply EXPLICIT if the image shows any of:
@@ -70,6 +101,14 @@ Judge only what is visible. Do not infer from the setting, and do not explain.`
 // credits for it come back on their own, because a failed job is already
 // refunded.
 func (r *OpenRouterRenderedImageReview) ReviewRenderedImage(ctx context.Context, path, contentType string) (bool, error) {
+	return r.ReviewRenderedImageAgainst(ctx, path, contentType, OmniChatImageStandardExplicit)
+}
+
+// ReviewRenderedImageAgainst reports whether the file at path fails the given
+// standard.
+func (r *OpenRouterRenderedImageReview) ReviewRenderedImageAgainst(
+	ctx context.Context, path, contentType string, standard OmniChatImageStandard,
+) (bool, error) {
 	if r == nil || r.client == nil {
 		return false, errors.New("rendered image review is not configured")
 	}
@@ -81,8 +120,13 @@ func (r *OpenRouterRenderedImageReview) ReviewRenderedImage(ctx context.Context,
 	reviewCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
+	systemPrompt, refuse := omniChatRenderedImageSystemPrompt, "EXPLICIT"
+	if standard == OmniChatImageStandardPortrait {
+		systemPrompt, refuse = omniChatRenderedPortraitSystemPrompt, "FAIL"
+	}
+
 	verdict, err := r.client.Generate(reviewCtx, []openrouter.Message{
-		{Role: openrouter.RoleSystem, Content: omniChatRenderedImageSystemPrompt},
+		{Role: openrouter.RoleSystem, Content: systemPrompt},
 		{Role: openrouter.RoleUser, Content: "Classify this image.", ImageDataURLs: []string{dataURL}},
 	}, func(string) {})
 	if err != nil {
@@ -91,10 +135,10 @@ func (r *OpenRouterRenderedImageReview) ReviewRenderedImage(ctx context.Context,
 		return false, fmt.Errorf("rendered image review unavailable: %w", err)
 	}
 
-	switch strings.TrimSpace(strings.ToUpper(verdict)) {
-	case "CLEAN":
+	switch answer := strings.TrimSpace(strings.ToUpper(verdict)); answer {
+	case "CLEAN", "PASS":
 		return false, nil
-	case "EXPLICIT":
+	case refuse:
 		return true, nil
 	default:
 		// An answer nobody can read is not an answer. Treated as unavailable
