@@ -955,3 +955,54 @@ func TestAFinishedRenderGoesWhereItsModeSays(t *testing.T) {
 		})
 	}
 }
+
+func TestFourCandidatesAreFourPictures(t *testing.T) {
+	// Measured against a real endpoint: without a seed the worker builds its
+	// generator from a fixed default, so four renders of one prompt came back
+	// byte-identical. That is one face charged for four times, and it is the
+	// opposite of a choice.
+	cfg := config.OmniChatMediaConfig{RunPodImageEndpointID: "endpoint"}
+	job := func() *models.OmniChatGenerationJob {
+		return &models.OmniChatGenerationJob{
+			ID: uuid.New(), Kind: models.OmniChatMediaKindImage,
+			Mode: models.OmniChatGenerationModeLikeness, EffectivePrompt: "one person",
+			AspectRatio: "9:16",
+		}
+	}
+
+	seeds := map[any]int{}
+	for i := 0; i < 4; i++ {
+		spec, err := BuildImageSpec(cfg, job(), nil)
+		require.NoError(t, err)
+		seed, present := spec.Input["seed"]
+		require.True(t, present, "every render carries a seed")
+		seeds[seed]++
+	}
+	require.Len(t, seeds, 4, "four jobs, four seeds")
+}
+
+func TestARetryRendersThePictureItWasGoingTo(t *testing.T) {
+	// The seed comes from the job's own id, so running the same job again is
+	// the same picture. A retry that silently produced a different face would
+	// be a different character arriving after a transient failure.
+	cfg := config.OmniChatMediaConfig{RunPodImageEndpointID: "endpoint"}
+	job := &models.OmniChatGenerationJob{
+		ID: uuid.New(), Kind: models.OmniChatMediaKindImage,
+		Mode: models.OmniChatGenerationModeLikeness, EffectivePrompt: "one person",
+		AspectRatio: "9:16",
+	}
+	first, err := BuildImageSpec(cfg, job, nil)
+	require.NoError(t, err)
+	second, err := BuildImageSpec(cfg, job, nil)
+	require.NoError(t, err)
+	require.Equal(t, first.Input["seed"], second.Input["seed"])
+}
+
+func TestASeedIsSomethingTheWorkerWillAccept(t *testing.T) {
+	// The contract refuses anything negative or over 2^63-1, so a seed that
+	// wrapped would fail every render at the door.
+	for i := 0; i < 500; i++ {
+		seed := seedForJob(uuid.New())
+		require.GreaterOrEqual(t, seed, int64(0))
+	}
+}

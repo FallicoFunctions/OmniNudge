@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1063,6 +1064,23 @@ func appendDirective(prompt, directive string) string {
 	return prompt + " " + directive
 }
 
+// seedForJob is what makes two renders of the same prompt two pictures.
+//
+// The worker builds its generator without seeding it when none is sent, and a
+// fresh torch generator starts from a fixed default -- so the same prompt
+// produced the same bytes every time. Four candidates came back byte-identical
+// from a real endpoint, which is not a choice between four faces; it is one
+// face charged for four times.
+//
+// Taken from the job's own id rather than from a random source, so it is
+// distinct per job and stable across a retry. A job that fails and runs again
+// should produce the picture it was going to produce, not a different one.
+func seedForJob(jobID uuid.UUID) int64 {
+	// The contract accepts 0 to 2^63-1, so the sign bit is cleared rather than
+	// wrapped: a negative seed is refused by the worker outright.
+	return int64(binary.BigEndian.Uint64(jobID[:8]) &^ (1 << 63))
+}
+
 // BuildImageSpec is the provider adapter boundary for image renders. Domain
 // requests do not leak RunPod endpoint details into handlers, persistence, or
 // frontend code. The worker receives this stable input contract and owns
@@ -1143,6 +1161,7 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		"num_images":      1,
 		"aspect_ratio":    aspectRatio,
 		"output_format":   "png",
+		"seed":            seedForJob(job.ID),
 	}
 	if providerMode == string(models.OmniChatGenerationModeContextual) {
 		// Keep structured scene state separate from the prose prompt so the
