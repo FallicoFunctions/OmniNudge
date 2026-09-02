@@ -21,7 +21,7 @@ ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 [ -z "$ROOT" ] && exit 0
 cd "$ROOT" || exit 0
 
-[ -f .review/active ] || { rm -f .review/.attempts; exit 0; }
+[ -f .review/active ] || exit 0
 
 # Deliberately NOT gated on stop_hook_active. The sibling stop-verify hook uses
 # that flag to step aside after it has blocked once, and doing the same here
@@ -31,16 +31,21 @@ cd "$ROOT" || exit 0
 # The escape from a genuine dead end is bounded instead: after this many blocks
 # the review is released with a loud notice, so a ledger that cannot be
 # satisfied ends the turn and says so rather than looping.
-ATTEMPTS=$(( $(cat .review/.attempts 2>/dev/null || echo 0) + 1 ))
-echo "$ATTEMPTS" > .review/.attempts
-if [ "$ATTEMPTS" -gt 5 ]; then
-  rm -f .review/active .review/.attempts
-  echo "REVIEW LEDGER NOT VERIFIED after 5 attempts. The review is being released unverified -- say so plainly to the user and do not claim it passed." >&2
+MAX_BLOCKS=5
+
+block() {
+  echo "$(( ATTEMPTS + 1 )) ${LEDGER:-none}" > .review/active
+  if [ "$ATTEMPTS" -ge "$MAX_BLOCKS" ]; then
+    rm -f .review/active
+    printf 'REVIEW LEDGER NOT VERIFIED after %s attempts. The review is being released unverified -- say so plainly to the user and do not claim it passed.\n\nThe last reason was:\n%b\n' "$MAX_BLOCKS" "$1" >&2
+    exit 2
+  fi
+  printf 'REVIEW LEDGER INCOMPLETE -- the review may not end yet. (attempt %s of %s)\n\n%b\n' "$(( ATTEMPTS + 1 ))" "$MAX_BLOCKS" "$1" >&2
   exit 2
-fi
+}
 
-block() { printf 'REVIEW LEDGER INCOMPLETE -- the review may not end yet.\n\n%b\n' "$1" >&2; exit 2; }
-
+ATTEMPTS=0
+LEDGER=""
 command -v jq >/dev/null || block "jq is required to verify the review ledger."
 
 HEAD_SHA=$(git rev-parse HEAD)
@@ -51,6 +56,20 @@ fi
 [ -n "$LEDGER" ] && [ -f "$LEDGER" ] || block "No ledger found. Write one to .review/<base-sha>.json before finishing -- the commit the review started from, which does not move as the review commits."
 
 jq empty "$LEDGER" 2>/dev/null || block "$LEDGER is not valid JSON."
+
+# The count lives in the marker and is scoped to the ledger it was counting.
+#
+# It used to live in its own file, and a count left behind by an abandoned
+# review carried into the next one -- which then got a single block and was
+# released as "not verified after 5 attempts", a claim that was simply untrue.
+# A new review writes a new ledger, so a different path here means a different
+# review and the count starts again.
+PREV_COUNT=$(awk '{print $1}' .review/active 2>/dev/null)
+PREV_LEDGER=$(awk '{print $2}' .review/active 2>/dev/null)
+case "$PREV_COUNT" in
+  ''|*[!0-9]*) PREV_COUNT=0 ;;
+esac
+[ "$PREV_LEDGER" = "$LEDGER" ] && ATTEMPTS="$PREV_COUNT"
 
 PROBLEMS=""
 
@@ -165,6 +184,6 @@ if [ "$COUNT" -gt 0 ]; then
   [ -n "$BLIND" ] && block "Controls replayed against ${HEAD_SHA:0:9}. These did not hold:\n${BLIND}\nA control passes only when the test PASSES at HEAD and FAILS with its fix reverted."
 fi
 
-rm -f .review/active .review/.attempts
+rm -f .review/active
 echo "Review ledger verified: $(jq -r '.instruments | length' "$LEDGER") instruments accounted for, ${COUNT} control(s) replayed and held." >&2
 exit 0

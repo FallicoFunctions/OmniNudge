@@ -38,8 +38,12 @@ consumer receives, not the code that makes it.
 
 ## How to run it
 
-**Open the review.** `touch .review/active`. The Stop hook will not let the
-session finish until the ledger is complete and the controls hold.
+**Open the review.** `: > .review/active` -- truncated, not touched, so the
+attempt count starts clean. The Stop hook will not let the session finish until
+the ledger is complete and the controls hold. It blocks five times; on the
+sixth it releases the review and tells you to report that it was never
+verified, so a ledger you cannot satisfy ends the turn honestly instead of
+looping.
 
 **Work the list.** For each instrument in `.review/instruments.json`, ask its
 question. Record what you did and what it showed. Instruments B1-B4 mean *print
