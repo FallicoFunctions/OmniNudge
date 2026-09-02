@@ -8,6 +8,17 @@ import { serverErrorFrom } from './refusals';
 import { pronounsFor } from './pronouns';
 
 /**
+ * How many faces a set is.
+ *
+ * The server's OmniChatOmniAILikenessCandidates is the source of truth. This
+ * mirrors it only to price the button, and the copy either side of it says
+ * "four" in words anyway -- so a change there is a copy change, not a silent
+ * one. The per-image price is deliberately not mirrored: that is configured,
+ * and the server publishes it.
+ */
+const LIKENESS_CANDIDATES = 4;
+
+/**
  * Choosing which of the four she looks like.
  *
  * It appears in the conversation rather than at the end of the creation flow.
@@ -52,6 +63,20 @@ export default function LikenessPicker({
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
     },
   });
+
+  // What the server charges for an image, rather than what this file remembers.
+  //
+  // The price is configured on the server and already published for exactly
+  // this reason. A button that says "40 credits" from a constant is telling
+  // somebody a number nobody promised to charge, and it goes wrong silently the
+  // first time the rate moves.
+  const costs = useQuery({
+    queryKey: omnichatQueryKeys.billingUsage(1),
+    queryFn: () => omnichatService.getBillingUsage(1),
+    staleTime: 5 * 60 * 1000,
+  });
+  const imageCost = costs.data?.costs.image;
+  const setCost = typeof imageCost === 'number' ? imageCost * LIKENESS_CANDIDATES : undefined;
 
   const reroll = useMutation({
     mutationFn: () => omnichatService.rerollLikeness(personaId),
@@ -158,17 +183,25 @@ export default function LikenessPicker({
             type="button"
             onClick={() => reroll.mutate()}
             disabled={reroll.isPending || waitingFor > 0}
+            // Otherwise the button announces its price and not its consequence:
+            // the note beside it is the only thing that says these four go, and
+            // a screen reader has no reason to read a neighbouring span.
+            aria-describedby="omniai-reroll-replaces"
             className="omnichat-touch-target rounded-xl border border-white/12 bg-white/[0.035] px-4 py-2 text-[13px] font-semibold text-white/75 transition hover:border-[#5d8fff]/60 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {reroll.isPending
               ? translate(t, 'omnichat.omniai.likeness.rerolling', 'Drawing four more...')
-              : translate(
-                  t,
-                  'omnichat.omniai.likeness.reroll',
-                  'Draw four more (40 credits)'
-                )}
+              : setCost === undefined
+                ? // The price has not arrived. Better to say nothing about cost
+                  // than to name one that may not be what is charged.
+                  translate(t, 'omnichat.omniai.likeness.rerollPlain', 'Draw four more')
+                : translate(
+                    t,
+                    'omnichat.omniai.likeness.reroll',
+                    `Draw four more (${setCost} credits)`
+                  )}
           </button>
-          <span className="text-[12px] text-white/35">
+          <span id="omniai-reroll-replaces" className="text-[12px] text-white/35">
             {translate(
               t,
               'omnichat.omniai.likeness.rerollReplaces',
@@ -192,11 +225,19 @@ export default function LikenessPicker({
                   'omnichat.omniai.likeness.rerollChosen',
                   `${p.poss[0].toUpperCase()}${p.poss.slice(1)} face is already chosen.`
                 )
-              : translate(
-                  t,
-                  'omnichat.omniai.likeness.rerollFailed',
-                  'Another set could not be drawn. Try again.'
-                )}
+              : rerollProblem === 'reroll_unavailable'
+                ? // Retrying cannot help: nothing is wired to draw one. Saying
+                  // "try again" sends somebody to press a button forever.
+                  translate(
+                    t,
+                    'omnichat.omniai.likeness.rerollOff',
+                    'Drawing another set is unavailable right now.'
+                  )
+                : translate(
+                    t,
+                    'omnichat.omniai.likeness.rerollFailed',
+                    'Another set could not be drawn. Try again.'
+                  )}
         </p>
       ) : null}
 

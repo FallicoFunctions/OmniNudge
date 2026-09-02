@@ -14,6 +14,7 @@ vi.mock('../../../../services/omnichatService', async (importOriginal) => ({
     getLikenessCandidates: vi.fn(),
     pickLikeness: vi.fn(),
     rerollLikeness: vi.fn(),
+    getBillingUsage: vi.fn(),
   },
 }));
 
@@ -38,6 +39,11 @@ const choice = (over: Partial<OmniAILikenessChoice> = {}): OmniAILikenessChoice 
 beforeEach(() => {
   vi.mocked(omnichatService.pickLikeness).mockResolvedValue({ asset_id: 'a1' });
   vi.mocked(omnichatService.rerollLikeness).mockResolvedValue({ started: 4 });
+  vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
+    usage: [],
+    costs: { voice: 2, image: 10, video: 40 },
+    limit: 1,
+  });
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -189,16 +195,46 @@ describe('choosing her face', () => {
 });
 
 describe('drawing another set', () => {
-  it('says what it costs and that it replaces these four', async () => {
-    // Both facts belong on the button, before it is pressed. Forty credits is
-    // not a small amount to discover afterwards, and somebody expecting eight
-    // pictures would be losing four they were still considering.
+  it('prices the set from what the server charges, not from a constant', async () => {
+    // Both facts belong on the button before it is pressed, and the number has
+    // to be the one that will actually be charged. The image price is
+    // configured on the server and published; four of them is the set.
     vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    expect(screen.getByRole('button', { name: /Draw four more \(40 credits\)/ })).toBeEnabled();
+    expect(
+      await screen.findByRole('button', { name: /Draw four more \(40 credits\)/ })
+    ).toBeEnabled();
     expect(screen.getByText('These four are replaced.')).toBeInTheDocument();
+  });
+
+  it('follows the server when the image price changes', async () => {
+    // The number on the button is not a constant this file keeps. If it were,
+    // it would go wrong silently the first time the rate moved.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
+      usage: [],
+      costs: { voice: 2, image: 25, video: 40 },
+      limit: 1,
+    });
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    expect(await screen.findByRole('button', { name: /Draw four more \(100 credits\)/ })).toBeEnabled();
+  });
+
+  it('names no price at all when it does not know one', async () => {
+    // Better to say nothing about cost than to name one nobody promised to
+    // charge. The button still works; it just does not claim a number.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    vi.mocked(omnichatService.getBillingUsage).mockRejectedValue(new Error('offline'));
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    const button = await screen.findByRole('button', { name: /^Draw four more$/ });
+    expect(button).toBeEnabled();
+    expect(screen.queryByText(/credits\)/)).toBeNull();
   });
 
   it('waits for the renders already on their way', async () => {
@@ -253,5 +289,38 @@ describe('drawing another set', () => {
     await user.click(screen.getByRole('button', { name: /Draw four more/ }));
 
     expect(await screen.findByText(/face is already chosen/)).toBeInTheDocument();
+  });
+});
+
+describe('what the button tells somebody who cannot see it', () => {
+  it('announces that these four are replaced, not just the price', async () => {
+    // The note beside the button is the only thing that says the current four
+    // go. A screen reader has no reason to read a neighbouring span, so the
+    // button has to point at it.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    const button = await screen.findByRole('button', { name: /Draw four more/ });
+    const described = button.getAttribute('aria-describedby');
+    expect(described).toBeTruthy();
+    expect(document.getElementById(described as string)?.textContent).toMatch(/replaced/);
+  });
+
+  it('does not tell somebody to retry something that cannot work', async () => {
+    // An unwired deployment will refuse every press. "Try again" sends them to
+    // press a button forever.
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    vi.mocked(omnichatService.rerollLikeness).mockRejectedValue({
+      response: { status: 503, data: { code: 'reroll_unavailable', message: 'nope' } },
+    });
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(await screen.findByRole('button', { name: /Draw four more/ }));
+
+    expect(await screen.findByText(/unavailable right now/)).toBeInTheDocument();
+    expect(screen.queryByText(/Try again/)).toBeNull();
   });
 });
