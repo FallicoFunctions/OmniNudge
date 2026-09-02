@@ -91,7 +91,20 @@ source-render-*.png
 
 
 # Local runtime/build artifacts (do not commit)
-.claude/
+#
+# .claude/ is ignored by default, with the review system carved back out. It
+# has to travel: untracked files do not copy into a new worktree, so an ignored
+# hook simply does not exist there and the Stop check silently never runs.
+#
+# settings.json is tracked because it is what wires the hook up -- the script
+# without its declaration is inert. It holds hook declarations only.
+# settings.local.json stays ignored: it holds this machine's permissions.
+.claude/*
+!.claude/hooks/
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/review/
+!.claude/settings.json
 node_modules/
 **/node_modules/
 **/.vite/

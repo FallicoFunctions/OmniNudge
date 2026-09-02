@@ -17,3 +17,12 @@ replays every one of them in a throwaway git worktree before a review may end.
 Ledgers are tracked deliberately. They are how a later review knows what an
 earlier one already found, so the same finding is not discovered and fixed
 twice.
+
+## One rule about what goes in
+
+This repository is public and these ledgers are tracked. A finding that has
+been **fixed** is already visible in the commit that fixed it, so record it
+normally -- that is the point of the file.
+
+A weakness found and **not** fixed is different: writing it here publishes it.
+Fix it in the same session, or tell the user and keep it out of the ledger.

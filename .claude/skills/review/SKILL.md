@@ -1,0 +1,67 @@
+---
+name: review
+description: Review the work in this session against every instrument in .review/instruments.json, in order, then fix what it finds. Use when asked to review, to review in a loop, to check the work, or to look for what was missed. Produces a ledger the Stop hook verifies.
+---
+
+# Review
+
+A review is not re-reading the diff. Re-reading the diff finds the things that
+are wrong on the page. Almost nothing is wrong on the page.
+
+Every finding worth having came from one move: **assemble the artifact that
+crosses a boundary, then read it.** The built prompt. The rendered markup. The
+response body. The negative prompt. The row that was written. Read the thing the
+consumer receives, not the code that makes it.
+
+## The rules
+
+1. **Work `.review/instruments.json` in order.** Every id gets a status:
+   `applied` with evidence, or `na` with a reason. Never skip one silently. If an
+   instrument does not apply, saying why takes five seconds and is the record
+   that it was considered.
+2. **Read the prior ledgers first (A2).** They are in `.review/`. Without this
+   the same finding is discovered, fixed and re-fixed across sessions. That has
+   already happened.
+3. **Control every fix (G1).** Revert the fix, run the new test, and require it
+   to **fail**. Save the reverting change as a patch under `.review/controls/`.
+   A control that passes is itself a finding: the test was blind.
+4. **Never write an unfixed security weakness into the ledger.** This
+   repository is public and the ledger is tracked, so a row saying a weakness
+   exists and is open is a disclosure. A weakness that has been fixed is
+   already visible in the commit that fixed it, so record those normally.
+   For anything found and not yet fixed: fix it in the same session, or tell
+   the user in the session and leave it out of the file.
+5. **Do not run the whole suite until the review is done.** Build, report, then
+   test.
+6. **Write the ledger as you go**, not at the end. It is the deliverable, not the
+   paperwork.
+
+## How to run it
+
+**Open the review.** `touch .review/active`. The Stop hook will not let the
+session finish until the ledger is complete and the controls hold.
+
+**Work the list.** For each instrument in `.review/instruments.json`, ask its
+question. Record what you did and what it showed. Instruments B1-B4 mean *print
+the real artifact and read it* -- write a throwaway test or a small script that
+emits it, look at the output, then delete the throwaway.
+
+**Fix what you find, immediately**, unless the user asked for findings only.
+
+**Build each control.** Edit the file to undo the fix, `git diff >
+.review/controls/<id>.patch`, then `git checkout` the file. Confirm by hand that
+the named tests fail with it applied.
+
+**Write the ledger** to `.review/<head-sha>.json`. The shape is in
+`.review/ledger.schema.json`. Keep the test selectors narrow -- the hook runs
+every one of them.
+
+**Commit in scopes**, then finish. The hook replays every control in a throwaway
+git worktree and blocks the stop if any still passes.
+
+## What the hook can and cannot do
+
+It checks that every instrument has a verdict, that every finding has a control,
+and that every control genuinely fails when replayed. It cannot tell whether an
+`na` was honest or whether an instrument was applied with any care. Those stay
+yours.
