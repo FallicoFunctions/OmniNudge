@@ -13,6 +13,28 @@ crosses a boundary, then read it.** The built prompt. The rendered markup. The
 response body. The negative prompt. The row that was written. Read the thing the
 consumer receives, not the code that makes it.
 
+## The loop
+
+**A review is not one pass.** It repeats until a full pass over every
+instrument finds nothing.
+
+A pass that finds something is evidence the pass before it was not finished:
+the fix is new code nobody has reviewed, and the technique that found it may
+find more of the same. So a pass with findings is always followed by another
+full pass. There is no budget. If it takes twenty passes, it takes twenty.
+
+**Do not stop to ask whether to go again.** Being told "review again" and then
+finding something is proof the loop terminated early. The stopping condition is
+evidence, not the sense of having done enough. The hook refuses a ledger whose
+last pass still has findings, so stopping in the middle is not available.
+
+**When a pass finds something by a technique the list does not name, add that
+technique to `.review/instruments.json` before the review ends** and name it in
+the finding's `found_by`. This is the ratchet, and it is why the list is worth
+having: without it every review re-invents its own instruments and finds what
+the last one had no way to look for. The hook refuses a finding whose
+`found_by` is not a real instrument id.
+
 ## The rules
 
 1. **Work `.review/instruments.json` in order.** Every id gets a status:
@@ -57,7 +79,8 @@ emits it, look at the output, then delete the throwaway.
 the named tests fail with it applied -- and that they fail as tests, with a real
 assertion failure, not because the patch stopped the code compiling.
 
-**Write the ledger** to `.review/<base-sha>.json` -- the commit the review
+**Write the ledger** as you go, one entry in `passes` per pass, to
+`.review/<base-sha>.json` -- the commit the review
 started from, which does not move as the review commits. The shape is in
 `.review/ledger.schema.json`.
 

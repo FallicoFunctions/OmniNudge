@@ -108,10 +108,10 @@ jq empty "$LEDGER" 2>/dev/null || block "$LEDGER is not valid JSON."
 # of a question that was never answered.
 jq -e 'type == "object"' "$LEDGER" >/dev/null 2>&1 \
   || block "$LEDGER must be a JSON object."
-jq -e '(.instruments | type) == "array"' "$LEDGER" >/dev/null 2>&1 \
-  || block "$LEDGER needs an \"instruments\" array, one row per id in .review/instruments.json."
-jq -e '((.findings // []) | type) == "array"' "$LEDGER" >/dev/null 2>&1 \
-  || block "$LEDGER needs \"findings\" to be an array (or absent when there were none)."
+jq -e '(.passes | type) == "array" and (.passes | length) > 0' "$LEDGER" >/dev/null 2>&1 \
+  || block "$LEDGER needs a non-empty \"passes\" array. A review is not one pass over the instruments; it repeats until a pass finds nothing."
+jq -e 'all(.passes[]; (.instruments | type) == "array" and ((.findings // []) | type) == "array")' "$LEDGER" >/dev/null 2>&1 \
+  || block "Every entry in \"passes\" needs an \"instruments\" array and a \"findings\" array."
 
 # The count lives in the marker and is scoped to the ledger it was counting.
 #
@@ -148,19 +148,44 @@ bullets() { while IFS= read -r line; do [ -n "$line" ] && printf '  - %s\n' "$li
 PROBLEMS=""
 
 # --- 1. every instrument accounted for -------------------------------------
+# Every pass is a full pass. A later one cannot skip what an earlier one covered:
+# the fixes made since are new code that nobody has looked at yet.
 MISSING=$(jq -r --slurpfile l "$LEDGER" '
-  [.instruments[].id] - [$l[0].instruments[]?.id] | .[]' .review/instruments.json)
-[ -n "$MISSING" ] && PROBLEMS="${PROBLEMS}Instruments with no status in the ledger:\n$(echo "$MISSING" | bullets)\n\n"
+  [.instruments[].id] as $all
+  | [$l[0].passes[] | .pass as $n | ($all - [.instruments[]?.id])[] | "pass \($n): \(.)"]
+  | .[]' .review/instruments.json)
+[ -n "$MISSING" ] && PROBLEMS="${PROBLEMS}Instruments with no status:\n$(echo "$MISSING" | bullets)\n\n"
 
-BAD=$(jq -r '.instruments[]?
+BAD=$(jq -r '.passes[] | .pass as $n | .instruments[]?
   | select((.status != "applied" and .status != "na")
       or (.status == "na" and ((.why // "") | length) < 3)
       or (.status == "applied" and ((.evidence // "") | length) < 3))
-  | .id' "$LEDGER")
+  | "pass \($n): \(.id)"' "$LEDGER")
 [ -n "$BAD" ] && PROBLEMS="${PROBLEMS}Instruments needing a real status ('applied' with evidence, or 'na' with why):\n$(echo "$BAD" | bullets)\n\n"
 
+# The rule that makes this a loop rather than a pass.
+#
+# A pass that found something is evidence the one before it was not finished.
+# The fix is new code, and the technique that found it may find more, so the
+# review is over only when a whole pass turns up nothing. Stopping while the
+# last pass still has findings is stopping in the middle.
+LAST_FINDINGS=$(jq -r '.passes[-1].findings | length' "$LEDGER" 2>/dev/null)
+LAST_PASS=$(jq -r '.passes[-1].pass' "$LEDGER" 2>/dev/null)
+if [ "${LAST_FINDINGS:-0}" -gt 0 ]; then
+  PROBLEMS="${PROBLEMS}Pass ${LAST_PASS} found ${LAST_FINDINGS} thing(s), so the review is not finished. Run every instrument again over the code as it now stands. A review ends on a pass that finds nothing, however many that takes.\n\n"
+fi
+
+# The ratchet. A technique good enough to find something is good enough to be on
+# the list, or the next review re-invents it from nothing -- which is how six
+# reviews in a row each found what the one before had no way to look for.
+UNNAMED=$(jq -r --slurpfile l "$LEDGER" '
+  [.instruments[].id] as $all
+  | [$l[0].passes[].findings[]? | select((.found_by // "") | IN($all[]) | not) | .id]
+  | .[]' .review/instruments.json)
+[ -n "$UNNAMED" ] && PROBLEMS="${PROBLEMS}Findings whose \"found_by\" is not an instrument in .review/instruments.json. Add the technique that found it as a row there, then name it here:\n$(echo "$UNNAMED" | bullets)\n\n"
+
 # --- 2. every finding carries a replayable control --------------------------
-NOCTRL=$(jq -r '.findings[]?
+NOCTRL=$(jq -r '.passes[].findings[]?
   | select(((.control.patch // "") | length) < 3
       or ((.control.runner // "") | length) < 2
       or ((.control.tests // []) | length) == 0)
@@ -170,7 +195,7 @@ NOCTRL=$(jq -r '.findings[]?
 [ -n "$PROBLEMS" ] && block "$PROBLEMS"
 
 # --- 3. replay each control in a throwaway worktree -------------------------
-COUNT=$(jq -r '(.findings // []) | length' "$LEDGER")
+COUNT=$(jq -r '[.passes[].findings[]?] | length' "$LEDGER")
 if [ "$COUNT" -gt 0 ]; then
   git worktree prune >/dev/null 2>&1
   WTBASE=$(mktemp -d "${TMPDIR:-/tmp}/review-replay.XXXXXX")
@@ -234,9 +259,9 @@ if [ "$COUNT" -gt 0 ]; then
 
   BLIND=""
   for i in $(seq 0 $((COUNT - 1))); do
-    FID=$(jq -r ".findings[$i].id" "$LEDGER")
-    PATCHFILE=$(jq -r ".findings[$i].control.patch" "$LEDGER")
-    RUNNER=$(jq -r ".findings[$i].control.runner" "$LEDGER")
+    FID=$(jq -r "[.passes[].findings[]?][$i].id" "$LEDGER")
+    PATCHFILE=$(jq -r "[.passes[].findings[]?][$i].control.patch" "$LEDGER")
+    RUNNER=$(jq -r "[.passes[].findings[]?][$i].control.runner" "$LEDGER")
 
     # Repo-relative, and inside the controls directory. An absolute path was
     # silently glued onto the repo root and then reported as "does not apply",
@@ -305,12 +330,12 @@ if [ "$COUNT" -gt 0 ]; then
       elif ! saw_a_real_failure "$RUNNER"; then
         BLIND="${BLIND}  - ${FID}: '${SEL}' did not pass with the patch applied, but no test actually failed -- the patch breaks the build or stops the suite starting rather than reverting a fix, so it proves nothing\n"
       fi
-    done < <(jq -r ".findings[$i].control.tests[]" "$LEDGER")
+    done < <(jq -r "[.passes[].findings[]?][$i].control.tests[]" "$LEDGER")
   done
 
   [ -n "$BLIND" ] && block "Controls replayed against ${HEAD_SHA:0:9}. These did not hold:\n${BLIND}\nA control passes only when the test PASSES at HEAD and FAILS with its fix reverted."
 fi
 
 rm -f .review/active
-echo "Review ledger verified: $(jq -r '.instruments | length' "$LEDGER") instruments accounted for, ${COUNT} control(s) replayed and held." >&2
+echo "Review ledger verified: $(jq -r '.passes | length' "$LEDGER") pass(es), the last finding nothing, ${COUNT} control(s) replayed and held." >&2
 exit 0

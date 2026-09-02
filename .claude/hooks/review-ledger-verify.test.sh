@@ -54,10 +54,24 @@ instruments_missing_one() {
 }
 
 # ledger PATH INSTRUMENTS_JSON FINDINGS_JSON
+#
+# Writes the shape a finished review has: the findings on a first pass, then a
+# second pass over every instrument that found nothing. A review ends on a clean
+# pass, so a fixture without one is not a finished review.
 ledger() {
   jq -n --argjson i "$2" --argjson f "$3" --arg h "$H" \
-    '{schema_version:1, head:$h, base:$h, scope:{files:[],boundaries:[]},
-      prior_ledgers_read:[], instruments:$i, findings:$f, gates:{}}' > "$1"
+    '{schema_version:2, head:$h, base:$h, scope:{files:[],boundaries:[]},
+      prior_ledgers_read:[],
+      passes: [{pass:1, instruments:$i, findings:$f},
+               {pass:2, instruments:$i, findings:[]}],
+      gates:{}}' > "$1"
+}
+
+# ledger_passes PATH PASSES_JSON -- for the cases that are about the loop itself
+ledger_passes() {
+  jq -n --argjson p "$2" --arg h "$H" \
+    '{schema_version:2, head:$h, base:$h, scope:{files:[],boundaries:[]},
+      prior_ledgers_read:[], passes:$p, gates:{}}' > "$1"
 }
 
 open_review() {
@@ -173,7 +187,7 @@ PYBP
 }
 
 control() { jq -n --arg p "$1" --arg r "$2" --arg t "$3" \
-  '[{id:"T", summary:"s", fix_commit:"x", control:{patch:$p, runner:$r, tests:[$t], observed:"by hand"}}]'; }
+  '[{id:"T", summary:"s", found_by:"A1", fix_commit:"x", control:{patch:$p, runner:$r, tests:[$t], observed:"by hand"}}]'; }
 
 echo "review-ledger-verify.sh"
 echo
@@ -184,7 +198,7 @@ expect "exits silently when no review is open" 0
 echo
 echo "completeness"
 open_review; ledger ".review/${H}.json" "$(instruments)" '[]'
-expect "a complete ledger with no findings passes" 0 "instruments accounted for"
+expect "a complete ledger with no findings passes" 0 "the last finding nothing"
 open_review; ledger ".review/${H}.json" "$(instruments_missing_one)" '[]'
 expect "an unaccounted instrument blocks" 2 "E1"
 open_review; ledger ".review/${H}.json" "$(jq -c '[.instruments[] | {id:.id, status:"na", why:""}]' .review/instruments.json)" '[]'
@@ -199,7 +213,7 @@ expect "no ledger at all blocks" 2 "No ledger found"
 open_review; ledger .review/stale.json "$(instruments)" '[]'; touch -t 202001010000 .review/stale.json
 expect "a ledger predating the review blocks" 2 "belongs to an earlier one"
 open_review; ledger .review/named-by-base.json "$(instruments)" '[]'
-expect "a ledger not named after HEAD is still found" 0 "instruments accounted for"
+expect "a ledger not named after HEAD is still found" 0 "the last finding nothing"
 open_review; ledger .review/old.json "$(instruments)" '[]'; touch -t 202001010000 .review/old.json
 ledger .review/new.json "$(instruments_missing_one)" '[]'
 expect "the newest ledger wins, not the valid one" 2 "E1"
@@ -208,10 +222,10 @@ echo
 echo "shape before content"
 open_review; echo '[1,2,3]' > ".review/${H}.json"
 expect "a bare array blocks" 2 "must be a JSON object"
-open_review; jq -n '{schema_version:1, instruments:{A1:"na"}, findings:[]}' > ".review/${H}.json"
+open_review; jq -n '{schema_version:2, passes:[{pass:1, instruments:{A1:"na"}, findings:[]}]}' > ".review/${H}.json"
 expect "instruments as an object blocks" 2 "instruments"
 open_review; ledger ".review/${H}.json" "$(instruments)" '[]'
-jq '.findings = {x:1}' ".review/${H}.json" > /tmp/l.$$ && mv /tmp/l.$$ ".review/${H}.json"
+jq '.passes[0].findings = {x:1}' ".review/${H}.json" > "$SANDBOX_BASE/l.json" && mv "$SANDBOX_BASE/l.json" ".review/${H}.json"
 expect "findings as an object blocks" 2 "findings"
 open_review; printf 'not json at all' > ".review/${H}.json"
 expect "a ledger that is not JSON blocks" 2 "not valid JSON"
@@ -251,13 +265,53 @@ expect "a patch path climbing out is named as such" 2 "repo-relative"
 open_review; ledger ".review/${H}.json" "$(instruments)" \
   "$(control .review/controls/tst-real.patch banana './internal/services/ -run TestX')"
 expect "an unknown runner is caught" 2 "unknown runner"
-open_review; ledger ".review/${H}.json" "$(instruments)" '[{"id":"T","summary":"s","fix_commit":"x","control":{}}]'
+open_review; ledger ".review/${H}.json" "$(instruments)" '[{"id":"T","summary":"s","found_by":"A1","fix_commit":"x","control":{}}]'
 expect "a finding with no control blocks" 2 "no replayable control"
 open_review; ledger ".review/${H}.json" "$(instruments)" \
   "$(jq -n --arg p .review/controls/tst-real.patch \
-     '[{id:"A",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}},
-       {id:"B",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}}]')"
+     '[{id:"A",summary:"s",found_by:"A1",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}},
+       {id:"B",summary:"s",found_by:"A1",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}}]')"
 expect "two findings sharing a patch both hold (the revert works)" 0 "2 control(s)"
+
+echo
+echo "the loop has to run itself out"
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" '[{pass:1, instruments:$i, findings:[]}]')"
+expect "one clean pass is a finished review" 0 "the last finding nothing"
+open_review
+make_real_patch .review/controls/tst-loop.patch
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" --arg p .review/controls/tst-loop.patch \
+     '[{pass:1, instruments:$i, findings:[{id:"L", summary:"s", found_by:"A1", fix_commit:"x",
+        control:{patch:$p, runner:"go", tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"], observed:"x"}}]}]')"
+expect "stopping while the last pass still found things blocks" 2 "the review is not finished"
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" --arg p .review/controls/tst-loop.patch \
+     '[{pass:1, instruments:$i, findings:[{id:"L", summary:"s", found_by:"A1", fix_commit:"x",
+        control:{patch:$p, runner:"go", tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"], observed:"x"}}]},
+       {pass:2, instruments:$i, findings:[]}]')"
+expect "a pass with findings followed by a clean one passes" 0 "2 pass(es)"
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" --argjson j "$(instruments_missing_one)" \
+     '[{pass:1, instruments:$i, findings:[]}, {pass:2, instruments:$j, findings:[]}]')"
+expect "a later pass may not skip an instrument" 2 "pass 2: E1"
+open_review; ledger_passes ".review/${H}.json" "$(jq -n '[]')"
+expect "no passes at all blocks" 2 "not one pass"
+
+echo
+echo "the ratchet"
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" --arg p .review/controls/tst-loop.patch \
+     '[{pass:1, instruments:$i, findings:[{id:"R", summary:"s", found_by:"a technique with no row", fix_commit:"x",
+        control:{patch:$p, runner:"go", tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"], observed:"x"}}]},
+       {pass:2, instruments:$i, findings:[]}]')"
+expect "a finding found by no listed instrument blocks" 2 "found_by"
+open_review; ledger_passes ".review/${H}.json" \
+  "$(jq -n --argjson i "$(instruments)" --arg p .review/controls/tst-loop.patch \
+     '[{pass:1, instruments:$i, findings:[{id:"R", summary:"s", fix_commit:"x",
+        control:{patch:$p, runner:"go", tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"], observed:"x"}}]},
+       {pass:2, instruments:$i, findings:[]}]')"
+expect "a finding with no found_by at all blocks" 2 "found_by"
 
 echo
 echo "the other two runners"

@@ -1,19 +1,30 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "why_passes": "A review is a loop, not a pass. It repeats until a full pass over every instrument finds nothing, because a pass that finds something is evidence the one before it was not finished -- the fix is new code, and the technique that found it may find more. The hook refuses a ledger whose last pass has findings.",
   "required": {
-    "schema_version": "1",
+    "schema_version": "2",
     "head": "the commit the review covers",
     "base": "the commit it starts from; the ledger is named <base>.json",
     "scope": {"files": "[]", "boundaries": "[] -- every seam the change crosses"},
     "prior_ledgers_read": "[] -- ledgers consulted for already-known findings",
-    "instruments": "[] (array) -- one row per id in instruments.json: {id, status: applied|na, evidence|why}",
-    "findings": "[] (array, may be absent) -- {id, summary, fix_commit, control}",
+    "passes": "[] -- one entry per pass, in order: {pass: 1, instruments: [], findings: []}",
     "gates": "{} -- build, vet, lint, types, tests"
   },
-  "control": {
-    "patch": "repo-relative path under .review/controls/ to a patch that REVERTS this fix",
-    "runner": "go | vitest | pytest",
-    "tests": "[] -- narrow selectors. Each is run TWICE: it must PASS at HEAD, then produce a real test failure with the patch applied. A patch that breaks the build is refused, because a suite that cannot run is not a test that failed.",
-    "observed": "what was seen when it was run by hand"
+  "pass": {
+    "pass": "1, 2, 3 ... in order",
+    "instruments": "[] -- one row per id in instruments.json, EVERY pass: {id, status: applied|na, evidence|why}",
+    "findings": "[] -- empty on the last pass, or the review is not over"
+  },
+  "finding": {
+    "id": "short, unique across the ledger",
+    "summary": "one line: what was wrong",
+    "found_by": "the instrument id that found it. If no instrument covers the technique, add one to instruments.json first -- that is the ratchet.",
+    "fix_commit": "the commit that fixed it",
+    "control": {
+      "patch": "repo-relative path under .review/controls/ to a patch that REVERTS this fix",
+      "runner": "go | vitest | pytest",
+      "tests": "[] -- narrow selectors. Each runs TWICE: it must PASS at HEAD, then produce a real test failure with the patch applied. A patch that breaks the build is refused, because a suite that cannot run is not a test that failed.",
+      "observed": "what was seen when it was run by hand"
+    }
   }
 }

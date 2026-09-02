@@ -1,30 +1,157 @@
 {
-  "schema_version": 1,
-  "note": "The canonical instrument list. The review skill works through it in order; .claude/hooks/review-ledger-verify.sh checks the ledger accounts for every id here. Add an instrument by adding a row -- never by remembering one.",
+  "schema_version": 2,
+  "note": "The canonical instrument list. A review works through it in order and must account for every id, every pass. It is meant to GROW: when a pass finds something by a technique not listed here, that technique is added as a row before the review ends, so the next review starts where this one finished instead of re-inventing it. The hook checks that every finding names the instrument that found it, and that the name resolves to a row in this file.",
   "instruments": [
-    {"id": "A1", "name": "Scope the change", "trigger": "always", "asks": "Which files changed, and which boundaries do they cross?"},
-    {"id": "A2", "name": "Read prior ledgers", "trigger": "always", "asks": "Has this area already been reviewed, and what was already found and fixed?"},
-    {"id": "B1", "name": "Print the built string or payload", "trigger": "a prompt, request, or message is assembled", "asks": "What does the consumer actually receive?"},
-    {"id": "B2", "name": "Print the rendered markup", "trigger": "any component changed", "asks": "What is on the screen, including what a screen reader gets?"},
-    {"id": "B3", "name": "Print the HTTP body", "trigger": "any handler changed", "asks": "What does the client actually receive, status and body?"},
-    {"id": "B4", "name": "Print the SQL, plan, or stored row", "trigger": "any query or migration changed", "asks": "What is actually written and read back?"},
-    {"id": "C1", "name": "Match constants across the seam", "trigger": "A1 found a boundary", "asks": "Do both sides spell every code, key and enum the same?"},
-    {"id": "C2", "name": "Match the shape the caller receives", "trigger": "A1 found a boundary", "asks": "Is the field the caller reads the field the sender sets?"},
-    {"id": "C3", "name": "Differential run of two implementations", "trigger": "one rule lives in two places", "asks": "Do they agree on the same inputs, and what stops them drifting?"},
-    {"id": "C4", "name": "Contract with the worker or provider", "trigger": "the worker or an external contract changed", "asks": "Does the other end do what this end assumes?"},
-    {"id": "D1", "name": "Probe with real inputs that must pass", "trigger": "any validation or parsing", "asks": "Does it accept the things people really type?"},
-    {"id": "D2", "name": "Probe with hostile inputs that must fail", "trigger": "any validation or parsing", "asks": "Does it refuse the thing it exists to refuse?"},
-    {"id": "D3", "name": "Probe the boundaries", "trigger": "any validation or parsing", "asks": "Empty, max, max plus one, unicode, whitespace, control characters?"},
-    {"id": "E1", "name": "What do siblings set that this does not?", "trigger": "always", "asks": "Which defence do neighbouring paths carry that this path lost?"},
-    {"id": "E2", "name": "What branch is now unreachable?", "trigger": "always", "asks": "Can every branch still be reached by some real input?"},
-    {"id": "E3", "name": "What error is swallowed?", "trigger": "always", "asks": "Does every failure reach somebody who can act on it?"},
-    {"id": "E4", "name": "What is gated on a flag this path lacks?", "trigger": "always", "asks": "Which conditional excludes this path without saying so?"},
-    {"id": "E5", "name": "What is duplicated that should be one?", "trigger": "always", "asks": "Which constant, rule or literal now exists twice?"},
-    {"id": "F1", "name": "Race detector", "trigger": "a goroutine or shared state changed", "asks": "Does it still pass under -race?"},
-    {"id": "F2", "name": "Transaction, lock order, partial failure", "trigger": "any transaction or queue work", "asks": "What happens when it fails half way?"},
-    {"id": "F3", "name": "Migration ladder and rollback", "trigger": "any migration", "asks": "Is every ladder updated, and does every up have a down?"},
-    {"id": "F4", "name": "Delete, cancel, re-do and orphan paths", "trigger": "anything persisted", "asks": "What is left behind when this is undone?"},
-    {"id": "G1", "name": "Control every fix", "trigger": "every finding fixed", "asks": "Does the new test fail when the fix is reverted?"},
-    {"id": "H1", "name": "Gates", "trigger": "always", "asks": "Do build, vet, lint, types and tests pass?"}
-  ]
+    {
+      "id": "A1",
+      "name": "Scope the change",
+      "trigger": "always",
+      "asks": "Which files changed, and which boundaries do they cross?"
+    },
+    {
+      "id": "A2",
+      "name": "Read prior ledgers",
+      "trigger": "always",
+      "asks": "Has this area already been reviewed, and what was already found and fixed?"
+    },
+    {
+      "id": "B1",
+      "name": "Print the built string or payload",
+      "trigger": "a prompt, request, or message is assembled",
+      "asks": "What does the consumer actually receive?"
+    },
+    {
+      "id": "B2",
+      "name": "Print the rendered markup",
+      "trigger": "any component changed",
+      "asks": "What is on the screen, including what a screen reader gets?"
+    },
+    {
+      "id": "B3",
+      "name": "Print the HTTP body",
+      "trigger": "any handler changed",
+      "asks": "What does the client actually receive, status and body?"
+    },
+    {
+      "id": "B4",
+      "name": "Print the SQL, plan, or stored row",
+      "trigger": "any query or migration changed",
+      "asks": "What is actually written and read back?"
+    },
+    {
+      "id": "C1",
+      "name": "Match constants across the seam",
+      "trigger": "A1 found a boundary",
+      "asks": "Do both sides spell every code, key and enum the same?"
+    },
+    {
+      "id": "C2",
+      "name": "Match the shape the caller receives",
+      "trigger": "A1 found a boundary",
+      "asks": "Is the field the caller reads the field the sender sets?"
+    },
+    {
+      "id": "C3",
+      "name": "Differential run of two implementations",
+      "trigger": "one rule lives in two places",
+      "asks": "Do they agree on the same inputs, and what stops them drifting?"
+    },
+    {
+      "id": "C4",
+      "name": "Contract with the worker or provider",
+      "trigger": "the worker or an external contract changed",
+      "asks": "Does the other end do what this end assumes?"
+    },
+    {
+      "id": "D1",
+      "name": "Probe with real inputs that must pass",
+      "trigger": "any validation or parsing",
+      "asks": "Does it accept the things people really type?"
+    },
+    {
+      "id": "D2",
+      "name": "Probe with hostile inputs that must fail",
+      "trigger": "any validation or parsing",
+      "asks": "Does it refuse the thing it exists to refuse?"
+    },
+    {
+      "id": "D3",
+      "name": "Probe the boundaries",
+      "trigger": "any validation or parsing",
+      "asks": "Empty, max, max plus one, unicode, whitespace, control characters?"
+    },
+    {
+      "id": "E1",
+      "name": "What do siblings set that this does not?",
+      "trigger": "always",
+      "asks": "Which defence do neighbouring paths carry that this path lost?"
+    },
+    {
+      "id": "E2",
+      "name": "What branch is now unreachable?",
+      "trigger": "always",
+      "asks": "Can every branch still be reached by some real input?"
+    },
+    {
+      "id": "E3",
+      "name": "What error is swallowed?",
+      "trigger": "always",
+      "asks": "Does every failure reach somebody who can act on it?"
+    },
+    {
+      "id": "E4",
+      "name": "What is gated on a flag this path lacks?",
+      "trigger": "always",
+      "asks": "Which conditional excludes this path without saying so?"
+    },
+    {
+      "id": "E5",
+      "name": "What is duplicated that should be one?",
+      "trigger": "always",
+      "asks": "Which constant, rule or literal now exists twice?"
+    },
+    {
+      "id": "F1",
+      "name": "Race detector",
+      "trigger": "a goroutine or shared state changed",
+      "asks": "Does it still pass under -race?"
+    },
+    {
+      "id": "F2",
+      "name": "Transaction, lock order, partial failure",
+      "trigger": "any transaction or queue work",
+      "asks": "What happens when it fails half way?"
+    },
+    {
+      "id": "F3",
+      "name": "Migration ladder and rollback",
+      "trigger": "any migration",
+      "asks": "Is every ladder updated, and does every up have a down?"
+    },
+    {
+      "id": "F4",
+      "name": "Delete, cancel, re-do and orphan paths",
+      "trigger": "anything persisted",
+      "asks": "What is left behind when this is undone?"
+    },
+    {
+      "id": "G1",
+      "name": "Control every fix",
+      "trigger": "every finding fixed",
+      "asks": "Does the new test fail when the fix is reverted?"
+    },
+    {
+      "id": "H1",
+      "name": "Gates",
+      "trigger": "always",
+      "asks": "Do build, vet, lint, types and tests pass?"
+    },
+    {
+      "id": "Z1",
+      "name": "What did this pass do that the list does not name?",
+      "trigger": "every pass that found something",
+      "asks": "Which technique found it, and is that technique a row here yet? If not, add it."
+    }
+  ],
+  "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
 }
