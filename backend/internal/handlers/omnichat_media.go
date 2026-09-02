@@ -493,10 +493,9 @@ func (h *OmniChatMediaHandler) GetAssetContent(c *gin.Context) {
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
-	limited := &io.LimitedReader{R: reader, N: objectSize}
-	if _, err := io.Copy(c.Writer, limited); err != nil {
-		return
-	}
+	// Headers are already flushed, so a copy failure cannot be reported to the
+	// client; discard it explicitly as the other streaming handlers do.
+	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
 }
 
 func (h *OmniChatMediaHandler) UpdateConversationScene(c *gin.Context) {
