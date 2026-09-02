@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { omnichatQueryKeys, omnichatService } from '../../../services/omnichatService';
 import { translate } from './labels';
+import { serverErrorFrom } from './refusals';
 import { pronounsFor } from './pronouns';
 
 /**
@@ -51,6 +52,19 @@ export default function LikenessPicker({
       void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.conversations });
     },
   });
+
+  const reroll = useMutation({
+    mutationFn: () => omnichatService.rerollLikeness(personaId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.omniAILikeness(personaId) });
+      void queryClient.invalidateQueries({ queryKey: omnichatQueryKeys.billingWallet });
+    },
+  });
+
+  // What the server actually said, not the status. "Her face is already chosen"
+  // and "not enough credits" are both refusals and want completely different
+  // sentences; a shared banner would offer neither.
+  const rerollProblem = reroll.isError ? serverErrorFrom(reroll.error).code : undefined;
 
   // Choosing settles it, even though the panel is still on screen: the refetch
   // that removes it has not landed yet, and until it does the pictures were
@@ -133,6 +147,58 @@ export default function LikenessPicker({
           </div>
         ))}
       </div>
+
+      {/* Drawing another set replaces these four rather than adding to them, and
+          costs credits, so the button says both before it is pressed. It is gone
+          the moment a choice is made: after that the answer is not another set,
+          it is that she already has a face. */}
+      {!settled ? (
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => reroll.mutate()}
+            disabled={reroll.isPending || waitingFor > 0}
+            className="omnichat-touch-target rounded-xl border border-white/12 bg-white/[0.035] px-4 py-2 text-[13px] font-semibold text-white/75 transition hover:border-[#5d8fff]/60 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {reroll.isPending
+              ? translate(t, 'omnichat.omniai.likeness.rerolling', 'Drawing four more...')
+              : translate(
+                  t,
+                  'omnichat.omniai.likeness.reroll',
+                  'Draw four more (40 credits)'
+                )}
+          </button>
+          <span className="text-[12px] text-white/35">
+            {translate(
+              t,
+              'omnichat.omniai.likeness.rerollReplaces',
+              'These four are replaced.'
+            )}
+          </span>
+        </div>
+      ) : null}
+
+      {rerollProblem ? (
+        <p className="mt-3 text-[13px] text-red-300">
+          {rerollProblem === 'insufficient_credits'
+            ? translate(
+                t,
+                'omnichat.omniai.likeness.rerollCredits',
+                'Another set costs more credits than you have.'
+              )
+            : rerollProblem === 'likeness_already_chosen'
+              ? translate(
+                  t,
+                  'omnichat.omniai.likeness.rerollChosen',
+                  `${p.poss[0].toUpperCase()}${p.poss.slice(1)} face is already chosen.`
+                )
+              : translate(
+                  t,
+                  'omnichat.omniai.likeness.rerollFailed',
+                  'Another set could not be drawn. Try again.'
+                )}
+        </p>
+      ) : null}
 
       {pick.isError && !pick.isSuccess ? (
         <p className="mt-3 text-[13px] text-red-300">

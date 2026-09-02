@@ -13,6 +13,7 @@ vi.mock('../../../../services/omnichatService', async (importOriginal) => ({
   omnichatService: {
     getLikenessCandidates: vi.fn(),
     pickLikeness: vi.fn(),
+    rerollLikeness: vi.fn(),
   },
 }));
 
@@ -36,9 +37,21 @@ const choice = (over: Partial<OmniAILikenessChoice> = {}): OmniAILikenessChoice 
 
 beforeEach(() => {
   vi.mocked(omnichatService.pickLikeness).mockResolvedValue({ asset_id: 'a1' });
+  vi.mocked(omnichatService.rerollLikeness).mockResolvedValue({ started: 4 });
 });
 
 afterEach(() => vi.clearAllMocks());
+
+/**
+ * The pictures, and only the pictures.
+ *
+ * These used to be counted as "every button on the panel", which stopped
+ * meaning the same thing the moment the panel grew a second kind of button.
+ * The candidates are the ones that say which picture they are.
+ */
+function pictureButtons() {
+  return screen.getAllByRole('button', { name: /^(Choose|Picture) / });
+}
 
 describe('choosing her face', () => {
   it('shows nothing when there is nothing to choose and nothing coming', async () => {
@@ -75,7 +88,7 @@ describe('choosing her face', () => {
 
     await screen.findByText('Choose how she looks');
     // Two arrived and are choosable; two are still coming and are not.
-    expect(screen.getAllByRole('button')).toHaveLength(2);
+    expect(pictureButtons()).toHaveLength(2);
   });
 
   it('does not offer a picture that has not been scanned yet', async () => {
@@ -89,7 +102,7 @@ describe('choosing her face', () => {
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    const buttons = screen.getAllByRole('button');
+    const buttons = pictureButtons();
     expect(buttons).toHaveLength(2);
     expect(buttons[0]).toBeEnabled();
     expect(buttons[1]).toBeDisabled();
@@ -101,7 +114,7 @@ describe('choosing her face', () => {
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    await user.click(screen.getAllByRole('button')[1]);
+    await user.click(pictureButtons()[1]);
 
     await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalledWith(31, 12));
   });
@@ -132,13 +145,13 @@ describe('choosing her face', () => {
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(pictureButtons()[0]);
     await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalledTimes(1));
 
-    for (const button of screen.getAllByRole('button')) {
+    for (const button of pictureButtons()) {
       expect(button).toBeDisabled();
     }
-    await user.click(screen.getAllByRole('button')[1]);
+    await user.click(pictureButtons()[1]);
     expect(omnichatService.pickLikeness).toHaveBeenCalledTimes(1);
   });
 
@@ -149,7 +162,7 @@ describe('choosing her face', () => {
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(pictureButtons()[0]);
     await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalled());
 
     expect(screen.queryByText(/could not be kept/)).toBeNull();
@@ -172,5 +185,73 @@ describe('choosing her face', () => {
     await screen.findByText('Choose how she looks');
     expect(screen.getByRole('button', { name: 'Choose picture 1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Picture 2, still arriving' })).toBeDisabled();
+  });
+});
+
+describe('drawing another set', () => {
+  it('says what it costs and that it replaces these four', async () => {
+    // Both facts belong on the button, before it is pressed. Forty credits is
+    // not a small amount to discover afterwards, and somebody expecting eight
+    // pictures would be losing four they were still considering.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    expect(screen.getByRole('button', { name: /Draw four more \(40 credits\)/ })).toBeEnabled();
+    expect(screen.getByText('These four are replaced.')).toBeInTheDocument();
+  });
+
+  it('waits for the renders already on their way', async () => {
+    // Drawing again cancels what is in flight, so offering it mid-render is
+    // offering to throw away pictures that are about to arrive.
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice({ pending: 2 }));
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    expect(screen.getByRole('button', { name: /Draw four more/ })).toBeDisabled();
+  });
+
+  it('is gone once a face has been chosen', async () => {
+    // After a pick the answer is not another set, it is that she already has a
+    // face. Leaving the button there offers something the server will refuse.
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(pictureButtons()[0]);
+    await waitFor(() => expect(omnichatService.pickLikeness).toHaveBeenCalled());
+
+    expect(screen.queryByRole('button', { name: /Draw four more/ })).toBeNull();
+  });
+
+  it('tells somebody short of credits that, and not something else', async () => {
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    vi.mocked(omnichatService.rerollLikeness).mockRejectedValue({
+      response: { status: 402, data: { code: 'insufficient_credits', message: 'nope' } },
+    });
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(screen.getByRole('button', { name: /Draw four more/ }));
+
+    expect(await screen.findByText(/costs more credits than you have/)).toBeInTheDocument();
+  });
+
+  it('tells somebody whose character already has a face exactly that', async () => {
+    // Not a money problem, and not a generic failure. Both would send them to
+    // the wrong place.
+    const user = userEvent.setup();
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    vi.mocked(omnichatService.rerollLikeness).mockRejectedValue({
+      response: { status: 409, data: { code: 'likeness_already_chosen', message: 'nope' } },
+    });
+    renderPicker();
+
+    await screen.findByText('Choose how she looks');
+    await user.click(screen.getByRole('button', { name: /Draw four more/ }));
+
+    expect(await screen.findByText(/face is already chosen/)).toBeInTheDocument();
   });
 });

@@ -391,6 +391,18 @@ export const omnichatService = {
     return api.post<{ asset_id: string }>(`/omnichat/omniai/${personaId}/likeness/${candidateId}`, {});
   },
 
+  /**
+   * Another four faces, charged as four images.
+   *
+   * The first set is included in what making her costs. This is every set after
+   * it, and it is refused outright once a face has been chosen -- that picture
+   * is her avatar, what every later render is conditioned on, and the 3D
+   * pipeline's input.
+   */
+  async rerollLikeness(personaId: number): Promise<{ started: number }> {
+    return api.post<{ started: number }>(`/omnichat/omniai/${personaId}/likeness/reroll`, {});
+  },
+
   async createPersona(payload: PersonaDefinitionPayload): Promise<BotPersonaDefinition> {
     const res = await api.post<{ persona: BotPersonaDefinition }>('/omnichat/personas', payload);
     return res.persona;
