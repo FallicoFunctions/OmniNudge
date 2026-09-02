@@ -1,0 +1,12 @@
+diff --git a/.claude/hooks/block-destructive.sh b/.claude/hooks/block-destructive.sh
+index 61614cbae..6db3d0c85 100755
+--- a/.claude/hooks/block-destructive.sh
++++ b/.claude/hooks/block-destructive.sh
+@@ -37,7 +37,6 @@ TARGET=${TARGET//\$\{HOME\}/\~}
+ TARGET=${TARGET//\$HOME/\~}
+ TARGET=${TARGET//\$\{PWD\}/.}
+ TARGET=${TARGET//\$PWD/.}
+-[ -n "${HOME:-}" ] && TARGET=${TARGET//$HOME/\~}
+ # A path that climbs back out is the place it climbs out to.
+ while [[ $TARGET == *"/../"* || $TARGET == *"/.."[[:space:]]* || $TARGET == *"/.." ]]; do
+   before=$TARGET

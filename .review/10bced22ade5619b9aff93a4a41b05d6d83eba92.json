@@ -1,0 +1,481 @@
+{
+  "schema_version": 2,
+  "head": "9429f7f0e2fcde2c5b67af108983d5a1f0a23dae",
+  "base": "10bced22ade5619b9aff93a4a41b05d6d83eba92",
+  "scope": {
+    "files": [
+      ".claude/hooks/block-destructive.sh",
+      ".claude/hooks/block-destructive.test.sh",
+      ".claude/hooks/review-ledger-verify.sh",
+      ".claude/hooks/review-ledger-verify.test.sh",
+      ".claude/skills/review/SKILL.md",
+      ".review/ledger.schema.json"
+    ],
+    "boundaries": [
+      "the guard -> every Bash command this session runs",
+      "the guard -> Claude Code: the PreToolUse deny shape",
+      "the review hook -> a shell suite, which it could not run until now"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/a1712456328c6abd1111176e3de4b1197b645920.json",
+    ".review/a8413c5c8c1e216743c13088de4172e2937322c0.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Two files: the guard and its suite. It sits on every Bash call, so its boundary is every command this session runs."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read both prior ledgers. Neither covers the hooks."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the guard's verdict for a list of hostile shapes rather than reading its regexes. That is what found all four."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No interface."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed the JSON it emits; the deny shape matches what a PreToolUse hook is read for."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No database, no rows. A shell guard reads a string and answers."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Every path rule reads the normalised form and every other rule reads the raw command, checked line by line. The split is deliberate: normalising a SQL string would change nothing."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The field a PreToolUse hook is read for is the field it sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One implementation. The suite is the only other place the rules are written down, and it writes them as cases rather than as logic."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No external worker is involved."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Forty-eight cases of ordinary work that must pass, including every shape that had been wrongly refused in this session."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile shapes: quoted, expanded, climbed out of, spelled as a refspec, split across a cd."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Roots, one level under them, two levels under them, and the boundary between a name and no name."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared the rm rules against each other. They disagreed about the same directory depending on spelling, which is the first finding."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Found a comment block describing a shape the rule had stopped using, and removed it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing swallowed: every branch either denies with a reason or falls through deliberately."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The template exclusion for credential files is the only conditional, and it has cases both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The reader list and the database client list are each written once."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No concurrency."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction. A denial is a single write to stdout."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing is persisted, so there is nothing to orphan."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Four controls, replayed by the hook."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "shellcheck clean on both files; 67 cases green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing the list does not name. The probe was instrument D2 with a wider list than usual."
+        }
+      ],
+      "findings": [
+        {
+          "id": "G1",
+          "summary": "the same directory got a different answer depending on how it was spelled",
+          "found_by": "E1",
+          "fix_commit": "159a27a31",
+          "control": {
+            "patch": ".review/controls/G1-one-spelling.patch",
+            "runner": "bash",
+            "tests": [
+              ".claude/hooks/block-destructive.test.sh"
+            ],
+            "observed": "the guard suite reports failures with the fix reverted"
+          }
+        },
+        {
+          "id": "G2",
+          "summary": "a force push written as a refspec, and --mirror, went straight through",
+          "found_by": "D2",
+          "fix_commit": "159a27a31",
+          "control": {
+            "patch": ".review/controls/G2-force-push-by-refspec.patch",
+            "runner": "bash",
+            "tests": [
+              ".claude/hooks/block-destructive.test.sh"
+            ],
+            "observed": "the guard suite reports failures with the fix reverted"
+          }
+        },
+        {
+          "id": "G3",
+          "summary": "a cd to the root followed by an rm was two harmless halves",
+          "found_by": "D2",
+          "fix_commit": "159a27a31",
+          "control": {
+            "patch": ".review/controls/G3-cd-then-rm.patch",
+            "runner": "bash",
+            "tests": [
+              ".claude/hooks/block-destructive.test.sh"
+            ],
+            "observed": "the guard suite reports failures with the fix reverted"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The four fixes from pass 1."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Pass 1, above."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the guard's verdict for a list of hostile shapes rather than reading its regexes. That is what found all four."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No interface."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed the JSON it emits; the deny shape matches what a PreToolUse hook is read for."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No database, no rows. A shell guard reads a string and answers."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Every path rule reads the normalised form and every other rule reads the raw command, checked line by line. The split is deliberate: normalising a SQL string would change nothing."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The field a PreToolUse hook is read for is the field it sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One implementation. The suite is the only other place the rules are written down, and it writes them as cases rather than as logic."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No external worker is involved."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Forty-eight cases of ordinary work that must pass, including every shape that had been wrongly refused in this session."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Re-probed every hostile shape after the fixes; all now agree."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Roots, one level under them, two levels under them, and the boundary between a name and no name."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared the rm rules against each other. They disagreed about the same directory depending on spelling, which is the first finding."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Found a comment block describing a shape the rule had stopped using, and removed it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing swallowed: every branch either denies with a reason or falls through deliberately."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The template exclusion for credential files is the only conditional, and it has cases both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The stale comment block is gone."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No concurrency."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction. A denial is a single write to stdout."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing is persisted, so there is nothing to orphan."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Mutation-tested every rule rather than only the new ones, which is how the untested rule was found."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "shellcheck clean, 67 cases green, and the two false positives that started the work retried end to end."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing new."
+        }
+      ],
+      "findings": [
+        {
+          "id": "G4",
+          "summary": "the rule folding the literal home path back to a tilde had no test at all",
+          "found_by": "G1",
+          "fix_commit": "159a27a31",
+          "control": {
+            "patch": ".review/controls/G4-literal-home-path.patch",
+            "runner": "bash",
+            "tests": [
+              ".claude/hooks/block-destructive.test.sh"
+            ],
+            "observed": "the guard suite reports failures with the fix reverted"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One test case, and the bash runner that lets these findings be recorded at all."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Passes 1 and 2."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the guard's verdict for a list of hostile shapes rather than reading its regexes. That is what found all four."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No interface."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed the JSON it emits; the deny shape matches what a PreToolUse hook is read for."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No database, no rows. A shell guard reads a string and answers."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Every path rule reads the normalised form and every other rule reads the raw command, checked line by line. The split is deliberate: normalising a SQL string would change nothing."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The field a PreToolUse hook is read for is the field it sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One implementation. The suite is the only other place the rules are written down, and it writes them as cases rather than as logic."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No external worker is involved."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Forty-eight cases of ordinary work that must pass, including every shape that had been wrongly refused in this session."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Re-probed every hostile shape after the fixes; all now agree."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Roots, one level under them, two levels under them, and the boundary between a name and no name."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared the rm rules against each other. They disagreed about the same directory depending on spelling, which is the first finding."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Found a comment block describing a shape the rule had stopped using, and removed it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing swallowed: every branch either denies with a reason or falls through deliberately."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The template exclusion for credential files is the only conditional, and it has cases both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The stale comment block is gone."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No concurrency."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction. A denial is a single write to stdout."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing is persisted, so there is nothing to orphan."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All four controls replay under the new bash runner."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "shellcheck clean, 67 cases green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing new. The gap the ratchet closed was a missing runner, not a missing instrument."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "shellcheck": "clean",
+    "guard_suite": "67 passed"
+  }
+}

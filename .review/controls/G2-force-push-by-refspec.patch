@@ -1,0 +1,13 @@
+diff --git a/.claude/hooks/block-destructive.sh b/.claude/hooks/block-destructive.sh
+index 61614cbae..7be617f9d 100755
+--- a/.claude/hooks/block-destructive.sh
++++ b/.claude/hooks/block-destructive.sh
+@@ -96,7 +96,7 @@ fi
+ # --- rewriting published history --------------------------------------------
+ # +ref is a force push written as a refspec, and --mirror is one that can
+ # delete branches nobody asked it to.
+-if echo "$COMMAND" | grep -qE 'git\s+push\s+.*(--force|--force-with-lease|--mirror)|git\s+push\s+-f\b|git\s+push\s+\S+\s+\+|git\s+reset\s+--hard\s+(HEAD~|origin)'; then
++if echo "$COMMAND" | grep -qE 'git\s+push\s+.*(--force|--force-with-lease|--mirror)|git\s+push\s+-f\b|git\s+reset\s+--hard\s+(HEAD~|origin)'; then
+   deny "Blocked force push or hard reset. If intentional, run it manually."
+ fi
+ 

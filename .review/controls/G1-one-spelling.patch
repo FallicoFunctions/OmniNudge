@@ -1,0 +1,12 @@
+diff --git a/.claude/hooks/block-destructive.sh b/.claude/hooks/block-destructive.sh
+index 61614cbae..780ebdcd0 100755
+--- a/.claude/hooks/block-destructive.sh
++++ b/.claude/hooks/block-destructive.sh
+@@ -31,7 +31,6 @@ deny() {
+ #
+ # Only for matching. The command that runs is the one the caller wrote.
+ TARGET=$COMMAND
+-TARGET=${TARGET//\"/}
+ TARGET=${TARGET//\'/}
+ TARGET=${TARGET//\$\{HOME\}/\~}
+ TARGET=${TARGET//\$HOME/\~}
