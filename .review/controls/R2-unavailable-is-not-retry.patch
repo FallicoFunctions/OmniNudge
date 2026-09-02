@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+index ca85db5ce..8a86e4bd9 100644
+--- a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
++++ b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+@@ -225,7 +225,7 @@ export default function LikenessPicker({
+                   'omnichat.omniai.likeness.rerollChosen',
+                   `${p.poss[0].toUpperCase()}${p.poss.slice(1)} face is already chosen.`
+                 )
+-              : rerollProblem === 'reroll_unavailable'
++              : false
+                 ? // Retrying cannot help: nothing is wired to draw one. Saying
+                   // "try again" sends somebody to press a button forever.
+                   translate(

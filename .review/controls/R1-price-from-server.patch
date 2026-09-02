@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+index ca85db5ce..1a511896b 100644
+--- a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
++++ b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+@@ -76,7 +76,7 @@ export default function LikenessPicker({
+     staleTime: 5 * 60 * 1000,
+   });
+   const imageCost = costs.data?.costs.image;
+-  const setCost = typeof imageCost === 'number' ? imageCost * LIKENESS_CANDIDATES : undefined;
++  const setCost = 40;
+ 
+   const reroll = useMutation({
+     mutationFn: () => omnichatService.rerollLikeness(personaId),

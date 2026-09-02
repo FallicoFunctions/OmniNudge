@@ -1,0 +1,475 @@
+{
+  "schema_version": 2,
+  "head": "9b07f56ea9862df18153f9d229ebd95e0bbbadee",
+  "base": "a8413c5c8c1e216743c13088de4172e2937322c0",
+  "scope": {
+    "files": [
+      "backend/cmd/server/main.go",
+      "backend/internal/handlers/omnichat_omniai_likeness.go",
+      "backend/internal/handlers/omnichat_omniai_likeness_test.go",
+      "backend/internal/models/omnichat_omniai_likeness_reroll.go",
+      "backend/internal/models/omnichat_omniai_likeness_reroll_test.go",
+      "backend/internal/services/omnichat_generation.go",
+      "backend/internal/services/omnichat_omniai_likeness_reroll_test.go",
+      "backend/internal/services/omnichat_omniai_likeness_service.go",
+      "frontend/src/components/omnichat/omniai/LikenessPicker.tsx",
+      "frontend/src/components/omnichat/omniai/__tests__/LikenessPicker.test.tsx",
+      "frontend/src/services/omnichatService.ts"
+    ],
+    "boundaries": [
+      "the picker -> the re-roll route: three refusal codes",
+      "the picker -> billing/usage: the price it states",
+      "service -> credits: reserve, capture, refund per picture",
+      "model -> Postgres: candidate rows, their files, and the jobs in flight"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/a1712456328c6abd1111176e3de4b1197b645920.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "11 files: the discard model, the billed normalizer and Reroll, the route, and the picker button."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read .review/a17124563...json, the only prior ledger. Nothing in it covers this code."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled re-roll request: mode likeness, 9:16, NSFW false, the caller's negative prompt and aspect discarded, a billing operation attached."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the button's markup. Found the price stated from a constant and the replacement warning tied to nothing."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The route answers {started}, and the three refusals carry their own codes."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Six tests against a live database: the rows and their files go together, an in-flight render is cancelled and can no longer land, another owner's set is untouched."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Diffed the codes the route emits against what the picker maps. Two of three were handled; reroll_unavailable fell through to a retry message."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The picker reads costs.image from the usage payload; tsc agrees the field exists."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The set size is written twice, backend constant and frontend constant. Left, with the reason: the copy either side says 'four' in words, so a change there is a copy change rather than a silent one. The price is not mirrored."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "The worker is untouched. A re-rolled picture is the same likeness render it already handles."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The endpoint takes no body; its inputs are the path id and the caller's identity, both covered by the handler tests."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Another owner's character, an unwired deployment, an already-chosen face and an empty balance are all refused."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Discarding nothing, discarding somebody else's, and a partial reservation failure are all covered."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared against the pick: that one detaches, this one waits. Deliberate and stated -- the four renders are what somebody just paid for."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch left unreachable: each of the three refusals has a test that reaches it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The refund path logs what it could not release. The price query's failure is swallowed on purpose and the button then names no price, which has its own test."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Nothing new is gated on a flag. A re-roll is a likeness, which is SFW by construction rather than by entitlement."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The price was stated in a constant while the server publishes it. Fixed."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race was green on all four backend packages before this change; the delta is frontend-only."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Reserving all four before queueing any, and releasing only what has no job behind it, are both tested and both controlled."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration was touched: the re-roll reuses the candidate and job tables as they stand."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Discarding takes the media_files rows, which is what feeds the retention trigger; tested against a real database."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Eleven controls across the model, service, handler and picker, plus three for this pass's own findings."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, all four backend packages green, tsc, eslint, the frontend suite."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing was used that the list does not name."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "the button quoted a price from a constant while the server publishes the real one",
+          "found_by": "E5",
+          "fix_commit": "de637e3db",
+          "control": {
+            "patch": ".review/controls/R1-price-from-server.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/omniai/__tests__/LikenessPicker.test.tsx"
+            ],
+            "observed": "two tests fail: the derived price and the changed-rate case"
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "an unwired deployment was told to try again, which cannot ever work",
+          "found_by": "C1",
+          "fix_commit": "de637e3db",
+          "control": {
+            "patch": ".review/controls/R2-unavailable-is-not-retry.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/omniai/__tests__/LikenessPicker.test.tsx"
+            ],
+            "observed": "the reroll_unavailable case fails"
+          }
+        },
+        {
+          "id": "R3",
+          "summary": "the button announced its price but not that it replaces the current four",
+          "found_by": "B2",
+          "fix_commit": "de637e3db",
+          "control": {
+            "patch": ".review/controls/R3-button-describes-itself.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/omniai/__tests__/LikenessPicker.test.tsx"
+            ],
+            "observed": "the aria-describedby case fails"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The three fixes from pass 1: the price query, the unavailable branch, the description."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Pass 1 of this ledger, immediately above."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled re-roll request: mode likeness, 9:16, NSFW false, the caller's negative prompt and aspect discarded, a billing operation attached."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the markup again after the fixes. The button now carries aria-describedby and the note carries the id."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The route answers {started}, and the three refusals carry their own codes."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Six tests against a live database: the rows and their files go together, an in-flight render is cancelled and can no longer land, another owner's set is untouched."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "All three codes are now handled distinctly."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The wallet carries balances only, so billing/usage is the sole source of prices -- the right choice, confirmed rather than assumed."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The set size is written twice, backend constant and frontend constant. Left, with the reason: the copy either side says 'four' in words, so a change there is a copy change rather than a silent one. The price is not mirrored."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "The worker is untouched. A re-rolled picture is the same likeness render it already handles."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The endpoint takes no body; its inputs are the path id and the caller's identity, both covered by the handler tests."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Another owner's character, an unwired deployment, an already-chosen face and an empty balance are all refused."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Discarding nothing, discarding somebody else's, and a partial reservation failure are all covered."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared against the pick: that one detaches, this one waits. Deliberate and stated -- the four renders are what somebody just paid for."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch left unreachable: each of the three refusals has a test that reaches it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The refund path logs what it could not release. The price query's failure is swallowed on purpose and the button then names no price, which has its own test."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Nothing new is gated on a flag. A re-roll is a likeness, which is SFW by construction rather than by entitlement."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Found two cache keys for one endpoint, the picker's and the commerce modal's, and unified them. Not recorded as a finding: reverting it leaves every test green, so there is nothing to control, and an assertion restating the argument would be a fake control."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race was green on all four backend packages before this change; the delta is frontend-only."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Reserving all four before queueing any, and releasing only what has no job behind it, are both tested and both controlled."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration was touched: the re-roll reuses the candidate and job tables as they stand."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Discarding takes the media_files rows, which is what feeds the retention trigger; tested against a real database."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Eleven controls across the model, service, handler and picker, plus three for this pass's own findings."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc, eslint over all of src, 141 frontend tests, go build and vet."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing new. The techniques that found all three were already rows."
+        }
+      ],
+      "findings": []
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One line: the shared cache key from pass 2."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Passes 1 and 2 above."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled re-roll request: mode likeness, 9:16, NSFW false, the caller's negative prompt and aspect discarded, a billing operation attached."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Unchanged by a query key."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The route answers {started}, and the three refusals carry their own codes."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Six tests against a live database: the rows and their files go together, an in-flight render is cancelled and can no longer land, another owner's set is untouched."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "All three codes are now handled distinctly."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The wallet carries balances only, so billing/usage is the sole source of prices -- the right choice, confirmed rather than assumed."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The set size is written twice, backend constant and frontend constant. Left, with the reason: the copy either side says 'four' in words, so a change there is a copy change rather than a silent one. The price is not mirrored."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "The worker is untouched. A re-rolled picture is the same likeness render it already handles."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The endpoint takes no body; its inputs are the path id and the caller's identity, both covered by the handler tests."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Another owner's character, an unwired deployment, an already-chosen face and an empty balance are all refused."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Discarding nothing, discarding somebody else's, and a partial reservation failure are all covered."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared against the pick: that one detaches, this one waits. Deliberate and stated -- the four renders are what somebody just paid for."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch left unreachable: each of the three refusals has a test that reaches it."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The refund path logs what it could not release. The price query's failure is swallowed on purpose and the button then names no price, which has its own test."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Nothing new is gated on a flag. A re-roll is a likeness, which is SFW by construction rather than by entitlement."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Nothing left duplicated in this scope."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race was green on all four backend packages before this change; the delta is frontend-only."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Reserving all four before queueing any, and releasing only what has no job behind it, are both tested and both controlled."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration was touched: the re-roll reuses the candidate and job tables as they stand."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Discarding takes the media_files rows, which is what feeds the retention trigger; tested against a real database."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Eleven controls across the model, service, handler and picker, plus three for this pass's own findings."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc, eslint, 141 frontend tests, go build and vet, all green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing new."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "pass",
+    "vet": "pass",
+    "go_packages": "models, services, handlers, queue all green",
+    "tsc": "pass",
+    "eslint": "pass",
+    "frontend_suite": "141 passed"
+  }
+}

@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+index ca85db5ce..e7ace9e27 100644
+--- a/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
++++ b/frontend/src/components/omnichat/omniai/LikenessPicker.tsx
+@@ -186,7 +186,7 @@ export default function LikenessPicker({
+             // Otherwise the button announces its price and not its consequence:
+             // the note beside it is the only thing that says these four go, and
+             // a screen reader has no reason to read a neighbouring span.
+-            aria-describedby="omniai-reroll-replaces"
++            data-noop="x"
+             className="omnichat-touch-target rounded-xl border border-white/12 bg-white/[0.035] px-4 py-2 text-[13px] font-semibold text-white/75 transition hover:border-[#5d8fff]/60 disabled:cursor-not-allowed disabled:opacity-40"
+           >
+             {reroll.isPending
