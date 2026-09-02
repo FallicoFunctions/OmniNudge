@@ -1,0 +1,17 @@
+diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
+index 908f0b69d..73bfe7ab0 100644
+--- a/backend/internal/queue/omnichat_generation_handler.go
++++ b/backend/internal/queue/omnichat_generation_handler.go
+@@ -662,11 +662,7 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
+ 	case models.OmniChatGenerationModeLikeness:
+ 		standard = services.OmniChatImageStandardPortrait
+ 	case models.OmniChatGenerationModeLikenessReference:
+-		// Not the portrait standard. These are the five nobody is shown, and
+-		// they are prompted for neutral expressions and three-quarter turns --
+-		// exactly what that standard's PASS clause excludes. Coverage still
+-		// applies; pose and expression never did.
+-		standard = services.OmniChatImageStandardReference
++		standard = services.OmniChatImageStandardPortrait
+ 	}
+ 	explicit, err := h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
+ 	if err != nil {

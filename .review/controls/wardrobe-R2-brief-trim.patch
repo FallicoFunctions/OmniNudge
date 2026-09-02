@@ -1,0 +1,12 @@
+diff --git a/backend/internal/services/omnichat_omniai_candidate_brief.go b/backend/internal/services/omnichat_omniai_candidate_brief.go
+index fd11722c5..19960e0c0 100644
+--- a/backend/internal/services/omnichat_omniai_candidate_brief.go
++++ b/backend/internal/services/omnichat_omniai_candidate_brief.go
+@@ -237,7 +237,6 @@ func (w *ModelOmniAICandidateBriefWriter) WriteCandidateBriefs(
+ 		return nil, fmt.Errorf("omnichat likeness brief: wanted %d briefs and got %d", count, len(decoded.Candidates))
+ 	}
+ 	for i, brief := range decoded.Candidates {
+-		brief = brief.Trimmed()
+ 		if err := brief.Validate(); err != nil {
+ 			return nil, fmt.Errorf("omnichat likeness brief %d: %w", i+1, err)
+ 		}

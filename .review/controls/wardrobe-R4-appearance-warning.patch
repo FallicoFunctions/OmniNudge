@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_omniai_candidate_brief.go b/backend/internal/services/omnichat_omniai_candidate_brief.go
+index fd11722c5..e44923dd7 100644
+--- a/backend/internal/services/omnichat_omniai_candidate_brief.go
++++ b/backend/internal/services/omnichat_omniai_candidate_brief.go
+@@ -258,7 +258,7 @@ func buildOmniAICandidateBriefInput(persona *models.BotPersona, count int) omniA
+ 	// from, so a brief cannot be written against a different person.
+ 	var appearance OmniAIAppearance
+ 	if len(persona.OmniAIAppearance) > 0 {
+-		if err := json.Unmarshal(persona.OmniAIAppearance, &appearance); err != nil {
++		if err := json.Unmarshal(persona.OmniAIAppearance, &appearance); false {
+ 			// Not fatal -- she still gets dressed from her description and her
+ 			// personality. Said out loud because the degradation is otherwise
+ 			// invisible: the briefs come back looking fine while having been

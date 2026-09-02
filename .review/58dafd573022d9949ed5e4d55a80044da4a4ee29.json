@@ -1,0 +1,666 @@
+{
+  "schema_version": 2,
+  "head": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+  "base": "58dafd573022d9949ed5e4d55a80044da4a4ee29",
+  "scope": {
+    "files": [
+      "backend/internal/services/omnichat_omniai_candidate_brief.go",
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/omnichat_omniai_likeness_service.go",
+      "backend/internal/services/omnichat_omniai_reference_set.go",
+      "backend/internal/services/omnichat_rendered_image_review.go",
+      "backend/internal/queue/omnichat_generation_handler.go",
+      "backend/internal/models/omnichat_omniai_likeness_pick.go",
+      "backend/internal/models/omnichat_omniai_likeness_reroll.go",
+      "backend/internal/services/omnichat_generation.go",
+      "backend/cmd/server/main.go",
+      "backend/cmd/zz_model_compare/main.go",
+      "backend/cmd/omnichat_prompt_preview/main.go"
+    ],
+    "boundaries": [
+      "user-written personality prose -> the brief writer (untrusted input into a model)",
+      "brief -> assembled image prompt -> RunPod worker contract",
+      "rendered image -> the vision classifier that admits or refuses it",
+      "generation mode -> which standard judges the render",
+      "brief field bounds -> the prompt length cap the request is normalised against"
+    ]
+  },
+  "prior_ledgers_read": [
+    "10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+    "a1712456328c6abd1111176e3de4b1197b645920.json",
+    "a8413c5c8c1e216743c13088de4172e2937322c0.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "11 files across services, queue, models and three commands; seams: brief writer -> prompt -> worker payload -> classifier."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "read all three ledgers in .review/. The E5/C1 theme (one rule stated twice, then drifting) is what prompted the four-way coverage comparison below."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "printed the assembled likeness prompt. Found the setting joining in lower case mid-prompt, and the coverage rule re-offering trousers after the brief had already dressed her."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no markup changed; the only rendered surface is cmd/zz_model_compare's sheet, a local dev artifact nobody ships."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no HTTP handler or response body changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "checked the assembled prompt against omniChatMaxGenerationPromptRunes, the cap the stored request is normalised against."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "rendered four for real through the new prompt and read every image. Found the brief writer refusing a whole set on one over-long field."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "compared all four statements of the coverage rule: brief instruction, likeness prompt, reference prompt, classifier standard. They agree in substance."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the portrait standard's PASS clause vs what the five reference variants are actually prompted for. This is finding R1."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "there is no second implementation of prompt assembly to run against."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "ran the built payloads through the worker's own validate_input: 4 accepted, 0 problems."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "the real brief writer against a real personality; four usable briefs, then four renders."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "prompt injection through the personality prose. All four outfits stayed covered; no nude/naked anywhere; coverage rule intact in every prompt."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "summed every brief bound against the prompt cap: 2084 worst case vs 2000, reachable only above a 194-rune appearance the structured renderer cannot produce."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "compared the likeness and reference builders; the differences (accessories allowed vs forbidden) are deliberate and documented."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "checked both remaining standards stay reachable after the switch gained an arm."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "found the OmniAIAppearance unmarshal error swallowed, dropping her age from the brief silently."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "only cmd/server constructs the likeness service, and it is where the writer is wired; the worker never calls it."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the coverage rule is stated four times. Not collapsed: a diffusion prompt and a vision classifier are different consumers and sharing one string would be wrong for both."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no concurrency added; the brief writer is one call on an existing synchronous path."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction, lock or multi-write sequence added."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "no delete, cancel or orphan path touched; the discard/re-roll guards were not modified."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "controlled below."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "recorded under gates rather than duplicated here."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing new; every technique used is already in the list."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "likeness_reference renders were judged by the portrait standard, whose PASS clause requires facing the camera and a warm expression -- four of the five variants are prompted for neutral expressions or three-quarter turns, and a refusal there is permanent.",
+          "found_by": "C2",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R1-reference-standard.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/queue/ -run TestHerOwnPortraitIsHeldToTheStricterStandard"
+            ]
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "one over-long brief field made the writer refuse all four, and the service falls back to a single plain brief for the whole set -- so a setting twenty characters long cost four good briefs and produced four identical plain pictures.",
+          "found_by": "B5",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R2-brief-trim.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run TestAnOverlongFieldIsTrimmedRatherThanCostingAllFour"
+            ]
+          }
+        },
+        {
+          "id": "R3",
+          "summary": "the setting joined the prompt in lower case immediately after a full stop, and the coverage rule re-offered trousers after the brief had already dressed her in a dress.",
+          "found_by": "B1",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R3-setting-capitalised.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run TestTheLikenessIsAPictureOfSomebodySomewhere"
+            ]
+          }
+        },
+        {
+          "id": "R4",
+          "summary": "a malformed omniai_appearance was swallowed, so her age, gender and build vanished from the brief input and she was dressed without them with nothing saying so.",
+          "found_by": "E3",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R4-appearance-warning.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run TestAnUnreadableAppearanceIsSaidOutLoud"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "the pass-1 fixes: the reference standard, the trim, the appearance log."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "same three ledgers; no prior finding overlaps these."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "printed both standards' FAIL clauses side by side."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no markup changed; the only rendered surface is cmd/zz_model_compare's sheet, a local dev artifact nobody ships."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no HTTP handler or response body changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "bounds test now asserts the relationship rather than a measurement."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pass-2 and pass-3 fixes are prompt wording and an error code; both were read assembled under B1 rather than re-rendered, and no new GPU run would distinguish them."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "diffed the portrait and reference standards clause by clause: 5 identical, 1 deliberately different."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the refusal reason a reference now produces. This is finding R5."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "there is no second implementation of prompt assembly to run against."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "re-ran the worker validator against the new prompt shape."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "targeted tests for every fix."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "re-ran the injection probe after the trim landed."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Trimmed() at and past each bound, including the word-boundary cut."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "the reference standard against the portrait standard it was split from."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "confirmed no arm of the standard switch became unreachable."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "the new warn log is the fix for the pass-1 finding."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "no new flag or gate introduced."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the two standards share five clauses verbatim; kept separate because the sixth must differ."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no concurrency added; the brief writer is one call on an existing synchronous path."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction, lock or multi-write sequence added."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "no delete, cancel or orphan path touched; the discard/re-roll guards were not modified."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "controlled below."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "recorded under gates rather than duplicated here."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing new."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R5",
+          "summary": "a reference refused for coverage reported explicit_content_refused and said the image was explicit -- it is not, and that reason is what somebody debugging a character with no pictures reads.",
+          "found_by": "E2",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R5-refusal-reason.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/queue/ -run TestEachStandardRefusesInItsOwnWords"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "the pass-2 fix: the reference refusal reason."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "same three ledgers; no prior finding overlaps these."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "printed all five assembled reference prompts. This is finding R6."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no markup changed; the only rendered surface is cmd/zz_model_compare's sheet, a local dev artifact nobody ships."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no HTTP handler or response body changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "bounds test now asserts the relationship rather than a measurement."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pass-2 and pass-3 fixes are prompt wording and an error code; both were read assembled under B1 rather than re-rendered, and no new GPU run would distinguish them."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "diffed the portrait and reference standards clause by clause: 5 identical, 1 deliberately different."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "grepped every consumer of the refusal codes; only the backend and its test read them, so no frontend mapping needed updating."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "there is no second implementation of prompt assembly to run against."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "re-ran the worker validator against the new prompt shape."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "targeted tests for every fix."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "re-ran the injection probe after the trim landed."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Trimmed() at and past each bound, including the word-boundary cut."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "compared what each reference variant sets; clothing was the one thing all five shared and should not have."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "confirmed no arm of the standard switch became unreachable."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "the new warn log is the fix for the pass-1 finding."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "no new flag or gate introduced."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the two standards share five clauses verbatim; kept separate because the sixth must differ."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no concurrency added; the brief writer is one call on an existing synchronous path."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction, lock or multi-write sequence added."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "no delete, cancel or orphan path touched; the discard/re-roll guards were not modified."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "controlled below."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "recorded under gates rather than duplicated here."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing new."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R6",
+          "summary": "one clothing sentence served all five reference variants, naming trousers and shoes to three head-and-shoulders shots that cannot show them; a widened crop is a smaller face, and below OMNICHAT_FACE_MIN_CROP_PX that reference is dropped from the face adapter entirely.",
+          "found_by": "B1",
+          "fix_commit": "074f28ce2d7b4681f1dd635993c064eae3931cfe",
+          "control": {
+            "patch": ".review/controls/wardrobe-R6-portrait-clothing.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run TestAPortraitIsNotToldAboutShoes"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "pass": 4,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "the pass-3 fix: per-variant clothing on the reference set."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "same three ledgers; no prior finding overlaps these."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "re-printed all five reference prompts; the three head-and-shoulders shots no longer mention trousers or shoes."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no markup changed; the only rendered surface is cmd/zz_model_compare's sheet, a local dev artifact nobody ships."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no HTTP handler or response body changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "bounds test now asserts the relationship rather than a measurement."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pass-2 and pass-3 fixes are prompt wording and an error code; both were read assembled under B1 rather than re-rendered, and no new GPU run would distinguish them."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "the two clothing constants: 'no jewellery' and 'no accessories' agree."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "nothing downstream reads the clothing sentence."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "there is no second implementation of prompt assembly to run against."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "re-ran the worker validator against the new prompt shape."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "targeted tests for every fix."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "re-ran the injection probe after the trim landed."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Trimmed() at and past each bound, including the word-boundary cut."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "every variant now carries its own clothing, asserted for all five."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "both clothing constants are still used by at least one variant."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "the new warn log is the fix for the pass-1 finding."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "no new flag or gate introduced."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the two standards share five clauses verbatim; kept separate because the sixth must differ."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no concurrency added; the brief writer is one call on an existing synchronous path."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction, lock or multi-write sequence added."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "no delete, cancel or orphan path touched; the discard/re-roll guards were not modified."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "three controls, each re-verified at HEAD after restoring."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "recorded under gates rather than duplicated here."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing new."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... clean",
+    "vet": "go vet ./... clean",
+    "tests": "go test ./internal/services/ ./internal/queue/ ./internal/models/ ./internal/handlers/ -p 1 -- all ok",
+    "worker_contract": "infra/runpod validate_input over the built payloads: 4 accepted, 0 problems"
+  }
+}

@@ -1,0 +1,14 @@
+diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
+index 908f0b69d..ebe571631 100644
+--- a/backend/internal/queue/omnichat_generation_handler.go
++++ b/backend/internal/queue/omnichat_generation_handler.go
+@@ -685,9 +685,6 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
+ 		case services.OmniChatImageStandardPortrait:
+ 			return permanentGenerationFailure("portrait_standard_refused",
+ 				errors.New("the rendered picture did not meet the standard for a character portrait"))
+-		case services.OmniChatImageStandardReference:
+-			return permanentGenerationFailure("reference_standard_refused",
+-				errors.New("the rendered picture did not meet the standard for an identity reference"))
+ 		}
+ 		return permanentGenerationFailure("explicit_content_refused",
+ 			errors.New("the rendered image was explicit and explicit content is not permitted here"))

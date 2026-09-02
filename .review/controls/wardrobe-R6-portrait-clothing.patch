@@ -1,0 +1,29 @@
+diff --git a/backend/internal/services/omnichat_omniai_reference_set.go b/backend/internal/services/omnichat_omniai_reference_set.go
+index 6cd722165..9978c492b 100644
+--- a/backend/internal/services/omnichat_omniai_reference_set.go
++++ b/backend/internal/services/omnichat_omniai_reference_set.go
+@@ -73,13 +73,13 @@ const (
+ var omniAIReferenceVariants = []omniAIReferenceVariant{
+ 	{
+ 		Key:      "portrait_neutral",
+-		Clothing: omniAIReferencePortraitClothing,
++		Clothing: omniAIReferenceFullBodyClothing,
+ 		Aspect:   "3:4",
+ 		Framing:  "Head and shoulders, facing the camera, neutral expression.",
+ 	},
+ 	{
+ 		Key:      "portrait_smiling",
+-		Clothing: omniAIReferencePortraitClothing,
++		Clothing: omniAIReferenceFullBodyClothing,
+ 		Aspect:   "3:4",
+ 		// Expression variety is half of what the portraits are for. A set that
+ 		// only ever shows one face teaches the adapter that face and nothing
+@@ -88,7 +88,7 @@ var omniAIReferenceVariants = []omniAIReferenceVariant{
+ 	},
+ 	{
+ 		Key:      "portrait_three_quarter",
+-		Clothing: omniAIReferencePortraitClothing,
++		Clothing: omniAIReferenceFullBodyClothing,
+ 		Aspect:   "3:4",
+ 		Framing:  "Head and shoulders, turned three-quarters toward the camera, neutral expression.",
+ 	},
