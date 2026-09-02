@@ -84,7 +84,7 @@ assertion failure, not because the patch stopped the code compiling.
 started from, which does not move as the review commits. The shape is in
 `.review/ledger.schema.json`.
 
-Runners are `go`, `vitest` and `pytest`. Keep the test selectors narrow: the
+Runners are `go`, `vitest`, `pytest` and `bash`. Keep the test selectors narrow: the
 hook runs each one **twice**, once at HEAD and once with the patch applied. It requires the test to pass at HEAD and then
 to produce a real failure -- so a control patch must revert a fix, not break the
 build. A patch that stops the package compiling is rejected, because a suite

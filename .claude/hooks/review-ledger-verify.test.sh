@@ -274,6 +274,32 @@ open_review; ledger ".review/${H}.json" "$(instruments)" \
 expect "two findings sharing a patch both hold (the revert works)" 0 "2 control(s)"
 
 echo
+echo "the bash runner"
+# A shell script is code, and a finding in one has to be recordable. The guard
+# hook's own suite is the fixture: it is real, it is fast, and it prints a
+# count.
+make_broken_guard_patch() {
+  python3 - "$1" <<'PYBG'
+import subprocess, sys
+p = '.claude/hooks/block-destructive.sh'
+src = open(p).read()
+cut = 'TARGET=${TARGET//\\"/}\n'
+if cut not in src:
+    sys.exit("fixture drift: quote stripping moved")
+open(p, 'w').write(src.replace(cut, '', 1))
+open(sys.argv[1], 'w').write(subprocess.run(['git','diff','--',p], capture_output=True, text=True).stdout)
+subprocess.run(['git','checkout','--',p], check=True)
+PYBG
+}
+make_broken_guard_patch .review/controls/tst-bash.patch
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-bash.patch bash '.claude/hooks/block-destructive.test.sh')"
+expect "a bash control holds" 0 "control(s) replayed and held"
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-bash.patch bash 'true')"
+expect "a bash control that cannot fail is caught" 2 "still PASSES"
+
+echo
 echo "the loop has to run itself out"
 open_review; ledger_passes ".review/${H}.json" \
   "$(jq -n --argjson i "$(instruments)" '[{pass:1, instruments:$i, findings:[]}]')"

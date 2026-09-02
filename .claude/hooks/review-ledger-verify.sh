@@ -235,6 +235,10 @@ if [ "$COUNT" -gt 0 ]; then
       go)     run_bounded "$RUN_LIMIT" bash -c "cd '$WT/backend'  && go test $2 -count=1" ;;
       vitest) run_bounded "$RUN_LIMIT" bash -c "cd '$WT/frontend' && npx vitest run $2" ;;
       pytest) run_bounded "$RUN_LIMIT" bash -c "cd '$WT'          && python3 -m pytest -q $2" ;;
+      # A shell script is code too, and until this existed a finding in one
+      # could not carry a control -- so it could not be recorded, so the review
+      # could not end. The selector is the suite to run, from the repo root.
+      bash)   run_bounded "$RUN_LIMIT" bash -c "cd '$WT'          && $2" ;;
       *)      return 127 ;;
     esac
   }
@@ -253,6 +257,9 @@ if [ "$COUNT" -gt 0 ]; then
       # a file it could not import or collect, so a patch that breaks the module
       # never reads as a test that failed. Checked against pytest 8.4.
       pytest) grep -qE "[0-9]+ failed" "$RUNLOG" ;;
+      # "0 failed" is the summary of a suite that passed, so the count has to
+      # start with something other than zero.
+      bash)   grep -qE "[1-9][0-9]* failed" "$RUNLOG" ;;
       *)      return 1 ;;
     esac
   }

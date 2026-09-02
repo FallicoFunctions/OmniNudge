@@ -22,7 +22,7 @@
     "fix_commit": "the commit that fixed it",
     "control": {
       "patch": "repo-relative path under .review/controls/ to a patch that REVERTS this fix",
-      "runner": "go | vitest | pytest",
+      "runner": "go | vitest | pytest | bash",
       "tests": "[] -- narrow selectors. Each runs TWICE: it must PASS at HEAD, then produce a real test failure with the patch applied. A patch that breaks the build is refused, because a suite that cannot run is not a test that failed.",
       "observed": "what was seen when it was run by hand"
     }
