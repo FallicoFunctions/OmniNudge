@@ -171,20 +171,32 @@ func TestEveryBoundTogetherStillFitsThePromptItIsPutIn(t *testing.T) {
 }
 
 func TestAnOverlongFieldIsTrimmedRatherThanCostingAllFour(t *testing.T) {
-	// The writer returns four or none and the service falls back to one plain
-	// brief for the whole set, so refusing on length once turned four good
-	// briefs into four identical plain pictures.
-	brief := OmniAICandidateBrief{
-		Outfit:  "a navy fisherman's jumper " + strings.Repeat("and a scarf ", 80),
-		Setting: "on a beach",
-	}.Trimmed()
+	// Through the writer, not through Trimmed(). Calling the method directly
+	// asserts that trimming works, which was never in doubt -- it says nothing
+	// about whether anything calls it, and the first version of this test
+	// passed with the call removed.
+	//
+	// The writer returns four or none, and the service falls back to one plain
+	// brief for the whole set, so a single long setting turned four good briefs
+	// into four identical plain pictures. That is what this is about.
+	long := strings.Repeat("and a scarf ", 80)
+	client := &briefStubClient{response: `{"candidates":[
+	 {"outfit":"a navy fisherman's jumper ` + long + `","setting":"on a beach"},
+	 {"outfit":"a jumper","setting":"indoors"},
+	 {"outfit":"a coat","setting":"a park"},
+	 {"outfit":"a shirt","setting":"a cafe"}
+	]}`}
 
-	require.NoError(t, brief.Validate())
-	require.LessOrEqual(t, utf8.RuneCountInString(brief.Outfit), omniAIBriefMaxOutfitRunes)
-	require.Contains(t, brief.Outfit, "navy fisherman's jumper")
+	briefs, err := NewModelOmniAICandidateBriefWriter(client).
+		WriteCandidateBriefs(context.Background(), briefPersona(), 4)
+	require.NoError(t, err, "one long field must not cost the other three briefs")
+	require.Len(t, briefs, 4)
+
+	require.LessOrEqual(t, utf8.RuneCountInString(briefs[0].Outfit), omniAIBriefMaxOutfitRunes)
+	require.Contains(t, briefs[0].Outfit, "navy fisherman's jumper")
 	// Cut at a word boundary: a prompt ending mid-word is still read as a word.
-	require.False(t, strings.HasSuffix(brief.Outfit, "sca"), brief.Outfit)
-	require.False(t, strings.HasSuffix(brief.Outfit, ","), brief.Outfit)
+	require.False(t, strings.HasSuffix(briefs[0].Outfit, "sca"), briefs[0].Outfit)
+	require.False(t, strings.HasSuffix(briefs[0].Outfit, ","), briefs[0].Outfit)
 }
 
 func TestAnUnreadableAppearanceIsSaidOutLoud(t *testing.T) {
