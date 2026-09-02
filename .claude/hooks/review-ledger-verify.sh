@@ -59,7 +59,17 @@ command -v jq >/dev/null || block "jq is required to verify the review ledger."
 jq empty .review/instruments.json 2>/dev/null || block ".review/instruments.json is not valid JSON."
 
 
-HEAD_SHA=$(git rev-parse HEAD)
+# git has to work before anything below means anything.
+#
+# Outside a repository -- or with CLAUDE_PROJECT_DIR pointing somewhere that is
+# not one -- rev-parse failed quietly, HEAD_SHA came back empty, and a review
+# with no findings was verified as though it had been checked. Nothing here can
+# be established without a commit to check against.
+HEAD_SHA=$(git rev-parse HEAD 2>/dev/null)
+case "$HEAD_SHA" in
+  [0-9a-f][0-9a-f]*) ;;
+  *) block "Could not resolve HEAD in ${ROOT}. A review is verified against a commit, so there is nothing to check here." ;;
+esac
 LEDGER=".review/${HEAD_SHA}.json"
 if [ ! -f "$LEDGER" ]; then
   LEDGER=$(ls -t .review/*.json 2>/dev/null | grep -vE 'instruments|ledger\.schema' | head -1)
@@ -125,7 +135,7 @@ COUNT=$(jq -r '(.findings // []) | length' "$LEDGER")
 if [ "$COUNT" -gt 0 ]; then
   WTBASE=$(mktemp -d "${TMPDIR:-/tmp}/review-replay.XXXXXX")
   WT="$WTBASE/wt"
-  cleanup() { git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$WTBASE"; }
+  cleanup() { git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$WTBASE"; git worktree prune >/dev/null 2>&1; }
   trap cleanup EXIT
 
   # LFS smudge is skipped: a control replays source, and one missing LFS
@@ -165,6 +175,16 @@ if [ "$COUNT" -gt 0 ]; then
     PATCHFILE=$(jq -r ".findings[$i].control.patch" "$LEDGER")
     RUNNER=$(jq -r ".findings[$i].control.runner" "$LEDGER")
 
+    # Repo-relative, and inside the controls directory. An absolute path was
+    # silently glued onto the repo root and then reported as "does not apply",
+    # which points at the patch instead of at the path.
+    case "$PATCHFILE" in
+      .review/controls/*) ;;
+      *) BLIND="${BLIND}  - ${FID}: control patch must be a repo-relative path under .review/controls/, not '${PATCHFILE}'\n"; continue ;;
+    esac
+    case "$PATCHFILE" in
+      *..*) BLIND="${BLIND}  - ${FID}: control patch path may not climb out of .review/controls/\n"; continue ;;
+    esac
     [ -f "$PATCHFILE" ] || { BLIND="${BLIND}  - ${FID}: control patch ${PATCHFILE} does not exist\n"; continue; }
 
     while IFS= read -r SEL; do
@@ -196,7 +216,13 @@ if [ "$COUNT" -gt 0 ]; then
       PATCHED=$?
       # Reversed rather than checked out, so a patch that adds a file is undone
       # too and nothing leaks into the next finding.
-      git -C "$WT" apply -R "$ROOT/$PATCHFILE" 2>/dev/null
+      # If the revert fails the patch stays applied, and the next finding is
+      # measured against a tree that is still broken -- which shows up as that
+      # finding's baseline failing, a diagnosis pointing at the wrong control.
+      if ! git -C "$WT" apply -R "$ROOT/$PATCHFILE" 2>/dev/null; then
+        BLIND="${BLIND}  - ${FID}: control patch applied but could not be reversed, so the replay tree is no longer trustworthy for the findings after it\n"
+        break
+      fi
 
       if [ "$PATCHED" -eq 0 ]; then
         BLIND="${BLIND}  - ${FID}: '${SEL}' still PASSES with the fix reverted -- it is not testing the fix\n"
