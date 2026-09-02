@@ -181,7 +181,7 @@ func NormalizeOmniChatReferenceRequest(
 	return normalizeOmniAIRenderRequest(request, models.OmniChatGenerationModeLikenessReference, aspect)
 }
 
-// omniAIRenderNegativePrompt keeps everyone else out of her reference photos.
+// OmniAIRenderNegativePrompt keeps everyone else out of her reference photos.
 // Three families, and each is here because a real render needed it.
 //
 // Nobody else in frame, which is what this started as.
@@ -204,7 +204,7 @@ func NormalizeOmniChatReferenceRequest(
 // And warm rather than alluring. The same prior that undresses an unspecified
 // subject also makes her pose and look like a glamour shoot, which is not what
 // somebody choosing a character's face is choosing between.
-const omniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
+const OmniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
 	"crowd, bystander, group photo, another woman, another man, " +
 	"nude, naked, topless, underwear, lingerie, swimwear, " +
 	"exposed skin instead of clothing, " +
@@ -266,7 +266,7 @@ func normalizeOmniAIRenderRequest(
 	// Set here rather than in the worker because the worker is told create for
 	// both, deliberately, and must not put this on somebody's own Create prompt
 	// that asked for two people.
-	normalized.NegativePrompt = omniAIRenderNegativePrompt
+	normalized.NegativePrompt = OmniAIRenderNegativePrompt
 
 	// Said rather than left false. AllowNSFW is resolved from the caller's plan
 	// on the ordinary path, so a Premium account would otherwise follow its
