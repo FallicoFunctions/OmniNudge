@@ -15,7 +15,10 @@
 # reason back.
 
 set -uo pipefail
-INPUT=$(cat)
+
+# The hook payload is drained but not read: the only field that would apply is
+# stop_hook_active, and this hook deliberately ignores it (see below).
+cat >/dev/null
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 [ -z "$ROOT" ] && exit 0
@@ -72,7 +75,15 @@ case "$HEAD_SHA" in
 esac
 LEDGER=".review/${HEAD_SHA}.json"
 if [ ! -f "$LEDGER" ]; then
-  LEDGER=$(ls -t .review/*.json 2>/dev/null | grep -vE 'instruments|ledger\.schema' | head -1)
+  NEWEST=0
+  for CANDIDATE in .review/*.json; do
+    [ -f "$CANDIDATE" ] || continue
+    case "$CANDIDATE" in
+      .review/instruments.json|.review/ledger.schema.json) continue ;;
+    esac
+    CANDIDATE_AT=$(mtime "$CANDIDATE")
+    if [ "$CANDIDATE_AT" -gt "$NEWEST" ]; then NEWEST="$CANDIDATE_AT"; LEDGER="$CANDIDATE"; fi
+  done
 fi
 [ -n "$LEDGER" ] && [ -f "$LEDGER" ] || block "No ledger found. Write one to .review/<base-sha>.json before finishing -- the commit the review started from, which does not move as the review commits."
 
@@ -120,19 +131,23 @@ if [ "$(mtime "$LEDGER")" -lt "$STARTED" ]; then
   block "$LEDGER was written before this review opened, so it belongs to an earlier one. Write a ledger for this review."
 fi
 
+# bullets indents a list of ids for the refusal message. One helper rather than
+# the same sed spelled out at each call site.
+bullets() { while IFS= read -r line; do [ -n "$line" ] && printf '  - %s\n' "$line"; done; }
+
 PROBLEMS=""
 
 # --- 1. every instrument accounted for -------------------------------------
 MISSING=$(jq -r --slurpfile l "$LEDGER" '
   [.instruments[].id] - [$l[0].instruments[]?.id] | .[]' .review/instruments.json)
-[ -n "$MISSING" ] && PROBLEMS="${PROBLEMS}Instruments with no status in the ledger:\n$(echo "$MISSING" | sed 's/^/  - /')\n\n"
+[ -n "$MISSING" ] && PROBLEMS="${PROBLEMS}Instruments with no status in the ledger:\n$(echo "$MISSING" | bullets)\n\n"
 
 BAD=$(jq -r '.instruments[]?
   | select((.status != "applied" and .status != "na")
       or (.status == "na" and ((.why // "") | length) < 3)
       or (.status == "applied" and ((.evidence // "") | length) < 3))
   | .id' "$LEDGER")
-[ -n "$BAD" ] && PROBLEMS="${PROBLEMS}Instruments needing a real status ('applied' with evidence, or 'na' with why):\n$(echo "$BAD" | sed 's/^/  - /')\n\n"
+[ -n "$BAD" ] && PROBLEMS="${PROBLEMS}Instruments needing a real status ('applied' with evidence, or 'na' with why):\n$(echo "$BAD" | bullets)\n\n"
 
 # --- 2. every finding carries a replayable control --------------------------
 NOCTRL=$(jq -r '.findings[]?
@@ -140,7 +155,7 @@ NOCTRL=$(jq -r '.findings[]?
       or ((.control.runner // "") | length) < 2
       or ((.control.tests // []) | length) == 0)
   | .id' "$LEDGER")
-[ -n "$NOCTRL" ] && PROBLEMS="${PROBLEMS}Findings with no replayable control (need control.patch, control.runner, control.tests):\n$(echo "$NOCTRL" | sed 's/^/  - /')\n\n"
+[ -n "$NOCTRL" ] && PROBLEMS="${PROBLEMS}Findings with no replayable control (need control.patch, control.runner, control.tests):\n$(echo "$NOCTRL" | bullets)\n\n"
 
 [ -n "$PROBLEMS" ] && block "$PROBLEMS"
 
@@ -150,6 +165,7 @@ if [ "$COUNT" -gt 0 ]; then
   git worktree prune >/dev/null 2>&1
   WTBASE=$(mktemp -d "${TMPDIR:-/tmp}/review-replay.XXXXXX")
   WT="$WTBASE/wt"
+  # shellcheck disable=SC2329  # invoked by the EXIT trap below
   cleanup() { git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$WTBASE"; git worktree prune >/dev/null 2>&1; }
   trap cleanup EXIT
 
