@@ -1,0 +1,208 @@
+{
+  "schema_version": 2,
+  "head": "92de56567ba422cbc32f0ae2d7274e1e9db8e63a",
+  "base": "a1712456328c6abd1111176e3de4b1197b645920",
+  "scope": {
+    "files": [
+      ".claude/hooks/block-destructive.sh",
+      ".claude/hooks/post-edit-verify.sh",
+      ".claude/hooks/review-ledger-verify.sh",
+      ".claude/hooks/review-ledger-verify.test.sh",
+      ".claude/hooks/stop-verify.sh",
+      ".claude/hooks/truncation-check.sh",
+      ".claude/settings.json",
+      ".claude/skills/review/SKILL.md",
+      ".gitignore",
+      ".review/README.md",
+      ".review/controls/.gitkeep",
+      ".review/instruments.json",
+      ".review/ledger.schema.json",
+      "backend/cmd/server/main.go",
+      "backend/internal/config/config.go",
+      "backend/internal/handlers/omnichat.go",
+      "backend/internal/handlers/omnichat_omniai.go",
+      "backend/internal/handlers/omnichat_omniai_likeness.go",
+      "backend/internal/handlers/omnichat_omniai_likeness_test.go",
+      "backend/internal/handlers/omnichat_omniai_test.go",
+      "backend/internal/models/omnichat_omniai_likeness_pick.go",
+      "backend/internal/queue/omnichat_generation_handler.go",
+      "backend/internal/queue/omnichat_generation_handler_test.go",
+      "backend/internal/queue/omnichat_generation_two_phase_test.go",
+      "backend/internal/services/omnichat_content_entitlement.go",
+      "backend/internal/services/omnichat_content_entitlement_test.go",
+      "backend/internal/services/omnichat_creation_limits.go",
+      "backend/internal/services/omnichat_creation_limits_test.go",
+      "backend/internal/services/omnichat_generation.go",
+      "backend/internal/services/omnichat_generation_video_test.go",
+      "backend/internal/services/omnichat_group.go",
+      "backend/internal/services/omnichat_group_test.go",
+      "backend/internal/services/omnichat_omniai_creation.go",
+      "backend/internal/services/omnichat_omniai_creation_test.go",
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/omnichat_omniai_likeness_service.go",
+      "backend/internal/services/omnichat_omniai_likeness_service_test.go",
+      "backend/internal/services/omnichat_omniai_reference_set.go",
+      "backend/internal/services/omnichat_omniai_reference_set_test.go",
+      "frontend/src/components/omnichat/omniai/CreationFlow.tsx",
+      "frontend/src/components/omnichat/omniai/__tests__/CreationFlow.test.tsx",
+      "frontend/src/components/omnichat/omniai/__tests__/name.test.ts",
+      "frontend/src/components/omnichat/omniai/__tests__/refusals.test.ts",
+      "frontend/src/components/omnichat/omniai/name.ts",
+      "frontend/src/components/omnichat/omniai/refusals.ts",
+      "frontend/src/components/omnichat/omniai/useCreationFlow.ts",
+      "shared/omniai/name-cases.json"
+    ],
+    "boundaries": [
+      "backend handlers -> browser: refusal codes and the shape axios throws",
+      "backend -> RunPod worker: generation mode, prompt and negative prompt",
+      "Go and TypeScript: one name rule written twice",
+      "backend -> Postgres: candidate, reference and job rows",
+      "the review hook -> settings.json and the ledger it reads"
+    ]
+  },
+  "prior_ledgers_read": [],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "47 files across backend services/handlers/queue/models, the frontend OmniAI flow, the RunPod worker, shared/, and the review system itself."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "None exist. This is the first ledger, so nothing could be consulted."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled likeness request: mode=likeness, 9:16, AllowNSFW=false, unbilled, the description terminated before the framing, and the solo negative present."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the rendered name step. aria-invalid=true and aria-describedby=omniai-name-problem are wired to the message element; the HTML maxlength is gone, which is right for a rune-counted rule."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Pick returns {asset_id}; list returns {candidates, pending}. The browser reads asset_id and nothing else."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Postgres is reachable here, so this was run rather than skipped: internal/database and internal/models both green against a real database (83s, 437s)."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Diffed the codes the backend emits against the ones refusals.ts maps. Two apparent mismatches, both explained: character_creation_requires_upgrade comes from the roleplay handler my grep did not cover, and the three omniai_name_* codes are field errors rather than refusal kinds, shown to the user through serverErrorFrom's message."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The field the browser reads is the field the handler sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The name rule lives in Go and TypeScript; shared/omniai/name-cases.json drives both and both suites are green."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The worker suite is 88 passed, 1 skipped with pytest, pillow and numpy. Backend maps likeness and likeness_reference to create before sending, so the worker sees no mode it does not know."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The 80-case shared fixture covers the names people really type, including curly punctuation and non-Latin scripts."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The same fixture covers what must be refused: anything that could end the sentence the name is placed in."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Empty, max, max+1, NBSP, zero-width space, U+2028, emoji and astral letters are all in the fixture; the hook's own 46-case suite covers the ledger's boundaries."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Compared every io.Copy that streams a response. Found a no-op error branch in omnichat_media.go -- pre-existing and outside this scope, so it is spawned as its own task rather than folded in here."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Searched for branches left unreachable by the passes refactor. The two hits read instruments.json's own top-level array and are correct."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Surveyed discarded errors in the changed Go files. The one in the likeness content handler matches six of the eight streaming handlers; the headers are already sent, so there is nothing to tell the client."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "AllowNSFW is never set true outside the entitlement, on any surface."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The runner list is spelled out in four places (two branches in the hook, the schema, the skill). Considered and left: adding a runner to one branch and not the other fails closed, and a single table in bash would cost more clarity than it buys."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race green on all three changed packages: services (87s), queue (71s), handlers (658s). No data races."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "The partial-set behaviour of the reference queue is covered and green."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration was touched in this range."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "discardReplacedReferences removes the references a new pick orphans, and leaves files that carry a gallery asset alone."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding to control: nothing in scope was found."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, tsc -b, eslint, the Go suites under -race, the frontend suite, the worker suite (88 passed, 1 skipped) and the hook's own 46 cases."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing this pass used a technique the list does not already name, so no instrument was added."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "pass",
+    "vet": "pass",
+    "race": "pass -- services 87s, queue 71s, handlers 658s, no data races",
+    "tsc": "pass",
+    "eslint": "pass",
+    "go_suites": "pass",
+    "frontend_suite": "pass",
+    "worker_suite": "88 passed, 1 skipped",
+    "hook_suite": "46 passed"
+  }
+}
