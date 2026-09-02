@@ -21,6 +21,9 @@ ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 [ -z "$ROOT" ] && exit 0
 cd "$ROOT" || exit 0
 
+# mtime, portably enough for macOS and Linux.
+mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+
 [ -f .review/active ] || exit 0
 
 # Deliberately NOT gated on stop_hook_active. The sibling stop-verify hook uses
@@ -34,7 +37,7 @@ cd "$ROOT" || exit 0
 MAX_BLOCKS=5
 
 block() {
-  echo "$(( ATTEMPTS + 1 )) ${LEDGER:-none}" > .review/active
+  echo "$(( ATTEMPTS + 1 )) ${LEDGER:-none} ${STARTED:-0}" > .review/active
   if [ "$ATTEMPTS" -ge "$MAX_BLOCKS" ]; then
     rm -f .review/active
     printf 'REVIEW LEDGER NOT VERIFIED after %s attempts. The review is being released unverified -- say so plainly to the user and do not claim it passed.\n\nThe last reason was:\n%b\n' "$MAX_BLOCKS" "$1" >&2
@@ -46,7 +49,15 @@ block() {
 
 ATTEMPTS=0
 LEDGER=""
+STARTED=$(mtime .review/active 2>/dev/null || echo 0)
 command -v jq >/dev/null || block "jq is required to verify the review ledger."
+
+# Without the list there is nothing to be complete against, and the
+# completeness check silently passed on an empty set -- a review could account
+# for no instruments at all by deleting the file that names them.
+[ -f .review/instruments.json ] || block ".review/instruments.json is missing. It is the list a review is checked against, so nothing can be verified without it."
+jq empty .review/instruments.json 2>/dev/null || block ".review/instruments.json is not valid JSON."
+
 
 HEAD_SHA=$(git rev-parse HEAD)
 LEDGER=".review/${HEAD_SHA}.json"
@@ -66,10 +77,24 @@ jq empty "$LEDGER" 2>/dev/null || block "$LEDGER is not valid JSON."
 # review and the count starts again.
 PREV_COUNT=$(awk '{print $1}' .review/active 2>/dev/null)
 PREV_LEDGER=$(awk '{print $2}' .review/active 2>/dev/null)
+STARTED=$(awk '{print $3}' .review/active 2>/dev/null)
 case "$PREV_COUNT" in
   ''|*[!0-9]*) PREV_COUNT=0 ;;
 esac
+case "$STARTED" in
+  ''|*[!0-9]*) STARTED=$(mtime .review/active) ;;
+esac
 [ "$PREV_LEDGER" = "$LEDGER" ] && ATTEMPTS="$PREV_COUNT"
+
+# The ledger has to have been written by THIS review.
+#
+# Ledgers are tracked and accumulate, and the fallback picks the newest file on
+# disk -- so a review that wrote nothing at all was quietly verified against
+# somebody else's months-old ledger and passed. The marker records when the
+# review opened; a ledger older than that belongs to an earlier one.
+if [ "$(mtime "$LEDGER")" -lt "$STARTED" ]; then
+  block "$LEDGER was written before this review opened, so it belongs to an earlier one. Write a ledger for this review."
+fi
 
 PROBLEMS=""
 
