@@ -40,6 +40,12 @@ GIT_LFS_SKIP_SMUDGE=1 git worktree add --detach "$SANDBOX" "$H" >/dev/null 2>&1 
 cd "$SANDBOX" || exit 1
 export CLAUDE_PROJECT_DIR="$SANDBOX"
 
+# node_modules is gitignored, so a fresh worktree has none and the hook finds
+# nothing to link into its replay tree -- which makes every vitest control fail
+# its baseline for a reason that has nothing to do with the control. Borrow the
+# real one; it is only ever read.
+[ -d "$REPO/frontend/node_modules" ] && ln -s "$REPO/frontend/node_modules" "$SANDBOX/frontend/node_modules" 2>/dev/null
+
 instruments() { # instruments(): every id, accounted for
   jq -c '[.instruments[] | {id: .id, status: "na", why: "test fixture"}]' .review/instruments.json
 }
@@ -110,6 +116,62 @@ open(sys.argv[1], 'w').write(subprocess.run(['git','diff'], capture_output=True,
 subprocess.run(['git','checkout','--',p], check=True)
 PY
 }
+# A vitest control: revert the typography fold, so a curly apostrophe stops
+# being folded and name.test.ts fails as a test.
+make_vitest_patch() {
+  python3 - "$1" <<'PYV'
+import subprocess, sys
+p = 'frontend/src/components/omnichat/omniai/name.ts'
+src = open(p).read()
+cut = '  for (const [pattern, replacement] of TYPOGRAPHY) name = name.replace(pattern, replacement);\n'
+if cut not in src:
+    sys.exit("fixture drift: the typography fold moved")
+open(p, 'w').write(src.replace(cut, '', 1))
+open(sys.argv[1], 'w').write(subprocess.run(['git','diff'], capture_output=True, text=True).stdout)
+subprocess.run(['git','checkout','--',p], check=True)
+PYV
+}
+
+# A pytest control: make the worker claim a reference unconditionally again.
+make_pytest_patch() {
+  python3 - "$1" <<'PYP'
+import subprocess, sys
+p = 'infra/runpod/omnichat_worker/generators.py'
+src = open(p).read()
+if '        if has_reference:' not in src:
+    sys.exit("fixture drift: the conditional reference clause moved")
+open(p, 'w').write(src.replace('        if has_reference:', '        if True:', 1))
+open(sys.argv[1], 'w').write(subprocess.run(['git','diff'], capture_output=True, text=True).stdout)
+subprocess.run(['git','checkout','--',p], check=True)
+PYP
+}
+
+# Patches that break the module rather than reverting a fix. Each runner has to
+# tell "a test failed" apart from "the code would not load": pytest reports
+# "1 error", vitest reports "no tests". Without a case per runner, the marker
+# that makes that distinction can be deleted and nothing goes red -- which is
+# exactly what a mutation test found.
+make_broken_vitest_patch() {
+  python3 - "$1" <<'PYBV'
+import subprocess, sys
+p = 'frontend/src/components/omnichat/omniai/name.ts'
+src = open(p).read()
+open(p, 'w').write(src.replace('export function normalizeOmniAIName', 'export function ((( normalizeOmniAIName', 1))
+open(sys.argv[1], 'w').write(subprocess.run(['git','diff'], capture_output=True, text=True).stdout)
+subprocess.run(['git','checkout','--',p], check=True)
+PYBV
+}
+make_broken_pytest_patch() {
+  python3 - "$1" <<'PYBP'
+import subprocess, sys
+p = 'infra/runpod/omnichat_worker/generators.py'
+src = open(p).read()
+open(p, 'w').write(src.replace('def build_image_prompt(', 'def build_image_prompt(((', 1))
+open(sys.argv[1], 'w').write(subprocess.run(['git','diff'], capture_output=True, text=True).stdout)
+subprocess.run(['git','checkout','--',p], check=True)
+PYBP
+}
+
 control() { jq -n --arg p "$1" --arg r "$2" --arg t "$3" \
   '[{id:"T", summary:"s", fix_commit:"x", control:{patch:$p, runner:$r, tests:[$t], observed:"by hand"}}]'; }
 
@@ -196,6 +258,40 @@ open_review; ledger ".review/${H}.json" "$(instruments)" \
      '[{id:"A",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}},
        {id:"B",summary:"s",fix_commit:"x",control:{patch:$p,runner:"go",tests:["./internal/services/ -run TestADescriptionNeverRunsIntoTheFraming"],observed:"x"}}]')"
 expect "two findings sharing a patch both hold (the revert works)" 0 "2 control(s)"
+
+echo
+echo "the other two runners"
+make_vitest_patch .review/controls/tst-vitest.patch
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-vitest.patch vitest 'src/components/omnichat/omniai/__tests__/name.test.ts')"
+expect "a vitest control holds" 0 "control(s) replayed and held"
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-vitest.patch vitest 'src/components/omnichat/omniai/__tests__/refusals.test.ts')"
+expect "a blind vitest control is caught" 2 "still PASSES"
+make_broken_vitest_patch .review/controls/tst-vitest-broken.patch
+open_review; ledger ".review/${H}.json" "$(instruments)" \
+  "$(control .review/controls/tst-vitest-broken.patch vitest 'src/components/omnichat/omniai/__tests__/name.test.ts')"
+expect "a vitest patch that breaks the module is caught" 2 "no test actually failed"
+
+if python3 -m pytest --version >/dev/null 2>&1; then
+  make_pytest_patch .review/controls/tst-pytest.patch
+  open_review; ledger ".review/${H}.json" "$(instruments)" \
+    "$(control .review/controls/tst-pytest.patch pytest 'infra/runpod/omnichat_worker/test_generators.py -k no_reference_is_claimed')"
+  expect "a pytest control holds" 0 "control(s) replayed and held"
+  open_review; ledger ".review/${H}.json" "$(instruments)" \
+    "$(control .review/controls/tst-pytest.patch pytest 'infra/runpod/omnichat_worker/test_contract.py')"
+  expect "a blind pytest control is caught" 2 "still PASSES"
+  make_broken_pytest_patch .review/controls/tst-pytest-broken.patch
+  open_review; ledger ".review/${H}.json" "$(instruments)" \
+    "$(control .review/controls/tst-pytest-broken.patch pytest 'infra/runpod/omnichat_worker/test_generators.py -k no_reference_is_claimed')"
+  expect "a pytest patch that breaks the module is caught" 2 "no test actually failed"
+else
+  # Said out loud rather than skipped quietly: an unverified runner that nobody
+  # is told about is the same as one that was never tested.
+  echo "  SKIP  the two pytest cases -- 'python3 -m pytest' is not available here,"
+  echo "        so pytest controls cannot run on this machine either. Install"
+  echo "        pytest (plus pillow and numpy for the worker suite) to cover them."
+fi
 
 echo
 echo "running out of time is not a way to pass"
