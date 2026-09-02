@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/omninudge/backend/internal/models"
@@ -182,4 +185,27 @@ func TestAnOverlongFieldIsTrimmedRatherThanCostingAllFour(t *testing.T) {
 	// Cut at a word boundary: a prompt ending mid-word is still read as a word.
 	require.False(t, strings.HasSuffix(brief.Outfit, "sca"), brief.Outfit)
 	require.False(t, strings.HasSuffix(brief.Outfit, ","), brief.Outfit)
+}
+
+func TestAnUnreadableAppearanceIsSaidOutLoud(t *testing.T) {
+	// Her age, gender and build come from that blob and decide whether the
+	// clothes suit the person wearing them. Dropping them silently leaves
+	// briefs that look completely fine and were written without knowing how old
+	// she is, which is the kind of wrong nobody goes looking for.
+	var buf bytes.Buffer
+	original := zlog.Logger
+	zlog.Logger = zerolog.New(&buf)
+	t.Cleanup(func() { zlog.Logger = original })
+
+	persona := briefPersona()
+	persona.OmniAIAppearance = json.RawMessage(`{"age": "twenty-three"}`)
+
+	client := &briefStubClient{response: fourBriefs()}
+	_, err := NewModelOmniAICandidateBriefWriter(client).
+		WriteCandidateBriefs(context.Background(), persona, 4)
+	require.NoError(t, err, "an unreadable appearance degrades the brief, it does not fail it")
+	require.Contains(t, buf.String(), "her appearance answers could not be read")
+
+	// And the rest of her still went, so the degradation really is partial.
+	require.Contains(t, client.sent[len(client.sent)-1].Content, "marine biology")
 }
