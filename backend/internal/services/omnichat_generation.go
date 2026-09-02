@@ -182,8 +182,29 @@ func NormalizeOmniChatReferenceRequest(
 }
 
 // omniAIRenderNegativePrompt keeps everyone else out of her reference photos.
+// Three families, and each is here because a real render needed it.
+//
+// Nobody else in frame, which is what this started as.
+//
+// Clothed. The scene path already argues that an adult-tuned checkpoint drifts
+// to nude whatever the positive prompt says, and defends a tracked outfit from
+// the negative side. Her reference photographs need the same defence and had
+// none.
+//
+// Facing the camera. Two of four came back showing her from behind despite the
+// prompt asking for the opposite -- and this picture is the one input the 3D
+// pipeline takes, so the wrong side of a person is not a variation.
+//
+// And warm rather than alluring. The same prior that undresses an unspecified
+// subject also makes her pose and look like a glamour shoot, which is not what
+// somebody choosing a character's face is choosing between.
 const omniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
-	"crowd, bystander, group photo, another woman, another man"
+	"crowd, bystander, group photo, another woman, another man, " +
+	"nude, naked, topless, underwear, lingerie, swimwear, bare midriff, " +
+	"exposed skin instead of clothing, " +
+	"from behind, back view, rear view, facing away, looking over the shoulder, buttocks, " +
+	"seductive, sultry, alluring, provocative, pouting, parted lips, bedroom eyes, " +
+	"glamour shot, lingerie model, boudoir"
 
 func normalizeOmniAIRenderRequest(
 	request models.OmniChatGenerationRequest,

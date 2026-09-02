@@ -203,3 +203,52 @@ func TestACallerCannotSmuggleANegativePromptIntoHerLikeness(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, request.NegativePrompt, "clothes")
 }
+
+func TestSheIsDressedFacingUsAndGladToSeeUs(t *testing.T) {
+	// Three things the first real renders got wrong. Two of four came back from
+	// behind, none of them mentioned clothing at all, and every one of them was
+	// posed like a glamour shoot rather than like somebody you are about to
+	// meet.
+	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman with freckles"}
+
+	anchor, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+		Prompt: BuildOmniAILikenessPrompt(profile),
+	})
+	require.NoError(t, err)
+
+	for _, asked := range []string{"fully clothed", "shoulders square", "facing the camera", "warm friendly"} {
+		require.Contains(t, anchor.EffectivePrompt, asked)
+	}
+	for _, refused := range []string{"nude", "topless", "lingerie", "back view", "facing away", "buttocks", "seductive", "sultry"} {
+		require.Contains(t, anchor.NegativePrompt, refused, "the negative has to defend it too")
+	}
+}
+
+func TestEverySupportingPictureIsDefendedTheSameWay(t *testing.T) {
+	// The five references are of the same person and are shown to nobody, but
+	// they condition every later render. One of them undressed or turned away
+	// teaches the adapter exactly that.
+	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman with freckles"}
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+		}, variant)
+		require.NoError(t, err, variant)
+		for _, refused := range []string{"nude", "lingerie", "back view", "seductive"} {
+			require.Contains(t, request.NegativePrompt, refused, variant)
+		}
+	}
+}
+
+func TestAThreeQuarterViewFacesUs(t *testing.T) {
+	// "Turned three-quarters away from the camera" is not what a three-quarter
+	// view is, and asking for it is how a set meant to show her face came back
+	// showing her back.
+	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman"}
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		require.NotContains(t, prompt, "away from the camera", variant)
+	}
+}

@@ -52,12 +52,12 @@ var omniAIReferenceVariants = []omniAIReferenceVariant{
 	{
 		Key:     "portrait_three_quarter",
 		Aspect:  "3:4",
-		Framing: "Head and shoulders, turned three-quarters away from the camera, neutral expression.",
+		Framing: "Head and shoulders, turned three-quarters toward the camera, neutral expression.",
 	},
 	{
 		Key:     "full_body_three_quarter",
 		Aspect:  "9:16",
-		Framing: "Full body from head to feet, standing, turned three-quarters away from the camera.",
+		Framing: "Full body from head to feet, standing, turned three-quarters toward the camera.",
 	},
 	{
 		Key:    "full_body_relaxed",
