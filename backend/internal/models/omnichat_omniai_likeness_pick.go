@@ -23,7 +23,7 @@ var ErrLikenessCandidateNotFound = errors.New("omnichat likeness: no such candid
 //
 // The picked file becomes three things at once -- her avatar, a private
 // identity reference every later render is conditioned on, and the single
-// forward-facing full body the 2D-to-3D pipeline takes. Nothing is regenerated
+// forward-facing full body of her that anybody chose. Nothing is regenerated
 // to produce any of them, which is what makes them incapable of disagreeing
 // about who she is.
 func (r *OmniChatMediaRepository) PickLikeness(

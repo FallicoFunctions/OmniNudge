@@ -44,3 +44,6 @@ uploads/
 
 # Build artifacts
 tmp/
+
+# Renders from cmd/zz_model_compare: real images, judged by eye, not repository content.
+model-compare/

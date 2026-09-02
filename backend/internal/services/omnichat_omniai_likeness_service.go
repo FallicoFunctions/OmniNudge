@@ -17,7 +17,7 @@ import (
 //
 // Four because a face nobody chose is the thing people reject hardest and she
 // is permanent, and because the one they pick is also the identity anchor every
-// later render is conditioned on and the input the 3D pipeline takes. That is
+// later render is conditioned on. That is
 // the cheapest place in the product to spend a render.
 const OmniChatOmniAILikenessCandidates = 4
 
@@ -50,6 +50,46 @@ type OmniChatOmniAILikenessService struct {
 	provider  string
 	billing   omniChatLikenessBilling
 	discarder omniChatLikenessDiscarder
+	briefs    OmniAICandidateBriefWriter
+}
+
+// SetCandidateBriefWriter wires what decides her clothes and where she stands.
+//
+// Optional, and absent it every candidate falls back to the same plain brief.
+// That is a worse set of four than she deserves, and it is still four pictures
+// of her -- a language model being unreachable must not stop a character who
+// was just created from having a face.
+func (s *OmniChatOmniAILikenessService) SetCandidateBriefWriter(
+	briefs OmniAICandidateBriefWriter,
+) *OmniChatOmniAILikenessService {
+	if s != nil {
+		s.briefs = briefs
+	}
+	return s
+}
+
+// candidateBriefs returns one brief per candidate, always exactly count of them.
+//
+// Failure is not an error here. Everything this reports is a downgrade in how
+// good the four look, never a reason to leave somebody without them, so a
+// writer that is missing, slow or wrong is logged and replaced by the fallback.
+func (s *OmniChatOmniAILikenessService) candidateBriefs(
+	ctx context.Context, persona *models.BotPersona, count int,
+) []OmniAICandidateBrief {
+	fallback := make([]OmniAICandidateBrief, count)
+	for i := range fallback {
+		fallback[i] = OmniAIFallbackCandidateBrief
+	}
+	if s == nil || s.briefs == nil {
+		return fallback
+	}
+	written, err := s.briefs.WriteCandidateBriefs(ctx, persona, count)
+	if err != nil {
+		zlog.Warn().Err(err).Int("persona_id", persona.ID).
+			Msg("omnichat likeness: could not write candidate briefs, using the fallback")
+		return fallback
+	}
+	return written
 }
 
 // SetRerollDependencies wires the two things only a re-roll needs. Kept off the
@@ -92,7 +132,8 @@ func (s *OmniChatOmniAILikenessService) Start(ctx context.Context, persona *mode
 		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
 	}
 
-	prompt := BuildOmniAILikenessPrompt(ResolveOmniChatMediaIdentityProfile(persona))
+	profile := ResolveOmniChatMediaIdentityProfile(persona)
+	briefs := s.candidateBriefs(ctx, persona, OmniChatOmniAILikenessCandidates)
 
 	started := make([]uuid.UUID, 0, OmniChatOmniAILikenessCandidates)
 	var failed error
@@ -100,12 +141,12 @@ func (s *OmniChatOmniAILikenessService) Start(ctx context.Context, persona *mode
 		request, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 			Kind:      models.OmniChatMediaKindImage,
 			PersonaID: persona.ID,
-			Prompt:    prompt,
+			Prompt:    BuildOmniAILikenessPrompt(profile, briefs[i]),
 		})
 		if err != nil {
-			// The same prompt every time, so this cannot fail on the fourth
-			// having worked on the first.
-			return started, fmt.Errorf("omnichat likeness: prepare request: %w", err)
+			// Four different prompts now, so unlike the single shared one this
+			// really can fail on the fourth having worked on the first.
+			return started, fmt.Errorf("omnichat likeness: prepare request %d: %w", i+1, err)
 		}
 
 		job, err := s.jobs.CreateGenerationJob(ctx, *persona.OwnerUserID, request, s.provider)
@@ -200,7 +241,7 @@ func (s *OmniChatOmniAILikenessService) StartReferences(
 // having enough credits -- better to refuse while nothing has been spent.
 //
 // Refused outright once she has been picked. That face is her avatar, the
-// conditioning for every later render and the 3D pipeline's input, so redrawing
+// conditioning for every later render, so redrawing
 // her is not a new choice; it is a different character wearing her name.
 func (s *OmniChatOmniAILikenessService) Reroll(
 	ctx context.Context, persona *models.BotPersona,
@@ -262,13 +303,18 @@ func (s *OmniChatOmniAILikenessService) Reroll(
 		operations = append(operations, operation)
 	}
 
-	prompt := BuildOmniAILikenessPrompt(ResolveOmniChatMediaIdentityProfile(persona))
+	// A re-roll is somebody saying none of these four are her, so it asks for
+	// four fresh briefs rather than redrawing the same clothes in the same
+	// places. Re-rolling into the same wardrobe would answer a different
+	// complaint from the one being made.
+	profile := ResolveOmniChatMediaIdentityProfile(persona)
+	briefs := s.candidateBriefs(ctx, persona, OmniChatOmniAILikenessCandidates)
 	started := make([]uuid.UUID, 0, OmniChatOmniAILikenessCandidates)
 	for i, operation := range operations {
 		request, err := NormalizeOmniChatRerollRequest(models.OmniChatGenerationRequest{
 			Kind:      models.OmniChatMediaKindImage,
 			PersonaID: persona.ID,
-			Prompt:    prompt,
+			Prompt:    BuildOmniAILikenessPrompt(profile, briefs[i]),
 		}, operation)
 		if err != nil {
 			refundAll(i)

@@ -12,7 +12,7 @@ import (
 // already has one.
 //
 // The picked face is her avatar, the reference every later render is
-// conditioned on, and the single input the 2D-to-3D pipeline takes. Drawing her
+// conditioned on. Drawing her
 // again after that does not offer a new choice; it changes who she is, for
 // somebody who is already talking to her. Deleting her is how you start again,
 // which is deliberately a decision rather than a button.

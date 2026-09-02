@@ -2,6 +2,8 @@ package services
 
 import (
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/omninudge/backend/internal/models"
 )
@@ -14,11 +16,21 @@ import (
 // This prompt therefore states everything itself: the subject, the medium, and
 // the framing.
 //
-// The framing is not a style choice. The picked image is three things at once:
-// what somebody chose, the reference every later render is conditioned on, and
-// the single forward-facing full-body input the 2D-to-3D pipeline takes. Asking
-// for it once and using it for all three is what makes the 3D input incapable
-// of drifting from the character somebody actually picked.
+// This is the picture somebody sees, and the only one they choose. It is not a
+// reference plate.
+//
+// It used to be written as one: plain seamless backdrop, flat even light, no
+// props, arms at the sides. Every one of those clauses is already carried by
+// the five supporting references, which say them in the same words and which
+// nobody is ever shown. Stating them here as well cost nothing technically and
+// everything otherwise -- it produced a catalogue photograph of a person
+// standing against nothing, four times, which is not somebody you want to talk
+// to.
+//
+// So the technical constraints stay where they belong, on the five, and this
+// one asks for a person somewhere real. What survives here is what a profile
+// picture actually needs: her whole body, her face toward the camera, warmth,
+// and the coverage rule -- which is not a framing choice and does not move.
 const (
 	// Three things this has to say that it did not, each measured from real
 	// renders rather than reasoned about:
@@ -38,20 +50,51 @@ const (
 	// are about to know, and a bare stomach is not what warm looks like.
 	//
 	// Shoulders square, because "facing the camera directly" alone produced two
-	// of four from behind. The identity anchor is also the 3D pipeline's single
-	// forward-facing input, so a back view is not a stylistic variation; it is
-	// an unusable input.
+	// of four from behind. A profile picture of somebody's back is not a
+	// stylistic variation.
 	//
 	// Warm rather than neutral, because neutral is not what somebody meeting a
 	// character should be handed, and because the same adult-tuned prior turns
 	// an unspecified expression into a sultry one.
-	omniAILikenessFraming = "Full body from head to feet, standing upright and facing the camera directly, " +
+	// Coverage, garment by garment, because saying it in general did not work.
+	// "Fully clothed in simple everyday clothes" produced a crop top and
+	// nothing below the waist: one garment satisfies a general instruction.
+	// Each half is named, and so are shoes, because bare feet were the next
+	// thing to go.
+	//
+	// The torso is named as one covered surface rather than as "chest and
+	// midriff", because the model answers a coverage instruction by choosing a
+	// garment, and a crop top is a garment that covers a chest. Overlapping the
+	// waistband is the thing that has no crop-top reading.
+	//
+	// This is the one clothing rule left. Everything else about what she wears
+	// comes from her brief, and nothing there is restricted: if a body can
+	// physically wear it, she can.
+	//
+	// Phrased as a constraint on the outfit already named, not as a second
+	// outfit. It used to end "...with full-length trousers or a skirt to the
+	// knee, and shoes", which arrives after the brief has already dressed her
+	// and reads as a fresh instruction to pick clothes -- so a brief that put
+	// her in a dress was followed by a sentence offering trousers.
+	omniAILikenessCoverage = "Her top overlaps the waistband so that no midriff, stomach or navel " +
+		"is visible at any point, her legs are covered to at least the knee, and she has shoes on."
+
+	// Shoulders square, because "facing the camera directly" alone produced two
+	// of four from behind. A profile picture of somebody's back is not a
+	// stylistic variation.
+	//
+	// Warm rather than neutral, because neutral is not what somebody meeting a
+	// character should be handed, and because the same adult-tuned prior turns
+	// an unspecified expression into a sultry one.
+	//
+	// Nothing here fixes her arms. They were pinned to her sides and a render
+	// put one above her head anyway; a pose rule that the model ignores is
+	// worse than no rule, because what she does with her hands is exactly the
+	// kind of detail that makes her look like a person rather than a mannequin.
+	// Her brief says what she is holding, when she is holding anything.
+	omniAILikenessFraming = "Full body from head to feet, standing and facing the camera, " +
 		"both shoulders square to the camera, " +
-		"wearing a top that covers the whole torso and overlaps the waistband so no midriff or navel is visible, " +
-		"full-length trousers or a skirt to the knee, and shoes, " +
-		"arms relaxed at the sides, a warm friendly expression with a natural closed-mouth smile, " +
-		"plain seamless background, even diffuse lighting with no strong shadows, " +
-		"no props and no other people."
+		"a warm friendly expression with a natural closed-mouth smile."
 
 	// Nothing here describes a person, so a character nobody described still
 	// renders somebody rather than failing. Written as its own sentence,
@@ -64,24 +107,66 @@ const (
 // She has no avatar yet, so there is no reference image to condition on: the
 // only thing carrying her identity is the description, which is exactly why it
 // is written at creation rather than when something first needs to draw her.
-func BuildOmniAILikenessPrompt(profile models.OmniChatMediaIdentityProfile) string {
+func BuildOmniAILikenessPrompt(
+	profile models.OmniChatMediaIdentityProfile, brief OmniAICandidateBrief,
+) string {
 	subject := strings.TrimSpace(profile.Appearance)
 	if subject == "" {
 		subject = omniAILikenessFallbackSubject
 	}
-	// The description is a sentence about a person ("A 27-year-old woman with
-	// long black hair."). Opening with it and then stating the framing reads as
-	// two instructions rather than one run-on subject.
+	if brief.Validate() != nil {
+		// A brief that cannot be put in a prompt is not worth half-using. The
+		// fallback still puts her somewhere with light in it, which is the
+		// whole point of having one.
+		brief = OmniAIFallbackCandidateBrief
+	}
+
+	// Ordered as the picture is built: who she is, then what she has on, then
+	// where she is standing. The coverage rule follows the outfit immediately
+	// rather than sitting with the framing, because it is a statement about
+	// those clothes and reads as an afterthought anywhere else.
 	return joinOmniAIPromptSentences(
-		// "image", not "photograph". This prompt can end with "Render as anime
-		// artwork, not as a photograph", and the scene prompt had exactly this
-		// contradiction two commits ago -- one sentence telling the model to
-		// photograph her and another telling it not to.
-		"Full-body reference image of one person.",
+		// "picture", not "photograph". This prompt can end with "Render as
+		// anime artwork, not as a photograph", and the scene prompt had exactly
+		// that contradiction -- one sentence telling the model to photograph
+		// her and another telling it not to.
+		"A picture of one person, and nobody else.",
 		subject,
+		"She is wearing "+strings.TrimSpace(brief.Outfit),
+		omniAILikenessCoverage,
+		holdingSentence(brief.Holding),
+		startsASentence(brief.Setting),
 		omniAILikenessFraming,
 		models.RenderMediumSentence(profile.RenderStyle),
 	)
+}
+
+// startsASentence capitalises a brief's setting so it reads as one.
+//
+// A setting is written as a phrase -- "on a path between brick buildings" --
+// because that is how somebody describes where a picture was taken. Joined
+// as-is it landed mid-prompt in lower case, directly after a full stop, which
+// is the same run-on fault joinOmniAIPromptSentences exists to prevent at the
+// other end of a sentence.
+func startsASentence(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	first, width := utf8.DecodeRuneInString(text)
+	if first == utf8.RuneError {
+		return text
+	}
+	return string(unicode.ToUpper(first)) + text[width:]
+}
+
+// holdingSentence is empty far more often than not, and says nothing when it is.
+func holdingSentence(holding string) string {
+	holding = strings.TrimSpace(holding)
+	if holding == "" {
+		return ""
+	}
+	return "She is holding " + holding
 }
 
 // joinOmniAIPromptSentences puts a prompt together out of whole sentences.

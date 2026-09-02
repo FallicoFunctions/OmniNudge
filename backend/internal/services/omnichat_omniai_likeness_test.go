@@ -207,36 +207,94 @@ func TestTheLikenessPromptNeverContradictsItsOwnMedium(t *testing.T) {
 	anime := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
 		RenderStyle: models.OmniChatRenderStyleAnime,
 		Appearance:  "A 22-year-old woman with long pink hair and violet eyes.",
-	})
+	}, testCandidateBrief())
 	require.Contains(t, anime, "anime artwork")
 	require.NotContains(t, anime, "photograph of")
 	require.NotContains(t, anime, "photorealistically")
 
 	realistic := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
 		Appearance: "A 27-year-old woman.",
-	})
+	}, testCandidateBrief())
 	require.Contains(t, realistic, "photorealistically")
 	require.NotContains(t, realistic, "anime")
 }
 
-func TestTheLikenessAsksForWhatThreeThingsNeed(t *testing.T) {
-	// The picked image is what somebody chose, the reference every later render
-	// is conditioned on, and the one forward-facing full-body input the
-	// 2D-to-3D pipeline takes. The framing has to serve all three, so it is
-	// asserted rather than left to the model.
-	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
-		Appearance: "A 27-year-old woman.",
-	})
-	for _, required := range []string{
-		"Full body from head to feet", "facing the camera directly",
-		"plain seamless background", "no props and no other people",
-	} {
-		require.Contains(t, prompt, required)
+func testCandidateBrief() OmniAICandidateBrief {
+	return OmniAICandidateBrief{
+		Outfit:  "a green wool coat over a striped jumper, black jeans and boots",
+		Setting: "outside a bookshop on a bright cold morning",
+		Holding: "a paper bag",
 	}
 }
 
+func TestTheLikenessIsAPictureOfSomebodySomewhere(t *testing.T) {
+	// This is the picture somebody sees and the only one they choose. It used
+	// to be written as a reference plate -- plain backdrop, flat light, no
+	// props -- and rendered four catalogue photographs of a person standing
+	// against nothing.
+	//
+	// Those clauses were never load-bearing here. The five supporting
+	// references say all of them, in the same words, and nobody is shown those.
+	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	}, testCandidateBrief())
+
+	for _, required := range []string{
+		"Full body from head to feet", "facing the camera",
+		"a green wool coat over a striped jumper, black jeans and boots",
+		// Capitalised: a setting is written as a phrase and has to read as a
+		// sentence once it lands after a full stop.
+		"Outside a bookshop on a bright cold morning",
+		"She is holding a paper bag",
+	} {
+		require.Contains(t, prompt, required)
+	}
+
+	// The reference-plate wording, asserted absent so it cannot come back by
+	// somebody copying the reference set's framing into this one.
+	for _, banned := range []string{
+		"plain seamless background", "no props", "reference image",
+		"arms relaxed at the sides", "even diffuse lighting",
+	} {
+		require.NotContains(t, prompt, banned)
+	}
+}
+
+func TestTheCoverageRuleSurvivesEveryBrief(t *testing.T) {
+	// The one clothing rule that is not the brief's to decide. A brief is
+	// written by a language model reading user-supplied prose, so this is
+	// asserted against a brief that actively asks for the opposite.
+	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	}, OmniAICandidateBrief{
+		Outfit:  "a cropped bikini top and nothing else",
+		Setting: "on a beach",
+	})
+	require.Contains(t, prompt, "overlaps the waistband so that no midriff, stomach or navel is visible")
+	require.Contains(t, prompt, "legs are covered to at least the knee, and she has shoes on")
+}
+
+func TestAnUnusableBriefFallsBackRatherThanRenderingNowhere(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	}, OmniAICandidateBrief{Setting: "a kitchen"})
+	require.Contains(t, prompt, startsASentence(OmniAIFallbackCandidateBrief.Setting))
+	require.Contains(t, prompt, OmniAIFallbackCandidateBrief.Outfit)
+	require.NotContains(t, prompt, "a kitchen")
+}
+
+func TestNothingIsHeldWhenTheBriefSaysNothingIsHeld(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A 27-year-old woman.",
+	}, OmniAICandidateBrief{
+		Outfit:  "a denim jacket, white tee, black jeans and trainers",
+		Setting: "in a park",
+	})
+	require.NotContains(t, prompt, "She is holding")
+}
+
 func TestACharacterNobodyDescribedStillRendersSomebody(t *testing.T) {
-	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{})
+	prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{}, testCandidateBrief())
 	require.Contains(t, prompt, "An adult.")
 	require.NotContains(t, prompt, "person. an adult")
 }

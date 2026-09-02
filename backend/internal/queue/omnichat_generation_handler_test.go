@@ -1165,7 +1165,11 @@ func TestHerOwnPortraitIsHeldToTheStricterStandard(t *testing.T) {
 		want services.OmniChatImageStandard
 	}{
 		{models.OmniChatGenerationModeLikeness, services.OmniChatImageStandardPortrait},
-		{models.OmniChatGenerationModeLikenessReference, services.OmniChatImageStandardPortrait},
+		// Not the portrait standard. The five references are prompted for
+		// neutral expressions and three-quarter turns, which is exactly what
+		// that standard's PASS clause excludes -- it refused four of the five
+		// while nobody was looking, and a refusal there is permanent.
+		{models.OmniChatGenerationModeLikenessReference, services.OmniChatImageStandardReference},
 		{models.OmniChatGenerationModeCreate, services.OmniChatImageStandardExplicit},
 		{models.OmniChatGenerationModeContextual, services.OmniChatImageStandardExplicit},
 	} {
@@ -1185,4 +1189,28 @@ func TestAPortraitRefusalSaysItIsAboutThePortrait(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "character portrait")
+}
+
+func TestEachStandardRefusesInItsOwnWords(t *testing.T) {
+	// The reason is what somebody reads when they ask why a character has no
+	// pictures. A reference turned down for a rucked-up hem is not explicit,
+	// and reporting it as explicit sends the next person looking for a content
+	// problem that does not exist.
+	for _, c := range []struct {
+		mode   models.OmniChatGenerationMode
+		reason string
+	}{
+		{models.OmniChatGenerationModeLikeness, "portrait_standard_refused"},
+		{models.OmniChatGenerationModeLikenessReference, "reference_standard_refused"},
+		{models.OmniChatGenerationModeContextual, "explicit_content_refused"},
+	} {
+		err := reviewingHandler(&imageReviewFake{explicit: true}, false).refuseExplicitRender(
+			context.Background(), &models.OmniChatGenerationJob{Mode: c.mode}, "/tmp/x.png", "image/png")
+		require.Error(t, err, string(c.mode))
+		// The code, not the message: the code is what is stored against the job
+		// and what anybody grouping failures actually reads.
+		var permanent *permanentGenerationError
+		require.ErrorAs(t, err, &permanent, string(c.mode))
+		require.Equal(t, c.reason, permanent.code, string(c.mode))
+	}
 }

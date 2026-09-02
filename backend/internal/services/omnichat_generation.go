@@ -227,7 +227,7 @@ func normalizeOmniAIRenderRequest(
 	request.Scene = models.OmniChatSceneState{}
 
 	// A likeness is a still. Nothing about a clip can be an identity anchor or
-	// the single forward-facing input the 3D pipeline takes, and a video asked
+	// a single forward-facing full body of her, and a video asked
 	// for here would be stored as one of the four pictures somebody chooses
 	// their character's face from.
 	request.Kind = models.OmniChatMediaKindImage
@@ -259,8 +259,8 @@ func normalizeOmniAIRenderRequest(
 	// negative side.
 	//
 	// It matters more here than in a scene. A scene can be rendered again. The
-	// anchor is the face somebody chose, the input the 3D pipeline takes, and
-	// what every later render is conditioned on, so a bystander in it is a
+	// anchor is the face somebody chose and what every later render is
+	// conditioned on, so a bystander in it is a
 	// bystander in her.
 	//
 	// Set here rather than in the worker because the worker is told create for

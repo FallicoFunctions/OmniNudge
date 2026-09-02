@@ -55,21 +55,37 @@ const defaultAppearance = "A woman in her late twenties with warm brown eyes, " 
 	"shoulder-length dark curly hair, light brown skin, and a few freckles across her nose. " +
 	"Average build, about five foot six."
 
+// A brief a model would plausibly write, held fixed across every checkpoint.
+//
+// Written down rather than generated, because a fresh brief per run would make
+// the outfit another thing that changed between two models and there would be
+// nothing left that did not.
+var defaultBrief = services.OmniAICandidateBrief{
+	Outfit: "a rust-coloured corduroy overshirt open over a cream long-sleeved top tucked into " +
+		"dark straight-leg jeans, brown leather ankle boots, a thin gold chain, and large black " +
+		"headphones resting around her neck",
+	Setting: "on a path between brick university buildings on an overcast autumn afternoon, " +
+		"wet leaves on the ground behind her",
+	Holding: "a travel coffee cup",
+}
+
 type candidate struct {
-	Seed         int64   `json:"seed"`
-	File         string  `json:"file"`
-	WorkerBuild  string  `json:"worker_build,omitempty"`
-	ReturnedSeed *int64  `json:"returned_seed,omitempty"`
-	Portrait     string  `json:"portrait_standard"`
-	RenderError  string  `json:"render_error,omitempty"`
-	Seconds      float64 `json:"seconds"`
+	Seed         int64                         `json:"seed"`
+	Brief        services.OmniAICandidateBrief `json:"brief"`
+	Prompt       string                        `json:"prompt"`
+	File         string                        `json:"file"`
+	WorkerBuild  string                        `json:"worker_build,omitempty"`
+	ReturnedSeed *int64                        `json:"returned_seed,omitempty"`
+	Portrait     string                        `json:"portrait_standard"`
+	RenderError  string                        `json:"render_error,omitempty"`
+	Seconds      float64                       `json:"seconds"`
 }
 
 type manifest struct {
 	Label          string      `json:"label"`
 	RenderedAt     string      `json:"rendered_at"`
 	Appearance     string      `json:"appearance"`
-	Prompt         string      `json:"prompt"`
+	Personality    string      `json:"personality,omitempty"`
 	NegativePrompt string      `json:"negative_prompt"`
 	Candidates     []candidate `json:"candidates"`
 }
@@ -81,6 +97,7 @@ func main() {
 	seedList := flag.String("seeds", "", "comma-separated seeds (default 101,202,303,404)")
 	sheet := flag.Bool("sheet", false, "build the comparison page from directories already rendered, and render nothing")
 	dryRun := flag.String("dry-run", "", "write the payloads to this file and submit nothing")
+	personality := flag.String("personality", "", "her personality, in prose. Set it to write the four briefs for real instead of reusing one fixed brief.")
 	timeout := flag.Duration("timeout", 8*time.Minute, "how long to wait for one render")
 	flag.Parse()
 
@@ -97,12 +114,12 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if err := run(*label, *out, *appearance, seeds, *timeout, *dryRun); err != nil {
+	if err := run(*label, *out, *appearance, *personality, seeds, *timeout, *dryRun); err != nil {
 		fail(err)
 	}
 }
 
-func run(label, out, appearance string, seeds []int64, timeout time.Duration, dryRun string) error {
+func run(label, out, appearance, personality string, seeds []int64, timeout time.Duration, dryRun string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -116,9 +133,11 @@ func run(label, out, appearance string, seeds []int64, timeout time.Duration, dr
 		return errors.New("RUNPOD_IMAGE_ENDPOINT_ID is not set")
 	}
 
-	prompt := services.BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
-		Appearance: appearance,
-	})
+	profile := models.OmniChatMediaIdentityProfile{Appearance: appearance}
+	briefs, err := briefsFor(cfg, personality, appearance, len(seeds))
+	if err != nil {
+		return err
+	}
 	negative := services.OmniAIRenderNegativePrompt
 
 	dir := filepath.Join(out, sanitize(label))
@@ -131,8 +150,9 @@ func run(label, out, appearance string, seeds []int64, timeout time.Duration, dr
 		// ends of this contract have disagreed before, and a field the worker
 		// refuses costs a GPU minute per seed to find out about.
 		payloads := map[string]any{}
-		for _, seed := range seeds {
-			payloads[fmt.Sprintf("seed-%d", seed)] = imageInput(prompt, negative, seed)
+		for i, seed := range seeds {
+			payloads[fmt.Sprintf("seed-%d", seed)] = imageInput(
+				services.BuildOmniAILikenessPrompt(profile, briefs[i]), negative, seed)
 		}
 		if err := writeJSON(dryRun, payloads); err != nil {
 			return err
@@ -155,20 +175,23 @@ func run(label, out, appearance string, seeds []int64, timeout time.Duration, dr
 		fmt.Println("note: the portrait review is not configured, so nothing below is judged.")
 	}
 
-	fmt.Printf("label:    %s\nendpoint: %s\nseeds:    %v\nprompt:   %s\n\n", label, endpoint, seeds, prompt)
+	fmt.Printf("label:    %s\nendpoint: %s\nseeds:    %v\n\n", label, endpoint, seeds)
 
 	record := manifest{
 		Label:          label,
 		RenderedAt:     time.Now().UTC().Format(time.RFC3339),
 		Appearance:     appearance,
-		Prompt:         prompt,
+		Personality:    personality,
 		NegativePrompt: negative,
 	}
 
-	for _, seed := range seeds {
+	for i, seed := range seeds {
+		brief := briefs[i]
+		prompt := services.BuildOmniAILikenessPrompt(profile, brief)
+		fmt.Printf("  outfit:  %s\n  setting: %s\n  holding: %s\n", brief.Outfit, brief.Setting, orDash(brief.Holding))
 		started := time.Now()
 		fmt.Printf("seed %d ... ", seed)
-		entry := candidate{Seed: seed, Portrait: "not checked"}
+		entry := candidate{Seed: seed, Portrait: "not checked", Brief: brief, Prompt: prompt}
 
 		file, result, err := render(context.Background(), client, endpoint, prompt, negative, seed, dir, timeout)
 		entry.Seconds = time.Since(started).Seconds()
@@ -209,6 +232,45 @@ func run(label, out, appearance string, seeds []int64, timeout time.Duration, dr
 	summarize(record)
 	fmt.Printf("\nwrote %s\n", dir)
 	return nil
+}
+
+// briefsFor returns one brief per seed.
+//
+// With --personality it runs the real writer against a persona built from the
+// same words the picture prompt is built from, so the thing being looked at is
+// what the product would actually produce -- the briefs included. Without it,
+// one fixed brief is repeated, which is what a model comparison wants: a brief
+// that varied per seed would make the clothes another thing that changed
+// between two checkpoints, and there would be nothing left that did not.
+func briefsFor(cfg *config.Config, personality, appearance string, count int) ([]services.OmniAICandidateBrief, error) {
+	repeated := make([]services.OmniAICandidateBrief, count)
+	for i := range repeated {
+		repeated[i] = defaultBrief
+	}
+	if strings.TrimSpace(personality) == "" {
+		return repeated, nil
+	}
+
+	model := strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
+	if model == "" {
+		model = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
+	}
+	if model == "" || strings.TrimSpace(cfg.OpenRouter.APIKey) == "" {
+		return nil, errors.New("--personality needs OPENROUTER_API_KEY and a model to write the briefs with")
+	}
+
+	// Refused rather than quietly falling back to the fixed brief. Asking for
+	// real briefs and silently getting four identical ones would be read as the
+	// writer having produced them.
+	persona := &models.BotPersona{Name: "Candidate", Personality: personality}
+	written, err := services.NewModelOmniAICandidateBriefWriter(
+		openrouter.NewClient(cfg.OpenRouter.APIKey, model),
+	).WriteCandidateBriefs(context.Background(), persona, count)
+	if err != nil {
+		return nil, fmt.Errorf("write the briefs: %w", err)
+	}
+	fmt.Printf("briefs written by %s\n\n", model)
+	return written, nil
 }
 
 // imageInput is field for field what BuildImageSpec sends for an anchor
@@ -443,8 +505,10 @@ func buildSheet(out string) error {
 	}
 	page.WriteString("</tbody></table>")
 
-	page.WriteString("<h2>The prompt every model was given</h2>")
-	fmt.Fprintf(&page, "<pre>%s</pre>", escape(manifests[0].Prompt))
+	if len(manifests[0].Candidates) > 0 {
+		page.WriteString("<h2>The prompt every model was given, for the first seed</h2>")
+		fmt.Fprintf(&page, "<pre>%s</pre>", escape(manifests[0].Candidates[0].Prompt))
+	}
 	page.WriteString("<h2>Negative prompt</h2>")
 	fmt.Fprintf(&page, "<pre>%s</pre>", escape(manifests[0].NegativePrompt))
 	page.WriteString("</body></html>")
@@ -474,9 +538,11 @@ func cellFor(record manifest, seed int64) string {
 		src := escape(filepath.Join(record.Label, entry.File))
 		return fmt.Sprintf(
 			"<td><a href=\"%s\"><img src=\"%s\" loading=lazy alt=\"%s seed %d\"></a>"+
-				"<div class=\"verdict %s\">%s</div><small>%.0fs &middot; %s</small></td>",
+				"<div class=\"verdict %s\">%s</div><small>%.0fs &middot; %s</small>"+
+				"<p class=brief><b>%s</b><br>%s</p></td>",
 			src, src, escape(record.Label), seed, verdict, escape(entry.Portrait),
-			entry.Seconds, escape(orDash(entry.WorkerBuild)))
+			entry.Seconds, escape(orDash(entry.WorkerBuild)),
+			escape(entry.Brief.Outfit), escape(entry.Brief.Setting))
 	}
 	return "<td class=missing><div class=err>not rendered</div></td>"
 }
@@ -542,6 +608,8 @@ img { display:block; width:230px; height:auto; border-radius:3px; }
 .verdict.unknown { color:var(--muted); }
 small { display:block; color:var(--muted); font-size:.72rem; margin-top:.15rem; }
 .missing { color:var(--muted); width:230px; }
+.brief { width:230px; margin:.5rem 0 0; text-align:left; font-size:.72rem;
+  color:var(--muted); line-height:1.35; }
 .err { font-weight:600; }
 pre { white-space:pre-wrap; background:rgba(128,128,128,.1); padding:.75rem;
   border-radius:4px; max-width:70ch; }

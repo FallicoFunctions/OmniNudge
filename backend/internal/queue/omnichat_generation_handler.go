@@ -659,8 +659,14 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
 	// may legitimately show a midriff and a portrait may not.
 	standard := services.OmniChatImageStandardExplicit
 	switch job.Mode {
-	case models.OmniChatGenerationModeLikeness, models.OmniChatGenerationModeLikenessReference:
+	case models.OmniChatGenerationModeLikeness:
 		standard = services.OmniChatImageStandardPortrait
+	case models.OmniChatGenerationModeLikenessReference:
+		// Not the portrait standard. These are the five nobody is shown, and
+		// they are prompted for neutral expressions and three-quarter turns --
+		// exactly what that standard's PASS clause excludes. Coverage still
+		// applies; pose and expression never did.
+		standard = services.OmniChatImageStandardReference
 	}
 	explicit, err := h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
 	if err != nil {
@@ -671,9 +677,17 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
 		// Permanent rather than retryable: the same prompt and the same seed
 		// produce the same picture, so a retry is the same refusal at the same
 		// cost.
-		if standard == services.OmniChatImageStandardPortrait {
+		// The reason is what somebody reads when they ask why a character has no
+		// pictures, so it names the standard that actually refused. A reference
+		// turned down for a rucked-up hem is not explicit, and saying it was
+		// sends the next person looking for a content problem that is not there.
+		switch standard {
+		case services.OmniChatImageStandardPortrait:
 			return permanentGenerationFailure("portrait_standard_refused",
 				errors.New("the rendered picture did not meet the standard for a character portrait"))
+		case services.OmniChatImageStandardReference:
+			return permanentGenerationFailure("reference_standard_refused",
+				errors.New("the rendered picture did not meet the standard for an identity reference"))
 		}
 		return permanentGenerationFailure("explicit_content_refused",
 			errors.New("the rendered image was explicit and explicit content is not permitted here"))

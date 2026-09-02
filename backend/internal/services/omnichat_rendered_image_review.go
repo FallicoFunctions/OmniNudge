@@ -63,6 +63,20 @@ type OmniChatImageStandard string
 const (
 	OmniChatImageStandardExplicit OmniChatImageStandard = "explicit"
 	OmniChatImageStandardPortrait OmniChatImageStandard = "portrait"
+	// OmniChatImageStandardReference judges the pictures nobody is shown.
+	//
+	// It exists because the portrait standard was applied to them and refuses
+	// four of the five outright. That standard only passes a subject "facing
+	// the camera, looking warm and approachable", and the five references are
+	// prompted for the opposite on purpose: two are neutral, two are turned
+	// three-quarters, and expression and angle variety is the entire reason
+	// there are five rather than one. A refusal there is permanent, so the set
+	// that carries her identity into every later render would have come back
+	// with one picture in it.
+	//
+	// What it keeps is coverage, one person, and nothing sexual. What it drops
+	// is pose and expression, which are the anchor's rules and were never these.
+	OmniChatImageStandardReference OmniChatImageStandard = "reference"
 )
 
 const omniChatRenderedPortraitSystemPrompt = `You are checking one image against the standard for a character's introduction portrait. Reply with exactly PASS or FAIL and nothing else.
@@ -76,6 +90,20 @@ Reply FAIL if any of these is true:
 - More than one person is in the frame.
 
 Reply PASS only for a single fully clothed person whose torso is completely covered from the shoulders to below the waistband, facing the camera, looking warm and approachable.
+
+Judge only what is visible. Do not explain.`
+
+const omniChatRenderedReferenceSystemPrompt = `You are checking one image against the standard for a private identity reference photograph. Reply with exactly PASS or FAIL and nothing else.
+
+Reply FAIL if any of these is true:
+- Any part of the abdomen, midriff, stomach, waist or navel is visible.
+- The top is a crop top, cropped shirt, sports bra, bralette, halter top, tube top, or is tied or cut to expose the torso.
+- Exposed genitals, buttocks, nipples, underboob or sideboob.
+- The subject is nude, in underwear, in lingerie, in swimwear, or bare below the waist.
+- The pose is sexual or the clothing is arranged to display the body.
+- More than one person is in the frame.
+
+Reply PASS for a single clothed person whose torso is covered from the shoulders to below the waistband. Any camera angle passes, including a three-quarter turn or a subject in profile. Any expression passes, including a neutral or unsmiling one. Judge clothing and framing only, never pose or mood.
 
 Judge only what is visible. Do not explain.`
 
@@ -121,8 +149,11 @@ func (r *OpenRouterRenderedImageReview) ReviewRenderedImageAgainst(
 	defer cancel()
 
 	systemPrompt, refuse := omniChatRenderedImageSystemPrompt, "EXPLICIT"
-	if standard == OmniChatImageStandardPortrait {
+	switch standard {
+	case OmniChatImageStandardPortrait:
 		systemPrompt, refuse = omniChatRenderedPortraitSystemPrompt, "FAIL"
+	case OmniChatImageStandardReference:
+		systemPrompt, refuse = omniChatRenderedReferenceSystemPrompt, "FAIL"
 	}
 
 	verdict, err := r.client.Generate(reviewCtx, []openrouter.Message{

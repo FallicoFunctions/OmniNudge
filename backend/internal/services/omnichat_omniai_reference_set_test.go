@@ -143,8 +143,8 @@ func TestADescriptionNeverRunsIntoTheFraming(t *testing.T) {
 		require.NotContains(t, prompt, "nose Head")
 	}
 
-	anchor := BuildOmniAILikenessPrompt(profile)
-	require.Contains(t, anchor, "freckles across her nose. Full body from head to feet")
+	anchor := BuildOmniAILikenessPrompt(profile, testCandidateBrief())
+	require.Contains(t, anchor, "freckles across her nose. She is wearing")
 }
 
 func TestADescriptionThatEndsItselfIsNotPunctuatedTwice(t *testing.T) {
@@ -176,7 +176,7 @@ func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
 
 	anchor, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-		Prompt: BuildOmniAILikenessPrompt(profile),
+		Prompt: BuildOmniAILikenessPrompt(profile, testCandidateBrief()),
 	})
 	require.NoError(t, err)
 	require.Contains(t, anchor.NegativePrompt, "second subject")
@@ -197,7 +197,7 @@ func TestACallerCannotSmuggleANegativePromptIntoHerLikeness(t *testing.T) {
 	// server-owned render takes nothing from the caller but the character.
 	request, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-		Prompt:         BuildOmniAILikenessPrompt(referenceProfile()),
+		Prompt:         BuildOmniAILikenessPrompt(referenceProfile(), testCandidateBrief()),
 		NegativePrompt: "clothes, clothing, dressed",
 	})
 	require.NoError(t, err)
@@ -213,14 +213,17 @@ func TestSheIsDressedFacingUsAndGladToSeeUs(t *testing.T) {
 
 	anchor, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 		Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-		Prompt: BuildOmniAILikenessPrompt(profile),
+		Prompt: BuildOmniAILikenessPrompt(profile, testCandidateBrief()),
 	})
 	require.NoError(t, err)
 
-	// Named garment by garment: "fully clothed" in general produced a crop top
-	// and nothing below the waist, which satisfies the general instruction.
-	for _, asked := range []string{"covers the whole torso", "overlaps the waistband",
-		"no midriff or navel is visible", "trousers or a skirt", "shoes",
+	// Coverage is stated as a constraint on whatever the brief dressed her in,
+	// because the brief has already named the garments by the time this is
+	// read. Both halves are still named -- "fully clothed" in general produced
+	// a crop top and nothing below the waist, which satisfies the general
+	// instruction.
+	for _, asked := range []string{"overlaps the waistband",
+		"no midriff, stomach or navel is visible", "legs are covered", "shoes",
 		"shoulders square", "facing the camera", "warm friendly"} {
 		require.Contains(t, anchor.EffectivePrompt, asked)
 	}
@@ -261,5 +264,80 @@ func TestAThreeQuarterViewFacesUs(t *testing.T) {
 	for _, variant := range OmniAIReferenceVariantKeys() {
 		prompt := BuildOmniAIReferencePrompt(profile, variant)
 		require.NotContains(t, prompt, "away from the camera", variant)
+	}
+}
+
+func TestTheReferenceStandardPassesWhatTheReferencesAreAskedFor(t *testing.T) {
+	// The five exist for expression and angle variety: two are neutral, two are
+	// turned three-quarters. A standard that only passes a subject "facing the
+	// camera, looking warm and approachable" refuses four of them, and a
+	// refused reference is a permanent failure -- so the set that carries her
+	// identity into every later render would come back holding one picture.
+	//
+	// Asserted against the framings themselves rather than a copy of them, so
+	// adding a sixth variant that leans further from the anchor cannot silently
+	// reintroduce this.
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		framing, found := findOmniAIReferenceVariant(variant)
+		require.True(t, found, variant)
+		if strings.Contains(framing.Framing, "three-quarters") ||
+			strings.Contains(framing.Framing, "neutral expression") {
+			require.NotContains(t, omniChatRenderedReferenceSystemPrompt,
+				"facing the camera, looking warm and approachable",
+				"the reference standard must not carry the anchor's pose and expression rules")
+		}
+	}
+	// What it does keep.
+	for _, kept := range []string{
+		"abdomen, midriff, stomach, waist or navel", "crop top", "underboob",
+		"More than one person",
+	} {
+		require.Contains(t, omniChatRenderedReferenceSystemPrompt, kept)
+	}
+	// And what it explicitly allows, so the model is told rather than left to
+	// infer it from an absence.
+	for _, allowed := range []string{"three-quarter turn", "neutral or unsmiling"} {
+		require.Contains(t, omniChatRenderedReferenceSystemPrompt, allowed)
+	}
+}
+
+func TestAPortraitIsNotToldAboutShoes(t *testing.T) {
+	// One clothing sentence used to serve all five, naming trousers and shoes
+	// to three head-and-shoulders shots that cannot show either. A diffusion
+	// model widens the frame to include what it is told is there, and a widened
+	// portrait is a smaller face -- below OMNICHAT_FACE_MIN_CROP_PX that
+	// reference is dropped from the face adapter altogether, so the pictures
+	// that exist to carry her face would have stopped carrying it.
+	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman with freckles"}
+	for _, key := range OmniAIReferenceVariantKeys() {
+		variant, found := findOmniAIReferenceVariant(key)
+		require.True(t, found, key)
+		prompt := BuildOmniAIReferencePrompt(profile, key)
+
+		if strings.HasPrefix(variant.Framing, "Head and shoulders") {
+			for _, unshowable := range []string{"trousers", "shoes", "tucked in"} {
+				require.NotContains(t, prompt, unshowable, key)
+			}
+			continue
+		}
+		// A full-length shot is the one that carries proportions, so it is the
+		// one that has to describe the whole figure.
+		for _, required := range []string{"trousers", "shoes"} {
+			require.Contains(t, prompt, required, key)
+		}
+	}
+}
+
+func TestEveryReferenceVariantSaysWhatSheIsWearing(t *testing.T) {
+	// Clothing moved onto the variant, so a new one added without it would
+	// render whatever the checkpoint reaches for -- and an adult-tuned
+	// checkpoint with no clothing instruction is the case that started all of
+	// this.
+	for _, key := range OmniAIReferenceVariantKeys() {
+		variant, found := findOmniAIReferenceVariant(key)
+		require.True(t, found, key)
+		require.NotEmpty(t, variant.Clothing, key)
+		require.Contains(t, BuildOmniAIReferencePrompt(
+			models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, key), "Wearing", key)
 	}
 }

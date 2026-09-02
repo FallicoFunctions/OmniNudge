@@ -800,6 +800,25 @@ func main() {
 	omniChatLikenessService := services.NewOmniChatOmniAILikenessService(
 		omniChatMediaRepo, omniChatGenerationEnqueuer, cfg.OmniChatMedia.Provider,
 	).SetRerollDependencies(omniChatBilling, omniChatMediaRepo)
+	// What she wears and where she stands, written from her own description.
+	// The extraction model rather than the chat one: this never speaks to
+	// anybody and is judged on whether it holds a brief, which is the same
+	// reason those two settings are separate in the first place.
+	//
+	// Left unset when there is no key, and the four then fall back to one plain
+	// brief. A character must still get a face when a language model cannot be
+	// reached.
+	briefModel := strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
+	if briefModel == "" {
+		briefModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
+	}
+	if briefModel != "" && strings.TrimSpace(cfg.OpenRouter.APIKey) != "" {
+		omniChatLikenessService = omniChatLikenessService.SetCandidateBriefWriter(
+			services.NewModelOmniAICandidateBriefWriter(
+				openrouter.NewClient(cfg.OpenRouter.APIKey, briefModel),
+			),
+		)
+	}
 	// Installed after construction because the generation enqueuer it needs is
 	// built below the handler. A character is made whether or not this is set,
 	// which is the point: creation does not depend on anything being able to

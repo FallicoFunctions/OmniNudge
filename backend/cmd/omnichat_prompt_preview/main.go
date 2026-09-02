@@ -273,7 +273,11 @@ func previewLikeness(cfg *config.Config, persona *models.BotPersona, ownerUserID
 	request, err := services.NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
 		Kind:      models.OmniChatMediaKindImage,
 		PersonaID: persona.ID,
-		Prompt:    services.BuildOmniAILikenessPrompt(profile),
+		// The brief is normally written for her by a language model. This
+		// preview makes no network calls, so it shows the shape with the same
+		// fallback a brief-writer outage would use -- the framing, the medium
+		// and the description around it are the real ones either way.
+		Prompt: services.BuildOmniAILikenessPrompt(profile, services.OmniAIFallbackCandidateBrief),
 	})
 	if err != nil {
 		return fmt.Errorf("normalize likeness request: %w", err)
