@@ -97,10 +97,7 @@ environment settings (never in the API's browser-facing configuration):
 | `OMNICHAT_INPUT_HOSTS` | required | required | Exact HTTPS hosts workers may fetch |
 | `HF_TOKEN` | optional | optional | Read-only Hugging Face token when a configured model requires gated-model access |
 | `OMNICHAT_WORKER_BUILD` | build-arg | build-arg | Image tag stamped at build time and returned as `worker_build` on every job |
-| `OMNICHAT_IMAGE_MODEL_ID` | required | — | Diffusers image model identifier; defaults to `SG161222/RealVisXL_V5.0` |
-| `OMNICHAT_POSE_CONTROL_ENABLED` | optional | — | `1` (default) enables the OpenPose layout pass for contextual physical scenes |
-| `OMNICHAT_CONTROLNET_MODEL_ID` | optional | — | OpenPose SDXL ControlNet; defaults to `thibaud/controlnet-openpose-sdxl-1.0` |
-| `OMNICHAT_POSE_CONTROL_SCALE` | optional | — | ControlNet strength, bounded to `0`–`2`; defaults to `0.85` |
+| `OMNICHAT_IMAGE_MODEL_ID` | optional | — | Diffusers image model identifier; defaults to `SG161222/RealVisXL_V5.0`. Unset is not a misconfiguration — it is the default, and it looks identical to setting the default on purpose |
 | `OMNICHAT_IP_ADAPTER_MODEL_ID` | required | — | Identity adapter repository; defaults to `h94/IP-Adapter` |
 | `OMNICHAT_IP_ADAPTER_SUBFOLDER` / `OMNICHAT_IP_ADAPTER_WEIGHT` | optional | — | Adapter files; defaults to `sdxl_models` / `ip-adapter-plus-face_sdxl_vit-h.safetensors` |
 | `OMNICHAT_IP_ADAPTER_IMAGE_ENCODER` | optional | — | CLIP encoder folder; defaults to `models/image_encoder`. Every `*_vit-h` adapter needs the ViT-H encoder at the repo root — pairing one with `sdxl_models/image_encoder` does not error, it silently weakens identity |
@@ -380,6 +377,17 @@ Model IDs are deployment configuration:
 - `OMNICHAT_IMAGE_MODEL_ID` (default `SG161222/RealVisXL_V5.0`; choose a gated
   model only when the endpoint also has a read-only `HF_TOKEN`)
 - `OMNICHAT_VIDEO_IMAGE_MODEL_ID` (default `Wan-AI/Wan2.2-TI2V-5B-Diffusers`)
+
+Both belong to the RunPod endpoint and nowhere else. They are read by the GPU
+worker inside its own container, which never sees `backend/.env`; the API does
+not read them and does not send a base model in the job payload, so the only
+model id that ever travels in a request is `lora_model_id`. Putting either of
+these in `backend/.env` sets nothing -- it is dead text that reads like
+configuration, which is worse than an absent setting.
+
+Neither is required, and an unset one is indistinguishable from one set to its
+default. That matters when swapping a checkpoint: forgetting to add the
+variable renders the default and looks exactly like a successful switch.
 
 The worker validates all prompt, duration, aspect-ratio, reference-URL, and
 seed fields before loading a model. `test_contract.py` runs without CUDA or
