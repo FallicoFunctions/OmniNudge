@@ -70,6 +70,18 @@ that cannot run is not a test that failed.
 **Commit in scopes**, then finish. The hook replays every control in a throwaway
 git worktree and blocks the stop if any still passes.
 
+## The hook has its own tests
+
+`.claude/hooks/review-ledger-verify.test.sh` -- 31 cases, every one of them a
+defect that was once live, or a behaviour that must keep working. Run it after
+any change to the hook, and read the result rather than assuming it.
+
+It has been mutation-tested: breaking the shape checks, the real-failure
+marker, the staleness check, the attempt limit, or restoring the
+stop_hook_active bypass each turns it red, on the matching case. A checker
+nobody can re-run is a claim, not a check -- which is what this was for six
+passes.
+
 ## What the hook can and cannot do
 
 It checks that every instrument has a verdict, that every finding has a control,
