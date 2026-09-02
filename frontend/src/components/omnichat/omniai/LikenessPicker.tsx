@@ -71,8 +71,10 @@ export default function LikenessPicker({
   // somebody a number nobody promised to charge, and it goes wrong silently the
   // first time the rate moves.
   const costs = useQuery({
-    queryKey: omnichatQueryKeys.billingUsage(1),
-    queryFn: () => omnichatService.getBillingUsage(1),
+    // The same key the commerce modal already uses, so the two share one
+    // request instead of asking the same endpoint twice for the same prices.
+    queryKey: omnichatQueryKeys.billingUsage(),
+    queryFn: () => omnichatService.getBillingUsage(),
     staleTime: 5 * 60 * 1000,
   });
   const imageCost = costs.data?.costs.image;

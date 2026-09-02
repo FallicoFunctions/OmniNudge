@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
     usage: [],
     costs: { voice: 2, image: 10, video: 40 },
-    limit: 1,
+    limit: 50,
   });
 });
 
@@ -216,7 +216,7 @@ describe('drawing another set', () => {
     vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
       usage: [],
       costs: { voice: 2, image: 25, video: 40 },
-      limit: 1,
+      limit: 50,
     });
     renderPicker();
 
