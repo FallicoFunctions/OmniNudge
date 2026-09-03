@@ -11,12 +11,17 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-status=0
+# Counted, and the count is printed even when it is zero.
+#
+# "exit 1" alone is indistinguishable from a script that could not run, which
+# is exactly how a reader -- human or hook -- mistakes a real refusal for a
+# broken check. A tally says which of the two happened.
+failed=0
 
 for artifact in backend/zz_model_compare backend/server; do
   if ! git check-ignore -q "$artifact"; then
     echo "FAIL: $artifact is not ignored, so building it makes it committable"
-    status=1
+    failed=$((failed+1))
   fi
 done
 
@@ -33,9 +38,10 @@ while read -r mode sha rest; do
   if [ "$size" -gt 5242880 ]; then
     printf 'FAIL: %s is staged or tracked and is %.1f MB\n' "${rest#*	}" \
       "$(echo "scale=1; $size/1048576" | bc -l)"
-    status=1
+    failed=$((failed+1))
   fi
 done < <(git ls-files -s)
 
-[ "$status" -eq 0 ] && echo "ok: no tracked build artifacts"
-exit "$status"
+printf '%d failed\n' "$failed"
+[ "$failed" -eq 0 ] && echo "ok: no tracked build artifacts"
+[ "$failed" -eq 0 ]
