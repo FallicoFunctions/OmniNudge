@@ -1,0 +1,12 @@
+diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
+index 5bad472be..908f0b69d 100644
+--- a/backend/internal/queue/omnichat_generation_handler.go
++++ b/backend/internal/queue/omnichat_generation_handler.go
+@@ -806,7 +806,6 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
+ 	}
+ 	provenance := models.OmniChatGenerationProvenance{
+ 		WorkerBuild:      result.WorkerBuild,
+-		ModelID:          result.ModelID,
+ 		ActualPrompt:     result.ActualPrompt,
+ 		LoadSeconds:      result.LoadSeconds,
+ 		InferenceSeconds: result.InferenceSeconds,

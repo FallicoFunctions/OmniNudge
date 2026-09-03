@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/runpod/client.go b/backend/internal/services/runpod/client.go
+index 71a23ab45..bd1f09c17 100644
+--- a/backend/internal/services/runpod/client.go
++++ b/backend/internal/services/runpod/client.go
+@@ -535,9 +535,6 @@ func decodeResultMetadata(object map[string]json.RawMessage, result *Result) {
+ 	// through this function, so a field added without a line here is populated
+ 	// by nothing and its tag is decoration -- which is exactly what happened to
+ 	// model_id, and what made a comparison of two checkpoints report neither.
+-	if value, ok := object["model_id"]; ok {
+-		_ = json.Unmarshal(value, &result.ModelID)
+-	}
+ 	if value, ok := object["load_seconds"]; ok {
+ 		_ = json.Unmarshal(value, &result.LoadSeconds)
+ 	}

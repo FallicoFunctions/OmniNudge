@@ -1,0 +1,14 @@
+diff --git a/backend/internal/models/omnichat_media_identity.go b/backend/internal/models/omnichat_media_identity.go
+index 2a033f9cf..a16c87232 100644
+--- a/backend/internal/models/omnichat_media_identity.go
++++ b/backend/internal/models/omnichat_media_identity.go
+@@ -136,9 +136,6 @@ func NormalizeOmniChatMediaIdentityProfile(profile OmniChatMediaIdentityProfile)
+ 	// anything into, and every other text field on this struct is bounded at
+ 	// exactly this point. A style that skipped it would be the one field able
+ 	// to grow a prompt without limit.
+-	profile.Style.Taste = boundProvenanceText(profile.Style.Taste, OmniAIStyleMaxTasteRunes)
+-	profile.Style.SignatureItem = boundProvenanceText(profile.Style.SignatureItem, OmniAIStyleMaxSignatureItemRunes)
+-	profile.Style.Note = boundProvenanceText(profile.Style.Note, OmniAIStyleMaxNoteRunes)
+ 	// Bound the private reference list the same way the public gallery is
+ 	// bounded, so persona metadata cannot make the worker fetch arbitrarily
+ 	// many images.

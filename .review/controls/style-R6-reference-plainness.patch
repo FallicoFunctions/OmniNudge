@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/omnichat_generation.go b/backend/internal/services/omnichat_generation.go
+index 3e44fdd9f..8d21cfd4d 100644
+--- a/backend/internal/services/omnichat_generation.go
++++ b/backend/internal/services/omnichat_generation.go
+@@ -277,9 +277,6 @@ func normalizeOmniAIRenderRequest(
+ 	// her. So the prohibitions live here rather than in the shared list, where
+ 	// they would strip the accessories out of the pictures somebody chooses
+ 	// between.
+-	if mode == models.OmniChatGenerationModeLikenessReference {
+-		normalized.NegativePrompt += ", " + omniAIReferenceNegativeAdditions
+-	}
+ 
+ 	// Said rather than left false. AllowNSFW is resolved from the caller's plan
+ 	// on the ordinary path, so a Premium account would otherwise follow its

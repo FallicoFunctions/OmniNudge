@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_omniai_reference_set.go b/backend/internal/services/omnichat_omniai_reference_set.go
+index eb515d127..762bc8186 100644
+--- a/backend/internal/services/omnichat_omniai_reference_set.go
++++ b/backend/internal/services/omnichat_omniai_reference_set.go
+@@ -94,7 +94,7 @@ const (
+ // and nothing would report which of the two won.
+ const omniAIReferenceNegativeAdditions = "jewellery, necklace, earrings, watch, bracelet, rings, " +
+ 	"hat, cap, headband, scarf, coat, jacket, bulky layers, bag, backpack, " +
+-	"headphones, sunglasses, patterned fabric, printed logo, graphic print"
++	"headphones, sunglasses, glasses, patterned fabric, printed logo, graphic print"
+ 
+ var omniAIReferenceVariants = []omniAIReferenceVariant{
+ 	{

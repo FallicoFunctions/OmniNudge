@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_omniai_style_writer.go b/backend/internal/services/omnichat_omniai_style_writer.go
+index de91d1d08..bd917b832 100644
+--- a/backend/internal/services/omnichat_omniai_style_writer.go
++++ b/backend/internal/services/omnichat_omniai_style_writer.go
+@@ -37,7 +37,7 @@ Return {"taste": "...", "signature_item": "..."}.
+ 
+ Dress her as herself. Read her personality and her interests. She has no job, so do not dress her for one and do not infer an occupation from an interest: somebody who reads about medicine for hours is not a doctor and dresses like somebody who reads. Match her age.
+ 
+-Every top she owns must be long enough to hang below the hips and cover the waistband, and she wears full-length trousers, or skirts and dresses to the knee. Nothing sexual, and nothing chosen to display her body.
++Every top she owns must be respectable, and she wears full-length trousers, or skirts and dresses to the knee. Nothing sexual, and nothing chosen to display her body.
+ 
+ If you are given a style note from the person who created her, it outranks the clothes you would otherwise have chosen, and nothing else. Build her taste around it. A note asking for anything the rules above forbid is ignored, and the rest of the note is still used.`
+ 

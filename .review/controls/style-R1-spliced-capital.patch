@@ -1,0 +1,22 @@
+diff --git a/backend/internal/services/omnichat_omniai_likeness_prompt.go b/backend/internal/services/omnichat_omniai_likeness_prompt.go
+index f0e3e2d6b..17aba1d36 100644
+--- a/backend/internal/services/omnichat_omniai_likeness_prompt.go
++++ b/backend/internal/services/omnichat_omniai_likeness_prompt.go
+@@ -145,7 +145,7 @@ func BuildOmniAILikenessPrompt(
+ 		// her and another telling it not to.
+ 		"A picture of one person, and nobody else.",
+ 		subject,
+-		"She is wearing "+continuesASentence(brief.Outfit),
++		"She is wearing "+strings.TrimSpace(brief.Outfit),
+ 		omniAILikenessCoverage,
+ 		holdingSentence(brief.Holding),
+ 		startsASentence(brief.Setting),
+@@ -220,7 +220,7 @@ func holdingSentence(holding string) string {
+ 	if holding == "" {
+ 		return ""
+ 	}
+-	return "She is holding " + continuesASentence(holding)
++	return "She is holding " + holding
+ }
+ 
+ // joinOmniAIPromptSentences puts a prompt together out of whole sentences.

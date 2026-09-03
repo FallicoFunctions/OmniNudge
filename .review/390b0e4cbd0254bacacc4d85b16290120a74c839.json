@@ -1,0 +1,1005 @@
+{
+  "schema_version": 2,
+  "head": "10ccc3e3a3304d957c3b53f46ff690fc5d0afd46",
+  "base": "390b0e4cbd0254bacacc4d85b16290120a74c839",
+  "scope": {
+    "files": [
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/omnichat_omniai_candidate_brief.go",
+      "backend/internal/services/omnichat_omniai_style_writer.go",
+      "backend/internal/services/omnichat_omniai_reference_set.go",
+      "backend/internal/services/omnichat_generation.go",
+      "backend/internal/services/runpod/client.go",
+      "backend/internal/models/omnichat_omniai_style.go",
+      "backend/internal/models/omnichat_media_identity.go",
+      "backend/internal/models/omnichat_media.go",
+      "backend/internal/queue/omnichat_generation_handler.go",
+      "backend/cmd/zz_model_compare/main.go",
+      "infra/runpod/omnichat_worker/worker.py"
+    ],
+    "boundaries": [
+      "Go queue <-> the RunPod Python worker (the model_id result field)",
+      "Go services <-> OpenRouter (the style-writer and brief-writer JSON contracts)",
+      "models <-> services (the style profile inside extensions_json)",
+      "the assembled image prompt and negative prompt handed to the diffusion model",
+      "the persona extensions_json column read and written under a transaction"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+    ".review/58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    ".review/a1712456328c6abd1111176e3de4b1197b645920.json",
+    ".review/a8413c5c8c1e216743c13088de4172e2937322c0.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "57432d2dd..HEAD: 12 files. Seams: Go<->the Python worker (model_id), Go<->OpenRouter (the style JSON contract), models<->services (the style profile through extensions_json), and the assembled image prompt."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read all four prior ledgers. The 58dafd573 one covers this area and its E3 finding (a swallowed omniai_appearance warning) sits on code I refactored today into omniAIAppearanceFacts -- re-ran TestAnUnreadableAppearanceIsSaidOutLoud, still green, no regression."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the likeness prompt with a real brief, the fallback brief and an empty brief; the brief-writer and style-writer user messages. Found the spliced capital. Also printed all five reference prompts, which found the negations in pass 3."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Printed the encoded provenance row: model_id present, bounded to 128, and an empty provenance still encodes as {}."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "model_id is spelled identically on both ends of the worker seam."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Result declares ModelID but decodeResultMetadata is hand-written and never read it -- the tag was decoration and the field was populated by nothing."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The coverage rule is prose in five places for four different readers, so it cannot share a constant, and nothing connected them. Both drift directions have already happened today."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The worker sets model_id for both image and video from a generator that is assigned before use; VideoGenerator.model_id exists."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Added this pass (Z1). Applied to the field just added: it was declared, decoded by nothing and stored nowhere."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The style writer against a realistic model answer: taste and signature item parsed, the creator's note carried."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Probed a hostile style note and a hostile taste. The trust line named only 'the description of her' while the payload had grown to carry taste and the note, and the note was separately told it outranked everything else."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Style bounds: empty, whitespace, at max, max+1, unicode at max, unicode over, control characters. Rune counting correct for multi-byte."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "WorkerBuild is decoded, bounded, warned about when empty and persisted; ModelID beside it had none of that and was dropped before the database."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Branches in continuesASentence all reachable."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The prior ledger's swallowed-appearance finding re-checked after my refactor; the warning still fires."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "omniChatProvenanceMaxBuildRunes is shared by WorkerBuild and ModelID -- one bound, both short identifiers, deliberate."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Five controls built, each confirmed by hand to fail as a real assertion rather than a build break."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Reading the decoder rather than the struct is not what C2 asks. Added C5."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pipeline was run for real earlier today -- four renders, four briefs, images inspected by eye, 2 refusals to 0 -- but that was the pre-capitalisation prompt. See the last pass."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "every prompt shipped today read 'She is wearing An oversized navy blue jumper' -- a model-written phrase spliced mid-sentence keeps the capital it was written with, and the helper that fixes this for the setting has no counterpart for the outfit",
+          "found_by": "B1",
+          "fix_commit": "3089b400f",
+          "control": {
+            "patch": ".review/controls/style-R1-spliced-capital.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestASplicedPhraseReadsAsPartOfItsSentence$"
+            ],
+            "observed": "fails on the assembled prompt string, showing the capital restored mid-clause"
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "Result.ModelID was never populated: decodeResultMetadata is hand-written and had no line for model_id, so the struct tag was decoration and rebuilding the worker would not have helped",
+          "found_by": "C2",
+          "fix_commit": "5ee951a23",
+          "control": {
+            "patch": ".review/controls/style-R2-model-id-decoded.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/runpod/ -run ^TestResultDecodesTheCheckpointThatRenderedIt$"
+            ],
+            "observed": "fails with an empty ModelID against the expected checkpoint"
+          }
+        },
+        {
+          "id": "R3",
+          "summary": "the handler never carried the checkpoint into provenance, so even once decoded it was dropped before the database -- while WorkerBuild beside it is decoded, bounded, warned about and stored",
+          "found_by": "E1",
+          "fix_commit": "5ee951a23",
+          "control": {
+            "patch": ".review/controls/style-R3-model-id-persisted.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/queue/ -run ^TestTheCheckpointReachesTheStoredProvenance$"
+            ],
+            "observed": "fails on the provenance the store was actually handed, asserted at the call site rather than on the struct"
+          }
+        },
+        {
+          "id": "R4",
+          "summary": "the coverage rule lives in five places as prose for four different readers and nothing connected them; both drift directions had already happened today, and each string had its own passing test asserting its own wording",
+          "found_by": "C3",
+          "fix_commit": "3089b400f",
+          "control": {
+            "patch": ".review/controls/style-R4-coverage-chain.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestEveryStageOfTheCoverageChainCarriesTheRule$"
+            ],
+            "observed": "fails naming the style writer as the stage that stopped carrying the rule"
+          }
+        },
+        {
+          "id": "R5",
+          "summary": "the trust boundary named only 'the description of her' while the payload had grown to carry her taste and the creator's style note, and the note was separately told it outranked everything else here",
+          "found_by": "D2",
+          "fix_commit": "3089b400f",
+          "control": {
+            "patch": ".review/controls/style-R5-note-outranks.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestEveryUserWrittenFieldIsNamedAsDataInBothWriters$"
+            ],
+            "observed": "fails on the restored 'outranks everything else here' wording"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is pass 1's fixes: continuesASentence, the decoder line, the provenance field, the chain tests, the reworded trust boundary."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Same four ledgers; nothing in them covers the new code."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Re-printed the likeness prompts after the fix: 'She is wearing an olive green...' and the setting still opens its own sentence."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the decoder now covers all seven metadata fields"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "chain test in place"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to every field on Result, not only the new one. Found a branch that builds a Result without calling decodeResultMetadata at all."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "re-printed the payload with the new wording"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "provenance construction has one call site, so likeness, reference and asset commits all receive the same fields"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Planted a panic in that branch and drove seven object shapes at it. None arrived: every shape it accepts is caught by the outer key checks first. Removed rather than fixed."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "five controls verified"
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "C5, added in pass 1, is what found this pass's finding"
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pipeline was run for real earlier today -- four renders, four briefs, images inspected by eye, 2 refusals to 0 -- but that was the pre-capitalisation prompt. See the last pass."
+        }
+      ],
+      "findings": []
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the dead-branch removal."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed all five reference prompts -- the artifact this review had not yet read. They forbid ornament inside the positive prompt: 'no coat, no scarf and no jewellery', 'no accessories'."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The plainness rule now lives positively in the prompt and negatively in a reference-only list, asserted together."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The likeness path gained a no-negation rule this morning; the reference path is its sibling and never got it, and the test written to guard it only looked at the likeness."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "R6 built and verified"
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "B1 and E1 both name this technique already"
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pipeline was run for real earlier today -- four renders, four briefs, images inspected by eye, 2 refusals to 0 -- but that was the pre-capitalisation prompt. See the last pass."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R6",
+          "summary": "the reference prompts forbade ornament inside the positive prompt -- 'no coat, no scarf and no jewellery', 'no accessories' -- which is the CLIP-negation fault the likeness prompt was fixed for this morning, on the sibling path the new test did not look at",
+          "found_by": "E1",
+          "fix_commit": "f736aa5ae",
+          "control": {
+            "patch": ".review/controls/style-R6-reference-plainness.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestOnlyTheReferencesRefuseAccessories$"
+            ],
+            "observed": "fails because the reference negative no longer refuses jewellery once the mode-gated addition is removed"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 4,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the reference clothing rewrite and the mode-gated negative."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the candidate negative and the reference negative side by side, and both reference positives. Found 'glasses' sitting next to 'sunglasses', and the assembled length at 916 runes."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Her appearance description may say she wears glasses; a negative refusing them contradicts the positive prompt in the same render with nothing to report which won."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The reference negative is assembled after NormalizeOmniChatGenerationRequest has run, so the 1000-rune bound it enforces never sees it. The worker accepts 2000, so crossing the server's own limit would have been silent."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "R7 built and verified"
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "B1 named it"
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pipeline was run for real earlier today -- four renders, four briefs, images inspected by eye, 2 refusals to 0 -- but that was the pre-capitalisation prompt. See the last pass."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R7",
+          "summary": "'glasses' sat beside 'sunglasses' in the reference refusals, so a character whose appearance says she wears glasses had her own description contradicted by the negative prompt in the same render",
+          "found_by": "B1",
+          "fix_commit": "73a1567d7",
+          "control": {
+            "patch": ".review/controls/style-R7-glasses-not-refused.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestTheReferencesRefuseSunglassesAndNotGlasses$"
+            ],
+            "observed": "fails once 'glasses' is restored to the additions"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 5,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the glasses removal and the assembled-negative bound."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to the style profile: writeIdentityProfile uses json.Marshal on the whole struct, so tags work and Style round-trips."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "NormalizeOmniChatMediaIdentityProfile bounds the appearance and the reference list at one point and skipped the style, making it the only text on the struct able to grow a prompt without limit."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Both callers of writeIdentityProfile read the profile first and mutate only ReferenceURLs, so a pick and a reference append cannot wipe her style."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "R8 built and verified"
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "C5 and E1 both name it"
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the pipeline was run for real earlier today -- four renders, four briefs, images inspected by eye, 2 refusals to 0 -- but that was the pre-capitalisation prompt. See the last pass."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R8",
+          "summary": "NormalizeOmniChatMediaIdentityProfile bounds the appearance and the reference list on the read path and skipped the style profile, making it the only text on the struct able to grow a prompt without limit from a jsonb column",
+          "found_by": "E1",
+          "fix_commit": "10ccc3e3a",
+          "control": {
+            "patch": ".review/controls/style-R8-style-bounded-on-read.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/models/ -run ^TestAStyleReadBackFromTheBlobIsBounded$"
+            ],
+            "observed": "fails with an unbounded taste surviving normalisation"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 6,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the read-path bound. Nothing else changed."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Artifacts re-read after every fix; nothing new."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "model_id spelled identically on both ends, checked again."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No remaining field on Result or on the identity profile is declared without a line in the code that moves it."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The three style bounds are named constants used by both the writer's trim and the normaliser's bound; no literal duplicated."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "the provenance write joins an existing transaction and adds a field to it"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "eight controls, all verified by hand"
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, four Go packages, 89 Python worker tests, and the hook's own 45 cases -- all green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing found, so nothing to add."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "Needs GPU time and the user's money: the coverage rule was validated against real renders earlier today, but the prompt has changed since and has not been re-rendered. Reported to the user rather than spent unasked."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... -- clean",
+    "vet": "go vet ./... -- clean",
+    "tests": "internal/services, internal/services/runpod, internal/models, internal/queue with -p 1 -- all ok",
+    "python": "89 worker tests (contract, generators, storage) -- ok, pyflakes clean",
+    "hook": ".claude/hooks/review-ledger-verify.test.sh -- 45 passed, 0 failed"
+  }
+}
