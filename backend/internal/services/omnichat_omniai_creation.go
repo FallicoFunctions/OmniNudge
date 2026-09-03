@@ -145,6 +145,12 @@ type OmniAIAnswers struct {
 	Relationship string
 
 	Appearance OmniAIAppearance
+
+	// StyleNote is how the person creating her says she dresses, in their own
+	// words. Optional, and the only thing on this form that is not chosen from
+	// a list: everything else about her is picked, and clothes are the one
+	// answer somebody may already have in mind.
+	StyleNote string
 }
 
 var omniAISlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
@@ -201,6 +207,58 @@ func OmniChatOmniAIRequiredPlan() string { return models.PlanPremium }
 type OmniChatOmniAICreator struct {
 	personas *models.BotPersonaRepository
 	users    OmniChatUserReader
+	styles   OmniAIStyleWriter
+}
+
+// SetStyleWriter wires what decides her taste in clothes.
+//
+// Off the constructor, like the brief writer on the likeness service and for
+// the same reason: an unreachable model must cost her a written wardrobe and
+// never a character. Creation runs without one.
+func (c *OmniChatOmniAICreator) SetStyleWriter(styles OmniAIStyleWriter) *OmniChatOmniAICreator {
+	if c != nil {
+		c.styles = styles
+	}
+	return c
+}
+
+// omniAIStyleWriteTimeout bounds a model call that sits on the request path.
+//
+// Somebody is waiting on a form when this runs. The wardrobe is worth a few
+// seconds and is worth none of a hung upstream, and the fallback -- no written
+// taste, her note kept -- is a character who still gets dressed from her
+// personality exactly as before this existed.
+const omniAIStyleWriteTimeout = 20 * time.Second
+
+// writeStyle decides her taste, and never fails creation.
+//
+// The note is carried whatever happens, including when there is no writer at
+// all: it is the one part of this a person typed, and losing it because an
+// upstream was down would discard an instruction silently.
+func (c *OmniChatOmniAICreator) writeStyle(
+	ctx context.Context, persona *models.BotPersona, note string,
+) models.OmniAIStyleProfile {
+	// Bounded here, not only inside the writer. The model writer trims what it
+	// is given, but the two paths below never reach it -- no writer configured,
+	// and a writer that failed -- and both still store the note. Left to the
+	// writer, a deployment with no OpenRouter key would keep whatever length
+	// somebody pasted.
+	note = trimToRunes(note, models.OmniAIStyleMaxNoteRunes)
+	if c == nil || c.styles == nil {
+		return models.OmniAIStyleProfile{Note: note}
+	}
+	styleCtx, cancel := context.WithTimeout(ctx, omniAIStyleWriteTimeout)
+	defer cancel()
+
+	style, err := c.styles.WriteStyleProfile(styleCtx, persona, note)
+	if err != nil {
+		// Warned rather than returned. Everything this reports is a downgrade
+		// in how well she is dressed, never a reason to refuse somebody a
+		// character -- and the profile it hands back still holds the note.
+		zlog.Warn().Err(err).Str("omniai_name", persona.Name).
+			Msg("omnichat omniai: could not write her style, dressing her from her personality alone")
+	}
+	return style
 }
 
 func NewOmniChatOmniAICreator(personas *models.BotPersonaRepository, users OmniChatUserReader) *OmniChatOmniAICreator {
@@ -289,7 +347,20 @@ func (c *OmniChatOmniAICreator) Create(ctx context.Context, creatorUserID int, a
 	// The words half of her likeness, written now. Nothing can draw her yet, but
 	// the image prompt reads this rather than the answers, and a scene generated
 	// before any picture exists still has to look like her.
-	extensions, err := encodeOmniAIIdentity(appearance)
+	// Her taste, decided from the person she is rather than asked for. It has
+	// to exist before the four candidate pictures are written, and they are
+	// rendered immediately after this returns.
+	//
+	// The persona it is written from does not exist yet, which is the point of
+	// assembling one here: these are the same four fields the row will carry,
+	// and the writer reads nothing else.
+	style := c.writeStyle(ctx, &models.BotPersona{
+		Name:             name,
+		Personality:      renderOmniAIInterests(answers.Interests),
+		OmniAIAppearance: encoded,
+	}, answers.StyleNote)
+
+	extensions, err := encodeOmniAIIdentity(appearance, style)
 	if err != nil {
 		return nil, err
 	}
@@ -403,28 +474,31 @@ func joinWithAnd(values []string) string {
 // Only the appearance is written. Everything else on that profile -- the
 // adapter, its scale, the reference limit -- has defaults that the resolver
 // applies, and repeating them here would be two places to change one number.
-func encodeOmniAIIdentity(appearance OmniAIAppearance) (json.RawMessage, error) {
+func encodeOmniAIIdentity(
+	appearance OmniAIAppearance, style models.OmniAIStyleProfile,
+) (json.RawMessage, error) {
 	// The same rule the appearance column follows: nothing answered means
 	// nothing stored. RenderOmniAIAppearance always produces a sentence -- an
 	// unanswered appearance renders as "A person." -- so guarding on the
 	// sentence being empty guarded against a case that cannot happen, and every
 	// character with no appearance at all was given "A person." as her
 	// description while the column beside it was correctly left NULL.
-	if !appearance.described() {
+	if !appearance.described() && style.IsZero() {
 		return nil, nil
 	}
 	described := RenderOmniAIAppearance(appearance)
 	// The medium is recorded beside the description and not inside it. She is
 	// the same person either way; only the rendering differs.
-	style := ""
+	medium := ""
 	if strings.EqualFold(strings.TrimSpace(appearance.Style), models.OmniChatRenderStyleAnime) {
-		style = models.OmniChatRenderStyleAnime
+		medium = models.OmniChatRenderStyleAnime
 	}
 	encoded, err := json.Marshal(struct {
 		OmniChatMedia models.OmniChatMediaIdentityProfile `json:"omnichat_media"`
 	}{OmniChatMedia: models.OmniChatMediaIdentityProfile{
 		Appearance:  described,
-		RenderStyle: style,
+		RenderStyle: medium,
+		Style:       style,
 	}})
 	if err != nil {
 		return nil, fmt.Errorf("omnichat omniai: encode identity: %w", err)

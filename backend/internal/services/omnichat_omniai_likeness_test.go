@@ -158,7 +158,7 @@ func TestTheMediumIsRecordedBesideHerDescriptionNotInsideIt(t *testing.T) {
 	// stated in a different sentence from the subject.
 	anime, err := encodeOmniAIIdentity(OmniAIAppearance{
 		Style: "anime", Gender: "woman", Age: 22, Eyes: "violet",
-	})
+	}, models.OmniAIStyleProfile{})
 	require.NoError(t, err)
 	require.Contains(t, string(anime), `"render_style":"anime"`)
 	require.NotContains(t, string(anime), `anime woman`)
@@ -167,7 +167,7 @@ func TestTheMediumIsRecordedBesideHerDescriptionNotInsideIt(t *testing.T) {
 	// before this field existed reads the same as one made after.
 	realistic, err := encodeOmniAIIdentity(OmniAIAppearance{
 		Style: "realistic", Gender: "woman", Age: 22,
-	})
+	}, models.OmniAIStyleProfile{})
 	require.NoError(t, err)
 	require.NotContains(t, string(realistic), "render_style")
 }
@@ -190,12 +190,12 @@ func TestNothingAnsweredStoresNothing(t *testing.T) {
 	// The identity blob guarded on the rendered sentence being empty instead --
 	// and it never is, because an unanswered appearance renders as "A person."
 	// So every such character was given that as her description.
-	empty, err := encodeOmniAIIdentity(OmniAIAppearance{})
+	empty, err := encodeOmniAIIdentity(OmniAIAppearance{}, models.OmniAIStyleProfile{})
 	require.NoError(t, err)
 	require.Nil(t, empty)
 
 	// One answer is still an answer.
-	some, err := encodeOmniAIIdentity(OmniAIAppearance{Gender: "woman"})
+	some, err := encodeOmniAIIdentity(OmniAIAppearance{Gender: "woman"}, models.OmniAIStyleProfile{})
 	require.NoError(t, err)
 	require.Contains(t, string(some), "A woman.")
 }

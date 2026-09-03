@@ -781,7 +781,7 @@ func main() {
 	omniChatHandler := handlers.NewOmniChatHandler(botPersonaRepo, botConversationRepo, botMessageRepo, chatbotService, omniChatModelSelectionService, omniChatAllowance).
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
 		SetReplyScheduler(omniChatReplyScheduler).
-		SetOmniAICreator(services.NewOmniChatOmniAICreator(botPersonaRepo, userRepo)).
+		SetOmniAICreator(newOmniAICreator(cfg, botPersonaRepo, userRepo)).
 		SetCreationLimits(services.NewOmniChatCreationLimits(userRepo))
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
@@ -1980,4 +1980,24 @@ func main() {
 	}
 
 	zlog.Info().Msg("Server exited")
+}
+
+// newOmniAICreator builds the OmniAI creator with a style writer when one can
+// be configured.
+//
+// The writer is optional on purpose. Without OpenRouter the creator still makes
+// characters -- they are dressed from their personality, exactly as every
+// character made before a style profile existed -- so a missing key costs a
+// written wardrobe rather than the feature it hangs off.
+func newOmniAICreator(
+	cfg *config.Config, personas *models.BotPersonaRepository, users services.OmniChatUserReader,
+) *services.OmniChatOmniAICreator {
+	creator := services.NewOmniChatOmniAICreator(personas, users)
+	model := strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
+	if model == "" || strings.TrimSpace(cfg.OpenRouter.APIKey) == "" {
+		return creator
+	}
+	return creator.SetStyleWriter(
+		services.NewModelOmniAIStyleWriter(openrouter.NewClient(cfg.OpenRouter.APIKey, model)),
+	)
 }

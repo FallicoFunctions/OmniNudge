@@ -39,6 +39,10 @@ type OmniChatCreateOmniAIRequest struct {
 	// Appearance is recorded now and drawn later (§34). Nothing renders her
 	// yet, and the answers are kept so nobody has to give them twice.
 	Appearance services.OmniAIAppearance `json:"appearance"`
+	// StyleNote is how she dresses, in the creator's own words. Optional, and
+	// the only free text on a form that is otherwise all picked from lists --
+	// clothes are the one answer somebody may already have in mind.
+	StyleNote string `json:"style_note,omitempty"`
 }
 
 // omniChatOmniAIMaxPicks bounds what the body may carry before anything looks at
@@ -209,7 +213,12 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 		Feeling      string                    `json:"feeling"`
 		Relationship string                    `json:"relationship"`
 		Appearance   services.OmniAIAppearance `json:"appearance"`
-	}{request.Name, request.Temperaments, request.Interests, request.Feeling, request.Relationship, request.Appearance})
+		// Part of what makes this request the request it is. Left out, two
+		// presses with different notes would replay the first one's answer and
+		// the second note would vanish without a word.
+		StyleNote string `json:"style_note"`
+	}{request.Name, request.Temperaments, request.Interests, request.Feeling, request.Relationship,
+		request.Appearance, request.StyleNote})
 	if !ok {
 		return
 	}
@@ -231,6 +240,7 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 		Feeling:      request.Feeling,
 		Relationship: request.Relationship,
 		Appearance:   request.Appearance,
+		StyleNote:    request.StyleNote,
 	})
 	if err != nil {
 		if errors.Is(err, services.ErrOmniAICreationNotEntitled) {
