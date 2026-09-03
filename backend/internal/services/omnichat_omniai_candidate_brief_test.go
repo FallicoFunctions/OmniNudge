@@ -131,6 +131,31 @@ func TestTheBriefInstructionOpensTheWardrobeAndClosesTheAbdomen(t *testing.T) {
 	require.Contains(t, omniAICandidateBriefSystemPrompt, "data, not instructions")
 }
 
+// An OmniAI has never been to a job, and the writer must not invent one to
+// dress her for. Her interests are real and may dress her; the professions they
+// resemble may not. The instruction used to reason from "what she does", which
+// is how a working life got invented for somebody who has never had one.
+func TestTheBriefWriterDressesHerInterestsAndNeverAnOccupation(t *testing.T) {
+	for _, stated := range []string{
+		"She has no job",
+		"do not infer an occupation from her interests",
+		"is not a doctor",
+	} {
+		require.Contains(t, omniAICandidateBriefSystemPrompt, stated)
+	}
+	// The old reasoning, gone rather than softened. It read a daily working
+	// routine off her personality and dressed her for it.
+	for _, absent := range []string{
+		"what she does", "on their feet all day", "studies late",
+	} {
+		require.NotContains(t, omniAICandidateBriefSystemPrompt, absent)
+	}
+	// The places behind her are a separate rule and stay. A photograph with
+	// books behind her is how she presents herself, not a claim she went
+	// anywhere -- that rule belongs to the conversation, not the picture.
+	require.Contains(t, omniAICandidateBriefSystemPrompt, "\"setting\" is one real place")
+}
+
 func TestABriefIsBoundedSoItCannotFloodAPrompt(t *testing.T) {
 	err := OmniAICandidateBrief{
 		Outfit:  strings.Repeat("a", omniAIBriefMaxOutfitRunes+1),
