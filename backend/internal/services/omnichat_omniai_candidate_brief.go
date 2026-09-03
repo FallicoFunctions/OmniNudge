@@ -160,6 +160,12 @@ All four are the same person on four different days. Vary the clothes and the pl
 
 Dress her as herself. Read her personality and her interests, and put her in what that person owns and would reach for. She has no job, so do not dress her for one and do not infer an occupation from her interests: somebody who reads about medicine for hours is not a doctor, and dresses like somebody who reads, not like somebody on a ward. What she cares about is what shows. Match her age.
 
+If you are given "taste", that is her wardrobe and these four outfits come out of it. Do not contradict it and do not restate it: choose four different things she would own, on four different days.
+
+If you are given a "signature_item", put it in at least three of the four. Leave it out of the fourth only where it would be wrong rather than to make a change: an item that survives every picture stops looking like hers and starts looking like a costume.
+
+If you are given a "style_note", it is from the person who created her and it outranks everything else here except the coverage rule below.
+
 Accessories are open, and they are most of what makes somebody look real. Hats, glasses, jewellery, watches, scarves, bags, headphones worn round the neck, a water bottle, pins on a jacket, two shirts layered with the collar popped, laces done a particular way. If a person could physically wear it, she can wear it. Give at least two of the four something specific and personal of this kind.
 
 Every top you choose must be long enough that its hem hangs below the hips and covers the waistband. Prefer tops that are naturally long or worn layered: an untucked jumper, a shirt worn open over another top, a long cardigan, a tunic. Do not choose a top whose length is short or cropped, and do not describe a top as ending at the waist. Below the waist she wears full-length trousers, or a skirt or dress that reaches the knee. She has shoes on. This holds for every body and every style: dress her warmly and normally, the way somebody dresses to meet a friend.
@@ -174,11 +180,36 @@ type omniAICandidateBriefInput struct {
 	Appearance  string   `json:"appearance,omitempty"`
 	Personality string   `json:"personality,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
-	Count       int      `json:"candidates_wanted"`
+	// Taste, her signature item and the creator's note, when she has them. A
+	// character created before the style profile existed sends none, and is
+	// dressed from her personality exactly as before.
+	Taste         string `json:"taste,omitempty"`
+	SignatureItem string `json:"signature_item,omitempty"`
+	StyleNote     string `json:"style_note,omitempty"`
+	Count         int    `json:"candidates_wanted"`
 }
 
 type omniAICandidateBriefResponse struct {
 	Candidates []OmniAICandidateBrief `json:"candidates"`
+}
+
+// omniAIAppearanceFacts reads the answers she was created from.
+//
+// Unreadable answers are not fatal -- she is still dressed from her description
+// and her personality -- but they are said out loud, because the degradation is
+// otherwise invisible: what comes back looks fine while having been written
+// without knowing how old she is.
+func omniAIAppearanceFacts(persona *models.BotPersona) (OmniAIAppearance, bool) {
+	var appearance OmniAIAppearance
+	if persona == nil || len(persona.OmniAIAppearance) == 0 {
+		return appearance, false
+	}
+	if err := json.Unmarshal(persona.OmniAIAppearance, &appearance); err != nil {
+		zlog.Warn().Err(err).Int("persona_id", persona.ID).
+			Msg("omnichat: her appearance answers could not be read")
+		return OmniAIAppearance{}, false
+	}
+	return appearance, true
 }
 
 // OmniAICandidateBriefWriter writes the four briefs for one character.
@@ -268,21 +299,15 @@ func buildOmniAICandidateBriefInput(persona *models.BotPersona, count int) omniA
 	// Appearance is sent so the clothes suit the body wearing them, and age so
 	// they suit her age. It is the same struct the picture prompt is built
 	// from, so a brief cannot be written against a different person.
-	var appearance OmniAIAppearance
-	if len(persona.OmniAIAppearance) > 0 {
-		if err := json.Unmarshal(persona.OmniAIAppearance, &appearance); err != nil {
-			// Not fatal -- she still gets dressed from her description and her
-			// personality. Said out loud because the degradation is otherwise
-			// invisible: the briefs come back looking fine while having been
-			// written without knowing how old she is.
-			zlog.Warn().Err(err).Int("persona_id", persona.ID).
-				Msg("omnichat likeness brief: her appearance answers could not be read")
-		} else {
-			input.Age = appearance.Age
-			input.Gender = appearance.Gender
-			input.Build = appearance.Build
-		}
+	if appearance, ok := omniAIAppearanceFacts(persona); ok {
+		input.Age = appearance.Age
+		input.Gender = appearance.Gender
+		input.Build = appearance.Build
 	}
-	input.Appearance = strings.TrimSpace(ResolveOmniChatMediaIdentityProfile(persona).Appearance)
+	profile := ResolveOmniChatMediaIdentityProfile(persona)
+	input.Appearance = strings.TrimSpace(profile.Appearance)
+	input.Taste = strings.TrimSpace(profile.Style.Taste)
+	input.SignatureItem = strings.TrimSpace(profile.Style.SignatureItem)
+	input.StyleNote = strings.TrimSpace(profile.Style.Note)
 	return input
 }

@@ -47,6 +47,16 @@ type OmniChatMediaIdentityProfile struct {
 	LoraModelID    string   `json:"lora_model_id,omitempty"`
 	LoraWeightName string   `json:"lora_weight_name,omitempty"`
 	LoraScale      float64  `json:"lora_scale,omitempty"`
+	// Style is how she dresses. It lives here because it is hers in the same
+	// way her appearance is -- written once, kept, and read by everything that
+	// draws her -- and because this profile already has a resolver that every
+	// such caller uses.
+	//
+	// It is not sent to the image model. Appearance and the medium are asserted
+	// in the render prompt because they are invariants a diffusion model has to
+	// be told every time; taste is an input to choosing an outfit, which
+	// happens a step earlier, where there is no prompt budget to spend.
+	Style OmniAIStyleProfile `json:"style,omitempty"`
 }
 
 // OmniChatRenderStyleAnime is the one medium that is not the default. Stated
