@@ -268,6 +268,19 @@ func normalizeOmniAIRenderRequest(
 	// that asked for two people.
 	normalized.NegativePrompt = OmniAIRenderNegativePrompt
 
+	// A reference is held to a plainness the candidates are not.
+	//
+	// Her four pictures may have anything on that a body can wear -- that is
+	// most of what makes somebody look like a person. The six references are
+	// the opposite job: they teach an adapter her face and her proportions, and
+	// a hat, a necklace or a bulky coat is something it would learn as part of
+	// her. So the prohibitions live here rather than in the shared list, where
+	// they would strip the accessories out of the pictures somebody chooses
+	// between.
+	if mode == models.OmniChatGenerationModeLikenessReference {
+		normalized.NegativePrompt += ", " + omniAIReferenceNegativeAdditions
+	}
+
 	// Said rather than left false. AllowNSFW is resolved from the caller's plan
 	// on the ordinary path, so a Premium account would otherwise follow its
 	// entitlement onto the explicit endpoint -- for a standing neutral

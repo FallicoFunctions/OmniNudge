@@ -64,11 +64,31 @@ type omniAIReferenceVariant struct {
 // path where a render is refused if it comes back explicit. Fitted plain
 // clothes reach the same proportions with none of that.
 const (
+	// Described, not forbidden -- the same correction the likeness prompt got.
+	// These said "no coat, no scarf and no jewellery" and "no accessories",
+	// which are negations sitting in a positive prompt, and CLIP does not
+	// encode negation: naming jewellery there raises its salience rather than
+	// removing it. What the reference needs is plainness, so plainness is what
+	// it now asks for, and the prohibitions moved to
+	// omniAIReferenceNegativeAdditions where a diffusion model reads them.
 	omniAIReferencePortraitClothing = "Wearing a plain fitted long-sleeved top with a plain neckline, " +
-		"no coat, no scarf and no jewellery."
-	omniAIReferenceFullBodyClothing = "Wearing plain close-fitting clothes: a fitted long-sleeved top tucked in, " +
-		"fitted full-length trousers, and flat shoes. No coat, no bulky layers, and no accessories."
+		"unadorned at the neck, ears and wrists."
+	omniAIReferenceFullBodyClothing = "Wearing plain close-fitting clothes in one layer: a fitted " +
+		"long-sleeved top tucked in, fitted full-length trousers, and flat shoes, " +
+		"all plain, unpatterned and unadorned."
 )
+
+// omniAIReferenceNegativeAdditions is what a reference must not carry, stated
+// where a diffusion model actually reads a prohibition.
+//
+// Reference-only, and deliberately not part of OmniAIRenderNegativePrompt. Her
+// candidate pictures are allowed anything a body can physically wear; putting
+// these in the shared list would take the hat, the headphones and the jewellery
+// out of the four somebody chooses between, which is most of what makes them
+// look like a person rather than a mannequin.
+const omniAIReferenceNegativeAdditions = "jewellery, necklace, earrings, watch, bracelet, rings, " +
+	"hat, cap, headband, scarf, coat, jacket, bulky layers, bag, backpack, " +
+	"headphones, sunglasses, glasses, patterned fabric, printed logo, graphic print"
 
 var omniAIReferenceVariants = []omniAIReferenceVariant{
 	{

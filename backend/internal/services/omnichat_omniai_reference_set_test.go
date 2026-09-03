@@ -188,7 +188,50 @@ func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
 			Prompt: BuildOmniAIReferencePrompt(profile, variant),
 		}, variant)
 		require.NoError(t, err)
-		require.Equal(t, anchor.NegativePrompt, request.NegativePrompt, variant)
+		// Everything the anchor refuses, a reference refuses too.
+		require.Contains(t, request.NegativePrompt, anchor.NegativePrompt, variant)
+	}
+}
+
+// A reference is held to a plainness the four candidates are not.
+//
+// Her pictures may carry anything a body can wear -- that is most of what makes
+// somebody look like a person. The six references teach an adapter her face and
+// her proportions, and a hat or a necklace is something it would learn as part
+// of her. The prohibition therefore lives on the reference mode alone: in the
+// shared list it would strip the accessories out of the pictures somebody
+// chooses between, which is the opposite of what was asked for.
+func TestOnlyTheReferencesRefuseAccessories(t *testing.T) {
+	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"}
+
+	anchor, err := NormalizeOmniChatLikenessRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 4, Prompt: "anything",
+	})
+	require.NoError(t, err)
+	for _, allowed := range []string{"jewellery", "hat", "headphones", "scarf"} {
+		require.NotContains(t, anchor.NegativePrompt, allowed,
+			"a candidate may wear anything a body physically can")
+	}
+
+	for _, variant := range OmniAIReferenceVariantKeys() {
+		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
+			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+		}, variant)
+		require.NoError(t, err)
+		for _, refused := range []string{"jewellery", "hat", "scarf", "bulky layers", "printed logo"} {
+			require.Contains(t, request.NegativePrompt, refused, variant)
+		}
+
+		// And the positive prompt describes plainness instead of forbidding
+		// ornament. A negation there is not encoded by CLIP: "no jewellery"
+		// mentions jewellery, which is the fault the likeness prompt was fixed
+		// for and which this path still had.
+		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		for _, negation := range []string{"no coat", "no scarf", "no jewellery", "no accessories", "no bulky"} {
+			require.NotContains(t, strings.ToLower(prompt), negation, variant)
+		}
+		require.Contains(t, prompt, "unadorned", variant)
 	}
 }
 
