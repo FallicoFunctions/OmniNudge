@@ -1,0 +1,508 @@
+{
+  "schema_version": 2,
+  "head": "0f9822a83063c1a72863ef8ce5d6f2b95b55195d",
+  "base": "edde601874009e0149098edc0309d556a163ddbf",
+  "scope": {
+    "files": [
+      "backend/internal/services/omnichat_omniai_creation.go",
+      "backend/internal/handlers/omnichat_omniai.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/models/omnichat_media_identity.go",
+      "backend/cmd/zz_model_compare/main.go",
+      "backend/.gitignore",
+      ".gitignore",
+      "scripts/no-build-artifacts.sh"
+    ],
+    "boundaries": [
+      "HTTP create request -> handler -> OmniAIAnswers",
+      "creator -> OpenRouter (the style writer contract)",
+      "creator -> the persona extensions_json blob",
+      "the idempotency claim fingerprint",
+      "git itself: what the repository tracks"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+    ".review/390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+    ".review/58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    ".review/a1712456328c6abd1111176e3de4b1197b645920.json",
+    ".review/a8413c5c8c1e216743c13088de4172e2937322c0.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "b2b81eac1..HEAD: slice 2 and the appearance fix. Seams: HTTP request -> handler -> creator, creator -> OpenRouter, creator -> the extensions_json blob. The file list itself carried the first finding: a 53.8 MB compiled binary."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "All five prior ledgers read. The 390b0e4cb one covers this area; nothing in it is re-found here."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the style writer's user message and the stored identity blob. The message now carries her description (the defect this review's base commit fixed); the blob carried four zeroed defaults it claims not to write."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Marshalled a persona carrying a style and read what a browser receives: no extensions, no style, no personality. Nothing leaked."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The stored blob is the row. It read {\"identity_mode\":\"\",\"identity_adapter\":\"\",\"identity_adapter_scale\":0,...,\"reference_limit\":0} -- values that are invalid, that no reader uses, and that read to somebody debugging as a character with no references."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "style_note is spelled the same in the request, the claim fingerprint and OmniAIAnswers."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The note is part of the idempotency fingerprint, so two presses with different notes are two requests. Asserted through the handler, mirroring the test that already does this for her appearance."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The coverage chain is unchanged by this work; its test still passes."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "No worker contract changed."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to the omitempty change: every consumer of ReferenceLimit and AdapterScale traced. One normalises before use; the other reads job.IdentityProfile, which is json:\"-\" and resolved immediately before submission, so it is never persisted and cannot carry an omitted field."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The creator with a working writer: taste, signature item and note all arrive."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The note reaches an LLM. It is bounded at three layers -- 1 MB request middleware, hashed rather than stored by the claim, trimmed to 300 runes before persistence."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "A 5000-rune note stores as 300 and validates. The handler bounds arrays and leaves strings to the service, which is what Name already does."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "WriteStyleProfile reads her description off the identity blob and the creator passed a persona without one -- fixed in this review's base commit, and re-checked here rather than assumed."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch added or removed."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "writeStyle warns and returns the note; nothing is swallowed."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "No conditional gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The style bounds are named constants used by both the writer's trim and the creator's."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Creation is one repository call; the style is a field on the row it writes."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Both callers of writeIdentityProfile read before writing, so a pick or a reference append cannot wipe her style."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Two controls built and confirmed by hand to fail as real assertions."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both findings were named by instruments already on the list -- A1 for the file list, B4 for the stored row."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the wardrobe was run against real renders in this session -- two arms, eight images, judged by eye -- and that run is what found the empty-appearance defect this review then scoped. Nothing changed here alters a prompt."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "a 53.8 MB compiled harness was committed by a git add -A, and writing a guard for it found two more binaries totalling 74 MB tracked since January, referenced by nothing and downloaded by every clone",
+          "found_by": "A1",
+          "fix_commit": "1c4a1022b",
+          "control": {
+            "patch": ".review/controls/slice2-R1-artifact-guard.patch",
+            "runner": "bash",
+            "tests": [
+              "bash scripts/no-build-artifacts.sh"
+            ],
+            "observed": "refuses backend/zz_model_compare as unignored once the rules are reverted"
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "the stored identity blob wrote identity_adapter_scale 0 and reference_limit 0 -- invalid values no reader uses, contradicting the comment above them, and reading to somebody debugging as a character configured to have no references",
+          "found_by": "B4",
+          "fix_commit": "1c4a1022b",
+          "control": {
+            "patch": ".review/controls/slice2-R2-zeroed-defaults.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestTheStoredIdentityBlobCarriesNoZeroedDefaults$"
+            ],
+            "observed": "fails showing the zeroed keys back in the blob"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the artifact guard, the ignore rules and the omitempty change."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Re-printed the blob after the change: it now carries only the appearance and the style."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Traced the omitempty change to every consumer, including the transient job profile. Safe."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Ran the guard against a real staged 6 MB file. It passed, which it should not have."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The guard read HEAD, so a staged file was invisible to it -- one commit too late for the only way this actually happens."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "R3 built and verified"
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "run once at the end of the review"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "D3 and E2 both name it"
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the wardrobe was run against real renders in this session -- two arms, eight images, judged by eye -- and that run is what found the empty-appearance defect this review then scoped. Nothing changed here alters a prompt."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R3",
+          "summary": "the artifact guard written in pass 1 read HEAD, so it answered whether a large file had been committed -- one commit too late, because the way this happens is git add -A staging a build",
+          "found_by": "E2",
+          "fix_commit": "0f9822a83",
+          "control": {
+            "patch": ".review/controls/slice2-R3-guard-reads-index.patch",
+            "runner": "bash",
+            "tests": [
+              "bash scripts/no-build-artifacts.test.sh"
+            ],
+            "observed": "the staged-file case fails: the guard returns 0 with a 6 MB file staged"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the guard's index read and its test."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed"
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Checked the ignore rules against six paths: the four artifacts are ignored, real source and the renders directory behave as intended, and nothing legitimate was newly hidden."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every tracked file is mode 100644 or 100755, so the guard's mode filter skips nothing that exists here."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration"
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls, each confirmed by hand."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, five Go packages, the guard's own 5 cases, the hook's 45, and the Python worker suite -- all green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing found, so nothing to add."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "the wardrobe was run against real renders in this session -- two arms, eight images, judged by eye -- and that run is what found the empty-appearance defect this review then scoped. Nothing changed here alters a prompt."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... -- clean",
+    "vet": "go vet ./... -- clean",
+    "tests": "services, models, queue, handlers, runpod with -p 1 -- all ok",
+    "scripts": "scripts/no-build-artifacts.test.sh -- 5 passed",
+    "hook": ".claude/hooks/review-ledger-verify.test.sh -- 45 passed",
+    "python": "worker contract and generators -- ok"
+  }
+}
