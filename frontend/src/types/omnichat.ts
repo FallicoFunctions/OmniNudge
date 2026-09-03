@@ -580,6 +580,9 @@ export interface CreateOmniAIRequest {
   feeling: string;
   relationship: string;
   appearance: OmniAIAppearanceAnswers;
+  /** How she dresses, in the creator's own words. Optional. It outranks the
+   *  taste the server writes from her personality, and nothing else. */
+  style_note?: string;
 }
 
 /** One of the four pictures somebody chooses her face from. */

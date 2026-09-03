@@ -28,6 +28,9 @@ export interface CreationAnswers {
   feeling: string;
   relationship: string;
   name: string;
+  /** How she dresses, in the creator's own words. Optional, and the only free
+   *  text on a form that is otherwise all picked from lists. */
+  styleNote: string;
 }
 
 /**
@@ -44,12 +47,17 @@ export const STEP = {
   look: 3,
   face: 4,
   build: 5,
-  traits: 6,
-  interests: 7,
-  you: 8,
-  name: 9,
-  review: 10,
+  style: 6,
+  traits: 7,
+  interests: 8,
+  you: 9,
+  name: 10,
+  review: 11,
 } as const;
+
+/** omniAIStyleMaxNoteRunes on the server. Counted in code points like the name,
+ *  so a note written outside the basic plane is not cut early. */
+export const STYLE_NOTE_LIMIT = 300;
 
 export const TOTAL_STEPS = STEP.review;
 
@@ -94,6 +102,7 @@ function emptyAnswers(options: OmniAIOptions | undefined): CreationAnswers {
     // is what the column carries. Nobody is handed a romance they did not pick.
     relationship: 'friend',
     name: '',
+    styleNote: '',
   };
 }
 
@@ -172,6 +181,13 @@ export function useCreationFlow(options: OmniAIOptions | undefined) {
    * over this length, and a form that accepts forty-one characters and fails on
    * submit is a form arguing with itself two screens later.
    */
+  const setStyleNote = useCallback((value: string) => {
+    setAnswers((current) => ({
+      ...current,
+      styleNote: [...value].slice(0, STYLE_NOTE_LIMIT).join(''),
+    }));
+  }, []);
+
   const setName = useCallback((value: string) => {
     setAnswers((current) => ({ ...current, name: [...value].slice(0, NAME_LIMIT).join('') }));
   }, []);
@@ -238,6 +254,7 @@ export function useCreationFlow(options: OmniAIOptions | undefined) {
     setAnswers,
     answer,
     setName,
+    setStyleNote,
     toggle,
     ready,
     goBack,

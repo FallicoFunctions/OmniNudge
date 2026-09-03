@@ -11,6 +11,7 @@ import { refusalFrom, serverErrorFrom, type CreationRefusal } from './refusals';
 import { normalizeOmniAIName } from './name';
 import {
   NAME_LIMIT,
+  STYLE_NOTE_LIMIT,
   STEP,
   TOTAL_STEPS,
   buildChoices,
@@ -82,6 +83,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
         feeling: answers.feeling,
         relationship: answers.relationship,
         appearance: flow.appearance,
+        style_note: flow.answers.styleNote.trim() || undefined,
       }),
     onSuccess: onMade,
     onError: (error) => {
@@ -140,6 +142,11 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
         return {
           title: `${p.Poss} build`,
           sub: '',
+        };
+      case STEP.style:
+        return {
+          title: `How ${p.subj} like${p.s} to dress`,
+          sub: `Optional. What ${p.subj} wear${p.s} follows from who ${p.subj} ${p.is}, so leave this empty unless you already have something in mind.`,
         };
       case STEP.traits:
         return {
@@ -391,7 +398,29 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
               </div>
             ) : null}
 
-            {step === STEP.name ? (
+            {step === STEP.style ? (
+              <div className="flex max-w-[440px] flex-col gap-2">
+                <textarea
+                  value={flow.answers.styleNote}
+                  onChange={(event) => flow.setStyleNote(event.target.value)}
+                  rows={4}
+                  // No maxLength, for the same reason the name field has none:
+                  // the attribute counts UTF-16 units and would cut a note
+                  // written outside the basic plane early, while the counter
+                  // beside it still read 300. setStyleNote caps by code point.
+                  aria-label={translate(t, 'omnichat.omniai.styleNoteLabel', 'How they dress')}
+                  placeholder={translate(
+                    t,
+                    'omnichat.omniai.styleNotePlaceholder',
+                    'Always in black. Never wears trainers.',
+                  )}
+                  className="min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-base font-medium text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
+                />
+                <p className="text-right text-[11px] tabular-nums text-white/30">
+                  {`${[...flow.answers.styleNote].length} / ${STYLE_NOTE_LIMIT}`}
+                </p>
+              </div>
+            ) : step === STEP.name ? (
               <div className="flex max-w-[440px] flex-col gap-2">
                 <div className="flex items-stretch gap-2.5">
                   <input

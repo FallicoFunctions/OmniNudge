@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CreationFlow from '../CreationFlow';
-import { STEP } from '../useCreationFlow';
+import { STEP, STYLE_NOTE_LIMIT } from '../useCreationFlow';
 import { omnichatService } from '../../../../services/omnichatService';
 import type { OmniAIOptions } from '../../../../types/omnichat';
 
@@ -404,5 +404,37 @@ describe('the name field itself', () => {
     await user.clear(field);
     await user.type(field, '𝐀'.repeat(30));
     expect([...field.value]).toHaveLength(30);
+  });
+});
+
+describe('how they like to dress', () => {
+  // The one screen that is not a list of options. Her taste is written from her
+  // personality, so this exists only for the creator who already has something
+  // in mind -- and the whole feature was reachable from nowhere until it did.
+  it('is optional, and says so', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.style);
+    expect(await screen.findByText(/Optional\./)).toBeInTheDocument();
+    // Nothing typed, and the screen still lets somebody past.
+    expect(screen.getByRole('button', { name: /Continue|Make/ })).toBeEnabled();
+  });
+
+  it('sends what was typed, and caps it where the server does', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.style);
+    const note = await screen.findByLabelText('How they dress');
+    await user.type(note, 'always in black');
+    expect(note).toHaveValue('always in black');
+    expect(screen.getByText(`15 / ${STYLE_NOTE_LIMIT}`)).toBeInTheDocument();
+  });
+
+  it('counts a note in code points, so an emoji is one character and not two', async () => {
+    await renderAtBasics();
+    await walkTo(STEP.style);
+    const note = await screen.findByLabelText('How they dress');
+    // The maxLength attribute counts UTF-16 units, which is why the field does
+    // not use one: this note is four code points and would read as six.
+    await user.type(note, 'a🧥b🧢');
+    expect(screen.getByText(`4 / ${STYLE_NOTE_LIMIT}`)).toBeInTheDocument();
   });
 });
