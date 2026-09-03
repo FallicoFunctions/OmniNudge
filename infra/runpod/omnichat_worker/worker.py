@@ -49,6 +49,16 @@ def handler(job: dict[str, Any]) -> dict[str, Any]:
             "images": images,
             "actual_prompt": result.actual_prompt,
             "worker_build": worker_build(),
+            # The checkpoint, for the same reason as the build tag above and
+            # with a sharper edge. OMNICHAT_IMAGE_MODEL_ID is optional, so an
+            # endpoint that never sets it renders the compiled default and
+            # looks identical to one that sets that default on purpose.
+            # Worse, editing the variable does not disturb a warm worker: a
+            # comparison of two checkpoints was run, passed, and was
+            # byte-identical to the run before it, because the old container
+            # still held the old pipeline. Timing and a checksum caught it.
+            # Neither should have been necessary.
+            "model_id": _image_generator.model_id,
         }
 
     _video_generator = _video_generator or VideoGenerator()
@@ -62,6 +72,7 @@ def handler(job: dict[str, Any]) -> dict[str, Any]:
         "video": output_video(url, duration=result.duration, file_size=size),
         "actual_prompt": result.actual_prompt,
         "worker_build": worker_build(),
+        "model_id": _video_generator.model_id,
         # Stored with the asset so a slow clip can be attributed without
         # reading RunPod's logs, which are gone by the time anyone looks.
         "load_seconds": round(result.load_seconds, 3),

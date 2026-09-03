@@ -104,6 +104,12 @@ type Result struct {
 	// template can silently serve a stale tag, so provenance is recorded with
 	// every result rather than inferred from what was last pushed.
 	WorkerBuild string `json:"worker_build,omitempty"`
+	// ModelID is the checkpoint that rendered this. Same argument as the build
+	// tag, and needed for the same reason: the model variable is optional, so
+	// an unset one is indistinguishable from one set to the default, and
+	// editing it leaves a warm worker serving the checkpoint it already
+	// loaded. Empty from any worker older than the build that reports it.
+	ModelID string `json:"model_id,omitempty"`
 	// LoadSeconds and InferenceSeconds split a render's wall clock into model
 	// load and sampling. They are reported separately because they have
 	// unrelated causes: load is a cold start or a CPU offload, sampling is

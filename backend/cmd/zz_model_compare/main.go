@@ -24,6 +24,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -70,15 +72,22 @@ var defaultBrief = services.OmniAICandidateBrief{
 }
 
 type candidate struct {
-	Seed         int64                         `json:"seed"`
-	Brief        services.OmniAICandidateBrief `json:"brief"`
-	Prompt       string                        `json:"prompt"`
-	File         string                        `json:"file"`
-	WorkerBuild  string                        `json:"worker_build,omitempty"`
-	ReturnedSeed *int64                        `json:"returned_seed,omitempty"`
-	Portrait     string                        `json:"portrait_standard"`
-	RenderError  string                        `json:"render_error,omitempty"`
-	Seconds      float64                       `json:"seconds"`
+	Seed        int64                         `json:"seed"`
+	Brief       services.OmniAICandidateBrief `json:"brief"`
+	Prompt      string                        `json:"prompt"`
+	File        string                        `json:"file"`
+	WorkerBuild string                        `json:"worker_build,omitempty"`
+	ModelID     string                        `json:"model_id,omitempty"`
+	// SHA256 of the rendered bytes. Two runs of the same seed and prompt on
+	// the same checkpoint are deterministic, so an identical digest across two
+	// labels means one model rendered both -- which is what a warm worker
+	// serving its already-loaded pipeline looks like after the model variable
+	// was edited. The run reports success either way.
+	Digest       string  `json:"digest,omitempty"`
+	ReturnedSeed *int64  `json:"returned_seed,omitempty"`
+	Portrait     string  `json:"portrait_standard"`
+	RenderError  string  `json:"render_error,omitempty"`
+	Seconds      float64 `json:"seconds"`
 }
 
 type manifest struct {
@@ -204,6 +213,8 @@ func run(label, out, appearance, personality, briefsFrom string, seeds []int64, 
 		}
 		entry.File = filepath.Base(file)
 		entry.WorkerBuild = result.WorkerBuild
+		entry.ModelID = result.ModelID
+		entry.Digest = digestOf(file)
 		entry.ReturnedSeed = result.Seed
 
 		// The classifier is the same one the pipeline runs, against the same
@@ -222,8 +233,9 @@ func run(label, out, appearance, personality, briefsFrom string, seeds []int64, 
 		default:
 			entry.Portrait = "PASS"
 		}
-		fmt.Printf("%s in %.0fs  portrait=%s  build=%s\n",
-			entry.File, entry.Seconds, entry.Portrait, orDash(result.WorkerBuild))
+		fmt.Printf("%s in %.0fs  portrait=%s  build=%s  model=%s\n",
+			entry.File, entry.Seconds, entry.Portrait, orDash(result.WorkerBuild),
+			orDash(result.ModelID))
 		record.Candidates = append(record.Candidates, entry)
 	}
 
@@ -454,6 +466,58 @@ func summarize(record manifest) {
 		record.Label, pass, fail, errored)
 }
 
+// digestOf hashes a rendered file, and returns "" rather than failing: a
+// missing digest weakens the duplicate check but must never lose a render.
+func digestOf(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = file.Close() }()
+	sum := sha256.New()
+	if _, err := io.Copy(sum, file); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
+
+// duplicateLabels reports groups of runs whose every render is byte-identical.
+//
+// This is the check that catches a model switch which did not take. Editing
+// OMNICHAT_IMAGE_MODEL_ID does not disturb a worker that is already warm, so
+// the endpoint keeps serving the checkpoint it loaded first and the run
+// succeeds, passes, and is labelled with a model that never rendered it.
+// Nothing in a per-run result says so; only two runs side by side do.
+func duplicateLabels(manifests []manifest) [][]string {
+	bySignature := map[string][]string{}
+	for _, record := range manifests {
+		var parts []string
+		complete := true
+		for _, entry := range record.Candidates {
+			if entry.Digest == "" {
+				complete = false
+				break
+			}
+			parts = append(parts, fmt.Sprintf("%d:%s", entry.Seed, entry.Digest))
+		}
+		if !complete || len(parts) == 0 {
+			continue
+		}
+		sort.Strings(parts)
+		signature := strings.Join(parts, "|")
+		bySignature[signature] = append(bySignature[signature], record.Label)
+	}
+	var groups [][]string
+	for _, labels := range bySignature {
+		if len(labels) > 1 {
+			sort.Strings(labels)
+			groups = append(groups, labels)
+		}
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i][0] < groups[j][0] })
+	return groups
+}
+
 func writeJSON(path string, value any) error {
 	raw, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
@@ -515,9 +579,19 @@ func buildSheet(out string) error {
 	fmt.Fprintf(&page, "<p class=meta>%d models &middot; %d seeds &middot; same prompt, same seeds, "+
 		"only the checkpoint differs.</p>", len(manifests), len(seeds))
 
+	for _, group := range duplicateLabels(manifests) {
+		fmt.Fprintf(&page, "<p class=alarm><strong>%s rendered identical bytes.</strong> "+
+			"The same seed and prompt on the same checkpoint is deterministic, so one model "+
+			"produced all of them. A model switch that did not take looks exactly like this: "+
+			"editing the model variable leaves a warm worker serving the pipeline it already "+
+			"loaded. Replace the worker and render again before reading anything below.</p>",
+			escape(strings.Join(group, " and ")))
+	}
+
 	page.WriteString("<table><thead><tr><th>seed</th>")
 	for _, record := range manifests {
-		fmt.Fprintf(&page, "<th>%s<span>%s</span></th>", escape(record.Label), escape(passRate(record)))
+		fmt.Fprintf(&page, "<th>%s<span>%s</span><span>%s</span></th>",
+			escape(record.Label), escape(passRate(record)), escape(reportedModel(record)))
 	}
 	page.WriteString("</tr></thead><tbody>")
 
@@ -587,6 +661,27 @@ func collectSeeds(manifests []manifest) []int64 {
 	return seeds
 }
 
+// reportedModel is what the worker said it loaded, which is not necessarily
+// what the label claims. Workers built before the model id was reported say
+// nothing, and an empty answer is shown as unreported rather than as agreement.
+func reportedModel(record manifest) string {
+	seen := map[string]bool{}
+	for _, entry := range record.Candidates {
+		if strings.TrimSpace(entry.ModelID) != "" {
+			seen[entry.ModelID] = true
+		}
+	}
+	if len(seen) == 0 {
+		return "model unreported"
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, " + ")
+}
+
 func passRate(record manifest) string {
 	var pass, total int
 	for _, entry := range record.Candidates {
@@ -636,6 +731,8 @@ small { display:block; color:var(--muted); font-size:.72rem; margin-top:.15rem; 
 .brief { width:230px; margin:.5rem 0 0; text-align:left; font-size:.72rem;
   color:var(--muted); line-height:1.35; }
 .err { font-weight:600; }
+.alarm { border:1px solid #b3261e; border-left-width:4px; border-radius:4px;
+  padding:.75rem 1rem; max-width:70ch; margin:0 0 1.25rem; }
 pre { white-space:pre-wrap; background:rgba(128,128,128,.1); padding:.75rem;
   border-radius:4px; max-width:70ch; }
 </style><body>
