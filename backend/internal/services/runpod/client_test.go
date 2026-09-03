@@ -269,3 +269,21 @@ func TestClientRejectsOversizedResponseAndRequest(t *testing.T) {
 	_, err = client.Submit(context.Background(), "endpoint-image", map[string]any{"prompt": strings.Repeat("x", maxJSONRequest)})
 	require.EqualError(t, err, "runpod request exceeds size limit")
 }
+
+// The decoder is hand-written, so a field added to Result without a line in
+// decodeResultMetadata is populated by nothing and its struct tag is
+// decoration. That happened to model_id: the worker reported the checkpoint,
+// the field existed, and a comparison of two models reported neither.
+func TestResultDecodesTheCheckpointThatRenderedIt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"COMPLETED","output":{
+		 "images":[{"url":"https://example.test/a.png","content_type":"image/png"}],
+		 "worker_build":"v53","model_id":"SG161222/RealVisXL_V5.0"}}`))
+	}))
+	defer server.Close()
+
+	result, err := NewClient("key", server.URL).Result(context.Background(), "endpoint", "job-1")
+	require.NoError(t, err)
+	require.Equal(t, "v53", result.WorkerBuild)
+	require.Equal(t, "SG161222/RealVisXL_V5.0", result.ModelID)
+}

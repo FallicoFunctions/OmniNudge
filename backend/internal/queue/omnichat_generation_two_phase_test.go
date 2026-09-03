@@ -27,6 +27,7 @@ type twoPhaseStoreFake struct {
 	secondPhaseCalls  int
 	intermediateCalls int
 	completeCalls     int
+	provenance        models.OmniChatGenerationProvenance
 	intermediateKind  models.OmniChatMediaKind
 	sourceAsset       *models.OmniChatMediaAsset
 	deletedAssets     []uuid.UUID
@@ -106,8 +107,9 @@ func (f *twoPhaseStoreFake) AttachIntermediateAsset(_ context.Context, jobID uui
 	return nil
 }
 
-func (f *twoPhaseStoreFake) CompleteGenerationJob(_ context.Context, _ uuid.UUID, _ *models.MediaFile, asset *models.OmniChatMediaAsset, _, _ int64, _ models.OmniChatGenerationProvenance) error {
+func (f *twoPhaseStoreFake) CompleteGenerationJob(_ context.Context, _ uuid.UUID, _ *models.MediaFile, asset *models.OmniChatMediaAsset, _, _ int64, provenance models.OmniChatGenerationProvenance) error {
 	f.completeCalls++
+	f.provenance = provenance
 	asset.ID = uuid.New()
 	f.job.Status = models.OmniChatGenerationStatusSucceeded
 	f.job.OutputAssetID = &asset.ID
@@ -152,11 +154,13 @@ func (f *twoPhaseProviderFake) Result(_ context.Context, endpointID, _ string) (
 		return &runpod.Result{
 			Video:       &runpod.MediaFile{URL: "https://storage.googleapis.com/omnichat/clip.mp4", Duration: 5},
 			WorkerBuild: "video-v1",
+			ModelID:     "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
 		}, nil
 	}
 	return &runpod.Result{
 		Images:      []runpod.MediaFile{{URL: "https://storage.googleapis.com/omnichat/still.png", Width: 1344, Height: 768}},
 		WorkerBuild: "image-v40",
+		ModelID:     "SG161222/RealVisXL_V5.0",
 	}, nil
 }
 
@@ -251,6 +255,28 @@ func TestSceneVideoRendersAStillThenAnimatesIt(t *testing.T) {
 	require.Contains(t, videoInput["source_image_url"], store.job.ID.String()+".png")
 	require.NotContains(t, videoInput["prompt"], "rain-slick balcony")
 	require.Contains(t, videoInput["prompt"], "leaning on the railing")
+}
+
+// The checkpoint has to reach the row, not merely the result struct.
+//
+// Both halves of this were broken at once: decodeResultMetadata is
+// hand-written and never read model_id, so the field was populated by nothing,
+// and the handler did not carry it into provenance either. A comparison of two
+// models could not say which had rendered anything, and neither could the
+// database afterwards.
+//
+// Asserted where the value is used rather than where it is defined. A test of
+// the provenance struct alone stays green when the handler stops filling it in.
+func TestTheCheckpointReachesTheStoredProvenance(t *testing.T) {
+	store := &twoPhaseStoreFake{job: newSceneVideoJob()}
+	provider := &twoPhaseProviderFake{}
+	storage := &twoPhaseStorageFake{}
+	handler := newTwoPhaseHandler(t, store, provider, storage)
+
+	require.NoError(t, handler.process(context.Background(), store.job.ID))
+	require.Equal(t, 1, store.completeCalls)
+	require.Equal(t, "video-v1", store.provenance.WorkerBuild)
+	require.Equal(t, "Wan-AI/Wan2.2-TI2V-5B-Diffusers", store.provenance.ModelID)
 }
 
 func TestSceneVideoProgressLeavesRoomForTheAnimation(t *testing.T) {

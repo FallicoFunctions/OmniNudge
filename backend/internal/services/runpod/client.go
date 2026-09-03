@@ -531,6 +531,13 @@ func decodeResultMetadata(object map[string]json.RawMessage, result *Result) {
 	if value, ok := object["worker_build"]; ok {
 		_ = json.Unmarshal(value, &result.WorkerBuild)
 	}
+	// Decoded here and not by a struct tag. Everything on Result arrives
+	// through this function, so a field added without a line here is populated
+	// by nothing and its tag is decoration -- which is exactly what happened to
+	// model_id, and what made a comparison of two checkpoints report neither.
+	if value, ok := object["model_id"]; ok {
+		_ = json.Unmarshal(value, &result.ModelID)
+	}
 	if value, ok := object["load_seconds"]; ok {
 		_ = json.Unmarshal(value, &result.LoadSeconds)
 	}

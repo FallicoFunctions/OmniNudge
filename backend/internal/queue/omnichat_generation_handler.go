@@ -806,6 +806,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	}
 	provenance := models.OmniChatGenerationProvenance{
 		WorkerBuild:      result.WorkerBuild,
+		ModelID:          result.ModelID,
 		ActualPrompt:     result.ActualPrompt,
 		LoadSeconds:      result.LoadSeconds,
 		InferenceSeconds: result.InferenceSeconds,

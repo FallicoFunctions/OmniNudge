@@ -466,7 +466,13 @@ func (r *OmniChatMediaRepository) CancelGenerationJobOwned(ctx context.Context, 
 // a RunPod template can be pointed at a stale tag, which makes prompt changes
 // look ineffective when they were simply never deployed.
 type OmniChatGenerationProvenance struct {
-	WorkerBuild  string `json:"worker_build,omitempty"`
+	WorkerBuild string `json:"worker_build,omitempty"`
+	// ModelID is the checkpoint, and it is stored for the same reason as the
+	// build tag beside it. The build says which code rendered an asset; it does
+	// not say which weights, and the two move independently -- the model is an
+	// endpoint variable that is optional, so an unset one renders a compiled
+	// default and looks identical to one set deliberately.
+	ModelID      string `json:"model_id,omitempty"`
 	ActualPrompt string `json:"actual_prompt,omitempty"`
 	// LoadSeconds and InferenceSeconds separate model load from sampling, so a
 	// slow render can be attributed after the fact. RunPod's own logs have
@@ -485,6 +491,7 @@ const (
 // must not be able to grow a row without limit.
 func (p OmniChatGenerationProvenance) encode() ([]byte, error) {
 	p.WorkerBuild = boundProvenanceText(p.WorkerBuild, omniChatProvenanceMaxBuildRunes)
+	p.ModelID = boundProvenanceText(p.ModelID, omniChatProvenanceMaxBuildRunes)
 	p.ActualPrompt = boundProvenanceText(p.ActualPrompt, omniChatProvenanceMaxPromptRunes)
 	return json.Marshal(p)
 }
