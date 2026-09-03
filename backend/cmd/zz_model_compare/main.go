@@ -111,6 +111,7 @@ func main() {
 	briefsFrom := flag.String("briefs-from", "", "reuse the briefs from an earlier run's manifest.json, so a prompt change is the only thing that differs")
 	styleNote := flag.String("style-note", "", "the creator's own words about how she dresses, passed to the style writer")
 	noStyle := flag.Bool("no-style", false, "skip the style writer, so the briefs are written from her personality alone")
+	subject := flag.String("subject", "", "the pronoun the prompt speaks about her in: man, woman or they. Empty is she, as it is in the product.")
 	timeout := flag.Duration("timeout", 8*time.Minute, "how long to wait for one render")
 	flag.Parse()
 
@@ -127,14 +128,14 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if err := run(*label, *out, *appearance, *personality, *briefsFrom, *styleNote, *noStyle,
+	if err := run(*label, *out, *appearance, *personality, *briefsFrom, *styleNote, *subject, *noStyle,
 		seeds, *timeout, *dryRun); err != nil {
 		fail(err)
 	}
 }
 
 func run(
-	label, out, appearance, personality, briefsFrom, styleNote string, noStyle bool,
+	label, out, appearance, personality, briefsFrom, styleNote, subject string, noStyle bool,
 	seeds []int64, timeout time.Duration, dryRun string,
 ) error {
 	cfg, err := config.Load()
@@ -150,7 +151,7 @@ func run(
 		return errors.New("RUNPOD_IMAGE_ENDPOINT_ID is not set")
 	}
 
-	profile := models.OmniChatMediaIdentityProfile{Appearance: appearance}
+	profile := models.OmniChatMediaIdentityProfile{Appearance: appearance, Subject: subject}
 	briefs, err := briefsFor(cfg, personality, briefsFrom, styleNote, noStyle, &profile, len(seeds))
 	if err != nil {
 		return err

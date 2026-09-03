@@ -112,6 +112,12 @@ func TestTheStyleInstructionAsksForAWardrobeAndNeverAnOccupation(t *testing.T) {
 	for _, asked := range []string{
 		"her wardrobe, not one outfit", "cold day and a warm one",
 		"Name the actual object", "She has no job",
+		// Sized for the frame it has to survive: a whole standing person.
+		"read from head to foot", "does not survive",
+		// Chosen from a closed list of kinds known to render, because two rounds
+		// of describing the constraint were obeyed adjective by adjective while
+		// the writer kept the object it had already decided on.
+		"Do not choose anything outside those kinds", "a beanie", "a backpack",
 	} {
 		require.Contains(t, omniAIStyleSystemPrompt, asked)
 	}

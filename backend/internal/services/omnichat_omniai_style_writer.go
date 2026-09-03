@@ -22,6 +22,23 @@ import (
 // at a glance, and it is asked for as an object somebody owns rather than as a
 // theme. "Something musical" dresses nobody; headphones round her neck do.
 //
+// It is also asked for at a size the picture can hold, and now from a closed
+// list rather than freely.
+//
+// Two rounds of describing the constraint failed. The first offered "a ring she
+// never removes" as an example and the writer chose a camera strap. The second
+// ruled out thin, dark and close-to-the-body items and named the camera strap
+// specifically -- and the writer chose a thick crimson camera strap, obeying
+// every adjective and keeping the object. It reasons about the character, and
+// photography means a camera, so no amount of describing the picture moved it.
+//
+// What the same renders showed is that the mechanism works: two of four drew a
+// beanie nobody had asked for, clearly and consistently. Large silhouette-
+// changing objects survive a full-length frame and small worn ones do not, so
+// the choice is now made from kinds of object known to render, with the
+// invisible ones refused by name and a redirection for the case that caused
+// this -- take the bag or the hat that goes with the same interest.
+//
 // No occupation, for the same reason the brief writer has none. She has never
 // had a job, so her interests may dress her while the professions they resemble
 // may not.
@@ -33,7 +50,18 @@ Return {"taste": "...", "signature_item": "..."}.
 
 "taste" is her wardrobe, not one outfit. Write the colours she reaches for, the materials, the shapes, how she layers, how worn or new her things are, what her shoes are like. It has to be able to dress her on a cold day and a warm one and still look like the same person. Write it as prose a person could follow. Keep it under 70 words.
 
-"signature_item" is one object she has in nearly every picture of her: headphones round her neck, a particular hat, a ring she never removes, a canvas bag. Name the actual object, its colour and its material. Not a theme, not a style word, not clothing she would change with the weather. Keep it under 12 words. Return an empty string only if nothing about her suggests one.
+"signature_item" is one object she has in nearly every picture of her. Every picture is full length, so it has to read from head to foot at several feet away. Choose one from these kinds of object, whichever suits her:
+
+Worn on the head: a beanie, a baseball cap, a flat cap, a bucket hat, a wide-brimmed hat, a headscarf, a bandana, a wide headband, a hood always worn up.
+Round the neck or shoulders: over-ear headphones, a long scarf, a shawl, a blanket wrap, a bandana knotted at the throat, a chunky necklace worn over clothes.
+Carried on the body: a backpack, a tote bag, a messenger bag across the body, a satchel, a bum bag, a holdall, a rolled mat, a guitar case, an instrument case, a skateboard, a folded umbrella.
+Worn as the outer layer: one jacket she always has on in a colour nothing else she owns is, a long coat, a gilet, a poncho, a cape, dungarees, a boiler suit, a varsity or bomber jacket with a marking on it.
+On the hands or feet: fingerless gloves, tall boots in an unmissable colour, brightly coloured trainers, thick patterned socks pulled above the boot.
+On the face: sunglasses pushed up onto the hair, goggles worn on the forehead.
+
+Do not choose anything outside those kinds. In particular do not choose a ring, a thin chain, a watch, a bracelet, a pin, a badge, an earring, a camera strap or a lanyard: every one of them is a few pixels against clothing in a full-length photograph and does not survive, whatever the prompt says. If her interests suggest one of those, pick the bag or the hat that goes with the same interest instead.
+
+Name the actual object, its colour and its material. Not a theme, not a style word, not clothing she would change with the weather. Keep it under 12 words. Return an empty string only if nothing about her suggests one.
 
 Dress her as herself. Read her personality and her interests. She has no job, so do not dress her for one and do not infer an occupation from an interest: somebody who reads about medicine for hours is not a doctor and dresses like somebody who reads. Match her age.
 
