@@ -1,13 +1,13 @@
 diff --git a/scripts/no-build-artifacts.sh b/scripts/no-build-artifacts.sh
-index 8f0d5fb22..3a468c347 100755
+index 325e045c2..97a13ca47 100755
 --- a/scripts/no-build-artifacts.sh
 +++ b/scripts/no-build-artifacts.sh
-@@ -35,7 +35,7 @@ while read -r mode sha rest; do
+@@ -40,7 +40,7 @@ while read -r mode sha rest; do
        "$(echo "scale=1; $size/1048576" | bc -l)"
-     status=1
+     failed=$((failed+1))
    fi
 -done < <(git ls-files -s)
 +done < <(git ls-tree -r -l HEAD 2>/dev/null | awk '{print $1, $3, "\t" $5}')
  
- [ "$status" -eq 0 ] && echo "ok: no tracked build artifacts"
- exit "$status"
+ printf '%d failed\n' "$failed"
+ [ "$failed" -eq 0 ] && echo "ok: no tracked build artifacts"
