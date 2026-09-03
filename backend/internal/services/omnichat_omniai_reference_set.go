@@ -106,6 +106,11 @@ const omniAIReferenceNegativeAdditions = "jewellery, necklace, earrings, watch, 
 	"hat, cap, headband, scarf, coat, jacket, bulky layers, bag, backpack, " +
 	"headphones, sunglasses, patterned fabric, printed logo, graphic print"
 
+// omniAIReferencePortraitAspect is the frame a close portrait is rendered in,
+// named so the builder can tell a portrait from a full-length shot without
+// matching on the variant key.
+const omniAIReferencePortraitAspect = "3:4"
+
 var omniAIReferenceVariants = []omniAIReferenceVariant{
 	{
 		Key:      "portrait_neutral",
@@ -159,13 +164,22 @@ func OmniAIReferenceVariantKeys() []string {
 // It states her description again rather than relying on the picked image
 // alone. The adapter carries identity weakly and the words carry it exactly, so
 // a reference generated from her own picture still says who she is.
-func BuildOmniAIReferencePrompt(profile models.OmniChatMediaIdentityProfile, variantKey string) string {
+// faceAppearance is used for the portrait variants when one is supplied.
+// Empty falls back to the full description, which is what every persona made
+// before this had.
+func BuildOmniAIReferencePrompt(
+	profile models.OmniChatMediaIdentityProfile, variantKey, faceAppearance string,
+) string {
 	variant, found := findOmniAIReferenceVariant(variantKey)
 	if !found {
 		return ""
 	}
 
 	subject := strings.TrimSpace(profile.Appearance)
+	// A portrait is cropped at the chest, so it is described from the chest up.
+	if variant.Aspect == omniAIReferencePortraitAspect && strings.TrimSpace(faceAppearance) != "" {
+		subject = strings.TrimSpace(faceAppearance)
+	}
 	if subject == "" {
 		subject = omniAILikenessFallbackSubject
 	}

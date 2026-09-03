@@ -194,6 +194,14 @@ func (s *OmniChatOmniAILikenessService) StartReferences(
 	if models.PersonaPerformsAScene(persona) {
 		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
 	}
+	// Her description from the chest up, for the portrait variants. Read from
+	// the answers she was made with rather than from the stored sentence,
+	// because that sentence is the full-length one and the whole point here is
+	// to leave the height and the build out of it.
+	faceAppearance := ""
+	if facts, ok := omniAIAppearanceFacts(persona); ok {
+		faceAppearance = RenderOmniAIFaceAppearance(facts)
+	}
 	if strings.TrimSpace(anchorURL) == "" {
 		// Without the picked picture there is nothing to condition on, and five
 		// unconditioned renders would be five more strangers rather than five
@@ -210,7 +218,7 @@ func (s *OmniChatOmniAILikenessService) StartReferences(
 		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
 			Kind:      models.OmniChatMediaKindImage,
 			PersonaID: persona.ID,
-			Prompt:    BuildOmniAIReferencePrompt(profile, variant),
+			Prompt:    BuildOmniAIReferencePrompt(profile, variant, faceAppearance),
 		}, variant)
 		if err != nil {
 			return started, fmt.Errorf("omnichat likeness: prepare %s: %w", variant, err)

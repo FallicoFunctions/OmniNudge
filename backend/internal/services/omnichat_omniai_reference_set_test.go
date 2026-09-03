@@ -25,7 +25,7 @@ func TestTheSetCarriesBothThingsSixReferencesAreFor(t *testing.T) {
 
 	var portraits, fullLength int
 	for _, key := range OmniAIReferenceVariantKeys() {
-		prompt := BuildOmniAIReferencePrompt(profile, key)
+		prompt := BuildOmniAIReferencePrompt(profile, key, "")
 		require.NotEmpty(t, prompt, key)
 		switch {
 		case strings.Contains(prompt, "Head and shoulders"):
@@ -45,8 +45,8 @@ func TestExpressionVarietyIsHalfOfWhatThePortraitsAreFor(t *testing.T) {
 	// A set that only ever shows one face teaches the adapter that face and
 	// nothing about how she looks when she is not holding it.
 	profile := referenceProfile()
-	require.Contains(t, BuildOmniAIReferencePrompt(profile, "portrait_neutral"), "neutral expression")
-	require.Contains(t, BuildOmniAIReferencePrompt(profile, "portrait_smiling"), "a small natural smile")
+	require.Contains(t, BuildOmniAIReferencePrompt(profile, "portrait_neutral", ""), "neutral expression")
+	require.Contains(t, BuildOmniAIReferencePrompt(profile, "portrait_smiling", ""), "a small natural smile")
 }
 
 func TestEveryReferenceSaysWhoSheIsRatherThanRelyingOnThePicture(t *testing.T) {
@@ -55,7 +55,7 @@ func TestEveryReferenceSaysWhoSheIsRatherThanRelyingOnThePicture(t *testing.T) {
 	// generated from her own picture still has to say who she is.
 	profile := referenceProfile()
 	for _, key := range OmniAIReferenceVariantKeys() {
-		prompt := BuildOmniAIReferencePrompt(profile, key)
+		prompt := BuildOmniAIReferencePrompt(profile, key, "")
 		require.Contains(t, prompt, "27-year-old East Asian woman", key)
 	}
 }
@@ -63,7 +63,7 @@ func TestEveryReferenceSaysWhoSheIsRatherThanRelyingOnThePicture(t *testing.T) {
 func TestAReferenceStatesTheMediumTheSameWayEverythingElseDoes(t *testing.T) {
 	anime := referenceProfile()
 	anime.RenderStyle = models.OmniChatRenderStyleAnime
-	prompt := BuildOmniAIReferencePrompt(anime, "portrait_neutral")
+	prompt := BuildOmniAIReferencePrompt(anime, "portrait_neutral", "")
 	require.Contains(t, prompt, "anime artwork")
 	require.NotContains(t, prompt, "photorealistically")
 
@@ -73,15 +73,15 @@ func TestAReferenceStatesTheMediumTheSameWayEverythingElseDoes(t *testing.T) {
 }
 
 func TestACharacterNobodyDescribedStillGetsReferences(t *testing.T) {
-	prompt := BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{}, "portrait_neutral")
+	prompt := BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{}, "portrait_neutral", "")
 	require.Contains(t, prompt, "An adult.")
 }
 
 func TestAnUnknownVariantIsNothingRatherThanAGuess(t *testing.T) {
 	// A caller asking for a framing this table does not have should get no
 	// render at all, not one that quietly falls back to somebody else's pose.
-	require.Empty(t, BuildOmniAIReferencePrompt(referenceProfile(), "underwater"))
-	require.Empty(t, BuildOmniAIReferencePrompt(referenceProfile(), ""))
+	require.Empty(t, BuildOmniAIReferencePrompt(referenceProfile(), "underwater", ""))
+	require.Empty(t, BuildOmniAIReferencePrompt(referenceProfile(), "", ""))
 }
 
 func TestAFaceIsNotRenderedInTheFrameBuiltForABody(t *testing.T) {
@@ -94,7 +94,7 @@ func TestAFaceIsNotRenderedInTheFrameBuiltForABody(t *testing.T) {
 		aspect, found := OmniAIReferenceVariantAspect(key)
 		require.True(t, found, key)
 
-		prompt := BuildOmniAIReferencePrompt(referenceProfile(), key)
+		prompt := BuildOmniAIReferencePrompt(referenceProfile(), key, "")
 		if strings.Contains(prompt, "Head and shoulders") {
 			require.Equal(t, "3:4", aspect, "%s is a face", key)
 			continue
@@ -137,7 +137,7 @@ func TestADescriptionNeverRunsIntoTheFraming(t *testing.T) {
 		Appearance: "a woman with freckles across her nose",
 	}
 	for _, variant := range OmniAIReferenceVariantKeys() {
-		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		prompt := BuildOmniAIReferencePrompt(profile, variant, "")
 		require.Contains(t, prompt, "freckles across her nose. ",
 			"the description has to end before the framing starts")
 		require.NotContains(t, prompt, "nose Full")
@@ -151,7 +151,7 @@ func TestADescriptionNeverRunsIntoTheFraming(t *testing.T) {
 func TestADescriptionThatEndsItselfIsNotPunctuatedTwice(t *testing.T) {
 	prompt := BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{
 		Appearance: "A woman with freckles.",
-	}, "portrait_neutral")
+	}, "portrait_neutral", "")
 	require.Contains(t, prompt, "freckles. Head and shoulders")
 	require.NotContains(t, prompt, "..")
 }
@@ -162,7 +162,7 @@ func TestAReferencePromptDoesNotClaimAReferenceItMayNotHave(t *testing.T) {
 	// have left out of the render.
 	for _, variant := range OmniAIReferenceVariantKeys() {
 		require.NotContains(t,
-			BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, variant),
+			BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, variant, ""),
 			"supplied reference")
 	}
 }
@@ -186,7 +186,7 @@ func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
 	for _, variant := range OmniAIReferenceVariantKeys() {
 		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
 			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+			Prompt: BuildOmniAIReferencePrompt(profile, variant, ""),
 		}, variant)
 		require.NoError(t, err)
 		// Everything the anchor refuses, a reference refuses too.
@@ -240,7 +240,7 @@ func TestOnlyTheReferencesRefuseAccessories(t *testing.T) {
 	for _, variant := range OmniAIReferenceVariantKeys() {
 		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
 			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+			Prompt: BuildOmniAIReferencePrompt(profile, variant, ""),
 		}, variant)
 		require.NoError(t, err)
 		for _, refused := range []string{"jewellery", "hat", "scarf", "bulky layers", "printed logo"} {
@@ -251,7 +251,7 @@ func TestOnlyTheReferencesRefuseAccessories(t *testing.T) {
 		// ornament. A negation there is not encoded by CLIP: "no jewellery"
 		// mentions jewellery, which is the fault the likeness prompt was fixed
 		// for and which this path still had.
-		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		prompt := BuildOmniAIReferencePrompt(profile, variant, "")
 		for _, negation := range []string{"no coat", "no scarf", "no jewellery", "no accessories", "no bulky"} {
 			require.NotContains(t, strings.ToLower(prompt), negation, variant)
 		}
@@ -313,7 +313,7 @@ func TestEverySupportingPictureIsDefendedTheSameWay(t *testing.T) {
 	for _, variant := range OmniAIReferenceVariantKeys() {
 		request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
 			Kind: models.OmniChatMediaKindImage, PersonaID: 4,
-			Prompt: BuildOmniAIReferencePrompt(profile, variant),
+			Prompt: BuildOmniAIReferencePrompt(profile, variant, ""),
 		}, variant)
 		require.NoError(t, err, variant)
 		for _, refused := range []string{"nude", "lingerie", "bottomless", "genitals",
@@ -329,7 +329,7 @@ func TestAThreeQuarterViewFacesUs(t *testing.T) {
 	// showing her back.
 	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman"}
 	for _, variant := range OmniAIReferenceVariantKeys() {
-		prompt := BuildOmniAIReferencePrompt(profile, variant)
+		prompt := BuildOmniAIReferencePrompt(profile, variant, "")
 		require.NotContains(t, prompt, "away from the camera", variant)
 	}
 }
@@ -379,7 +379,7 @@ func TestAPortraitIsNotToldAboutShoes(t *testing.T) {
 	for _, key := range OmniAIReferenceVariantKeys() {
 		variant, found := findOmniAIReferenceVariant(key)
 		require.True(t, found, key)
-		prompt := BuildOmniAIReferencePrompt(profile, key)
+		prompt := BuildOmniAIReferencePrompt(profile, key, "")
 
 		if strings.HasPrefix(variant.Framing, "Head and shoulders") {
 			for _, unshowable := range []string{"trousers", "shoes", "tucked in"} {
@@ -405,6 +405,6 @@ func TestEveryReferenceVariantSaysWhatSheIsWearing(t *testing.T) {
 		require.True(t, found, key)
 		require.NotEmpty(t, variant.Clothing, key)
 		require.Contains(t, BuildOmniAIReferencePrompt(
-			models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, key), "Wearing", key)
+			models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, key, ""), "Wearing", key)
 	}
 }

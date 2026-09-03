@@ -333,7 +333,7 @@ func run(owner int, name string, personaID, pick int, timeout time.Duration) err
 	for i, u := range final.ReferenceURLs {
 		fmt.Printf("  %d. %s\n", i+1, shorten(u))
 	}
-	fmt.Printf("\nher style survived the pick: taste=%q signature=%q\n",
+	fmt.Printf("\nher style survived the pick: taste=%v signature=%v\n",
 		final.Style.Taste != "", final.Style.SignatureItem != "")
 	return nil
 }

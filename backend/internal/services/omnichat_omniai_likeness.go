@@ -119,6 +119,23 @@ var omniAISpokenHairLength = map[string]string{
 // gets a shorter sentence rather than a description full of invented detail,
 // which is the whole reason those screens may be skipped.
 func RenderOmniAIAppearance(appearance OmniAIAppearance) string {
+	return renderOmniAIAppearance(appearance, false)
+}
+
+// RenderOmniAIFaceAppearance is the same description with the whole-body
+// attributes left out.
+//
+// Height and build are not visible above the chest, and naming them in a
+// head-and-shoulders prompt tells the model the body is in frame. That is the
+// same fault as naming her wrists in a portrait, one level up: the appearance
+// sentence is written once for a full-length likeness and was then reused
+// verbatim for the close portraits, which is why every one of them came back as
+// a three-quarter body shot.
+func RenderOmniAIFaceAppearance(appearance OmniAIAppearance) string {
+	return renderOmniAIAppearance(appearance, true)
+}
+
+func renderOmniAIAppearance(appearance OmniAIAppearance, faceOnly bool) string {
 	gender := strings.TrimSpace(strings.ToLower(appearance.Gender))
 
 	var subject []string
@@ -145,7 +162,7 @@ func RenderOmniAIAppearance(appearance OmniAIAppearance) string {
 	// The comma belongs to the height or not at all. Without it this reads "A
 	// woman, with long black hair", which is a pause nobody speaks.
 	joiner := " with "
-	if appearance.HeightInches > 0 {
+	if appearance.HeightInches > 0 && !faceOnly {
 		who += fmt.Sprintf(", %d'%d\" tall", appearance.HeightInches/12, appearance.HeightInches%12)
 		joiner = ", with "
 	}
@@ -160,7 +177,7 @@ func RenderOmniAIAppearance(appearance OmniAIAppearance) string {
 	if eyes := omniAIOpenOut(appearance.Eyes); eyes != "" {
 		features = append(features, eyes+" eyes")
 	}
-	if build := omniAISpokenBuildFor(appearance.Build); build != "" {
+	if build := omniAISpokenBuildFor(appearance.Build); build != "" && !faceOnly {
 		features = append(features, indefiniteArticle(build)+" "+build+" build")
 	}
 
