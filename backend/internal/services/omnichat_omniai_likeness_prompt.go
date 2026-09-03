@@ -145,7 +145,7 @@ func BuildOmniAILikenessPrompt(
 		// her and another telling it not to.
 		"A picture of one person, and nobody else.",
 		subject,
-		"She is wearing "+strings.TrimSpace(brief.Outfit),
+		"She is wearing "+continuesASentence(brief.Outfit),
 		omniAILikenessCoverage,
 		holdingSentence(brief.Holding),
 		startsASentence(brief.Setting),
@@ -173,13 +173,54 @@ func startsASentence(text string) string {
 	return string(unicode.ToUpper(first)) + text[width:]
 }
 
+// continuesASentence lowercases a phrase that is spliced into the middle of one.
+//
+// The mirror of startsASentence, and the same fault at the other end. An outfit
+// and a holding are written by a model as standalone phrases, so they come back
+// capitalised -- every real brief so far has begun "An oversized navy blue
+// jumper" or "A thick, dog-eared paperback". Spliced after "She is wearing"
+// they read "She is wearing An oversized navy blue jumper", which is the run-on
+// this file already fixes when a phrase lands after a full stop rather than
+// inside a clause.
+//
+// Only a determiner is lowered, and anything else is left exactly as written.
+// A blind lowercase would turn "Doc Martens" into "doc Martens", which is a
+// worse error than the one being fixed and one nothing would catch. Every brief
+// observed opens with one of these words, so the closed list covers the real
+// case while being unable to damage a name.
+func continuesASentence(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	word := text
+	if space := strings.IndexAny(word, " \t"); space > 0 {
+		word = word[:space]
+	}
+	if !omniAIPhraseOpeners[strings.ToLower(strings.Trim(word, ",;:"))] {
+		return text
+	}
+	first, width := utf8.DecodeRuneInString(text)
+	if first == utf8.RuneError {
+		return text
+	}
+	return string(unicode.ToLower(first)) + text[width:]
+}
+
+// The words a described outfit or object actually starts with. Articles,
+// determiners and small numbers -- none of which can be part of a name.
+var omniAIPhraseOpeners = map[string]bool{
+	"a": true, "an": true, "the": true, "her": true, "his": true, "their": true,
+	"one": true, "two": true, "three": true, "four": true, "several": true, "some": true,
+}
+
 // holdingSentence is empty far more often than not, and says nothing when it is.
 func holdingSentence(holding string) string {
 	holding = strings.TrimSpace(holding)
 	if holding == "" {
 		return ""
 	}
-	return "She is holding " + holding
+	return "She is holding " + continuesASentence(holding)
 }
 
 // joinOmniAIPromptSentences puts a prompt together out of whole sentences.

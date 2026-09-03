@@ -347,3 +347,36 @@ func TestTheModeIsNotSomethingACallerCanAskFor(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mode is invalid")
 }
+
+// A brief is written as a standalone phrase, so it comes back capitalised --
+// every real one so far begins "An oversized navy blue jumper" or "A thick,
+// dog-eared paperback". Spliced after "She is wearing" that reads "She is
+// wearing An oversized navy blue jumper", which is the same run-on this file
+// already fixes when a phrase lands after a full stop instead of inside a
+// clause. It shipped in every render made today.
+func TestASplicedPhraseReadsAsPartOfItsSentence(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(
+		models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"},
+		OmniAICandidateBrief{
+			Outfit:  "An oversized navy blue fisherman's jumper and dark jeans",
+			Setting: "A rocky beach at dawn",
+			Holding: "A thick, dog-eared paperback",
+		},
+	)
+	require.Contains(t, prompt, "She is wearing an oversized navy blue")
+	require.Contains(t, prompt, "She is holding a thick, dog-eared paperback")
+	// The setting still opens its own sentence and keeps its capital, which is
+	// the opposite correction and must not be undone by this one.
+	require.Contains(t, prompt, "A rocky beach at dawn.")
+}
+
+// Only a determiner is lowered. A blind lowercase would turn "Doc Martens" into
+// "doc Martens" -- a worse error than the one being fixed, and one that nothing
+// downstream would ever flag.
+func TestASplicedNameKeepsItsCapital(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(
+		models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"},
+		OmniAICandidateBrief{Outfit: "Doc Martens boots and a long cardigan", Setting: "a kitchen"},
+	)
+	require.Contains(t, prompt, "She is wearing Doc Martens boots")
+}

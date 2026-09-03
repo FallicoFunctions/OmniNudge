@@ -63,6 +63,12 @@
       "asks": "Does the other end do what this end assumes?"
     },
     {
+      "id": "C5",
+      "name": "Is the field wired, or only declared?",
+      "trigger": "a field is added to a struct that crosses a boundary",
+      "asks": "Is the (de)serialiser generated or hand-written? A hand-written decoder, scanner, encoder or column list ignores struct tags, so a field added without a line there is populated by nothing while reading as correct. Find the function that actually moves the bytes and check the new field appears in it -- then check every sibling path the field beside it already had: decode, bound, persist, log."
+    },
+    {
       "id": "D1",
       "name": "Probe with real inputs that must pass",
       "trigger": "any validation or parsing",
