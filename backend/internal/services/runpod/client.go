@@ -401,11 +401,19 @@ func decodeResult(raw json.RawMessage) (*Result, error) {
 			decodeResultMetadata(object, result)
 			return result, nil
 		}
-		// A direct object with a URL and metadata is also accepted even when the
-		// URL field was decoded through the MediaFile contract above.
-		if file := firstMediaFile(decodeMediaCollection(raw)); file != nil {
-			return &Result{Images: []MediaFile{*file}}, nil
-		}
+		// No object fallback here on purpose. One used to sit at this point,
+		// claiming to accept "a direct object with a URL and metadata" while
+		// returning an images-only Result -- so on that shape the worker build,
+		// the checkpoint, the seed and the timings were all dropped, silently,
+		// because the image it did return made the result look complete.
+		//
+		// It could not fire. Reaching it needs decodeMediaCollection to find a
+		// file in an object where every key it looks at -- url, image,
+		// image_url, video, video_url -- has already been read above, and any
+		// of those producing a file returns at the branch above with the
+		// metadata attached. Seven shapes were tried against it and none
+		// arrived. Restoring a fallback here means finding the payload that
+		// needs it first, and decoding the metadata into it.
 	}
 
 	if values, ok := rawJSONArray(raw); ok {
