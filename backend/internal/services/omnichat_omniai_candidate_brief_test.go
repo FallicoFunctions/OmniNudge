@@ -156,6 +156,31 @@ func TestTheBriefWriterDressesHerInterestsAndNeverAnOccupation(t *testing.T) {
 	require.Contains(t, omniAICandidateBriefSystemPrompt, "\"setting\" is one real place")
 }
 
+// A setting names a place, never a pose.
+//
+// It asked only for "one real place, described physically", and the writer
+// returned "Sitting on a low concrete retaining wall in a quiet urban park".
+// The render came back seated, contradicting the framing sentence that asks for
+// a standing figure -- and it read as the image model ignoring an instruction
+// when it had followed the brief exactly. The anchor is the one forward-facing
+// full body the 3D pipeline takes, so a seated one is the wrong input.
+func TestTheSettingNamesAPlaceAndNotAPose(t *testing.T) {
+	for _, stated := range []string{
+		"Name the place only, never what she is doing in it",
+		`Do not begin it with "Sitting on"`,
+		"her pose is decided elsewhere",
+	} {
+		require.Contains(t, omniAICandidateBriefSystemPrompt, stated)
+	}
+
+	// And the backstop, for a pose that gets through anyway. Leaning is
+	// deliberately absent: it is a standing pose and good renders have used it.
+	for _, refused := range []string{"sitting", "seated", "crouching", "kneeling", "reclining"} {
+		require.Contains(t, OmniAIRenderNegativePrompt, refused)
+	}
+	require.NotContains(t, OmniAIRenderNegativePrompt, "leaning")
+}
+
 func TestABriefIsBoundedSoItCannotFloodAPrompt(t *testing.T) {
 	err := OmniAICandidateBrief{
 		Outfit:  strings.Repeat("a", omniAIBriefMaxOutfitRunes+1),

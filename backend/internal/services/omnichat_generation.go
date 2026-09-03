@@ -214,6 +214,12 @@ const OmniAIRenderNegativePrompt = "second subject, extra person, extra faces, "
 	"bottomless, no trousers, missing trousers, bare legs with no skirt, " +
 	"exposed groin, pubic area, genitals, naked lower body, " +
 	"from behind, back view, rear view, facing away, looking over the shoulder, buttocks, " +
+	// Standing, and the backstop for it. The brief writer is told to keep a
+	// pose out of the setting; this is what catches one that gets through,
+	// the same way the view terms above catch a subject turned away. Leaning
+	// is deliberately absent -- it is a standing pose and several good renders
+	// used it.
+	"sitting, seated, sitting down, crouching, kneeling, squatting, lying down, reclining, " +
 	"seductive, sultry, alluring, provocative, pouting, parted lips, bedroom eyes, " +
 	"glamour shot, lingerie model, boudoir"
 
