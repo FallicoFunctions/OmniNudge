@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -88,9 +89,9 @@ const (
 	// So this describes where the fabric is, and every prohibition lives in
 	// OmniAIRenderNegativePrompt, which is the one place a diffusion model
 	// actually reads them.
-	omniAILikenessCoverage = "Her top is long, and its hem hangs below her hips and covers the " +
-		"waistband of her trousers completely. Her legs are covered to at least the knee, and she " +
-		"has shoes on."
+	omniAILikenessCoverageTemplate = "%[2]s top is long, and its hem hangs below %[1]s hips and " +
+		"covers the waistband of %[1]s trousers completely. %[2]s legs are covered to at least the " +
+		"knee, and %[3]s %[4]s shoes on."
 
 	// Shoulders square, because "facing the camera directly" alone produced two
 	// of four from behind. A profile picture of somebody's back is not a
@@ -123,6 +124,7 @@ const (
 func BuildOmniAILikenessPrompt(
 	profile models.OmniChatMediaIdentityProfile, brief OmniAICandidateBrief,
 ) string {
+	p := pronounsFor(profile.Subject)
 	subject := strings.TrimSpace(profile.Appearance)
 	if subject == "" {
 		subject = omniAILikenessFallbackSubject
@@ -145,13 +147,48 @@ func BuildOmniAILikenessPrompt(
 		// her and another telling it not to.
 		"A picture of one person, and nobody else.",
 		subject,
-		"She is wearing "+continuesASentence(brief.Outfit),
-		omniAILikenessCoverage,
-		holdingSentence(brief.Holding),
+		p.Subj+" "+p.is+" wearing "+continuesASentence(brief.Outfit),
+		fmt.Sprintf(omniAILikenessCoverageTemplate, p.poss, p.Poss, p.subj, p.has),
+		signatureSentence(p, brief.Signature),
+		holdingSentence(p, brief.Holding),
 		startsASentence(brief.Setting),
 		omniAILikenessFraming,
 		models.RenderMediumSentence(profile.RenderStyle),
 	)
+}
+
+// omniAIPronouns is how the prompt speaks about one character.
+//
+// The prompt is prose, so every sentence past the subject line needs one. They
+// were literals -- "She is wearing", "Her top is long", "she has shoes on" --
+// which described a woman regardless of who the character was, and contradicted
+// the subject line for everybody else.
+type omniAIPronouns struct {
+	subj, Subj, poss, Poss string
+	// is and has carry verb agreement, which "they" does not share with the
+	// other two. Without them the prompt read "They is wearing" and "they has
+	// shoes on". The creation form's own pronoun table carries an "is" for the
+	// same reason and says so.
+	is, has string
+}
+
+// pronounsFor mirrors the set the creation form uses, so the words a creator
+// read while answering are the words her prompt is written in.
+//
+// Empty is "she": that is what every prompt said before this existed, so a
+// character made earlier keeps the prompt it has always had. "They" is
+// deliberately not the fallback -- it reads as more than one person to a
+// diffusion model, and this prompt spends a whole negative list keeping the
+// frame to one.
+func pronounsFor(subject string) omniAIPronouns {
+	switch strings.ToLower(strings.TrimSpace(subject)) {
+	case "he", "man", "male":
+		return omniAIPronouns{"he", "He", "his", "His", "is", "has"}
+	case "they", "nonbinary", "non-binary":
+		return omniAIPronouns{"they", "They", "their", "Their", "are", "have"}
+	default:
+		return omniAIPronouns{"she", "She", "her", "Her", "is", "has"}
+	}
 }
 
 // startsASentence capitalises a brief's setting so it reads as one.
@@ -214,13 +251,31 @@ var omniAIPhraseOpeners = map[string]bool{
 	"one": true, "two": true, "three": true, "four": true, "several": true, "some": true,
 }
 
+// signatureSentence gives the one recurring item a sentence of its own.
+//
+// It used to be written into the outfit, and came back in none of four
+// renders. An outfit runs to forty words and the item landed at the end,
+// past the point where a diffusion model is still weighting tokens. Stated
+// separately it is a short clause of its own, which is the same reason
+// holdingSentence exists below.
+//
+// Placed before the setting so it reads as part of what she has on rather than
+// part of where she is standing.
+func signatureSentence(p omniAIPronouns, signature string) string {
+	signature = strings.TrimSpace(signature)
+	if signature == "" {
+		return ""
+	}
+	return p.Subj + " " + p.has + " " + continuesASentence(signature)
+}
+
 // holdingSentence is empty far more often than not, and says nothing when it is.
-func holdingSentence(holding string) string {
+func holdingSentence(p omniAIPronouns, holding string) string {
 	holding = strings.TrimSpace(holding)
 	if holding == "" {
 		return ""
 	}
-	return "She is holding " + continuesASentence(holding)
+	return p.Subj + " " + p.is + " holding " + continuesASentence(holding)
 }
 
 // joinOmniAIPromptSentences puts a prompt together out of whole sentences.

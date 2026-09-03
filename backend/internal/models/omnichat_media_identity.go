@@ -65,6 +65,19 @@ type OmniChatMediaIdentityProfile struct {
 	// be told every time; taste is an input to choosing an outfit, which
 	// happens a step earlier, where there is no prompt budget to spend.
 	Style OmniAIStyleProfile `json:"style,omitempty"`
+	// Subject is the pronoun the render prompt speaks about her in: "he", "she"
+	// or "they".
+	//
+	// It is here because the prompt is written in sentences and every one of
+	// them needs it. They were hardcoded to "she", so a character whose subject
+	// line read "A man in his early thirties" was then described with "She is
+	// wearing", "Her top is long" and "she has shoes on" -- a prompt arguing
+	// with itself for every character who is not a woman.
+	//
+	// Empty means "she", which is what every prompt said before this field
+	// existed. A character made since is correct; one made before keeps exactly
+	// the prompt it has always had rather than silently changing.
+	Subject string `json:"subject,omitempty"`
 }
 
 // OmniChatRenderStyleAnime is the one medium that is not the default. Stated

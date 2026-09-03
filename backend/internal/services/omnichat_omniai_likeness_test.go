@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -379,4 +380,72 @@ func TestASplicedNameKeepsItsCapital(t *testing.T) {
 		OmniAICandidateBrief{Outfit: "Doc Martens boots and a long cardigan", Setting: "a kitchen"},
 	)
 	require.Contains(t, prompt, "She is wearing Doc Martens boots")
+}
+
+// The signature item is stated as its own sentence, not folded into the outfit.
+//
+// It was written into the outfit clause and rendered in none of four real
+// pictures: an outfit runs to forty words and the item landed at the end,
+// past where a diffusion model is still weighting tokens.
+func TestTheSignatureItemGetsItsOwnSentence(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(
+		models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"},
+		OmniAICandidateBrief{
+			Outfit:    "a long green cardigan over a turtleneck and dark jeans",
+			Signature: "black over-ear headphones round her neck",
+			Setting:   "a bookshop",
+		},
+	)
+	require.Contains(t, prompt, "She has black over-ear headphones round her neck.")
+	// Its own clause, before the setting, so it reads as what she has on rather
+	// than as part of where she is standing.
+	require.Less(t, strings.Index(prompt, "She has black"), strings.Index(prompt, "A bookshop"))
+
+	// The fourth picture leaves it out, and says nothing at all rather than
+	// leaving an empty sentence behind.
+	without := BuildOmniAILikenessPrompt(
+		models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"},
+		OmniAICandidateBrief{Outfit: "a long green cardigan", Setting: "a bookshop"},
+	)
+	require.NotContains(t, without, "She has ")
+}
+
+// Every sentence past the subject line was hardcoded to "she", so a character
+// whose subject line read "A man in his early thirties" was then described with
+// "She is wearing" and "Her top is long" -- a prompt arguing with itself.
+func TestThePromptSpeaksAboutHerInHerOwnPronouns(t *testing.T) {
+	brief := OmniAICandidateBrief{
+		Outfit: "a navy jumper", Signature: "a leather satchel", Holding: "a paperback",
+		Setting: "a kitchen",
+	}
+	man := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "A man in his early thirties with a short beard.", Subject: "man",
+	}, brief)
+	for _, expected := range []string{
+		"He is wearing", "His top is long", "his hips", "he has shoes on",
+		"He has a leather satchel", "He is holding",
+	} {
+		require.Contains(t, man, expected)
+	}
+	require.NotContains(t, man, "She ")
+	require.NotContains(t, man, "Her ")
+
+	// Empty is "she", which is what every prompt said before this field
+	// existed, so a character made earlier keeps the prompt it has always had.
+	legacy := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "a woman with dark curly hair",
+	}, brief)
+	require.Contains(t, legacy, "She is wearing")
+	require.Contains(t, legacy, "Her top is long")
+
+	// "They" is available and deliberately not the fallback: it reads as more
+	// than one person to a diffusion model, and this prompt spends a whole
+	// negative list keeping the frame to one.
+	they := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{
+		Appearance: "a person with dark curly hair", Subject: "they",
+	}, brief)
+	require.Contains(t, they, "They are wearing")
+	require.Contains(t, they, "they have shoes on")
+	require.Contains(t, they, "They have a leather satchel")
+	require.Contains(t, they, "They are holding")
 }

@@ -26,7 +26,7 @@ func TestEveryStageOfTheCoverageChainCarriesTheRule(t *testing.T) {
 	for name, stage := range map[string]string{
 		"style writer":       omniAIStyleSystemPrompt,
 		"brief writer":       omniAICandidateBriefSystemPrompt,
-		"image prompt":       omniAILikenessCoverage,
+		"image prompt":       omniAILikenessCoverageTemplate,
 		"portrait standard":  omniChatRenderedPortraitSystemPrompt,
 		"reference standard": omniChatRenderedReferenceSystemPrompt,
 	} {

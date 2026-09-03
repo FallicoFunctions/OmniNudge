@@ -510,6 +510,9 @@ func encodeOmniAIIdentity(
 		Appearance:  described,
 		RenderStyle: medium,
 		Style:       style,
+		// The answer she was made with, so the render prompt speaks about her
+		// in the words the creator read while answering.
+		Subject: strings.ToLower(strings.TrimSpace(appearance.Gender)),
 	}})
 	if err != nil {
 		return nil, fmt.Errorf("omnichat omniai: encode identity: %w", err)

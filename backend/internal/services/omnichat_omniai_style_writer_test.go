@@ -139,7 +139,10 @@ func TestTheBriefWriterIsToldHerTasteAndHerSignatureItem(t *testing.T) {
 		require.Contains(t, sent, required)
 	}
 	for _, instruction := range []string{
-		"that is her wardrobe", "put it in at least three of the four",
+		"that is her wardrobe", "at least three of the four",
+		// Its own field, never folded into the outfit: written into that clause
+		// it rendered in none of four real pictures.
+		"never folded into \"outfit\"",
 		"outranks your own taste in clothes and nothing else",
 	} {
 		require.Contains(t, omniAICandidateBriefSystemPrompt, instruction)
