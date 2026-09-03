@@ -1,0 +1,29 @@
+diff --git a/.gitignore b/.gitignore
+index 4659b06cb..85f016741 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -149,5 +149,3 @@ tasks.json
+ # found by a guard written for a third one that a `git add -A` had just swept
+ # into a commit. Named rather than matched by a wildcard, because an
+ # extensionless pattern would hide real files.
+-/omninudge
+-/backend/bin/
+diff --git a/backend/.gitignore b/backend/.gitignore
+index 7c9413a2b..7a6341c4b 100644
+--- a/backend/.gitignore
++++ b/backend/.gitignore
+@@ -45,11 +45,11 @@ uploads/
+ # Build artifacts
+ tmp/
+ 
+-# Renders from cmd/zz_model_compare: real images, judged by eye, not repository content.
++# Renders from cmd: real images, judged by eye, not repository content.
+ model-compare/
+ 
+-# The compiled harness itself. `go build ./cmd/zz_model_compare` drops a 54 MB
++# The compiled harness itself. `go build ./cmd` drops a 54 MB
+ # binary here, and a `git add -A backend` swept one into a commit. Named rather
+ # than covered by a wildcard, because every other pattern in this file names a
+ # thing too, and a blanket rule for extensionless files would hide real ones.
+-/zz_model_compare
++

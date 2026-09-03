@@ -1,0 +1,26 @@
+diff --git a/backend/internal/models/omnichat_media_identity.go b/backend/internal/models/omnichat_media_identity.go
+index 0744579c3..6a5ea2c4c 100644
+--- a/backend/internal/models/omnichat_media_identity.go
++++ b/backend/internal/models/omnichat_media_identity.go
+@@ -27,9 +27,9 @@ type OmniChatMediaIdentityProfile struct {
+ 	// character configured to have no references at all. The comment on
+ 	// encodeOmniAIIdentity has always said only the appearance is written; this
+ 	// is what makes that true.
+-	Mode         OmniChatMediaIdentityMode `json:"identity_mode,omitempty"`
+-	Adapter      string                    `json:"identity_adapter,omitempty"`
+-	AdapterScale float64                   `json:"identity_adapter_scale,omitempty"`
++	Mode         OmniChatMediaIdentityMode `json:"identity_mode"`
++	Adapter      string                    `json:"identity_adapter"`
++	AdapterScale float64                   `json:"identity_adapter_scale"`
+ 	// Appearance is the persona's stable physical description: hair, build,
+ 	// age, distinguishing features. A single reference photo plus a general
+ 	// adapter reproduces identity only weakly, so stating the invariants in
+@@ -51,7 +51,7 @@ type OmniChatMediaIdentityProfile struct {
+ 	// asserts the medium in a different sentence from the subject.
+ 	RenderStyle    string   `json:"render_style,omitempty"`
+ 	ReferenceURLs  []string `json:"reference_urls,omitempty"`
+-	ReferenceLimit int      `json:"reference_limit,omitempty"`
++	ReferenceLimit int      `json:"reference_limit"`
+ 	LoraModelID    string   `json:"lora_model_id,omitempty"`
+ 	LoraWeightName string   `json:"lora_weight_name,omitempty"`
+ 	LoraScale      float64  `json:"lora_scale,omitempty"`
