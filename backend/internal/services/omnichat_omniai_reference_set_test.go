@@ -3,6 +3,7 @@ package services
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 
@@ -201,6 +202,29 @@ func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
 // of her. The prohibition therefore lives on the reference mode alone: in the
 // shared list it would strip the accessories out of the pictures somebody
 // chooses between, which is the opposite of what was asked for.
+// The reference negative is assembled after the request has been validated, so
+// the 1000-rune bound the normaliser enforces never sees it. Two independently
+// chosen strings land in one field with nothing connecting them, which is the
+// same shape as the prompt-budget fault the brief bounds already have a test
+// for -- and the failure is silent, because the worker accepts up to 2000 and
+// would keep taking it long after the server's own rule had been broken.
+func TestTheAssembledReferenceNegativeStaysInsideItsBound(t *testing.T) {
+	request, err := NormalizeOmniChatReferenceRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, PersonaID: 4, Prompt: "x",
+	}, "portrait_neutral")
+	require.NoError(t, err)
+	require.LessOrEqual(t, utf8.RuneCountInString(request.NegativePrompt), omniChatMaxNegativePromptRunes,
+		"the reference negative outgrew the bound its own normaliser enforces on every other caller")
+}
+
+// Her appearance description may say she wears glasses, and it is the sentence
+// that decides who she is. A negative refusing them would contradict the
+// positive prompt in the same render, with nothing to report which one won.
+func TestTheReferencesRefuseSunglassesAndNotGlasses(t *testing.T) {
+	require.Contains(t, omniAIReferenceNegativeAdditions, "sunglasses")
+	require.NotContains(t, strings.ReplaceAll(omniAIReferenceNegativeAdditions, "sunglasses", ""), "glasses")
+}
+
 func TestOnlyTheReferencesRefuseAccessories(t *testing.T) {
 	profile := models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"}
 

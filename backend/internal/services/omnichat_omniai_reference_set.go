@@ -86,9 +86,15 @@ const (
 // these in the shared list would take the hat, the headphones and the jewellery
 // out of the four somebody chooses between, which is most of what makes them
 // look like a person rather than a mannequin.
+//
+// Sunglasses and not glasses. Sunglasses hide the eyes, which is fatal for a
+// face adapter. Ordinary glasses can be part of who somebody is, and her
+// appearance description is free to say so -- refusing them here would put this
+// list in contradiction with the sentence describing her in the same prompt,
+// and nothing would report which of the two won.
 const omniAIReferenceNegativeAdditions = "jewellery, necklace, earrings, watch, bracelet, rings, " +
 	"hat, cap, headband, scarf, coat, jacket, bulky layers, bag, backpack, " +
-	"headphones, sunglasses, glasses, patterned fabric, printed logo, graphic print"
+	"headphones, sunglasses, patterned fabric, printed logo, graphic print"
 
 var omniAIReferenceVariants = []omniAIReferenceVariant{
 	{
