@@ -135,6 +135,30 @@ func TestHerStyleIsStoredWhereEverythingThatDrawsHerLooks(t *testing.T) {
 	require.Equal(t, "nothing tight", profile.Style.Note)
 }
 
+// The stored row says only what was decided about her.
+//
+// Every field omitted here has a default the resolver applies on read, and
+// writing them anyway put "identity_adapter_scale":0 and "reference_limit":0
+// into the blob -- invalid values that no reader uses and that read to somebody
+// debugging a persona as a character configured to have no references at all.
+func TestTheStoredIdentityBlobCarriesNoZeroedDefaults(t *testing.T) {
+	appearance, err := normaliseOmniAIAppearance(styleAnswers().Appearance)
+	require.NoError(t, err)
+	blob, err := encodeOmniAIIdentity(appearance, models.OmniAIStyleProfile{Taste: "heavy knits"})
+	require.NoError(t, err)
+
+	for _, absent := range []string{
+		"identity_adapter_scale", "reference_limit", "identity_mode", "identity_adapter",
+	} {
+		require.NotContains(t, string(blob), absent)
+	}
+	// And the defaults still arrive, because they come from the resolver.
+	profile := ResolveOmniChatMediaIdentityProfile(&models.BotPersona{ExtensionsJSON: blob})
+	require.Equal(t, 6, profile.ReferenceLimit)
+	require.Equal(t, models.OmniChatMediaIdentityAdapterIPAdapter, profile.Adapter)
+	require.Equal(t, "heavy knits", profile.Style.Taste)
+}
+
 // A creator who answered nothing about her looks but typed a style note has
 // said something, and the blob must not be dropped for being half empty.
 func TestANoteAloneIsStoredEvenWithNoAppearance(t *testing.T) {

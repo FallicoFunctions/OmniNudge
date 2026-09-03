@@ -19,9 +19,17 @@ const OmniChatMediaIdentityAdapterIPAdapter = "ip_adapter"
 // data. It is never accepted directly from a browser request and is carried on
 // a generation job only while it is being submitted to the provider.
 type OmniChatMediaIdentityProfile struct {
-	Mode         OmniChatMediaIdentityMode `json:"identity_mode"`
-	Adapter      string                    `json:"identity_adapter"`
-	AdapterScale float64                   `json:"identity_adapter_scale"`
+	// Omitted when unset rather than written as a zero. Every one of these has
+	// a default that NormalizeOmniChatMediaIdentityProfile applies on read, and
+	// writing them anyway put "identity_adapter_scale":0 and
+	// "reference_limit":0 into the stored blob -- values that are invalid, that
+	// no reader ever uses, and that read to somebody debugging a persona as a
+	// character configured to have no references at all. The comment on
+	// encodeOmniAIIdentity has always said only the appearance is written; this
+	// is what makes that true.
+	Mode         OmniChatMediaIdentityMode `json:"identity_mode,omitempty"`
+	Adapter      string                    `json:"identity_adapter,omitempty"`
+	AdapterScale float64                   `json:"identity_adapter_scale,omitempty"`
 	// Appearance is the persona's stable physical description: hair, build,
 	// age, distinguishing features. A single reference photo plus a general
 	// adapter reproduces identity only weakly, so stating the invariants in
@@ -43,7 +51,7 @@ type OmniChatMediaIdentityProfile struct {
 	// asserts the medium in a different sentence from the subject.
 	RenderStyle    string   `json:"render_style,omitempty"`
 	ReferenceURLs  []string `json:"reference_urls,omitempty"`
-	ReferenceLimit int      `json:"reference_limit"`
+	ReferenceLimit int      `json:"reference_limit,omitempty"`
 	LoraModelID    string   `json:"lora_model_id,omitempty"`
 	LoraWeightName string   `json:"lora_weight_name,omitempty"`
 	LoraScale      float64  `json:"lora_scale,omitempty"`

@@ -141,3 +141,13 @@ __pycache__/
 # Per-worktree local configuration: each worktree describes its own role,
 # so a tracked copy would overwrite every other worktree with one of them.
 tasks.json
+
+# Compiled Go binaries.
+#
+# Two of these were tracked from January -- 74 MB between them, referenced by no
+# script, Dockerfile or document, and downloaded by every clone since. They were
+# found by a guard written for a third one that a `git add -A` had just swept
+# into a commit. Named rather than matched by a wildcard, because an
+# extensionless pattern would hide real files.
+/omninudge
+/backend/bin/

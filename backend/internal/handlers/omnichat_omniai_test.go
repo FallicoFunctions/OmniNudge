@@ -294,6 +294,38 @@ func TestAppearanceBelongsToTheCreationRequestIdentity(t *testing.T) {
 	require.NotEqual(t, claims.hashes[0], claims.hashes[1])
 }
 
+// The style note is part of what is being made, for the same reason her
+// appearance is. Omitted from the hash, a second press with a different note
+// replays the first character and the new note vanishes without a word.
+func TestTheStyleNoteBelongsToTheCreationRequestIdentity(t *testing.T) {
+	maker := &omniAIMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	claims := &omniAIRequestHashRecorder{}
+	router := newOmniAITestRouter(maker, claims)
+	requestID := uuid.NewString()
+
+	first := postOmniAI(t, router, `{"request_id":"`+requestID+`","name":"Sam",
+		"style_note":"she dresses like a 90s skater"}`)
+	second := postOmniAI(t, router, `{"request_id":"`+requestID+`","name":"Sam",
+		"style_note":"always in black"}`)
+
+	require.Equal(t, http.StatusCreated, first.Code)
+	require.Equal(t, http.StatusCreated, second.Code)
+	require.Len(t, claims.hashes, 2)
+	require.NotEqual(t, claims.hashes[0], claims.hashes[1])
+}
+
+// And it has to arrive at the thing that dresses her, not merely be accepted.
+func TestTheStyleNoteReachesTheMaker(t *testing.T) {
+	maker := &omniAIMakerFake{persona: &models.BotPersona{ID: 12, Name: "Sam", Slug: "sam-12"}}
+	router := newOmniAITestRouter(maker, &omniAIRequestHashRecorder{})
+
+	response := postOmniAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam",
+		"style_note":"nothing tight, mostly black"}`)
+
+	require.Equal(t, http.StatusCreated, response.Code)
+	require.Equal(t, "nothing tight, mostly black", maker.answers.StyleNote)
+}
+
 func TestAnAccountThatCannotMakeOneIsToldWhy(t *testing.T) {
 	// §19 excludes free and the lowest tier. Somebody who cannot do this should
 	// learn that rather than meet a generic failure they cannot act on.
