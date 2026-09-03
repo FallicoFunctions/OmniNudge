@@ -354,10 +354,21 @@ func (c *OmniChatOmniAICreator) Create(ctx context.Context, creatorUserID int, a
 	// The persona it is written from does not exist yet, which is the point of
 	// assembling one here: these are the same four fields the row will carry,
 	// and the writer reads nothing else.
+	// The identity blob is built twice, once without her style to write it from
+	// and once with it to store. The writer reads her description out of this
+	// blob, so a persona assembled without it left that field empty on every
+	// call ever made -- the answers alone carry her age, gender and build, and
+	// not her hair, her colouring or anything that decides what colours she
+	// would put on.
+	described, err := encodeOmniAIIdentity(appearance, models.OmniAIStyleProfile{})
+	if err != nil {
+		return nil, err
+	}
 	style := c.writeStyle(ctx, &models.BotPersona{
 		Name:             name,
 		Personality:      renderOmniAIInterests(answers.Interests),
 		OmniAIAppearance: encoded,
+		ExtensionsJSON:   described,
 	}, answers.StyleNote)
 
 	extensions, err := encodeOmniAIIdentity(appearance, style)

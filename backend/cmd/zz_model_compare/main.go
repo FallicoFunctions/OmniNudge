@@ -91,12 +91,13 @@ type candidate struct {
 }
 
 type manifest struct {
-	Label          string      `json:"label"`
-	RenderedAt     string      `json:"rendered_at"`
-	Appearance     string      `json:"appearance"`
-	Personality    string      `json:"personality,omitempty"`
-	NegativePrompt string      `json:"negative_prompt"`
-	Candidates     []candidate `json:"candidates"`
+	Label          string                    `json:"label"`
+	RenderedAt     string                    `json:"rendered_at"`
+	Appearance     string                    `json:"appearance"`
+	Personality    string                    `json:"personality,omitempty"`
+	Style          models.OmniAIStyleProfile `json:"style,omitempty"`
+	NegativePrompt string                    `json:"negative_prompt"`
+	Candidates     []candidate               `json:"candidates"`
 }
 
 func main() {
@@ -108,6 +109,8 @@ func main() {
 	dryRun := flag.String("dry-run", "", "write the payloads to this file and submit nothing")
 	personality := flag.String("personality", "", "her personality, in prose. Set it to write the four briefs for real instead of reusing one fixed brief.")
 	briefsFrom := flag.String("briefs-from", "", "reuse the briefs from an earlier run's manifest.json, so a prompt change is the only thing that differs")
+	styleNote := flag.String("style-note", "", "the creator's own words about how she dresses, passed to the style writer")
+	noStyle := flag.Bool("no-style", false, "skip the style writer, so the briefs are written from her personality alone")
 	timeout := flag.Duration("timeout", 8*time.Minute, "how long to wait for one render")
 	flag.Parse()
 
@@ -124,12 +127,16 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if err := run(*label, *out, *appearance, *personality, *briefsFrom, seeds, *timeout, *dryRun); err != nil {
+	if err := run(*label, *out, *appearance, *personality, *briefsFrom, *styleNote, *noStyle,
+		seeds, *timeout, *dryRun); err != nil {
 		fail(err)
 	}
 }
 
-func run(label, out, appearance, personality, briefsFrom string, seeds []int64, timeout time.Duration, dryRun string) error {
+func run(
+	label, out, appearance, personality, briefsFrom, styleNote string, noStyle bool,
+	seeds []int64, timeout time.Duration, dryRun string,
+) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -144,7 +151,7 @@ func run(label, out, appearance, personality, briefsFrom string, seeds []int64, 
 	}
 
 	profile := models.OmniChatMediaIdentityProfile{Appearance: appearance}
-	briefs, err := briefsFor(cfg, personality, briefsFrom, len(seeds))
+	briefs, err := briefsFor(cfg, personality, briefsFrom, styleNote, noStyle, &profile, len(seeds))
 	if err != nil {
 		return err
 	}
@@ -192,6 +199,7 @@ func run(label, out, appearance, personality, briefsFrom string, seeds []int64, 
 		RenderedAt:     time.Now().UTC().Format(time.RFC3339),
 		Appearance:     appearance,
 		Personality:    personality,
+		Style:          profile.Style,
 		NegativePrompt: negative,
 	}
 
@@ -255,7 +263,10 @@ func run(label, out, appearance, personality, briefsFrom string, seeds []int64, 
 // one fixed brief is repeated, which is what a model comparison wants: a brief
 // that varied per seed would make the clothes another thing that changed
 // between two checkpoints, and there would be nothing left that did not.
-func briefsFor(cfg *config.Config, personality, briefsFrom string, count int) ([]services.OmniAICandidateBrief, error) {
+func briefsFor(
+	cfg *config.Config, personality, briefsFrom, styleNote string, noStyle bool,
+	profile *models.OmniChatMediaIdentityProfile, count int,
+) ([]services.OmniAICandidateBrief, error) {
 	// Reused from an earlier run when asked. Writing fresh briefs would make the
 	// clothes change alongside the prompt, and there would be nothing left to
 	// attribute a different result to.
@@ -300,6 +311,28 @@ func briefsFor(cfg *config.Config, personality, briefsFrom string, count int) ([
 	// real briefs and silently getting four identical ones would be read as the
 	// writer having produced them.
 	persona := &models.BotPersona{Name: "Candidate", Personality: personality}
+
+	// Her taste, written by the real writer, then carried on the profile the
+	// brief writer resolves it from. This is the whole experiment: the same
+	// person and the same seeds, dressed once out of a written wardrobe and
+	// once out of her personality alone.
+	// Encoded before the style is written, not after. The writer reads her
+	// description off this blob, so setting it afterwards left it empty and the
+	// wardrobe came back written for nobody -- "She wears..." for a man.
+	persona.ExtensionsJSON = mustEncodeProfile(*profile)
+	if !noStyle {
+		style, err := services.NewModelOmniAIStyleWriter(
+			openrouter.NewClient(cfg.OpenRouter.APIKey, model),
+		).WriteStyleProfile(context.Background(), persona, styleNote)
+		if err != nil {
+			return nil, fmt.Errorf("write her style: %w", err)
+		}
+		profile.Style = style
+		fmt.Printf("taste:     %s\nsignature: %s\nnote:      %s\n\n",
+			style.Taste, orDash(style.SignatureItem), orDash(style.Note))
+	}
+	persona.ExtensionsJSON = mustEncodeProfile(*profile)
+
 	written, err := services.NewModelOmniAICandidateBriefWriter(
 		openrouter.NewClient(cfg.OpenRouter.APIKey, model),
 	).WriteCandidateBriefs(context.Background(), persona, count)
@@ -308,6 +341,19 @@ func briefsFor(cfg *config.Config, personality, briefsFrom string, count int) ([
 	}
 	fmt.Printf("briefs written by %s\n\n", model)
 	return written, nil
+}
+
+// mustEncodeProfile puts the profile where ResolveOmniChatMediaIdentityProfile
+// reads it, so the brief writer receives her taste through the same path the
+// product uses rather than through a field this command sets directly.
+func mustEncodeProfile(profile models.OmniChatMediaIdentityProfile) []byte {
+	encoded, err := json.Marshal(struct {
+		OmniChatMedia models.OmniChatMediaIdentityProfile `json:"omnichat_media"`
+	}{OmniChatMedia: profile})
+	if err != nil {
+		return nil
+	}
+	return encoded
 }
 
 // imageInput is field for field what BuildImageSpec sends for an anchor

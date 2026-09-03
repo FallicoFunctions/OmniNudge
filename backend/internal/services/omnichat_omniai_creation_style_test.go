@@ -72,6 +72,35 @@ func TestHerStyleIsWrittenFromWhoSheIsAboutToBe(t *testing.T) {
 	require.Equal(t, "nothing tight", style.Note)
 }
 
+// The writer reads her description off the identity blob, not off the answers.
+//
+// The creator assembled a persona without one, so that field was empty on every
+// call ever made: the answers carry her age, gender and build, and none of her
+// hair, her colouring or anything that decides what colours she would put on.
+// Caught by running the real writer and reading the payload it was sent -- the
+// wardrobe came back written for nobody, and said "She wears" about a man.
+func TestTheStyleWriterIsToldWhatSheLooksLike(t *testing.T) {
+	appearance, err := normaliseOmniAIAppearance(OmniAIAppearance{
+		Gender: "man", Age: 31, Eyes: "brown", Style: "realistic",
+	})
+	require.NoError(t, err)
+	encoded, err := json.Marshal(appearance)
+	require.NoError(t, err)
+	described, err := encodeOmniAIIdentity(appearance, models.OmniAIStyleProfile{})
+	require.NoError(t, err)
+
+	writer := &styleWriterStub{}
+	(&OmniChatOmniAICreator{}).SetStyleWriter(writer).writeStyle(context.Background(),
+		&models.BotPersona{
+			Name: "Ade", Personality: "Drawn to music.",
+			OmniAIAppearance: encoded, ExtensionsJSON: described,
+		}, "")
+
+	require.NotEmpty(t, ResolveOmniChatMediaIdentityProfile(writer.called).Appearance,
+		"the persona handed to the style writer carries no description of her")
+	require.Contains(t, ResolveOmniChatMediaIdentityProfile(writer.called).Appearance, "man")
+}
+
 // An unreachable model costs her a written wardrobe and never a character.
 func TestAFailedStyleWriteStillMakesTheCharacter(t *testing.T) {
 	creator := (&OmniChatOmniAICreator{}).SetStyleWriter(
