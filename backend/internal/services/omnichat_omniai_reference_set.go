@@ -71,8 +71,18 @@ const (
 	// removing it. What the reference needs is plainness, so plainness is what
 	// it now asks for, and the prohibitions moved to
 	// omniAIReferenceNegativeAdditions where a diffusion model reads them.
+	// Long-sleeved, and no wrists. Dropping the wrists took "long-sleeved" out
+	// with it in the same edit, and both portraits came back sleeveless -- a
+	// reference showing bare arms teaches the adapter bare arms. The sleeve
+	// length has to stay; only the wrists go.
+	//
+	// No wrists. They were named here -- "unadorned at the neck, ears and
+	// wrists" -- and a head-and-shoulders crop has no wrists in it, so naming
+	// them told the model they were in frame and every portrait variant came
+	// back as a three-quarter body shot. The full-body clothing below may
+	// mention them; this may not.
 	omniAIReferencePortraitClothing = "Wearing a plain fitted long-sleeved top with a plain neckline, " +
-		"unadorned at the neck, ears and wrists."
+		"unadorned at the neck and ears."
 	omniAIReferenceFullBodyClothing = "Wearing plain close-fitting clothes in one layer: a fitted " +
 		"long-sleeved top tucked in, fitted full-length trousers, and flat shoes, " +
 		"all plain, unpatterned and unadorned."
@@ -101,7 +111,7 @@ var omniAIReferenceVariants = []omniAIReferenceVariant{
 		Key:      "portrait_neutral",
 		Clothing: omniAIReferencePortraitClothing,
 		Aspect:   "3:4",
-		Framing:  "Head and shoulders, facing the camera, neutral expression.",
+		Framing:  "Head and shoulders only, cropped at the chest, the face filling most of the frame, facing the camera, neutral expression.",
 	},
 	{
 		Key:      "portrait_smiling",
@@ -110,13 +120,13 @@ var omniAIReferenceVariants = []omniAIReferenceVariant{
 		// Expression variety is half of what the portraits are for. A set that
 		// only ever shows one face teaches the adapter that face and nothing
 		// about how she looks when she is not holding it.
-		Framing: "Head and shoulders, facing the camera, a small natural smile.",
+		Framing: "Head and shoulders only, cropped at the chest, the face filling most of the frame, facing the camera, a small natural smile.",
 	},
 	{
 		Key:      "portrait_three_quarter",
 		Clothing: omniAIReferencePortraitClothing,
 		Aspect:   "3:4",
-		Framing:  "Head and shoulders, turned three-quarters toward the camera, neutral expression.",
+		Framing:  "Head and shoulders only, cropped at the chest, the face filling most of the frame, turned three-quarters toward the camera, neutral expression.",
 	},
 	{
 		Key:      "full_body_three_quarter",
