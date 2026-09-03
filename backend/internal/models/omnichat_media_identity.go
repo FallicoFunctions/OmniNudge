@@ -130,6 +130,15 @@ func NormalizeOmniChatMediaIdentityProfile(profile OmniChatMediaIdentityProfile)
 		profile.RenderStyle = ""
 	}
 	profile.Appearance = boundProvenanceText(profile.Appearance, omniChatMaxAppearanceRunes)
+	// Bounded here for the same reason Appearance is. The writer trims what it
+	// produces, but this is the read path: a profile arrives out of a jsonb
+	// column that a migration, an admin edit or a future writer could have put
+	// anything into, and every other text field on this struct is bounded at
+	// exactly this point. A style that skipped it would be the one field able
+	// to grow a prompt without limit.
+	profile.Style.Taste = boundProvenanceText(profile.Style.Taste, OmniAIStyleMaxTasteRunes)
+	profile.Style.SignatureItem = boundProvenanceText(profile.Style.SignatureItem, OmniAIStyleMaxSignatureItemRunes)
+	profile.Style.Note = boundProvenanceText(profile.Style.Note, OmniAIStyleMaxNoteRunes)
 	// Bound the private reference list the same way the public gallery is
 	// bounded, so persona metadata cannot make the worker fetch arbitrarily
 	// many images.
