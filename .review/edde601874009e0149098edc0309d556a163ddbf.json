@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "head": "18be32f6c529caba1e38ee939b216ab94a24c372",
+  "head": "31dc71f533eb0d28d12aa3bfc8547b2b96022ac2",
   "base": "edde601874009e0149098edc0309d556a163ddbf",
   "scope": {
     "files": [
@@ -504,5 +504,6 @@
     "scripts": "scripts/no-build-artifacts.test.sh -- 5 passed",
     "hook": ".claude/hooks/review-ledger-verify.test.sh -- 45 passed",
     "python": "worker contract and generators -- ok"
-  }
+  },
+  "note_on_head": "the last commit of reviewed work. The ledger is committed after it, so this is one commit behind the tip by construction -- recording HEAD inside a commit moves HEAD."
 }
