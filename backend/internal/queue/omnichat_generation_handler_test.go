@@ -1214,3 +1214,42 @@ func TestEachStandardRefusesInItsOwnWords(t *testing.T) {
 		require.Equal(t, c.reason, permanent.code, string(c.mode))
 	}
 }
+
+// Only the close portraits render without the whole-image adapter.
+//
+// It conditions on the entire reference, so it supplies a whole standing
+// person in the anchor's clothes and the anchor's room. That is what a scene
+// wants and the opposite of what a head-and-shoulders reference asks for: with
+// it on, every portrait variant came back as a three-quarter body shot and no
+// prompt wording tried against it won.
+//
+// The other three rows are the point of the test. A flag that switched it off
+// everywhere would take her proportions out of scenes and out of the
+// full-length references, which is the drift the adapter exists to stop.
+func TestOnlyThePortraitReferencesRenderWithoutTheBodyAdapter(t *testing.T) {
+	cfg := config.OmniChatMediaConfig{RunPodImageEndpointID: "ep", Provider: "runpod"}
+	for _, c := range []struct {
+		name    string
+		mode    models.OmniChatGenerationMode
+		aspect  string
+		without bool
+	}{
+		{"a close portrait reference", models.OmniChatGenerationModeLikenessReference, "3:4", true},
+		{"a full-length reference", models.OmniChatGenerationModeLikenessReference, "9:16", false},
+		{"the anchor likeness", models.OmniChatGenerationModeLikeness, "9:16", false},
+		{"a scene", models.OmniChatGenerationModeContextual, "16:9", false},
+	} {
+		spec, err := BuildImageSpec(cfg, &models.OmniChatGenerationJob{
+			ID: uuid.New(), Kind: models.OmniChatMediaKindImage,
+			Mode: c.mode, AspectRatio: c.aspect, EffectivePrompt: "x",
+		}, nil)
+		require.NoError(t, err, c.name)
+		value, present := spec.Input["body_adapter"]
+		if !c.without {
+			require.False(t, present, "%s must not ask for the adapter to be switched off", c.name)
+			continue
+		}
+		require.True(t, present, "%s renders without the body adapter", c.name)
+		require.Equal(t, false, value, c.name)
+	}
+}

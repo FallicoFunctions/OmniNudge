@@ -68,6 +68,12 @@ class GenerationRequest:
     lora_weight_name: str | None
     lora_scale: float
     seed: int | None
+    # None means the endpoint decides. False switches the whole-image adapter
+    # off for this render alone, which the close portraits in a character's
+    # reference set ask for: that adapter supplies a whole standing person and
+    # overrides a prompt asking for head and shoulders. True is not accepted --
+    # a request must not be able to turn on what the operator has disabled.
+    body_adapter: bool | None
 
 
 def _text(value: Any, field: str, limit: int, *, required: bool = False) -> str:
@@ -130,6 +136,22 @@ def _seed(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0 or value > 2**63 - 1:
         raise ContractError("invalid_input", "seed must be a non-negative integer")
     return value
+
+
+def _body_adapter(value: Any) -> bool | None:
+    """Only ever False or unset.
+
+    Accepting True would let a forged request re-enable an adapter the operator
+    switched off, so the one direction that can be asked for is the one that
+    removes conditioning rather than adds it.
+    """
+    if value is None or value == "":
+        return None
+    if value is False:
+        return False
+    if value is True:
+        return None
+    raise ContractError("invalid_input", "body_adapter must be a boolean")
 
 
 def _bounded_float(value: Any, field: str, default: float) -> float:
@@ -277,6 +299,7 @@ def validate_input(raw: Any, expected_kind: str | None = None) -> GenerationRequ
         lora_weight_name=lora_weight_name,
         lora_scale=lora_scale,
         seed=_seed(raw.get("seed")),
+        body_adapter=_body_adapter(raw.get("body_adapter")),
     )
 
 

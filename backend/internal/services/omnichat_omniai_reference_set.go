@@ -150,6 +150,17 @@ var omniAIReferenceVariants = []omniAIReferenceVariant{
 	},
 }
 
+// OmniAIReferenceIsPortraitFrame reports whether a reference rendered in this
+// aspect is one of the close portraits.
+//
+// It exists so the queue can ask the question without matching on a variant
+// key it has no business knowing, and so a portrait variant added later is
+// covered by the aspect it is given rather than by somebody remembering to
+// extend a list somewhere else.
+func OmniAIReferenceIsPortraitFrame(aspect string) bool {
+	return strings.TrimSpace(aspect) == omniAIReferencePortraitAspect
+}
+
 // OmniAIReferenceVariantKeys lists the variants, in the order they are asked for.
 func OmniAIReferenceVariantKeys() []string {
 	keys := make([]string, 0, len(omniAIReferenceVariants))

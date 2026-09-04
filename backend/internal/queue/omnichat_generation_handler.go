@@ -1284,6 +1284,22 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	if len(referenceURLs) > 0 {
 		input["reference_image_urls"] = referenceURLs
 	}
+	// The close portraits render without the whole-image adapter.
+	//
+	// It conditions on the entire reference, so it supplies a whole standing
+	// person in the anchor's clothes and the anchor's room -- which is what a
+	// scene wants and the exact opposite of what a head-and-shoulders
+	// reference asks for. Measured across four runs: with it on, every
+	// portrait variant came back as a three-quarter body shot and no prompt
+	// wording tried against it won; with it off the same prompt renders a
+	// plain portrait.
+	//
+	// Only the portraits. The full-length variants and every scene keep it,
+	// because it is what stops her figure drifting between generations.
+	if job.Mode == models.OmniChatGenerationModeLikenessReference &&
+		services.OmniAIReferenceIsPortraitFrame(aspectRatio) {
+		input["body_adapter"] = false
+	}
 	// The image phase is where every explicit pixel is produced, so it is also
 	// the only place the content entitlement changes anything.
 	endpointID := strings.TrimSpace(cfg.RunPodImageEndpointID)

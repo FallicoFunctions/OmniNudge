@@ -788,24 +788,39 @@ def _identity_reference_image(references: list[Any]) -> Any:
     return _identity_reference_images(references)[0]
 
 
-def body_adapter_enabled() -> bool:
+def body_adapter_enabled(request: GenerationRequest | None = None) -> bool:
     """Whether the whole-image adapter is loaded alongside the face adapter.
 
     The face adapter is trained on face crops and carries no body information,
     so figure and proportions drift between generations. The general "plus"
     adapter conditions on the whole reference and fixes that, at the cost of
     also carrying clothing, pose and background, which fight the scene prompt.
-    It therefore runs at a much lower scale than the face adapter, and can be
-    switched off entirely without a rebuild.
+    It therefore runs at a much lower scale than the face adapter.
+
+    A request may switch it off for itself, and the close portraits in a
+    character's reference set do. Measured, not assumed: with it on, every one
+    of those came back as a three-quarter body shot wearing the anchor's
+    clothes in the anchor's room, and no wording tried against it won -- the
+    prompt asks for head and shoulders and the adapter supplies a whole
+    standing person. With it off the same prompt renders a plain portrait.
+
+    It stays on everywhere else, because a scene without it drifts in figure
+    between generations, which is the fault it was added for. The environment
+    variable remains the operator's blanket switch and still wins when it is
+    off: a request cannot turn on what the endpoint has disabled.
     """
-    return os.getenv("OMNICHAT_BODY_ADAPTER", "1").strip().lower() not in {"0", "false", "no", "off"}
+    if os.getenv("OMNICHAT_BODY_ADAPTER", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return False
+    if request is not None and request.body_adapter is False:
+        return False
+    return True
 
 
 def body_adapter_scale() -> float:
     return _bounded_float_env("OMNICHAT_BODY_ADAPTER_SCALE", 0.3, minimum=0.0, maximum=1.0)
 
 
-def identity_adapter_weights() -> list[str]:
+def identity_adapter_weights(request: GenerationRequest | None = None) -> list[str]:
     """Adapter weight files in the order their images must be supplied.
 
     Order is load order, and diffusers requires ip_adapter_image to be a list
@@ -813,7 +828,7 @@ def identity_adapter_weights() -> list[str]:
     the whole generation, so both are derived from this one list.
     """
     face = os.getenv("OMNICHAT_IP_ADAPTER_WEIGHT", DEFAULT_IP_ADAPTER_WEIGHT)
-    if not body_adapter_enabled():
+    if not body_adapter_enabled(request):
         return [face]
     return [os.getenv("OMNICHAT_BODY_ADAPTER_WEIGHT", DEFAULT_BODY_ADAPTER_WEIGHT), face]
 
@@ -834,7 +849,9 @@ def _body_reference_image(image: Any) -> Any:
     return canvas.resize((768, 768), Image.Resampling.LANCZOS)
 
 
-def build_ip_adapter_images(references: list[Any]) -> list[Any]:
+def build_ip_adapter_images(
+    references: list[Any], request: GenerationRequest | None = None
+) -> list[Any]:
     """Build one entry per loaded adapter, in load order.
 
     Diffusers reads the outer list as one entry per adapter and each inner list
@@ -868,7 +885,7 @@ def build_ip_adapter_images(references: list[Any]) -> list[Any]:
     faces = _identity_reference_images([p[0] for p in pairs], [p[1] for p in pairs])
     anchor_repeat = _positive_int_env("OMNICHAT_IDENTITY_ANCHOR_REPEAT", 2, minimum=1, maximum=4)
     face_entry = [faces[0]] * anchor_repeat + faces[1:]
-    if not body_adapter_enabled():
+    if not body_adapter_enabled(request):
         return [face_entry]
     # A close portrait carries no proportions and would dilute them, so the body
     # adapter only sees references where the body is actually in frame. The two
@@ -1024,7 +1041,7 @@ class ImageGenerator:
     def _load(self, request: GenerationRequest, *, image_to_image: bool = False):
         has_references = bool(request.reference_image_urls) and not image_to_image
         adapter_scale = identity_adapter_scale(request)
-        adapter_weights = identity_adapter_weights()
+        adapter_weights = identity_adapter_weights(request)
         key = (
             "image2image" if image_to_image else "text2image",
             has_references,
@@ -1148,7 +1165,7 @@ class ImageGenerator:
             # Diffusers requires exactly one entry per loaded adapter and
             # raises ValueError otherwise, so this list is always built from
             # the same source as the adapter weights.
-            kwargs["ip_adapter_image"] = build_ip_adapter_images(references)
+            kwargs["ip_adapter_image"] = build_ip_adapter_images(references, request)
         try:
             with torch.inference_mode():
                 result = pipe(**kwargs)

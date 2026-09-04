@@ -1058,3 +1058,33 @@ class VideoRenderOutputTests(unittest.TestCase):
             with self.assertRaises(ModelError) as raised:
                 self._render(empty)
             self.assertIn("no frames", str(raised.exception))
+
+
+class BodyAdapterSelectionTests(unittest.TestCase):
+    """The request may drop the body adapter; the endpoint variable still wins."""
+
+    def _request(self, body_adapter):
+        import types as _types
+
+        return _types.SimpleNamespace(body_adapter=body_adapter)
+
+    def test_a_request_can_render_without_it(self):
+        from .generators import body_adapter_enabled, identity_adapter_weights
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(body_adapter_enabled(None))
+            self.assertFalse(body_adapter_enabled(self._request(False)))
+            # Two weights with it, one without -- and the pipeline cache key is
+            # built from this tuple, so a cached pipeline carrying both adapters
+            # cannot be handed to a request that asked for only the face.
+            self.assertEqual(len(identity_adapter_weights(None)), 2)
+            self.assertEqual(len(identity_adapter_weights(self._request(False))), 1)
+
+    def test_the_endpoint_switch_still_wins(self):
+        from .generators import body_adapter_enabled
+
+        with patch.dict(os.environ, {"OMNICHAT_BODY_ADAPTER": "0"}, clear=True):
+            # Nothing a request says turns it back on.
+            self.assertFalse(body_adapter_enabled(None))
+            self.assertFalse(body_adapter_enabled(self._request(None)))
+            self.assertFalse(body_adapter_enabled(self._request(False)))

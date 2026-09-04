@@ -152,3 +152,39 @@ class SceneContractCompletenessTests(unittest.TestCase):
     def test_include_user_body_must_be_a_boolean(self):
         with self.assertRaises(ContractError):
             validate_input(self._payload({"include_user_body": "yes"}))
+
+
+class BodyAdapterContractTests(unittest.TestCase):
+    """A request may switch the whole-image adapter off, and may not switch it on.
+
+    The close portraits in a character's reference set ask for it off: that
+    adapter supplies a whole standing person and overrides a prompt asking for
+    head and shoulders. Accepting True would let a forged request re-enable
+    conditioning the operator had disabled, so the only direction a request can
+    ask for is the one that removes it.
+    """
+
+    def _request(self, **extra):
+        payload = {
+            "kind": "image",
+            "mode": "create",
+            "prompt": "a portrait",
+            "aspect_ratio": "3:4",
+        }
+        payload.update(extra)
+        return validate_input(payload, expected_kind="image")
+
+    def test_absent_leaves_the_endpoint_to_decide(self):
+        self.assertIsNone(self._request().body_adapter)
+        self.assertIsNone(self._request(body_adapter="").body_adapter)
+
+    def test_false_switches_it_off_for_this_render(self):
+        self.assertIs(self._request(body_adapter=False).body_adapter, False)
+
+    def test_true_is_not_a_way_to_turn_it_back_on(self):
+        self.assertIsNone(self._request(body_adapter=True).body_adapter)
+
+    def test_anything_else_is_refused(self):
+        for value in ("no", 0, 1, [], {}):
+            with self.assertRaises(ContractError):
+                self._request(body_adapter=value)
