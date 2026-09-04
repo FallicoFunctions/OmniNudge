@@ -145,5 +145,35 @@ allows 'ls -la backend | grep env'
 allows 'grep -rn "OMNICHAT_EXPLICIT" backend/internal/config/'
 
 echo
+# `git add -A` is how both build artifacts reached this repository, and it is
+# refused only when it would actually do harm -- banning it outright would be a
+# rule to remember, which is the shape of failure this replaces.
+#
+# The ignored case is the one worth asserting. A file matching .gitignore cannot
+# be staged by `git add -A` at all, so refusing it would train somebody to work
+# around the guard for something that was never a risk.
+HOOK=$(cd "$(dirname "$HOOK")" && pwd)/$(basename "$HOOK")
+addsandbox=$(mktemp -d)
+here=$PWD
+cd "$addsandbox" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p backend && printf '/ignored_*\n' > .gitignore
+git add .gitignore && git commit -qm init
+
+dd if=/dev/zero of=ignored_big bs=1024 count=7000 2>/dev/null
+allows "git add -A"
+allows "git add ."
+
+dd if=/dev/zero of=backend/big_untracked bs=1024 count=7000 2>/dev/null
+blocks "git add -A"
+blocks "git add ."
+blocks "git add --all"
+allows "git add backend/one_file.go"
+
+rm -f backend/big_untracked
+allows "git add -A"
+cd "$here" || exit 1
+rm -rf "$addsandbox"
+
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

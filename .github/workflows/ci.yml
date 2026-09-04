@@ -50,6 +50,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Before anything else, because it is cheap and because the thing it
+      # catches is permanent once merged.
+      #
+      # The same check runs in a pre-commit hook, and git hooks are not cloned:
+      # they guard this one machine and nothing else. A 79 MB binary reached
+      # main once already, from a checkout where the hook existed and was wired
+      # to nothing. This is the copy that runs everywhere.
+      - name: No tracked build artifacts
+        run: bash scripts/no-build-artifacts.sh
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

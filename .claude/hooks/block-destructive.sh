@@ -100,6 +100,32 @@ if echo "$COMMAND" | grep -qE 'git\s+push\s+.*(--force|--force-with-lease|--mirr
   deny "Blocked force push or hard reset. If intentional, run it manually."
 fi
 
+# --- staging something nobody looked at --------------------------------------
+#
+# `git add -A` is how both build artifacts reached this repository. It is not
+# refused outright: it is the right command for a multi-file edit and banning it
+# would be a rule to remember, which is the shape of failure this is meant to
+# replace. It is refused only when it would actually do harm.
+#
+# The pre-commit hook and CI both catch a large file too, and this is the layer
+# that catches it earliest -- before it is staged, while the fix is still `rm`
+# rather than a history rewrite. The first one cost a force-push to a public
+# repository; the second was caught only because a review printed the file list.
+#
+# Only untracked files are considered. A large file already tracked is a
+# separate problem and the other two layers own it.
+if echo "$TARGET" | grep -qE '(^|[;&|]|\s)git\s+add\s+(-A|--all|\.)(\s|$)'; then
+  big=$(git ls-files --others --exclude-standard -z 2>/dev/null \
+    | xargs -0 -I{} sh -c 'test -f "{}" && find "{}" -size +5000k -print' 2>/dev/null | head -3)
+  if [ -n "$big" ]; then
+    deny "Blocked: git add -A with an untracked file over 5 MB present:
+$big
+
+That is how a 79 MB binary reached this repository twice. Delete it, or add
+the paths you meant explicitly."
+  fi
+fi
+
 # --- reading credentials -----------------------------------------------------
 #
 # Anywhere, not only in the working directory. The old rule required whitespace
