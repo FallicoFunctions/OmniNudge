@@ -74,7 +74,7 @@ func TestEverySystemPromptIsInTheInventory(t *testing.T) {
 	}, 0)
 	require.NoError(t, err)
 
-	var found []string
+	found := map[string]string{}
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
@@ -82,9 +82,15 @@ func TestEverySystemPromptIsInTheInventory(t *testing.T) {
 				if !ok {
 					return true
 				}
-				for _, ident := range spec.Names {
-					if strings.HasSuffix(ident.Name, "SystemPrompt") {
-						found = append(found, ident.Name)
+				for i, ident := range spec.Names {
+					if !strings.HasSuffix(ident.Name, "SystemPrompt") {
+						continue
+					}
+					found[ident.Name] = ""
+					if i < len(spec.Values) {
+						if lit, isLit := spec.Values[i].(*ast.BasicLit); isLit {
+							found[ident.Name] = strings.Trim(lit.Value, "`\"")
+						}
 					}
 				}
 				return true
@@ -93,12 +99,20 @@ func TestEverySystemPromptIsInTheInventory(t *testing.T) {
 	}
 	require.NotEmpty(t, found, "the source scan found no system prompts, so it is checking nothing")
 
-	for _, name := range found {
-		_, listed := systemPromptInventory[name]
+	for name, source := range found {
+		entry, listed := systemPromptInventory[name]
 		require.Truef(t, listed,
 			"%s is a system prompt with no row in systemPromptInventory.\n"+
 				"Add one saying whether the message beside it carries text a person wrote. "+
 				"If it does, it has to say that text is data and not instructions.", name)
+
+		// The key names a constant and the value holds one, and nothing made
+		// them agree. A row pointing at its neighbour would check the wrong
+		// string and pass, which is the same "wired to nothing" fault these
+		// tests exist for -- one level up, in the test itself.
+		require.Equalf(t, source, entry.prompt,
+			"systemPromptInventory[%q] does not hold the constant of that name. "+
+				"The row is checking a different prompt than the one it claims to.", name)
 	}
 	t.Logf("system prompts inventoried: %d of %d found in source", len(systemPromptInventory), len(found))
 }
