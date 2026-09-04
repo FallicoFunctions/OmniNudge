@@ -126,7 +126,15 @@ func TestNoPromptContradictsItsOwnSubject(t *testing.T) {
 //
 // The inputs in this matrix contain no proper nouns, so any capital that is not
 // preceded by sentence-ending punctuation was spliced in by a builder.
-var midSentenceCapital = regexp.MustCompile(`[a-z,] +[A-Z][a-z]`)
+// No [a-z] after the capital. That was here to avoid matching an acronym and
+// it excluded the single most common case instead: "A long green cardigan"
+// opens with a one-letter word, so the pattern could not see the exact splice
+// it was written for. Mutation testing is the only thing that showed it -- the
+// assertion passed on every real prompt and on the reverted fix alike.
+//
+// Nothing in this matrix is an acronym or a proper noun, so a bare capital is
+// unambiguous here.
+var midSentenceCapital = regexp.MustCompile(`[a-z,] +[A-Z]`)
 
 // TestNoPromptSplicesAPhraseMidSentence catches the fault that shipped in every
 // render made in one day: "She is wearing An oversized navy blue jumper".
