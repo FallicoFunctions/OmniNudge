@@ -189,11 +189,18 @@ on a larger GPU tier with a correspondingly longer timeout.
 
 ## Bringing the video endpoint back up
 
-**Done on 2026-08-08.** The endpoint now runs template `omnichat-video-wan22`
-(`95d2tt9dpk`) on `nickf579/omnichat-video-worker:v52`, with a 60 GB container
-disk, a 1800 s execution timeout, and `workersMin: 0`. A worker was observed
-reaching `ready`, so the image pulls and the container starts. The steps below
-are kept as the procedure for the next rebuild.
+**Brought up 2026-08-08 on `v52`.** The endpoint runs template
+`omnichat-video-wan22` (`95d2tt9dpk`), with a 60 GB container disk, a 1800 s
+execution timeout, and `workersMin: 0`. A worker was observed reaching `ready`,
+so the image pulls and the container starts. The steps below are kept as the
+procedure for the next rebuild.
+
+`v53` was pushed on 2026-09-04 and the template has **not** been repointed at
+it yet, so the deployed video worker is still `v52`. `v53` carries the
+`model_id` in the result payload and the portrait adapter change; its
+`omnichat_worker` tree is byte-identical to `omnichat-image-worker:v53`
+(`sha256:56cfc3a7…`). Until step 3 below is done, video renders record no
+checkpoint.
 
 Before that, `omnichat-video` pointed at template `6l94ogw9ch`, which was
 deleted and returned 404. Only `nickf579/omnichat-video-worker:v1` and `:v3`
@@ -215,14 +222,14 @@ cd backend && go run ./cmd/migrate -action=dry-run && go run ./cmd/migrate -acti
 the image worker so the two stay legible together:
 
 ```bash
-TAG=v52 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
+TAG=v53 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
 ```
 
 The buildx flags are load-bearing; see the Build section above for what happens
 without them. Verify the manifest type before going further:
 
 ```bash
-docker buildx imagetools inspect nickf579/omnichat-video-worker:v52
+docker buildx imagetools inspect nickf579/omnichat-video-worker:v53
 ```
 
 `MediaType` must be `application/vnd.docker.distribution.manifest.v2+json`. An
@@ -286,7 +293,7 @@ check the call directly against a built image rather than on a GPU:
 
 ```bash
 docker run --rm --platform linux/amd64 --entrypoint python \
-  nickf579/omnichat-video-worker:v52 \
+  nickf579/omnichat-video-worker:v53 \
   -c "from diffusers.pipelines.wan.pipeline_wan_i2v import prompt_clean; print(prompt_clean('test'))"
 ```
 
