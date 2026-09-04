@@ -1,0 +1,12 @@
+diff --git a/frontend/.husky/pre-commit b/frontend/.husky/pre-commit
+index e4bd472e3..39cc74707 100755
+--- a/frontend/.husky/pre-commit
++++ b/frontend/.husky/pre-commit
+@@ -6,7 +6,5 @@
+ # backend` staged it, and it went in. The check was correct the whole time and
+ # nothing ran it: a guard that fires only when somebody remembers to run it
+ # fires only when it is not needed.
+-bash scripts/no-build-artifacts.sh || exit 1
+-
+ cd frontend
+ npm run i18n:verify

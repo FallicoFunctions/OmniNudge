@@ -147,6 +147,12 @@
       "asks": "Does the new test fail when the fix is reverted?"
     },
     {
+      "id": "G2",
+      "name": "Is the guard reachable?",
+      "trigger": "a check, guard, hook or script exists to prevent something",
+      "asks": "What invokes it automatically? Grep for its name outside its own file and its own tests. A guard nobody runs is not a weaker guard, it is no guard: this repository has one that correctly refuses tracked build artifacts and was referenced only by its own test suite, and a 79 MB binary was committed four commits after it was written. Assert the wiring in the guard's own tests, beside the behaviour, because 'correct but unreachable' is invisible to every test of the behaviour."
+    },
+    {
       "id": "H1",
       "name": "Gates",
       "trigger": "always",

@@ -1,0 +1,529 @@
+{
+  "schema_version": 2,
+  "head": "688f753288eac3ea50fe2bb883602f27af2f3cdd",
+  "base": "418a22c2a793fe582ae6a797feb68b8add89edda",
+  "scope": {
+    "files": [
+      "scripts/no-build-artifacts.sh",
+      "scripts/no-build-artifacts.test.sh",
+      "frontend/.husky/pre-commit",
+      "backend/.gitignore",
+      "backend/internal/services/omnichat_media_identity.go",
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/omnichat_omniai_likeness.go",
+      "backend/internal/services/omnichat_omniai_reference_set.go",
+      "backend/internal/services/omnichat_omniai_style_writer.go",
+      "backend/internal/queue/omnichat_generation_handler.go",
+      "frontend/src/components/omnichat/omniai/CreationFlow.tsx",
+      "frontend/src/components/omnichat/omniai/useCreationFlow.ts",
+      "infra/runpod/omnichat_worker/contract.py",
+      "infra/runpod/omnichat_worker/generators.py"
+    ],
+    "boundaries": [
+      "the frontend creation form <-> the API (style_note)",
+      "the Go queue <-> the RunPod Python worker (body_adapter)",
+      "the assembled likeness prompt handed to a diffusion model",
+      "the assembled reference prompts, one per variant",
+      "the commit path <-> the build-artifact guard"
+    ]
+  },
+  "prior_ledgers_read": [
+    "10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+    "390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+    "58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    "a1712456328c6abd1111176e3de4b1197b645920.json",
+    "a8413c5c8c1e216743c13088de4172e2937322c0.json",
+    "edde601874009e0149098edc0309d556a163ddbf.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "418a22c2a..HEAD, 8 commits. Seams: Go<->the Python worker (body_adapter), the frontend creation form<->the API (style_note), and the assembled likeness and reference prompts. The prior ledgers' SHAs are all orphaned by the history rewrite, so the last surviving reviewed commit was used as the base."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read all six prior ledgers. Their fix_commit fields point at pre-rewrite commits that no longer exist, which is a permanent consequence of the rewrite; the content is still readable and nothing in them covers this range."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the likeness prompt for a man and a woman, with and without a signature and a holding, and all five reference variants. Found the pose contradiction (already fixed at the writer in af56fdc30) and, in pass 2, the pronoun fallback."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "the one component changed is covered by B1 on its request body and by its own suite"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing persisted changed shape"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "body_adapter spelled identically on both ends"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the worker reads the field the backend sets, checked through the worker's own validator"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "the coverage chain test from the last review still passes"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "payloads run through validate_input: 3 accepted, 0 problems"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to style_note on the frontend: wired at CreationFlow.tsx:86 and asserted by nothing -- every test on that screen checks the textarea, and a screen that captures the note while the request drops it looks identical to all of them."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "real briefs and a real appearance drove the printed prompts"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "body_adapter accepts false and refuses true, so a request cannot re-enable what an operator disabled"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "contract probed with '', 0, 1, [], {} and non-booleans"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The artifact guard carries a defence the commit path did not: it is correct and nothing invoked it."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "no branch left unreachable"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "no error newly swallowed"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates these paths"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the portrait aspect is one constant, read by both the reference set and the queue"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction or queue ordering changed"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration -- the pronoun fallback exists to avoid needing one"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls built. R3 had to be rebuilt: the first patch left a stray brace, broke the build, and my check misread the absence of '--- FAIL' as a pass."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Added this pass (Z1). Grepped the guard's name outside its own files: only its test suite and a ledger."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "deferred to the end"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Asking what invokes a guard is not what any instrument asked. Added G2."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "four real reference runs drove this work and are written up in 550df7c56 and e8694a4fa; the body-adapter change itself is dormant until a v53 rebuild, so it cannot be rendered yet"
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "a 79 MB binary was committed four commits after the guard written to refuse exactly that; the guard was correct the whole time and nothing invoked it",
+          "found_by": "G2",
+          "fix_commit": "b2f6a42f5",
+          "control": {
+            "patch": ".review/controls/refs-R1-guard-wired.patch",
+            "runner": "bash",
+            "tests": [
+              "scripts/no-build-artifacts.test.sh"
+            ],
+            "observed": "the wiring case fails: 5 passed, 1 failed"
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "style_note was wired into the request and asserted by nothing -- every test on that screen checks the textarea, so a request that dropped it would look identical",
+          "found_by": "C5",
+          "fix_commit": "0da74fb1b",
+          "control": {
+            "patch": ".review/controls/refs-R2-style-note-sent.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/omniai/__tests__/CreationFlow.test.tsx"
+            ],
+            "observed": "'is sent with the request when somebody typed one' fails"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is pass 1's fixes: the guard wiring, the widened ignore pattern, the request-body test."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read all six prior ledgers. Their fix_commit fields point at pre-rewrite commits that no longer exist, which is a permanent consequence of the rewrite; the content is still readable and nothing in them covers this range."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the full-body reference variants, an anime character's prompt, and a persona with no stored pronoun. The last one reads 'A man with a beard. She is wearing a jumper.'"
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "the one component changed is covered by B1 on its request body and by its own suite"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing persisted changed shape"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "body_adapter spelled identically on both ends"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the worker reads the field the backend sets, checked through the worker's own validator"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "the coverage chain test from the last review still passes"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "payloads run through validate_input: 3 accepted, 0 problems"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to style_note on the frontend: wired at CreationFlow.tsx:86 and asserted by nothing -- every test on that screen checks the textarea, and a screen that captures the note while the request drops it looks identical to all of them."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "real briefs and a real appearance drove the printed prompts"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "body_adapter accepts false and refuses true, so a request cannot re-enable what an operator disabled"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "contract probed with '', 0, 1, [], {} and non-booleans"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "A character made before the pronoun field kept the fallback, which the commit that added it defended as preserving what those prompts always said -- and what they always said contradicted their own subject line."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "no branch left unreachable"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "no error newly swallowed"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates these paths"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the portrait aspect is one constant, read by both the reference set and the queue"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction or queue ordering changed"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration -- the pronoun fallback exists to avoid needing one"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "R3 built, rejected for breaking the build, rebuilt as a clean revert, verified failing as a test."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Added this pass (Z1). Grepped the guard's name outside its own files: only its test suite and a ledger."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "deferred to the end"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "B1 and E1 both name this technique already."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "four real reference runs drove this work and are written up in 550df7c56 and e8694a4fa; the body-adapter change itself is dormant until a v53 rebuild, so it cannot be rendered yet"
+        }
+      ],
+      "findings": [
+        {
+          "id": "R3",
+          "summary": "a character made before the pronoun field was stored still had every sentence of her prompt written as 'she', so a man's prompt contradicted its own subject line",
+          "found_by": "B1",
+          "fix_commit": "688f75328",
+          "control": {
+            "patch": ".review/controls/refs-R3-pronoun-backfill.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestAPersonaMadeBeforeThePronounWasStoredIsStillSpokenAboutCorrectly$"
+            ],
+            "observed": "fails on the assembled prompt, which reads 'She is wearing' for a man"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the pronoun backfill in the resolver."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read all six prior ledgers. Their fix_commit fields point at pre-rewrite commits that no longer exist, which is a permanent consequence of the rewrite; the content is still readable and nothing in them covers this range."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Re-read the prompts after the backfill: 'A man with a beard. He is wearing a jumper. His top is long.'"
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "the one component changed is covered by B1 on its request body and by its own suite"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "nothing persisted changed shape"
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "body_adapter spelled identically on both ends"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "the worker reads the field the backend sets, checked through the worker's own validator"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "the coverage chain test from the last review still passes"
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "payloads run through validate_input: 3 accepted, 0 problems"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to style_note on the frontend: wired at CreationFlow.tsx:86 and asserted by nothing -- every test on that screen checks the textarea, and a screen that captures the note while the request drops it looks identical to all of them."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "real briefs and a real appearance drove the printed prompts"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "body_adapter accepts false and refuses true, so a request cannot re-enable what an operator disabled"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "pronounsFor probed with empty, mixed case, padded, unknown words, a SQL fragment and an over-long string: unknown falls back to she, and it is a switch so there is no injection surface."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The backfill runs in the single resolver every prompt path uses, and does not reach the reference or scene prompts, which carry no pronouns."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "no branch left unreachable"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "no error newly swallowed"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates these paths"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "the portrait aspect is one constant, read by both the reference set and the queue"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction or queue ordering changed"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration -- the pronoun fallback exists to avoid needing one"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing new persisted"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "three controls, all verified failing as tests"
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Added this pass (Z1). Grepped the guard's name outside its own files: only its test suite and a ledger."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, services and queue, 62 frontend tests, 95 worker tests, the artifact guard's 6 and the ledger hook's 45 -- all green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing found, so nothing to add."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "four real reference runs drove this work and are written up in 550df7c56 and e8694a4fa; the body-adapter change itself is dormant until a v53 rebuild, so it cannot be rendered yet"
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... clean",
+    "vet": "go vet ./... clean",
+    "tests": "internal/services and internal/queue ok; 62 frontend tests; 95 worker tests",
+    "scripts": "no-build-artifacts.test.sh 6 passed; review-ledger-verify.test.sh 45 passed",
+    "types": "tsc -b clean"
+  }
+}

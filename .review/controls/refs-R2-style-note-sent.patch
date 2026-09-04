@@ -1,0 +1,12 @@
+diff --git a/frontend/src/components/omnichat/omniai/CreationFlow.tsx b/frontend/src/components/omnichat/omniai/CreationFlow.tsx
+index b838d6873..de5210397 100644
+--- a/frontend/src/components/omnichat/omniai/CreationFlow.tsx
++++ b/frontend/src/components/omnichat/omniai/CreationFlow.tsx
+@@ -83,7 +83,6 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
+         feeling: answers.feeling,
+         relationship: answers.relationship,
+         appearance: flow.appearance,
+-        style_note: flow.answers.styleNote.trim() || undefined,
+       }),
+     onSuccess: onMade,
+     onError: (error) => {

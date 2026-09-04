@@ -1,0 +1,16 @@
+diff --git a/backend/internal/services/omnichat_media_identity.go b/backend/internal/services/omnichat_media_identity.go
+index 49bf8427e..32d32930e 100644
+--- a/backend/internal/services/omnichat_media_identity.go
++++ b/backend/internal/services/omnichat_media_identity.go
+@@ -40,11 +40,6 @@ func ResolveOmniChatMediaIdentityProfile(persona *models.BotPersona) models.Omni
+ 	// man with a beard. She is wearing a jumper. Her top is long." The answers
+ 	// have been on the row since creation, so nothing needs a migration to
+ 	// stop saying that.
+-	if strings.TrimSpace(profile.Subject) == "" {
+-		if facts, ok := omniAIAppearanceFacts(persona); ok {
+-			profile.Subject = strings.ToLower(strings.TrimSpace(facts.Gender))
+-		}
+-	}
+ 	if profile.Adapter != models.OmniChatMediaIdentityAdapterIPAdapter {
+ 		return models.DefaultOmniChatMediaIdentityProfile()
+ 	}
