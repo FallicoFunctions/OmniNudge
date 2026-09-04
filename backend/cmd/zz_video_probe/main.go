@@ -127,7 +127,10 @@ func run(list bool, assetID, prompt string, seconds int, timeout time.Duration) 
 			return err
 		}
 		fmt.Printf("  %s  %s %s\n", time.Now().Format("15:04:05"), status, errCode)
-		if status == "completed" || status == "failed" {
+		// "succeeded", not "completed". The first version of this loop watched
+		// for the wrong word and polled a finished job for twenty-five minutes,
+		// which looks exactly like work still in progress.
+		if status == "succeeded" || status == "failed" || status == "cancelled" {
 			return report(ctx, db, job.ID)
 		}
 	}
