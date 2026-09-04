@@ -42,11 +42,19 @@ func main() {
 	timeout := flag.Duration("timeout", 25*time.Minute, "how long to wait for each stage")
 	list := flag.Bool("list", false, "print the OmniAI characters that already exist, and do nothing else")
 	save := flag.String("save", "", "download her stored references into this directory and do nothing else")
+	prov := flag.Bool("provenance", false, "print what rendered her most recent assets, and do nothing else")
 	redo := flag.Bool("redo-references", false, "drop her supporting references, keep the anchor, and render the five again")
 	flag.Parse()
 
 	if strings.TrimSpace(*save) != "" {
 		if err := saveReferences(*personaID, *save); err != nil {
+			fmt.Fprintln(os.Stderr, "zz_reference_run:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *prov {
+		if err := printProvenance(*personaID); err != nil {
 			fmt.Fprintln(os.Stderr, "zz_reference_run:", err)
 			os.Exit(1)
 		}
@@ -185,6 +193,48 @@ func saveReferences(personaID int, dir string) error {
 //
 // It writes to her profile, which is why it is a flag nobody reaches by
 // accident. This is for a test character.
+// printProvenance answers which build and which checkpoint actually rendered
+// her pictures -- the question a config change cannot be trusted to have
+// answered, because editing an endpoint does not disturb a running container.
+func printProvenance(personaID int) error {
+	ctx := context.Background()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	db, err := database.New(cfg.Database.DatabaseURL())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	rows, err := db.Pool.Query(ctx, `
+		SELECT j.created_at, j.mode, j.aspect_ratio, j.status,
+		       COALESCE(j.provider_metadata::text, '(null)')
+		  FROM omnichat_generation_jobs j
+		 WHERE j.persona_id = $1
+		 ORDER BY j.created_at DESC
+		 LIMIT 8`, personaID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	fmt.Printf("%-20s %-22s %-7s %-10s %s\n", "CREATED", "MODE", "ASPECT", "STATUS", "PROVIDER METADATA")
+	for rows.Next() {
+		var created time.Time
+		var mode, aspect, status, meta string
+		if err := rows.Scan(&created, &mode, &aspect, &status, &meta); err != nil {
+			return err
+		}
+		if len(meta) > 150 {
+			meta = meta[:150]
+		}
+		fmt.Printf("%-20s %-22s %-7s %-10s %s\n",
+			created.Format("2006-01-02 15:04:05"), mode, aspect, status, meta)
+	}
+	return rows.Err()
+}
+
 func redoReferences(personaID, owner int, timeout time.Duration) error {
 	ctx := context.Background()
 	cfg, err := config.Load()

@@ -643,6 +643,51 @@ func (h *OmniChatGenerationHandler) commitFor(
 // case, and the two costs are not comparable: being wrong the permissive way
 // puts an explicit picture in front of somebody who did not ask for one, and
 // being wrong the cautious way costs a render that is retried and refunded.
+// omniChatImageReviewAttempts is how many times a rendered picture is offered
+// to the classifier before the render is thrown away.
+//
+// The picture is already made and on disk by the time this runs. A retry costs
+// one more call to a text API; not retrying costs the GPU render that produced
+// it, and on a reference set it costs one of the six slots permanently -- the
+// job fails, nothing re-renders it, and the set silently settles for five.
+//
+// Measured, not guessed at. Two reference runs lost one of five and then two
+// of five to a classifier that was briefly unreachable, which is a 40% loss on
+// a set whose whole design is three portraits and three full-length.
+const omniChatImageReviewAttempts = 3
+
+// omniChatImageReviewBackoff is the wait before each retry after the first.
+var omniChatImageReviewBackoff = []time.Duration{2 * time.Second, 5 * time.Second}
+
+// reviewWithRetry asks the classifier again when it could not answer.
+//
+// Only when it could not answer. A verdict of explicit is a verdict and is
+// returned immediately: asking a second time until a picture is allowed is not
+// a retry, it is shopping for the answer you want.
+func (h *OmniChatGenerationHandler) reviewWithRetry(
+	ctx context.Context, path, contentType string, standard services.OmniChatImageStandard,
+) (bool, error) {
+	var err error
+	for attempt := 0; attempt < omniChatImageReviewAttempts; attempt++ {
+		if attempt > 0 {
+			wait := omniChatImageReviewBackoff[min(attempt-1, len(omniChatImageReviewBackoff)-1)]
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+		var refused bool
+		refused, err = h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
+		if err == nil {
+			return refused, nil
+		}
+		zlog.Warn().Err(err).Int("attempt", attempt+1).Int("of", omniChatImageReviewAttempts).
+			Msg("omnichat: the rendered image review could not answer, trying again")
+	}
+	return false, err
+}
+
 func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, job *models.OmniChatGenerationJob, path, contentType string) error {
 	if h.imageReview == nil {
 		if h.failClosed {
@@ -668,7 +713,7 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
 		// applies; pose and expression never did.
 		standard = services.OmniChatImageStandardReference
 	}
-	explicit, err := h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
+	explicit, err := h.reviewWithRetry(ctx, path, contentType, standard)
 	if err != nil {
 		zlog.Error().Err(err).Msg("omnichat: could not review a rendered image")
 		return permanentGenerationFailure("image_review_unavailable", err)

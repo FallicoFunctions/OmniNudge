@@ -1014,12 +1014,19 @@ type imageReviewFake struct {
 	explicit bool
 	err      error
 	standard services.OmniChatImageStandard
+	// failFor is how many opening calls answer with err before the fake starts
+	// answering properly. It is what a classifier being briefly unreachable
+	// looks like from here.
+	failFor int
 }
 
 func (f *imageReviewFake) ReviewRenderedImageAgainst(_ context.Context, _, _ string,
 	standard services.OmniChatImageStandard) (bool, error) {
 	f.calls++
 	f.standard = standard
+	if f.calls <= f.failFor {
+		return false, errors.New("upstream is briefly unreachable")
+	}
 	return f.explicit, f.err
 }
 
@@ -1252,4 +1259,51 @@ func TestOnlyThePortraitReferencesRenderWithoutTheBodyAdapter(t *testing.T) {
 		require.True(t, present, "%s renders without the body adapter", c.name)
 		require.Equal(t, false, value, c.name)
 	}
+}
+
+// A picture is already rendered and on disk by the time the classifier is
+// asked about it. Not retrying throws that render away, and on a reference set
+// it costs one of six slots permanently: the job fails, nothing re-renders it,
+// and the set silently settles for five.
+//
+// Two real runs lost one of five and then two of five to a classifier that was
+// briefly unreachable, which is the failure this reproduces.
+func TestABrieflyUnreachableReviewDoesNotThrowAwayTheRender(t *testing.T) {
+	for _, unreachable := range []int{1, 2} {
+		review := &imageReviewFake{failFor: unreachable}
+		handler := reviewingHandler(review, true)
+		err := handler.refuseExplicitRender(context.Background(),
+			&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate},
+			"/tmp/x.png", "image/png")
+		require.NoErrorf(t, err, "a review that answered on attempt %d still failed the render",
+			unreachable+1)
+		require.Equal(t, unreachable+1, review.calls)
+	}
+}
+
+// It gives up eventually. A classifier that is down stays down, and a render
+// nobody can judge must not become an asset.
+func TestAReviewThatNeverAnswersStillFailsTheRender(t *testing.T) {
+	review := &imageReviewFake{failFor: 99}
+	handler := reviewingHandler(review, true)
+	err := handler.refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate},
+		"/tmp/x.png", "image/png")
+	var permanent *permanentGenerationError
+	require.ErrorAs(t, err, &permanent)
+	require.Equal(t, "image_review_unavailable", permanent.code)
+	require.Equal(t, omniChatImageReviewAttempts, review.calls,
+		"it should try exactly the configured number of times, no more and no fewer")
+}
+
+// A verdict is a verdict. Asking again until a picture is allowed is not a
+// retry, it is shopping for the answer you want.
+func TestAnExplicitVerdictIsNotRetried(t *testing.T) {
+	review := &imageReviewFake{explicit: true}
+	handler := reviewingHandler(review, true)
+	err := handler.refuseExplicitRender(context.Background(),
+		&models.OmniChatGenerationJob{Mode: models.OmniChatGenerationModeCreate},
+		"/tmp/x.png", "image/png")
+	require.Error(t, err)
+	require.Equal(t, 1, review.calls)
 }
