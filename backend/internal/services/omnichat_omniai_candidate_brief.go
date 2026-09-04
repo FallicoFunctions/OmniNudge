@@ -127,8 +127,13 @@ func (b OmniAICandidateBrief) Validate() error {
 // Deliberately not blank. A missing brief used to mean the plain-backdrop
 // picture this whole file exists to stop, so the failure mode says as little as
 // possible about her while still putting her somewhere with light in it.
+// No pronoun in it. It read "everyday clothes she would have picked out
+// herself", so a male character whose brief writer was unreachable got "He is
+// wearing everyday clothes she would have picked out herself" -- a prompt
+// arguing with itself on the one path taken when something has already gone
+// wrong and nobody is watching the output.
 var OmniAIFallbackCandidateBrief = OmniAICandidateBrief{
-	Outfit:  "everyday clothes she would have picked out herself",
+	Outfit:  "everyday clothes, comfortable and well worn",
 	Setting: "an ordinary room with daylight coming in from a window behind the camera",
 }
 
