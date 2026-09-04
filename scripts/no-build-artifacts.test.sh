@@ -22,7 +22,7 @@ git config user.email t@t; git config user.name t
 mkdir -p backend scripts
 cp "$guard" scripts/no-build-artifacts.sh
 printf '/omninudge\n/backend/bin/\n' > .gitignore
-printf '/zz_model_compare\n/server\n' > backend/.gitignore
+printf '/zz_*\n/server\n' > backend/.gitignore
 echo hello > backend/small.txt
 git add -A >/dev/null && git commit -qm first
 
@@ -49,6 +49,15 @@ printf '/server\n' > backend/.gitignore
 git add -A >/dev/null && git commit -qm unignore
 bash scripts/no-build-artifacts.sh >/dev/null 2>&1
 check "an artifact that is no longer ignored is refused" 1 $?
+
+# The failure this guard was written for happened anyway, four commits after it
+# was written, because nothing ran it. A correct check that only fires when
+# somebody remembers to run it fires only when it is not needed -- so the wiring
+# is asserted here, next to the behaviour it carries.
+hook="$(dirname "$guard")/../frontend/.husky/pre-commit"
+wired=1
+[ -f "$hook" ] && grep -q "no-build-artifacts.sh" "$hook" && wired=0
+check "the commit hook runs this guard" 0 "$wired"
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -48,8 +48,12 @@ tmp/
 # Renders from cmd/zz_model_compare: real images, judged by eye, not repository content.
 model-compare/
 
-# The compiled harness itself. `go build ./cmd/zz_model_compare` drops a 54 MB
-# binary here, and a `git add -A backend` swept one into a commit. Named rather
-# than covered by a wildcard, because every other pattern in this file names a
-# thing too, and a blanket rule for extensionless files would hide real ones.
-/zz_model_compare
+# The compiled throwaway commands. `go build ./cmd/zz_...` drops a binary here
+# and a `git add -A backend` sweeps it into a commit.
+#
+# A pattern, not a list. This named zz_model_compare specifically, on the
+# reasoning that every other rule in this file names a thing too -- and four
+# commits later zz_reference_run was written, built, and committed at 79 MB,
+# because a list only covers what existed when it was written. Every command
+# under cmd/zz_ is a throwaway by that prefix, so the prefix is the rule.
+/zz_*

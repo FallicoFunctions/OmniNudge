@@ -18,7 +18,7 @@ cd "$(dirname "$0")/.." || exit 1
 # broken check. A tally says which of the two happened.
 failed=0
 
-for artifact in backend/zz_model_compare backend/server; do
+for artifact in backend/zz_model_compare backend/zz_reference_run backend/server; do
   if ! git check-ignore -q "$artifact"; then
     echo "FAIL: $artifact is not ignored, so building it makes it committable"
     failed=$((failed+1))

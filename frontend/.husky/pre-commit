@@ -1,2 +1,12 @@
+# Refuses a tracked build artifact before the commit that would make it
+# permanent.
+#
+# The guard was written four commits before this line was, and in that window
+# `go build ./cmd/zz_reference_run` produced a 79 MB binary, `git add -A
+# backend` staged it, and it went in. The check was correct the whole time and
+# nothing ran it: a guard that fires only when somebody remembers to run it
+# fires only when it is not needed.
+bash scripts/no-build-artifacts.sh || exit 1
+
 cd frontend
 npm run i18n:verify
