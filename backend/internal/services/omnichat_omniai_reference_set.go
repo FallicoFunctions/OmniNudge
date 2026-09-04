@@ -161,6 +161,31 @@ func OmniAIReferenceIsPortraitFrame(aspect string) bool {
 	return strings.TrimSpace(aspect) == omniAIReferencePortraitAspect
 }
 
+// OmniAIPortraitAdapterScale is the identity conditioning a close portrait is
+// rendered at, and it is lower than everything else on purpose.
+//
+// At the profile's 0.65 the face adapter imposes the anchor's own framing on
+// whatever is asked for. The anchor is a mid-shot, so every portrait came back
+// a mid-shot -- and every full-length one did too, which collapsed a set whose
+// whole design is that portraits carry the face and full-length shots carry the
+// figure. "Four total cannot hold both sets" is the reason there are six, and
+// at 0.65 there was only ever one kind of picture.
+//
+// Measured on four fixed seeds per arm, the same seeds in each:
+//
+//	0.65  1 of 4 head-and-shoulders
+//	0.50  1 of 4          -- a cliff, not a slope; 0.50 behaves like 0.65
+//	0.35  3 of 4
+//
+// Identity is unaffected: 4 of 4 judged the same person at every scale, by a
+// judge that scored 0 of 4 on a different woman and 0 of 4 on a man.
+//
+// Portraits only. The full-length variants keep 0.65 because proportions are
+// what they exist to carry and nothing here measured proportions -- and scenes
+// keep it because a scene is rendered months later with no other anchor, which
+// is the drift this adapter was raised to prevent.
+const OmniAIPortraitAdapterScale = 0.35
+
 // OmniAIReferenceVariantKeys lists the variants, in the order they are asked for.
 func OmniAIReferenceVariantKeys() []string {
 	keys := make([]string, 0, len(omniAIReferenceVariants))

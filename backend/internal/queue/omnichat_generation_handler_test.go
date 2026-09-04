@@ -1307,3 +1307,47 @@ func TestAnExplicitVerdictIsNotRetried(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, 1, review.calls)
 }
+
+// A close portrait is conditioned more weakly than anything else, and only a
+// close portrait is.
+//
+// The scale is what decides the crop: at the profile's 0.65 the face adapter
+// imposes the anchor's framing, and the anchor is a mid-shot. Measured on four
+// fixed seeds, 1 of 4 came back head-and-shoulders at 0.65 and 3 of 4 at 0.35,
+// with identity holding at both.
+//
+// The full-length variants keep the profile's scale because proportions are
+// what they carry, and a scene keeps it because a scene is rendered months
+// later with no other anchor -- the drift this adapter exists to prevent.
+func TestOnlyACloseProfilePortraitIsConditionedWeakly(t *testing.T) {
+	profile := models.NormalizeOmniChatMediaIdentityProfile(models.OmniChatMediaIdentityProfile{
+		Appearance: "a woman with dark curly hair",
+	})
+	scaleFor := func(mode models.OmniChatGenerationMode, aspect string) any {
+		spec, err := BuildImageSpec(config.OmniChatMediaConfig{RunPodImageEndpointID: "e"},
+			&models.OmniChatGenerationJob{
+				ID: uuid.New(), Kind: models.OmniChatMediaKindImage, Mode: mode,
+				AspectRatio: aspect, EffectivePrompt: "x", IdentityProfile: profile,
+			}, []string{"https://example.test/a.png"})
+		require.NoError(t, err)
+		return spec.Input["identity_adapter_scale"]
+	}
+
+	require.Equal(t, services.OmniAIPortraitAdapterScale,
+		scaleFor(models.OmniChatGenerationModeLikenessReference, "3:4"),
+		"a portrait reference must be conditioned at the measured scale")
+
+	for _, unchanged := range []struct {
+		mode   models.OmniChatGenerationMode
+		aspect string
+		why    string
+	}{
+		{models.OmniChatGenerationModeLikenessReference, "9:16", "a full-length reference carries proportions"},
+		{models.OmniChatGenerationModeLikeness, "9:16", "the anchor is not conditioned on anything"},
+		{models.OmniChatGenerationModeContextual, "3:4", "a scene must not drift in figure"},
+		{models.OmniChatGenerationModeCreate, "3:4", "somebody's own prompt is not a reference"},
+	} {
+		require.Equalf(t, profile.AdapterScale, scaleFor(unchanged.mode, unchanged.aspect),
+			"%s: %s", unchanged.mode, unchanged.why)
+	}
+}

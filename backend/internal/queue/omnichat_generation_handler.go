@@ -1344,6 +1344,12 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	if job.Mode == models.OmniChatGenerationModeLikenessReference &&
 		services.OmniAIReferenceIsPortraitFrame(aspectRatio) {
 		input["body_adapter"] = false
+		// And weaker identity conditioning, which is what actually decides the
+		// crop. At the profile's scale the face adapter imposes the anchor's
+		// framing -- the anchor is a mid-shot, so the portraits were too. On
+		// four fixed seeds: 1 of 4 head-and-shoulders at 0.65, 1 of 4 at 0.50,
+		// 3 of 4 at 0.35, with identity holding at every scale.
+		input["identity_adapter_scale"] = services.OmniAIPortraitAdapterScale
 	}
 	// The image phase is where every explicit pixel is produced, so it is also
 	// the only place the content entitlement changes anything.

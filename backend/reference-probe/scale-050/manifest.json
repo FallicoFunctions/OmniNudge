@@ -1,0 +1,14 @@
+{
+  "aspect": "3:4",
+  "body_adapter": "off",
+  "identity_adapter_scale": 0.5,
+  "label": "scale-050",
+  "prompt": "Reference image of one person. A 27-year-old East Asian woman, 5'6\" tall, with long curly black hair in a high ponytail, brown eyes and an athletic build. Head and shoulders only, cropped at the chest, the face filling most of the frame, facing the camera, neutral expression. Wearing a plain fitted long-sleeved top with a plain neckline, unadorned at the neck and ears. Plain seamless background, even diffuse lighting with no strong shadows, no props and no other people. Render photorealistically.",
+  "seeds": [
+    11,
+    22,
+    33,
+    44
+  ],
+  "variant": "portrait_neutral"
+}
