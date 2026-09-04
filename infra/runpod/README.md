@@ -189,18 +189,41 @@ on a larger GPU tier with a correspondingly longer timeout.
 
 ## Bringing the video endpoint back up
 
-**Brought up 2026-08-08 on `v52`.** The endpoint runs template
-`omnichat-video-wan22` (`95d2tt9dpk`), with a 60 GB container disk, a 1800 s
-execution timeout, and `workersMin: 0`. A worker was observed reaching `ready`,
-so the image pulls and the container starts. The steps below are kept as the
-procedure for the next rebuild.
+**This section records tags. It has been wrong before -- read the endpoint,
+not this file.** It claimed `v52` was deployed while the template actually
+named `v56`, and a rebuild was planned against the stale number. Docker Hub and
+the RunPod template are the only authorities:
 
-`v53` was pushed on 2026-09-04 and the template has **not** been repointed at
-it yet, so the deployed video worker is still `v52`. `v53` carries the
-`model_id` in the result payload and the portrait adapter change; its
+```bash
+docker buildx imagetools inspect nickf579/omnichat-video-worker:<tag>
+```
+
+**The two workers no longer share a tag number.** The build section below still
+shows one `TAG` for both, and that is now history rather than practice: the
+video sequence ran ahead to `v57` while the image worker stayed at `v53`. Pick
+the next free number above every existing tag on the repository you are
+pushing, and never assume the other worker's number means anything.
+
+**As of 2026-09-04.** Template `omnichat-video-wan22` (`95d2tt9dpk`) names
+`v56`, with a 60 GB container disk, a 1800 s execution timeout, and
+`workersMin: 0`. The current build is **`v58`**: it carries the `model_id` in
+the result payload and the request-level `body_adapter` switch, and its
 `omnichat_worker` tree is byte-identical to `omnichat-image-worker:v53`
-(`sha256:56cfc3a7…`). Until step 3 below is done, video renders record no
-checkpoint.
+(`sha256:56cfc3a7…`).
+
+`v56` and `v57` both predate the `model_id` line, so **the deployed video
+worker records no checkpoint** until the template is repointed at `v58`.
+Neither holds any source that `v58` lacks -- every line unique to them is the
+older form of a signature `v58` extends. `v52` no longer exists on the
+registry.
+
+Verify a tag's contents rather than trusting its number:
+
+```bash
+docker run --rm --platform linux/amd64 --entrypoint sh \
+  nickf579/omnichat-video-worker:<tag> \
+  -c "find /app/omnichat_worker -type f -name '*.py' | sort | xargs sha256sum | sha256sum"
+```
 
 Before that, `omnichat-video` pointed at template `6l94ogw9ch`, which was
 deleted and returned 404. Only `nickf579/omnichat-video-worker:v1` and `:v3`
@@ -222,14 +245,14 @@ cd backend && go run ./cmd/migrate -action=dry-run && go run ./cmd/migrate -acti
 the image worker so the two stay legible together:
 
 ```bash
-TAG=v53 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
+TAG=v58 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
 ```
 
 The buildx flags are load-bearing; see the Build section above for what happens
 without them. Verify the manifest type before going further:
 
 ```bash
-docker buildx imagetools inspect nickf579/omnichat-video-worker:v53
+docker buildx imagetools inspect nickf579/omnichat-video-worker:v58
 ```
 
 `MediaType` must be `application/vnd.docker.distribution.manifest.v2+json`. An
@@ -293,7 +316,7 @@ check the call directly against a built image rather than on a GPU:
 
 ```bash
 docker run --rm --platform linux/amd64 --entrypoint python \
-  nickf579/omnichat-video-worker:v53 \
+  nickf579/omnichat-video-worker:v58 \
   -c "from diffusers.pipelines.wan.pipeline_wan_i2v import prompt_clean; print(prompt_clean('test'))"
 ```
 
