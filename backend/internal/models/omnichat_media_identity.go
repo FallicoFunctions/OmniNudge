@@ -129,10 +129,17 @@ func DefaultOmniChatMediaIdentityProfile() OmniChatMediaIdentityProfile {
 // the service resolver, which knows whether a persona is platform-owned.
 func NormalizeOmniChatMediaIdentityProfile(profile OmniChatMediaIdentityProfile) OmniChatMediaIdentityProfile {
 	defaults := DefaultOmniChatMediaIdentityProfile()
-	if profile.Mode == "" {
+	// Unrecognised falls back, rather than only empty.
+	//
+	// These are enums and were treated as free text: anything in the column
+	// passed straight through to the provider payload, while RenderStyle
+	// directly below has had the fallback since it was added. Same asymmetry
+	// the reviews keep turning up -- a field is unguarded because the one
+	// beside it is.
+	if profile.Mode != OmniChatMediaIdentityModeReference && profile.Mode != OmniChatMediaIdentityModeLoRA {
 		profile.Mode = defaults.Mode
 	}
-	if profile.Adapter == "" {
+	if profile.Adapter != OmniChatMediaIdentityAdapterIPAdapter {
 		profile.Adapter = defaults.Adapter
 	}
 	if profile.AdapterScale < 0.1 || profile.AdapterScale > 1.5 {
@@ -160,6 +167,14 @@ func NormalizeOmniChatMediaIdentityProfile(profile OmniChatMediaIdentityProfile)
 	profile.Style.Taste = boundProvenanceText(profile.Style.Taste, OmniAIStyleMaxTasteRunes)
 	profile.Style.SignatureItem = boundProvenanceText(profile.Style.SignatureItem, OmniAIStyleMaxSignatureItemRunes)
 	profile.Style.Note = boundProvenanceText(profile.Style.Note, OmniAIStyleMaxNoteRunes)
+	// The rest of the free text on this struct. A LoRA id is separately
+	// allowlisted by the worker and the subject only selects a pronoun, so
+	// neither is dangerous at length -- but "not dangerous today" is how the
+	// style profile came to be the one unbounded string, and a bound costs a
+	// line.
+	profile.LoraModelID = boundProvenanceText(profile.LoraModelID, omniChatProvenanceMaxBuildRunes)
+	profile.LoraWeightName = boundProvenanceText(profile.LoraWeightName, omniChatProvenanceMaxBuildRunes)
+	profile.Subject = boundProvenanceText(profile.Subject, omniChatProvenanceMaxBuildRunes)
 	// Bound the private reference list the same way the public gallery is
 	// bounded, so persona metadata cannot make the worker fetch arbitrarily
 	// many images.
