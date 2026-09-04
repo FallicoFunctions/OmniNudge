@@ -31,6 +31,20 @@ func ResolveOmniChatMediaIdentityProfile(persona *models.BotPersona) models.Omni
 		return profile
 	}
 	profile = models.NormalizeOmniChatMediaIdentityProfile(*extensions.OmniChatMedia)
+	// Filled from the answers when the blob does not carry it.
+	//
+	// Subject decides the pronoun every sentence of her render prompt is
+	// written in, and it is stored only for characters made since the field
+	// existed. Falling back to "she" for the rest is what those prompts always
+	// said -- and what they always said was wrong for the men among them: "A
+	// man with a beard. She is wearing a jumper. Her top is long." The answers
+	// have been on the row since creation, so nothing needs a migration to
+	// stop saying that.
+	if strings.TrimSpace(profile.Subject) == "" {
+		if facts, ok := omniAIAppearanceFacts(persona); ok {
+			profile.Subject = strings.ToLower(strings.TrimSpace(facts.Gender))
+		}
+	}
 	if profile.Adapter != models.OmniChatMediaIdentityAdapterIPAdapter {
 		return models.DefaultOmniChatMediaIdentityProfile()
 	}

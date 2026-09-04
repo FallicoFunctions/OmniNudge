@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -448,4 +449,33 @@ func TestThePromptSpeaksAboutHerInHerOwnPronouns(t *testing.T) {
 	require.Contains(t, they, "they have shoes on")
 	require.Contains(t, they, "They have a leather satchel")
 	require.Contains(t, they, "They are holding")
+}
+
+// A character made before the pronoun was stored is still spoken about
+// correctly.
+//
+// Subject decides the pronoun in every sentence of her render prompt, and it is
+// written only by creations since the field existed. Falling back to "she" for
+// the rest is what those prompts always said, and what they always said was
+// wrong for the men among them -- "A man with a beard. She is wearing a
+// jumper." The answers have been on the row since creation, so the resolver
+// fills it and no migration is needed.
+func TestAPersonaMadeBeforeThePronounWasStoredIsStillSpokenAboutCorrectly(t *testing.T) {
+	prompt := BuildOmniAILikenessPrompt(ResolveOmniChatMediaIdentityProfile(&models.BotPersona{
+		ExtensionsJSON:   json.RawMessage(`{"omnichat_media":{"appearance":"A man with a beard."}}`),
+		OmniAIAppearance: json.RawMessage(`{"gender":"man","age":31}`),
+	}), OmniAICandidateBrief{Outfit: "a jumper", Setting: "a park"})
+
+	require.Contains(t, prompt, "He is wearing")
+	require.Contains(t, prompt, "His top is long")
+	require.NotContains(t, prompt, "She is wearing")
+	require.NotContains(t, prompt, "Her top")
+
+	// What the blob says still wins where it says anything: the answers are the
+	// fallback, not an override.
+	stored := BuildOmniAILikenessPrompt(ResolveOmniChatMediaIdentityProfile(&models.BotPersona{
+		ExtensionsJSON:   json.RawMessage(`{"omnichat_media":{"appearance":"A person.","subject":"they"}}`),
+		OmniAIAppearance: json.RawMessage(`{"gender":"man"}`),
+	}), OmniAICandidateBrief{Outfit: "a jumper", Setting: "a park"})
+	require.Contains(t, stored, "They are wearing")
 }
