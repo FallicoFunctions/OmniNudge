@@ -84,6 +84,10 @@ func main() {
 	// Initialize zerolog structured logger — must come before any other log calls.
 	logger.Initialize(cfg.AppEnv, appVersion, serviceName)
 
+	for _, gap := range cfg.OmniChatMedia.MediaEndpointGaps() {
+		zlog.Error().Str("check", "media_endpoint").Msg(gap)
+	}
+
 	// Initialize Sentry error tracking (no-op when SENTRY_DSN is empty).
 	observability.InitSentry(os.Getenv("SENTRY_DSN"), cfg.AppEnv, appVersion)
 	defer observability.FlushSentry()

@@ -42,6 +42,10 @@ func main() {
 		zlog.Fatal().Msg("REDIS_ADDR is required for worker")
 	}
 
+	for _, gap := range cfg.OmniChatMedia.MediaEndpointGaps() {
+		zlog.Error().Str("check", "media_endpoint").Msg(gap)
+	}
+
 	zlog.Info().Str("redis", cfg.Redis.Addr).Msg("Starting OmniNudge worker")
 
 	// Initialize database dependencies used by queue handlers.
