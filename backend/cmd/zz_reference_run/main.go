@@ -210,7 +210,7 @@ func printProvenance(personaID int) error {
 
 	rows, err := db.Pool.Query(ctx, `
 		SELECT j.created_at, j.mode, j.aspect_ratio, j.status,
-		       COALESCE(j.provider_metadata::text, '(null)')
+		       COALESCE(j.error_code,'') || ' :: ' || COALESCE(j.provider_error,'')
 		  FROM omnichat_generation_jobs j
 		 WHERE j.persona_id = $1
 		 ORDER BY j.created_at DESC
