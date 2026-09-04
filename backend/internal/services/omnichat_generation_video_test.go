@@ -60,14 +60,24 @@ func TestVideoMotionPromptGivesTheClipAnEnding(t *testing.T) {
 	require.Contains(t, prompt, "comes to rest before the clip ends")
 }
 
-func TestVideoMotionPromptUsesCreateRequestsAsWritten(t *testing.T) {
+// Create and image-to-video used to be returned as written, with none of the
+// scaffolding a scene clip gets. That was the whole defect: a clip animated
+// from the Create screen had no static-camera line, no identity-hold line and
+// no arc, so it drifted and stopped mid-gesture. The caller's words are still
+// the motion -- the scene's activity is ignored here, deliberately -- but they
+// arrive wrapped in the same instructions.
+func TestVideoMotionPromptScaffoldsCreateRequestsToo(t *testing.T) {
 	for _, mode := range []models.OmniChatGenerationMode{
 		models.OmniChatGenerationModeCreate,
 		models.OmniChatGenerationModeImageToVideo,
 	} {
 		prompt := BuildOmniChatVideoMotionPrompt(mode, "she turns and waves",
 			models.OmniChatSceneState{Activity: "standing still"})
-		require.Equal(t, "she turns and waves", prompt)
+
+		require.Contains(t, prompt, "Motion: she turns and waves.", string(mode))
+		require.Contains(t, prompt, "Static camera", string(mode))
+		require.Contains(t, prompt, "comes to rest before the clip ends", string(mode))
+		require.NotContains(t, prompt, "standing still", string(mode))
 	}
 }
 

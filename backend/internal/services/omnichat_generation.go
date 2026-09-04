@@ -22,6 +22,18 @@ const (
 	omniChatMaxAccessories           = 8
 )
 
+// omniChatDefaultVideoSeconds is how long a clip runs when nobody asks for a
+// length. Six rather than five: a five-second clip ended mid-gesture on every
+// motion worth watching, because the frame budget ran out rather than the
+// movement finishing.
+//
+// It is above the length Wan 2.2 was trained at, and the worker's own frame
+// budget warns that the model degrades away from that length rather than
+// failing. That trade is deliberate and it is measured, not assumed: if the
+// extra second costs more drift than the finished gesture is worth, this is
+// the one number to put back.
+const omniChatDefaultVideoSeconds = 6
+
 // omniChatLikenessAspectRatio is the tallest frame the provider accepts, which
 // is what a standing figure photographed head to feet wants.
 const omniChatLikenessAspectRatio = "9:16"
@@ -92,7 +104,7 @@ func NormalizeOmniChatGenerationRequest(input models.OmniChatGenerationRequest) 
 	}
 	if request.Kind == models.OmniChatMediaKindVideo {
 		if request.DurationSeconds == 0 {
-			request.DurationSeconds = 5
+			request.DurationSeconds = omniChatDefaultVideoSeconds
 		}
 		if request.DurationSeconds < 3 || request.DurationSeconds > 10 {
 			return request, errors.New("duration_seconds must be between 3 and 10")
@@ -484,16 +496,37 @@ func buildOmniChatEffectivePrompt(request models.OmniChatGenerationRequest) stri
 //   - CameraDirection is a camera *position*, and labelling it "camera
 //     movement" invited a moving camera, which reads as motion blur.
 func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt string, scene models.OmniChatSceneState) string {
-	prompt = strings.TrimSpace(prompt)
-	if mode != models.OmniChatGenerationModeContextual {
-		return prompt
+	// The motion comes from the scene for a contextual clip and from the
+	// caller's own words otherwise. Everything around it is identical: a clip
+	// animated from the Create screen drifts for exactly the same reasons a
+	// scene clip does, and for a while only the scene clip was told not to.
+	contextual := mode == models.OmniChatGenerationModeContextual
+	motion := strings.TrimSpace(prompt)
+	if contextual {
+		motion = strings.TrimSpace(scene.Activity)
+	}
+	if motion == "" && !contextual {
+		// Callers treat an empty return as "no prompt", which is a refusal.
+		// Returning the scaffolding alone would animate nothing and charge for
+		// it. A contextual clip is the exception: its prompt is fixed
+		// boilerplate that is dropped on purpose, so an activity-less scene
+		// still animates, on the hold and arc lines alone.
+		return ""
+	}
+	if motion != "" {
+		if last := motion[len(motion)-1]; last == '.' || last == '!' || last == '?' {
+			motion = motion[:len(motion)-1]
+		}
 	}
 	parts := []string{
 		"Animate the supplied still image.",
 		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
-		"Static camera, fixed framing, no camera movement.",
+		// The camera is a thing in the room, not a viewpoint. Saying where it
+		// is stops the model inventing a move for it: an unanchored frame
+		// wanders, and a wandering frame reads as the subject drifting.
+		"Static camera, fixed framing, no camera movement: the phone is propped up and does not move.",
 	}
-	if motion := strings.TrimSpace(scene.Activity); motion != "" {
+	if motion != "" {
 		parts = append(parts, "Motion: "+motion+".")
 	}
 	// Without an arc the model samples a slice out of the middle of a movement
@@ -615,3 +648,8 @@ func stripQuotedText(value string) string {
 	}
 	return builder.String()
 }
+
+// OmniChatDefaultVideoSeconds exposes the clip length to the queue, so the
+// handler's fallback and the request normalizer cannot drift to two different
+// numbers. They were 5 in both places by coincidence, not by construction.
+func OmniChatDefaultVideoSeconds() int { return omniChatDefaultVideoSeconds }

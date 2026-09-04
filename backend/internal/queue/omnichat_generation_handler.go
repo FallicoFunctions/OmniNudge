@@ -1393,7 +1393,7 @@ func BuildVideoSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	}
 	durationSeconds := job.DurationSeconds
 	if durationSeconds == 0 {
-		durationSeconds = 5
+		durationSeconds = services.OmniChatDefaultVideoSeconds()
 	}
 	// No aspect ratio: the worker derives the frame from the source still's own
 	// dimensions. Sending one would invite a mismatch that letterboxes or crops

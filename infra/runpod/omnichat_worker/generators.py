@@ -77,7 +77,13 @@ DEFAULT_VIDEO_NEGATIVE_PROMPT = (
 DEFAULT_VIDEO_MODEL_ID = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
 DEFAULT_VIDEO_FPS = 24
 # The trained clip length: 121 frames is about five seconds at 24fps.
-DEFAULT_VIDEO_MAX_FRAMES = 121
+# 145 frames is six seconds at 24fps. Wan 2.2 is trained at 121 (about five),
+# and video_frame_count below explains that it degrades away from that length
+# rather than failing -- so this ceiling buys a finished gesture at some cost in
+# fidelity. It is raised because five seconds cut every motion worth watching
+# mid-movement: the budget ran out, not the movement. If the extra second costs
+# more drift than the finished gesture is worth, this is the number to put back.
+DEFAULT_VIDEO_MAX_FRAMES = 145
 DEFAULT_VIDEO_MAX_AREA = 720 * 1280
 
 

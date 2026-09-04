@@ -505,7 +505,10 @@ func TestBuildVideoSpecAnimatesTheRenderedStill(t *testing.T) {
 	require.Equal(t, 7, spec.Input["duration_seconds"])
 	require.Equal(t, "video", spec.Input["kind"])
 	require.Equal(t, "image_to_video", spec.Input["mode"])
-	require.Equal(t, "She turns and waves", spec.Input["prompt"])
+	// Scaffolded now, in every mode. The caller's words are the motion; the
+	// camera, identity-hold and arc lines wrap them.
+	require.Contains(t, spec.Input["prompt"], "Motion: She turns and waves.")
+	require.Contains(t, spec.Input["prompt"], "Static camera")
 }
 
 // A clip needs its own seed for the same reason a picture does, and for a
