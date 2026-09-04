@@ -44,6 +44,7 @@ func main() {
 	label := flag.String("label", "", "name for this arm (required)")
 	out := flag.String("out", "reference-probe", "directory to write into")
 	bodyAdapter := flag.String("body-adapter", "", "off | on | unset -- what to send, or nothing")
+	adapterScale := flag.Float64("adapter-scale", 0, "identity_adapter_scale to send; 0 uses her profile's")
 	timeout := flag.Duration("timeout", 20*time.Minute, "per render")
 	flag.Parse()
 
@@ -51,13 +52,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "zz_reference_probe: --persona and --label are required")
 		os.Exit(1)
 	}
-	if err := probe(*personaID, *variant, *label, *out, *bodyAdapter, *seedList, *timeout); err != nil {
+	if err := probe(*personaID, *variant, *label, *out, *bodyAdapter, *seedList, *adapterScale, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, "zz_reference_probe:", err)
 		os.Exit(1)
 	}
 }
 
-func probe(personaID int, variant, label, out, bodyAdapter, seedList string, timeout time.Duration) error {
+func probe(personaID int, variant, label, out, bodyAdapter, seedList string,
+	adapterScale float64, timeout time.Duration) error {
 	ctx := context.Background()
 	cfg, err := config.Load()
 	if err != nil {
@@ -108,8 +110,12 @@ func probe(personaID int, variant, label, out, bodyAdapter, seedList string, tim
 	}
 	client := runpod.NewClient(cfg.OmniChatMedia.RunPodAPIKey, cfg.OmniChatMedia.RunPodBaseURL)
 
-	fmt.Printf("arm:      %s\nvariant:  %s (%s)\nseeds:    %v\nadapter:  %s\nprompt:   %s\n\n",
-		label, variant, aspect, seeds, orUnset(bodyAdapter), prompt)
+	scale := profile.AdapterScale
+	if adapterScale > 0 {
+		scale = adapterScale
+	}
+	fmt.Printf("arm:      %s\nvariant:  %s (%s)\nseeds:    %v\nbody:     %s\nscale:    %.2f\nprompt:   %s\n\n",
+		label, variant, aspect, seeds, orUnset(bodyAdapter), scale, prompt)
 
 	for _, seed := range seeds {
 		input := map[string]any{
@@ -119,7 +125,7 @@ func probe(personaID int, variant, label, out, bodyAdapter, seedList string, tim
 			"seed":                   seed,
 			"identity_mode":          string(profile.Mode),
 			"identity_adapter":       profile.Adapter,
-			"identity_adapter_scale": profile.AdapterScale,
+			"identity_adapter_scale": scale,
 			"reference_image_urls":   []string{anchorURL},
 		}
 		switch strings.ToLower(strings.TrimSpace(bodyAdapter)) {
@@ -141,7 +147,7 @@ func probe(personaID int, variant, label, out, bodyAdapter, seedList string, tim
 
 	manifest, err := json.MarshalIndent(map[string]any{
 		"label": label, "variant": variant, "aspect": aspect, "seeds": seeds,
-		"body_adapter": orUnset(bodyAdapter), "prompt": prompt,
+		"body_adapter": orUnset(bodyAdapter), "identity_adapter_scale": scale, "prompt": prompt,
 	}, "", "  ")
 	if err != nil {
 		return err
