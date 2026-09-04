@@ -289,7 +289,7 @@ func TestSheIsDressedFacingUsAndGladToSeeUs(t *testing.T) {
 	// read. Both halves are still named -- "fully clothed" in general produced
 	// a crop top and nothing below the waist, which satisfies the general
 	// instruction.
-	for _, asked := range []string{"hem hangs below her hips", "covers the waistband",
+	for _, asked := range []string{"one unbroken line", "below the hips",
 		"legs are covered", "shoes",
 		"shoulders square", "facing the camera", "warm friendly"} {
 		require.Contains(t, anchor.EffectivePrompt, asked)

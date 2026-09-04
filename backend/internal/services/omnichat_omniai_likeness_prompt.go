@@ -89,8 +89,19 @@ const (
 	// So this describes where the fabric is, and every prohibition lives in
 	// OmniAIRenderNegativePrompt, which is the one place a diffusion model
 	// actually reads them.
-	omniAILikenessCoverageTemplate = "%[2]s top is long, and its hem hangs below %[1]s hips and " +
-		"covers the waistband of %[1]s trousers completely. %[2]s legs are covered to at least the " +
+	// Garment-neutral, because the brief may not have put her in trousers.
+	//
+	// This said "covers the waistband of her trousers completely", and the
+	// brief writer is told in the same breath that she may wear a skirt or a
+	// dress to the knee. When it chose one, the prompt dressed her in a dress
+	// and then asserted a waistband she did not have -- the same contradiction
+	// the comment below records being fixed once, surviving in the middle of
+	// the sentence after it was taken off the end.
+	//
+	// An unbroken line from the shoulders to below the hips is satisfied by a
+	// dress, a tucked shirt and a long jumper alike, and by no crop top.
+	omniAILikenessCoverageTemplate = "%[2]s clothing covers %[1]s body in one unbroken line from " +
+		"the shoulders to below the hips. %[2]s legs are covered to at least the " +
 		"knee, and %[3]s %[4]s shoes on."
 
 	// Shoulders square, because "facing the camera directly" alone produced two

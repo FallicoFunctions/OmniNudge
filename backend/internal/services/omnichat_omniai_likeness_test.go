@@ -272,7 +272,7 @@ func TestTheCoverageRuleSurvivesEveryBrief(t *testing.T) {
 		Outfit:  "a cropped bikini top and nothing else",
 		Setting: "on a beach",
 	})
-	require.Contains(t, prompt, "hem hangs below her hips and covers the waistband")
+	require.Contains(t, prompt, "clothing covers her body in one unbroken line")
 	require.Contains(t, prompt, "legs are covered to at least the knee, and she has shoes on")
 	// Described, never forbidden. A negation in the positive prompt is not
 	// encoded by CLIP, and naming the navel there raises its salience -- which
@@ -423,7 +423,7 @@ func TestThePromptSpeaksAboutHerInHerOwnPronouns(t *testing.T) {
 		Appearance: "A man in his early thirties with a short beard.", Subject: "man",
 	}, brief)
 	for _, expected := range []string{
-		"He is wearing", "His top is long", "his hips", "he has shoes on",
+		"He is wearing", "His clothing covers his body", "below the hips", "he has shoes on",
 		"He has a leather satchel", "He is holding",
 	} {
 		require.Contains(t, man, expected)
@@ -437,7 +437,7 @@ func TestThePromptSpeaksAboutHerInHerOwnPronouns(t *testing.T) {
 		Appearance: "a woman with dark curly hair",
 	}, brief)
 	require.Contains(t, legacy, "She is wearing")
-	require.Contains(t, legacy, "Her top is long")
+	require.Contains(t, legacy, "Her clothing covers her body")
 
 	// "They" is available and deliberately not the fallback: it reads as more
 	// than one person to a diffusion model, and this prompt spends a whole
@@ -467,7 +467,7 @@ func TestAPersonaMadeBeforeThePronounWasStoredIsStillSpokenAboutCorrectly(t *tes
 	}), OmniAICandidateBrief{Outfit: "a jumper", Setting: "a park"})
 
 	require.Contains(t, prompt, "He is wearing")
-	require.Contains(t, prompt, "His top is long")
+	require.Contains(t, prompt, "His clothing covers his body")
 	require.NotContains(t, prompt, "She is wearing")
 	require.NotContains(t, prompt, "Her top")
 

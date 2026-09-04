@@ -30,8 +30,13 @@ func TestEveryStageOfTheCoverageChainCarriesTheRule(t *testing.T) {
 		"portrait standard":  omniChatRenderedPortraitSystemPrompt,
 		"reference standard": omniChatRenderedReferenceSystemPrompt,
 	} {
-		require.Contains(t, strings.ToLower(stage), "waistband",
-			"%s stopped naming the waistband, which is the one instruction with no crop-top reading", name)
+		// Either wording. The language-model stages name the waistband, which
+		// they read perfectly well. The image prompt cannot: the brief may put
+		// her in a dress, and asserting a waistband she has not got is a prompt
+		// contradicting the outfit it just named. What both must carry is
+		// coverage past the hips, which no crop top satisfies.
+		require.Regexpf(t, `waistband|below the hips`, strings.ToLower(stage),
+			"%s stopped requiring coverage past the hips, which is the part with no crop-top reading", name)
 	}
 
 	// The rule reaches a real prompt, not only the constant it is written in.
@@ -40,7 +45,7 @@ func TestEveryStageOfTheCoverageChainCarriesTheRule(t *testing.T) {
 		models.OmniChatMediaIdentityProfile{Appearance: "a woman with dark curly hair"},
 		OmniAICandidateBrief{Outfit: "a green jacket", Setting: "a bookshop"},
 	)
-	require.Contains(t, prompt, "covers the waistband")
+	require.Contains(t, prompt, "one unbroken line from the shoulders to below the hips")
 }
 
 // The image prompt is the one stage that may not phrase the rule as a negation.
