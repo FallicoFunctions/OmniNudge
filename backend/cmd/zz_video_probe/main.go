@@ -13,7 +13,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +24,7 @@ import (
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/services"
 )
 
 func main() {
@@ -30,7 +33,25 @@ func main() {
 	prompt := flag.String("prompt", "she blinks and turns her head slightly", "motion prompt")
 	seconds := flag.Int("seconds", 5, "clip length")
 	timeout := flag.Duration("timeout", 30*time.Minute, "how long to wait")
+	save := flag.String("save", "", "download the clips this job produced into this directory, and do nothing else")
+	jobID := flag.String("job", "", "the job to save from (with --save)")
+	clips := flag.Bool("clips", false, "list rendered video clips, and do nothing else")
 	flag.Parse()
+
+	if *clips {
+		if err := listClips(); err != nil {
+			fmt.Fprintln(os.Stderr, "zz_video_probe:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if strings.TrimSpace(*save) != "" {
+		if err := saveClip(*jobID, *save); err != nil {
+			fmt.Fprintln(os.Stderr, "zz_video_probe:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*list, *asset, *prompt, *seconds, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, "zz_video_probe:", err)
@@ -166,4 +187,100 @@ func orMissing(v string) string {
 		return "(MISSING)"
 	}
 	return v
+}
+
+func openDB() (*database.DB, *config.Config, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, err
+	}
+	db, err := database.New(cfg.Database.DatabaseURL())
+	if err != nil {
+		return nil, nil, err
+	}
+	return db, cfg, nil
+}
+
+func listClips() error {
+	ctx := context.Background()
+	db, _, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	rows, err := db.Pool.Query(ctx, `
+		SELECT j.id, j.created_at,
+		       COALESCE(j.provider_metadata->>'worker_build', '(none)'),
+		       COALESCE(j.provider_metadata->>'model_id', '(none)')
+		  FROM omnichat_generation_jobs j
+		 WHERE j.kind = 'video' AND j.status = 'succeeded'
+		 ORDER BY j.created_at DESC LIMIT 12`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	fmt.Printf("%-38s %-18s %-8s %s\n", "JOB", "CREATED", "BUILD", "MODEL")
+	for rows.Next() {
+		var id uuid.UUID
+		var created time.Time
+		var build, model string
+		if err := rows.Scan(&id, &created, &build, &model); err != nil {
+			return err
+		}
+		fmt.Printf("%-38s %-18s %-8s %s\n", id, created.Format("2006-01-02 15:04"), build, model)
+	}
+	return rows.Err()
+}
+
+func saveClip(jobID, dir string) error {
+	ctx := context.Background()
+	db, cfg, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	var storage services.StorageService
+	if cfg.Storage.StorageBackend == "s3" {
+		if storage, err = services.NewS3StorageService(cfg); err != nil {
+			return fmt.Errorf("s3: %w", err)
+		}
+	} else if storage, err = services.NewLocalStorageService("./uploads", cfg.FrontendURL+"/uploads"); err != nil {
+		return fmt.Errorf("local storage: %w", err)
+	}
+
+	id, err := uuid.Parse(jobID)
+	if err != nil {
+		return fmt.Errorf("bad job id: %w", err)
+	}
+	var path, fileType string
+	err = db.Pool.QueryRow(ctx, `
+		SELECT mf.storage_path, mf.file_type
+		  FROM omnichat_generation_jobs j
+		  JOIN omnichat_media_assets a ON a.id = j.output_asset_id
+		  JOIN media_files mf ON mf.id = a.media_file_id
+		 WHERE j.id = $1`, id).Scan(&path, &fileType)
+	if err != nil {
+		return fmt.Errorf("locate the clip: %w", err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	body, err := storage.Download(ctx, path)
+	if err != nil {
+		return fmt.Errorf("download %s: %w", path, err)
+	}
+	defer body.Close()
+	name := dir + "/" + jobID[:8] + "-" + path[strings.LastIndex(path, "/")+1:]
+	out, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	n, copyErr := io.Copy(out, body)
+	_ = out.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	fmt.Printf("%s  (%d KB, %s)\n", name, n/1024, fileType)
+	return nil
 }
