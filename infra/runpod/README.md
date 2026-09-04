@@ -204,12 +204,21 @@ video sequence ran ahead to `v57` while the image worker stayed at `v53`. Pick
 the next free number above every existing tag on the repository you are
 pushing, and never assume the other worker's number means anything.
 
-**As of 2026-09-04.** Template `omnichat-video-wan22` (`95d2tt9dpk`) names
-`v56`, with a 60 GB container disk, a 1800 s execution timeout, and
-`workersMin: 0`. The current build is **`v58`**: it carries the `model_id` in
-the result payload and the request-level `body_adapter` switch, and its
-`omnichat_worker` tree is byte-identical to `omnichat-image-worker:v53`
-(`sha256:56cfc3a7…`).
+**As of 2026-09-04.** Template `omnichat-video-wan22` (`95d2tt9dpk`) was moved
+to `v58`, with a 60 GB container disk, a 1800 s execution timeout, and
+`workersMin: 0`.
+
+The current build is **`v59`**. It raises `DEFAULT_VIDEO_MAX_FRAMES` from 121
+to 145, so a clip runs six seconds at 24fps rather than five. That is above the
+121 frames Wan 2.2 was trained at, and `video_frame_count` says the model
+degrades away from that length rather than failing -- the trade buys a gesture
+that finishes instead of one cut off by the frame budget. If the extra second
+costs more drift than the finished gesture is worth, 121 is the number to put
+back, in `generators.py` and in `omniChatDefaultVideoSeconds`.
+
+`v58` carries the `model_id` in the result payload and the request-level
+`body_adapter` switch; its `omnichat_worker` tree is byte-identical to
+`omnichat-image-worker:v53` (`sha256:56cfc3a7…`).
 
 `v56` and `v57` both predate the `model_id` line, so **the deployed video
 worker records no checkpoint** until the template is repointed at `v58`.
@@ -245,14 +254,14 @@ cd backend && go run ./cmd/migrate -action=dry-run && go run ./cmd/migrate -acti
 the image worker so the two stay legible together:
 
 ```bash
-TAG=v58 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
+TAG=v59 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
 ```
 
 The buildx flags are load-bearing; see the Build section above for what happens
 without them. Verify the manifest type before going further:
 
 ```bash
-docker buildx imagetools inspect nickf579/omnichat-video-worker:v58
+docker buildx imagetools inspect nickf579/omnichat-video-worker:v59
 ```
 
 `MediaType` must be `application/vnd.docker.distribution.manifest.v2+json`. An
@@ -316,7 +325,7 @@ check the call directly against a built image rather than on a GPU:
 
 ```bash
 docker run --rm --platform linux/amd64 --entrypoint python \
-  nickf579/omnichat-video-worker:v58 \
+  nickf579/omnichat-video-worker:v59 \
   -c "from diffusers.pipelines.wan.pipeline_wan_i2v import prompt_clean; print(prompt_clean('test'))"
 ```
 
