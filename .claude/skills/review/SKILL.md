@@ -68,16 +68,33 @@ it was never verified, so a ledger you cannot satisfy ends the turn honestly
 instead of looping.
 
 **Work the list.** For each instrument in `.review/instruments.json`, ask its
-question. B5 is the one that cannot be done from a desk: if the thing produces
-output through a model or another system, run it for real and look at what came
-back, side by side. A payload can be correct and the picture still wrong. Record what you did and what it showed. Instruments B1-B4 mean *print
-the real artifact and read it* -- write a throwaway test or a small script that
-emits it, look at the output, then delete the throwaway.
+question. Instruments B1-B4 mean *print the real artifact and read it* -- write
+a throwaway test or a small script that emits it, look at the output, then
+delete the throwaway. **Print it for at least two materially different inputs**,
+along whatever dimension the code branches on. One input only proves the
+literal is spelled correctly: the likeness prompt was printed five times across
+two reviews, always with a woman, while every sentence in it was hardcoded to
+"She is wearing" -- so a male character was described as a woman, in an
+artifact a review had already read five times.
+
+B5 is the one that cannot be done from a desk: if the thing produces output
+through a model or another system, run it for real and look at what came back,
+side by side. A payload can be correct and the picture still wrong. Record what
+you did and what it showed. **Cost is not a reason to mark it `na`.** If a
+prompt or other model input changed and nothing has been rendered since, that
+is an unverified change: record it as such and say so in the session, rather
+than burying it among the other `na` lines. Across the first 23 passes it was
+applied once and skipped fifteen times, and in that same period every defect
+that actually reached a picture was found by running it -- none by a review.
 
 **Fix what you find, immediately**, unless the user asked for findings only.
 
 **Build each control.** Edit the file to undo the fix, `git diff >
-.review/controls/<id>.patch`, then `git checkout` the file. Confirm by hand that
+.review/controls/<id>.patch`, then `git checkout` the file. Then print the
+artifact the fix changed one more time before closing: review-time code is the
+least reviewed code in the repository, written last and quickly. A rewrite made
+during one review named a body part that a head-and-shoulders crop excludes,
+and every portrait rendered wrong until somebody looked at a picture. Confirm by hand that
 the named tests fail with it applied -- and that they fail as tests, with a real
 assertion failure, not because the patch stopped the code compiling.
 

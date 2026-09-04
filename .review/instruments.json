@@ -18,7 +18,7 @@
       "id": "B1",
       "name": "Print the built string or payload",
       "trigger": "a prompt, request, or message is assembled",
-      "asks": "What does the consumer actually receive?"
+      "asks": "What does the consumer actually receive? Print it for at least TWO materially different inputs -- the dimensions the code actually branches on: man and woman, empty and full, anime and realistic, first render and retry. One input proves the literal is spelled right and nothing else. Every likeness prompt in this repository was printed five times across two reviews, always with a woman, while every sentence after the subject line was hardcoded to \"She is wearing\" and \"Her top\" -- so a male character was described as a woman for as long as the feature existed, in an artifact a review had read five times."
     },
     {
       "id": "B2",
@@ -144,7 +144,7 @@
       "id": "G1",
       "name": "Control every fix",
       "trigger": "every finding fixed",
-      "asks": "Does the new test fail when the fix is reverted?"
+      "asks": "Does the new test fail when the fix is reverted? Then print the artifact the fix changed, once more, before closing. Review-time code is the least reviewed code in the repository: it is written last, quickly, under the urge to be finished. A rewrite made during one review put \"unadorned at the neck, ears and wrists\" into a head-and-shoulders prompt -- naming a body part the crop excludes -- and every portrait came back as a three-quarter body shot until somebody rendered one."
     },
     {
       "id": "G2",
@@ -168,7 +168,7 @@
       "id": "B5",
       "name": "Run it against the real thing and compare the outputs to each other",
       "trigger": "anything whose output is produced by a model, a provider, or another system",
-      "asks": "Not just: is each output correct? Also: are the outputs different from each other in the ways the feature promises, and does anyone looking at them agree they are what was asked for?"
+      "asks": "Not just: is each output correct? Also: are the outputs different from each other in the ways the feature promises, and does anyone looking at them agree they are what was asked for? This may NOT be marked na because it costs money or GPU time. If a prompt or any other model input changed and nothing has been rendered since, that is a finding with no fix yet: record it as an explicit unverified row and say so to the user, rather than burying it among twenty other na lines. Applied once in the first 23 passes and skipped fifteen times -- and meanwhile every product defect that actually reached a picture was found by running it, none of them by a review."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
