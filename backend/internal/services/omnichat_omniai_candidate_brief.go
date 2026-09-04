@@ -236,6 +236,13 @@ type omniAICandidateBriefResponse struct {
 // and her personality -- but they are said out loud, because the degradation is
 // otherwise invisible: what comes back looks fine while having been written
 // without knowing how old she is.
+// OmniAIAppearanceFactsFor is the exported form, for the reference probe, which
+// has to build the same face description the product builds or it is measuring
+// itself rather than the product.
+func OmniAIAppearanceFactsFor(persona *models.BotPersona) (OmniAIAppearance, bool) {
+	return omniAIAppearanceFacts(persona)
+}
+
 func omniAIAppearanceFacts(persona *models.BotPersona) (OmniAIAppearance, bool) {
 	var appearance OmniAIAppearance
 	if persona == nil || len(persona.OmniAIAppearance) == 0 {
