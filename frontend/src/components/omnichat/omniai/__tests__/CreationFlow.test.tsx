@@ -438,3 +438,47 @@ describe('how they like to dress', () => {
     expect(screen.getByText(`4 / ${STYLE_NOTE_LIMIT}`)).toBeInTheDocument();
   });
 });
+
+// The note has to reach the request, not just the textarea.
+//
+// It is read by the style writer, stored on her identity profile and allowed
+// to outrank the taste a model writes from her personality -- and every one of
+// those is reached through this one field on the request body. A screen that
+// captures it and a request that drops it look identical from the UI, which is
+// what the other tests here check.
+describe('the style note on the way out', () => {
+  it('is sent with the request when somebody typed one', async () => {
+    vi.mocked(omnichatService.createOmniAI).mockResolvedValue({ id: 7 } as never);
+    await renderAtBasics();
+    await walkTo(STEP.style);
+    await user.type(await screen.findByLabelText('How they dress'), 'always in black');
+    // Onward from here rather than walkTo again: walkTo restarts at the first
+    // screen, and the note would be typed and then walked away from.
+    // Typed as a number: `let step = STEP.style` infers the literal 6, and
+    // TypeScript then calls every comparison against another screen a
+    // comparison between non-overlapping literals.
+    for (let step: number = STEP.style; step < STEP.review; step += 1) {
+      if (step === STEP.traits) await clickText('Warm');
+      if (step === STEP.you) await clickText('Fond');
+      await user.click(screen.getByRole('button', { name: /Continue|Make/ }));
+    }
+
+    await user.click(screen.getByRole('button', { name: /Make her/ }));
+    await waitFor(() => expect(omnichatService.createOmniAI).toHaveBeenCalled());
+    expect(vi.mocked(omnichatService.createOmniAI).mock.calls[0][0]).toMatchObject({
+      style_note: 'always in black',
+    });
+  });
+
+  // Left out rather than sent empty. An empty string is an answer, and the
+  // server would store it as one; nobody typing anything is not an answer.
+  it('is left out when nobody typed one', async () => {
+    vi.mocked(omnichatService.createOmniAI).mockResolvedValue({ id: 7 } as never);
+    await renderAtBasics();
+    await walkTo(STEP.review);
+
+    await user.click(screen.getByRole('button', { name: /Make her/ }));
+    await waitFor(() => expect(omnichatService.createOmniAI).toHaveBeenCalled());
+    expect(vi.mocked(omnichatService.createOmniAI).mock.calls[0][0].style_note).toBeUndefined();
+  });
+})
