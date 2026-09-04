@@ -204,64 +204,24 @@ func NormalizeOmniChatReferenceRequest(
 // And warm rather than alluring. The same prior that undresses an unspecified
 // subject also makes her pose and look like a glamour shoot, which is not what
 // somebody choosing a character's face is choosing between.
-// The negative prompt in groups, because not every group belongs in every frame.
-//
-// A head-and-shoulders reference contains no legs, so naming trousers, skirts,
-// bare legs and sitting in its negative prompt describes a body that is not in
-// the picture. That is the same fault as naming her wrists in a portrait's
-// positive prompt: what the crop excludes should not be mentioned at either
-// end, because mentioning it is how the model learns the crop includes it.
-const (
-	omniAINegativeNobodyElse = "second subject, extra person, extra faces, " +
-		"crowd, bystander, group photo, another woman, another man"
-
-	omniAINegativeUndressed = "nude, naked, topless, underwear, lingerie, swimwear, " +
-		"exposed skin instead of clothing"
-
-	// The midriff family, named garment by garment because a coverage
-	// instruction is answered by choosing a garment and "bare midriff" alone
-	// left every cropped top available.
-	omniAINegativeMidriff = "crop top, cropped shirt, cropped top, sports bra, bralette, " +
-		"halter top, tube top, tied shirt, bare midriff, bare stomach, bare abdomen, " +
-		"exposed navel, visible navel, underboob, sideboob, cutout top"
-
-	// Below the waist. Meaningless in a crop that stops at the chest.
-	omniAINegativeLowerBody = "bottomless, no trousers, missing trousers, " +
-		"bare legs with no skirt, exposed groin, pubic area, genitals, naked lower body, buttocks"
-
-	// Which way she is facing, which matters at any crop.
-	omniAINegativeFacing = "from behind, back view, rear view, facing away, looking over the shoulder"
-
+const OmniAIRenderNegativePrompt = "second subject, extra person, extra faces, " +
+	"crowd, bystander, group photo, another woman, another man, " +
+	"nude, naked, topless, underwear, lingerie, swimwear, " +
+	"exposed skin instead of clothing, " +
+	"crop top, cropped shirt, cropped top, sports bra, bralette, halter top, " +
+	"tube top, tied shirt, bare midriff, bare stomach, bare abdomen, " +
+	"exposed navel, visible navel, underboob, sideboob, cutout top, " +
+	"bottomless, no trousers, missing trousers, bare legs with no skirt, " +
+	"exposed groin, pubic area, genitals, naked lower body, " +
+	"from behind, back view, rear view, facing away, looking over the shoulder, buttocks, " +
 	// Standing, and the backstop for it. The brief writer is told to keep a
-	// pose out of the setting; this catches one that gets through. Leaning is
-	// deliberately absent -- it is a standing pose and several good renders
-	// used it. Whole-body frames only: a seated headshot and a standing one
-	// are the same picture.
-	omniAINegativePosture = "sitting, seated, sitting down, crouching, kneeling, " +
-		"squatting, lying down, reclining"
-
-	omniAINegativeAlluring = "seductive, sultry, alluring, provocative, pouting, " +
-		"parted lips, bedroom eyes, glamour shot, lingerie model, boudoir"
-)
-
-// OmniAIRenderNegativePrompt keeps everyone else out of her pictures, for every
-// frame that shows her whole body.
-var OmniAIRenderNegativePrompt = strings.Join([]string{
-	omniAINegativeNobodyElse, omniAINegativeUndressed, omniAINegativeMidriff,
-	omniAINegativeLowerBody, omniAINegativeFacing, omniAINegativePosture,
-	omniAINegativeAlluring,
-}, ", ")
-
-// OmniAIPortraitNegativePrompt is the same list with the parts of the body that
-// are not in the picture taken out.
-//
-// A portrait reference is cropped at the chest. Fifteen terms about trousers,
-// bare legs and sitting were describing a lower body the frame does not
-// contain, and every portrait variant came back showing one.
-var OmniAIPortraitNegativePrompt = strings.Join([]string{
-	omniAINegativeNobodyElse, omniAINegativeUndressed, omniAINegativeMidriff,
-	omniAINegativeFacing, omniAINegativeAlluring,
-}, ", ")
+	// pose out of the setting; this is what catches one that gets through,
+	// the same way the view terms above catch a subject turned away. Leaning
+	// is deliberately absent -- it is a standing pose and several good renders
+	// used it.
+	"sitting, seated, sitting down, crouching, kneeling, squatting, lying down, reclining, " +
+	"seductive, sultry, alluring, provocative, pouting, parted lips, bedroom eyes, " +
+	"glamour shot, lingerie model, boudoir"
 
 func normalizeOmniAIRenderRequest(
 	request models.OmniChatGenerationRequest,
@@ -313,13 +273,6 @@ func normalizeOmniAIRenderRequest(
 	// both, deliberately, and must not put this on somebody's own Create prompt
 	// that asked for two people.
 	normalized.NegativePrompt = OmniAIRenderNegativePrompt
-	// A portrait is cropped at the chest, so the terms about legs, trousers and
-	// sitting come out. They described a body the frame does not contain, which
-	// is how the model was told the frame contained one.
-	if mode == models.OmniChatGenerationModeLikenessReference &&
-		OmniAIReferenceIsPortraitFrame(aspectRatio) {
-		normalized.NegativePrompt = OmniAIPortraitNegativePrompt
-	}
 
 	// A reference is held to a plainness the candidates are not.
 	//

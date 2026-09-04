@@ -189,16 +189,8 @@ func TestNobodyElseIsInHerReferencePhotos(t *testing.T) {
 			Prompt: BuildOmniAIReferencePrompt(profile, variant, ""),
 		}, variant)
 		require.NoError(t, err)
-		// Everything about who is in the frame, the anchor and every reference
-		// refuse alike. A full-length reference refuses the whole anchor list;
-		// a portrait refuses all of it except the parts describing a lower body
-		// its crop does not contain.
-		require.Contains(t, request.NegativePrompt, "second subject", variant)
-		require.Contains(t, request.NegativePrompt, "bystander", variant)
-		aspect, _ := OmniAIReferenceVariantAspect(variant)
-		if !OmniAIReferenceIsPortraitFrame(aspect) {
-			require.Contains(t, request.NegativePrompt, anchor.NegativePrompt, variant)
-		}
+		// Everything the anchor refuses, a reference refuses too.
+		require.Contains(t, request.NegativePrompt, anchor.NegativePrompt, variant)
 	}
 }
 
@@ -324,28 +316,9 @@ func TestEverySupportingPictureIsDefendedTheSameWay(t *testing.T) {
 			Prompt: BuildOmniAIReferencePrompt(profile, variant, ""),
 		}, variant)
 		require.NoError(t, err, variant)
-		// Every frame refuses these. They are about who is in the picture, what
-		// she has on above the waist, which way she faces and how she looks --
-		// none of which depends on where the crop falls.
-		for _, refused := range []string{"nude", "lingerie", "crop top", "sports bra",
-			"underboob", "back view", "seductive", "second subject"} {
+		for _, refused := range []string{"nude", "lingerie", "bottomless", "genitals",
+			"crop top", "sports bra", "underboob", "back view", "seductive"} {
 			require.Contains(t, request.NegativePrompt, refused, variant)
-		}
-
-		// The lower body only where there is one. A portrait stops at the
-		// chest, and naming trousers, bare legs and sitting in its negative
-		// describes a body the frame does not contain -- which is how the model
-		// was told the frame contained one.
-		aspect, found := OmniAIReferenceVariantAspect(variant)
-		require.True(t, found, variant)
-		for _, lower := range []string{"bottomless", "genitals", "bare legs", "sitting", "kneeling"} {
-			if OmniAIReferenceIsPortraitFrame(aspect) {
-				require.NotContainsf(t, request.NegativePrompt, lower,
-					"%s is cropped at the chest and still refuses %q", variant, lower)
-			} else {
-				require.Containsf(t, request.NegativePrompt, lower,
-					"%s shows her whole body and must still refuse %q", variant, lower)
-			}
 		}
 	}
 }
