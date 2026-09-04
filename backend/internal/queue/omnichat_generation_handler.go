@@ -1405,6 +1405,12 @@ func BuildVideoSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		"negative_prompt":  strings.TrimSpace(job.NegativePrompt),
 		"duration_seconds": durationSeconds,
 		"source_image_url": sourceURL,
+		// Same reason as the image phase, and it was missing here. The worker
+		// only seeds its generator when a seed arrives, so an unseeded clip
+		// starts from torch's fixed default: the same still and prompt returned
+		// the same bytes every time, which is what made four candidate images
+		// one face charged for four times.
+		"seed": seedForJob(job.ID),
 	}
 	endpointID := strings.TrimSpace(cfg.RunPodVideoEndpointID)
 	if endpointID == "" {

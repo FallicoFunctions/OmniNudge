@@ -508,6 +508,33 @@ func TestBuildVideoSpecAnimatesTheRenderedStill(t *testing.T) {
 	require.Equal(t, "She turns and waves", spec.Input["prompt"])
 }
 
+// A clip needs its own seed for the same reason a picture does, and for a
+// month it had none: the worker only seeds when a seed arrives, so every
+// unseeded render started from torch's fixed default and returned the same
+// bytes. The image path was given a seed after four candidates came back
+// byte-identical. The video path was not.
+func TestBuildVideoSpecSeedsTheClipFromItsJob(t *testing.T) {
+	first := &models.OmniChatGenerationJob{
+		ID:              uuid.MustParse("11111111-2222-3333-4444-555555555555"),
+		Kind:            models.OmniChatMediaKindVideo,
+		Mode:            models.OmniChatGenerationModeImageToVideo,
+		Prompt:          "She turns and waves",
+		DurationSeconds: 5,
+	}
+	second := *first
+	second.ID = uuid.MustParse("99999999-8888-7777-6666-555555555555")
+
+	one, err := BuildVideoSpec(omniChatMediaTestConfig(), first, "https://signed.example.test/a.png")
+	require.NoError(t, err)
+	two, err := BuildVideoSpec(omniChatMediaTestConfig(), &second, "https://signed.example.test/a.png")
+	require.NoError(t, err)
+
+	require.Equal(t, seedForJob(first.ID), one.Input["seed"],
+		"the seed must come from the job, so a retry renders the clip it was going to render")
+	require.NotEqual(t, one.Input["seed"], two.Input["seed"],
+		"two jobs must not animate the same still into the same clip")
+}
+
 func TestBuildVideoSpecSendsMotionOnlyForASceneClip(t *testing.T) {
 	// The still already carries appearance and setting. Sending them again
 	// gives the video model something to contradict, which reads as drift.
