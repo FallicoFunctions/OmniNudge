@@ -1,0 +1,362 @@
+{
+  "schema_version": 2,
+  "head": "a6e2b83a9fcdaf7220aa73ba7d9da48c5b9b6974",
+  "base": "2a7c8bec4e5e83369d6d143d3966db3839341afb",
+  "scope": {
+    "files": [
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/system_prompt_inventory_test.go",
+      "backend/internal/services/omnichat_prompt_matrix_test.go",
+      "backend/internal/services/omnichat_omniai_coverage_chain_test.go",
+      "backend/internal/services/omnichat_omniai_likeness_test.go",
+      "backend/internal/services/omnichat_omniai_reference_set_test.go",
+      "backend/internal/models/identity_wiring_test.go",
+      "backend/internal/models/provenance_wiring_test.go",
+      "backend/internal/services/runpod/wiring_test.go"
+    ],
+    "boundaries": [
+      "the assembled image prompt handed to the diffusion model",
+      "test <-> source, through the go/ast scan that requires every system prompt to be inventoried",
+      "models <-> services, through the identity profile read out of extensions_json"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/418a22c2a793fe582ae6a797feb68b8add89edda.json",
+    ".review/edde601874009e0149098edc0309d556a163ddbf.json",
+    ".review/390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+    ".review/58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    ".review/a8413c5c8c1e216743c13088de4172e2937322c0.json",
+    ".review/10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+    ".review/a1712456328c6abd1111176e3de4b1197b645920.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "2a7c8bec4..HEAD. Three reflection wiring tests, the 28-prompt matrix, the system-prompt inventory, enum validation on the identity profile, the fallback-brief pronoun, the baseline trust clause, the CI artifact step and the git add -A rule. Seams: test<->source (the go/ast scan), models<->services, repo<->CI."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "All seven prior ledgers. The 418a22c2a one is the most recent and its B4 finding (the stored blob writing zeros) sits on the file I changed, so B4 below re-checks it."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the likeness prompt for all four subjects, then -- the new two-input rule, applied on a second axis -- for four outfits. The second axis found the dress contradiction. Also printed the fallback brief under 'they'."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed; the style-note screen was reviewed in the previous ledger"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Printed the stored identity blob and what reads back, for man/realistic and woman/anime. Only answered fields are written, and mode, adapter, scale and limit come back valid. The prior ledger's zero-writing finding has not regressed."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "no constant crosses a seam in this range"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Result, provenance and the identity profile are all now covered by round-trips that fail when a field is added and wired to nothing."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The coverage rule reached five prose stages in one wording. The image prompt now differs deliberately and the chain test accepts either, because the image prompt is the one that has just named the outfit."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "the worker contract is untouched here"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Applied to the new test code itself. systemPromptInventory maps a name to a constant and nothing made the two agree, so a row could check its neighbour's prompt and pass."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "omniChatBaselineDerivationSystemPrompt reads a creator-written character definition and had no trust boundary -- found in the previous session's work and fixed there; re-checked here by the inventory."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Bounds on Mode, Adapter, LoraModelID, LoraWeightName and Subject, and the four format verbs in the coverage template verified by reading a rendered prompt rather than counting them."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The three wiring tests cover hand-written decoders. Noted and not built: the repository Scan lists have the same hazard -- a column added to a struct and not to every Scan is a silent zero -- and no test guards them. Out of scope here and worth its own pass."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Branches in the new AST scan are reachable; the i < len(spec.Values) guard covers a const block with names and no values."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The AST parse error is required rather than logged, so a scan that cannot run fails instead of reporting nothing found."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The coverage wording now differs between the image prompt and the four language-model stages, deliberately and with the chain test asserting both."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction or queue work changed"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration changed -- the row records that, not that the check is idle"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing newly persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Two controls, each verified by hand to fail as a real assertion. R2's first control was blind -- it weakened the assertion instead of breaking what it guards -- and was rebuilt as the defect itself."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, four Go packages, 89 worker tests, and the three guard suites (6, 74, 45) all green."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both findings were named by existing instruments: the dress by B1's new two-input rule applied on the outfit axis, the inventory by C5. Nothing needed adding."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "UNVERIFIED. The coverage sentence sent to the image model changed from 'covers the waistband of her trousers' to 'one unbroken line from the shoulders to below the hips', and nothing has been rendered since. This is the instrument's new rule: recorded as unverified rather than skipped, and said out loud to the user in the session."
+        }
+      ],
+      "findings": [
+        {
+          "id": "R1",
+          "summary": "the coverage rule asserted 'the waistband of her trousers' while the brief writer is told she may wear a skirt or a dress -- a knee-length dress produced a prompt naming the dress and then the waistband in consecutive sentences",
+          "found_by": "B1",
+          "fix_commit": "8fc6b2d15",
+          "control": {
+            "patch": ".review/controls/proactive-R1-coverage-garment.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestTheCoverageRuleNamesNoGarment$"
+            ],
+            "observed": "fails naming the garment the rule reintroduced"
+          }
+        },
+        {
+          "id": "R2",
+          "summary": "systemPromptInventory maps a constant's name to a constant's value and nothing made them agree, so a row holding its neighbour's prompt would check the wrong string and pass",
+          "found_by": "C5",
+          "fix_commit": "a1a0a403a",
+          "control": {
+            "patch": ".review/controls/proactive-R2-inventory-keys.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run ^TestEverySystemPromptIsInTheInventory$"
+            ],
+            "observed": "fails naming the row whose stored prompt is not the constant it names"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "New surface is the garment-neutral coverage sentence, its regression test, and the inventory key check."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the composed result across two subjects and two outfits -- a dress and a boiler suit, for a man and for they. Pronouns, verb agreement and the coverage sentence all read correctly together, and no format verb is missing."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "no component changed; the style-note screen was reviewed in the previous ledger"
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "no handler changed"
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "unchanged"
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "no constant crosses a seam in this range"
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "the chain test accepts both wordings and still requires coverage past the hips at every stage"
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "the worker contract is untouched here"
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "the coverage test asserts on the template the builder actually formats, not on a rendered string where a brief's own garment would be indistinguishable from a leaked one"
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "the reference prompts name garments deliberately and correctly -- they choose the outfit rather than describing one already chosen, so the same words are right there and wrong in the likeness prompt"
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "no conditional gates this path"
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "clean"
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "no goroutine or shared state changed"
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "no transaction or queue work changed"
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "no migration changed -- the row records that, not that the check is idle"
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "nothing newly persisted; the style rides in an existing blob"
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "both controls verified"
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "nothing in this pass touched what it asks about"
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "re-run after the fix: all green"
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "nothing found, so nothing to add"
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "UNVERIFIED, same change. Nothing rendered since the coverage sentence was rewritten."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... clean",
+    "vet": "go vet ./... clean",
+    "tests": "services, services/runpod, models, queue with -p 1 -count=1 -- all ok",
+    "python": "89 worker tests ok",
+    "guards": "no-build-artifacts 6, block-destructive 74, review-ledger-verify 45 -- all passed"
+  }
+}

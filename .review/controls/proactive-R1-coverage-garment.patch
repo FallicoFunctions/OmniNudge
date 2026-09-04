@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_omniai_likeness_prompt.go b/backend/internal/services/omnichat_omniai_likeness_prompt.go
+index fdbfb3add..2c80eedbd 100644
+--- a/backend/internal/services/omnichat_omniai_likeness_prompt.go
++++ b/backend/internal/services/omnichat_omniai_likeness_prompt.go
+@@ -100,7 +100,7 @@ const (
+ 	//
+ 	// An unbroken line from the shoulders to below the hips is satisfied by a
+ 	// dress, a tucked shirt and a long jumper alike, and by no crop top.
+-	omniAILikenessCoverageTemplate = "%[2]s clothing covers %[1]s body in one unbroken line from " +
++	omniAILikenessCoverageTemplate = "%[2]s top is long and covers the waistband of %[1]s trousers, " +
+ 		"the shoulders to below the hips. %[2]s legs are covered to at least the " +
+ 		"knee, and %[3]s %[4]s shoes on."
+ 

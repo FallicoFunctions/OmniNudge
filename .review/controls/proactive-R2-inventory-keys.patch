@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/system_prompt_inventory_test.go b/backend/internal/services/system_prompt_inventory_test.go
+index 157342362..8413f9d12 100644
+--- a/backend/internal/services/system_prompt_inventory_test.go
++++ b/backend/internal/services/system_prompt_inventory_test.go
+@@ -28,7 +28,7 @@ var systemPromptInventory = map[string]struct {
+ }{
+ 	"omniAICandidateBriefSystemPrompt": {omniAICandidateBriefSystemPrompt, true,
+ 		"her description, personality, tags, taste and the creator's style note"},
+-	"omniAIStyleSystemPrompt": {omniAIStyleSystemPrompt, true,
++	"omniAIStyleSystemPrompt": {omniAICandidateBriefSystemPrompt, true,
+ 		"the same, plus the style note it is told outranks its own taste"},
+ 	"omniChatMediaModerationSystemPrompt": {omniChatMediaModerationSystemPrompt, true,
+ 		"the prompt somebody typed, classified before it is rendered"},
