@@ -193,3 +193,28 @@ func TestThePromptMatrixCoversEveryBuilderAndSubject(t *testing.T) {
 	fmt.Printf("prompt matrix: %d prompts, %d builders, %d subjects\n",
 		len(cases), len(builders), len(subjects))
 }
+
+// The rule about her clothes may not name a garment the brief might not have
+// chosen.
+//
+// It said "covers the waistband of her trousers", while the brief writer is
+// told in the same breath that she may wear a skirt or a dress to the knee. A
+// knee-length dress produced a prompt that named the dress and then asserted a
+// waistband, in consecutive sentences.
+//
+// Asserted on the template rather than on a rendered prompt, because that is
+// where the fault lives: a rendered prompt legitimately contains whatever
+// garment the brief chose, so searching one for "dress" cannot tell the two
+// apart.
+func TestTheCoverageRuleNamesNoGarment(t *testing.T) {
+	for _, garment := range []string{
+		"trousers", "skirt", "dress", "shirt", "jumper", "top", "coat", "jeans",
+	} {
+		require.NotContainsf(t, strings.ToLower(omniAILikenessCoverageTemplate), garment,
+			"the coverage rule names %q. It is a statement about the outfit the brief "+
+				"already chose, so naming a garment asserts one she may not be wearing.", garment)
+	}
+	// And it still says the thing it exists to say.
+	require.Contains(t, omniAILikenessCoverageTemplate, "below the hips")
+	require.Contains(t, omniAILikenessCoverageTemplate, "covered to at least the")
+}
