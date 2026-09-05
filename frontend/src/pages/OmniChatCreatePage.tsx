@@ -135,7 +135,10 @@ export function OmniChatCreateWorkspace() {
       mode: animateExisting ? 'image_to_video' : 'create',
       persona_id: selectedPersona.id,
       prompt: prompt.trim(),
-      negative_prompt: negativePrompt.trim() || undefined,
+      // Not sent for a clip even if the box was filled before switching kind.
+      // Hiding the field is not enough on its own: the state survives the
+      // switch, and a value the provider cannot use should not travel.
+      negative_prompt: kind === 'image' ? negativePrompt.trim() || undefined : undefined,
       aspect_ratio: aspectRatio as '1:1' | '3:4' | '4:3' | '4:5' | '5:4' | '9:16' | '16:9',
       duration_seconds: kind === 'video' ? duration : undefined,
       source_asset_id: animateExisting ? sourceAssetId : undefined,
@@ -268,16 +271,22 @@ export function OmniChatCreateWorkspace() {
                     className="mt-2 min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
                   />
                 </label>
-                <label className="block text-sm font-medium text-white/75">
-                  Avoid <span className="font-normal text-white/35">(optional)</span>
-                  <input
-                    value={negativePrompt}
-                    onChange={(event) => setNegativePrompt(event.target.value)}
-                    maxLength={1000}
-                    placeholder="Blur, distorted hands, text…"
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
-                  />
-                </label>
+                {/* Images only. The hosted video model takes no negative
+                    prompt, so offering the box for a clip collects something
+                    that is thrown away -- worse than not asking, because the
+                    user believes it did something. */}
+                {kind === 'image' && (
+                  <label className="block text-sm font-medium text-white/75">
+                    Avoid <span className="font-normal text-white/35">(optional)</span>
+                    <input
+                      value={negativePrompt}
+                      onChange={(event) => setNegativePrompt(event.target.value)}
+                      maxLength={1000}
+                      placeholder="Blur, distorted hands, text…"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
+                    />
+                  </label>
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium text-white/75">
                     Aspect ratio

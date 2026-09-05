@@ -851,9 +851,20 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	// Only where explicit output would be a defect. A render the account is
 	// entitled to make explicit is not this check's business, so it neither
 	// waits nor charges on that path.
-	if !job.AllowNSFW && kind == models.OmniChatMediaKindImage {
-		if err := h.refuseExplicitRender(ctx, job, download.Path, download.ContentType); err != nil {
-			return nil, false, err
+	if !job.AllowNSFW {
+		switch kind {
+		case models.OmniChatMediaKindImage:
+			if err := h.refuseExplicitRender(ctx, job, download.Path, download.ContentType); err != nil {
+				return nil, false, err
+			}
+		case models.OmniChatMediaKindVideo:
+			// A clip was never looked at. Its opening frame is an approved
+			// still, but nothing checked where the animation took the subject
+			// -- and the model doing the animating is now a hosted one whose
+			// behaviour is not ours to predict.
+			if err := h.refuseExplicitClip(ctx, job, download.Path, providerMedia.Duration); err != nil {
+				return nil, false, err
+			}
 		}
 	}
 

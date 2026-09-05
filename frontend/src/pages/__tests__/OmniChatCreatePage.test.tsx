@@ -166,6 +166,63 @@ describe('OmniChatCreateWorkspace', () => {
     );
   });
 
+  // The hosted video model takes no negative prompt. Offering the box for a
+  // clip collects something that is thrown away, which is worse than not
+  // asking: the user believes it did something. Hiding it is not enough on its
+  // own -- the state survives a switch of kind, so the value must not travel
+  // either.
+  it('does not offer or send a negative prompt for a video', async () => {
+    vi.mocked(omnichatService.listGallery).mockResolvedValue([
+      {
+        id: 'asset-1',
+        owner_user_id: 9,
+        persona_id: 42,
+        generation_job_id: 'job-asset-1',
+        kind: 'image',
+        file_type: 'image/png',
+        content_url: '/omnichat/media/asset-1/content',
+        width: 1024,
+        height: 1280,
+        duration_seconds: 0,
+        prompt: 'Sadie at the park',
+        scene: {},
+        visibility: 'private',
+        created_at: '2026-07-20T00:00:00Z',
+      },
+    ]);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OmniChatCreateWorkspace />
+      </QueryClientProvider>
+    );
+
+    await screen.findByRole('option', { name: 'Sadie' });
+    // Fill it while the kind is image, then switch. A field that is merely
+    // hidden still holds what was typed into it.
+    fireEvent.change(screen.getByLabelText(/Avoid/), {
+      target: { value: 'blurry, extra fingers' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }));
+
+    expect(screen.queryByLabelText(/Avoid/)).not.toBeInTheDocument();
+
+    fireEvent.change(await screen.findByLabelText('Starting image'), {
+      target: { value: 'asset-1' },
+    });
+    fireEvent.change(screen.getByLabelText('Prompt'), {
+      target: { value: 'Sadie waves beside the fountain' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate video' }));
+
+    await waitFor(() => expect(omnichatService.createGeneration).toHaveBeenCalled());
+    expect(omnichatService.createGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'video', negative_prompt: undefined })
+    );
+  });
+
   it('opens auth for an unauthenticated generation and opens the video paywall on 402', async () => {
     mockIsAuthenticated = false;
     const authListener = vi.fn();
