@@ -734,16 +734,16 @@
    "findings": [
     {
      "id": "video-R6",
-     "summary": "the codex guard writes .codex/cache/touched.json on every edit, and it was neither tracked nor ignored -- a broad git add would have committed runtime state, which is the accident that once needed a history rewrite",
+     "summary": "the codex guard writes .codex/cache/touched.json on every edit, and it was neither tracked nor ignored -- a broad git add would have committed runtime state, which is the accident that once needed a history rewrite; the first control for it was a bare git check-ignore, which exits non-zero without failing as a test and so proved nothing",
      "found_by": "D2",
      "fix_commit": "ee691dc1a",
      "control": {
       "patch": ".review/controls/video-R6-codex-cache-untracked.patch",
       "runner": "bash",
       "tests": [
-       "git check-ignore -q .codex/cache/touched.json"
+       "bash scripts/no-build-artifacts.test.sh"
       ],
-      "observed": "with the patch applied the path is no longer ignored; without it, git check-ignore matches .gitignore:120"
+      "observed": "with the patch applied: 'FAIL  the codex guard's cache is ignored (wanted exit 0, got 1)' and '6 passed, 1 failed'; without it, 7 passed, 0 failed"
      }
     }
    ]

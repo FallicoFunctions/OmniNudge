@@ -7,6 +7,7 @@
 # staging a build.
 set -uo pipefail
 guard="$(cd "$(dirname "$0")" && pwd)/no-build-artifacts.sh"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 passed=0; failed=0
 
 check() { # name, expected_status, actual_status
@@ -58,6 +59,16 @@ hook="$(dirname "$guard")/../frontend/.husky/pre-commit"
 wired=1
 [ -f "$hook" ] && grep -q "no-build-artifacts.sh" "$hook" && wired=0
 check "the commit hook runs this guard" 0 "$wired"
+
+# Runtime state an agent guard writes on every edit. Untracked and unignored is
+# how a broad git add commits something nobody meant to keep -- the same
+# accident that put a compiled binary in this repository and needed a history
+# rewrite to remove it. Asked here rather than left to a reviewer, because the
+# whole point of this file is that the repository refuses what it should not
+# carry without anyone having to remember.
+cd "$REPO_ROOT" || exit 1
+git check-ignore -q .codex/cache/touched.json
+check "the codex guard's cache is ignored" 0 $?
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
