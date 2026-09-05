@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "ee691dc1a662b030de127077a7a2736d68498118",
+ "head": "ef3857e376ad9277efaf00febbfe1ad426b27898",
  "base": "982264d473060ceb5adc796467a6096a3a8c7960",
  "scope": {
   "files": [
@@ -895,6 +895,157 @@
      "id": "B5",
      "status": "applied",
      "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    }
+   ],
+   "findings": []
+  },
+  {
+   "pass": 6,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The new assertion was mutation-checked in both directions before being trusted, rather than assumed to bite because it was written to."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All six controls re-checked against this head: each applies cleanly, and video-R6's replacement now fails as a test -- 'FAIL the codex guard's cache is ignored' and '6 passed, 1 failed' -- where the bare git check-ignore it replaced only exited non-zero. The hook was right to refuse that one: a command that merely exits non-zero cannot distinguish a reverted fix from a suite that never started, which is the same mistake as the pass-1 control whose selector matched no test."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet, go test ./... -p 1 and the guard suite all clean. The guard suite is 7 passed, 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. The pass exists because a control was repaired, and repairing a control is new code like any other."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over the one file added since pass 5, a bash assertion in the existing guard suite. Nothing new."
     }
    ],
    "findings": []
