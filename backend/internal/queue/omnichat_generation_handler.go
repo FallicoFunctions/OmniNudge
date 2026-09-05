@@ -469,7 +469,7 @@ func (h *OmniChatGenerationHandler) renderVideoSourceStill(ctx context.Context, 
 	job.Progress = videoStillProgressCeiling
 
 	// Cancelling during the still must not buy a clip.
-	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, "", "")
+	cancelled, err := h.stopIfGenerationCancelled(ctx, nil, job.ID, "", "")
 	if err != nil {
 		return "", false, err
 	}
@@ -538,14 +538,14 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		phase.providerJobID = submitted
 		claimed, err := phase.record(ctx, job.ID, submitted)
 		if err != nil {
-			h.cancelSubmittedGeneration(ctx, job.ID, phase.spec.EndpointID, submitted)
+			h.cancelSubmittedGeneration(ctx, phase.client, job.ID, phase.spec.EndpointID, submitted)
 			return nil, fmt.Errorf("record generation provider request: %w", err)
 		}
 		if !claimed {
 			// A retry or concurrent worker won the database claim, or the user
 			// cancelled while Submit was in flight. Its provider request is the
 			// authoritative one, so discard this duplicate without retrying.
-			h.cancelSubmittedGeneration(ctx, job.ID, phase.spec.EndpointID, submitted)
+			h.cancelSubmittedGeneration(ctx, phase.client, job.ID, phase.spec.EndpointID, submitted)
 			return nil, nil
 		}
 	} else if phase.providerJobID == "" {
@@ -561,7 +561,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		progress = phase.progressMin
 	}
 	for {
-		cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
+		cancelled, err := h.stopIfGenerationCancelled(ctx, phase.client, job.ID, phase.spec.EndpointID, phase.providerJobID)
 		if err != nil {
 			return nil, err
 		}
@@ -610,7 +610,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		case <-timer.C:
 		}
 	}
-	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
+	cancelled, err := h.stopIfGenerationCancelled(ctx, phase.client, job.ID, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +818,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		return nil, false, permanentGenerationFailure("provider_result_invalid", err)
 	}
 	defer cleanup()
-	cancelled, err := h.stopIfGenerationCancelled(ctx, job.ID, phase.spec.EndpointID, phase.providerJobID)
+	cancelled, err := h.stopIfGenerationCancelled(ctx, phase.client, job.ID, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -965,18 +965,27 @@ func (h *OmniChatGenerationHandler) deleteGenerationObject(ctx context.Context, 
 	}
 }
 
-func (h *OmniChatGenerationHandler) cancelSubmittedGeneration(ctx context.Context, jobID uuid.UUID, modelID, providerJobID string) {
+// cancelSubmittedGeneration takes the client explicitly rather than reaching
+// for h.provider. Video may be held by a hosted model while images are not, and
+// cancelling a hosted clip against the self-hosted endpoint sends that
+// provider's model id to RunPod as an endpoint -- a call to the wrong service
+// that then logs a failed cancel, while the real job keeps running and keeps
+// billing.
+func (h *OmniChatGenerationHandler) cancelSubmittedGeneration(ctx context.Context, client runPodGenerationClient, jobID uuid.UUID, modelID, providerJobID string) {
 	if providerJobID == "" {
 		return
 	}
 	cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
-	if err := h.provider.Cancel(cancelCtx, modelID, providerJobID); err != nil {
+	if client == nil {
+		client = h.provider
+	}
+	if err := client.Cancel(cancelCtx, modelID, providerJobID); err != nil {
 		zlog.Warn().Err(err).Str("job_id", jobID.String()).Msg("failed to cancel unclaimed OmniChat provider job")
 	}
 }
 
-func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Context, jobID uuid.UUID, modelID, providerJobID string) (bool, error) {
+func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Context, client runPodGenerationClient, jobID uuid.UUID, modelID, providerJobID string) (bool, error) {
 	current, err := h.jobs.GetGenerationJobForProcessing(ctx, jobID)
 	if err != nil {
 		return false, fmt.Errorf("check generation cancellation: %w", err)
@@ -989,7 +998,10 @@ func (h *OmniChatGenerationHandler) stopIfGenerationCancelled(ctx context.Contex
 	}
 	if providerJobID != "" {
 		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-		err := h.provider.Cancel(cancelCtx, modelID, providerJobID)
+		if client == nil {
+			client = h.provider
+		}
+		err := client.Cancel(cancelCtx, modelID, providerJobID)
 		cancel()
 		if err != nil {
 			// The local cancellation is authoritative. RunPod may already have

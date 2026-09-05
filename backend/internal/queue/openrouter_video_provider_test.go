@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -146,4 +147,40 @@ func TestUsesHostedVideoReadsTheConfiguredProvider(t *testing.T) {
 		cfg.VideoProvider = provider
 		require.Falsef(t, UsesHostedVideo(cfg), "%q must not select the hosted path", provider)
 	}
+}
+
+// countingCanceller records who was asked to cancel what.
+type countingCanceller struct {
+	runPodGenerationClient
+	cancels []string
+}
+
+func (c *countingCanceller) Cancel(_ context.Context, endpointID, jobID string) error {
+	c.cancels = append(c.cancels, endpointID+"/"+jobID)
+	return nil
+}
+
+// Cancelling a hosted clip must not reach the self-hosted client. It would send
+// a hosted model id to RunPod as an endpoint -- a call to the wrong service
+// that logs a failed cancel while the real job keeps running and keeps billing.
+func TestCancelGoesToTheProviderHoldingTheJob(t *testing.T) {
+	image := &countingCanceller{}
+	video := &countingCanceller{}
+	handler := &OmniChatGenerationHandler{provider: image, videoProvider: video}
+
+	handler.cancelSubmittedGeneration(t.Context(), video, uuid.New(), "minimax/hailuo-3", "job-1")
+
+	require.Empty(t, image.cancels, "the self-hosted client must not be asked to cancel a hosted clip")
+	require.Equal(t, []string{"minimax/hailuo-3/job-1"}, video.cancels)
+}
+
+// A nil client still has to cancel something rather than panic: the path that
+// passes nil is the one that runs before any phase exists.
+func TestCancelFallsBackToTheDefaultProvider(t *testing.T) {
+	image := &countingCanceller{}
+	handler := &OmniChatGenerationHandler{provider: image}
+
+	handler.cancelSubmittedGeneration(t.Context(), nil, uuid.New(), "endpoint-image", "job-2")
+
+	require.Equal(t, []string{"endpoint-image/job-2"}, image.cancels)
 }

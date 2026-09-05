@@ -634,7 +634,7 @@ func TestOmniChatGenerationHandlerStopsProviderWorkWhenJobIsCancelled(t *testing
 		billing:  billing,
 	}
 
-	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), jobID, "endpoint-image", "provider-job")
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), nil, jobID, "endpoint-image", "provider-job")
 	require.NoError(t, err)
 	require.True(t, cancelled)
 	require.Equal(t, 1, provider.cancelCalls)
@@ -656,7 +656,7 @@ func TestOmniChatGenerationHandlerSurfacesCancellationRefundFailure(t *testing.T
 		billing:  &generationBillingFake{refundErr: refundErr},
 	}
 
-	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), handler.jobs.(*cancelledGenerationStoreFake).job.ID, "endpoint-image", "provider-job")
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), nil, handler.jobs.(*cancelledGenerationStoreFake).job.ID, "endpoint-image", "provider-job")
 	require.True(t, cancelled)
 	require.ErrorIs(t, err, refundErr)
 }
@@ -677,6 +677,7 @@ func TestOmniChatGenerationHandlerStopsProviderWorkWhenReconciliationFailsJob(t 
 
 	stopped, err := handler.stopIfGenerationCancelled(
 		context.Background(),
+		nil,
 		jobID,
 		"endpoint-image",
 		"provider-job",

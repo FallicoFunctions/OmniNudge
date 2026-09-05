@@ -462,7 +462,7 @@ func TestCancellationDiscardsTheStill(t *testing.T) {
 	require.NotNil(t, store.job.SourceAssetID)
 
 	store.job.Status = models.OmniChatGenerationStatusCancelled
-	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), store.job.ID, "endpoint-video", "")
+	cancelled, err := handler.stopIfGenerationCancelled(context.Background(), nil, store.job.ID, "endpoint-video", "")
 	require.NoError(t, err)
 	require.True(t, cancelled)
 	require.Len(t, store.deletedAssets, 1)
