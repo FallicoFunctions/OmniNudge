@@ -116,7 +116,34 @@ func generatedMediaHostTrusted(host string, additionalHosts ...string) bool {
 	return false
 }
 
-func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, additionalHosts ...string) (*generatedMediaDownload, func(), error) {
+// mediaBearer is a credential that may be sent to exactly one host.
+//
+// OpenRouter's finished clips live behind its own API and need the key to
+// fetch -- "unsigned_urls" names the URL's lack of a signature, not public
+// access. A bearer token is not a signed URL: sending it anywhere else would
+// hand the account credential to whatever host a provider named, so Host is
+// compared exactly and a redirect that changes host drops it.
+type mediaBearer struct {
+	Host  string
+	Token string
+}
+
+func (b *mediaBearer) headerFor(rawURL string) (string, bool) {
+	if b == nil || strings.TrimSpace(b.Host) == "" || strings.TrimSpace(b.Token) == "" {
+		return "", false
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", false
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	if host != strings.ToLower(strings.TrimSpace(b.Host)) {
+		return "", false
+	}
+	return "Bearer " + b.Token, true
+}
+
+func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, bearer *mediaBearer, additionalHosts ...string) (*generatedMediaDownload, func(), error) {
 	if err := validateGeneratedMediaURL(rawURL, additionalHosts...); err != nil {
 		return nil, nil, err
 	}
@@ -143,7 +170,16 @@ func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMedia
 			if len(via) >= 3 {
 				return errors.New("too many generated media redirects")
 			}
-			return validateGeneratedMediaURL(request.URL.String(), additionalHosts...)
+			if err := validateGeneratedMediaURL(request.URL.String(), additionalHosts...); err != nil {
+				return err
+			}
+			// A redirect to a different host must not carry the credential
+			// with it. Go copies headers across same-host redirects only for
+			// some cases, so drop it explicitly rather than rely on that.
+			if _, ok := bearer.headerFor(request.URL.String()); !ok {
+				request.Header.Del("Authorization")
+			}
+			return nil
 		},
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -151,6 +187,9 @@ func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMedia
 		return nil, nil, fmt.Errorf("create generated media download: %w", err)
 	}
 	request.Header.Set("Accept", "image/png,image/jpeg,image/webp,video/mp4")
+	if header, ok := bearer.headerFor(rawURL); ok {
+		request.Header.Set("Authorization", header)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, nil, fmt.Errorf("download generated media: %w", err)

@@ -197,7 +197,7 @@ func newTwoPhaseHandler(t *testing.T, store *twoPhaseStoreFake, provider *twoPha
 	// The real fetch refuses loopback hosts, so an in-process HTTPS server
 	// cannot stand in for the provider's object store. Hand back a temp file
 	// with the extension the artifact kind implies.
-	handler.downloadMedia = func(_ context.Context, _ string, kind modelsMediaKind, _ int64, _ ...string) (*generatedMediaDownload, func(), error) {
+	handler.downloadMedia = func(_ context.Context, _ string, kind modelsMediaKind, _ int64, _ *mediaBearer, _ ...string) (*generatedMediaDownload, func(), error) {
 		extension, contentType := ".png", "image/png"
 		if kind == modelsMediaKind(models.OmniChatMediaKindVideo) {
 			extension, contentType = ".mp4", "video/mp4"

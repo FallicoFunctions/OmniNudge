@@ -51,17 +51,18 @@ func main() {
 	say := flag.String("say", "", "synthesize this line through voicebox and drive the mouth with it")
 	voice := flag.String("voice", "af_heart", "voicebox preset voice id for --say")
 	prompt := flag.String("prompt", "", "prompt, for models that take one")
+	videoFile := flag.String("video-file", "", "upload this local clip and drive its mouth instead of animating a still")
 	out := flag.String("out", "", "directory to write the clip into")
 	timeout := flag.Duration("timeout", 15*time.Minute, "how long to wait")
 	flag.Parse()
 
-	if err := run(*model, *asset, *persona, *refIndex, *audio, *say, *voice, *prompt, *out, *timeout); err != nil {
+	if err := run(*model, *asset, *persona, *refIndex, *audio, *say, *voice, *prompt, *videoFile, *out, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, "zz_fal_probe:", err)
 		os.Exit(1)
 	}
 }
 
-func run(model, assetID string, personaID, refIndex int, audioURL, say, voice, prompt, outDir string, timeout time.Duration) error {
+func run(model, assetID string, personaID, refIndex int, audioURL, say, voice, prompt, videoFile, outDir string, timeout time.Duration) error {
 	ctx := context.Background()
 	cfg, err := config.Load()
 	if err != nil {
@@ -76,7 +77,16 @@ func run(model, assetID string, personaID, refIndex int, audioURL, say, voice, p
 	}
 	defer db.Close()
 
-	imageURL, err := signStill(ctx, cfg, db, assetID, personaID, refIndex)
+	// Two shapes behind one probe. A model that animates a still takes
+	// image_url; a lip-sync model takes a clip that already exists and only
+	// drives its mouth. The second splits a job OmniHuman does in one pass,
+	// and does neither half especially well.
+	var imageURL, videoURL string
+	if strings.TrimSpace(videoFile) != "" {
+		videoURL, err = uploadClip(ctx, cfg, videoFile)
+	} else {
+		imageURL, err = signStill(ctx, cfg, db, assetID, personaID, refIndex)
+	}
 	if err != nil {
 		return err
 	}
@@ -91,34 +101,43 @@ func run(model, assetID string, personaID, refIndex int, audioURL, say, voice, p
 		audioURL = falExampleAudio
 	}
 
-	body := map[string]any{"image_url": imageURL, "audio_url": audioURL}
+	body := map[string]any{"audio_url": audioURL}
+	if videoURL != "" {
+		body["video_url"] = videoURL
+	} else {
+		body["image_url"] = imageURL
+	}
 	if strings.TrimSpace(prompt) != "" {
 		body["prompt"] = prompt
 	}
 
 	fmt.Printf("model:  %s\n", model)
-	fmt.Printf("still:  %s\n", shorten(imageURL))
+	if videoURL != "" {
+		fmt.Printf("clip:   %s\n", shorten(videoURL))
+	} else {
+		fmt.Printf("still:  %s\n", shorten(imageURL))
+	}
 	fmt.Printf("audio:  %s\n\n", shorten(audioURL))
 
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	videoURL, err := generate(ctx, cfg.OmniChatMedia.FalBaseURL, cfg.OmniChatMedia.FalAPIKey, model, body)
+	resultURL, err := generate(ctx, cfg.OmniChatMedia.FalBaseURL, cfg.OmniChatMedia.FalAPIKey, model, body)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("done in %s\n", time.Since(started).Round(time.Second))
 
 	if strings.TrimSpace(outDir) == "" {
-		fmt.Printf("video:  %s\n", videoURL)
+		fmt.Printf("video:  %s\n", resultURL)
 		return nil
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
 	name := outDir + "/" + strings.NewReplacer("/", "_", ".", "-").Replace(model) + ".mp4"
-	size, err := download(ctx, videoURL, name)
+	size, err := download(ctx, resultURL, name)
 	if err != nil {
 		return err
 	}
@@ -277,6 +296,26 @@ func cleanKey(reference string) string {
 // internet. The provider fetches audio by URL, which makes the upload a
 // requirement of the architecture rather than a convenience: local synthesis
 // and a hosted animator cannot meet without object storage between them.
+// uploadClip puts a local clip somewhere fal can fetch it, for the same reason
+// speak does: the provider pulls by URL and nothing on this machine is
+// reachable from the public internet.
+func uploadClip(ctx context.Context, cfg *config.Config, path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	storage, err := storageFor(cfg)
+	if err != nil {
+		return "", err
+	}
+	key := fmt.Sprintf("omnichat/generated/probe-%s.mp4", uuid.NewString())
+	if _, err := storage.Upload(ctx, key, file, "video/mp4"); err != nil {
+		return "", fmt.Errorf("upload clip: %w", err)
+	}
+	return storage.GetSignedURL(ctx, key, 60*time.Minute)
+}
+
 func speak(ctx context.Context, cfg *config.Config, text, voiceID string) (string, error) {
 	client, err := voicebox.NewClient(cfg.OmniChatVoice.VoiceboxBaseURL,
 		time.Duration(cfg.OmniChatVoice.VoiceboxTimeoutSeconds)*time.Second)

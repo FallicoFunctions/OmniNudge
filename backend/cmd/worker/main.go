@@ -157,6 +157,12 @@ func main() {
 	if queue.UsesHostedVideo(cfg.OmniChatMedia) && cfg.OpenRouter.APIKey != "" {
 		omniChatGenerationWorker = omniChatGenerationWorker.SetVideoProvider(
 			queue.NewOpenRouterVideoProvider(openrouter.NewClient(cfg.OpenRouter.APIKey, "")))
+		// The finished clip lives behind OpenRouter's own API and needs the key
+		// to fetch: "unsigned_urls" names the URL's lack of a signature, not
+		// public access. Scoped to that host so the account credential cannot
+		// follow a result URL somewhere else.
+		omniChatGenerationWorker = omniChatGenerationWorker.SetMediaBearer(
+			config.OpenRouterMediaHost, cfg.OpenRouter.APIKey)
 		zlog.Info().
 			Str("provider", cfg.OmniChatMedia.VideoProvider).
 			Str("model", cfg.OmniChatMedia.VideoModel).

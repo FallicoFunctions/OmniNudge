@@ -57,7 +57,7 @@ func TestOpenRouterVideoSpecCarriesTheModelAndTheStill(t *testing.T) {
 	require.Equal(t, "2K", spec.Input[videoInputResolution])
 	require.Equal(t, "9:16", spec.Input[videoInputAspectRatio])
 	require.Equal(t, 6, spec.Input[videoInputDuration])
-	require.Equal(t, seedForJob(hostedVideoJob().ID), spec.Input[videoInputSeed])
+	require.Equal(t, openRouterSafeSeed(seedForJob(hostedVideoJob().ID)), spec.Input[videoInputSeed])
 }
 
 // The rules learned on the self-hosted path have to survive the move. The
@@ -74,6 +74,47 @@ func TestOpenRouterVideoSpecPromptNeverAsksHerToSpeak(t *testing.T) {
 	require.NotContains(t, prompt, "talk")
 	require.NotContains(t, prompt, "at the camera")
 	require.Contains(t, prompt, "Static camera")
+}
+
+// The defect that failed the first real job while every probe passed.
+// seedForJob returns up to 2^63-1; OpenRouter rejects anything above 2^53-1
+// with a 400. The probes were run with a small hand-picked seed and could not
+// have caught it.
+func TestOpenRouterVideoSeedFitsWhatTheProviderAccepts(t *testing.T) {
+	for _, seed := range []int64{
+		0, 1, openRouterMaxSeed, openRouterMaxSeed + 1,
+		1 << 62, (1 << 63) - 1, -1, -(1 << 62),
+	} {
+		got := openRouterSafeSeed(seed)
+
+		require.GreaterOrEqualf(t, got, int64(0), "seed %d became negative", seed)
+		require.LessOrEqualf(t, got, openRouterMaxSeed,
+			"seed %d stayed above the safe integer range and would be a 400", seed)
+	}
+}
+
+// Masked, not clamped. Clamping maps every large seed onto one value, which is
+// one picture charged for many times.
+func TestOpenRouterVideoSeedKeepsDistinctJobsDistinct(t *testing.T) {
+	first := openRouterSafeSeed(seedForJob(uuid.MustParse("11111111-2222-3333-4444-555555555555")))
+	second := openRouterSafeSeed(seedForJob(uuid.MustParse("99999999-8888-7777-6666-555555555555")))
+
+	require.NotEqual(t, first, second)
+	require.NotEqual(t, openRouterSafeSeed(1<<62), openRouterSafeSeed((1<<63)-1))
+}
+
+// The spec must carry the bounded seed, not the raw one. Bounding it in a
+// helper nobody calls is the defect this whole file exists to prevent.
+func TestOpenRouterVideoSpecCarriesTheBoundedSeed(t *testing.T) {
+	job := hostedVideoJob()
+
+	spec, err := BuildOpenRouterVideoSpec(hostedVideoConfig(), job, "https://x.test/s.png")
+
+	require.NoError(t, err)
+	seed, ok := spec.Input[videoInputSeed].(int64)
+	require.True(t, ok, "seed must be an int64: %T", spec.Input[videoInputSeed])
+	require.LessOrEqual(t, seed, openRouterMaxSeed)
+	require.Equal(t, openRouterSafeSeed(seedForJob(job.ID)), seed)
 }
 
 func TestOpenRouterVideoSpecRefusesWhatCannotSucceed(t *testing.T) {

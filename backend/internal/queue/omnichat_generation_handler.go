@@ -136,8 +136,12 @@ type OmniChatGenerationHandler struct {
 	// field so the two-phase flow can be exercised without a live HTTPS host:
 	// the real implementation refuses loopback addresses by design, which
 	// makes an in-process test server unusable. Nil means the real one.
-	downloadMedia func(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, additionalHosts ...string) (*generatedMediaDownload, func(), error)
-	billing       interface {
+	downloadMedia func(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, bearer *mediaBearer, additionalHosts ...string) (*generatedMediaDownload, func(), error)
+	// mediaBearer authorises the fetch of a finished artifact, for the one
+	// provider whose output URLs are not public. Nil for the self-hosted path,
+	// whose URLs are signed.
+	mediaBearer *mediaBearer
+	billing     interface {
 		CaptureOwned(context.Context, int, uuid.UUID) error
 		RefundOwned(context.Context, int, uuid.UUID) error
 	}
@@ -175,6 +179,18 @@ func NewOmniChatGenerationHandler(
 // self-hosted worker.
 func (h *OmniChatGenerationHandler) SetVideoProvider(provider runPodGenerationClient) *OmniChatGenerationHandler {
 	h.videoProvider = provider
+	return h
+}
+
+// SetMediaBearer authorises fetching finished artifacts from one host.
+//
+// Scoped to a host on purpose. The token is an account credential, and a
+// provider that named a different host in its result must not receive it.
+func (h *OmniChatGenerationHandler) SetMediaBearer(host, token string) *OmniChatGenerationHandler {
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(token) == "" {
+		return h
+	}
+	h.mediaBearer = &mediaBearer{Host: host, Token: token}
 	return h
 }
 
@@ -797,7 +813,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	if fetch == nil {
 		fetch = downloadGeneratedMedia
 	}
-	download, cleanup, err := fetch(ctx, providerMedia.URL, modelsMediaKind(kind), maxBytes, h.config.RunPodOutputHosts...)
+	download, cleanup, err := fetch(ctx, providerMedia.URL, modelsMediaKind(kind), maxBytes, h.mediaBearer, h.config.RunPodOutputHosts...)
 	if err != nil {
 		return nil, false, permanentGenerationFailure("provider_result_invalid", err)
 	}
@@ -1411,6 +1427,26 @@ func UsesHostedVideo(cfg config.OmniChatMediaConfig) bool {
 	return strings.EqualFold(strings.TrimSpace(cfg.VideoProvider), OmniChatVideoProviderOpenRouter)
 }
 
+// openRouterSafeSeed bounds a seed to what OpenRouter will accept.
+//
+// seedForJob returns up to 2^63-1, which RunPod's contract takes. OpenRouter
+// validates against JavaScript's safe integer range and rejects anything above
+// 2^53-1 with a 400 -- so the product path failed on its first real job while
+// every probe passed, because the probes were run with a small hand-picked
+// seed.
+//
+// Masked rather than clamped: clamping would map every large seed onto the
+// same value, which is one picture charged for many times. This keeps the low
+// 53 bits, so distinct jobs stay distinct.
+const openRouterMaxSeed = int64(1)<<53 - 1
+
+func openRouterSafeSeed(seed int64) int64 {
+	if seed < 0 {
+		seed = -seed
+	}
+	return seed & openRouterMaxSeed
+}
+
 // providerFor picks who animates or renders this kind of job.
 //
 // Video may go to a hosted model while images stay on the self-hosted worker:
@@ -1466,7 +1502,7 @@ func BuildOpenRouterVideoSpec(cfg config.OmniChatMediaConfig, job *models.OmniCh
 			videoInputDuration:    durationSeconds,
 			videoInputResolution:  strings.TrimSpace(cfg.VideoResolution),
 			videoInputAspectRatio: strings.TrimSpace(cfg.VideoAspectRatio),
-			videoInputSeed:        seedForJob(job.ID),
+			videoInputSeed:        openRouterSafeSeed(seedForJob(job.ID)),
 			videoInputFirstFrame:  sourceURL,
 		},
 	}, nil

@@ -126,7 +126,7 @@ func TestValidateGeneratedMediaURLRejectsPrivateIPEvenWhenConfigured(t *testing.
 
 func TestDownloadGeneratedMediaRejectsOverflowingSizeLimit(t *testing.T) {
 	_, _, err := downloadGeneratedMedia(
-		context.Background(), "https://storage.googleapis.com/output.png", "image", int64(1<<63-1),
+		context.Background(), "https://storage.googleapis.com/output.png", "image", int64(1<<63-1), nil,
 	)
 	require.EqualError(t, err, "generated media size limit is invalid")
 }

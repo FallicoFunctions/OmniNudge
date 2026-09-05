@@ -108,6 +108,10 @@ type OpenRouterConfig struct {
 	PremiumDeepModel  string // OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY
 }
 
+// OpenRouterMediaHost is where OpenRouter serves a finished clip. Named once
+// so the download allowlist and the credential scope cannot drift apart.
+const OpenRouterMediaHost = "openrouter.ai"
+
 // OmniChatMediaConfig keeps generative-media credentials server-side and
 // makes worker endpoint choices deploy-time configuration rather than UI
 // concerns. RunPod endpoints are owned by the deployment and expose the
@@ -548,6 +552,14 @@ func Load() (*Config, error) {
 	// HTTPS origin automatically so a Cloudflare R2/MinIO endpoint cannot be
 	// accidentally omitted from RUNPOD_OUTPUT_HOSTS. Explicit environment
 	// entries remain supported for a separate worker output origin or CDN.
+	// A hosted video model's finished clip is served from its own host, so that
+	// host has to be trusted for download. Added here rather than left to
+	// RUNPOD_OUTPUT_HOSTS: an operator who selects the provider has already
+	// made the decision, and a forgotten entry fails as "generated media host
+	// is not trusted" long after the clip has been paid for.
+	if strings.EqualFold(strings.TrimSpace(cfg.OmniChatMedia.VideoProvider), "openrouter") {
+		cfg.OmniChatMedia.RunPodOutputHosts = append(cfg.OmniChatMedia.RunPodOutputHosts, OpenRouterMediaHost)
+	}
 	cfg.OmniChatMedia.RunPodOutputHosts = appendHTTPSOriginHost(
 		cfg.OmniChatMedia.RunPodOutputHosts,
 		cfg.Storage.S3Endpoint,

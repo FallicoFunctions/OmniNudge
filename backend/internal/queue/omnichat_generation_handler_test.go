@@ -1143,7 +1143,7 @@ func persistingHandler(t *testing.T, review omniChatRenderedImageReviewer) (*Omn
 		jobs:    &persistJobStoreFake{},
 		storage: storage,
 		config:  config.OmniChatMediaConfig{MaxImageBytes: 1 << 20},
-		downloadMedia: func(context.Context, string, modelsMediaKind, int64, ...string) (*generatedMediaDownload, func(), error) {
+		downloadMedia: func(context.Context, string, modelsMediaKind, int64, *mediaBearer, ...string) (*generatedMediaDownload, func(), error) {
 			return &generatedMediaDownload{
 				Path: path, Size: 16, ContentType: "image/png", Extension: ".png",
 			}, func() {}, nil
