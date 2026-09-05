@@ -1,20 +1,20 @@
 diff --git a/frontend/src/services/omnichatService.ts b/frontend/src/services/omnichatService.ts
-index 3f7e8a03c..4d91376ab 100644
+index 65384f8d4..b65eac401 100644
 --- a/frontend/src/services/omnichatService.ts
 +++ b/frontend/src/services/omnichatService.ts
-@@ -588,10 +588,11 @@ export const omnichatService = {
-    * anything. The poster is about a hundred kilobytes, and it is served
-    * through the same ownership gate as the clip rather than from storage.
+@@ -589,10 +589,11 @@ export const omnichatService = {
+    * about fifty kilobytes, and it is served through the same ownership gate as
+    * the asset rather than from storage.
     */
--  async getMediaAssetPoster(assetId: string, posterUrl?: string): Promise<Blob> {
--    const response = await authenticatedFetch(resolveApiMediaPosterUrl(assetId, posterUrl), {
+-  async getMediaAssetThumbnail(assetId: string, posterUrl?: string): Promise<Blob> {
+-    const response = await authenticatedFetch(resolveApiMediaThumbnailUrl(assetId, posterUrl), {
 -      cache: 'no-store',
 -    });
-+  async getMediaAssetPoster(assetId: string, _posterUrl?: string): Promise<Blob> {
++  async getMediaAssetThumbnail(assetId: string, _posterUrl?: string): Promise<Blob> {
 +    const response = await authenticatedFetch(
-+      getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`).toString(),
++      getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/thumbnail`).toString(),
 +      { cache: 'no-store' },
 +    );
      if (!response.ok) {
-       throw new Error('Failed to load the poster frame');
+       throw new Error('Failed to load the thumbnail');
      }

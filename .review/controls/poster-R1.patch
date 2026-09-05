@@ -1,18 +1,18 @@
 diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
-index 646225732..a9ce98cb5 100644
+index 1652999f7..c8e0f42b7 100644
 --- a/backend/internal/models/omnichat_media.go
 +++ b/backend/internal/models/omnichat_media.go
 @@ -963,17 +963,7 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id
- 	// with nothing left that names it. Queued in the same transaction as the
- 	// clip, because a poster that outlives its clip is unreachable and only
+ 	// storage with nothing left that names it. Queued in the same transaction,
+ 	// because a thumbnail that outlives its asset is unreachable and only
  	// discoverable by listing the bucket.
 -	if thumbnailURL != nil {
--		if posterKey, ok := OmniChatPosterStorageKey(*thumbnailURL, ownerUserID); ok {
+-		if thumbnailKey, ok := OmniChatThumbnailStorageKey(*thumbnailURL, ownerUserID); ok {
 -			if _, err = tx.Exec(ctx, `
 -				INSERT INTO omnichat_media_deletion_queue(storage_path, owner_user_id)
 -				VALUES ($1, $2)
 -				ON CONFLICT (storage_path) DO NOTHING
--			`, posterKey, ownerUserID); err != nil {
+-			`, thumbnailKey, ownerUserID); err != nil {
 -				return false, err
 -			}
 -		}

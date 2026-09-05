@@ -1,12 +1,12 @@
 diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
-index 646225732..d2f215b70 100644
+index 1652999f7..d935a595c 100644
 --- a/backend/internal/models/omnichat_media.go
 +++ b/backend/internal/models/omnichat_media.go
-@@ -1063,8 +1063,7 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
- 	// media like everything else here, and it has to satisfy this rule or it is
- 	// invisible to it: the deletion guard refuses any path this rejects, so a
- 	// shape missing from here is a shape that never gets cleaned up.
--	stem := strings.TrimSuffix(strings.TrimSuffix(parts[3], extension), omniChatPosterSuffix)
+@@ -1064,8 +1064,7 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
+ 	// rule or it is invisible to it: the deletion guard refuses any path this
+ 	// rejects, so a shape missing from here is a shape that never gets cleaned
+ 	// up.
+-	stem := strings.TrimSuffix(strings.TrimSuffix(parts[3], extension), OmniChatThumbnailSuffix)
 -	_, err = uuid.Parse(stem)
 +	_, err = uuid.Parse(strings.TrimSuffix(parts[3], extension))
  	return err == nil

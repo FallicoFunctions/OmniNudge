@@ -75,6 +75,12 @@
    "asks": "Break the READER and see whether anything fails. A wiring test that only checks what the writer produced leaves the read unguarded, and a type assertion that no longer matches returns a zero value rather than an error. Changing intField from .(int) to .(int64) turned every hosted clip's duration into zero and the entire queue suite still passed -- the key check proved the key was present and the builder's type was right, and said nothing about the read. The fix is a round-trip assertion: build the real thing, read it back through the real accessor, and require that nothing came back zero."
   },
   {
+   "id": "C7",
+   "name": "Does the fixture match what the producer really emits?",
+   "trigger": "a test supplies a value that some other code produces in production -- a path, a filename, an id, a header, a payload",
+   "asks": "Build the value the way production builds it, not the way that is convenient to type. downloadGeneratedMedia writes to os.CreateTemp and decides the file type afterwards by sniffing the bytes, so every real download landed on a path with NO extension -- while every test handed the same code a file called artifact.mp4. ffmpeg picks its output container from the output name, so the playback rendition produced an unnamed output and failed on every real render, silently, with a green suite. The fixture was not wrong about the content; it was wrong about the shape, in the one attribute the code under test actually read. Find the function that mints the value in production and mint it the same way in the test, or assert the shape explicitly."
+  },
+  {
    "id": "D1",
    "name": "Probe with real inputs that must pass",
    "trigger": "any validation or parsing",

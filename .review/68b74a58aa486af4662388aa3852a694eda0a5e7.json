@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "ed8f00e55",
+ "head": "dc328cada",
  "base": "68b74a58aa486af4662388aa3852a694eda0a5e7",
  "scope": {
   "files": [
@@ -215,7 +215,7 @@
       "patch": ".review/controls/poster-R1.patch",
       "runner": "go",
       "tests": [
-       "./internal/database/ -run TestDeletingAClipQueuesItsPosterToo"
+       "./internal/database/ -run TestDeletingAnAssetQueuesItsThumbnailToo"
       ],
       "observed": "FAIL with 'the poster outlived the clip it belongs to'; the clip's own key is still queued, so the failure is the poster and not the mechanism"
      }
@@ -229,8 +229,8 @@
       "patch": ".review/controls/poster-R2.patch",
       "runner": "go",
       "tests": [
-       "./internal/models/ -run TestAPosterIsGeneratedMedia",
-       "./internal/models/ -run TestPosterStorageKeyAcceptsWhatTheWorkerWrites"
+       "./internal/models/ -run TestAThumbnailIsGeneratedMedia",
+       "./internal/models/ -run TestThumbnailStorageKeyAcceptsWhatTheWorkerWrites"
       ],
       "observed": "both FAIL with 'Should be true' at the assertions that a poster path is generated media and that the worker's own key is accepted"
      }
@@ -258,7 +258,7 @@
       "patch": ".review/controls/poster-R4.patch",
       "runner": "vitest",
       "tests": [
-       "src/pages/__tests__/OmniChatExplorePage.test.tsx -t 'asks for a card, not for the clip, in the feed'"
+       "src/pages/__tests__/OmniChatExplorePage.test.tsx -t 'asks for a card, not for the asset, in the feed'"
       ],
       "observed": "FAIL with 'expected false to be true'; the feed rendered the media view with preview undefined"
      }
@@ -272,7 +272,7 @@
       "patch": ".review/controls/poster-R5.patch",
       "runner": "vitest",
       "tests": [
-       "src/services/__tests__/omnichatService.test.ts -t 'fetches a published clip poster from the route the asset names'"
+       "src/services/__tests__/omnichatService.test.ts -t 'fetches a published clip thumbnail from the route the asset names'"
       ],
       "observed": "FAIL with 'expected vi.fn() to be called with arguments'; the call went to /omnichat/media/asset-1/poster instead of the explore route the asset named"
      }
@@ -429,6 +429,348 @@
     }
    ],
    "findings": []
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "dc328cada: image thumbnails, the poster-to-thumbnail rename, and the downloaded file's name. New boundary: the queue -> services.ThumbnailService, which already owned every resize in this repository."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Passes 1 and 2 of this same ledger re-read. Pass 2 declared clean and had missed a live defect in cf87db741, which is thumb-R1 and the reason instrument C7 now exists."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The ffmpeg argv is the payload. Printed the real download path shape -- os.CreateTemp with pattern omnichat-generated-*, no extension -- and ran the rendition against it. It refused. Against a fixture called sized.mp4 it succeeded. That difference is thumb-R1."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The tile markup was re-read after the branch stopped being video-only: an image tile gets no play overlay, keeps the image badge, and carries its own aria-label. The alt text falls back to the asset kind rather than the word video."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The decorated asset bodies were printed again after the decorator stopped gating on kind. Both kinds now offer a thumbnail route; neither offers a storage URL."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The database tests that read thumbnail_url back and queue it on deletion were re-run under the renamed key shape. Both still hold."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Ran the real thing: a 1338 KB 896x1120 PNG through ThumbnailService produced a 480x600 JPEG of 43 KB, and the picture was looked at, not just measured -- it is a correct, legible tile. That is thirty-one times smaller than the asset a tile was fetching."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "One suffix constant, exported from models and used by the writer. The route's Content-Disposition filename was still saying -poster after the rename; corrected."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The component reads thumbnail_url for both kinds now, and the field exists on both asset shapes the grids use."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The bespoke ffmpeg frame extraction added yesterday duplicated ThumbnailService.GenerateVideoThumbnailSecure, which does the same job with a size cap and an existing test suite. Deleted rather than kept."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No new field crosses a hand-written boundary this pass; the ones added in pass 1 are unchanged and still covered by the database tests."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "No new untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The instrument this pass added, and the one that found thumb-R1. Every test of the rendition handed it a path ending in .mp4; production hands it a path ending in nothing. The code under test read exactly that attribute."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The thumbnail service accepts what the worker gives it for both kinds, proved by driving whole jobs rather than by calling the service directly."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The key rule's hostile inputs re-run under the -thumb suffix, including a stem that is not a job id."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "nameDownloadedMedia with an empty extension, an extension already present, and a path that cannot be renamed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Clips got a tile image and images did not, though a generated image is about a megabyte of PNG shown at a few hundred pixels. That is thumb-R2. Also compared against the upload path, which has had thumbnails all along -- this queue was the sibling missing the defence."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both kinds reach the thumbnail branch; the no-service branch and the failed-generation branch are both exercised."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every thumbnail failure logs with the job id and the kind, and none of them fails the render."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The thumbnail is not gated on AllowNSFW, matching the measurement beside it: it is metadata, not a content decision."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The duplicate resize is gone. One suffix constant, one storage-path rule, one thumbnail service."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The thumbnail upload is still covered by the uncommitted defer, now for both kinds. The small variant the service writes beside the primary is removed rather than left in the worker's temp directory."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The deletion path is unchanged and still queues the thumbnail; the renamed suffix is what the rule and the writer both use."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two new controls built and replayed by hand. Three existing controls were regenerated because the rename moved the code they patch, and all five were re-verified at the new HEAD."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Both routes still registered; the rename moved the path from /poster to /thumbnail on both, and both ends were changed together."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet ./internal/..., gofmt, tsc -b, eslint clean. queue, handlers, models and database pass with -p 1. Frontend 906 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "C7 added: does the fixture match what the producer really emits. It is what found thumb-R1, and no existing row asked it."
+    }
+   ],
+   "findings": [
+    {
+     "id": "thumb-R1",
+     "summary": "the playback rendition shipped in cf87db741 never ran on a real render: downloadGeneratedMedia names its temp file before it knows the type, so every real download had no extension, and ffmpeg picks its output container from the output name -- while every test handed it a file called something.mp4",
+     "found_by": "C7",
+     "fix_commit": "dc328cada",
+     "control": {
+      "patch": ".review/controls/thumb-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestReduceClipForPlaybackWorksOnAPathWithNoExtension",
+       "./internal/queue/ -run TestDownloadedMediaIsNamedForWhatItHolds"
+      ],
+      "observed": "both FAIL: 'the reduction never ran on a real download', and the downloaded file keeps a name that does not say what it holds"
+     }
+    },
+    {
+     "id": "thumb-R2",
+     "summary": "only clips got a tile image, so a gallery still fetched every generated image whole -- about a megabyte of PNG at 896x1120 to draw a tile a few hundred pixels wide, on every visit",
+     "found_by": "E1",
+     "fix_commit": "dc328cada",
+     "control": {
+      "patch": ".review/controls/thumb-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestAFinishedRenderStoresAThumbnailBesideIt"
+      ],
+      "observed": "FAIL on the 'a still' case with 'the render was stored with no thumbnail'; the clip case still passes, which is the asymmetry the finding names"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The image thumbnail was rendered and looked at during pass 3, from a real 1338 KB still. No model input changed, so there is nothing unrendered to declare."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Applied again over the whole change: the remaining fixtures were checked against their producers. The storage keys in the handler tests are built from real uuids the same way the worker builds them, and the download path test builds its path with os.CreateTemp exactly as production does."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All seven controls apply at HEAD and each produces a named assertion failure. Verified one at a time, restoring between."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Full gates re-run after the rename: go build, go vet, gofmt, tsc -b, eslint, four backend packages with -p 1, and the whole frontend suite."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    }
+   ],
+   "findings": []
   }
  ],
  "gates": {
@@ -436,6 +778,6 @@
   "vet": "go vet ./internal/... clean",
   "lint": "gofmt -l clean; eslint clean on every changed frontend file",
   "types": "npx tsc -b clean",
-  "tests": "go test -p 1 on handlers, models, database and queue: all ok. vitest full run: 159 files, 906 passed, 1 skipped."
+  "tests": "go test -p 1 on queue, handlers, models and database: all ok. vitest full run: 159 files, 906 passed, 1 skipped."
  }
 }
