@@ -244,9 +244,14 @@ type StreamCallback func(token string)
 
 // Client talks to OpenRouter's chat completions API.
 type Client struct {
-	apiKey          string
-	model           string
-	endpoint        string
+	apiKey   string
+	model    string
+	endpoint string
+	// videoURL overrides the video endpoint in tests only. Empty means the
+	// published URL; it is a separate field from endpoint because video is a
+	// different path on the same host, and a test server must be able to serve
+	// one without the other.
+	videoURL        string
 	httpClient      *http.Client
 	waitBeforeRetry func(context.Context, time.Duration) error
 	telemetryMu     sync.Mutex
