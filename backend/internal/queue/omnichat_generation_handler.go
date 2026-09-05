@@ -49,6 +49,12 @@ type RunPodGenerationSpec struct {
 // job, while the animation phase claims an already-running one and cannot use
 // the same transition.
 type providerPhase struct {
+	// client is the provider this phase talks to. It is chosen where the spec
+	// is built and carried here, so submit, poll, result and cancel can never
+	// disagree about who is holding the job -- cancelling a hosted clip
+	// against the self-hosted endpoint would silently do nothing.
+	client runPodGenerationClient
+
 	kind models.OmniChatMediaKind
 	spec *RunPodGenerationSpec
 	// providerJobID is the request being resumed on entry, and the request that
@@ -112,12 +118,15 @@ type runPodGenerationClient interface {
 }
 
 type OmniChatGenerationHandler struct {
-	jobs             omniChatGenerationJobStore
-	personas         omniChatPersonaReader
-	mediaReferences  mediaReferenceReader
-	storage          services.StorageService
-	scanner          services.VirusScanner
-	provider         runPodGenerationClient
+	jobs            omniChatGenerationJobStore
+	personas        omniChatPersonaReader
+	mediaReferences mediaReferenceReader
+	storage         services.StorageService
+	scanner         services.VirusScanner
+	provider        runPodGenerationClient
+	// videoProvider is optional. Nil means every kind goes to provider, which
+	// is what a deployment without a hosted key gets.
+	videoProvider    runPodGenerationClient
 	config           config.OmniChatMediaConfig
 	failClosed       bool
 	imageReview      omniChatRenderedImageReviewer
@@ -156,6 +165,17 @@ func NewOmniChatGenerationHandler(
 		provider: provider, config: cfg, failClosed: failClosed,
 		storageQuotaFree: 1 << 30, storageQuotaPro: 50 << 30,
 	}
+}
+
+// SetVideoProvider routes clips to a hosted model.
+//
+// A setter rather than a constructor argument: every existing caller and test
+// builds this handler with one provider, and adding a parameter would make
+// them all declare a decision they do not have. Nil leaves video on the
+// self-hosted worker.
+func (h *OmniChatGenerationHandler) SetVideoProvider(provider runPodGenerationClient) *OmniChatGenerationHandler {
+	h.videoProvider = provider
+	return h
 }
 
 func (h *OmniChatGenerationHandler) SetStorageQuotas(freeTierBytes, proTierBytes int64) *OmniChatGenerationHandler {
@@ -318,7 +338,11 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	case models.OmniChatMediaKindImage:
 		spec, err = BuildImageSpec(h.config, job, references)
 	case models.OmniChatMediaKindVideo:
-		spec, err = BuildVideoSpec(h.config, job, sourceURL)
+		if UsesHostedVideo(h.config) {
+			spec, err = BuildOpenRouterVideoSpec(h.config, job, sourceURL)
+		} else {
+			spec, err = BuildVideoSpec(h.config, job, sourceURL)
+		}
 	default:
 		err = fmt.Errorf("unsupported generation kind %q", job.Kind)
 	}
@@ -329,6 +353,7 @@ func (h *OmniChatGenerationHandler) process(ctx context.Context, jobID uuid.UUID
 	phase := &providerPhase{
 		kind:          job.Kind,
 		spec:          spec,
+		client:        h.providerFor(job.Kind),
 		providerJobID: job.ProviderJobID,
 		progressMin:   firstPhaseProgressFloor,
 		progressMax:   finalPhaseProgressCeiling,
@@ -390,8 +415,12 @@ func (h *OmniChatGenerationHandler) renderVideoSourceStill(ctx context.Context, 
 		return "", false, providerSpecFailure(err)
 	}
 	phase := &providerPhase{
-		kind:          models.OmniChatMediaKindImage,
-		spec:          spec,
+		kind: models.OmniChatMediaKindImage,
+		spec: spec,
+		// The still is an image even on a video job, so it renders on the image
+		// provider. Sending it to the hosted video model would ask a video
+		// model for a photograph.
+		client:        h.providerFor(models.OmniChatMediaKindImage),
 		providerJobID: job.ProviderJobID,
 		progressMin:   firstPhaseProgressFloor,
 		progressMax:   videoStillProgressCeiling,
@@ -444,6 +473,14 @@ func (h *OmniChatGenerationHandler) renderVideoSourceStill(ctx context.Context, 
 // this phase was in flight -- cancelled by its owner, or claimed by another
 // worker -- and the caller must stop without treating it as a failure.
 func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *models.OmniChatGenerationJob, phase *providerPhase) (*runpod.Result, error) {
+	if phase.client == nil {
+		// A phase built without a provider is a programming error, and it
+		// surfaced as a nil dereference the first time one was added. Fail as
+		// a named provider fault instead: the job is refunded rather than
+		// crashing the worker mid-queue.
+		return nil, permanentGenerationFailure("provider_unavailable",
+			errors.New("generation phase has no provider"))
+	}
 	providerCompleted := false
 	defer func() {
 		if phase.providerJobID == "" || providerCompleted || ctx.Err() == nil {
@@ -451,7 +488,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		}
 		cancelContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
-		if cancelErr := h.provider.Cancel(cancelContext, phase.spec.EndpointID, phase.providerJobID); cancelErr != nil {
+		if cancelErr := phase.client.Cancel(cancelContext, phase.spec.EndpointID, phase.providerJobID); cancelErr != nil {
 			zlog.Warn().Err(cancelErr).Str("job_id", job.ID.String()).Msg("failed to cancel timed-out RunPod media job")
 		}
 	}()
@@ -470,7 +507,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 			Str("render_style", job.IdentityProfile.RenderStyle).
 			Str("mode", string(job.Mode)).
 			Msg("submitting omnichat media job")
-		submitted, err := h.provider.Submit(ctx, phase.spec.EndpointID, phase.spec.Input)
+		submitted, err := phase.client.Submit(ctx, phase.spec.EndpointID, phase.spec.Input)
 		if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
 			return nil, permanentGenerationFailure("provider_unavailable", err)
 		}
@@ -515,7 +552,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		if cancelled {
 			return nil, nil
 		}
-		status, err := h.provider.Status(ctx, phase.spec.EndpointID, phase.providerJobID)
+		status, err := phase.client.Status(ctx, phase.spec.EndpointID, phase.providerJobID)
 		if err != nil {
 			if errors.Is(err, runpod.ErrNotConfigured) || errors.Is(err, runpod.ErrEndpointNotConfigured) || errors.Is(err, runpod.ErrInvalidConfiguration) {
 				return nil, permanentGenerationFailure("provider_unavailable", err)
@@ -565,7 +602,7 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 		return nil, nil
 	}
 
-	result, err := h.provider.Result(ctx, phase.spec.EndpointID, phase.providerJobID)
+	result, err := phase.client.Result(ctx, phase.spec.EndpointID, phase.providerJobID)
 	if err != nil {
 		switch {
 		case errors.Is(err, runpod.ErrNotConfigured), errors.Is(err, runpod.ErrEndpointNotConfigured), errors.Is(err, runpod.ErrInvalidConfiguration):
@@ -1363,6 +1400,76 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 		return nil, fmt.Errorf("%w: image generation endpoint", runpod.ErrEndpointNotConfigured)
 	}
 	return &RunPodGenerationSpec{EndpointID: endpointID, Input: input}, nil
+}
+
+// OmniChatVideoProviderOpenRouter routes video through a hosted model.
+const OmniChatVideoProviderOpenRouter = "openrouter"
+
+// UsesHostedVideo reports whether clips go to OpenRouter rather than to the
+// self-hosted worker.
+func UsesHostedVideo(cfg config.OmniChatMediaConfig) bool {
+	return strings.EqualFold(strings.TrimSpace(cfg.VideoProvider), OmniChatVideoProviderOpenRouter)
+}
+
+// providerFor picks who animates or renders this kind of job.
+//
+// Video may go to a hosted model while images stay on the self-hosted worker:
+// images are cheap and fast there, and it is the only path that could ever
+// serve explicit content. Falling back to the self-hosted client when the
+// hosted one is absent is deliberate -- an unconfigured hosted provider should
+// degrade to a slow clip, not to no clip.
+func (h *OmniChatGenerationHandler) providerFor(kind models.OmniChatMediaKind) runPodGenerationClient {
+	if kind == models.OmniChatMediaKindVideo && UsesHostedVideo(h.config) && h.videoProvider != nil {
+		return h.videoProvider
+	}
+	return h.provider
+}
+
+// BuildOpenRouterVideoSpec is BuildVideoSpec for a hosted model.
+//
+// The prompt is built by the same function either way, so the rules learned on
+// the self-hosted path still apply: the camera is stated, identity is held,
+// and the motion carries no audience. That last one is what keeps her from
+// appearing to speak, and it is the only thing that ever did.
+//
+// generate_audio is left unset deliberately. It is not an oversight: the
+// backing track these models produce is wanted, and only speech is not. Asking
+// for silence would remove the track and would not stop the mouth anyway --
+// both were measured.
+func BuildOpenRouterVideoSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerationJob, sourceURL string) (*RunPodGenerationSpec, error) {
+	if job == nil {
+		return nil, errors.New("generation job is required")
+	}
+	sourceURL = strings.TrimSpace(sourceURL)
+	if sourceURL == "" {
+		return nil, errors.New("image-to-video source is unavailable")
+	}
+	if !safeProviderReferenceURL(sourceURL) {
+		return nil, errors.New("provider source image URL is invalid")
+	}
+	prompt := strings.TrimSpace(services.BuildOmniChatVideoMotionPrompt(job.Mode, job.Prompt, job.Scene))
+	if prompt == "" {
+		return nil, errors.New("generation prompt is unavailable")
+	}
+	model := strings.TrimSpace(cfg.VideoModel)
+	if model == "" {
+		return nil, fmt.Errorf("%w: video model", runpod.ErrNotConfigured)
+	}
+	durationSeconds := job.DurationSeconds
+	if durationSeconds == 0 {
+		durationSeconds = services.OmniChatDefaultVideoSeconds()
+	}
+	return &RunPodGenerationSpec{
+		EndpointID: model,
+		Input: map[string]any{
+			videoInputPrompt:      prompt,
+			videoInputDuration:    durationSeconds,
+			videoInputResolution:  strings.TrimSpace(cfg.VideoResolution),
+			videoInputAspectRatio: strings.TrimSpace(cfg.VideoAspectRatio),
+			videoInputSeed:        seedForJob(job.ID),
+			videoInputFirstFrame:  sourceURL,
+		},
+	}, nil
 }
 
 // BuildVideoSpec animates an existing still. There is no other video path:

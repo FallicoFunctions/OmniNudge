@@ -178,6 +178,25 @@ type OmniChatMediaConfig struct {
 	// budget, which is the ending problem solved rather than worked around.
 	FalAPIKey  string
 	FalBaseURL string
+
+	// VideoProvider chooses who animates a still: "runpod" for the self-hosted
+	// worker, "openrouter" for a hosted model. It is configuration rather than
+	// a constant because the self-hosted path is the only one that could ever
+	// serve explicit content, so it stays wired even while nothing routes to
+	// it.
+	VideoProvider string
+	// VideoModel is the OpenRouter model id used when VideoProvider is
+	// openrouter. Named rather than defaulted silently: a model change alters
+	// price, latency, resolution and what the clip looks like, so it should be
+	// a visible edit.
+	VideoModel string
+	// VideoResolution and VideoAspectRatio are per-model constraints, not
+	// preferences. minimax/hailuo-3 refuses 720p outright and serves 2K only;
+	// google/veo-3.1-lite refuses a 5-second duration. Sending the wrong one
+	// is a 400 before anything is billed, which is the good failure -- but it
+	// is still a failure a user sees.
+	VideoResolution  string
+	VideoAspectRatio string
 }
 
 type OmniChatVoiceConfig struct {
@@ -469,6 +488,10 @@ func Load() (*Config, error) {
 			VeoAPIKey:                   getEnv("VEO_API_KEY", ""),
 			FalAPIKey:                   getEnv("FAL_API_KEY", ""),
 			FalBaseURL:                  getEnv("FAL_BASE_URL", "https://queue.fal.run"),
+			VideoProvider:               getEnv("OMNICHAT_VIDEO_PROVIDER", "openrouter"),
+			VideoModel:                  getEnv("OMNICHAT_VIDEO_MODEL", "minimax/hailuo-3"),
+			VideoResolution:             getEnv("OMNICHAT_VIDEO_RESOLUTION", "2K"),
+			VideoAspectRatio:            getEnv("OMNICHAT_VIDEO_ASPECT_RATIO", "9:16"),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
 			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),

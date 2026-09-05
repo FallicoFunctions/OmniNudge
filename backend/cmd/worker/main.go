@@ -150,6 +150,23 @@ func main() {
 		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
 		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 			SetAdminReader(workerOmniChatUserRepo))
+
+	// Clips go to a hosted model; stills stay on the self-hosted worker. Only
+	// wired when a key exists, so an unconfigured deployment degrades to a slow
+	// clip rather than to a failing one.
+	if queue.UsesHostedVideo(cfg.OmniChatMedia) && cfg.OpenRouter.APIKey != "" {
+		omniChatGenerationWorker = omniChatGenerationWorker.SetVideoProvider(
+			queue.NewOpenRouterVideoProvider(openrouter.NewClient(cfg.OpenRouter.APIKey, "")))
+		zlog.Info().
+			Str("provider", cfg.OmniChatMedia.VideoProvider).
+			Str("model", cfg.OmniChatMedia.VideoModel).
+			Str("resolution", cfg.OmniChatMedia.VideoResolution).
+			Msg("omnichat video: hosted provider wired")
+	} else if queue.UsesHostedVideo(cfg.OmniChatMedia) {
+		zlog.Error().
+			Str("check", "media_endpoint").
+			Msg("OMNICHAT_VIDEO_PROVIDER is openrouter but OPENROUTER_API_KEY is not set: clips fall back to the self-hosted worker")
+	}
 	// Looks at what the provider returned, on the paths where explicit output
 	// would be a defect. Without it the handler falls back to failClosed, so an
 	// unset review is a refusal rather than a silent gap.
