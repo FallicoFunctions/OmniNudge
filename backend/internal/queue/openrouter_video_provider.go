@@ -58,13 +58,28 @@ func (p *OpenRouterVideoProvider) Submit(ctx context.Context, endpointID string,
 	if !ok {
 		return "", fmt.Errorf("openrouter video: unexpected input %T", input)
 	}
+	job, err := p.client.SubmitVideo(ctx, VideoRequestFromInput(endpointID, fields))
+	if err != nil {
+		return "", translateOpenRouterVideoError(err)
+	}
+	return job.ID, nil
+}
+
+// VideoRequestFromInput is the map the spec carries turned into the request the
+// provider receives.
+//
+// Exported and pure so the mapping itself can be read. Every key check in this
+// package proves a key is present; only this proves it lands in the right
+// field, and a resolution swapped with an aspect ratio would satisfy the
+// former while producing a differently shaped clip.
+func VideoRequestFromInput(model string, fields map[string]any) openrouter.VideoRequest {
 	frames := []openrouter.FrameImage{}
 	if url := strings.TrimSpace(stringField(fields, videoInputFirstFrame)); url != "" {
 		frames = append(frames, openrouter.FrameImage{URL: url, FrameType: openrouter.FrameTypeFirst})
 	}
 	seed := int64Field(fields, videoInputSeed)
-	job, err := p.client.SubmitVideo(ctx, openrouter.VideoRequest{
-		Model:       strings.TrimSpace(endpointID),
+	return openrouter.VideoRequest{
+		Model:       strings.TrimSpace(model),
 		Prompt:      stringField(fields, videoInputPrompt),
 		Duration:    intField(fields, videoInputDuration),
 		Resolution:  stringField(fields, videoInputResolution),
@@ -75,11 +90,7 @@ func (p *OpenRouterVideoProvider) Submit(ctx context.Context, endpointID string,
 		// giving her nobody to address. Asking for silence removes the track
 		// and does not stop the mouth -- both measured.
 		FrameImages: frames,
-	})
-	if err != nil {
-		return "", translateOpenRouterVideoError(err)
 	}
-	return job.ID, nil
 }
 
 // Status maps OpenRouter's job states onto RunPod's, because the handler

@@ -34,11 +34,17 @@ var speechClause = regexp.MustCompile(`(?i)\b(talk|talks|talking|speak|speaks|sp
 // that produced speech.
 var addresseeClause = regexp.MustCompile(`(?i)\b(at|into|to|toward|towards)\s+(the\s+)?(camera|lens|viewer|screen|phone|you)\b`)
 
-// silentMotionFallback is used when removing the speech leaves nothing. It has
-// to be an action rather than a state: "standing still" arrived at the model as
-// an instruction contradicting "add only motion", which is why the pose field
-// was dropped from this prompt in the first place.
-const silentMotionFallback = "she shifts her weight and looks around, taking in her surroundings"
+// silentMotionFallback is used when removing the speech leaves nothing.
+//
+// It has to be an action rather than a state: "standing still" arrived at the
+// model as an instruction contradicting "add only motion", which is why the
+// pose field was dropped from this prompt in the first place.
+//
+// And it carries no pronoun. The first version read "she shifts her weight",
+// which described every male character as a woman -- the same defect a prompt
+// matrix was built to prevent after it shipped once already, in a builder that
+// matrix does not cover. It does now.
+const silentMotionFallback = "shifts weight slightly and looks around, taking in the surroundings"
 
 // SilentMotion rewrites a motion description so the subject has nobody to
 // address and nothing to say.

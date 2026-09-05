@@ -528,7 +528,11 @@ func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt s
 	motion = SilentMotion(motion)
 	parts := []string{
 		"Animate the supplied still image.",
-		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
+		// "as shown", not "as they appear". In a prompt about one person "they"
+		// reads as a pronoun for the subject, which contradicts a male or
+		// female character and is the exact ambiguity the prompt matrix exists
+		// to refuse. It also blocked this builder from joining that matrix.
+		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as shown in the image; add only motion.",
 		// The camera is a thing in the room, not a viewpoint. Saying where it
 		// is stops the model inventing a move for it: an unanchored frame
 		// wanders, and a wandering frame reads as the subject drifting.

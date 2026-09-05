@@ -57,6 +57,24 @@ func promptMatrix() []promptCase {
 					return BuildOmniAILikenessPrompt(p, OmniAIFallbackCandidateBrief)
 				}},
 		)
+		// The video motion prompt, in both shapes it takes: a motion the caller
+		// supplied, and the fallback used when removing the speech leaves
+		// nothing. The fallback shipped reading "she shifts her weight",
+		// because this matrix did not cover this builder.
+		cases = append(cases,
+			promptCase{"video-motion/" + orNone(subject), subject,
+				func(models.OmniChatMediaIdentityProfile) string {
+					return BuildOmniChatVideoMotionPrompt(
+						models.OmniChatGenerationModeImageToVideo,
+						"reaches for the book on the table", models.OmniChatSceneState{})
+				}},
+			promptCase{"video-motion-fallback/" + orNone(subject), subject,
+				func(models.OmniChatMediaIdentityProfile) string {
+					return BuildOmniChatVideoMotionPrompt(
+						models.OmniChatGenerationModeContextual,
+						"boilerplate", models.OmniChatSceneState{})
+				}},
+		)
 		for _, variant := range OmniAIReferenceVariantKeys() {
 			variant := variant
 			cases = append(cases, promptCase{"reference/" + variant + "/" + orNone(subject), subject,
