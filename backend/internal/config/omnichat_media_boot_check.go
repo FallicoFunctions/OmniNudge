@@ -34,8 +34,18 @@ func (c OmniChatMediaConfig) MediaEndpointGaps() []string {
 	add("RUNPOD_API_KEY", c.RunPodAPIKey, "no media of any kind can be generated")
 	add("RUNPOD_IMAGE_ENDPOINT_ID", c.RunPodImageEndpointID,
 		"image generation fails as provider_unavailable")
-	add("RUNPOD_VIDEO_ENDPOINT_ID", c.RunPodVideoEndpointID,
-		"video generation fails as provider_unavailable")
+	// Only the provider actually chosen. Reporting the self-hosted endpoint as
+	// missing while clips render fine on a hosted model is a false alarm, and
+	// the whole point of keeping this block short is that a reader trusts it --
+	// a check that cries wolf is skipped, which is how the real gap gets missed
+	// the second time.
+	if strings.EqualFold(strings.TrimSpace(c.VideoProvider), "openrouter") {
+		add("OMNICHAT_VIDEO_MODEL", c.VideoModel,
+			"the hosted video provider is selected but no model is named: video fails as provider_unavailable")
+	} else {
+		add("RUNPOD_VIDEO_ENDPOINT_ID", c.RunPodVideoEndpointID,
+			"video generation fails as provider_unavailable")
+	}
 	if c.ExplicitContentEnabled {
 		add("RUNPOD_NSFW_IMAGE_ENDPOINT_ID", c.RunPodNSFWImageEndpointID,
 			"explicit content is enabled but falls back to the standard image endpoint")

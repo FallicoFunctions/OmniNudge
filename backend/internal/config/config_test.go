@@ -97,6 +97,10 @@ func TestLoadUsesQualifiedOmniChatStandardModelByDefault(t *testing.T) {
 	require.Equal(t, "video-endpoint", cfg.OmniChatMedia.RunPodVideoEndpointID)
 	// A video job is two provider renders inside one bounded request.
 	require.Equal(t, 1800, cfg.OmniChatMedia.RunPodRequestTimeoutSeconds)
-	require.Equal(t, []string{"storage.googleapis.com", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodOutputHosts)
+	// openrouter.ai is added by Load when the hosted video provider is
+	// selected, which is the default: a finished clip is served from that host
+	// and has to be downloadable. It sits where it is appended, before the
+	// hosts derived from S3_ENDPOINT and CLOUDFRONT_URL.
+	require.Equal(t, []string{"storage.googleapis.com", "media.example.test", "openrouter.ai", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodOutputHosts)
 	require.Equal(t, []string{"storage.example.test", "media.example.test", "r2.example.test", "cdn.example.test"}, cfg.OmniChatMedia.RunPodInputHosts)
 }

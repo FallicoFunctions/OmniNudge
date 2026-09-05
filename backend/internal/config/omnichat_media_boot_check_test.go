@@ -22,6 +22,26 @@ func TestMediaEndpointGapsSilentWhenConfigured(t *testing.T) {
 	require.Empty(t, full().MediaEndpointGaps())
 }
 
+// The check must describe the provider actually in use. It reported the
+// self-hosted endpoint as missing while clips rendered fine on a hosted model,
+// which is a false alarm -- and a block that cries wolf is skipped, which is
+// how the real gap gets missed the second time.
+func TestMediaEndpointGapsReportsTheChosenVideoProvider(t *testing.T) {
+	hosted := full()
+	hosted.VideoProvider = "openrouter"
+	hosted.VideoModel = "minimax/hailuo-3"
+	hosted.RunPodVideoEndpointID = ""
+
+	require.Empty(t, hosted.MediaEndpointGaps(),
+		"a configured hosted provider must not report the self-hosted endpoint as missing")
+
+	hosted.VideoModel = ""
+	gaps := hosted.MediaEndpointGaps()
+	require.Len(t, gaps, 1)
+	require.Contains(t, gaps[0], "OMNICHAT_VIDEO_MODEL")
+	require.NotContains(t, gaps[0], "RUNPOD_VIDEO_ENDPOINT_ID")
+}
+
 // The regression this whole check exists for: video worked in August, the
 // endpoint id was lost, and the backend kept booting without a word.
 func TestMediaEndpointGapsNamesTheMissingVideoEndpoint(t *testing.T) {
