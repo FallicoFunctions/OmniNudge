@@ -154,10 +154,12 @@ type OmniChatMediaConfig struct {
 	MaxVideoBytes               int64
 	PollIntervalSeconds         int
 
-	// Hosted video providers, under trial against the self-hosted path. Kling
-	// signs with a key pair rather than a bearer token, so both halves are
-	// required and one without the other is not partial configuration -- it is
-	// no configuration.
+	// Hosted video providers, under trial against the self-hosted path.
+	//
+	// Kling is one key on an Authorization: Bearer header. Its older system
+	// signed a short-lived JWT from an access key and a secret key, and most
+	// third-party writing still describes that -- the official quick start
+	// does not. Read the vendor's own docs before writing an auth path.
 	//
 	// VEO_API_KEY rather than GEMINI_API_KEY, which is already taken by the Hub
 	// AI Designer. One Gemini key can serve both, and the same value may go in
@@ -165,9 +167,9 @@ type OmniChatMediaConfig struct {
 	// rotation, a quota, or a blast radius. Naming the product rather than the
 	// vendor also survives Veo moving to Vertex AI, where the credential is not
 	// a Gemini key at all.
-	KlingAccessKey string
-	KlingSecretKey string
-	VeoAPIKey      string
+	KlingAPIKey  string
+	KlingBaseURL string
+	VeoAPIKey    string
 }
 
 type OmniChatVoiceConfig struct {
@@ -454,8 +456,8 @@ func Load() (*Config, error) {
 			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
 			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),
 			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
-			KlingAccessKey:              getEnv("KLING_ACCESS_KEY", ""),
-			KlingSecretKey:              getEnv("KLING_SECRET_KEY", ""),
+			KlingAPIKey:                 getEnv("KLING_API_KEY", ""),
+			KlingBaseURL:                getEnv("KLING_BASE_URL", "https://api-singapore.klingai.com"),
 			VeoAPIKey:                   getEnv("VEO_API_KEY", ""),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
