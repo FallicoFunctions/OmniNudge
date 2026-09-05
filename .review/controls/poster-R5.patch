@@ -1,0 +1,20 @@
+diff --git a/frontend/src/services/omnichatService.ts b/frontend/src/services/omnichatService.ts
+index 3f7e8a03c..4d91376ab 100644
+--- a/frontend/src/services/omnichatService.ts
++++ b/frontend/src/services/omnichatService.ts
+@@ -588,10 +588,11 @@ export const omnichatService = {
+    * anything. The poster is about a hundred kilobytes, and it is served
+    * through the same ownership gate as the clip rather than from storage.
+    */
+-  async getMediaAssetPoster(assetId: string, posterUrl?: string): Promise<Blob> {
+-    const response = await authenticatedFetch(resolveApiMediaPosterUrl(assetId, posterUrl), {
+-      cache: 'no-store',
+-    });
++  async getMediaAssetPoster(assetId: string, _posterUrl?: string): Promise<Blob> {
++    const response = await authenticatedFetch(
++      getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`).toString(),
++      { cache: 'no-store' },
++    );
+     if (!response.ok) {
+       throw new Error('Failed to load the poster frame');
+     }

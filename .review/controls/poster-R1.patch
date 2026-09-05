@@ -1,0 +1,23 @@
+diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
+index 646225732..a9ce98cb5 100644
+--- a/backend/internal/models/omnichat_media.go
++++ b/backend/internal/models/omnichat_media.go
+@@ -963,17 +963,7 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id
+ 	// with nothing left that names it. Queued in the same transaction as the
+ 	// clip, because a poster that outlives its clip is unreachable and only
+ 	// discoverable by listing the bucket.
+-	if thumbnailURL != nil {
+-		if posterKey, ok := OmniChatPosterStorageKey(*thumbnailURL, ownerUserID); ok {
+-			if _, err = tx.Exec(ctx, `
+-				INSERT INTO omnichat_media_deletion_queue(storage_path, owner_user_id)
+-				VALUES ($1, $2)
+-				ON CONFLICT (storage_path) DO NOTHING
+-			`, posterKey, ownerUserID); err != nil {
+-				return false, err
+-			}
+-		}
+-	}
++	_ = thumbnailURL
+ 	// Media replies are represented by an empty assistant message whose only
+ 	// visible content is the generated asset. Remove that shell when this was
+ 	// its last attachment; otherwise deleting a gallery item would leave an

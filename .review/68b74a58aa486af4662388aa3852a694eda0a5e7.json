@@ -1,0 +1,441 @@
+{
+ "schema_version": 2,
+ "head": "ed8f00e55",
+ "base": "68b74a58aa486af4662388aa3852a694eda0a5e7",
+ "scope": {
+  "files": [
+   "backend/cmd/server/main.go",
+   "backend/internal/handlers/omnichat_media.go",
+   "backend/internal/handlers/omnichat_media_poster_test.go",
+   "backend/internal/handlers/omnichat_media_test.go",
+   "backend/internal/handlers/omnichat_social.go",
+   "backend/internal/handlers/omnichat_social_test.go",
+   "backend/internal/handlers/omnichat_explore_poster_test.go",
+   "backend/internal/models/omnichat_media.go",
+   "backend/internal/models/omnichat_social.go",
+   "backend/internal/models/omnichat_poster_path_test.go",
+   "backend/internal/database/omnichat_poster_deletion_test.go",
+   "backend/internal/queue/omnichat_generation_handler.go",
+   "backend/internal/queue/video_clip_probe.go",
+   "backend/internal/queue/video_clip_probe_test.go",
+   "backend/internal/queue/video_frame_review.go",
+   "backend/internal/queue/video_frame_review_test.go",
+   "backend/internal/queue/video_playback_rendition.go",
+   "backend/internal/queue/video_playback_rendition_test.go",
+   "backend/internal/queue/video_measurement_warning_test.go",
+   "backend/internal/queue/omnichat_generation_two_phase_test.go",
+   "frontend/src/components/omnichat/OmniChatMediaAssetView.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx",
+   "frontend/src/pages/OmniChatCreatePage.tsx",
+   "frontend/src/pages/__tests__/OmniChatCreatePage.test.tsx",
+   "frontend/src/pages/OmniChatExplorePage.tsx",
+   "frontend/src/pages/__tests__/OmniChatExplorePage.test.tsx",
+   "frontend/src/services/omnichatService.ts",
+   "frontend/src/services/__tests__/omnichatService.test.ts",
+   "frontend/src/types/omnichat.ts"
+  ],
+  "boundaries": [
+   "the worker -> ffmpeg and ffprobe: the argv that measures a clip, samples it and makes its poster",
+   "the worker -> object storage: a second object per clip, under a key nothing else knows",
+   "the worker -> Postgres: width, height, duration and thumbnail_url through a hand-written column list",
+   "a database row -> a storage key: a value read back out of the database and used to address storage",
+   "the handlers -> the browser: the asset JSON, and two new routes that return bytes",
+   "the publication access gate -> two queries that must answer the same question",
+   "the React media view -> the API: which endpoint each mode calls, and how much it costs to draw a page"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a1712456328c6abd1111176e3de4b1197b645920",
+  "a8413c5c8c1e216743c13088de4172e2937322c0",
+  "10bced22ade5619b9aff93a4a41b05d6d83eba92",
+  "58dafd573022d9949ed5e4d55a80044da4a4ee29",
+  "390b0e4cbd0254bacacc4d85b16290120a74c839",
+  "edde601874009e0149098edc0309d556a163ddbf",
+  "418a22c2a793fe582ae6a797feb68b8add89edda",
+  "2a7c8bec4e5e83369d6d143d3966db3839341afb",
+  "982264d473060ceb5adc796467a6096a3a8c7960"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Four commits since the last ledger's final pass: 1e1acb6b0 (clip frame review, hidden negative prompt), a85e4fdac (measure the clip, store a poster), cf87db741 (reduce the clip for playback), 68b74a58a (a gallery tile shows the poster). 18 files. Boundaries: worker->ffmpeg/ffprobe argv; worker->object storage (a second object per clip); worker->Postgres (width, height, duration, thumbnail_url through a hand-written column list); handler->browser (the asset JSON and two new binary routes); a database row->a storage key; the React component->which endpoint each mode calls."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read all nine prior ledgers. 390b0e4c R2 (a hand-written decoder ignores struct tags) and R4 (one rule as prose in five places) both bear directly on this change and both recurred here: see poster-R2. 982264d4 video-R4 and instrument C6 governed the untyped-map reads that this change does not use."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The assembled ffmpeg and ffprobe argv are the payloads this change builds. Printed and run for two materially different inputs: portrait 1440x2528 (the real MiniMax render) and 64x64 and 640x480 test clips. The 2K case scaled to 1080x1896; the small case took the no-rendition branch."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered the tile for four states and read the markup: a clip with a poster, a clip with none, an opened clip, and an image. Found the poster img carries the prompt as alt while the button's aria-label overrides it for the accessible name -- an improvement on the previous state (a bare video element with no name), so recorded rather than filed. Also confirmed object-contain, so a portrait frame in a 4:5 tile is not cropped."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed the decorated asset JSON for a clip with a poster, a clip without, and an image, and the poster route's status, headers and body for a hit and a miss. thumbnail_url appears only for a clip that has one; the storage URL never appears. Observed but not filed: the poster route sends Cache-Control private, no-store, copied from the clip route, and the browser fetch also passes cache: no-store -- so a gallery re-fetches every poster on every visit. At ~118 KB a tile that is 1.4 MB per visit against the 40 MB the change removed, so it is an optimisation and not a defect. Reported to the user."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Wrote a throwaway against the real Postgres: inserted a media_files row with thumbnail_url, read it back through GetMediaAssetOwned, then deleted the asset and printed the deletion queue. thumbnail_url, width, height and duration all round-tripped. The deletion queue held only the clip -- poster-R1."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The poster is produced by ffmpeg from a real 6.62 MB MiniMax render, and the frame was extracted and looked at, not merely measured: 640x1124, a representative full-body frame, correct as a tile. The playback rendition was run on the same real clip (6.62 MB -> 2.21 MB, 1080x1896, audio preserved) and both files were sent to the user side by side. No model-facing prompt changed in these four commits, so there is no unrendered prompt change to declare."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The poster key is written in one place (video_clip_probe.go) and read in two (the private route, the deletion). They did not agree on the shape: IsOmniChatGeneratedStoragePath requires a bare uuid stem and the poster's stem is '<job id>-poster' -- poster-R2."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The frontend reads asset.thumbnail_url; the backend sets it in decorateOmniChatAsset for the private path. On the public path the field did not exist on either side -- poster-R4."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The generated-storage-path rule existed twice: models.IsOmniChatGeneratedStoragePath and a weaker local copy in the handler. Ran both against the same inputs; they disagreed on segment count and on a non-numeric owner -- poster-R2."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract changed. The OpenRouter video request and the RunPod worker are untouched by these four commits."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "thumbnail_url crosses two hand-written boundaries. The private path's omniChatAssetSelect and scanOmniChatMediaAsset already carried it, proved by a real-database round trip. The public path's omniChatPublicationSelect and scanOmniChatPublication did not carry it at all, which is why adding the field to the struct alone would have been populated by nothing -- part of poster-R4, and guarded by a database test that publishes a clip and reads HasPoster back through the feed."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "No untyped-map or reflection accessor was added. The nearest equivalent is the poster key read out of a database row and used to address storage; it is exercised through the real accessor in both directions -- written by the worker, read back by the route and by the deletion."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "OmniChatPosterStorageKey accepts what the worker actually writes: /uploads/omnichat/generated/<owner>/<job id>-poster.jpg, asserted with a real uuid rather than a literal."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Thirteen hostile inputs against the poster key rule: traversal, too few segments, too many segments, a non-numeric owner, another owner, a doubled slash, a backslash, another prefix, the clip itself, a non-poster jpg, a stem that is not a job, an absolute host, whitespace. All refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundaries on the same rule: empty string, whitespace only, a nil thumbnail, owner id zero and negative. Boundaries on playbackScale: exactly at the cap, one over, zero, and odd dimensions that must round to even."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the poster routes against the media routes beside them, field by field: ownership or publication gate, scan status, storage nil, size cap before download, Content-Length, nosniff, and the viewer-scoped cache headers with Vary. Then compared the two grids -- the gallery got the poster and the explore feed did not, which is poster-R4."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reachable: the no-rendition branch by a clip inside the cap, the grew-larger branch by a clip that encodes larger, the no-poster tile by every clip that predates a85e4fdac, the placeholder by a clip whose poster fails. expanded on an explore card defaults false and is true only on the detail route, so preview is genuinely on in the feed."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "probeClip returns zeros on every failure and said nothing, so a worker with no ffprobe would store every clip with no dimensions in silence -- the original defect in a quieter form. poster-R3. The poster and rendition failures already logged."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The clip review is gated on !job.AllowNSFW; the poster and the measurement are not, which is correct -- both are metadata, not a content decision. The explore poster route carries the same social rate limiter as the explore content route beside it."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Three duplications found. The generated-path rule (poster-R2). The publication access gate, which would have had to be copied to ask the same question for the poster and is now one constant. The omnichat/generated prefix, which existed in four places and is now the models rule plus the two fmt calls that build keys."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine and no shared state. The new work is sequential inside one job and two request handlers."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The poster's deletion row is inserted inside the same transaction as the clip's, so a rollback cannot queue one without the other. On the write side the poster upload is covered by the same uncommitted defer as the clip, verified by reading the defer and by the failure path in the tests."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. thumbnail_url already exists on media_files."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Deleting a clip left its poster in storage with nothing in the database naming it -- poster-R1, proved and controlled against the real schema. The failed-render path already deletes the poster with the clip. discardIntermediateAsset removes a still, which has no poster."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Five controls built, each reverting one fix, each confirmed by hand to fail as a real assertion rather than a build break. The artifacts were printed again afterwards: the decorated public asset JSON for three cases, and the poster image itself."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Both poster routes are registered in cmd/server/main.go beside the content routes they mirror. No route-registration test exists for any route in this repository, so the poster routes are no less reachable than their siblings; recorded rather than filed."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet ./internal/..., gofmt, tsc -b and eslint all clean. Backend handlers, models, database and queue packages pass with -p 1. Frontend: 159 files, 906 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Every technique that found something is already a row: F4 found poster-R1, C1/C3/E5 found poster-R2, E3 found poster-R3, E1/C2/C5 found poster-R4, C2 found poster-R5. No new instrument was needed this pass."
+    }
+   ],
+   "findings": [
+    {
+     "id": "poster-R1",
+     "summary": "deleting a clip queued only the clip, so its poster stayed in storage with nothing left in the database naming it -- unreachable, and findable only by listing the bucket",
+     "found_by": "F4",
+     "fix_commit": "ed8f00e55",
+     "control": {
+      "patch": ".review/controls/poster-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/database/ -run TestDeletingAClipQueuesItsPosterToo"
+      ],
+      "observed": "FAIL with 'the poster outlived the clip it belongs to'; the clip's own key is still queued, so the failure is the poster and not the mechanism"
+     }
+    },
+    {
+     "id": "poster-R2",
+     "summary": "the poster key was outside this repository's own definition of generated media -- IsOmniChatGeneratedStoragePath requires a bare uuid stem and a poster's stem is '<job id>-poster' -- so the deletion guard could never have accepted one, while the handler carried a second, weaker copy of the same rule",
+     "found_by": "C3",
+     "fix_commit": "ed8f00e55",
+     "control": {
+      "patch": ".review/controls/poster-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/models/ -run TestAPosterIsGeneratedMedia",
+       "./internal/models/ -run TestPosterStorageKeyAcceptsWhatTheWorkerWrites"
+      ],
+      "observed": "both FAIL with 'Should be true' at the assertions that a poster path is generated media and that the worker's own key is accepted"
+     }
+    },
+    {
+     "id": "poster-R3",
+     "summary": "a clip whose dimensions could not be read was stored with none and said nothing, so a worker without ffprobe reproduces the original defect in silence",
+     "found_by": "E3",
+     "fix_commit": "ed8f00e55",
+     "control": {
+      "patch": ".review/controls/poster-R3.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestAClipThatCannotBeMeasuredSaysSo"
+      ],
+      "observed": "FAIL with 'the clip lost its dimensions and nothing said so'; the captured log shows the render succeeding and the poster warning firing, with no word about the measurement"
+     }
+    },
+    {
+     "id": "poster-R4",
+     "summary": "the explore feed is three columns of cards and each card rendered the clip itself, so a published clip was downloaded in full to draw a card -- the same defect the gallery grid had, on the public surface",
+     "found_by": "E1",
+     "fix_commit": "ed8f00e55",
+     "control": {
+      "patch": ".review/controls/poster-R4.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/pages/__tests__/OmniChatExplorePage.test.tsx -t 'asks for a card, not for the clip, in the feed'"
+      ],
+      "observed": "FAIL with 'expected false to be true'; the feed rendered the media view with preview undefined"
+     }
+    },
+    {
+     "id": "poster-R5",
+     "summary": "the poster fetch hardcoded the private route, which reads as working -- the fetch 404s, the card shows its placeholder, no clip is downloaded -- while every published clip in the feed silently loses its poster",
+     "found_by": "C2",
+     "fix_commit": "ed8f00e55",
+     "control": {
+      "patch": ".review/controls/poster-R5.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/omnichatService.test.ts -t 'fetches a published clip poster from the route the asset names'"
+      ],
+      "observed": "FAIL with 'expected vi.fn() to be called with arguments'; the call went to /omnichat/media/asset-1/poster instead of the explore route the asset named"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-scoped over ed8f00e55, the fix commit: models (the path rule, the deletion, the public gate constant, the publication select and scanner), handlers (both poster routes and both decorators), the queue warning, and four frontend files. Same boundaries, plus one new one: the publication access gate now shared by two queries."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Prior ledgers re-read against the fixes. 390b0e4c R2 is the reason the publication scanner was checked against a real database rather than by reading it, and R4 is the reason the access gate became a constant instead of a second copy."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "No argv changed in the fixes. The ffmpeg and ffprobe commands are byte-identical to the ones printed and run in pass 1."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The component markup is unchanged by the fixes except for one extra argument threaded into the poster fetch. The explore card's preview flag was read in context: it is !expanded, expanded defaults false, and it is true only on the single-publication route."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed the decorated public asset JSON for a published clip with a poster, one without, and an image. thumbnail_url points at the explore poster route and only for a clip that has one; HasPoster is json:\"-\" so the existence flag never reaches a client either. Printed the explore poster route's headers for an anonymous and a signed-in viewer: public max-age for anonymous, private no-store with Vary on Authorization and Cookie for a viewer, matching the clip route beside it."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Two real-database tests now read what is written: a clip's poster survives the round trip and is queued on deletion, and a published clip reports HasPoster through the feed while one without reports false. Both run against migrated Postgres, not a fake."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Nothing model-facing changed in the fixes: no prompt, no provider request, no ffmpeg argument. The poster image produced by the unchanged command was inspected in pass 1. There is no unrendered model input to declare."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The poster key is now spelled by one rule. Checked the writer's fmt string against the models rule directly: omnichat/generated/<owner>/<uuid>-poster.jpg satisfies IsOmniChatGeneratedStoragePath, which is what the deletion guard requires."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The public asset carries thumbnail_url on both sides now, and the component's 'thumbnail_url' in asset check still holds for the message attachment shape, which has no such field and shows the clip rather than a tile."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The two copies of the storage-path rule are one. The two copies of the publication access gate never both existed: extracted before the second query was written. The existing repository test that exercises the gate through a banned author and a blocked reader still passes against the extracted constant."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "Still no provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The publication column list and its scanner both carry the new column, and the pairing is proved by a database test rather than by reading them: a published clip with a poster reports true, one without reports false. A field added to the struct alone would fail that test."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "No new untyped accessor. The poster key round-trips through the real writer and the real readers in the database tests."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The accepting cases still pass with the rule moved into models, including a real uuid stem rather than a literal path."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The thirteen hostile inputs now run against the canonical rule and are all refused, including the two the removed copy accepted."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Owner id zero, a nil thumbnail, an empty string and whitespace all refused; an oversized poster refused before any download on both routes."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The explore poster route was written against the explore content route line by line: same gate, same storage nil check, same size cap before download, same Content-Length, same nosniff, same anonymous and viewer-scoped cache rules with Vary. The private poster route matches the private content route the same way. Both are registered with the rate limiter their sibling carries."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every new branch reachable: a poster that exists, one that does not, an image asked for a poster, a viewer the gate refuses, an oversized object. All five exercised by tests."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A clip that cannot be measured now warns, and a clip that can stays silent -- both asserted, because a warning on every clip is a warning nobody reads. PublicAssetPosterPath distinguishes a real database error, which becomes a 500, from an empty key, which becomes a 404."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Nothing new is gated on a flag this path lacks. The explore poster carries the social rate limiter; the private poster is inside the protected group."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Nothing left duplicated: one storage-path rule, one publication gate, one poster size cap shared by both routes, one poster suffix constant used by the rule."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "Still no goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The poster's deletion row shares the clip's transaction, so the two cannot diverge. Confirmed by reading the transaction and by the control: reverting the insert leaves the clip queued and the poster not."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "Still no migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The orphan is closed and proved against the real schema. No new object is created by the fixes."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All five controls replayed by hand: each reverts one fix, each produces a named assertion failure with the message the test was written to print, and each restores cleanly. The public asset JSON was printed once more afterwards."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Both poster routes registered beside their content siblings, and the guard this repository does have -- the build-artifact check -- ran on the commit."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet ./internal/..., gofmt, tsc -b, eslint clean. handlers, models, database and queue pass with -p 1. Frontend 906 passed, 1 skipped, 159 files."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no technique to add."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... clean",
+  "lint": "gofmt -l clean; eslint clean on every changed frontend file",
+  "types": "npx tsc -b clean",
+  "tests": "go test -p 1 on handlers, models, database and queue: all ok. vitest full run: 159 files, 906 passed, 1 skipped."
+ }
+}

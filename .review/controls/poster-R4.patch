@@ -1,0 +1,12 @@
+diff --git a/frontend/src/pages/OmniChatExplorePage.tsx b/frontend/src/pages/OmniChatExplorePage.tsx
+index 2bfee7494..5cace4c19 100644
+--- a/frontend/src/pages/OmniChatExplorePage.tsx
++++ b/frontend/src/pages/OmniChatExplorePage.tsx
+@@ -267,7 +267,6 @@ function OmniChatPublicationCard({
+       {publication.asset && (
+         <OmniChatMediaAssetView
+           asset={publication.asset}
+-          preview={!expanded}
+           className={`${expanded ? 'max-h-[70vh]' : 'aspect-[4/5] max-h-[680px]'} min-h-64 w-full rounded-none`}
+         />
+       )}
