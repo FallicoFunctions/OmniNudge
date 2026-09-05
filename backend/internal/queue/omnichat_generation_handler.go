@@ -868,6 +868,31 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		}
 	}
 
+	width, height := providerMedia.Width, providerMedia.Height
+	clipDuration := providerMedia.Duration
+	if kind == models.OmniChatMediaKindVideo {
+		// The self-hosted worker returns all three of these with its result and
+		// the hosted provider returns none, so a clip from the hosted path was
+		// stored with no width and no height at all: a gallery had nothing to
+		// reserve space with, and every clip moved the layout when it loaded.
+		// The file that was downloaded wins over anything claimed about it.
+		metrics := probeClip(ctx, download.Path)
+		if metrics.Width > 0 && metrics.Height > 0 {
+			width, height = metrics.Width, metrics.Height
+		}
+		if metrics.Duration > 0 {
+			clipDuration = metrics.Duration
+		}
+		// Reduced here, after the review has looked at the clip the model
+		// actually made and before anything is stored, so what goes into
+		// storage is the file the user will play and the row describes it.
+		reducedWidth, reducedHeight, releaseRendition := applyPlaybackRendition(ctx, job, download, metrics)
+		defer releaseRendition()
+		if reducedWidth > 0 && reducedHeight > 0 {
+			width, height = reducedWidth, reducedHeight
+		}
+	}
+
 	file, err := os.Open(download.Path)
 	if err != nil {
 		return nil, false, fmt.Errorf("open generated media for storage: %w", err)
@@ -892,22 +917,6 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		}
 	}()
 
-	width, height := providerMedia.Width, providerMedia.Height
-	clipDuration := providerMedia.Duration
-	if kind == models.OmniChatMediaKindVideo {
-		// The self-hosted worker returns all three of these with its result and
-		// the hosted provider returns none, so a clip from the hosted path was
-		// stored with no width and no height at all: a gallery had nothing to
-		// reserve space with, and every clip moved the layout when it loaded.
-		// The file that was downloaded wins over anything claimed about it.
-		metrics := probeClip(ctx, download.Path)
-		if metrics.Width > 0 && metrics.Height > 0 {
-			width, height = metrics.Width, metrics.Height
-		}
-		if metrics.Duration > 0 {
-			clipDuration = metrics.Duration
-		}
-	}
 	media := &models.MediaFile{
 		UserID: job.OwnerUserID, Filename: filepath.Base(storageKey),
 		OriginalFilename: "omnichat-generated" + download.Extension,
