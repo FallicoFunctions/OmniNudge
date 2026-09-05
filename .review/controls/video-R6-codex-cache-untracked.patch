@@ -1,0 +1,14 @@
+diff --git a/.gitignore b/.gitignore
+index 977915329..e73cadaa9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -115,9 +115,6 @@ source-render-*.png
+ # directory arrived untracked, which is how a build artifact reaches this
+ # repository in the first place.
+ .codex/guards/**/__pycache__/
+-# Runtime state the guard writes on every edit, not configuration. Untracked
+-# and unignored is how a broad git add commits something nobody meant to keep.
+-.codex/cache/
+ 
+ # Review runtime markers. The ledgers and control patches beside them are
+ # tracked on purpose; this one is per-run state and would dirty the tree

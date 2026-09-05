@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "c7a04c2844e6475548f0eae44085e6b5ababf4ba",
+ "head": "ee691dc1a662b030de127077a7a2736d68498118",
  "base": "982264d473060ceb5adc796467a6096a3a8c7960",
  "scope": {
   "files": [
@@ -113,6 +113,11 @@
      "id": "C5",
      "status": "applied",
      "evidence": "The wiring question applied twice: the map keys (C1) and the decoded result. TestEveryFieldOnVideoStatusIsDecoded and TestEveryFieldOnVideoJobIsDecoded walk each struct by reflection and fail on any exported field still zero after decoding a payload that sets everything."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "The instrument did not exist. It was added in pass 2, by the ratchet, when mutating an accessor found what no instrument then named."
     },
     {
      "id": "D1",
@@ -244,12 +249,661 @@
      }
     }
    ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-printed the built request for the two shapes the pass-1 fixes changed: the fallback path with a male subject, and a motion whose middle clause is speech. The fallback now carries no pronoun and clause removal leaves grammatical text."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The key test proves the builder writes what the adapter reads. This pass found it says nothing about the reads themselves -- see C6."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Mutated the adapter's accessor rather than the field: changing intField from .(int) to .(int64) turned every hosted clip's duration into zero and the entire queue suite passed. Found video-R4."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "video-R4's control replayed by hand and fails with 'duration was read back as zero'. The new test was itself mutation-tested two ways before being trusted."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Queue and services suites pass. This claim was still too narrow -- see pass 3."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "C6 added to instruments.json: mutate the accessor, not just the field."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    }
+   ],
+   "findings": [
+    {
+     "id": "video-R4",
+     "summary": "the adapter reads the spec through untyped map assertions, so changing intField from .(int) to .(int64) turned every hosted clip's duration into zero and the whole queue suite still passed",
+     "found_by": "C6",
+     "fix_commit": "22534d3e8",
+     "control": {
+      "patch": ".review/controls/video-R4-adapter-read-type.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestVideoRequestFromInputReadsEveryFieldTheBuilderWrote"
+      ],
+      "observed": "duration was read back as zero: the adapter's type assertion no longer matches what the builder writes"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed what the boot check itself emits under both providers. With the hosted provider selected it still reported RUNPOD_VIDEO_ENDPOINT_ID as missing while clips render fine. Found video-R5."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked. No new accessor was added this pass."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard was made to speak: printing its output under each provider is what showed it naming a provider that is not in use."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Ran go build, go vet and go test ./... -p 1 across every package, which passes 1 and 2 had not. A config test had been failing since openrouter.ai was added to the download allowlist, because that commit ran only the queue and services suites. All clean now."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    }
+   ],
+   "findings": [
+    {
+     "id": "video-R5",
+     "summary": "the boot check reported RUNPOD_VIDEO_ENDPOINT_ID as missing while the hosted provider was rendering clips fine -- a false alarm in the one block whose value depends on being trusted",
+     "found_by": "B1",
+     "fix_commit": "785211dd4",
+     "control": {
+      "patch": ".review/controls/video-R5-boot-check-wrong-provider.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/config/ -run TestMediaEndpointGapsReportsTheChosenVideoProvider"
+      ],
+      "observed": "a configured hosted provider must not report the self-hosted endpoint as missing"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked. No new accessor."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Read the 263 lines of guard code committed from the other agent, which had been distributed without being read. Every subprocess call takes a literal list with no shell, the gate commands come from a fixed dict filtered by membership, and paths are resolved and constrained to the repository root. No finding in the code -- but it writes a cache file, which was neither tracked nor ignored. Found video-R6."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Checked that the download allowlist and the credential scope share one constant rather than two literals of \"openrouter.ai\". They do."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    }
+   ],
+   "findings": [
+    {
+     "id": "video-R6",
+     "summary": "the codex guard writes .codex/cache/touched.json on every edit, and it was neither tracked nor ignored -- a broad git add would have committed runtime state, which is the accident that once needed a history rewrite",
+     "found_by": "D2",
+     "fix_commit": "ee691dc1a",
+     "control": {
+      "patch": ".review/controls/video-R6-codex-cache-untracked.patch",
+      "runner": "bash",
+      "tests": [
+       "git check-ignore -q .codex/cache/touched.json"
+      ],
+      "observed": "with the patch applied the path is no longer ignored; without it, git check-ignore matches .gitignore:120"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 5,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "openrouter.ai is one exported constant used by both the download allowlist and the credential scope. They cannot drift."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked across the newest code. The boot check's branch reads a string field directly with no accessor that can fail silently."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Checked the three committed probes for credential leaks. No key, token or secret is printed; signed URLs are truncated at the query string. One result URL is printed in full when no output directory is given, which is fal's own link to the user's generated clip on their own terminal -- not a credential."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet and go test ./... -p 1 all clean."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. Every instrument re-asked and nothing found."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked against the code as it stands after the previous pass's fixes; nothing new."
+    }
+   ],
+   "findings": []
   }
  ],
  "gates": {
   "build": "go build ./... clean",
-  "vet": "clean",
-  "tests": "internal/queue and internal/services suites pass",
+  "vet": "go vet ./... clean",
+  "tests": "go test ./... -p 1 clean across every package",
   "guards": "no-build-artifacts and i18n guards pass on every commit"
  }
 }
