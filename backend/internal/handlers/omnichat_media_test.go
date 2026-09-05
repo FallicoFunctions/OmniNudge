@@ -64,13 +64,17 @@ type omniChatMediaStorageFake struct {
 	body          []byte
 	size          *int64
 	downloadCalls int
+	// downloadedKeys is what the handler actually asked storage for. A poster
+	// route that reads the clip's key would still return bytes.
+	downloadedKeys []string
 }
 
 func (f *omniChatMediaStorageFake) Upload(context.Context, string, io.Reader, string) (string, error) {
 	return "", nil
 }
-func (f *omniChatMediaStorageFake) Download(context.Context, string) (io.ReadCloser, error) {
+func (f *omniChatMediaStorageFake) Download(_ context.Context, key string) (io.ReadCloser, error) {
 	f.downloadCalls++
+	f.downloadedKeys = append(f.downloadedKeys, key)
 	return io.NopCloser(bytes.NewReader(f.body)), nil
 }
 func (f *omniChatMediaStorageFake) Delete(context.Context, string) error { return nil }

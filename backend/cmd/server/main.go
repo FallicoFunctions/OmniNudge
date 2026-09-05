@@ -1507,6 +1507,7 @@ func main() {
 			protected.GET("/omnichat/gallery", omniChatMediaHandler.ListGallery)
 			protected.GET("/omnichat/media/:id", omniChatMediaHandler.GetAsset)
 			protected.GET("/omnichat/media/:id/content", omniChatMediaHandler.GetAssetContent)
+			protected.GET("/omnichat/media/:id/poster", omniChatMediaHandler.GetAssetPoster)
 			protected.DELETE("/omnichat/media/:id", omniChatMediaHandler.DeleteAsset)
 			protected.POST("/omnichat/explore/publish/media", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishAsset)
 			protected.POST("/omnichat/explore/publish/chat", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishChat)

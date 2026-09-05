@@ -12,8 +12,14 @@ vi.mock('../../contexts/AuthContext', () => ({
     user: mockIsAuthenticated ? { id: 9 } : null,
   }),
 }));
+// Records how the gallery asked for each tile. The grid used to render the
+// full view, which downloads every clip it lists.
+const mediaViewProps: { kind: string; preview?: boolean }[] = [];
 vi.mock('../../components/omnichat/OmniChatMediaAssetView', () => ({
-  default: () => <div>gallery scene</div>,
+  default: ({ asset, preview }: { asset: { kind: string }; preview?: boolean }) => {
+    mediaViewProps.push({ kind: asset.kind, preview });
+    return <div>gallery scene</div>;
+  },
 }));
 vi.mock('../../services/omnichatService', () => ({
   createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
@@ -45,6 +51,7 @@ vi.mock('../../services/omnichatService', () => ({
 describe('OmniChatCreateWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mediaViewProps.length = 0;
     mockIsAuthenticated = true;
     vi.mocked(omnichatService.listPersonas).mockResolvedValue([
       {
@@ -470,5 +477,43 @@ describe('OmniChatCreateWorkspace', () => {
     await waitFor(() => expect(omnichatService.cancelGeneration).toHaveBeenCalledWith('job-1'));
     expect(await screen.findByText('Generation cancelled')).toBeInTheDocument();
     expect(screen.queryByText(/Creating your image/i)).not.toBeInTheDocument();
+  });
+  // The gate, not the component.
+  //
+  // OmniChatMediaAssetView knows how to show a poster instead of a clip, and
+  // proving that says nothing about whether the gallery asks it to. Rendering
+  // the grid without preview downloads every clip it lists -- one real render
+  // was 6.6 MB -- on every visit, whether or not anybody presses play.
+  it('asks the gallery grid for tiles, not for the clips themselves', async () => {
+    vi.mocked(omnichatService.listGallery).mockResolvedValue([
+      {
+        id: 'asset-clip',
+        owner_user_id: 9,
+        persona_id: 1,
+        generation_job_id: 'job-clip',
+        kind: 'video',
+        visibility: 'private',
+        prompt: 'a clip',
+        scene: {},
+        file_type: 'video/mp4',
+        content_url: '/api/v1/omnichat/media/asset-clip/content',
+        thumbnail_url: '/api/v1/omnichat/media/asset-clip/poster',
+        created_at: '2026-07-20T00:00:00Z',
+      },
+    ]);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OmniChatCreateWorkspace />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /gallery/i }));
+
+    await waitFor(() => expect(mediaViewProps.some((props) => props.kind === 'video')).toBe(true));
+    const videoTiles = mediaViewProps.filter((props) => props.kind === 'video');
+    expect(videoTiles.every((tile) => tile.preview === true)).toBe(true);
   });
 });

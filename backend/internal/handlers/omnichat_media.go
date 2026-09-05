@@ -563,9 +563,105 @@ func (h *OmniChatMediaHandler) getOwnedAsset(c *gin.Context) (*models.OmniChatMe
 
 func decorateOmniChatAsset(asset *models.OmniChatMediaAsset) {
 	asset.ContentURL = "/api/v1/omnichat/media/" + asset.ID.String() + "/content"
-	// Never expose an underlying storage/CDN thumbnail URL for a private asset.
+	// Never expose an underlying storage/CDN URL for a private asset. The
+	// poster is still offered, but through this API and the same ownership
+	// gate the clip itself goes through.
+	//
+	// A gallery tile that has a poster shows the poster. A tile that does not
+	// has to show something else, because the alternative -- falling back to
+	// the clip -- is a grid that downloads every video it lists.
+	if asset.Kind == models.OmniChatMediaKindVideo && omniChatPosterKey(asset) != "" {
+		posterURL := "/api/v1/omnichat/media/" + asset.ID.String() + "/poster"
+		asset.ThumbnailURL = &posterURL
+		return
+	}
 	asset.ThumbnailURL = nil
 }
+
+// omniChatPosterKey turns the stored poster URL back into a storage key, or
+// returns empty when there is no usable poster.
+//
+// The worker writes this value and nothing else does, but it is read back out
+// of a database row and used to address storage, so it is checked rather than
+// trusted: the prefix must be the one generated media is written under, and no
+// segment may climb out of it.
+func omniChatPosterKey(asset *models.OmniChatMediaAsset) string {
+	if asset == nil || asset.ThumbnailURL == nil {
+		return ""
+	}
+	key := strings.TrimPrefix(strings.TrimSpace(*asset.ThumbnailURL), "/uploads/")
+	if key == "" || !strings.HasPrefix(key, omniChatGeneratedPrefix) {
+		return ""
+	}
+	if strings.Contains(key, "..") || strings.Contains(key, "//") {
+		return ""
+	}
+	if !strings.HasSuffix(key, ".jpg") {
+		return ""
+	}
+	return key
+}
+
+// omniChatGeneratedPrefix is where the worker writes everything it generates.
+const omniChatGeneratedPrefix = "omnichat/generated/"
+
+// GetAssetPoster streams a clip's poster frame.
+//
+// A gallery grid must never fetch the clips it lists. One real render was 6.6
+// MB, and a twelve-tile page holding six of them pulled forty megabytes before
+// it drew anything, on every visit. The poster is about a hundred kilobytes and
+// is the only thing a tile can show without the clip.
+func (h *OmniChatMediaHandler) GetAssetPoster(c *gin.Context) {
+	asset, ok := h.getOwnedAsset(c)
+	if !ok {
+		return
+	}
+	if asset.Kind != models.OmniChatMediaKindVideo {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	if asset.ScanStatus != models.MediaScanStatusClean {
+		RespondError(c, http.StatusConflict, "Media is still being verified")
+		return
+	}
+	if h.storage == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Media storage is unavailable")
+		return
+	}
+	posterKey := omniChatPosterKey(asset)
+	if posterKey == "" {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), posterKey)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	// A poster is one scaled-down frame. Anything near the clip's own size cap
+	// is not a poster, and serving it would defeat the point of having one.
+	if objectSize <= 0 || objectSize > omniChatMaxPosterBytes {
+		RespondError(c, http.StatusConflict, "Media size is invalid")
+		return
+	}
+	reader, err := h.storage.Download(c.Request.Context(), posterKey)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	defer func() { _ = reader.Close() }()
+	c.Header("Content-Type", "image/jpeg")
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-poster.jpg"`, asset.ID.String()))
+	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	// Headers are already flushed, so a copy failure cannot be reported to the
+	// client; discard it explicitly as the other streaming handlers do.
+	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+}
+
+// omniChatMaxPosterBytes caps what this route will serve.
+const omniChatMaxPosterBytes = int64(4 << 20)
 
 func parseUUIDParam(c *gin.Context, name string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param(name))

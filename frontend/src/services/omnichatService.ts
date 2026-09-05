@@ -561,6 +561,25 @@ export const omnichatService = {
     });
   },
 
+  /**
+   * Resolves with a clip's poster frame.
+   *
+   * A gallery grid must never fetch the clips it lists: one real render was
+   * 6.6 MB, so a page of tiles pulled tens of megabytes before it drew
+   * anything. The poster is about a hundred kilobytes, and it is served
+   * through the same ownership gate as the clip rather than from storage.
+   */
+  async getMediaAssetPoster(assetId: string): Promise<Blob> {
+    const response = await authenticatedFetch(
+      getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`).toString(),
+      { cache: 'no-store' },
+    );
+    if (!response.ok) {
+      throw new Error('Failed to load the poster frame');
+    }
+    return response.blob();
+  },
+
   async getMediaAssetContent(assetId: string, publicContentUrl?: string): Promise<Blob> {
     const contentUrl = resolveApiMediaContentUrl(assetId, publicContentUrl);
     const response = await authenticatedFetch(contentUrl, {
