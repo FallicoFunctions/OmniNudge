@@ -30,8 +30,11 @@ type twoPhaseStoreFake struct {
 	provenance        models.OmniChatGenerationProvenance
 	intermediateKind  models.OmniChatMediaKind
 	sourceAsset       *models.OmniChatMediaAsset
-	deletedAssets     []uuid.UUID
-	progress          []int
+	// completedMedia is the media row the finished job wrote. The asset carries
+	// width and height, but the poster lives only on the media file.
+	completedMedia *models.MediaFile
+	deletedAssets  []uuid.UUID
+	progress       []int
 	// progressAtAttach is everything the bar had reported by the time the still
 	// was stored, which is the only point where the two phases can be told
 	// apart from inside the store.
@@ -107,9 +110,10 @@ func (f *twoPhaseStoreFake) AttachIntermediateAsset(_ context.Context, jobID uui
 	return nil
 }
 
-func (f *twoPhaseStoreFake) CompleteGenerationJob(_ context.Context, _ uuid.UUID, _ *models.MediaFile, asset *models.OmniChatMediaAsset, _, _ int64, provenance models.OmniChatGenerationProvenance) error {
+func (f *twoPhaseStoreFake) CompleteGenerationJob(_ context.Context, _ uuid.UUID, media *models.MediaFile, asset *models.OmniChatMediaAsset, _, _ int64, provenance models.OmniChatGenerationProvenance) error {
 	f.completeCalls++
 	f.provenance = provenance
+	f.completedMedia = media
 	asset.ID = uuid.New()
 	f.job.Status = models.OmniChatGenerationStatusSucceeded
 	f.job.OutputAssetID = &asset.ID

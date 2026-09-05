@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/omninudge/backend/internal/models"
@@ -106,18 +105,7 @@ func extractVideoFrames(ctx context.Context, videoPath string, duration float64,
 
 // probeClipDuration reads a clip's real length in seconds, or zero.
 func probeClipDuration(ctx context.Context, videoPath string) float64 {
-	// #nosec G204 -- ffprobe is fixed and the path is one this process wrote.
-	out, err := exec.CommandContext(ctx, "ffprobe",
-		"-v", "error", "-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1", videoPath).Output()
-	if err != nil {
-		return 0
-	}
-	seconds, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
-	if err != nil || seconds <= 0 {
-		return 0
-	}
-	return seconds
+	return probeClip(ctx, videoPath).Duration
 }
 
 // refuseExplicitClip reviews sampled frames of a clip and refuses the whole

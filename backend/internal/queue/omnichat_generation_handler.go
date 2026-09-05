@@ -882,13 +882,32 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		return nil, false, fmt.Errorf("store generated media: %w", err)
 	}
 	committed := false
+	posterKey := ""
 	defer func() {
 		if !committed {
 			h.deleteGenerationObject(ctx, storageKey)
+			if posterKey != "" {
+				h.deleteGenerationObject(ctx, posterKey)
+			}
 		}
 	}()
 
 	width, height := providerMedia.Width, providerMedia.Height
+	clipDuration := providerMedia.Duration
+	if kind == models.OmniChatMediaKindVideo {
+		// The self-hosted worker returns all three of these with its result and
+		// the hosted provider returns none, so a clip from the hosted path was
+		// stored with no width and no height at all: a gallery had nothing to
+		// reserve space with, and every clip moved the layout when it loaded.
+		// The file that was downloaded wins over anything claimed about it.
+		metrics := probeClip(ctx, download.Path)
+		if metrics.Width > 0 && metrics.Height > 0 {
+			width, height = metrics.Width, metrics.Height
+		}
+		if metrics.Duration > 0 {
+			clipDuration = metrics.Duration
+		}
+	}
 	media := &models.MediaFile{
 		UserID: job.OwnerUserID, Filename: filepath.Base(storageKey),
 		OriginalFilename: "omnichat-generated" + download.Extension,
@@ -907,11 +926,19 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 	asset := &models.OmniChatMediaAsset{Width: media.Width, Height: media.Height}
 	if kind == models.OmniChatMediaKindVideo {
 		duration := job.DurationSeconds
-		if providerMedia.Duration > 0 {
-			duration = int(providerMedia.Duration + 0.5)
+		if clipDuration > 0 {
+			duration = int(clipDuration + 0.5)
 		}
 		media.Duration = &duration
 		asset.DurationSeconds = &duration
+
+		// A clip with no poster is a black rectangle until it plays. The frame
+		// is stored beside the clip and behind the same access gate, never as a
+		// direct storage URL.
+		if url, key := h.storePosterFrame(ctx, job, download.Path, clipDuration); key != "" {
+			posterKey = key
+			media.ThumbnailURL = &url
+		}
 	}
 	provenance := models.OmniChatGenerationProvenance{
 		WorkerBuild:      result.WorkerBuild,
