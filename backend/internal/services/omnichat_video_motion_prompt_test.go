@@ -61,11 +61,17 @@ func TestVideoMotionPromptIsEmptyOnlyWhenTheCallerSuppliesTheMotion(t *testing.T
 	require.Empty(t, services.BuildOmniChatVideoMotionPrompt(
 		models.OmniChatGenerationModeCreate, "", models.OmniChatSceneState{}))
 
+	// A contextual clip with no activity used to carry no motion line at all,
+	// which left the model to invent one -- and what it invented was talking to
+	// the camera. It now gets a neutral physical action instead. Clips ship
+	// silent, so an unspecified motion is not a blank to be filled by whatever
+	// the model likes.
 	contextual := services.BuildOmniChatVideoMotionPrompt(
 		models.OmniChatGenerationModeContextual, "she waves", models.OmniChatSceneState{})
 	require.Contains(t, contextual, "Animate the supplied still image.")
 	require.Contains(t, contextual, "comes to rest before the clip ends")
-	require.NotContains(t, contextual, "Motion: ")
+	require.Contains(t, contextual, "Motion: ")
+	require.False(t, services.MotionImpliesSpeech(contextual), contextual)
 }
 
 func TestVideoMotionPromptDoesNotDoubleThePeriod(t *testing.T) {

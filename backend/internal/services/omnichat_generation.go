@@ -518,6 +518,14 @@ func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt s
 			motion = motion[:len(motion)-1]
 		}
 	}
+	// Clips ship silent, so nobody may appear to be speaking in one. This
+	// removes the audience rather than forbidding speech: a prohibition was
+	// tried, plainly worded, and she spoke anyway. See SilentMotion.
+	//
+	// A contextual clip with no activity gets the fallback too. It used to
+	// animate on the hold and arc lines alone, which left the model to invent
+	// the motion, and what it invented was talking to the camera.
+	motion = SilentMotion(motion)
 	parts := []string{
 		"Animate the supplied still image.",
 		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
