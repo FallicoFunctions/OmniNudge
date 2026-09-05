@@ -1,0 +1,376 @@
+{
+ "schema_version": 2,
+ "head": "9f5966f04",
+ "base": "a053fc7ebe0b5a28021865686c30e5392a072cc1",
+ "scope": {
+  "files": [
+   "backend/internal/models/omnichat_media.go",
+   "backend/internal/models/omnichat_social_repository_test.go",
+   "backend/internal/database/omnichat_thumbnail_deletion_test.go",
+   "backend/internal/queue/media_thumbnail.go",
+   "backend/internal/queue/media_thumbnail_test.go",
+   "backend/internal/queue/omnichat_generation_handler_test.go",
+   "backend/internal/queue/omnichat_generation_two_phase_test.go"
+  ],
+  "boundaries": [
+   "the queue -> object storage: a derived object stored beside a media_files row",
+   "the discard paths -> the deletion outbox trigger, which only ever sees storage_path",
+   "the publication access gate -> two queries that must answer the same question",
+   "a test literal -> the key a function elsewhere builds"
+  ]
+ },
+ "prior_ledgers_read": [
+  "68b74a58aa486af4662388aa3852a694eda0a5e7",
+  "982264d473060ceb5adc796467a6096a3a8c7960",
+  "2a7c8bec4e5e83369d6d143d3966db3839341afb",
+  "418a22c2a793fe582ae6a797feb68b8add89edda",
+  "390b0e4cbd0254bacacc4d85b16290120a74c839"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-reviewed the whole thumbnail body of work with fresh eyes, base a053fc7eb. Boundaries: the queue -> object storage (a derived object beside a media_files row); the discard paths -> the deletion outbox trigger, which only ever sees storage_path; the publication gate -> two queries; a test literal -> the key a function elsewhere builds."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read the six passes of ledger 68b74a58a. C7 and E6, both added during it, are what this pass leaned on: C7 found the stale fixture below and E6 was re-run over the derived-object shape."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler or response body changed."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Ran the public thumbnail gate against a real migrated Postgres for the first time, through every state it exists to refuse. It holds: an unpublished thumbnail is refused, a published one is readable signed-in and anonymous, a banned author's is refused, a blocked viewer's is refused, and it agrees with the asset path it shares a gate with. Also queried the live gallery for likeness candidates carrying a thumbnail: none exist, so grid-R1 orphaned nothing in practice."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Nothing model-facing changed this pass. The thumbnails produced by the unchanged pipeline were run for real and looked at during the previous ledger, including one fetched back out of R2."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The new test reads OmniChatThumbnailSuffix rather than spelling '-thumb', so an assertion about what was NOT uploaded cannot drift away from what is uploaded."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "No shape crossing to a client changed."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Two readers of one rule: commitFor decides where a render is stored and MakesAGalleryAsset decides whether it gets a tile image. A test now requires them to agree for all five modes rather than trusting two switches to stay in step."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Found a stale fixture: the deletion test still spelled out '<job id>-thumb.jpg' two commits after the writer moved to naming the whole asset file, so it passed while describing a key that no longer existed. Corrected to build the key with the function that writes it. Not recorded as a finding, because reverting the correction produces no failure -- the old literal is a valid key too -- and by this review's own rule a control that passes means the finding is about the test, not the product."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "MakesAGalleryAsset accepts the three modes that really write an asset, asserted against commitFor's own routing rather than against a list written twice."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The two modes that must be refused a thumbnail are driven through a whole job, and every uploaded key is checked for the suffix."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An unrecognised mode falls to the same default in both readers, so the two cannot disagree about one."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the thumbnail against the asset it stands beside: the asset is a media_files row that the outbox trigger sees, and the thumbnail is not. That asymmetry is grid-R1."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The image branch of storeThumbnail is still reached by ordinary stills; the early return is reached by the two likeness modes; both exercised."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The new early return logs nothing, deliberately: it is the normal path for two modes, and a warning on every likeness render is a warning nobody reads."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The thumbnail is now gated on the mode, and the gate is the same one the storage destination uses."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The gallery-asset rule was implicit in commitFor's switch and its comment. It is a named method now, read by both."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The shape is 'a derived object stored beside a media_files row, which the row's deletion trigger cannot see'. Looked for others: the playback rendition replaces the asset in place rather than adding an object; the HLS transcode writes a directory of them and would have the same problem, but nothing enqueues it, so it is not live; ordinary upload thumbnails are outside the omnichat retention path entirely. No second live instance."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The mode check happens before any upload, so a refused thumbnail leaves no partial state."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "This is what found grid-R1. Asking what is left behind when a likeness pick discards three of four candidates: the discard is a DELETE on media_files, the outbox trigger hands over that row's storage_path, and a thumbnail is not a media_files row."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "One control built and replayed by hand; it produces a named assertion failure on both likeness modes. A second control was built for the stale fixture and PASSED, which is why that was withdrawn as a finding rather than written up."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "MakesAGalleryAsset is invoked by the thumbnail path and asserted against commitFor, so it cannot become a rule nobody reads."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet over internal and cmd, gofmt clean; tsc -b clean. queue, models, database and handlers pass with -p 1. Frontend 906 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. F4 found the finding and it is already a row; C7 and E6, added in the previous ledger, both earned their place again."
+    }
+   ],
+   "findings": [
+    {
+     "id": "grid-R1",
+     "summary": "a likeness candidate and a supporting reference were given a thumbnail they never use, and the discard that deletes three of every four candidates removes a media_files row -- which a thumbnail is not -- so each would have stayed in the bucket with nothing left naming it",
+     "found_by": "F4",
+     "fix_commit": "9f5966f04",
+     "control": {
+      "patch": ".review/controls/grid-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestARenderThatIsNotAGalleryAssetGetsNoThumbnail",
+       "./internal/queue/ -run TestAFinishedRenderGoesWhereItsModeSays"
+      ],
+      "observed": "FAIL on both likeness modes with 'a render nobody lists in a grid was given a tile image', and the routing test fails on the same two modes with 'the two readers of one rule disagree'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler or response body changed."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The public gate test and the deletion test were both re-run against the real database after the fix, and both hold."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "No shape crossing to a client changed."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The two readers were re-checked for all five modes with the fix in place, and the assertion that they agree is what the control breaks."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-run over the fix; still no second live instance of the shape."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over the fix: a likeness render now leaves no thumbnail to orphan, and an ordinary render's thumbnail is queued with its asset."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The control applies at HEAD and fails as an assertion on both likeness modes, verified by hand with a restore after."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over 9f5966f04 with the fix in place; nothing new."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... ./cmd/... clean",
+  "lint": "gofmt -l clean",
+  "types": "npx tsc -b clean",
+  "tests": "go test -p 1 on queue, models, database and handlers: all ok. vitest: 159 files, 906 passed, 1 skipped."
+ }
+}

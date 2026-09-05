@@ -1,0 +1,18 @@
+diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
+index d79daf3c5..d62917387 100644
+--- a/backend/internal/models/omnichat_media.go
++++ b/backend/internal/models/omnichat_media.go
+@@ -63,12 +63,7 @@ const (
+ // storage that the discard cannot find -- the discard removes the media_files
+ // row, and a thumbnail is not one.
+ func (m OmniChatGenerationMode) MakesAGalleryAsset() bool {
+-	switch m {
+-	case OmniChatGenerationModeLikeness, OmniChatGenerationModeLikenessReference:
+-		return false
+-	default:
+-		return true
+-	}
++	return true
+ }
+ 
+ type OmniChatGenerationStatus string
