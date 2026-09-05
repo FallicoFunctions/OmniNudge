@@ -170,6 +170,14 @@ type OmniChatMediaConfig struct {
 	KlingAPIKey  string
 	KlingBaseURL string
 	VeoAPIKey    string
+
+	// fal.ai carries what OpenRouter does not: lip sync driven by a supplied
+	// audio track. That is the only path on which a character speaks in her
+	// own stored voice -- the video models here all invent one, and cannot be
+	// told not to. It also sizes a clip by the sentence rather than by a frame
+	// budget, which is the ending problem solved rather than worked around.
+	FalAPIKey  string
+	FalBaseURL string
 }
 
 type OmniChatVoiceConfig struct {
@@ -459,6 +467,8 @@ func Load() (*Config, error) {
 			KlingAPIKey:                 getEnv("KLING_API_KEY", ""),
 			KlingBaseURL:                getEnv("KLING_BASE_URL", "https://api-singapore.klingai.com"),
 			VeoAPIKey:                   getEnv("VEO_API_KEY", ""),
+			FalAPIKey:                   getEnv("FAL_API_KEY", ""),
+			FalBaseURL:                  getEnv("FAL_BASE_URL", "https://queue.fal.run"),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
 			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),
