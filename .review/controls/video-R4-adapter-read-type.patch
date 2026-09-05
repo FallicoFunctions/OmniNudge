@@ -1,0 +1,15 @@
+diff --git a/backend/internal/queue/openrouter_video_provider.go b/backend/internal/queue/openrouter_video_provider.go
+index 98d63276c..96d0571d2 100644
+--- a/backend/internal/queue/openrouter_video_provider.go
++++ b/backend/internal/queue/openrouter_video_provider.go
+@@ -169,8 +169,8 @@ func stringField(fields map[string]any, key string) string {
+ }
+ 
+ func intField(fields map[string]any, key string) int {
+-	value, _ := fields[key].(int)
+-	return value
++	value, _ := fields[key].(int64)
++	return int(value)
+ }
+ 
+ func int64Field(fields map[string]any, key string) int64 {

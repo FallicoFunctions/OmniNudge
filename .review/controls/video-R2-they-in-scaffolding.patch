@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_generation.go b/backend/internal/services/omnichat_generation.go
+index 23c43eb08..4249b4d29 100644
+--- a/backend/internal/services/omnichat_generation.go
++++ b/backend/internal/services/omnichat_generation.go
+@@ -532,7 +532,7 @@ func BuildOmniChatVideoMotionPrompt(mode models.OmniChatGenerationMode, prompt s
+ 		// reads as a pronoun for the subject, which contradicts a male or
+ 		// female character and is the exact ambiguity the prompt matrix exists
+ 		// to refuse. It also blocked this builder from joining that matrix.
+-		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as shown in the image; add only motion.",
++		"Keep the subject's identity, appearance, outfit, lighting, and setting exactly as they appear in the image; add only motion.",
+ 		// The camera is a thing in the room, not a viewpoint. Saying where it
+ 		// is stops the model inventing a move for it: an unanchored frame
+ 		// wanders, and a wandering frame reads as the subject drifting.

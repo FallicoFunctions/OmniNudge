@@ -1,0 +1,16 @@
+diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
+index 6177d8b0f..6c35e29a6 100644
+--- a/backend/internal/queue/omnichat_generation_handler.go
++++ b/backend/internal/queue/omnichat_generation_handler.go
+@@ -977,10 +977,7 @@ func (h *OmniChatGenerationHandler) cancelSubmittedGeneration(ctx context.Contex
+ 	}
+ 	cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+ 	defer cancel()
+-	if client == nil {
+-		client = h.provider
+-	}
+-	if err := client.Cancel(cancelCtx, modelID, providerJobID); err != nil {
++	if err := h.provider.Cancel(cancelCtx, modelID, providerJobID); err != nil {
+ 		zlog.Warn().Err(err).Str("job_id", jobID.String()).Msg("failed to cancel unclaimed OmniChat provider job")
+ 	}
+ }

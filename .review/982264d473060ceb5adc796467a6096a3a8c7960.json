@@ -1,0 +1,255 @@
+{
+ "schema_version": 2,
+ "head": "c7a04c2844e6475548f0eae44085e6b5ababf4ba",
+ "base": "982264d473060ceb5adc796467a6096a3a8c7960",
+ "scope": {
+  "files": [
+   ".codex/guards/codex_guard.py",
+   ".codex/guards/tests/test_codex_guard.py",
+   ".codex/hooks.json",
+   ".gitignore",
+   "backend/.env.example",
+   "backend/cmd/server/main.go",
+   "backend/cmd/worker/main.go",
+   "backend/cmd/zz_fal_probe/main.go",
+   "backend/cmd/zz_video_compare/main.go",
+   "backend/cmd/zz_video_probe/main.go",
+   "backend/internal/config/config.go",
+   "backend/internal/config/omnichat_media_boot_check.go",
+   "backend/internal/config/omnichat_media_boot_check_test.go",
+   "backend/internal/queue/generated_media_download.go",
+   "backend/internal/queue/generated_media_download_test.go",
+   "backend/internal/queue/media_bearer_test.go",
+   "backend/internal/queue/omnichat_generation_handler.go",
+   "backend/internal/queue/omnichat_generation_handler_test.go",
+   "backend/internal/queue/omnichat_generation_two_phase_test.go",
+   "backend/internal/queue/openrouter_video_provider.go",
+   "backend/internal/queue/openrouter_video_provider_test.go",
+   "backend/internal/services/omnichat_generation.go",
+   "backend/internal/services/omnichat_generation_video_test.go",
+   "backend/internal/services/omnichat_prompt_matrix_test.go",
+   "backend/internal/services/omnichat_video_motion_prompt_test.go",
+   "backend/internal/services/omnichat_video_silence.go",
+   "backend/internal/services/omnichat_video_silence_test.go",
+   "backend/internal/services/openrouter/client.go",
+   "backend/internal/services/openrouter/video.go",
+   "backend/internal/services/openrouter/video_test.go",
+   "infra/runpod/README.md",
+   "infra/runpod/omnichat_worker/generators.py"
+  ],
+  "boundaries": [
+   "the Go queue -> the OpenRouter video API (the submitted JSON)",
+   "the assembled video motion prompt -> the video model",
+   "the OpenRouter result -> the media download (credential scope and host allowlist)",
+   "the provider switch -> which client holds a job, through submit, poll, result and cancel",
+   "worker boot -> the operator, through the media endpoint gaps"
+  ]
+ },
+ "prior_ledgers_read": [
+  "10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+  "2a7c8bec4e5e83369d6d143d3966db3839341afb.json",
+  "390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+  "418a22c2a793fe582ae6a797feb68b8add89edda.json",
+  "58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+  "a1712456328c6abd1111176e3de4b1197b645920.json",
+  "a8413c5c8c1e216743c13088de4172e2937322c0.json",
+  "edde601874009e0149098edc0309d556a163ddbf.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "19 commits, 31 files: the OpenRouter video client, the queue adapter, the provider switch, the silent-motion rule, the media-download credential, the boot check, and three zz_ probes."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "All eight prior ledgers read. Two bear directly on this change: 390b0e4c R1 (a hardcoded pronoun described every character as a woman) and 390b0e4c R2/R3 (model_id declared but decoded and stored nowhere). The first recurred here and was found; the second is guarded by the key-wiring test."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the built VideoRequest for four materially different inputs -- image_to_video with a physical action, contextual whose scene activity is speech, create with a male subject and no duration, and contextual with no activity at all. Found video-R1: the fallback read 'she shifts her weight and looks around, taking in her surroundings' for every subject."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup changed. The frontend was read but not modified."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The HTTP body is asserted field by field in TestSubmitVideoSendsTheDocumentedShape against a capturing server, including that a zero seed and generate_audio=false survive omitempty. The spec-to-request mapping was extracted as VideoRequestFromInput during this pass so it could be read at all; before that a swapped resolution and aspect ratio would have satisfied every key check."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The row a hosted clip writes was read from the product-path job 860c8c08: provider_metadata is {\"model_id\": \"minimax/hailuo-3\"}. worker_build is absent, which is correct -- there is no worker -- and model_id alone identifies the render unambiguously. Elapsed time is derivable from started_at and completed_at on the job row, so the missing load and inference seconds lose nothing that is not recoverable."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The spec's map keys and the adapter's reads are one set of constants, asserted both ways by TestOpenRouterVideoSpecWritesEveryKeyTheAdapterReads, including that the builder writes nothing the adapter ignores."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "runpod.Result is what the handler consumes, and the adapter fills Video and ModelID. Width, height and duration are deliberately left zero: OpenRouter reports none, and the ingest path measures the downloaded file instead of trusting a claim."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The two video builders were diffed call site by call site. That comparison found video-R3 (two cancel paths still reaching for the self-hosted client) and the negative-prompt gap reported in session."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The provider contract was read from OpenRouter's own documentation rather than from search results, after a search result described Kling's retired auth scheme as current. The seed ceiling -- 2^53-1, not the 2^63-1 RunPod accepts -- was learned from a real 400 and is now bounded and tested."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The wiring question applied twice: the map keys (C1) and the decoded result. TestEveryFieldOnVideoStatusIsDecoded and TestEveryFieldOnVideoJobIsDecoded walk each struct by reflection and fail on any exported field still zero after decoding a payload that sets everything."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: four builder shapes in B1, and a live end-to-end job through the queue."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile inputs that must fail: an insecure source URL, an empty model, a nil job and a blank source are each refused by TestOpenRouterVideoSpecRefusesWhatCannotSucceed. The credential is refused to every host but one, including openrouter.ai.evil.test and sub.openrouter.ai."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundaries: the seed at 0, 1, 2^53-1, 2^53, 2^62, 2^63-1 and negative values; an unrecognised provider status; an empty unsigned_urls list on a completed job."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Comparing the sibling builders found that BuildVideoSpec sends negative_prompt and BuildOpenRouterVideoSpec cannot -- OpenRouter's video API has no such field, and the Create page sends one for video. Reported in session as a product decision rather than fixed unilaterally."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable. The self-hosted video path stays reachable by configuration and is the fallback when no hosted key is set."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "No error is swallowed. A completed job with no URL is refused rather than returned; an unrecognised status keeps polling rather than failing; a phase with no provider fails as a named provider fault after arriving as a nil dereference that took the worker down mid-queue."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The explicit-content review is gated on kind == image, so no video output is ever looked at. Pre-existing, not introduced here, and bounded because every source still is itself reviewed -- but the provider producing the animation changed. Reported in session rather than written here."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The two builders share the prompt builder, the seed function and the URL check rather than duplicating them. The provider adapter wears the existing client interface so the two-phase state machine, billing, refunds and retries exist once."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No new shared mutable state. The adapter holds only a client; the provider choice is read-only configuration."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or lock order changed. The commit path is the existing one."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. The change adds configuration and a provider, not a schema."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The cancel path was followed for a hosted job and found video-R3: two call sites still reached for the self-hosted client, so a cancelled clip sent a hosted model id to RunPod as an endpoint."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Three controls saved and each replayed by hand: video-R1 fails with 'a prompt for subject \"man\" contains \"she\"', video-R2 with 'contains \"they\"', video-R3 with 'Should be empty, but was [minimax/hailuo-3/job-1]'. All three fail as assertions and pass when reverted. One control selector was wrong on the first attempt and reported a pass; a control that never ran is not a control that passed."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The boot check is reachable and was seen firing: running the worker with the video endpoint emptied printed both gaps by name. The silence rule is reachable on every video mode, asserted by TestBuiltVideoPromptNeverAsksHerToSpeak."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./... clean; the queue and services suites pass; the artifact guard and the i18n guards run on every commit."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. Every finding this pass came from an instrument already on the list: B1 printed the artifact, C3 and F4 compared the sibling call sites."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Run for real, repeatedly and side by side, across the whole session: self-hosted Wan 2.2, Veo 3.1 Lite, Wan 3.0, Seedance, MiniMax H3, OmniHuman and PixVerse lip sync, on one still with a pinned seed. The product path was then run end to end through the queue on MiniMax and the clip watched. That is what found the seed ceiling and the missing download credential, neither of which any payload inspection would have shown."
+    }
+   ],
+   "findings": [
+    {
+     "id": "video-R1",
+     "summary": "the silent-motion fallback read 'she shifts her weight', describing every male character as a woman -- ledger 390b0e4c R1 again, in a builder the prompt matrix built to prevent it did not cover",
+     "found_by": "B1",
+     "fix_commit": "93f7f2144",
+     "control": {
+      "patch": ".review/controls/video-R1-gendered-fallback.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestNoPromptContradictsItsOwnSubject"
+      ],
+      "observed": "a prompt for subject \"man\" contains \"she\"; also fails for subject \"they\""
+     }
+    },
+    {
+     "id": "video-R2",
+     "summary": "the shared scaffolding read 'exactly as they appear in the image' -- a pronoun for the subject in a prompt about one person, which contradicts a male or female character and blocked the builder from joining the prompt matrix at all",
+     "found_by": "B1",
+     "fix_commit": "93f7f2144",
+     "control": {
+      "patch": ".review/controls/video-R2-they-in-scaffolding.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestNoPromptContradictsItsOwnSubject"
+      ],
+      "observed": "a prompt for subject \"man\" contains \"they\""
+     }
+    },
+    {
+     "id": "video-R3",
+     "summary": "two cancel paths still reached for the self-hosted client, so cancelling a hosted clip sent minimax/hailuo-3 to RunPod as an endpoint id while the real job kept running and kept billing",
+     "found_by": "F4",
+     "fix_commit": "c7a04c284",
+     "control": {
+      "patch": ".review/controls/video-R3-cancel-wrong-provider.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestCancelGoesToTheProviderHoldingTheJob"
+      ],
+      "observed": "Should be empty, but was [minimax/hailuo-3/job-1]"
+     }
+    }
+   ]
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "clean",
+  "tests": "internal/queue and internal/services suites pass",
+  "guards": "no-build-artifacts and i18n guards pass on every commit"
+ }
+}

@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_video_silence.go b/backend/internal/services/omnichat_video_silence.go
+index 6fe434faa..5e91ad887 100644
+--- a/backend/internal/services/omnichat_video_silence.go
++++ b/backend/internal/services/omnichat_video_silence.go
+@@ -44,7 +44,7 @@ var addresseeClause = regexp.MustCompile(`(?i)\b(at|into|to|toward|towards)\s+(t
+ // which described every male character as a woman -- the same defect a prompt
+ // matrix was built to prevent after it shipped once already, in a builder that
+ // matrix does not cover. It does now.
+-const silentMotionFallback = "shifts weight slightly and looks around, taking in the surroundings"
++const silentMotionFallback = "she shifts her weight and looks around, taking in her surroundings"
+ 
+ // SilentMotion rewrites a motion description so the subject has nobody to
+ // address and nothing to say.
