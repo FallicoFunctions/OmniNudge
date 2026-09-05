@@ -879,6 +879,12 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		metrics := probeClip(ctx, download.Path)
 		if metrics.Width > 0 && metrics.Height > 0 {
 			width, height = metrics.Width, metrics.Height
+		} else {
+			// The failure this whole measurement exists to end was silent: every
+			// hosted clip stored with no size, and nothing anywhere saying so. A
+			// missing ffprobe on a worker must not reproduce that quietly.
+			zlog.Warn().Str("job_id", job.ID.String()).
+				Msg("omnichat: the clip could not be measured and is stored with no dimensions")
 		}
 		if metrics.Duration > 0 {
 			clipDuration = metrics.Duration

@@ -9,8 +9,14 @@ import type { OmniChatPublication, OmniChatPublicationComment } from '../../type
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true, user: { id: 9 } }),
 }));
+// Records how the feed asked for each card. A card rendered as the media
+// itself downloads the whole clip, and the feed is three columns of them.
+const exploreMediaProps: { kind: string; preview?: boolean }[] = [];
 vi.mock('../../components/omnichat/OmniChatMediaAssetView', () => ({
-  default: () => <div>public scene media</div>,
+  default: ({ asset, preview }: { asset: { kind: string }; preview?: boolean }) => {
+    exploreMediaProps.push({ kind: asset.kind, preview });
+    return <div>public scene media</div>;
+  },
 }));
 vi.mock('../../services/omnichatService', () => ({
   createOmniChatSocialRequestId: () => 'explore-request-id',
@@ -37,6 +43,7 @@ vi.mock('../../services/omnichatService', () => ({
 describe('OmniChatExploreWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    exploreMediaProps.length = 0;
     vi.mocked(omnichatService.listExplore).mockResolvedValue([
       {
         id: 'pub-chat',
@@ -274,5 +281,58 @@ describe('OmniChatExploreWorkspace', () => {
       )
     );
     expect(await screen.findByText('Next comment')).toBeInTheDocument();
+  });
+  // The gate, not the component.
+  //
+  // OmniChatMediaAssetView knows how to show a poster instead of a clip. That
+  // says nothing about whether this feed asks it to, and a feed card rendered
+  // as the media itself downloads every published clip on the page.
+  it('asks for a card, not for the clip, in the feed', async () => {
+    vi.mocked(omnichatService.listExplore).mockResolvedValue([
+      {
+        id: 'pub-clip',
+        author_user_id: 3,
+        author: { id: 3, username: 'storyteller' },
+        persona_id: 42,
+        persona_name: 'Sadie',
+        content_kind: 'video',
+        caption: 'A clip',
+        visibility: 'public',
+        status: 'published',
+        is_nsfw: false,
+        like_count: 0,
+        comment_count: 0,
+        share_count: 0,
+        remix_count: 0,
+        viewer_liked: false,
+        viewer_bookmarked: false,
+        viewer_following: false,
+        published_at: '2026-07-20T00:00:00Z',
+        updated_at: '2026-07-20T00:00:00Z',
+        asset: {
+          id: 'asset-clip',
+          kind: 'video',
+          visibility: 'public',
+          file_type: 'video/mp4',
+          content_url: '/api/v1/omnichat/explore/media/asset-clip/content',
+          thumbnail_url: '/api/v1/omnichat/explore/media/asset-clip/poster',
+          created_at: '2026-07-20T00:00:00Z',
+        },
+      },
+    ] as OmniChatPublication[]);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <OmniChatExploreWorkspace />
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(exploreMediaProps.some((props) => props.kind === 'video')).toBe(true));
+    const videoCards = exploreMediaProps.filter((props) => props.kind === 'video');
+    expect(videoCards.every((card) => card.preview === true)).toBe(true);
   });
 });

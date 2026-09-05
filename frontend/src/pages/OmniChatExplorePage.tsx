@@ -267,6 +267,7 @@ function OmniChatPublicationCard({
       {publication.asset && (
         <OmniChatMediaAssetView
           asset={publication.asset}
+          preview={!expanded}
           className={`${expanded ? 'max-h-[70vh]' : 'aspect-[4/5] max-h-[680px]'} min-h-64 w-full rounded-none`}
         />
       )}

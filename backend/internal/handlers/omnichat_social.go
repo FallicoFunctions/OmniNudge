@@ -37,6 +37,7 @@ type OmniChatSocialStore interface {
 	ReportPublication(ctx context.Context, publicationID uuid.UUID, reporterUserID int, reason, details string) error
 	RemovePublicationOwned(ctx context.Context, publicationID uuid.UUID, ownerUserID int) (bool, error)
 	PublicAssetStoragePath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, string, error)
+	PublicAssetPosterPath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, error)
 	DeleteCommentOwned(ctx context.Context, id uuid.UUID, userID int, moderator bool) (bool, error)
 	ListPublicationReports(ctx context.Context, status string, limit int) ([]*models.OmniChatPublicationReport, error)
 	ResolvePublicationReport(ctx context.Context, reportID uuid.UUID, reviewerUserID int, resolution string) (bool, error)
@@ -531,6 +532,65 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
 }
 
+// GetPublicMediaPoster streams a published clip's poster frame.
+//
+// It answers to exactly the people the clip itself answers to, because both go
+// through omniChatPublicAssetGate. A poster readable by somebody the clip is
+// not would leak the frame the whole clip is made of.
+func (h *OmniChatSocialHandler) GetPublicMediaPoster(c *gin.Context) {
+	assetID, ok := parseUUIDParam(c, "asset_id")
+	if !ok {
+		return
+	}
+	var viewer *int
+	if userID, exists := middleware.GetOptionalUserID(c); exists {
+		viewer = &userID
+	}
+	posterKey, err := h.store.PublicAssetPosterPath(c.Request.Context(), assetID, viewer)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load media")
+		return
+	}
+	if posterKey == "" {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	if h.storage == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Media storage is unavailable")
+		return
+	}
+	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), posterKey)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	if objectSize <= 0 || objectSize > omniChatMaxPosterBytes {
+		RespondError(c, http.StatusConflict, "Media size is invalid")
+		return
+	}
+	reader, err := h.storage.Download(c.Request.Context(), posterKey)
+	if err != nil {
+		RespondError(c, http.StatusNotFound, "Media has no poster")
+		return
+	}
+	defer func() { _ = reader.Close() }()
+	c.Header("Content-Type", "image/jpeg")
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-poster.jpg"`, assetID))
+	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
+	// The same rule the clip follows: access depends on this viewer's NSFW
+	// preference and block graph, so an authorized response must never be
+	// replayed to a different viewer from the same URL.
+	if viewer == nil {
+		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
+	} else {
+		c.Header("Cache-Control", "private, no-store")
+		c.Writer.Header().Add("Vary", "Authorization")
+		c.Writer.Header().Add("Vary", "Cookie")
+	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+}
+
 func (h *OmniChatSocialHandler) ListReports(c *gin.Context) {
 	status := strings.TrimSpace(c.Query("status"))
 	if status != "" && status != "open" && status != "reviewing" && status != "resolved" && status != "dismissed" {
@@ -576,6 +636,15 @@ func decoratePublicPublication(publication *models.OmniChatPublication) {
 			return
 		}
 		asset.ContentURL = "/api/v1/omnichat/explore/media/" + asset.ID.String() + "/content"
+		// A card that has to fetch the clip to show anything fetches every clip
+		// on the page. The poster is offered through this API and the same
+		// publication gate; a storage URL is never handed out.
+		if asset.Kind == models.OmniChatMediaKindVideo && asset.HasPoster {
+			posterURL := "/api/v1/omnichat/explore/media/" + asset.ID.String() + "/poster"
+			asset.ThumbnailURL = &posterURL
+			return
+		}
+		asset.ThumbnailURL = nil
 	}
 	decorate(publication.Asset)
 	if publication.Snapshot != nil {

@@ -848,15 +848,16 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 
 	var mediaFileID int
 	var storagePath string
+	var thumbnailURL *string
 	err = tx.QueryRow(ctx, `
-		SELECT media_file_id, mf.storage_path
+		SELECT media_file_id, mf.storage_path, mf.thumbnail_url
 		FROM omnichat_media_assets a
 		JOIN media_files mf
 		  ON mf.id = a.media_file_id
 		 AND mf.user_id = a.owner_user_id
 		WHERE a.id = $1 AND a.owner_user_id = $2 AND a.deleted_at IS NULL
 		FOR UPDATE OF a, mf
-	`, id, ownerUserID).Scan(&mediaFileID, &storagePath)
+	`, id, ownerUserID).Scan(&mediaFileID, &storagePath, &thumbnailURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -957,6 +958,22 @@ func (r *OmniChatMediaRepository) DeleteMediaAssetOwned(ctx context.Context, id 
 	`, storagePath, ownerUserID); err != nil {
 		return false, err
 	}
+	// A clip's poster is a second object under a second key, and it is not a
+	// media_files row of its own -- so deleting the clip leaves it in storage
+	// with nothing left that names it. Queued in the same transaction as the
+	// clip, because a poster that outlives its clip is unreachable and only
+	// discoverable by listing the bucket.
+	if thumbnailURL != nil {
+		if posterKey, ok := OmniChatPosterStorageKey(*thumbnailURL, ownerUserID); ok {
+			if _, err = tx.Exec(ctx, `
+				INSERT INTO omnichat_media_deletion_queue(storage_path, owner_user_id)
+				VALUES ($1, $2)
+				ON CONFLICT (storage_path) DO NOTHING
+			`, posterKey, ownerUserID); err != nil {
+				return false, err
+			}
+		}
+	}
 	// Media replies are represented by an empty assistant message whose only
 	// visible content is the generated asset. Remove that shell when this was
 	// its last attachment; otherwise deleting a gallery item would leave an
@@ -1042,8 +1059,39 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
 	default:
 		return false
 	}
-	_, err = uuid.Parse(strings.TrimSuffix(parts[3], extension))
+	// A clip's poster sits beside it under the same job id. It is generated
+	// media like everything else here, and it has to satisfy this rule or it is
+	// invisible to it: the deletion guard refuses any path this rejects, so a
+	// shape missing from here is a shape that never gets cleaned up.
+	stem := strings.TrimSuffix(strings.TrimSuffix(parts[3], extension), omniChatPosterSuffix)
+	_, err = uuid.Parse(stem)
 	return err == nil
+}
+
+// omniChatPosterSuffix is what the worker appends to a clip's job id to name
+// the poster it stores beside that clip.
+const omniChatPosterSuffix = "-poster"
+
+// OmniChatPosterStorageKey turns a stored poster URL back into a storage key.
+//
+// The value comes out of a database row and is used to address storage, so it
+// is checked rather than trusted, and it is checked by the same rule that
+// governs every other generated object rather than by a second copy of it. A
+// weaker copy is how the coverage rule drifted four ways in ledger 390b0e4c.
+func OmniChatPosterStorageKey(thumbnailURL string, ownerUserID int) (string, bool) {
+	key := strings.TrimPrefix(strings.TrimSpace(thumbnailURL), "/uploads/")
+	if !IsOmniChatGeneratedStoragePathForOwner(key, ownerUserID) {
+		return "", false
+	}
+	if !strings.HasSuffix(strings.TrimSuffix(key, path.Ext(key)), omniChatPosterSuffix) {
+		return "", false
+	}
+	switch path.Ext(key) {
+	case ".jpg", ".jpeg", ".png", ".webp":
+	default:
+		return "", false
+	}
+	return key, true
 }
 
 func IsOmniChatGeneratedStoragePathForOwner(storagePath string, ownerUserID int) bool {

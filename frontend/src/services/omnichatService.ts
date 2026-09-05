@@ -94,13 +94,12 @@ export function isSafeOmniChatCheckoutURL(value: string): boolean {
  * redirect an authenticated browser request to a third party.  In particular,
  * a compromised publication record must not receive the user's bearer token.
  */
-function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): string {
-  const fallback = getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/content`);
-  if (!publicContentUrl) return fallback.toString();
+function resolveApiMediaUrl(fallback: URL, suppliedUrl?: string): string {
+  if (!suppliedUrl) return fallback.toString();
 
   let candidate: URL;
   try {
-    candidate = new URL(publicContentUrl, fallback);
+    candidate = new URL(suppliedUrl, fallback);
   } catch {
     throw new Error('Generated media URL is invalid');
   }
@@ -110,6 +109,26 @@ function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): 
   }
 
   return candidate.toString();
+}
+
+function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): string {
+  return resolveApiMediaUrl(
+    getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/content`),
+    publicContentUrl,
+  );
+}
+
+/**
+ * A published clip's poster lives behind the explore route, not the private
+ * one. Hardcoding the private route here reads as working -- the fetch 404s,
+ * the tile shows its placeholder, and no clip is downloaded -- while every
+ * published clip in the feed silently loses its poster.
+ */
+function resolveApiMediaPosterUrl(assetId: string, posterUrl?: string): string {
+  return resolveApiMediaUrl(
+    getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`),
+    posterUrl,
+  );
 }
 
 /**
@@ -569,11 +588,10 @@ export const omnichatService = {
    * anything. The poster is about a hundred kilobytes, and it is served
    * through the same ownership gate as the clip rather than from storage.
    */
-  async getMediaAssetPoster(assetId: string): Promise<Blob> {
-    const response = await authenticatedFetch(
-      getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`).toString(),
-      { cache: 'no-store' },
-    );
+  async getMediaAssetPoster(assetId: string, posterUrl?: string): Promise<Blob> {
+    const response = await authenticatedFetch(resolveApiMediaPosterUrl(assetId, posterUrl), {
+      cache: 'no-store',
+    });
     if (!response.ok) {
       throw new Error('Failed to load the poster frame');
     }

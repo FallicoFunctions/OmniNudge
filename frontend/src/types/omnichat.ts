@@ -276,6 +276,11 @@ export interface OmniChatPublicMediaAsset {
   duration_seconds?: number;
   file_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'video/mp4';
   content_url: string;
+  /**
+   * The API route for a published clip's poster frame, present only when one
+   * exists. Never a storage URL.
+   */
+  thumbnail_url?: string;
   created_at: string;
 }
 

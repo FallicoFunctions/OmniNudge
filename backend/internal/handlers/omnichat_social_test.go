@@ -38,6 +38,7 @@ type omniChatSocialStoreFake struct {
 	canFollow      bool
 	publicPath     string
 	publicFileType string
+	posterPath     string
 	reports        []*models.OmniChatPublicationReport
 	resolvedReport uuid.UUID
 	resolution     string
@@ -77,6 +78,10 @@ func (f *omniChatSocialStoreFake) ReportPublication(context.Context, uuid.UUID, 
 func (f *omniChatSocialStoreFake) RemovePublicationOwned(context.Context, uuid.UUID, int) (bool, error) {
 	return false, nil
 }
+func (f *omniChatSocialStoreFake) PublicAssetPosterPath(context.Context, uuid.UUID, *int) (string, error) {
+	return f.posterPath, nil
+}
+
 func (f *omniChatSocialStoreFake) PublicAssetStoragePath(context.Context, uuid.UUID, *int) (string, string, error) {
 	return f.publicPath, f.publicFileType, nil
 }

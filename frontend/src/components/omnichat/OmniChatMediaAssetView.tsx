@@ -24,6 +24,7 @@ function useAuthorizedMediaUrl(
   source: 'content' | 'poster' | null,
   assetId: string,
   contentUrl: string,
+  posterUrl: string | undefined,
   visibility: string,
   attempt: number,
 ) {
@@ -42,7 +43,7 @@ function useAuthorizedMediaUrl(
     setFailed(false);
     const request =
       source === 'poster'
-        ? omnichatService.getMediaAssetPoster(assetId)
+        ? omnichatService.getMediaAssetPoster(assetId, posterUrl)
         : omnichatService.getMediaAssetContent(assetId, contentUrl);
     void request
       .then((blob) => {
@@ -57,7 +58,7 @@ function useAuthorizedMediaUrl(
       active = false;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [source, assetId, contentUrl, visibility, attempt]);
+  }, [source, assetId, contentUrl, posterUrl, visibility, attempt]);
 
   return { objectUrl, failed };
 }
@@ -94,6 +95,7 @@ export default function OmniChatMediaAssetView({
     showsPosterOnly ? null : 'content',
     asset.id,
     asset.content_url,
+    posterURL,
     asset.visibility,
     attempt,
   );
@@ -101,6 +103,7 @@ export default function OmniChatMediaAssetView({
     showsPosterOnly && posterURL ? 'poster' : null,
     asset.id,
     asset.content_url,
+    posterURL,
     asset.visibility,
     attempt,
   );

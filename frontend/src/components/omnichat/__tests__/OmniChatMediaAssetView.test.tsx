@@ -96,7 +96,7 @@ describe('OmniChatMediaAssetView', () => {
 
       const poster = await screen.findByRole('img', { name: 'Sadie at the park' });
       expect(poster).toHaveAttribute('src', 'blob:generated-media');
-      expect(omnichatService.getMediaAssetPoster).toHaveBeenCalledWith(clip.id);
+      expect(omnichatService.getMediaAssetPoster).toHaveBeenCalledWith(clip.id, clip.thumbnail_url);
       expect(omnichatService.getMediaAssetContent).not.toHaveBeenCalled();
       expect(document.querySelector('video')).toBeNull();
     });

@@ -1300,6 +1300,7 @@ func main() {
 			omniChatPublic.GET("/explore/:id", omniChatSocialHandler.GetPublication)
 			omniChatPublic.GET("/explore/:id/comments", omniChatSocialHandler.ListComments)
 			omniChatPublic.GET("/explore/media/:asset_id/content", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaContent)
+			omniChatPublic.GET("/explore/media/:asset_id/poster", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaPoster)
 		}
 
 		// Protected routes (auth required)

@@ -42,7 +42,13 @@ type OmniChatPublicMediaAsset struct {
 	DurationSeconds *int                    `json:"duration_seconds,omitempty"`
 	FileType        string                  `json:"file_type"`
 	ContentURL      string                  `json:"content_url"`
-	CreatedAt       time.Time               `json:"created_at"`
+	// ThumbnailURL is the API route for a clip's poster, filled in by the
+	// handler. Never a storage URL.
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	// HasPoster says a poster object exists. It carries no location, so the
+	// read path can select it without a storage key ever reaching this struct.
+	HasPoster bool      `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type OmniChatSnapshotMessage struct {
@@ -135,7 +141,8 @@ const omniChatPublicationSelect = `
 	p.id, p.author_user_id, u.username, u.avatar_url, p.persona_id, bp.name, bp.avatar_url,
 	p.content_kind, p.caption, p.visibility, p.status, p.like_count, p.comment_count,
 	p.share_count, p.remix_count, p.is_nsfw, p.published_at, p.updated_at,
-	a.id, a.kind, a.width, a.height, a.duration_seconds, mf.file_type, a.created_at,
+	a.id, a.kind, a.width, a.height, a.duration_seconds, mf.file_type,
+	(mf.thumbnail_url IS NOT NULL), a.created_at,
 	s.id, s.owner_user_id, s.title, s.excerpt, s.message_count, s.created_at,
 	EXISTS (SELECT 1 FROM omnichat_publication_reactions r WHERE r.publication_id = p.id AND r.user_id = $1),
 	EXISTS (SELECT 1 FROM omnichat_publication_bookmarks b WHERE b.publication_id = p.id AND b.user_id = $1),
@@ -148,6 +155,10 @@ func scanOmniChatPublication(scanner interface{ Scan(...any) error }) (*OmniChat
 	var assetKind *OmniChatMediaKind
 	var assetWidth, assetHeight, assetDuration *int
 	var assetFileType *string
+	// Whether a poster exists, never where it is. This is a hand-written column
+	// list and a hand-written scanner: a field added to the struct without a
+	// line in both is populated by nothing while reading as correct.
+	var assetHasPoster bool
 	var assetCreated *time.Time
 	var snapshotID *uuid.UUID
 	var snapshotOwner *int
@@ -159,7 +170,8 @@ func scanOmniChatPublication(scanner interface{ Scan(...any) error }) (*OmniChat
 		&p.PersonaID, &p.PersonaName, &p.PersonaAvatar, &p.ContentKind, &p.Caption,
 		&p.Visibility, &p.Status, &p.LikeCount, &p.CommentCount, &p.ShareCount,
 		&p.RemixCount, &p.IsNSFW, &p.PublishedAt, &p.UpdatedAt,
-		&assetID, &assetKind, &assetWidth, &assetHeight, &assetDuration, &assetFileType, &assetCreated,
+		&assetID, &assetKind, &assetWidth, &assetHeight, &assetDuration, &assetFileType,
+		&assetHasPoster, &assetCreated,
 		&snapshotID, &snapshotOwner, &snapshotTitle, &snapshotExcerpt, &snapshotCount, &snapshotCreated,
 		&p.ViewerLiked, &p.ViewerBookmarked, &p.ViewerFollowing,
 	)
@@ -170,7 +182,8 @@ func scanOmniChatPublication(scanner interface{ Scan(...any) error }) (*OmniChat
 	if assetID != nil {
 		p.Asset = &OmniChatPublicMediaAsset{
 			ID: *assetID, Kind: *assetKind, Visibility: OmniChatAssetVisibilityPublic,
-			Width: assetWidth, Height: assetHeight, DurationSeconds: assetDuration, FileType: *assetFileType, CreatedAt: *assetCreated,
+			Width: assetWidth, Height: assetHeight, DurationSeconds: assetDuration, FileType: *assetFileType,
+			HasPoster: assetHasPoster, CreatedAt: *assetCreated,
 		}
 	}
 	if snapshotID != nil {
@@ -593,7 +606,7 @@ func (r *OmniChatSocialRepository) listSnapshotMessages(ctx context.Context, sna
 			message.Attachments = append(message.Attachments, &OmniChatPublicMediaAsset{
 				ID: asset.ID, Kind: asset.Kind, Visibility: OmniChatAssetVisibilityPublic,
 				Width: asset.Width, Height: asset.Height, DurationSeconds: asset.DurationSeconds,
-				FileType: asset.FileType, CreatedAt: asset.CreatedAt,
+				FileType: asset.FileType, HasPoster: asset.ThumbnailURL != nil, CreatedAt: asset.CreatedAt,
 			})
 		}
 		assetRows.Close()
@@ -1030,10 +1043,15 @@ func (r *OmniChatSocialRepository) RemovePublicationOwned(ctx context.Context, p
 	return true, nil
 }
 
-func (r *OmniChatSocialRepository) PublicAssetStoragePath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, string, error) {
-	var path, fileType string
-	err := r.pool.QueryRow(ctx, `
-		SELECT mf.storage_path, mf.file_type
+// omniChatPublicAssetGate is who may read a published asset's object at all:
+// approved, not deleted, scanned clean, carried by a live publication whose
+// author is neither deleted nor banned, NSFW only for a viewer who has asked
+// for it, and never across a block in either direction.
+//
+// One copy, because the poster and the media it stands for must be reachable
+// by exactly the same people. Two copies of this would be two answers to that
+// question, and the one that drifted would be the one nobody was reading.
+const omniChatPublicAssetGate = `
 		FROM omnichat_media_assets a JOIN media_files mf ON mf.id=a.media_file_id
 		WHERE a.id=$1 AND a.safety_status='approved' AND a.deleted_at IS NULL AND mf.scan_status='clean'
 		  AND EXISTS (
@@ -1048,8 +1066,40 @@ func (r *OmniChatSocialRepository) PublicAssetStoragePath(ctx context.Context, a
 				(bu.blocker_id=$2 AND bu.blocked_id=p.author_user_id) OR
 				(bu.blocker_id=p.author_user_id AND bu.blocked_id=$2)
 			))
-		  )
-	`, assetID, viewerUserID).Scan(&path, &fileType)
+		  )`
+
+// PublicAssetPosterPath returns the storage key of a published clip's poster,
+// or empty when this viewer may not have it or there is none.
+//
+// An explore feed that has to fetch a clip to show a card fetches every clip on
+// the page: one real render was 6.6 MB, and the feed is three columns of them.
+func (r *OmniChatSocialRepository) PublicAssetPosterPath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, error) {
+	var thumbnailURL *string
+	var ownerUserID int
+	err := r.pool.QueryRow(ctx,
+		`SELECT mf.thumbnail_url, a.owner_user_id`+omniChatPublicAssetGate, assetID, viewerUserID).
+		Scan(&thumbnailURL, &ownerUserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if thumbnailURL == nil {
+		return "", nil
+	}
+	key, ok := OmniChatPosterStorageKey(*thumbnailURL, ownerUserID)
+	if !ok {
+		return "", nil
+	}
+	return key, nil
+}
+
+func (r *OmniChatSocialRepository) PublicAssetStoragePath(ctx context.Context, assetID uuid.UUID, viewerUserID *int) (string, string, error) {
+	var path, fileType string
+	err := r.pool.QueryRow(ctx,
+		`SELECT mf.storage_path, mf.file_type`+omniChatPublicAssetGate, assetID, viewerUserID).
+		Scan(&path, &fileType)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", nil
 	}

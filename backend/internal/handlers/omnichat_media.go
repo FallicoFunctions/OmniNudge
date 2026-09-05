@@ -581,29 +581,20 @@ func decorateOmniChatAsset(asset *models.OmniChatMediaAsset) {
 // omniChatPosterKey turns the stored poster URL back into a storage key, or
 // returns empty when there is no usable poster.
 //
-// The worker writes this value and nothing else does, but it is read back out
-// of a database row and used to address storage, so it is checked rather than
-// trusted: the prefix must be the one generated media is written under, and no
-// segment may climb out of it.
+// The rule lives in models beside the one that governs every other generated
+// object. A second copy here was weaker than that one -- it accepted a path
+// with the wrong number of segments and a non-numeric owner -- and a rule
+// written twice is the drift ledger 390b0e4c recorded four ways.
 func omniChatPosterKey(asset *models.OmniChatMediaAsset) string {
 	if asset == nil || asset.ThumbnailURL == nil {
 		return ""
 	}
-	key := strings.TrimPrefix(strings.TrimSpace(*asset.ThumbnailURL), "/uploads/")
-	if key == "" || !strings.HasPrefix(key, omniChatGeneratedPrefix) {
-		return ""
-	}
-	if strings.Contains(key, "..") || strings.Contains(key, "//") {
-		return ""
-	}
-	if !strings.HasSuffix(key, ".jpg") {
+	key, ok := models.OmniChatPosterStorageKey(*asset.ThumbnailURL, asset.OwnerUserID)
+	if !ok {
 		return ""
 	}
 	return key
 }
-
-// omniChatGeneratedPrefix is where the worker writes everything it generates.
-const omniChatGeneratedPrefix = "omnichat/generated/"
 
 // GetAssetPoster streams a clip's poster frame.
 //
