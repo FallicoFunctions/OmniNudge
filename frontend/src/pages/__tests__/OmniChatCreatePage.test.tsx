@@ -480,11 +480,11 @@ describe('OmniChatCreateWorkspace', () => {
   });
   // The gate, not the component.
   //
-  // OmniChatMediaAssetView knows how to show a poster instead of a clip, and
-  // proving that says nothing about whether the gallery asks it to. Rendering
-  // the grid without preview downloads every clip it lists -- one real render
-  // was 6.6 MB -- on every visit, whether or not anybody presses play.
-  it('asks the gallery grid for tiles, not for the clips themselves', async () => {
+  // OmniChatMediaAssetView knows how to show a thumbnail instead of the asset,
+  // and proving that says nothing about whether the gallery asks it to.
+  // Rendering the grid without preview downloads everything it lists -- about a
+  // megabyte for a generated image, 6.6 MB for one real clip -- on every visit.
+  it('asks the gallery grid for tiles, not for the assets themselves', async () => {
     vi.mocked(omnichatService.listGallery).mockResolvedValue([
       {
         id: 'asset-clip',
@@ -497,7 +497,21 @@ describe('OmniChatCreateWorkspace', () => {
         scene: {},
         file_type: 'video/mp4',
         content_url: '/api/v1/omnichat/media/asset-clip/content',
-        thumbnail_url: '/api/v1/omnichat/media/asset-clip/poster',
+        thumbnail_url: '/api/v1/omnichat/media/asset-clip/thumbnail',
+        created_at: '2026-07-20T00:00:00Z',
+      },
+      {
+        id: 'asset-still',
+        owner_user_id: 9,
+        persona_id: 1,
+        generation_job_id: 'job-still',
+        kind: 'image',
+        visibility: 'private',
+        prompt: 'a still',
+        scene: {},
+        file_type: 'image/png',
+        content_url: '/api/v1/omnichat/media/asset-still/content',
+        thumbnail_url: '/api/v1/omnichat/media/asset-still/thumbnail',
         created_at: '2026-07-20T00:00:00Z',
       },
     ]);
@@ -512,8 +526,8 @@ describe('OmniChatCreateWorkspace', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /gallery/i }));
 
-    await waitFor(() => expect(mediaViewProps.some((props) => props.kind === 'video')).toBe(true));
-    const videoTiles = mediaViewProps.filter((props) => props.kind === 'video');
-    expect(videoTiles.every((tile) => tile.preview === true)).toBe(true);
+    await waitFor(() => expect(mediaViewProps.length).toBeGreaterThan(0));
+    expect([...new Set(mediaViewProps.map((tile) => tile.kind))].sort()).toEqual(['image', 'video']);
+    expect(mediaViewProps.every((tile) => tile.preview === true)).toBe(true);
   });
 });

@@ -64,8 +64,8 @@ type omniChatMediaStorageFake struct {
 	body          []byte
 	size          *int64
 	downloadCalls int
-	// downloadedKeys is what the handler actually asked storage for. A poster
-	// route that reads the clip's key would still return bytes.
+	// downloadedKeys is what the handler actually asked storage for. A thumbnail
+	// route that reads the asset's key would still return bytes.
 	downloadedKeys []string
 }
 

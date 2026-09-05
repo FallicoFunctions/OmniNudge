@@ -148,6 +148,9 @@ func main() {
 		cfg.VirusScan.FailClosed,
 	).SetMediaReferenceReader(mediaRepo).
 		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+		// Without this every render is stored with no tile image, and a gallery
+		// has to fetch each asset whole to draw a grid.
+		SetThumbnails(services.NewThumbnailService()).
 		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 			SetAdminReader(workerOmniChatUserRepo))
 

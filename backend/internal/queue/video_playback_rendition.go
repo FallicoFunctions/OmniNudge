@@ -84,7 +84,15 @@ func reduceClipForPlayback(ctx context.Context, videoPath string, width, height 
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 
-	out := filepath.Join(dir, "playback"+filepath.Ext(videoPath))
+	// The container comes from the source file's own name. ffmpeg picks its
+	// output muxer from the output name, so an output with no extension fails
+	// outright -- which is what happened for every real render, because the
+	// downloaded file had no extension and only the test fixture did.
+	extension := filepath.Ext(videoPath)
+	if extension == "" {
+		extension = ".mp4"
+	}
+	out := filepath.Join(dir, "playback"+extension)
 	// #nosec G204 -- ffmpeg is fixed, and every argument is either a number
 	// this function computed or a path it created. Nothing reaches a shell.
 	cmd := exec.CommandContext(ctx, "ffmpeg",

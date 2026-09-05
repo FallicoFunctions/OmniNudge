@@ -47,11 +47,16 @@ func makeTestClip(t *testing.T, seconds string) string {
 	t.Helper()
 	ffmpegOrSkip(t)
 	path := filepath.Join(t.TempDir(), "clip.mp4")
-	cmd := exec.Command("ffmpeg", "-nostdin", "-loglevel", "error",
+	require.NoError(t, runFFmpeg(
 		"-f", "lavfi", "-i", "color=c=green:s=64x64:d="+seconds,
-		"-pix_fmt", "yuv420p", "-y", path)
-	require.NoError(t, cmd.Run())
+		"-pix_fmt", "yuv420p", "-y", path))
 	return path
+}
+
+// runFFmpeg builds a fixture. Test-only: the production calls build their own
+// arguments and are the thing under test.
+func runFFmpeg(args ...string) error {
+	return exec.Command("ffmpeg", append([]string{"-nostdin", "-loglevel", "error"}, args...)...).Run()
 }
 
 func TestExtractVideoFramesSamplesTheClip(t *testing.T) {

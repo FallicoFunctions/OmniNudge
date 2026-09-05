@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -168,4 +169,42 @@ func TestDetectGeneratedMediaTypeChecksMagicBytes(t *testing.T) {
 
 	_, _, err = detectGeneratedMediaType([]byte("<html>not media</html>"), "image")
 	require.Error(t, err)
+}
+
+// A downloaded file has to say what it holds.
+//
+// The name cannot carry the extension up front, because the type is decided by
+// sniffing the bytes after they are written -- so every real download landed on
+// a path with no extension. ffmpeg chooses its output container from a file
+// name, and the thumbnail service refuses a source whose type it cannot read
+// from one. The playback rendition failed on every real render for exactly
+// this, while passing every test, because the fixtures were all called
+// something.mp4 and the real file was not called anything.
+func TestDownloadedMediaIsNamedForWhatItHolds(t *testing.T) {
+	dir := t.TempDir()
+	file, err := os.CreateTemp(dir, "omnichat-generated-*")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+	require.Empty(t, filepath.Ext(file.Name()), "this test is only meaningful without an extension")
+
+	named := nameDownloadedMedia(file.Name(), ".mp4")
+
+	require.Equal(t, ".mp4", filepath.Ext(named))
+	_, err = os.Stat(named)
+	require.NoError(t, err, "the file did not move with its name")
+	_, err = os.Stat(file.Name())
+	require.True(t, os.IsNotExist(err), "the old path survived, so cleanup would miss the new one")
+}
+
+func TestNamingADownloadIsSafeWhenItCannotHelp(t *testing.T) {
+	dir := t.TempDir()
+	already := filepath.Join(dir, "render.mp4")
+	require.NoError(t, os.WriteFile(already, []byte("x"), 0o600))
+
+	require.Equal(t, already, nameDownloadedMedia(already, ".mp4"), "a correct name must not be doubled")
+	require.Equal(t, already, nameDownloadedMedia(already, ""), "no extension means nothing to add")
+
+	missing := filepath.Join(dir, "gone")
+	require.Equal(t, missing, nameDownloadedMedia(missing, ".mp4"),
+		"a rename that cannot happen must not lose the path")
 }

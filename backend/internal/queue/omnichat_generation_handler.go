@@ -98,6 +98,16 @@ func (h *OmniChatGenerationHandler) SetRenderedImageReview(review omniChatRender
 	return h
 }
 
+// SetThumbnails gives the handler the service that makes a tile image for a
+// finished render. Without it every asset is stored with no thumbnail, and a
+// gallery has to fetch each one whole to draw a tile.
+func (h *OmniChatGenerationHandler) SetThumbnails(thumbnails *services.ThumbnailService) *OmniChatGenerationHandler {
+	if h != nil {
+		h.thumbnails = thumbnails
+	}
+	return h
+}
+
 type omniChatPersonaReader interface {
 	GetAccessibleByID(ctx context.Context, id int, viewerUserID *int) (*models.BotPersona, error)
 }
@@ -130,6 +140,7 @@ type OmniChatGenerationHandler struct {
 	config           config.OmniChatMediaConfig
 	failClosed       bool
 	imageReview      omniChatRenderedImageReviewer
+	thumbnails       *services.ThumbnailService
 	storageQuotaFree int64
 	storageQuotaPro  int64
 	// downloadMedia fetches a finished artifact from the provider. It is a
@@ -913,12 +924,12 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		return nil, false, fmt.Errorf("store generated media: %w", err)
 	}
 	committed := false
-	posterKey := ""
+	thumbnailKey := ""
 	defer func() {
 		if !committed {
 			h.deleteGenerationObject(ctx, storageKey)
-			if posterKey != "" {
-				h.deleteGenerationObject(ctx, posterKey)
+			if thumbnailKey != "" {
+				h.deleteGenerationObject(ctx, thumbnailKey)
 			}
 		}
 	}()
@@ -946,14 +957,13 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		}
 		media.Duration = &duration
 		asset.DurationSeconds = &duration
+	}
 
-		// A clip with no poster is a black rectangle until it plays. The frame
-		// is stored beside the clip and behind the same access gate, never as a
-		// direct storage URL.
-		if url, key := h.storePosterFrame(ctx, job, download.Path, clipDuration); key != "" {
-			posterKey = key
-			media.ThumbnailURL = &url
-		}
+	// A tile has to show something that is not the asset itself. Stored beside
+	// it and behind the same access gate, never as a direct storage URL.
+	if url, key := h.storeThumbnail(ctx, job, kind, download.Path); key != "" {
+		thumbnailKey = key
+		media.ThumbnailURL = &url
 	}
 	provenance := models.OmniChatGenerationProvenance{
 		WorkerBuild:      result.WorkerBuild,

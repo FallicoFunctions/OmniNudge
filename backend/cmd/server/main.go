@@ -430,6 +430,7 @@ func main() {
 			cfg.VirusScan.FailClosed,
 		).SetMediaReferenceReader(mediaRepo).
 			SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
+			SetThumbnails(queueThumbnailService).
 			SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 				SetAdminReader(workerOmniChatUserRepo))
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
@@ -1300,7 +1301,7 @@ func main() {
 			omniChatPublic.GET("/explore/:id", omniChatSocialHandler.GetPublication)
 			omniChatPublic.GET("/explore/:id/comments", omniChatSocialHandler.ListComments)
 			omniChatPublic.GET("/explore/media/:asset_id/content", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaContent)
-			omniChatPublic.GET("/explore/media/:asset_id/poster", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaPoster)
+			omniChatPublic.GET("/explore/media/:asset_id/thumbnail", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.GetPublicMediaThumbnail)
 		}
 
 		// Protected routes (auth required)
@@ -1508,7 +1509,7 @@ func main() {
 			protected.GET("/omnichat/gallery", omniChatMediaHandler.ListGallery)
 			protected.GET("/omnichat/media/:id", omniChatMediaHandler.GetAsset)
 			protected.GET("/omnichat/media/:id/content", omniChatMediaHandler.GetAssetContent)
-			protected.GET("/omnichat/media/:id/poster", omniChatMediaHandler.GetAssetPoster)
+			protected.GET("/omnichat/media/:id/thumbnail", omniChatMediaHandler.GetAssetThumbnail)
 			protected.DELETE("/omnichat/media/:id", omniChatMediaHandler.DeleteAsset)
 			protected.POST("/omnichat/explore/publish/media", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishAsset)
 			protected.POST("/omnichat/explore/publish/chat", omniChatSocialRateLimiter.Middleware(), omniChatSocialHandler.PublishChat)

@@ -240,7 +240,7 @@ export interface OmniChatMediaAsset {
   file_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'video/mp4';
   content_url: string;
   /**
-   * The API route for a clip's poster frame, present only when one exists.
+   * The API route for the asset's tile image, present only when one exists.
    * Never a storage URL: a private asset's location does not reach a client.
    */
   thumbnail_url?: string;
@@ -277,7 +277,7 @@ export interface OmniChatPublicMediaAsset {
   file_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'video/mp4';
   content_url: string;
   /**
-   * The API route for a published clip's poster frame, present only when one
+   * The API route for a published asset's tile image, present only when one
    * exists. Never a storage URL.
    */
   thumbnail_url?: string;

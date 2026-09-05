@@ -232,46 +232,46 @@ describe('omnichatService billing adapters', () => {
   // one. Hardcoding the private route reads as working -- the fetch 404s, the
   // card shows its placeholder, and no clip is downloaded -- while every
   // published clip in the feed silently loses its poster.
-  it('fetches a published clip poster from the route the asset names', async () => {
+  it('fetches a published clip thumbnail from the route the asset names', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       blob: () => Promise.resolve(new Blob(['poster'])),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await omnichatService.getMediaAssetPoster(
+    await omnichatService.getMediaAssetThumbnail(
       'asset-1',
-      '/api/v1/omnichat/explore/media/asset-1/poster'
+      '/api/v1/omnichat/explore/media/asset-1/thumbnail'
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8080/api/v1/omnichat/explore/media/asset-1/poster',
+      'http://localhost:8080/api/v1/omnichat/explore/media/asset-1/thumbnail',
       expect.objectContaining({ credentials: 'include' })
     );
   });
 
-  it('falls back to the private poster route when the asset names none', async () => {
+  it('falls back to the private thumbnail route when the asset names none', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       blob: () => Promise.resolve(new Blob(['poster'])),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await omnichatService.getMediaAssetPoster('asset-1');
+    await omnichatService.getMediaAssetThumbnail('asset-1');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8080/api/v1/omnichat/media/asset-1/poster',
+      'http://localhost:8080/api/v1/omnichat/media/asset-1/thumbnail',
       expect.objectContaining({ credentials: 'include' })
     );
   });
 
-  it('does not send a stored authorization token to a cross-origin poster URL', async () => {
+  it('does not send a stored authorization token to a cross-origin thumbnail URL', async () => {
     localStorage.setItem('auth_token', 'sensitive-token');
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      omnichatService.getMediaAssetPoster('asset-1', 'https://attacker.example/poster.jpg')
+      omnichatService.getMediaAssetThumbnail('asset-1', 'https://attacker.example/thumbnail.jpg')
     ).rejects.toThrow('untrusted origin');
 
     expect(fetchMock).not.toHaveBeenCalled();

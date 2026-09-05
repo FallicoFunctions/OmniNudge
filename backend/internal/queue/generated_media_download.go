@@ -143,6 +143,28 @@ func (b *mediaBearer) headerFor(rawURL string) (string, bool) {
 	return "Bearer " + b.Token, true
 }
 
+// nameDownloadedMedia renames a downloaded temp file so it carries the
+// extension its own bytes claim, and returns the path to use.
+//
+// The name cannot carry the extension up front: the type is decided by sniffing
+// the content after it is written. But a path with no extension is a path that
+// lies about what it holds. ffmpeg picks its output container from a file name,
+// so a rendition written beside an extensionless input got an extensionless
+// output name and failed on every real render -- while every test passed,
+// because every fixture was called something.mp4. A rename that fails is not
+// worth failing a render over; the original path still works for everything
+// that sniffs content rather than names.
+func nameDownloadedMedia(path, extension string) string {
+	if extension == "" || strings.HasSuffix(path, extension) {
+		return path
+	}
+	named := path + extension
+	if err := os.Rename(path, named); err != nil {
+		return path
+	}
+	return named
+}
+
 func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, bearer *mediaBearer, additionalHosts ...string) (*generatedMediaDownload, func(), error) {
 	if err := validateGeneratedMediaURL(rawURL, additionalHosts...); err != nil {
 		return nil, nil, err
@@ -244,8 +266,24 @@ func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMedia
 		cleanup()
 		return nil, nil, fmt.Errorf("close generated media temp file: %w", err)
 	}
+
+	// Give the file the extension its own bytes say it has.
+	//
+	// The name cannot carry it up front, because the type is decided by
+	// sniffing the content after it is written -- but a path with no extension
+	// is a path that lies about what it holds, and every tool downstream reads
+	// it. ffmpeg picks its output container from the file name, so a rendition
+	// written beside an extensionless input was named with no extension and
+	// failed on every real download while passing every test, because the test
+	// fixture was called artifact.mp4 and the real file was not called
+	// anything. The thumbnail service refuses a source whose type it cannot
+	// read from the name for the same reason.
+	path := nameDownloadedMedia(tempFile.Name(), extension)
+	if path != tempFile.Name() {
+		cleanup = func() { _ = os.Remove(path) }
+	}
 	return &generatedMediaDownload{
-		Path: tempFile.Name(), Size: written, ContentType: contentType, Extension: extension,
+		Path: path, Size: written, ContentType: contentType, Extension: extension,
 	}, cleanup, nil
 }
 

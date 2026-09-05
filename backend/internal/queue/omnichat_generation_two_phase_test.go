@@ -31,7 +31,7 @@ type twoPhaseStoreFake struct {
 	intermediateKind  models.OmniChatMediaKind
 	sourceAsset       *models.OmniChatMediaAsset
 	// completedMedia is the media row the finished job wrote. The asset carries
-	// width and height, but the poster lives only on the media file.
+	// width and height, but the thumbnail lives only on the media file.
 	completedMedia *models.MediaFile
 	deletedAssets  []uuid.UUID
 	progress       []int

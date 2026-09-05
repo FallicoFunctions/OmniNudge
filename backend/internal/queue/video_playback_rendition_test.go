@@ -150,3 +150,31 @@ func TestAVideoJobStoresTheReducedClip(t *testing.T) {
 	require.Equal(t, 1896, *media.Height)
 	require.Less(t, media.FileSize, original.Size(), "the 2K clip was stored unchanged")
 }
+
+// The shape of the real path, not the shape of a convenient fixture.
+//
+// downloadGeneratedMedia writes to os.CreateTemp with the pattern
+// "omnichat-generated-*", and the file type is decided afterwards by sniffing
+// the bytes -- so for every real render the path had no extension. ffmpeg picks
+// its output container from the output name, so the rendition was written to a
+// name with no extension and failed. Every test passed, because every test
+// handed it a file called something.mp4.
+func TestReduceClipForPlaybackWorksOnAPathWithNoExtension(t *testing.T) {
+	clip := makeSizedTestClip(t, "1440x2528")
+	source, err := os.ReadFile(clip)
+	require.NoError(t, err)
+
+	nameless, err := os.CreateTemp(t.TempDir(), "omnichat-generated-*")
+	require.NoError(t, err)
+	_, err = nameless.Write(source)
+	require.NoError(t, err)
+	require.NoError(t, nameless.Close())
+	require.Empty(t, filepath.Ext(nameless.Name()), "this test is only meaningful without an extension")
+
+	path, size, cleanup, ok := reduceClipForPlayback(context.Background(), nameless.Name(), 1440, 2528)
+	defer cleanup()
+
+	require.True(t, ok, "the reduction never ran on a real download")
+	require.Greater(t, size, int64(0))
+	require.Equal(t, 1080, probeClip(context.Background(), path).Width)
+}

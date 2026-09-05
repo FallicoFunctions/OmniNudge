@@ -18,13 +18,13 @@ type AnyMediaAsset = OmniChatMediaAsset | OmniChatMessageMediaAsset | OmniChatPu
  * assigning the route directly to an img or video src.
  *
  * A null source fetches nothing. That is what keeps a gallery tile from pulling
- * a clip it is not showing.
+ * the asset it is not showing.
  */
 function useAuthorizedMediaUrl(
-  source: 'content' | 'poster' | null,
+  source: 'content' | 'thumbnail' | null,
   assetId: string,
   contentUrl: string,
-  posterUrl: string | undefined,
+  thumbnailUrl: string | undefined,
   visibility: string,
   attempt: number,
 ) {
@@ -42,8 +42,8 @@ function useAuthorizedMediaUrl(
     setObjectUrl(null);
     setFailed(false);
     const request =
-      source === 'poster'
-        ? omnichatService.getMediaAssetPoster(assetId, posterUrl)
+      source === 'thumbnail'
+        ? omnichatService.getMediaAssetThumbnail(assetId, thumbnailUrl)
         : omnichatService.getMediaAssetContent(assetId, contentUrl);
     void request
       .then((blob) => {
@@ -58,7 +58,7 @@ function useAuthorizedMediaUrl(
       active = false;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [source, assetId, contentUrl, posterUrl, visibility, attempt]);
+  }, [source, assetId, contentUrl, thumbnailUrl, visibility, attempt]);
 
   return { objectUrl, failed };
 }
@@ -73,37 +73,37 @@ export default function OmniChatMediaAssetView({
   /**
    * A tile in a grid rather than the media itself.
    *
-   * A clip shows its poster and loads nothing else until the viewer asks for
-   * it. Before this, a gallery of twelve tiles holding six clips downloaded
-   * every one of them in full -- about forty megabytes -- on every visit,
-   * whether or not anybody pressed play.
+   * A tile shows the asset's thumbnail and loads nothing else until the viewer
+   * asks for it. Before this, a page of twenty-four tiles downloaded every
+   * asset in full -- about a megabyte for a generated image and 6.6 MB for one
+   * real clip -- on every visit, whether or not anybody looked closer.
    */
   preview?: boolean;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [opened, setOpened] = useState(false);
 
-  const posterURL = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
+  const thumbnailURL = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
   const isVideo = asset.kind === 'video';
-  const showsPosterOnly = isVideo && preview && !opened;
+  const showsThumbnailOnly = preview && !opened;
 
   useEffect(() => {
     setOpened(false);
   }, [asset.id]);
 
   const { objectUrl: mediaUrl, failed: mediaFailed } = useAuthorizedMediaUrl(
-    showsPosterOnly ? null : 'content',
+    showsThumbnailOnly ? null : 'content',
     asset.id,
     asset.content_url,
-    posterURL,
+    thumbnailURL,
     asset.visibility,
     attempt,
   );
-  const { objectUrl: posterUrl } = useAuthorizedMediaUrl(
-    showsPosterOnly && posterURL ? 'poster' : null,
+  const { objectUrl: thumbnailUrl } = useAuthorizedMediaUrl(
+    showsThumbnailOnly && thumbnailURL ? 'thumbnail' : null,
     asset.id,
     asset.content_url,
-    posterURL,
+    thumbnailURL,
     asset.visibility,
     attempt,
   );
@@ -114,39 +114,43 @@ export default function OmniChatMediaAssetView({
     </span>
   );
 
-  // A clip in a grid. Nothing of the clip is fetched: the poster stands in for
-  // it, and a viewer who wants to watch says so.
-  if (showsPosterOnly) {
+  // A tile in a grid. Nothing of the asset is fetched: the thumbnail stands in
+  // for it, and a viewer who wants the real thing says so.
+  if (showsThumbnailOnly) {
     return (
       <button
         type="button"
-        aria-label="Play generated video"
+        aria-label={isVideo ? 'Play generated video' : 'Open generated image'}
         onClick={() => setOpened(true)}
         className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
       >
-        {posterUrl ? (
+        {thumbnailUrl ? (
           <img
-            src={posterUrl}
-            alt={'prompt' in asset && asset.prompt ? asset.prompt : 'Generated character video'}
-            // Contained rather than cropped, which is how an image tile in the
-            // same grid renders. A portrait poster cropped to fill a 4:5 tile
-            // loses about a seventh of its height at each end, and on a
-            // full-body frame that takes the head off.
+            src={thumbnailUrl}
+            alt={
+              'prompt' in asset && asset.prompt
+                ? asset.prompt
+                : `Generated character ${asset.kind}`
+            }
+            // Contained rather than cropped, which is how the full asset
+            // renders in the same grid. A portrait frame cropped to fill a 4:5
+            // tile loses about a seventh of its height at each end, and on a
+            // full-body picture that takes the head off.
             className="block h-full w-full object-contain"
           />
         ) : (
-          // No poster: clips generated before posters existed, and clips whose
-          // poster could not be made. Showing the clip instead would put the
-          // whole download back.
-          <span className="text-white/25">
-            <Video size={32} />
+          // No thumbnail: everything generated before thumbnails existed, and
+          // anything whose thumbnail could not be made. Showing the asset
+          // instead would put the whole download back for exactly those.
+          <span className="text-white/25">{isVideo ? <Video size={32} /> : <ImageIcon size={32} />}</span>
+        )}
+        {isVideo && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
+              <Play size={20} />
+            </span>
           </span>
         )}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
-            <Play size={20} />
-          </span>
-        </span>
         {badge}
       </button>
     );

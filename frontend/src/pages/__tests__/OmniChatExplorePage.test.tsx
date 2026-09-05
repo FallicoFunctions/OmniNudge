@@ -284,10 +284,10 @@ describe('OmniChatExploreWorkspace', () => {
   });
   // The gate, not the component.
   //
-  // OmniChatMediaAssetView knows how to show a poster instead of a clip. That
-  // says nothing about whether this feed asks it to, and a feed card rendered
-  // as the media itself downloads every published clip on the page.
-  it('asks for a card, not for the clip, in the feed', async () => {
+  // OmniChatMediaAssetView knows how to show a thumbnail instead of the asset.
+  // That says nothing about whether this feed asks it to, and a card rendered
+  // as the media itself downloads every published asset on the page.
+  it('asks for a card, not for the asset, in the feed', async () => {
     vi.mocked(omnichatService.listExplore).mockResolvedValue([
       {
         id: 'pub-clip',
@@ -315,7 +315,7 @@ describe('OmniChatExploreWorkspace', () => {
           visibility: 'public',
           file_type: 'video/mp4',
           content_url: '/api/v1/omnichat/explore/media/asset-clip/content',
-          thumbnail_url: '/api/v1/omnichat/explore/media/asset-clip/poster',
+          thumbnail_url: '/api/v1/omnichat/explore/media/asset-clip/thumbnail',
           created_at: '2026-07-20T00:00:00Z',
         },
       },

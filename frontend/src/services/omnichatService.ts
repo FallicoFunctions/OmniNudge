@@ -119,14 +119,14 @@ function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): 
 }
 
 /**
- * A published clip's poster lives behind the explore route, not the private
+ * A published asset's thumbnail lives behind the explore route, not the private
  * one. Hardcoding the private route here reads as working -- the fetch 404s,
- * the tile shows its placeholder, and no clip is downloaded -- while every
- * published clip in the feed silently loses its poster.
+ * the tile shows its placeholder, and no asset is downloaded -- while every
+ * published asset in the feed silently loses its thumbnail.
  */
-function resolveApiMediaPosterUrl(assetId: string, posterUrl?: string): string {
+function resolveApiMediaThumbnailUrl(assetId: string, posterUrl?: string): string {
   return resolveApiMediaUrl(
-    getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/poster`),
+    getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/thumbnail`),
     posterUrl,
   );
 }
@@ -581,19 +581,20 @@ export const omnichatService = {
   },
 
   /**
-   * Resolves with a clip's poster frame.
+   * Resolves with an asset's tile image.
    *
-   * A gallery grid must never fetch the clips it lists: one real render was
-   * 6.6 MB, so a page of tiles pulled tens of megabytes before it drew
-   * anything. The poster is about a hundred kilobytes, and it is served
-   * through the same ownership gate as the clip rather than from storage.
+   * A grid must never fetch the assets it lists: a generated image is about a
+   * megabyte of PNG and one real clip was 6.6 MB, so a page of tiles pulled
+   * tens of megabytes before it drew anything, on every visit. A thumbnail is
+   * about fifty kilobytes, and it is served through the same ownership gate as
+   * the asset rather than from storage.
    */
-  async getMediaAssetPoster(assetId: string, posterUrl?: string): Promise<Blob> {
-    const response = await authenticatedFetch(resolveApiMediaPosterUrl(assetId, posterUrl), {
+  async getMediaAssetThumbnail(assetId: string, posterUrl?: string): Promise<Blob> {
+    const response = await authenticatedFetch(resolveApiMediaThumbnailUrl(assetId, posterUrl), {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error('Failed to load the poster frame');
+      throw new Error('Failed to load the thumbnail');
     }
     return response.blob();
   },

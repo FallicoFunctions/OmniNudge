@@ -564,51 +564,48 @@ func (h *OmniChatMediaHandler) getOwnedAsset(c *gin.Context) (*models.OmniChatMe
 func decorateOmniChatAsset(asset *models.OmniChatMediaAsset) {
 	asset.ContentURL = "/api/v1/omnichat/media/" + asset.ID.String() + "/content"
 	// Never expose an underlying storage/CDN URL for a private asset. The
-	// poster is still offered, but through this API and the same ownership
-	// gate the clip itself goes through.
+	// thumbnail is still offered, but through this API and the same ownership
+	// gate the asset itself goes through.
 	//
-	// A gallery tile that has a poster shows the poster. A tile that does not
-	// has to show something else, because the alternative -- falling back to
-	// the clip -- is a grid that downloads every video it lists.
-	if asset.Kind == models.OmniChatMediaKindVideo && omniChatPosterKey(asset) != "" {
-		posterURL := "/api/v1/omnichat/media/" + asset.ID.String() + "/poster"
-		asset.ThumbnailURL = &posterURL
+	// A tile that has a thumbnail shows it. A tile that does not has to show
+	// something else, because the alternative -- falling back to the asset --
+	// is a grid that downloads everything it lists.
+	if omniChatThumbnailKey(asset) != "" {
+		thumbnailURL := "/api/v1/omnichat/media/" + asset.ID.String() + "/thumbnail"
+		asset.ThumbnailURL = &thumbnailURL
 		return
 	}
 	asset.ThumbnailURL = nil
 }
 
-// omniChatPosterKey turns the stored poster URL back into a storage key, or
-// returns empty when there is no usable poster.
+// omniChatThumbnailKey turns the stored thumbnail URL back into a storage
+// key, or returns empty when there is no usable thumbnail.
 //
 // The rule lives in models beside the one that governs every other generated
 // object. A second copy here was weaker than that one -- it accepted a path
 // with the wrong number of segments and a non-numeric owner -- and a rule
 // written twice is the drift ledger 390b0e4c recorded four ways.
-func omniChatPosterKey(asset *models.OmniChatMediaAsset) string {
+func omniChatThumbnailKey(asset *models.OmniChatMediaAsset) string {
 	if asset == nil || asset.ThumbnailURL == nil {
 		return ""
 	}
-	key, ok := models.OmniChatPosterStorageKey(*asset.ThumbnailURL, asset.OwnerUserID)
+	key, ok := models.OmniChatThumbnailStorageKey(*asset.ThumbnailURL, asset.OwnerUserID)
 	if !ok {
 		return ""
 	}
 	return key
 }
 
-// GetAssetPoster streams a clip's poster frame.
+// GetAssetThumbnail streams an asset's tile image.
 //
-// A gallery grid must never fetch the clips it lists. One real render was 6.6
-// MB, and a twelve-tile page holding six of them pulled forty megabytes before
-// it drew anything, on every visit. The poster is about a hundred kilobytes and
-// is the only thing a tile can show without the clip.
-func (h *OmniChatMediaHandler) GetAssetPoster(c *gin.Context) {
+// A gallery grid must never fetch the assets it lists. A generated image is
+// about a megabyte of PNG and a clip was 6.6 MB, and a page is twenty-four
+// tiles -- fetched again on every visit, because none of it is cached. A
+// thumbnail is fifty kilobytes and is the only thing a tile can show without
+// the asset itself.
+func (h *OmniChatMediaHandler) GetAssetThumbnail(c *gin.Context) {
 	asset, ok := h.getOwnedAsset(c)
 	if !ok {
-		return
-	}
-	if asset.Kind != models.OmniChatMediaKindVideo {
-		RespondError(c, http.StatusNotFound, "Media has no poster")
 		return
 	}
 	if asset.ScanStatus != models.MediaScanStatusClean {
@@ -619,30 +616,30 @@ func (h *OmniChatMediaHandler) GetAssetPoster(c *gin.Context) {
 		RespondError(c, http.StatusServiceUnavailable, "Media storage is unavailable")
 		return
 	}
-	posterKey := omniChatPosterKey(asset)
-	if posterKey == "" {
-		RespondError(c, http.StatusNotFound, "Media has no poster")
+	thumbnailKey := omniChatThumbnailKey(asset)
+	if thumbnailKey == "" {
+		RespondError(c, http.StatusNotFound, "Media has no thumbnail")
 		return
 	}
-	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), posterKey)
+	objectSize, err := h.storage.GetObjectSize(c.Request.Context(), thumbnailKey)
 	if err != nil {
-		RespondError(c, http.StatusNotFound, "Media has no poster")
+		RespondError(c, http.StatusNotFound, "Media has no thumbnail")
 		return
 	}
-	// A poster is one scaled-down frame. Anything near the clip's own size cap
-	// is not a poster, and serving it would defeat the point of having one.
-	if objectSize <= 0 || objectSize > omniChatMaxPosterBytes {
+	// A thumbnail is one scaled-down picture. Anything near the asset's own
+	// size cap is not a thumbnail, and serving it would defeat the point.
+	if objectSize <= 0 || objectSize > omniChatMaxThumbnailBytes {
 		RespondError(c, http.StatusConflict, "Media size is invalid")
 		return
 	}
-	reader, err := h.storage.Download(c.Request.Context(), posterKey)
+	reader, err := h.storage.Download(c.Request.Context(), thumbnailKey)
 	if err != nil {
-		RespondError(c, http.StatusNotFound, "Media has no poster")
+		RespondError(c, http.StatusNotFound, "Media has no thumbnail")
 		return
 	}
 	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", "image/jpeg")
-	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-poster.jpg"`, asset.ID.String()))
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-thumb.jpg"`, asset.ID.String()))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
@@ -651,8 +648,8 @@ func (h *OmniChatMediaHandler) GetAssetPoster(c *gin.Context) {
 	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
 }
 
-// omniChatMaxPosterBytes caps what this route will serve.
-const omniChatMaxPosterBytes = int64(4 << 20)
+// omniChatMaxThumbnailBytes caps what this route will serve.
+const omniChatMaxThumbnailBytes = int64(4 << 20)
 
 func parseUUIDParam(c *gin.Context, name string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param(name))
