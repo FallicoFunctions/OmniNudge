@@ -31,6 +31,7 @@ import (
 
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/services/openrouter"
 )
@@ -52,7 +53,9 @@ var pricePerSecond = map[string]float64{
 }
 
 func main() {
-	asset := flag.String("asset", "", "the image asset id to animate (required)")
+	asset := flag.String("asset", "", "the image asset id to animate")
+	persona := flag.Int("persona", 0, "animate a persona's stored reference instead of an asset id")
+	refIndex := flag.Int("ref", 1, "which of that persona's references, 1-based")
 	models := flag.String("models", "bytedance/seedance-2.0-mini,alibaba/wan-3.0,google/veo-3.1-lite",
 		"comma-separated OpenRouter model ids")
 	prompt := flag.String("prompt", "she talks and smiles, gesturing lightly with one hand", "motion prompt")
@@ -60,19 +63,22 @@ func main() {
 	resolution := flag.String("resolution", "720p", "clip resolution")
 	seed := flag.Int64("seed", 4242, "seed, held constant across every model")
 	lastFrame := flag.Bool("last-frame", false, "also pin the closing frame to the same still")
+	noAudio := flag.Bool("no-audio", false, "ask the provider for a silent clip")
+	aspect := flag.String("aspect", "", "aspect ratio to send, e.g. 9:16; empty lets the provider derive it from the still")
 	out := flag.String("out", "", "directory to write the clips into (required)")
 	timeout := flag.Duration("timeout", 10*time.Minute, "how long to wait for each clip")
 	dryRun := flag.Bool("dry-run", false, "print what would be sent and spend nothing")
 	flag.Parse()
 
-	if err := run(*asset, *models, *prompt, *resolution, *out, *seconds, *seed, *lastFrame, *dryRun, *timeout); err != nil {
+	if err := run(*asset, *persona, *refIndex, *models, *prompt, *resolution, *aspect, *out,
+		*seconds, *seed, *lastFrame, *noAudio, *dryRun, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, "zz_video_compare:", err)
 		os.Exit(1)
 	}
 }
 
-func run(assetID, modelList, prompt, resolution, outDir string,
-	seconds int, seed int64, lastFrame, dryRun bool, timeout time.Duration) error {
+func run(assetID string, personaID, refIndex int, modelList, prompt, resolution, aspect, outDir string,
+	seconds int, seed int64, lastFrame, noAudio, dryRun bool, timeout time.Duration) error {
 	ctx := context.Background()
 
 	chosen := make([]string, 0, 4)
@@ -84,8 +90,8 @@ func run(assetID, modelList, prompt, resolution, outDir string,
 	if len(chosen) == 0 {
 		return errors.New("--models is empty")
 	}
-	if strings.TrimSpace(assetID) == "" {
-		return errors.New("--asset is required")
+	if strings.TrimSpace(assetID) == "" && personaID <= 0 {
+		return errors.New("one of --asset or --persona is required")
 	}
 	if strings.TrimSpace(outDir) == "" && !dryRun {
 		return errors.New("--out is required")
@@ -101,7 +107,12 @@ func run(assetID, modelList, prompt, resolution, outDir string,
 	}
 	defer db.Close()
 
-	sourceURL, err := signAsset(ctx, cfg, db, assetID)
+	var sourceURL string
+	if personaID > 0 {
+		sourceURL, err = signPersonaReference(ctx, cfg, db, personaID, refIndex)
+	} else {
+		sourceURL, err = signAsset(ctx, cfg, db, assetID)
+	}
 	if err != nil {
 		return err
 	}
@@ -116,7 +127,8 @@ func run(assetID, modelList, prompt, resolution, outDir string,
 
 	fmt.Printf("still:   %s\n", shorten(sourceURL))
 	fmt.Printf("prompt:  %s\n", prompt)
-	fmt.Printf("fixed:   %ds at %s, seed %d, last_frame=%v\n\n", seconds, resolution, seed, lastFrame)
+	fmt.Printf("fixed:   %ds at %s, seed %d, last_frame=%v, no_audio=%v, aspect=%q\n\n",
+		seconds, resolution, seed, lastFrame, noAudio, aspect)
 
 	if dryRun {
 		for _, model := range chosen {
@@ -134,12 +146,14 @@ func run(assetID, modelList, prompt, resolution, outDir string,
 	var spent float64
 	for _, model := range chosen {
 		latency, size, note := renderOne(ctx, client, model, cfg.OpenRouter.APIKey, openrouter.VideoRequest{
-			Model:       model,
-			Prompt:      prompt,
-			Duration:    seconds,
-			Resolution:  resolution,
-			Seed:        &seed,
-			FrameImages: frames,
+			Model:         model,
+			Prompt:        prompt,
+			Duration:      seconds,
+			Resolution:    resolution,
+			AspectRatio:   aspect,
+			Seed:          &seed,
+			GenerateAudio: audioFlag(noAudio),
+			FrameImages:   frames,
 		}, outDir, timeout)
 		cost := costOf(model, seconds)
 		if !strings.HasPrefix(note, "submit failed") && !strings.HasPrefix(note, "failed") {
@@ -224,18 +238,66 @@ func signAsset(ctx context.Context, cfg *config.Config, db *database.DB, assetID
 		return "", fmt.Errorf("locate the still: %w", err)
 	}
 
-	var storage services.StorageService
-	if cfg.Storage.StorageBackend == "s3" {
-		if storage, err = services.NewS3StorageService(cfg); err != nil {
-			return "", fmt.Errorf("s3: %w", err)
-		}
-	} else if storage, err = services.NewLocalStorageService("./uploads", cfg.FrontendURL+"/uploads"); err != nil {
-		return "", fmt.Errorf("local storage: %w", err)
+	storage, err := storageFor(cfg)
+	if err != nil {
+		return "", err
 	}
 	// Long enough to outlast the slowest clip in a comparison. The provider
 	// fetches this itself, so an expiry shorter than the queue would fail the
 	// last model in the list and look like that model's fault.
 	return storage.GetSignedURL(ctx, path, 60*time.Minute)
+}
+
+// signPersonaReference reaches the reference set, which is not in the asset
+// table: references live on the persona profile as URLs. The opening frame of
+// a clip is a different job from an identity anchor, and choosing between the
+// six is the experiment.
+func signPersonaReference(ctx context.Context, cfg *config.Config, db *database.DB,
+	personaID, index int) (string, error) {
+	persona, err := models.NewBotPersonaRepository(db.Pool).GetByID(ctx, personaID)
+	if err != nil {
+		return "", err
+	}
+	profile := services.ResolveOmniChatMediaIdentityProfile(persona)
+	if index < 1 || index > len(profile.ReferenceURLs) {
+		return "", fmt.Errorf("persona %d has %d references, asked for %d",
+			personaID, len(profile.ReferenceURLs), index)
+	}
+	key := strings.TrimPrefix(profile.ReferenceURLs[index-1], "/uploads/")
+	if i := strings.Index(key, "?"); i > 0 {
+		key = key[:i]
+	}
+	storage, err := storageFor(cfg)
+	if err != nil {
+		return "", err
+	}
+	return storage.GetSignedURL(ctx, key, 60*time.Minute)
+}
+
+// audioFlag keeps "unset" distinct from "off". Only an explicit --no-audio
+// sends the field; without it the provider keeps its own default, which is a
+// different request.
+func audioFlag(noAudio bool) *bool {
+	if !noAudio {
+		return nil
+	}
+	off := false
+	return &off
+}
+
+func storageFor(cfg *config.Config) (services.StorageService, error) {
+	if cfg.Storage.StorageBackend == "s3" {
+		storage, err := services.NewS3StorageService(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("s3: %w", err)
+		}
+		return storage, nil
+	}
+	storage, err := services.NewLocalStorageService("./uploads", cfg.FrontendURL+"/uploads")
+	if err != nil {
+		return nil, fmt.Errorf("local storage: %w", err)
+	}
+	return storage, nil
 }
 
 func costOf(model string, seconds int) float64 {

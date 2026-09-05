@@ -94,6 +94,51 @@ func TestSubmitVideoSendsAZeroSeed(t *testing.T) {
 	require.EqualValues(t, 0, value)
 }
 
+// generate_audio false is a real request and must reach the provider. These
+// models speak by default, in a voice the provider picks, and every character
+// here already has a stored ElevenLabs voice -- so a clip that speaks in a
+// different one contradicts her own audio messages. A false dropped by
+// omitempty would silently mean "provider default", which is the opposite.
+func TestSubmitVideoSendsGenerateAudioFalse(t *testing.T) {
+	var body map[string]any
+	client := videoClient(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(raw, &body))
+		_, _ = w.Write([]byte(`{"id":"job-1","status":"pending"}`))
+	})
+
+	off := false
+	_, err := client.SubmitVideo(context.Background(), VideoRequest{
+		Model: "google/veo-3.1-lite", Prompt: "p", GenerateAudio: &off, AspectRatio: "9:16",
+	})
+
+	require.NoError(t, err)
+	value, present := body["generate_audio"]
+	require.True(t, present, "generate_audio=false must be sent, not omitted: %v", body)
+	require.Equal(t, false, value)
+	require.Equal(t, "9:16", body["aspect_ratio"])
+}
+
+// Unset must stay unset. It means "provider default", which is not the same
+// request as "no audio", and inventing one would change every caller that has
+// not thought about it.
+func TestSubmitVideoOmitsGenerateAudioWhenUnset(t *testing.T) {
+	var body map[string]any
+	client := videoClient(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(raw, &body))
+		_, _ = w.Write([]byte(`{"id":"job-1","status":"pending"}`))
+	})
+
+	_, err := client.SubmitVideo(context.Background(), VideoRequest{Model: "a/b", Prompt: "p"})
+
+	require.NoError(t, err)
+	_, present := body["generate_audio"]
+	require.False(t, present, "unset must not become false: %v", body)
+	_, present = body["aspect_ratio"]
+	require.False(t, present, "unset aspect ratio must not become empty string: %v", body)
+}
+
 func TestSubmitVideoRefusesWhatCannotSucceed(t *testing.T) {
 	client := videoClient(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("no request should reach the provider")

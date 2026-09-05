@@ -51,21 +51,36 @@ const (
 // reason to move: changing a clip's length on the self-hosted path needed a
 // container rebuild and a template edit.
 type VideoRequest struct {
-	Model       string
-	Prompt      string
-	Duration    int
-	Resolution  string
+	Model      string
+	Prompt     string
+	Duration   int
+	Resolution string
+	// AspectRatio is sent because the provider otherwise derives the frame
+	// from the source still. A 3:4 still asked to fill a 9:16 clip comes back
+	// padded with black bars rather than cropped, which reads as a broken
+	// render.
+	AspectRatio string
 	Seed        *int64
-	FrameImages []FrameImage
+	// GenerateAudio false asks for a silent clip. It matters because these
+	// models speak by default, in a voice the provider chooses -- and every
+	// character here already has a stored voice, so a clip that speaks in a
+	// different one contradicts her own audio messages.
+	//
+	// A pointer: unset must mean "provider default", because false is a real
+	// request and the two are not the same thing.
+	GenerateAudio *bool
+	FrameImages   []FrameImage
 }
 
 type videoRequestBody struct {
-	Model       string           `json:"model"`
-	Prompt      string           `json:"prompt"`
-	Duration    int              `json:"duration,omitempty"`
-	Resolution  string           `json:"resolution,omitempty"`
-	Seed        *int64           `json:"seed,omitempty"`
-	FrameImages []frameImageBody `json:"frame_images,omitempty"`
+	Model         string           `json:"model"`
+	Prompt        string           `json:"prompt"`
+	Duration      int              `json:"duration,omitempty"`
+	Resolution    string           `json:"resolution,omitempty"`
+	AspectRatio   string           `json:"aspect_ratio,omitempty"`
+	Seed          *int64           `json:"seed,omitempty"`
+	GenerateAudio *bool            `json:"generate_audio,omitempty"`
+	FrameImages   []frameImageBody `json:"frame_images,omitempty"`
 }
 
 type frameImageBody struct {
@@ -132,11 +147,13 @@ func (c *Client) SubmitVideo(ctx context.Context, request VideoRequest) (*VideoJ
 	}
 
 	body := videoRequestBody{
-		Model:      model,
-		Prompt:     strings.TrimSpace(request.Prompt),
-		Duration:   request.Duration,
-		Resolution: strings.TrimSpace(request.Resolution),
-		Seed:       request.Seed,
+		Model:         model,
+		Prompt:        strings.TrimSpace(request.Prompt),
+		Duration:      request.Duration,
+		Resolution:    strings.TrimSpace(request.Resolution),
+		AspectRatio:   strings.TrimSpace(request.AspectRatio),
+		Seed:          request.Seed,
+		GenerateAudio: request.GenerateAudio,
 	}
 	for _, frame := range request.FrameImages {
 		url := strings.TrimSpace(frame.URL)
