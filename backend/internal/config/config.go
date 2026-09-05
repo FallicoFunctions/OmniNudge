@@ -153,6 +153,14 @@ type OmniChatMediaConfig struct {
 	MaxImageBytes               int64
 	MaxVideoBytes               int64
 	PollIntervalSeconds         int
+
+	// Hosted video providers, under trial against the self-hosted path. Kling
+	// signs with a key pair rather than a bearer token, so both halves are
+	// required and one without the other is not partial configuration -- it is
+	// no configuration.
+	KlingAccessKey string
+	KlingSecretKey string
+	GeminiAPIKey   string
 }
 
 type OmniChatVoiceConfig struct {
@@ -439,6 +447,9 @@ func Load() (*Config, error) {
 			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
 			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),
 			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
+			KlingAccessKey:              getEnv("KLING_ACCESS_KEY", ""),
+			KlingSecretKey:              getEnv("KLING_SECRET_KEY", ""),
+			GeminiAPIKey:                getEnv("GEMINI_API_KEY", ""),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
 			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),

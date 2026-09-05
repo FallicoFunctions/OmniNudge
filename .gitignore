@@ -106,6 +106,16 @@ source-render-*.png
 !.claude/skills/review/
 !.claude/settings.json
 
+# .codex/ is the same arrangement for the other agent: hooks.json declares the
+# guards and guards/ implements them, with their own tests. They travel for the
+# reason above -- an untracked guard does not exist in a new worktree, and a
+# guard that is not there fails silently rather than loudly.
+#
+# __pycache__ under it is already ignored above, but say so here too: the
+# directory arrived untracked, which is how a build artifact reaches this
+# repository in the first place.
+.codex/guards/**/__pycache__/
+
 # Review runtime markers. The ledgers and control patches beside them are
 # tracked on purpose; this one is per-run state and would dirty the tree
 # mid-review, or be swept into a commit by a broad `git add .review/`.
