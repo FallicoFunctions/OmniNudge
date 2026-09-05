@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 
 	"github.com/omninudge/backend/internal/services"
 )
@@ -50,7 +51,14 @@ func resolveMediaSource(ctx context.Context, localPath, remoteKey string, storag
 	}
 	defer func() { _ = rc.Close() }()
 
-	tempFile, err := os.CreateTemp("", "omnimedia-*")
+	// The temp file keeps the extension the stored object has.
+	//
+	// A path with no extension is a path that lies about what it holds, and the
+	// thumbnail service refuses a source whose type it cannot read from the
+	// name -- so every video stored remotely came back as "not a supported
+	// video file" and got no thumbnail at all. ffmpeg has the same habit on the
+	// output side.
+	tempFile, err := os.CreateTemp("", "omnimedia-*"+path.Ext(remoteKey))
 	if err != nil {
 		return "", nil, fmt.Errorf("create temp media source: %w", err)
 	}

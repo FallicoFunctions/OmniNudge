@@ -961,7 +961,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 
 	// A tile has to show something that is not the asset itself. Stored beside
 	// it and behind the same access gate, never as a direct storage URL.
-	if url, key := h.storeThumbnail(ctx, job, kind, download.Path); key != "" {
+	if url, key := h.storeThumbnail(ctx, job, kind, download.Path, storageKey); key != "" {
 		thumbnailKey = key
 		media.ThumbnailURL = &url
 	}

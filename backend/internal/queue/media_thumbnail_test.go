@@ -34,6 +34,10 @@ func thumbnailHandler(t *testing.T, store *twoPhaseStoreFake, provider *twoPhase
 // one real clip, on every visit. Both kinds must come out of the queue with a
 // tile image beside them, and the wiring is what proves it: the service knows
 // how to make one, and that says nothing about whether a job asks it to.
+//
+// The key is asserted in full, extension included. A two-phase video job stores
+// its still and then its clip under one job id, and a thumbnail named for the
+// job alone was one object for both -- the clip's overwriting the still's.
 func TestAFinishedRenderStoresAThumbnailBesideIt(t *testing.T) {
 	for name, kind := range map[string]models.OmniChatMediaKind{
 		"a clip":  models.OmniChatMediaKindVideo,
@@ -65,7 +69,11 @@ func TestAFinishedRenderStoresAThumbnailBesideIt(t *testing.T) {
 			media := store.completedMedia
 			require.NotNil(t, media)
 			require.NotNil(t, media.ThumbnailURL, "the render was stored with no thumbnail")
-			key := "omnichat/generated/" + "41" + "/" + store.job.ID.String() + "-thumb.jpg"
+			extension := ".mp4"
+			if kind == models.OmniChatMediaKindImage {
+				extension = ".png"
+			}
+			key := "omnichat/generated/41/" + store.job.ID.String() + extension + "-thumb.jpg"
 			require.Contains(t, storage.uploads, key, "the thumbnail was never uploaded")
 			// Never a direct storage URL: the thumbnail is as private as the
 			// asset it stands for.

@@ -1059,12 +1059,20 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
 	default:
 		return false
 	}
-	// An asset's thumbnail sits beside it under the same job id. It is
+	// An asset's thumbnail sits beside it, named for the whole asset file. It is
 	// generated media like everything else here, and it has to satisfy this
 	// rule or it is invisible to it: the deletion guard refuses any path this
 	// rejects, so a shape missing from here is a shape that never gets cleaned
 	// up.
-	stem := strings.TrimSuffix(strings.TrimSuffix(parts[3], extension), OmniChatThumbnailSuffix)
+	//
+	// The asset's own extension is part of the name, because a two-phase video
+	// job leaves two assets under one job id -- the still it rendered first and
+	// the clip it animated -- differing only by extension. A thumbnail named
+	// for the job would be one file for two different pictures.
+	stem := strings.TrimSuffix(parts[3], extension)
+	if trimmed, isThumbnail := strings.CutSuffix(stem, OmniChatThumbnailSuffix); isThumbnail {
+		stem = strings.TrimSuffix(trimmed, path.Ext(trimmed))
+	}
 	_, err = uuid.Parse(stem)
 	return err == nil
 }
@@ -1076,6 +1084,27 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
 // up in has always been called thumbnail_url; a still picture's tile image is
 // not a poster.
 const OmniChatThumbnailSuffix = "-thumb"
+
+// OmniChatThumbnailKeyFor names the thumbnail that belongs beside a generated
+// asset, or reports false when the asset's own key is not one this repository
+// wrote.
+//
+// The asset's key is the input rather than the job id, so the two names can
+// never disagree: a thumbnail is the asset's key with its extension replaced.
+func OmniChatThumbnailKeyFor(storagePath string) (string, bool) {
+	if !IsOmniChatGeneratedStoragePath(storagePath) {
+		return "", false
+	}
+	if strings.HasSuffix(strings.TrimSuffix(storagePath, path.Ext(storagePath)), OmniChatThumbnailSuffix) {
+		// Already a thumbnail. Nothing has a thumbnail of its own.
+		return "", false
+	}
+	// The whole asset file name, extension included. A two-phase video job
+	// leaves a still and a clip under one job id, and dropping the extension
+	// gave both of them the same thumbnail -- one object, two pictures, the
+	// second silently overwriting the first.
+	return storagePath + OmniChatThumbnailSuffix + ".jpg", true
+}
 
 // OmniChatThumbnailStorageKey turns a stored thumbnail URL back into a storage
 // key.

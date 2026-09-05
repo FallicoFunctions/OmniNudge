@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -36,9 +35,13 @@ const thumbnailTimeout = 30 * time.Second
 // picture, the picture is in hand, and a tile without a preview is a smaller
 // loss than a refund and a retry.
 func (h *OmniChatGenerationHandler) storeThumbnail(
-	ctx context.Context, job *models.OmniChatGenerationJob, kind models.OmniChatMediaKind, sourcePath string,
+	ctx context.Context, job *models.OmniChatGenerationJob, kind models.OmniChatMediaKind, sourcePath, assetKey string,
 ) (string, string) {
 	if h.thumbnails == nil {
+		return "", ""
+	}
+	key, ok := models.OmniChatThumbnailKeyFor(assetKey)
+	if !ok {
 		return "", ""
 	}
 	warn := func(err error, message string) (string, string) {
@@ -74,7 +77,6 @@ func (h *OmniChatGenerationHandler) storeThumbnail(
 	}
 	defer func() { _ = file.Close() }()
 
-	key := fmt.Sprintf("omnichat/generated/%d/%s%s.jpg", job.OwnerUserID, job.ID.String(), models.OmniChatThumbnailSuffix)
 	if _, err := h.storage.Upload(ctx, key, file, "image/jpeg"); err != nil {
 		return warn(err, "omnichat: the thumbnail could not be stored")
 	}
