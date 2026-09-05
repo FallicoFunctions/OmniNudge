@@ -31,13 +31,18 @@ const thumbnailTimeout = 30 * time.Second
 // the asset, returning the URL to record and the storage key to clean up. Both
 // are empty when there is no thumbnail.
 //
+// Only for a render that becomes a gallery asset. A likeness candidate and a
+// reference are never listed in a grid, and their discard removes a media_files
+// row -- which a thumbnail is not -- so a tile image for one is work nobody
+// wants and an object nothing can find again.
+//
 // A missing thumbnail is never a reason to fail a render. The user paid for the
 // picture, the picture is in hand, and a tile without a preview is a smaller
 // loss than a refund and a retry.
 func (h *OmniChatGenerationHandler) storeThumbnail(
 	ctx context.Context, job *models.OmniChatGenerationJob, kind models.OmniChatMediaKind, sourcePath, assetKey string,
 ) (string, string) {
-	if h.thumbnails == nil {
+	if h.thumbnails == nil || !job.Mode.MakesAGalleryAsset() {
 		return "", ""
 	}
 	key, ok := models.OmniChatThumbnailKeyFor(assetKey)

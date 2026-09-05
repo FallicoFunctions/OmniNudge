@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -238,4 +239,95 @@ func mustMarkRunning(t *testing.T, ctx context.Context, repo *models.OmniChatMed
 	marked, err := repo.MarkGenerationJobRunning(ctx, id, "social-provider-job")
 	require.NoError(t, err)
 	return marked
+}
+
+// The thumbnail answers to exactly the people the asset answers to.
+//
+// Both go through one gate constant, but a shared constant only proves the two
+// queries read the same text -- it says nothing about whether the second query
+// binds it correctly. This runs the thumbnail path against the real schema
+// through every state the gate exists to refuse, beside the asset path that has
+// always been checked this way. A thumbnail readable by somebody the asset is
+// not would leak the picture in miniature.
+func TestAPublishedThumbnailIsGatedExactlyAsItsAssetIs(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	users := models.NewUserRepository(db.Pool)
+	owner := &models.User{Username: "thumb_gate_owner", PasswordHash: "hash", Role: "user"}
+	reader := &models.User{Username: "thumb_gate_reader", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, users.Create(ctx, owner))
+	require.NoError(t, users.Create(ctx, reader))
+
+	var personaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `
+		INSERT INTO bot_personas (slug, name, category, system_prompt, visibility, source_format, is_active)
+		VALUES ('thumb-gate-persona', 'Sadie', 'original', 'Stay in character.', 'public', 'native', TRUE)
+		RETURNING id`).Scan(&personaID))
+
+	request, err := services.NormalizeOmniChatGenerationRequest(models.OmniChatGenerationRequest{
+		Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeCreate,
+		PersonaID: personaID, Prompt: "Sadie beside the park fountain",
+	})
+	require.NoError(t, err)
+	mediaRepo := models.NewOmniChatMediaRepository(db.Pool)
+	job, err := mediaRepo.CreateGenerationJob(ctx, owner.ID, withGenerationBillingReservation(t, ctx, db.Pool, owner.ID, request), "test")
+	require.NoError(t, err)
+	require.True(t, mustMarkRunning(t, ctx, mediaRepo, job.ID))
+
+	// The key the worker really writes, built by the function that writes it,
+	// so this cannot drift away from the shape in storage.
+	assetKey := fmt.Sprintf("omnichat/generated/%d/%s.png", owner.ID, job.ID)
+	thumbnailKey, ok := models.OmniChatThumbnailKeyFor(assetKey)
+	require.True(t, ok)
+
+	asset := &models.OmniChatMediaAsset{}
+	thumbnailURL := "/uploads/" + thumbnailKey
+	require.NoError(t, mediaRepo.CompleteGenerationJob(ctx, job.ID, &models.MediaFile{
+		UserID: owner.ID, Filename: "still.png", OriginalFilename: "still.png",
+		FileType: "image/png", FileSize: 1024, StorageURL: "/uploads/" + assetKey,
+		StoragePath: assetKey, ThumbnailURL: &thumbnailURL, ScanStatus: models.MediaScanStatusClean,
+	}, asset, 1<<30, 50<<30, models.OmniChatGenerationProvenance{}))
+
+	social := models.NewOmniChatSocialRepository(db.Pool)
+
+	// Unpublished: the asset exists and nobody outside may have either part.
+	strangerKey, err := social.PublicAssetThumbnailPath(ctx, asset.ID, &reader.ID)
+	require.NoError(t, err)
+	require.Empty(t, strangerKey, "an unpublished thumbnail was readable")
+
+	_, err = social.PublishAssetOwned(ctx, owner.ID, asset.ID, "A day at the park")
+	require.NoError(t, err)
+
+	published, err := social.PublicAssetThumbnailPath(ctx, asset.ID, &reader.ID)
+	require.NoError(t, err)
+	require.Equal(t, thumbnailKey, published)
+	anonymous, err := social.PublicAssetThumbnailPath(ctx, asset.ID, nil)
+	require.NoError(t, err)
+	require.Equal(t, thumbnailKey, anonymous, "a published thumbnail must be readable without an account")
+
+	_, err = db.Pool.Exec(ctx, `UPDATE users SET banned=TRUE WHERE id=$1`, owner.ID)
+	require.NoError(t, err)
+	bannedKey, err := social.PublicAssetThumbnailPath(ctx, asset.ID, &reader.ID)
+	require.NoError(t, err)
+	require.Empty(t, bannedKey, "a banned author's thumbnail stayed readable")
+	_, err = db.Pool.Exec(ctx, `UPDATE users SET banned=FALSE WHERE id=$1`, owner.ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `INSERT INTO blocked_users(blocker_id,blocked_id) VALUES($1,$2)`, owner.ID, reader.ID)
+	require.NoError(t, err)
+	blockedKey, err := social.PublicAssetThumbnailPath(ctx, asset.ID, &reader.ID)
+	require.NoError(t, err)
+	require.Empty(t, blockedKey, "a blocked viewer read the thumbnail the asset would have refused them")
+	_, err = db.Pool.Exec(ctx, `DELETE FROM blocked_users WHERE blocker_id=$1 AND blocked_id=$2`, owner.ID, reader.ID)
+	require.NoError(t, err)
+
+	// The two answers must agree, which is the point of one gate.
+	assetPath, _, err := social.PublicAssetStoragePath(ctx, asset.ID, &reader.ID)
+	require.NoError(t, err)
+	require.Equal(t, assetKey, assetPath)
 }

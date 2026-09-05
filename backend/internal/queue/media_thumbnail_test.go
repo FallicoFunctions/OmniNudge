@@ -119,3 +119,36 @@ func TestAHandlerWithNoThumbnailServiceStillFinishesTheJob(t *testing.T) {
 	require.Equal(t, 1, store.completeCalls)
 	require.Nil(t, store.completedMedia.ThumbnailURL)
 }
+
+// A likeness candidate and a reference never appear in a grid, and their
+// discard removes a media_files row -- which a thumbnail is not. Three of every
+// four candidates are deleted on the pick, so a tile image for one is work
+// nobody wants and an object nothing can find again.
+func TestARenderThatIsNotAGalleryAssetGetsNoThumbnail(t *testing.T) {
+	ffmpegOrSkip(t)
+	for _, mode := range []models.OmniChatGenerationMode{
+		models.OmniChatGenerationModeLikeness,
+		models.OmniChatGenerationModeLikenessReference,
+	} {
+		t.Run(string(mode), func(t *testing.T) {
+			job := newSceneVideoJob()
+			job.Kind = models.OmniChatMediaKindImage
+			job.Mode = mode
+			store := &twoPhaseStoreFake{job: job}
+			storage := &twoPhaseStorageFake{}
+			handler := thumbnailHandler(t, store, &twoPhaseProviderFake{}, storage)
+
+			still := writeTestPNG(t, t.TempDir())
+			handler.downloadMedia = func(_ context.Context, _ string, _ modelsMediaKind, _ int64, _ *mediaBearer, _ ...string) (*generatedMediaDownload, func(), error) {
+				return &generatedMediaDownload{Path: still, Size: 11, ContentType: "image/png", Extension: ".png"}, func() {}, nil
+			}
+
+			require.NoError(t, handler.process(context.Background(), store.job.ID))
+
+			for _, key := range storage.uploads {
+				require.NotContains(t, key, models.OmniChatThumbnailSuffix,
+					"a render nobody lists in a grid was given a tile image")
+			}
+		})
+	}
+}

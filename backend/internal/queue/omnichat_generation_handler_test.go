@@ -985,6 +985,14 @@ func TestAFinishedRenderGoesWhereItsModeSays(t *testing.T) {
 
 			require.NoError(t, commit(&models.MediaFile{}, &models.OmniChatMediaAsset{}, models.OmniChatGenerationProvenance{}))
 			require.Equal(t, mode.want, store.destination)
+
+			// One rule, two readers. MakesAGalleryAsset decides whether a render
+			// gets a tile image, and it has to mean exactly what commitFor means
+			// by writing an asset -- a thumbnail for a likeness candidate is an
+			// object in storage that the discard cannot find, because the
+			// discard removes a media_files row and a thumbnail is not one.
+			require.Equal(t, mode.want == "asset", mode.mode.MakesAGalleryAsset(),
+				"the two readers of one rule disagree about %s", mode.mode)
 		})
 	}
 }

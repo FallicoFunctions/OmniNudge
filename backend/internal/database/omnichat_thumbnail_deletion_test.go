@@ -34,7 +34,13 @@ func TestDeletingAnAssetQueuesItsThumbnailToo(t *testing.T) {
 
 	jobID := uuid.New()
 	clipKey := fmt.Sprintf("omnichat/generated/%d/%s.mp4", owner.ID, jobID)
-	thumbnailKey := fmt.Sprintf("omnichat/generated/%d/%s-thumb.jpg", owner.ID, jobID)
+	// Built by the function the worker builds it with, never spelled out here.
+	// A literal in a test is a second opinion about the shape, and this one was
+	// already wrong once: it still said "<job id>-thumb.jpg" after the writer
+	// had moved to naming the whole asset file, so the test went on passing
+	// while describing a key that no longer existed.
+	thumbnailKey, ok := models.OmniChatThumbnailKeyFor(clipKey)
+	require.True(t, ok)
 
 	var fileID int
 	require.NoError(t, db.Pool.QueryRow(ctx, `
@@ -135,7 +141,9 @@ func publishOneAsset(ctx context.Context, t *testing.T, db *database.DB, ownerID
 	clipKey := fmt.Sprintf("omnichat/generated/%d/%s.mp4", ownerID, jobID)
 	var thumbnail *string
 	if thumb {
-		value := fmt.Sprintf("/uploads/omnichat/generated/%d/%s-thumb.jpg", ownerID, jobID)
+		key, ok := models.OmniChatThumbnailKeyFor(clipKey)
+		require.True(t, ok)
+		value := "/uploads/" + key
 		thumbnail = &value
 	}
 

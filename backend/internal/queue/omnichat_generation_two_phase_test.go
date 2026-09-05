@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -513,10 +512,14 @@ func TestASucceededJobKeepsItsStill(t *testing.T) {
 	require.Empty(t, store.deletedAssets)
 }
 
-func (f *twoPhaseStoreFake) AttachLikenessCandidate(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
-	return nil, errors.New("not expected")
+func (f *twoPhaseStoreFake) AttachLikenessCandidate(_ context.Context, _ uuid.UUID, media *models.MediaFile, _, _ int64, _ models.OmniChatGenerationProvenance) (*models.OmniChatOmniAILikenessCandidate, error) {
+	f.completedMedia = media
+	f.completeCalls++
+	return &models.OmniChatOmniAILikenessCandidate{}, nil
 }
 
-func (f *twoPhaseStoreFake) AttachLikenessReference(context.Context, uuid.UUID, *models.MediaFile, int64, int64, models.OmniChatGenerationProvenance) error {
-	return errors.New("not expected")
+func (f *twoPhaseStoreFake) AttachLikenessReference(_ context.Context, _ uuid.UUID, media *models.MediaFile, _, _ int64, _ models.OmniChatGenerationProvenance) error {
+	f.completedMedia = media
+	f.completeCalls++
+	return nil
 }

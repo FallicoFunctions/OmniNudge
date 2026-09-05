@@ -53,6 +53,24 @@ const (
 	OmniChatGenerationModeLikenessReference OmniChatGenerationMode = "likeness_reference"
 )
 
+// MakesAGalleryAsset says whether a finished render in this mode becomes a
+// picture in somebody's gallery.
+//
+// A likeness and its supporting references are pictures of her that the account
+// does not own yet, or ever: three of the four candidates are deleted on the
+// pick and no reference is ever shown to anybody. Nothing that is not a gallery
+// asset needs a tile image, and making one for a candidate leaves an object in
+// storage that the discard cannot find -- the discard removes the media_files
+// row, and a thumbnail is not one.
+func (m OmniChatGenerationMode) MakesAGalleryAsset() bool {
+	switch m {
+	case OmniChatGenerationModeLikeness, OmniChatGenerationModeLikenessReference:
+		return false
+	default:
+		return true
+	}
+}
+
 type OmniChatGenerationStatus string
 
 const (
