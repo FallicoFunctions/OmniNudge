@@ -158,9 +158,16 @@ type OmniChatMediaConfig struct {
 	// signs with a key pair rather than a bearer token, so both halves are
 	// required and one without the other is not partial configuration -- it is
 	// no configuration.
+	//
+	// VEO_API_KEY rather than GEMINI_API_KEY, which is already taken by the Hub
+	// AI Designer. One Gemini key can serve both, and the same value may go in
+	// both variables -- but a live feature and a trial should not share a
+	// rotation, a quota, or a blast radius. Naming the product rather than the
+	// vendor also survives Veo moving to Vertex AI, where the credential is not
+	// a Gemini key at all.
 	KlingAccessKey string
 	KlingSecretKey string
-	GeminiAPIKey   string
+	VeoAPIKey      string
 }
 
 type OmniChatVoiceConfig struct {
@@ -449,7 +456,7 @@ func Load() (*Config, error) {
 			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
 			KlingAccessKey:              getEnv("KLING_ACCESS_KEY", ""),
 			KlingSecretKey:              getEnv("KLING_SECRET_KEY", ""),
-			GeminiAPIKey:                getEnv("GEMINI_API_KEY", ""),
+			VeoAPIKey:                   getEnv("VEO_API_KEY", ""),
 			RunPodInputHosts:            getEnvAsStringList("RUNPOD_INPUT_HOSTS"),
 			RunPodOutputHosts:           getEnvAsStringList("RUNPOD_OUTPUT_HOSTS"),
 			RunPodPodAPIURL:             getEnv("RUNPOD_POD_API_URL", "https://api.runpod.io/graphql"),
