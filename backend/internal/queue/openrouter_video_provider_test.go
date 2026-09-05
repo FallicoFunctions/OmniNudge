@@ -184,3 +184,39 @@ func TestCancelFallsBackToTheDefaultProvider(t *testing.T) {
 
 	require.Equal(t, []string{"endpoint-image/job-2"}, image.cancels)
 }
+
+// The round trip: what the builder wrote, read back through the adapter.
+//
+// The key test proves every key is present and the builder's types are right.
+// It says nothing about the reads, and the reads are type assertions on an
+// untyped map -- so changing intField to assert int64 turned every clip's
+// duration into zero and the whole queue suite still passed. Found by mutating
+// the accessor rather than the field.
+func TestVideoRequestFromInputReadsEveryFieldTheBuilderWrote(t *testing.T) {
+	job := hostedVideoJob()
+	spec, err := BuildOpenRouterVideoSpec(hostedVideoConfig(), job, "https://signed.example.test/still.png")
+	require.NoError(t, err)
+
+	request := VideoRequestFromInput(spec.EndpointID, spec.Input)
+
+	require.Equal(t, "minimax/hailuo-3", request.Model)
+	require.Equal(t, spec.Input[videoInputPrompt], request.Prompt)
+	require.Equal(t, spec.Input[videoInputDuration], request.Duration,
+		"duration was read back as zero: the adapter's type assertion no longer matches what the builder writes")
+	require.Equal(t, spec.Input[videoInputResolution], request.Resolution)
+	require.Equal(t, spec.Input[videoInputAspectRatio], request.AspectRatio)
+	require.NotNil(t, request.Seed)
+	require.Equal(t, spec.Input[videoInputSeed], *request.Seed)
+	require.Len(t, request.FrameImages, 1)
+	require.Equal(t, spec.Input[videoInputFirstFrame], request.FrameImages[0].URL)
+	require.Equal(t, "first_frame", request.FrameImages[0].FrameType)
+
+	// Nothing the builder wrote may read back as a zero value. A silent zero is
+	// the failure this whole file guards: an absent duration becomes the
+	// provider's own default, and nobody sees a defect until the clip is the
+	// wrong length.
+	require.NotZero(t, request.Duration)
+	require.NotEmpty(t, request.Resolution)
+	require.NotEmpty(t, request.AspectRatio)
+	require.NotEmpty(t, request.Prompt)
+}
