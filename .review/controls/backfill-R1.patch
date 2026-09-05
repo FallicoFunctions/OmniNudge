@@ -1,0 +1,13 @@
+diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
+index af8051d85..9eb912ea1 100644
+--- a/backend/internal/models/omnichat_media.go
++++ b/backend/internal/models/omnichat_media.go
+@@ -1103,7 +1103,7 @@ func OmniChatThumbnailKeyFor(storagePath string) (string, bool) {
+ 	// leaves a still and a clip under one job id, and dropping the extension
+ 	// gave both of them the same thumbnail -- one object, two pictures, the
+ 	// second silently overwriting the first.
+-	return storagePath + OmniChatThumbnailSuffix + ".jpg", true
++	return strings.TrimSuffix(storagePath, path.Ext(storagePath)) + OmniChatThumbnailSuffix + ".jpg", true
+ }
+ 
+ // OmniChatThumbnailStorageKey turns a stored thumbnail URL back into a storage

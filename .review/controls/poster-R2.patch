@@ -1,12 +1,15 @@
 diff --git a/backend/internal/models/omnichat_media.go b/backend/internal/models/omnichat_media.go
-index 1652999f7..d935a595c 100644
+index af8051d85..ca7a7aa14 100644
 --- a/backend/internal/models/omnichat_media.go
 +++ b/backend/internal/models/omnichat_media.go
-@@ -1064,8 +1064,7 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
- 	// rule or it is invisible to it: the deletion guard refuses any path this
- 	// rejects, so a shape missing from here is a shape that never gets cleaned
- 	// up.
--	stem := strings.TrimSuffix(strings.TrimSuffix(parts[3], extension), OmniChatThumbnailSuffix)
+@@ -1069,11 +1069,7 @@ func IsOmniChatGeneratedStoragePath(storagePath string) bool {
+ 	// job leaves two assets under one job id -- the still it rendered first and
+ 	// the clip it animated -- differing only by extension. A thumbnail named
+ 	// for the job would be one file for two different pictures.
+-	stem := strings.TrimSuffix(parts[3], extension)
+-	if trimmed, isThumbnail := strings.CutSuffix(stem, OmniChatThumbnailSuffix); isThumbnail {
+-		stem = strings.TrimSuffix(trimmed, path.Ext(trimmed))
+-	}
 -	_, err = uuid.Parse(stem)
 +	_, err = uuid.Parse(strings.TrimSuffix(parts[3], extension))
  	return err == nil

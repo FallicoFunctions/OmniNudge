@@ -129,6 +129,12 @@
    "asks": "Which constant, rule or literal now exists twice?"
   },
   {
+   "id": "E6",
+   "name": "Where else does this shape occur?",
+   "trigger": "any finding, before it is written down",
+   "asks": "A defect is a shape, and a repository rarely has one instance of a shape. Having found one, grep for every other place that makes or reads the same kind of value and ask the same question there. The download path named a temp file before it knew the file type, so the name had no extension and ffmpeg could not choose a container -- and resolveMediaSource, written by somebody else for a different job, does exactly the same thing, so the shipped thumbnail job could never make a video thumbnail for anything stored remotely. One was found by a test; the second was found only by looking for it. Do this while the shape is still in your head, because after the fix is committed nobody looks again."
+  },
+  {
    "id": "F1",
    "name": "Race detector",
    "trigger": "a goroutine or shared state changed",

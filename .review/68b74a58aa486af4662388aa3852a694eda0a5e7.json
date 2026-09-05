@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "dc328cada",
+ "head": "d6cd56a26",
  "base": "68b74a58aa486af4662388aa3852a694eda0a5e7",
  "scope": {
   "files": [
@@ -32,7 +32,12 @@
    "frontend/src/pages/__tests__/OmniChatExplorePage.test.tsx",
    "frontend/src/services/omnichatService.ts",
    "frontend/src/services/__tests__/omnichatService.test.ts",
-   "frontend/src/types/omnichat.ts"
+   "frontend/src/types/omnichat.ts",
+   "backend/cmd/backfill_thumbnails/main.go",
+   "backend/internal/queue/media_source.go",
+   "backend/internal/queue/media_source_test.go",
+   "backend/internal/queue/media_thumbnail.go",
+   "backend/internal/queue/media_thumbnail_test.go"
   ],
   "boundaries": [
    "the worker -> ffmpeg and ffprobe: the argv that measures a clip, samples it and makes its poster",
@@ -41,7 +46,8 @@
    "a database row -> a storage key: a value read back out of the database and used to address storage",
    "the handlers -> the browser: the asset JSON, and two new routes that return bytes",
    "the publication access gate -> two queries that must answer the same question",
-   "the React media view -> the API: which endpoint each mode calls, and how much it costs to draw a page"
+   "the React media view -> the API: which endpoint each mode calls, and how much it costs to draw a page",
+   "stored object -> a local file, whose NAME is read by ffmpeg and by the thumbnail service"
   ]
  },
  "prior_ledgers_read": [
@@ -768,6 +774,357 @@
      "id": "Z1",
      "status": "applied",
      "evidence": "Re-asked over dc328cada with the fixes in place; nothing new."
+    }
+   ],
+   "findings": []
+  },
+  {
+   "pass": 5,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "d6cd56a26: a backfill command, one function that names a thumbnail from an asset's key, and the extension of a file resolved out of storage. New boundary: a stored object copied to a local file whose name is then read as a type declaration."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Passes 1 to 4 re-read. Pass 4 declared clean over dc328cada and had missed the key collision, which needs two real rows to be visible at all."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The command's plan is the artifact: printed for all 34 real assets with --dry-run, twice, before and after the key changed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "This is what found backfill-R1. Printing the key that would be written for every real row showed two rows mapping to one object, twice over -- the still and the clip of the same two-phase job. Then the rows themselves were read back after the run, and the stored object was fetched out of R2 and looked at: 49.6 KB, the right picture."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Run for real against the live bucket and the live database. 34 of 34, no failures, a second run a no-op, and the result downloaded again and viewed rather than only measured."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "One function now names a thumbnail, and it takes the asset's key rather than the job id, so the writer and every reader cannot disagree."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "No shape crossing to a client changed."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The key was being built in two places -- the worker by fmt from the job id, the backfill from the storage path. Now one function, and it is the reason the collision could be fixed in one place."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The key round-trips through the real writer and the real readers: written by the backfill, read back from the database, fetched from storage."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The command's own temp file is built the way production builds it, keeping the object's extension, which is the fix this instrument's first finding taught."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both real extensions accepted: .png for a still, .mp4 for a clip, asserted to produce different keys."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A thumbnail of a thumbnail, a path outside generated media, a traversal, and an empty path are all refused a key."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A remote key with no extension still resolves; the command's limit of zero means all; a rerun over an already-filled table does nothing."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The backfill carries the guards the worker path carries: the same key rule, the same size the service caps at, the same scan-status filter the routes apply."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of the command exercised against real data: image, video, dry run, rerun. The unsupported-type branch is unreachable from the current query, which only selects assets, and is kept as a refusal rather than a silent skip."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure is printed with the media id and the command exits non-zero if any row failed, rather than reporting success over a partial run."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The two ways of naming a thumbnail became one."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The instrument this pass added, and what found backfill-R2. Having found that the download path names a temp file before it knows the type, grepped for every other producer of a local path from a stored object: resolveMediaSource does the same thing, so the shipped thumbnail job could never make a video thumbnail for anything stored remotely."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "The command is sequential and single-process."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The object is stored before the row is written, and the update is conditional on the column still being null -- so an interrupted run leaves an unreferenced object and never a row pointing at nothing, and a concurrent run cannot double-write."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Backfilled thumbnails follow the same deletion path as new ones, because they satisfy the same key rule. Verified the new key shape passes IsOmniChatGeneratedStoragePathForOwner, which is what the deletion guard requires."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two controls built and replayed by hand; both produce a named assertion failure. All nine controls apply at HEAD."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The command is run by an operator and prints what it will do before it does it. Nothing else invokes it, which is correct for a one-off."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet over internal and cmd, gofmt, tsc -b clean. queue, handlers, models and database pass with -p 1. Frontend 906 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "E6 added: where else does this shape occur. It is what found backfill-R2, and no existing row asked it."
+    }
+   ],
+   "findings": [
+    {
+     "id": "backfill-R1",
+     "summary": "a two-phase video job leaves two assets under one job id -- the still it rendered and the clip it animated -- and the thumbnail key was built from the job id, so both mapped to one object and the clip's thumbnail would have overwritten the still's",
+     "found_by": "B4",
+     "fix_commit": "d6cd56a26",
+     "control": {
+      "patch": ".review/controls/backfill-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/models/ -run TestTheStillAndTheClipOfOneJobGetDifferentThumbnails"
+      ],
+      "observed": "FAIL with \"one job's two assets share a thumbnail\""
+     }
+    },
+    {
+     "id": "backfill-R2",
+     "summary": "resolveMediaSource writes a stored object to a temp file with no extension, and the thumbnail service refuses a source whose type it cannot read from the name -- so the shipped thumbnail_generation job could never make a video thumbnail for anything stored remotely",
+     "found_by": "E6",
+     "fix_commit": "d6cd56a26",
+     "control": {
+      "patch": ".review/controls/backfill-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestAResolvedRemoteSourceKeepsItsExtension"
+      ],
+      "observed": "FAIL with 'the downloaded source does not say what it holds'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 6,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The backfill's plan printed once more after the key changed: 34 rows, 34 distinct keys, no collision. The table then read back with every thumbnail_url set."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The whole gallery was backfilled for real and one result fetched back out of storage and viewed. Nothing model-facing changed."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "No shape crossing to a client changed."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Applied again over the fixes: grepped every remaining os.CreateTemp and every place a stored object becomes a local path. The download path, the media source and the backfill all keep the extension now, and no fourth producer exists."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "The command is sequential and single-process."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All nine controls apply at HEAD and each produces a named assertion failure, verified one at a time with a restore between."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over d6cd56a26 with the fixes in place; nothing new."
     }
    ],
    "findings": []

@@ -1,13 +1,13 @@
 diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
-index ed4ceb4a4..379f00fcf 100644
+index 038af478a..eb2e61385 100644
 --- a/backend/internal/queue/omnichat_generation_handler.go
 +++ b/backend/internal/queue/omnichat_generation_handler.go
 @@ -961,7 +961,7 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
  
  	// A tile has to show something that is not the asset itself. Stored beside
  	// it and behind the same access gate, never as a direct storage URL.
--	if url, key := h.storeThumbnail(ctx, job, kind, download.Path); key != "" {
-+	if url, key := h.storeThumbnail(ctx, job, kind, download.Path); key != "" && kind == models.OmniChatMediaKindVideo {
+-	if url, key := h.storeThumbnail(ctx, job, kind, download.Path, storageKey); key != "" {
++	if url, key := h.storeThumbnail(ctx, job, kind, download.Path, storageKey); key != "" && kind == models.OmniChatMediaKindVideo {
  		thumbnailKey = key
  		media.ThumbnailURL = &url
  	}

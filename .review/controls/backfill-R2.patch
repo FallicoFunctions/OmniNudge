@@ -1,0 +1,14 @@
+diff --git a/backend/internal/queue/media_source.go b/backend/internal/queue/media_source.go
+index de510dd2a..f6530ce9d 100644
+--- a/backend/internal/queue/media_source.go
++++ b/backend/internal/queue/media_source.go
+@@ -58,7 +58,8 @@ func resolveMediaSource(ctx context.Context, localPath, remoteKey string, storag
+ 	// name -- so every video stored remotely came back as "not a supported
+ 	// video file" and got no thumbnail at all. ffmpeg has the same habit on the
+ 	// output side.
+-	tempFile, err := os.CreateTemp("", "omnimedia-*"+path.Ext(remoteKey))
++	_ = path.Ext
++	tempFile, err := os.CreateTemp("", "omnimedia-*")
+ 	if err != nil {
+ 		return "", nil, fmt.Errorf("create temp media source: %w", err)
+ 	}
