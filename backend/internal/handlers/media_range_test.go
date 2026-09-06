@@ -228,3 +228,22 @@ func (*plainStorageFake) PublicURL(string) string { return "" }
 func (*plainStorageFake) GetObjectSize(context.Context, string) (int64, error) {
 	return 0, nil
 }
+
+// A partial answer must not be stored as if it were the whole file.
+//
+// The explore route lets a shared cache keep an anonymous response for five
+// minutes. A cache that stored one 206 under the URL could hand its slice to
+// the next plain GET, and every viewer would get a truncated clip.
+func TestARangeIsKeptApartFromTheWholeFileInACache(t *testing.T) {
+	storage := &rangeStorageFake{body: []byte("0123456789")}
+	router := servingRouter(t, storage, 10)
+
+	partial := requestRange(router, "bytes=0-2")
+	require.Equal(t, http.StatusPartialContent, partial.Code)
+	require.Contains(t, partial.Header().Values("Vary"), "Range")
+
+	whole := requestRange(router, "")
+	require.Equal(t, http.StatusOK, whole.Code)
+	require.Contains(t, whole.Header().Values("Vary"), "Range",
+		"a cache stores the whole answer under the same key, so it has to be told too")
+}

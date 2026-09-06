@@ -103,6 +103,13 @@ func parseByteRange(header string, size int64) (*byteRange, error) {
 // already set Content-Type, Content-Disposition, Cache-Control and any Vary.
 func serveStoredObject(c *gin.Context, storage services.StorageService, key string, size int64) {
 	c.Header("Accept-Ranges", "bytes")
+	// A partial answer must not be stored as if it were the whole file.
+	//
+	// The explore route lets a shared cache keep an anonymous response for five
+	// minutes. Without this, a cache that stored one 206 under the URL could
+	// hand its slice to the next plain GET, and every viewer would get a
+	// truncated clip. Keying on Range keeps the two apart.
+	c.Writer.Header().Add("Vary", "Range")
 
 	requested, err := parseByteRange(c.GetHeader("Range"), size)
 	if err != nil {

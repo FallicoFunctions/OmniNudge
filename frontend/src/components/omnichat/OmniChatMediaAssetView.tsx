@@ -22,6 +22,14 @@ type AnyMediaAsset = OmniChatMediaAsset | OmniChatMessageMediaAsset | OmniChatPu
  * arrived; seeking; its own cache; and native lazy loading -- and one real clip
  * is 6.6 MB before a first frame could appear.
  *
+ * Every element carries crossOrigin="use-credentials", and it is load-bearing.
+ * The API is its own origin in development and under the deployment that puts
+ * it on api.omninudge.com, and a cross-origin img or video sends NO cookie
+ * unless it is asked to -- so without this the session never arrives, every
+ * request is a 401, and all media is broken. The attribute is ignored when the
+ * API is same-origin, so it is right either way. The server already echoes the
+ * origin and allows credentials for the app's own origins.
+ *
  * What is lost: a 401 on an element cannot run the refresh-and-retry that the
  * fetch wrapper does. The page's own API calls meet that first and refresh, and
  * the retry below is the manual way back.
@@ -70,7 +78,13 @@ export default function OmniChatMediaAssetView({
   }
   // Retrying has to ask for something the browser has not already failed on,
   // or the cache answers with the same failure and the button does nothing.
-  const retry = attempt > 0 ? `${contentSrc?.includes('?') ? '&' : '?'}retry=${attempt}` : '';
+  //
+  // Per URL, not once: the separator depends on whether THAT url already has a
+  // query, and one suffix computed from the content URL and pasted onto the
+  // thumbnail produces "...jpg&retry=1" with no question mark the moment the
+  // two differ.
+  const withRetry = (url: string) =>
+    attempt > 0 ? `${url}${url.includes('?') ? '&' : '?'}retry=${attempt}` : url;
 
   const badge = (
     <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur">
@@ -106,8 +120,9 @@ export default function OmniChatMediaAssetView({
       >
         {thumbnailSrc ? (
           <img
-            src={thumbnailSrc + retry}
+            src={withRetry(thumbnailSrc)}
             alt={alt}
+            crossOrigin="use-credentials"
             // The browser defers a tile below the fold on its own. An
             // IntersectionObserver here would be a second, worse copy of what
             // it already does for an img with a src.
@@ -146,7 +161,8 @@ export default function OmniChatMediaAssetView({
         className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
       >
         <video
-          src={contentSrc + retry}
+          src={withRetry(contentSrc)}
+          crossOrigin="use-credentials"
           // The thumbnail shows while the clip is still arriving, so an opened
           // tile does not go black between the tile and the first frame.
           poster={thumbnailSrc ?? undefined}
@@ -169,8 +185,9 @@ export default function OmniChatMediaAssetView({
       className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black/25 ${className}`}
     >
       <img
-        src={contentSrc + retry}
+        src={withRetry(contentSrc)}
         alt={alt}
+        crossOrigin="use-credentials"
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}

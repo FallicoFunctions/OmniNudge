@@ -128,7 +128,28 @@ describe('OmniChatMediaAssetView', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
 
     const image = await screen.findByRole('img', { name: 'Sadie at the park' });
-    expect(image.getAttribute('src')).toContain('retry=1');
+    expect(image.getAttribute('src')).toContain('?retry=1');
+  });
+
+  // The separator depends on the URL it is appended to. One suffix computed
+  // from the content URL and pasted onto the thumbnail produces
+  // "...jpg&retry=1" with no question mark the moment the two differ.
+  it('joins the retry to whichever url it is appending to', async () => {
+    render(
+      <OmniChatMediaAssetView
+        asset={{
+          ...baseAsset,
+          content_url: '/api/v1/omnichat/media/asset-1/content?v=2',
+        }}
+      />
+    );
+
+    fireEvent.error(await screen.findByRole('img', { name: 'Sadie at the park' }));
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    const src = (await screen.findByRole('img', { name: 'Sadie at the park' })).getAttribute('src');
+    expect(src).toContain('?v=2&retry=1');
+    expect(src).not.toContain('??');
   });
 
   describe('as a grid tile', () => {
@@ -181,6 +202,36 @@ describe('OmniChatMediaAssetView', () => {
 
       const thumbnail = await screen.findByRole('img', { name: 'Sadie at the park' });
       expect(thumbnail.getAttribute('src')).toContain('/thumbnail');
+    });
+  });
+
+  // Load-bearing, and invisible when it is missing until every picture is gone.
+  //
+  // The API is its own origin in development and under the deployment that puts
+  // it on api.omninudge.com. A cross-origin img or video sends NO cookie unless
+  // it is asked to, so without this the session never arrives, every request is
+  // a 401, and all media is broken. The attribute is ignored when the API is
+  // same-origin, so it is right either way.
+  describe('credentials', () => {
+    it('asks every element to send the session', async () => {
+      render(<OmniChatMediaAssetView asset={baseAsset} />);
+      expect(await screen.findByRole('img', { name: 'Sadie at the park' })).toHaveAttribute(
+        'crossorigin',
+        'use-credentials'
+      );
+    });
+
+    it('asks the clip to send the session', () => {
+      render(<OmniChatMediaAssetView asset={clip} />);
+      expect(document.querySelector('video')).toHaveAttribute('crossorigin', 'use-credentials');
+    });
+
+    it('asks the tile to send the session', async () => {
+      render(<OmniChatMediaAssetView asset={clip} preview />);
+      expect(await screen.findByRole('img', { name: 'Sadie at the park' })).toHaveAttribute(
+        'crossorigin',
+        'use-credentials'
+      );
     });
   });
 });
