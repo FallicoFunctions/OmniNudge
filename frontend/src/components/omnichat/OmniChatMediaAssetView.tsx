@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { ImageIcon, Loader2, Play, RefreshCw, Video } from 'lucide-react';
 import { omnichatService } from '../../services/omnichatService';
 import type {
@@ -63,6 +64,43 @@ function useAuthorizedMediaUrl(
   return { objectUrl, failed };
 }
 
+/**
+ * Reports whether an element has come near the viewport, and stays true once it
+ * has.
+ *
+ * A grid mounts every tile at once, and each one starts its fetch immediately
+ * -- including the twenty that are below the fold and may never be looked at.
+ * The browser's own lazy loading cannot help, because these are fetches made by
+ * script rather than an image tag reading a src.
+ *
+ * Where there is no IntersectionObserver -- an old browser, a test environment
+ * -- everything is near. Losing the deferral costs bandwidth; getting it wrong
+ * the other way would leave a grid permanently blank.
+ */
+function useIsNearViewport(enabled: boolean) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [near, setNear] = useState(!enabled || typeof IntersectionObserver === 'undefined');
+
+  useEffect(() => {
+    if (near || !ref.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      // Start a little before the tile arrives, so a scroll meets a picture
+      // rather than a placeholder that begins loading on contact.
+      { rootMargin: '400px' },
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [near]);
+
+  return { ref, near };
+}
+
 export default function OmniChatMediaAssetView({
   asset,
   className = '',
@@ -86,6 +124,7 @@ export default function OmniChatMediaAssetView({
   const thumbnailURL = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
   const isVideo = asset.kind === 'video';
   const showsThumbnailOnly = preview && !opened;
+  const { ref: tileRef, near } = useIsNearViewport(showsThumbnailOnly);
 
   useEffect(() => {
     setOpened(false);
@@ -100,7 +139,7 @@ export default function OmniChatMediaAssetView({
     attempt,
   );
   const { objectUrl: thumbnailUrl } = useAuthorizedMediaUrl(
-    showsThumbnailOnly && thumbnailURL ? 'thumbnail' : null,
+    showsThumbnailOnly && thumbnailURL && near ? 'thumbnail' : null,
     asset.id,
     asset.content_url,
     thumbnailURL,
@@ -120,6 +159,7 @@ export default function OmniChatMediaAssetView({
     return (
       <button
         type="button"
+        ref={tileRef as RefObject<HTMLButtonElement>}
         aria-label={isVideo ? 'Play generated video' : 'Open generated image'}
         onClick={() => setOpened(true)}
         className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
@@ -138,20 +178,23 @@ export default function OmniChatMediaAssetView({
             // full-body picture that takes the head off.
             className="block h-full w-full object-contain"
           />
+        ) : !near ? (
+          // Below the fold. The tile holds its place and fetches nothing.
+          <span className="sr-only">Not yet loaded</span>
         ) : (
           // No thumbnail: everything generated before thumbnails existed, and
           // anything whose thumbnail could not be made. Showing the asset
           // instead would put the whole download back for exactly those.
           <span className="text-white/25">{isVideo ? <Video size={32} /> : <ImageIcon size={32} />}</span>
         )}
-        {isVideo && (
+        {near && isVideo && (
           <span className="absolute inset-0 flex items-center justify-center">
             <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
               <Play size={20} />
             </span>
           </span>
         )}
-        {badge}
+        {near && badge}
       </button>
     );
   }

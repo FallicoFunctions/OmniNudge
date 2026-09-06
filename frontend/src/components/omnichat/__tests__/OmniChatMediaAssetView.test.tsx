@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OmniChatMediaAssetView from '../OmniChatMediaAssetView';
 import { omnichatService } from '../../../services/omnichatService';
 import type { OmniChatMediaAsset } from '../../../types/omnichat';
@@ -104,8 +104,9 @@ describe('OmniChatMediaAssetView', () => {
     // A clip made before posters existed, or one whose poster could not be
     // made. Falling back to the clip would put the whole download back.
     it('shows a placeholder rather than the asset when there is no thumbnail', async () => {
-      const { thumbnail_url: _unused, ...withoutPoster } = clip;
-      render(<OmniChatMediaAssetView asset={withoutPoster} preview />);
+      const withoutThumbnail: OmniChatMediaAsset = { ...clip };
+      delete withoutThumbnail.thumbnail_url;
+      render(<OmniChatMediaAssetView asset={withoutThumbnail} preview />);
 
       await waitFor(() =>
         expect(screen.getByRole('button', { name: 'Play generated video' })).toBeInTheDocument()
@@ -153,5 +154,62 @@ describe('OmniChatMediaAssetView', () => {
     await waitFor(() => expect(document.querySelector('video')).toBeTruthy());
     expect(omnichatService.getMediaAssetContent).toHaveBeenCalled();
     expect(omnichatService.getMediaAssetThumbnail).not.toHaveBeenCalled();
+  });
+
+  // A grid mounts every tile at once and each one starts its fetch, including
+  // the twenty below the fold that may never be looked at. The browser's own
+  // lazy loading cannot help: these are fetches made by script, not an image
+  // tag reading a src.
+  describe('below the fold', () => {
+    // The stub is a global. Leaving it in place would decide the outcome of
+    // every test that runs after these two.
+    afterEach(() => vi.unstubAllGlobals());
+
+    const clip: OmniChatMediaAsset = {
+      ...baseAsset,
+      kind: 'video',
+      file_type: 'video/mp4',
+      thumbnail_url: '/api/v1/omnichat/media/id/thumbnail',
+    };
+
+    function stubIntersectionObserver() {
+      const callbacks: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+      class FakeObserver {
+        constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+          callbacks.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      }
+      vi.stubGlobal('IntersectionObserver', FakeObserver);
+      return { arrive: () => callbacks.forEach((c) => c([{ isIntersecting: true }])) };
+    }
+
+    it('fetches nothing until the tile comes near the screen', async () => {
+      const observer = stubIntersectionObserver();
+      render(<OmniChatMediaAssetView asset={clip} preview />);
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Play generated video' })).toBeInTheDocument()
+      );
+      expect(omnichatService.getMediaAssetThumbnail).not.toHaveBeenCalled();
+      expect(omnichatService.getMediaAssetContent).not.toHaveBeenCalled();
+
+      await act(async () => observer.arrive());
+
+      await waitFor(() => expect(omnichatService.getMediaAssetThumbnail).toHaveBeenCalled());
+      expect(omnichatService.getMediaAssetContent).not.toHaveBeenCalled();
+    });
+
+    // Losing the deferral costs bandwidth. Getting it wrong the other way would
+    // leave a grid permanently blank, so anywhere without an observer treats
+    // everything as near.
+    it('loads immediately where there is no observer to ask', async () => {
+      vi.stubGlobal('IntersectionObserver', undefined);
+      render(<OmniChatMediaAssetView asset={clip} preview />);
+
+      await waitFor(() => expect(omnichatService.getMediaAssetThumbnail).toHaveBeenCalled());
+    });
   });
 });
