@@ -1,0 +1,28 @@
+diff --git a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
+index a2925aa48..1f8221247 100644
+--- a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
++++ b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
+@@ -122,7 +122,6 @@ export default function OmniChatMediaAssetView({
+           <img
+             src={withRetry(thumbnailSrc)}
+             alt={alt}
+-            crossOrigin="use-credentials"
+             // The browser defers a tile below the fold on its own. An
+             // IntersectionObserver here would be a second, worse copy of what
+             // it already does for an img with a src.
+@@ -162,7 +161,6 @@ export default function OmniChatMediaAssetView({
+       >
+         <video
+           src={withRetry(contentSrc)}
+-          crossOrigin="use-credentials"
+           // The thumbnail shows while the clip is still arriving, so an opened
+           // tile does not go black between the tile and the first frame.
+           poster={thumbnailSrc ?? undefined}
+@@ -187,7 +185,6 @@ export default function OmniChatMediaAssetView({
+       <img
+         src={withRetry(contentSrc)}
+         alt={alt}
+-        crossOrigin="use-credentials"
+         loading="lazy"
+         decoding="async"
+         onError={() => setFailed(true)}

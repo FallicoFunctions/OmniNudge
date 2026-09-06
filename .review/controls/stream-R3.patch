@@ -1,0 +1,12 @@
+diff --git a/backend/internal/handlers/media_range.go b/backend/internal/handlers/media_range.go
+index f49edd65c..a9e83527f 100644
+--- a/backend/internal/handlers/media_range.go
++++ b/backend/internal/handlers/media_range.go
+@@ -109,7 +109,6 @@ func serveStoredObject(c *gin.Context, storage services.StorageService, key stri
+ 	// minutes. Without this, a cache that stored one 206 under the URL could
+ 	// hand its slice to the next plain GET, and every viewer would get a
+ 	// truncated clip. Keying on Range keeps the two apart.
+-	c.Writer.Header().Add("Vary", "Range")
+ 
+ 	requested, err := parseByteRange(c.GetHeader("Range"), size)
+ 	if err != nil {

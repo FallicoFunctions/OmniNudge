@@ -1,0 +1,405 @@
+{
+ "schema_version": 2,
+ "head": "d4c70b4a2",
+ "base": "121713a04",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/media_range.go",
+   "backend/internal/handlers/media_range_test.go",
+   "backend/internal/handlers/omnichat_media.go",
+   "backend/internal/handlers/omnichat_social.go",
+   "backend/internal/services/storage.go",
+   "backend/internal/services/storage_range_test.go",
+   "backend/internal/queue/omnichat_generation_handler.go",
+   "frontend/src/components/omnichat/OmniChatMediaAssetView.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx",
+   "frontend/src/services/omnichatService.ts",
+   "frontend/src/services/__tests__/omnichatService.test.ts",
+   "frontend/src/pages/__tests__/OmniChatChatPage.test.tsx"
+  ],
+  "boundaries": [
+   "the media routes -> a player: byte ranges, and what it may cache",
+   "the app -> the API across an ORIGIN, which decides whether a cookie is sent at all",
+   "a shared cache -> two different answers stored under one URL",
+   "storage -> a partial read, and the file handle behind it"
+  ]
+ },
+ "prior_ledgers_read": [
+  "68b74a58aa486af4662388aa3852a694eda0a5e7",
+  "a053fc7ebe0b5a28021865686c30e5392a072cc1"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Four commits: byte ranges on both content routes, media moved into a src, the tile assertion, and the removal of the playback reduction. Boundaries: the routes -> a player (ranges and cache keys); the app -> the API across an ORIGIN, which is what the whole change turns on; and a shared cache -> two different answers under one URL."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Ledgers 68b74a58a and a053fc7eb, both of this same media path. The second's cache-R3 is why B3 was aimed at what the client actually sends rather than at what the route declares."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Read the rendered markup for every branch: full image, clip, tile with a thumbnail, tile without, and the retry state. That is where the missing credential mode was visible -- the elements were plain src attributes with no mode at all."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed the responses for a whole request and a ranged one on both routes: 200 with Accept-Ranges and the full length, 206 with an inclusive Content-Range and the whole object's size after the slash, 416 with bytes */size. Then asked what a shared cache would store, which is stream-R3."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Nothing model-facing changed. The clips these routes now serve were rendered and watched earlier in this ledger's history; no prompt or provider input is unverified."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Range arithmetic is the constant that had to match across the seam: inclusive at both ends, and the size after the slash is the object's rather than the slice's. Both stated in tests rather than trusted."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The component reads URLs from exported resolvers now instead of Blobs from a service, and the two blob methods that no longer had a caller were removed rather than left as dead exports."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The other end of this contract is a browser, and the contract is CORS. Read the server's CORS middleware rather than assuming: it echoes the origin and allows credentials for the app's own origins and, outside production, for any loopback origin. That is what makes the fix for stream-R1 work, and reading it is what showed the fix was needed."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixture that mattered was the API base URL. Tests resolve against http://localhost:8080, which the component's own environment treats as another origin -- exactly as production does under .env.production. Asking what a real browser sends to that origin is what found stream-R1."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The ranges a player really sends: bytes=0- to start, a seek with an open end, both ends, a single byte, and a suffix. All in the table."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A start past the end, a backwards range, a negative start, a non-numeric range, an empty suffix, a zero suffix -- all refused with 416 rather than silently clamped into something plausible. A range must also not become a way to read part of somebody else's clip, which is asserted at the route."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty object, a suffix longer than the object, an end past the end, multiple ranges, another unit, and no header at all."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The elements were compared against the fetch they replaced. The fetch said credentials include explicitly; the elements said nothing, which is not the same default. That is stream-R1."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of serveStoredObject is exercised, including the one for a backend that cannot serve a range."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A 401 on an element cannot run the refresh the fetch wrapper did. That is stated in the file, surfaced to the user, and answered by a retry that asks again rather than replaying a cached failure."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One helper serves both content routes rather than two copies of range arithmetic. The retry suffix was the opposite -- one value used for two different URLs -- which is stream-R2."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The shape of stream-R1 is 'an element inherits a default the fetch it replaced had stated explicitly'. Looked for others in the same component: loading, decoding and preload are all stated; nothing else relies on an unstated default."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A ranged read holds a file handle and closes it on both paths; the local backend's bounded reader closes the file rather than leaking a descriptor on every seek, which is asserted."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Deleting the playback reduction leaves nothing behind: it wrote to a temp directory it removed, and it never created a stored object."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Three controls built after the commit and replayed. One PASSED at first -- the retry assertion was on the full-size image, where a single suffix is correct by construction -- so the test was rewritten to exercise the tile, where the two URLs genuinely differ, and the control then failed."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Accept-Ranges is what makes a player try to seek at all, and it is asserted on the whole-file answer as well as the partial one. Vary is asserted on both for the same reason."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet, gofmt, tsc -b and eslint clean. The handlers package passes with -p 1. Frontend: 159 files, 913 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. C4 earned its keep on a contract whose other end is a browser rather than a provider, and C7 on a fixture that was an origin rather than a path."
+    }
+   ],
+   "findings": [
+    {
+     "id": "stream-R1",
+     "summary": "a cross-origin img or video sends no cookie unless it is asked to, so moving media into a src would have made every request a 401 and every picture gone -- wherever the API is a different origin, which is the development default and one of the two production configs",
+     "found_by": "E1",
+     "fix_commit": "d4c70b4a2",
+     "control": {
+      "patch": ".review/controls/stream-R1.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx -t 'send the session'"
+      ],
+      "observed": "three FAIL: the image, the clip and the tile all carry no credential mode"
+     }
+    },
+    {
+     "id": "stream-R2",
+     "summary": "the retry suffix was computed once from the content URL and appended to both URLs, so the moment only one of them carries a query it produces a second query with no question mark",
+     "found_by": "E5",
+     "fix_commit": "d4c70b4a2",
+     "control": {
+      "patch": ".review/controls/stream-R2.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx -t 'joins the retry to whichever url it is appending to'"
+      ],
+      "observed": "FAIL: the thumbnail got the content URL's separator"
+     }
+    },
+    {
+     "id": "stream-R3",
+     "summary": "a shared cache could store a partial response as if it were the whole file -- the explore route lets it keep an anonymous answer for five minutes, and one 206 stored under the URL would hand its slice to the next plain GET",
+     "found_by": "B3",
+     "fix_commit": "d4c70b4a2",
+     "control": {
+      "patch": ".review/controls/stream-R3.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/handlers/ -run TestARangeIsKeptApartFromTheWholeFileInACache"
+      ],
+      "observed": "FAIL: the Vary header does not contain \"Range\" -- neither answer told a cache to key on it"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The markup was read once more after the fixes: every img and video carries the credential mode, and the retry joins each URL by that URL's own separator."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All three controls apply at HEAD and each fails as an assertion; verified one at a time with a restore between."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over d4c70b4a2 with the three fixes in place; nothing new."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... clean",
+  "lint": "gofmt -l clean; eslint clean",
+  "types": "npx tsc -b clean",
+  "tests": "go test -p 1 on handlers: ok. vitest: 159 files, 913 passed, 1 skipped."
+ }
+}
