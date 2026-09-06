@@ -19,20 +19,3 @@ index 1f30039be..8915be794 100644
  }
  
  func downloadGeneratedMedia(ctx context.Context, rawURL string, kind modelsMediaKind, maxBytes int64, bearer *mediaBearer, additionalHosts ...string) (*generatedMediaDownload, func(), error) {
-diff --git a/backend/internal/queue/video_playback_rendition.go b/backend/internal/queue/video_playback_rendition.go
-index e1264e7a9..a61b7480c 100644
---- a/backend/internal/queue/video_playback_rendition.go
-+++ b/backend/internal/queue/video_playback_rendition.go
-@@ -88,11 +88,7 @@ func reduceClipForPlayback(ctx context.Context, videoPath string, width, height
- 	// output muxer from the output name, so an output with no extension fails
- 	// outright -- which is what happened for every real render, because the
- 	// downloaded file had no extension and only the test fixture did.
--	extension := filepath.Ext(videoPath)
--	if extension == "" {
--		extension = ".mp4"
--	}
--	out := filepath.Join(dir, "playback"+extension)
-+	out := filepath.Join(dir, "playback"+filepath.Ext(videoPath))
- 	// #nosec G204 -- ffmpeg is fixed, and every argument is either a number
- 	// this function computed or a path it created. Nothing reaches a shell.
- 	cmd := exec.CommandContext(ctx, "ffmpeg",

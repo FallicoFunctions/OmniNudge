@@ -600,11 +600,11 @@
       "patch": ".review/controls/thumb-R1.patch",
       "runner": "go",
       "tests": [
-       "./internal/queue/ -run TestReduceClipForPlaybackWorksOnAPathWithNoExtension",
        "./internal/queue/ -run TestDownloadedMediaIsNamedForWhatItHolds"
       ],
-      "observed": "both FAIL: 'the reduction never ran on a real download', and the downloaded file keeps a name that does not say what it holds"
-     }
+      "observed": "FAIL: the downloaded file keeps a name that does not say what it holds"
+     },
+     "superseded": "Half of what this defect broke -- the playback rendition -- was removed in 6bd92a44d once the routes learned byte ranges, so its half of the control went with it. The naming itself still matters and is still controlled: the thumbnail service refuses a source whose type it cannot read from the name."
     },
     {
      "id": "thumb-R2",
