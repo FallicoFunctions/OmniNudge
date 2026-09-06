@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createOmniChatCheckoutIdempotencyId,
   isSafeOmniChatCheckoutURL,
+  mediaAssetContentUrl,
+  mediaAssetThumbnailUrl,
   omnichatService,
 } from '../omnichatService';
 import { api } from '../../lib/api';
@@ -73,33 +75,19 @@ describe('omnichatService media content loading', () => {
     expect(requestInit?.signal?.aborted).toBe(true);
   });
 
-  it('does not send a stored authorization token to a cross-origin content URL', async () => {
-    localStorage.setItem('auth_token', 'sensitive-token');
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      omnichatService.getMediaAssetContent('asset-1', 'https://attacker.example/media')
-    ).rejects.toThrow('untrusted origin');
-
-    expect(fetchMock).not.toHaveBeenCalled();
+  // The URL goes straight into a src now, so a compromised publication record
+  // must be refused before it is ever assigned rather than before it is
+  // fetched.
+  it('refuses a cross-origin content URL', () => {
+    expect(() => mediaAssetContentUrl('asset-1', 'https://attacker.example/media')).toThrow(
+      'untrusted origin'
+    );
   });
 
-  it('continues to fetch same-origin media with authentication', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['image'])),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await omnichatService.getMediaAssetContent('asset-1', '/api/v1/omnichat/media/asset-1/content');
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8080/api/v1/omnichat/media/asset-1/content',
-      expect.objectContaining({ credentials: 'include' })
+  it('resolves same-origin media against the API', () => {
+    expect(mediaAssetContentUrl('asset-1', '/api/v1/omnichat/media/asset-1/content')).toBe(
+      'http://localhost:8080/api/v1/omnichat/media/asset-1/content'
     );
-    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(new Headers(requestInit.headers).has('Authorization')).toBe(false);
   });
 });
 
@@ -232,78 +220,25 @@ describe('omnichatService billing adapters', () => {
   // one. Hardcoding the private route reads as working -- the fetch 404s, the
   // card shows its placeholder, and no clip is downloaded -- while every
   // published clip in the feed silently loses its poster.
-  it('fetches a published clip thumbnail from the route the asset names', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['poster'])),
-    });
-    vi.stubGlobal('fetch', fetchMock);
+  // A published asset's thumbnail lives behind the explore route, not the
+  // private one. Hardcoding the private route reads as working -- the request
+  // 404s, the card shows its placeholder, no asset is downloaded -- while every
+  // published asset in the feed silently loses its thumbnail.
+  it('resolves a published thumbnail against the route the asset names', () => {
+    expect(
+      mediaAssetThumbnailUrl('asset-1', '/api/v1/omnichat/explore/media/asset-1/thumbnail')
+    ).toBe('http://localhost:8080/api/v1/omnichat/explore/media/asset-1/thumbnail');
+  });
 
-    await omnichatService.getMediaAssetThumbnail(
-      'asset-1',
-      '/api/v1/omnichat/explore/media/asset-1/thumbnail'
-    );
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8080/api/v1/omnichat/explore/media/asset-1/thumbnail',
-      expect.objectContaining({ credentials: 'include' })
+  it('falls back to the private thumbnail route when the asset names none', () => {
+    expect(mediaAssetThumbnailUrl('asset-1')).toBe(
+      'http://localhost:8080/api/v1/omnichat/media/asset-1/thumbnail'
     );
   });
 
-  // authenticatedFetch defaults every request to no-store, so saying nothing
-  // about the cache is not "let the browser decide" -- it is "go past the cache
-  // every time", and the route's max-age becomes decoration.
-  it('lets the browser cache a thumbnail, which is the whole point of its max-age', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['thumbnail'])),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await omnichatService.getMediaAssetThumbnail('asset-1');
-
-    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(requestInit.cache).not.toBe('no-store');
-  });
-
-  // The asset itself is a different question and keeps its answer.
-  it('still goes past the cache for the asset itself', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['media'])),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await omnichatService.getMediaAssetContent('asset-1');
-
-    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(requestInit.cache).toBe('no-store');
-  });
-
-  it('falls back to the private thumbnail route when the asset names none', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['poster'])),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await omnichatService.getMediaAssetThumbnail('asset-1');
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8080/api/v1/omnichat/media/asset-1/thumbnail',
-      expect.objectContaining({ credentials: 'include' })
+  it('refuses a cross-origin thumbnail URL', () => {
+    expect(() => mediaAssetThumbnailUrl('asset-1', 'https://attacker.example/thumbnail.jpg')).toThrow(
+      'untrusted origin'
     );
-  });
-
-  it('does not send a stored authorization token to a cross-origin thumbnail URL', async () => {
-    localStorage.setItem('auth_token', 'sensitive-token');
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      omnichatService.getMediaAssetThumbnail('asset-1', 'https://attacker.example/thumbnail.jpg')
-    ).rejects.toThrow('untrusted origin');
-
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

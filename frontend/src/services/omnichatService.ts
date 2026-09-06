@@ -111,6 +111,25 @@ function resolveApiMediaUrl(fallback: URL, suppliedUrl?: string): string {
   return candidate.toString();
 }
 
+/**
+ * The URL to put in an img or video src.
+ *
+ * Media on this API is authorized by cookie -- a GET carries no headers of its
+ * own, only the session -- so an element can fetch it directly, and only then
+ * does the browser stream it: byte ranges, seeking, its own cache, and native
+ * lazy loading. Reading the bytes into a blob first throws all four away,
+ * because a blob is a whole download however well the route can serve part of
+ * one.
+ */
+export function mediaAssetContentUrl(assetId: string, publicContentUrl?: string): string {
+  return resolveApiMediaContentUrl(assetId, publicContentUrl);
+}
+
+/** The URL to put in an img src for an asset's tile image. */
+export function mediaAssetThumbnailUrl(assetId: string, thumbnailUrl?: string): string {
+  return resolveApiMediaThumbnailUrl(assetId, thumbnailUrl);
+}
+
 function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): string {
   return resolveApiMediaUrl(
     getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/content`),
@@ -578,42 +597,6 @@ export const omnichatService = {
       offer_id: offerId,
       idempotency_id: idempotencyId,
     });
-  },
-
-  /**
-   * Resolves with an asset's tile image.
-   *
-   * A grid must never fetch the assets it lists: a generated image is about a
-   * megabyte of PNG and one real clip was 6.6 MB, so a page of tiles pulled
-   * tens of megabytes before it drew anything, on every visit. A thumbnail is
-   * about fifty kilobytes, and it is served through the same ownership gate as
-   * the asset rather than from storage.
-   */
-  async getMediaAssetThumbnail(assetId: string, thumbnailUrl?: string): Promise<Blob> {
-    // cache: 'default', explicitly, because authenticatedFetch defaults every
-    // request to no-store. Leaving it out looks like "let the browser decide"
-    // and means the opposite: the request goes past the cache every time and
-    // the route's max-age is decoration. A thumbnail's bytes never change --
-    // its key is the asset plus a suffix -- so the browser is exactly the right
-    // place to keep it.
-    const response = await authenticatedFetch(resolveApiMediaThumbnailUrl(assetId, thumbnailUrl), {
-      cache: 'default',
-    });
-    if (!response.ok) {
-      throw new Error('Failed to load the thumbnail');
-    }
-    return response.blob();
-  },
-
-  async getMediaAssetContent(assetId: string, publicContentUrl?: string): Promise<Blob> {
-    const contentUrl = resolveApiMediaContentUrl(assetId, publicContentUrl);
-    const response = await authenticatedFetch(contentUrl, {
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      throw new Error('Failed to load generated media');
-    }
-    return response.blob();
   },
 
   async getScene(conversationId: number): Promise<OmniChatSceneState> {

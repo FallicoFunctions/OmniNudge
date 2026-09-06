@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
-import { ImageIcon, Loader2, Play, RefreshCw, Video } from 'lucide-react';
-import { omnichatService } from '../../services/omnichatService';
+import { useEffect, useState } from 'react';
+import { ImageIcon, Play, RefreshCw, Video } from 'lucide-react';
+import { mediaAssetContentUrl, mediaAssetThumbnailUrl } from '../../services/omnichatService';
 import type {
   OmniChatMediaAsset,
   OmniChatMessageMediaAsset,
@@ -11,96 +10,22 @@ import type {
 type AnyMediaAsset = OmniChatMediaAsset | OmniChatMessageMediaAsset | OmniChatPublicMediaAsset;
 
 /**
- * Fetches an asset's bytes through the API and hands back an object URL, or
- * null while it has none.
+ * Media goes straight into a src.
  *
- * Public asset authorization still depends on the viewer's NSFW preference and
- * block graph, so the bytes are fetched with the API auth header instead of
- * assigning the route directly to an img or video src.
+ * This used to read every asset into a blob with an authenticated fetch, on the
+ * belief that the route needed an auth header. It does not: media here is
+ * authorized by cookie, and a GET carries no headers of its own, so an element
+ * fetches it exactly as well as a script can.
  *
- * A null source fetches nothing. That is what keeps a gallery tile from pulling
- * the asset it is not showing.
+ * A blob is a whole download. Reading the bytes ourselves threw away everything
+ * the browser does better -- byte ranges, so a clip plays before it has
+ * arrived; seeking; its own cache; and native lazy loading -- and one real clip
+ * is 6.6 MB before a first frame could appear.
+ *
+ * What is lost: a 401 on an element cannot run the refresh-and-retry that the
+ * fetch wrapper does. The page's own API calls meet that first and refresh, and
+ * the retry below is the manual way back.
  */
-function useAuthorizedMediaUrl(
-  source: 'content' | 'thumbnail' | null,
-  assetId: string,
-  contentUrl: string,
-  thumbnailUrl: string | undefined,
-  visibility: string,
-  attempt: number,
-) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!source) {
-      setObjectUrl(null);
-      setFailed(false);
-      return;
-    }
-    let active = true;
-    let createdUrl: string | null = null;
-    setObjectUrl(null);
-    setFailed(false);
-    const request =
-      source === 'thumbnail'
-        ? omnichatService.getMediaAssetThumbnail(assetId, thumbnailUrl)
-        : omnichatService.getMediaAssetContent(assetId, contentUrl);
-    void request
-      .then((blob) => {
-        if (!active) return;
-        createdUrl = URL.createObjectURL(blob);
-        setObjectUrl(createdUrl);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
-    };
-  }, [source, assetId, contentUrl, thumbnailUrl, visibility, attempt]);
-
-  return { objectUrl, failed };
-}
-
-/**
- * Reports whether an element has come near the viewport, and stays true once it
- * has.
- *
- * A grid mounts every tile at once, and each one starts its fetch immediately
- * -- including the twenty that are below the fold and may never be looked at.
- * The browser's own lazy loading cannot help, because these are fetches made by
- * script rather than an image tag reading a src.
- *
- * Where there is no IntersectionObserver -- an old browser, a test environment
- * -- everything is near. Losing the deferral costs bandwidth; getting it wrong
- * the other way would leave a grid permanently blank.
- */
-function useIsNearViewport(enabled: boolean) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [near, setNear] = useState(!enabled || typeof IntersectionObserver === 'undefined');
-
-  useEffect(() => {
-    if (near || !ref.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setNear(true);
-          observer.disconnect();
-        }
-      },
-      // Start a little before the tile arrives, so a scroll meets a picture
-      // rather than a placeholder that begins loading on contact.
-      { rootMargin: '400px' },
-    );
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [near]);
-
-  return { ref, near };
-}
-
 export default function OmniChatMediaAssetView({
   asset,
   className = '',
@@ -120,32 +45,32 @@ export default function OmniChatMediaAssetView({
 }) {
   const [attempt, setAttempt] = useState(0);
   const [opened, setOpened] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  const thumbnailURL = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
+  const thumbnailPath = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
   const isVideo = asset.kind === 'video';
   const showsThumbnailOnly = preview && !opened;
-  const { ref: tileRef, near } = useIsNearViewport(showsThumbnailOnly);
+  const alt = 'prompt' in asset && asset.prompt ? asset.prompt : `Generated character ${asset.kind}`;
 
   useEffect(() => {
     setOpened(false);
+    setFailed(false);
   }, [asset.id]);
 
-  const { objectUrl: mediaUrl, failed: mediaFailed } = useAuthorizedMediaUrl(
-    showsThumbnailOnly ? null : 'content',
-    asset.id,
-    asset.content_url,
-    thumbnailURL,
-    asset.visibility,
-    attempt,
-  );
-  const { objectUrl: thumbnailUrl } = useAuthorizedMediaUrl(
-    showsThumbnailOnly && thumbnailURL && near ? 'thumbnail' : null,
-    asset.id,
-    asset.content_url,
-    thumbnailURL,
-    asset.visibility,
-    attempt,
-  );
+  // A URL the API did not mint, or one pointing at another origin, is refused
+  // rather than assigned: the resolvers throw on both.
+  let contentSrc: string | null = null;
+  let thumbnailSrc: string | null = null;
+  try {
+    contentSrc = mediaAssetContentUrl(asset.id, asset.content_url);
+    thumbnailSrc = thumbnailPath ? mediaAssetThumbnailUrl(asset.id, thumbnailPath) : null;
+  } catch {
+    contentSrc = null;
+    thumbnailSrc = null;
+  }
+  // Retrying has to ask for something the browser has not already failed on,
+  // or the cache answers with the same failure and the button does nothing.
+  const retry = attempt > 0 ? `${contentSrc?.includes('?') ? '&' : '?'}retry=${attempt}` : '';
 
   const badge = (
     <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur">
@@ -153,57 +78,14 @@ export default function OmniChatMediaAssetView({
     </span>
   );
 
-  // A tile in a grid. Nothing of the asset is fetched: the thumbnail stands in
-  // for it, and a viewer who wants the real thing says so.
-  if (showsThumbnailOnly) {
+  if (failed || !contentSrc) {
     return (
       <button
         type="button"
-        ref={tileRef as RefObject<HTMLButtonElement>}
-        aria-label={isVideo ? 'Play generated video' : 'Open generated image'}
-        onClick={() => setOpened(true)}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
-      >
-        {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt={
-              'prompt' in asset && asset.prompt
-                ? asset.prompt
-                : `Generated character ${asset.kind}`
-            }
-            // Contained rather than cropped, which is how the full asset
-            // renders in the same grid. A portrait frame cropped to fill a 4:5
-            // tile loses about a seventh of its height at each end, and on a
-            // full-body picture that takes the head off.
-            className="block h-full w-full object-contain"
-          />
-        ) : !near ? (
-          // Below the fold. The tile holds its place and fetches nothing.
-          <span className="sr-only">Not yet loaded</span>
-        ) : (
-          // No thumbnail: everything generated before thumbnails existed, and
-          // anything whose thumbnail could not be made. Showing the asset
-          // instead would put the whole download back for exactly those.
-          <span className="text-white/25">{isVideo ? <Video size={32} /> : <ImageIcon size={32} />}</span>
-        )}
-        {near && isVideo && (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
-              <Play size={20} />
-            </span>
-          </span>
-        )}
-        {near && badge}
-      </button>
-    );
-  }
-
-  if (mediaFailed) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAttempt((value) => value + 1)}
+        onClick={() => {
+          setFailed(false);
+          setAttempt((value) => value + 1);
+        }}
         className={`flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-2xl bg-black/25 text-sm text-white/60 ${className}`}
       >
         <RefreshCw size={20} />
@@ -212,14 +94,49 @@ export default function OmniChatMediaAssetView({
     );
   }
 
-  if (!mediaUrl) {
+  // A tile in a grid. Nothing of the asset is fetched: the thumbnail stands in
+  // for it, and a viewer who wants the real thing says so.
+  if (showsThumbnailOnly) {
     return (
-      <div
-        aria-label={`Loading generated ${asset.kind}`}
-        className={`flex min-h-40 w-full items-center justify-center rounded-2xl bg-black/25 text-white/50 ${className}`}
+      <button
+        type="button"
+        aria-label={isVideo ? 'Play generated video' : 'Open generated image'}
+        onClick={() => setOpened(true)}
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
       >
-        <Loader2 size={24} className="animate-spin" />
-      </div>
+        {thumbnailSrc ? (
+          <img
+            src={thumbnailSrc + retry}
+            alt={alt}
+            // The browser defers a tile below the fold on its own. An
+            // IntersectionObserver here would be a second, worse copy of what
+            // it already does for an img with a src.
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailed(true)}
+            // Contained rather than cropped, which is how the full asset
+            // renders in the same grid. A portrait frame cropped to fill a 4:5
+            // tile loses about a seventh of its height at each end, and on a
+            // full-body picture that takes the head off.
+            className="block h-full w-full object-contain"
+          />
+        ) : (
+          // No thumbnail: everything generated before thumbnails existed, and
+          // anything whose thumbnail could not be made. Showing the asset
+          // instead would put the whole download back for exactly those.
+          <span className="text-white/25">
+            {isVideo ? <Video size={32} /> : <ImageIcon size={32} />}
+          </span>
+        )}
+        {isVideo && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
+              <Play size={20} />
+            </span>
+          </span>
+        )}
+        {badge}
+      </button>
     );
   }
 
@@ -229,11 +146,17 @@ export default function OmniChatMediaAssetView({
         className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black ${className}`}
       >
         <video
-          src={mediaUrl}
+          src={contentSrc + retry}
+          // The thumbnail shows while the clip is still arriving, so an opened
+          // tile does not go black between the tile and the first frame.
+          poster={thumbnailSrc ?? undefined}
           controls
           autoPlay={opened}
           playsInline
+          // Now that the route answers byte ranges this means what it says:
+          // enough to know the length, and the rest when somebody plays.
           preload="metadata"
+          onError={() => setFailed(true)}
           className="block max-h-[75vh] max-w-full object-contain"
         />
         {badge}
@@ -246,8 +169,11 @@ export default function OmniChatMediaAssetView({
       className={`relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-black/25 ${className}`}
     >
       <img
-        src={mediaUrl}
-        alt={'prompt' in asset && asset.prompt ? asset.prompt : 'Generated character scene'}
+        src={contentSrc + retry}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
         className="block max-h-[75vh] max-w-full object-contain"
       />
       {badge}
