@@ -204,3 +204,52 @@ func TestTheAssetItselfIsStillNotCached(t *testing.T) {
 
 	require.Equal(t, "private, no-store", response.Header().Get("Cache-Control"))
 }
+
+// The gate, not the helper.
+//
+// serveStoredObject knows how to answer a range. That says nothing about
+// whether the content route calls it, and a route that ignores the header
+// leaves a player waiting for the last byte before it shows the first frame.
+func TestTheContentRouteAnswersARange(t *testing.T) {
+	id := uuid.New()
+	asset := &models.OmniChatMediaAsset{
+		ID: id, OwnerUserID: 9, Kind: models.OmniChatMediaKindVideo,
+		FileType: "video/mp4", StoragePath: "omnichat/generated/9/" + id.String() + ".mp4",
+		ScanStatus: models.MediaScanStatusClean,
+	}
+	storage := &rangeStorageFake{body: []byte("0123456789")}
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{}, &omniChatMediaReaderFake{asset: asset}, storage)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.GET("/media/:id/content", handler.GetAssetContent)
+
+	request := httptest.NewRequest(http.MethodGet, "/media/"+id.String()+"/content", nil)
+	request.Header.Set("Range", "bytes=2-4")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusPartialContent, response.Code)
+	require.Equal(t, "234", response.Body.String())
+	require.Equal(t, "bytes", response.Header().Get("Accept-Ranges"))
+	require.Equal(t, "video/mp4", response.Header().Get("Content-Type"))
+}
+
+// Ownership is decided before a single byte is read. A range must not become a
+// way to read part of somebody else's clip.
+func TestARangeDoesNotBypassTheOwnershipGate(t *testing.T) {
+	id := uuid.New()
+	storage := &rangeStorageFake{body: []byte("0123456789")}
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{}, &omniChatMediaReaderFake{}, storage)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.GET("/media/:id/content", handler.GetAssetContent)
+
+	request := httptest.NewRequest(http.MethodGet, "/media/"+id.String()+"/content", nil)
+	request.Header.Set("Range", "bytes=0-0")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusNotFound, response.Code)
+	require.Empty(t, storage.ranges)
+	require.Zero(t, storage.wholes)
+}

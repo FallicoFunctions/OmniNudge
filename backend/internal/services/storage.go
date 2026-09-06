@@ -47,6 +47,26 @@ type ObjectCopyStorage interface {
 	CopyObject(ctx context.Context, sourceKey, destinationKey string) (string, error)
 }
 
+// RangeStorage is implemented by backends that can hand back part of an object
+// without reading the whole thing.
+//
+// This is what lets a video play before it has finished arriving, and what lets
+// somebody drag the scrubber. Optional, like the two above, so a backend that
+// cannot do it keeps working and simply serves whole objects.
+type RangeStorage interface {
+	// DownloadRange returns length bytes starting at offset. The caller has
+	// already clamped both to the object's real size.
+	DownloadRange(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error)
+}
+
+// Both backends can serve a range. Asserted here so a signature change breaks
+// the build rather than silently dropping every video back to whole-file
+// downloads, which is the failure this whole path exists to end.
+var (
+	_ RangeStorage = (*LocalStorageService)(nil)
+	_ RangeStorage = (*S3StorageService)(nil)
+)
+
 // LocalStorageService implements StorageService using local filesystem
 type LocalStorageService struct {
 	baseDir string
@@ -196,6 +216,47 @@ func (s *LocalStorageService) Download(ctx context.Context, key string) (io.Read
 		return nil, fmt.Errorf("local storage: open %q: %w", key, err)
 	}
 	return f, nil
+}
+
+// DownloadRange opens the file and seeks, then bounds the reader so a caller
+// cannot read past the range it asked for.
+func (s *LocalStorageService) DownloadRange(_ context.Context, key string, offset, length int64) (io.ReadCloser, error) {
+	path, err := s.resolveKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.rejectSymlinkPath(path, true); err != nil {
+		return nil, err
+	}
+	// #nosec G304 -- resolveKey confines the key to canonical baseDir and rejectSymlinkPath rejects every symlink component.
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("local storage: open %q: %w", key, err)
+	}
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("local storage: seek %q: %w", key, err)
+	}
+	return &boundedFile{File: f, remaining: length}, nil
+}
+
+// boundedFile stops at the end of the requested range and still closes the file
+// underneath it. An io.LimitedReader alone would leak the descriptor.
+type boundedFile struct {
+	*os.File
+	remaining int64
+}
+
+func (b *boundedFile) Read(p []byte) (int, error) {
+	if b.remaining <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > b.remaining {
+		p = p[:b.remaining]
+	}
+	n, err := b.File.Read(p)
+	b.remaining -= int64(n)
+	return n, err
 }
 
 func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
@@ -427,6 +488,33 @@ func (s *S3StorageService) Download(ctx context.Context, key string) (io.ReadClo
 		})
 		if err != nil {
 			return fmt.Errorf("s3: download %q: %w", key, err)
+		}
+		rc = out.Body
+		return nil
+	})
+	return rc, err
+}
+
+// DownloadRange asks the object store for the bytes rather than reading the
+// whole object and throwing most of it away.
+func (s *S3StorageService) DownloadRange(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error) {
+	bucket, err := s.bucketForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	// HTTP byte ranges are inclusive at both ends, so the last byte is one
+	// before offset+length. Off by one here serves a byte too many on every
+	// request and a corrupt final chunk on the last one.
+	byteRange := fmt.Sprintf("bytes=%d-%d", offset, offset+length-1)
+	var rc io.ReadCloser
+	err = s.cb.Do(func() error {
+		out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: &bucket,
+			Key:    &key,
+			Range:  &byteRange,
+		})
+		if err != nil {
+			return fmt.Errorf("s3: download range %q: %w", key, err)
 		}
 		rc = out.Body
 		return nil

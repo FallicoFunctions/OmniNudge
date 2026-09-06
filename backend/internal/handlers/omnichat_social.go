@@ -506,15 +506,8 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 		RespondError(c, http.StatusConflict, "Media size is invalid")
 		return
 	}
-	reader, err := h.storage.Download(c.Request.Context(), path)
-	if err != nil {
-		RespondError(c, http.StatusNotFound, "Media not found")
-		return
-	}
-	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", fileType)
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, assetID, extension))
-	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	// Access depends on the current viewer's NSFW preference and block graph.
 	// Never let a browser, proxy, or CDN replay an authorized response to a
 	// different viewer using the same asset URL.
@@ -529,7 +522,7 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 		c.Writer.Header().Add("Vary", "Cookie")
 	}
 	c.Header("X-Content-Type-Options", "nosniff")
-	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+	serveStoredObject(c, h.storage, path, objectSize)
 }
 
 // GetPublicMediaThumbnail streams a published asset's tile image.

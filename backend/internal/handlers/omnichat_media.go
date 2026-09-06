@@ -482,20 +482,11 @@ func (h *OmniChatMediaHandler) GetAssetContent(c *gin.Context) {
 		RespondError(c, http.StatusConflict, "Media size is invalid")
 		return
 	}
-	reader, err := h.storage.Download(c.Request.Context(), asset.StoragePath)
-	if err != nil {
-		RespondError(c, http.StatusNotFound, "Media not found")
-		return
-	}
-	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, asset.ID.String(), extension))
-	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
-	// Headers are already flushed, so a copy failure cannot be reported to the
-	// client; discard it explicitly as the other streaming handlers do.
-	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
+	serveStoredObject(c, h.storage, asset.StoragePath, objectSize)
 }
 
 func (h *OmniChatMediaHandler) UpdateConversationScene(c *gin.Context) {
