@@ -139,6 +139,9 @@ describe('OmniChatMediaAssetView', () => {
       expect(thumbnail.getAttribute('src')).toContain('/thumbnail');
       expect(thumbnail.getAttribute('src')).not.toContain('/content');
       expect(document.querySelector('video')).toBeNull();
+      // A grid mounts every tile at once. Without this the twenty below the
+      // fold all fetch immediately, whether or not anybody scrolls to them.
+      expect(thumbnail).toHaveAttribute('loading', 'lazy');
     });
 
     // A clip made before thumbnails existed, or one whose thumbnail could not
