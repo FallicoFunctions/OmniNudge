@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "e222f3f4d",
+ "head": "950a161d6",
  "base": "a053fc7ebe0b5a28021865686c30e5392a072cc1",
  "scope": {
   "files": [
@@ -723,6 +723,343 @@
      "id": "Z1",
      "status": "applied",
      "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    }
+   ],
+   "findings": []
+  },
+  {
+   "pass": 5,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "One file: the thumbnail fetch. Boundary: what the caller says about the cache versus what the route says, which are two different declarations and only one of them was being read."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Pass 3 of this ledger, whose own fix this corrects."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed what the fetch actually sends rather than what it appears to say. authenticatedFetch fills in cache: 'no-store' for anything that does not state one, so the request went past the browser cache and the max-age set in pass 3 never applied."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. The two headers and the deferral touch neither."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The caller's declaration and the route's now agree for the thumbnail, and still disagree deliberately for the asset, which is asserted both ways."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The asset fetch says no-store and its route says no-store. The thumbnail fetch said nothing, which is not neutral in this wrapper."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state. IntersectionObserver's callback runs on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the commit and replayed: the test fails with 'expected no-store not to be no-store'."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b clean, the service suite passes."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. B3 found it, by reading what crosses the boundary instead of what the code appears to declare."
+    }
+   ],
+   "findings": [
+    {
+     "id": "cache-R3",
+     "summary": "the max-age shipped in pass 3 was decoration: authenticatedFetch defaults every request to cache 'no-store', so removing the explicit no-store from the thumbnail fetch changed nothing and the browser still went past its cache on every visit",
+     "found_by": "B3",
+     "fix_commit": "950a161d6",
+     "control": {
+      "patch": ".review/controls/cache-R3.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/omnichatService.test.ts -t 'lets the browser cache a thumbnail'"
+      ],
+      "observed": "FAIL with 'expected no-store not to be no-store'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 6,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. The two headers and the deferral touch neither."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state. IntersectionObserver's callback runs on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over the one-line cache declaration; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over 950a161d6 with the fix in place; nothing new."
     }
    ],
    "findings": []
