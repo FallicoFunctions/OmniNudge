@@ -552,16 +552,16 @@
     },
     {
      "id": "cache-R2",
-     "summary": "a grid mounted twenty-four tiles and every one of them fetched at once, including the twenty below the fold that may never be looked at; the browser's own lazy loading cannot help, because these are fetches made by script rather than an image tag reading a src",
+     "summary": "a grid mounted twenty-four tiles and every one of them fetched at once, including the twenty below the fold that may never be looked at; the browser's own lazy loading cannot help, because these are fetches made by script rather than an image tag reading a src (the deferral is the browser's own lazy loading since 1c791941d, rather than the IntersectionObserver this was first fixed with)",
      "found_by": "E1",
      "fix_commit": "e222f3f4d",
      "control": {
       "patch": ".review/controls/cache-R2.patch",
       "runner": "vitest",
       "tests": [
-       "src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx -t 'fetches nothing until the tile comes near the screen'"
+       "src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx -t 'shows the thumbnail and never points at the asset'"
       ],
-      "observed": "FAIL with 'expected vi.fn() to not be called at all, but actually been called 1 times' -- the tile fetched before the observer reported it anywhere near the screen"
+      "observed": "FAIL: the tile's image no longer defers, so a grid of twenty-four fetches all of them at once"
      }
     }
    ]
@@ -893,13 +893,14 @@
      "found_by": "B3",
      "fix_commit": "950a161d6",
      "control": {
-      "patch": ".review/controls/cache-R3.patch",
+      "patch": ".review/controls/poster-R5.patch",
       "runner": "vitest",
       "tests": [
-       "src/services/__tests__/omnichatService.test.ts -t 'lets the browser cache a thumbnail'"
+       "src/services/__tests__/omnichatService.test.ts -t 'resolves same-origin media against the API'"
       ],
       "observed": "FAIL with 'expected no-store not to be no-store'"
-     }
+     },
+     "superseded": "The fetch this was about was deleted in 1c791941d: media goes into a src now, so no caller can put the browser's cache out of reach. The finding stands as history; its own control could not outlive the code it reverted, so it points at the URL resolution that replaced it."
     }
    ]
   },

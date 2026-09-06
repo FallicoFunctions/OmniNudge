@@ -1,13 +1,15 @@
 diff --git a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
-index 61ba4ec49..79b2b900f 100644
+index cb32c3904..b9e19e26b 100644
 --- a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
 +++ b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
-@@ -139,7 +139,7 @@ export default function OmniChatMediaAssetView({
-     attempt,
-   );
-   const { objectUrl: thumbnailUrl } = useAuthorizedMediaUrl(
--    showsThumbnailOnly && thumbnailURL && near ? 'thumbnail' : null,
-+    showsThumbnailOnly && thumbnailURL ? 'thumbnail' : null,
-     asset.id,
-     asset.content_url,
-     thumbnailURL,
+@@ -108,10 +108,6 @@ export default function OmniChatMediaAssetView({
+           <img
+             src={thumbnailSrc + retry}
+             alt={alt}
+-            // The browser defers a tile below the fold on its own. An
+-            // IntersectionObserver here would be a second, worse copy of what
+-            // it already does for an img with a src.
+-            loading="lazy"
+             decoding="async"
+             onError={() => setFailed(true)}
+             // Contained rather than cropped, which is how the full asset
