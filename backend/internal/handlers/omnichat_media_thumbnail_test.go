@@ -159,3 +159,48 @@ func TestADecoratedAssetNeverLeaksAStorageURL(t *testing.T) {
 		require.Nil(t, asset.ThumbnailURL, "%s reached the client", thumbnail)
 	}
 }
+
+// A thumbnail is the one thing here worth caching. The bytes never change --
+// the key is the asset plus a suffix -- and only the owner can ever get a 200,
+// so there is no revocation to outrun. Without this a gallery re-fetched every
+// tile on every visit, which is most of what the thumbnail exists to stop.
+func TestThumbnailRouteLetsTheOwnersBrowserKeepIt(t *testing.T) {
+	id := uuid.New()
+	asset := thumbnailAsset(id, models.OmniChatMediaKindImage, "/uploads/omnichat/generated/9/"+id.String()+".png-thumb.jpg")
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{},
+		&omniChatMediaReaderFake{asset: asset}, &omniChatMediaStorageFake{body: []byte("jpeg")})
+
+	response := httptest.NewRecorder()
+	thumbnailRouter(handler).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/media/"+id.String()+"/thumbnail", nil))
+
+	require.Equal(t, http.StatusOK, response.Code)
+	cacheControl := response.Header().Get("Cache-Control")
+	require.Contains(t, cacheControl, "max-age=", "the owner's browser must be allowed to keep this")
+	// Private and varied: no shared cache may hold it, and no browser may
+	// replay one account's tile to another.
+	require.Contains(t, cacheControl, "private")
+	require.NotContains(t, cacheControl, "no-store")
+	require.Contains(t, response.Header().Values("Vary"), "Authorization")
+	require.Contains(t, response.Header().Values("Vary"), "Cookie")
+}
+
+// The asset itself is a different question and keeps its answer: megabytes,
+// and no reason yet to let them persist.
+func TestTheAssetItselfIsStillNotCached(t *testing.T) {
+	id := uuid.New()
+	asset := &models.OmniChatMediaAsset{
+		ID: id, OwnerUserID: 9, Kind: models.OmniChatMediaKindImage,
+		FileType: "image/png", StoragePath: "omnichat/generated/9/still.png",
+		ScanStatus: models.MediaScanStatusClean,
+	}
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{},
+		&omniChatMediaReaderFake{asset: asset}, &omniChatMediaStorageFake{body: []byte("png")})
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", 9); c.Next() })
+	router.GET("/media/:id/content", handler.GetAssetContent)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/media/"+id.String()+"/content", nil))
+
+	require.Equal(t, "private, no-store", response.Header().Get("Cache-Control"))
+}

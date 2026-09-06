@@ -641,7 +641,20 @@ func (h *OmniChatMediaHandler) GetAssetThumbnail(c *gin.Context) {
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-thumb.jpg"`, asset.ID.String()))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
-	c.Header("Cache-Control", "private, no-store")
+	// A thumbnail is the one thing here worth caching, and the only route where
+	// caching is uncomplicated.
+	//
+	// The bytes never change: the key is the asset plus a suffix, so a URL is a
+	// permanent name for one picture. Only the owner can ever get a 200, so
+	// there is no revocation to outrun -- nobody blocks themselves, and a
+	// deleted asset stops being listed. Private, so no shared cache may hold
+	// it, and Vary so a browser cannot replay one account's tile to another.
+	//
+	// Without this a gallery re-fetched every tile on every visit, which is
+	// most of what the thumbnail was introduced to stop.
+	c.Header("Cache-Control", "private, max-age=604800, immutable")
+	c.Writer.Header().Add("Vary", "Authorization")
+	c.Writer.Header().Add("Vary", "Cookie")
 	c.Header("X-Content-Type-Options", "nosniff")
 	// Headers are already flushed, so a copy failure cannot be reported to the
 	// client; discard it explicitly as the other streaming handlers do.

@@ -577,13 +577,17 @@ func (h *OmniChatSocialHandler) GetPublicMediaThumbnail(c *gin.Context) {
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-thumb.jpg"`, assetID))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
-	// The same rule the clip follows: access depends on this viewer's NSFW
-	// preference and block graph, so an authorized response must never be
-	// replayed to a different viewer from the same URL.
+	// Bounded, not permanent, and never shared.
+	//
+	// Unlike the owner's own gallery, access here depends on the viewer: their
+	// NSFW preference, the block graph, and whether the publication still
+	// stands. So a cached thumbnail outlives a block or an unpublish for as
+	// long as it is allowed to live, and five minutes is what the anonymous
+	// branch beside it already decided that bound should be.
 	if viewer == nil {
 		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
 	} else {
-		c.Header("Cache-Control", "private, no-store")
+		c.Header("Cache-Control", "private, max-age=300")
 		c.Writer.Header().Add("Vary", "Authorization")
 		c.Writer.Header().Add("Vary", "Cookie")
 	}

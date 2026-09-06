@@ -71,9 +71,35 @@ func TestExploreThumbnailRouteNeverSharesAViewerScopedResponse(t *testing.T) {
 	exploreThumbRouter(handler, 44).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/media/"+assetID.String()+"/thumbnail", nil))
 
 	require.Equal(t, http.StatusOK, res.Code)
-	require.Equal(t, "private, no-store", res.Header().Get("Cache-Control"))
+	cacheControl := res.Header().Get("Cache-Control")
+	require.Contains(t, cacheControl, "private", "a viewer-scoped response must never enter a shared cache")
+	require.NotContains(t, cacheControl, "public")
+	require.NotContains(t, cacheControl, "s-maxage")
 	require.Contains(t, res.Header().Values("Vary"), "Authorization")
 	require.Contains(t, res.Header().Values("Vary"), "Cookie")
+}
+
+// Explore is not the owner's gallery. Access depends on the viewer -- their
+// NSFW preference, the block graph, whether the publication still stands -- so
+// a cached thumbnail outlives a block or an unpublish for as long as it is
+// allowed to live. Bounded at the five minutes the anonymous branch beside it
+// already settled on, and never in a shared cache.
+func TestExploreThumbnailIsCachedOnlyBriefly(t *testing.T) {
+	assetID := uuid.New()
+	store := &omniChatSocialStoreFake{thumbnailPath: "omnichat/generated/9/" + assetID.String() + ".png-thumb.jpg"}
+	handler := NewOmniChatSocialHandler(&omniChatSocialPublisherFake{}, store, &omniChatMediaStorageFake{body: []byte("jpeg")})
+
+	viewer := httptest.NewRecorder()
+	exploreThumbRouter(handler, 44).ServeHTTP(viewer, httptest.NewRequest(http.MethodGet, "/media/"+assetID.String()+"/thumbnail", nil))
+
+	require.Equal(t, "private, max-age=300", viewer.Header().Get("Cache-Control"))
+	require.Contains(t, viewer.Header().Values("Vary"), "Authorization")
+
+	anonymous := httptest.NewRecorder()
+	exploreThumbRouter(handler, 0).ServeHTTP(anonymous, httptest.NewRequest(http.MethodGet, "/media/"+assetID.String()+"/thumbnail", nil))
+
+	require.Equal(t, "public, max-age=300, s-maxage=300", anonymous.Header().Get("Cache-Control"),
+		"anonymous authorization has no viewer state, so the two bounds must match")
 }
 
 func TestExploreThumbnailRouteRefusesAnOversizedObjectBeforeDownloading(t *testing.T) {
