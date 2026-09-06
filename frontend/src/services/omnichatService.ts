@@ -590,11 +590,15 @@ export const omnichatService = {
    * the asset rather than from storage.
    */
   async getMediaAssetThumbnail(assetId: string, thumbnailUrl?: string): Promise<Blob> {
-    // No cache: 'no-store' here, unlike the asset itself. A thumbnail's bytes
-    // never change -- its key is the asset plus a suffix -- and the route says
-    // how long a browser may keep it. Forcing a fetch past the browser cache
-    // would make the header meaningless and every gallery visit pay again.
-    const response = await authenticatedFetch(resolveApiMediaThumbnailUrl(assetId, thumbnailUrl));
+    // cache: 'default', explicitly, because authenticatedFetch defaults every
+    // request to no-store. Leaving it out looks like "let the browser decide"
+    // and means the opposite: the request goes past the cache every time and
+    // the route's max-age is decoration. A thumbnail's bytes never change --
+    // its key is the asset plus a suffix -- so the browser is exactly the right
+    // place to keep it.
+    const response = await authenticatedFetch(resolveApiMediaThumbnailUrl(assetId, thumbnailUrl), {
+      cache: 'default',
+    });
     if (!response.ok) {
       throw new Error('Failed to load the thumbnail');
     }

@@ -250,6 +250,36 @@ describe('omnichatService billing adapters', () => {
     );
   });
 
+  // authenticatedFetch defaults every request to no-store, so saying nothing
+  // about the cache is not "let the browser decide" -- it is "go past the cache
+  // every time", and the route's max-age becomes decoration.
+  it('lets the browser cache a thumbnail, which is the whole point of its max-age', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['thumbnail'])),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await omnichatService.getMediaAssetThumbnail('asset-1');
+
+    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(requestInit.cache).not.toBe('no-store');
+  });
+
+  // The asset itself is a different question and keeps its answer.
+  it('still goes past the cache for the asset itself', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['media'])),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await omnichatService.getMediaAssetContent('asset-1');
+
+    const requestInit = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(requestInit.cache).toBe('no-store');
+  });
+
   it('falls back to the private thumbnail route when the asset names none', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
