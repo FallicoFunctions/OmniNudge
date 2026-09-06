@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
+index 61ba4ec49..79b2b900f 100644
+--- a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
++++ b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
+@@ -139,7 +139,7 @@ export default function OmniChatMediaAssetView({
+     attempt,
+   );
+   const { objectUrl: thumbnailUrl } = useAuthorizedMediaUrl(
+-    showsThumbnailOnly && thumbnailURL && near ? 'thumbnail' : null,
++    showsThumbnailOnly && thumbnailURL ? 'thumbnail' : null,
+     asset.id,
+     asset.content_url,
+     thumbnailURL,

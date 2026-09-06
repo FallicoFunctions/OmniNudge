@@ -1,0 +1,28 @@
+diff --git a/backend/internal/handlers/omnichat_media.go b/backend/internal/handlers/omnichat_media.go
+index 815e9cf77..253bdaabe 100644
+--- a/backend/internal/handlers/omnichat_media.go
++++ b/backend/internal/handlers/omnichat_media.go
+@@ -652,9 +652,7 @@ func (h *OmniChatMediaHandler) GetAssetThumbnail(c *gin.Context) {
+ 	//
+ 	// Without this a gallery re-fetched every tile on every visit, which is
+ 	// most of what the thumbnail was introduced to stop.
+-	c.Header("Cache-Control", "private, max-age=604800, immutable")
+-	c.Writer.Header().Add("Vary", "Authorization")
+-	c.Writer.Header().Add("Vary", "Cookie")
++	c.Header("Cache-Control", "private, no-store")
+ 	c.Header("X-Content-Type-Options", "nosniff")
+ 	// Headers are already flushed, so a copy failure cannot be reported to the
+ 	// client; discard it explicitly as the other streaming handlers do.
+diff --git a/backend/internal/handlers/omnichat_social.go b/backend/internal/handlers/omnichat_social.go
+index 14a0fd463..bf25116ff 100644
+--- a/backend/internal/handlers/omnichat_social.go
++++ b/backend/internal/handlers/omnichat_social.go
+@@ -587,7 +587,7 @@ func (h *OmniChatSocialHandler) GetPublicMediaThumbnail(c *gin.Context) {
+ 	if viewer == nil {
+ 		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
+ 	} else {
+-		c.Header("Cache-Control", "private, max-age=300")
++		c.Header("Cache-Control", "private, no-store")
+ 		c.Writer.Header().Add("Vary", "Authorization")
+ 		c.Writer.Header().Add("Vary", "Cookie")
+ 	}

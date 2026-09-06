@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "9f5966f04",
+ "head": "e222f3f4d",
  "base": "a053fc7ebe0b5a28021865686c30e5392a072cc1",
  "scope": {
   "files": [
@@ -10,13 +10,23 @@
    "backend/internal/queue/media_thumbnail.go",
    "backend/internal/queue/media_thumbnail_test.go",
    "backend/internal/queue/omnichat_generation_handler_test.go",
-   "backend/internal/queue/omnichat_generation_two_phase_test.go"
+   "backend/internal/queue/omnichat_generation_two_phase_test.go",
+   "backend/internal/handlers/omnichat_media.go",
+   "backend/internal/handlers/omnichat_media_thumbnail_test.go",
+   "backend/internal/handlers/omnichat_social.go",
+   "backend/internal/handlers/omnichat_explore_thumbnail_test.go",
+   "frontend/src/services/omnichatService.ts",
+   "frontend/src/services/__tests__/omnichatService.test.ts",
+   "frontend/src/components/omnichat/OmniChatMediaAssetView.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx"
   ],
   "boundaries": [
    "the queue -> object storage: a derived object stored beside a media_files row",
    "the discard paths -> the deletion outbox trigger, which only ever sees storage_path",
    "the publication access gate -> two queries that must answer the same question",
-   "a test literal -> the key a function elsewhere builds"
+   "a test literal -> the key a function elsewhere builds",
+   "the routes -> a browser's own cache: how long a private picture may be kept, and by whom",
+   "a grid -> the network: which of twenty-four tiles asks for anything at all"
   ]
  },
  "prior_ledgers_read": [
@@ -364,6 +374,358 @@
     }
    ],
    "findings": []
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Two changes the user asked for after the last pass: cache headers on both thumbnail routes and the fetch that reads them, and a tile that defers its fetch until it nears the screen. New boundaries: what a browser is allowed to keep, and which tiles ask for anything."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Passes 1 and 2 of this ledger, and the six of 68b74a58a. The explore route's existing anonymous branch is where the five-minute bound came from rather than a number invented here."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Read the rendered tile in all three deferral states: far away, near with a thumbnail, near without one. A far tile is a button with a screen-reader-only 'Not yet loaded' and no badge, so a grid of them is not twenty-four play buttons over nothing."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed both routes' headers for both viewer states. Owner: private, max-age=604800, immutable, Vary on Authorization and Cookie. Explore signed-in: private, max-age=300, same Vary. Explore anonymous: public, max-age=300, s-maxage=300, unchanged. Asset content on both routes: private, no-store, unchanged and asserted."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. The two headers and the deferral touch neither."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Nothing model-facing changed. The thumbnails these headers govern were rendered and looked at in the previous ledger."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Both thumbnail routes now name the same bound where they agree and different ones where they must differ, and the difference is asserted rather than assumed."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The service's second argument was renamed from posterUrl to thumbnailUrl, the last place the old word survived."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The two routes answer the same question -- how long may this be kept -- with two answers, and a test states each one so they cannot silently converge."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The deferral test stubs IntersectionObserver rather than assuming jsdom has one. Without the stub the fallback path runs and proves nothing about the feature; both are now asserted separately."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A viewer who is signed in and one who is not both get a usable, bounded answer from the explore route."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The owner's route must never be shared: private asserted, no-store absent, Vary present. The explore route must never be public for a signed-in viewer: public and s-maxage both asserted absent."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "The deferral's two edges: no observer at all, and an observer that has not yet fired."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the thumbnail routes against the content routes beside them. The content routes keep no-store, which is asserted rather than left implicit, so a later change cannot quietly cache megabytes."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "All three deferral branches reachable, and both cache branches on the explore route."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing new is swallowed. A thumbnail that fails still leaves the tile in its placeholder rather than reaching for the asset."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The deferral is gated on preview, so the full view and the chat bubble are unaffected."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The five-minute bound is stated once per branch and matched against the branch beside it in the test rather than being written twice with no relation."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The shape is 'a header that says one thing and a caller that overrides it'. The fetch for the asset itself still passes cache: no-store, which agrees with its route; the thumbnail fetch no longer does, which agrees with its route. No third place overrides a cache header."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state. IntersectionObserver's callback runs on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "No transaction and no partial state. The observer is disconnected on both the first intersection and unmount."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing new is persisted. A cached thumbnail on a device outlives a deleted asset, which is the user's own picture on the user's own machine and was the decision taken knowingly."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two controls built after the fixes were committed and replayed by hand; both produce named assertion failures. An earlier attempt at these two was discarded: it had been generated before the commit, so the patch carried only the new tests and reverted nothing."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The deferral is invoked by the tile itself and asserted by a test that stubs the observer, so it cannot become a hook nobody runs."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet over internal and cmd, gofmt, tsc -b and eslint clean. The handlers package passes with -p 1. Frontend: 159 files, 908 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. C7 earned its place again on the observer stub."
+    }
+   ],
+   "findings": [
+    {
+     "id": "cache-R1",
+     "summary": "every thumbnail was re-fetched on every visit, because both routes sent no-store and the fetch overrode the header anyway -- which is most of what the thumbnail was introduced to stop",
+     "found_by": "B3",
+     "fix_commit": "40b0d5e03",
+     "control": {
+      "patch": ".review/controls/cache-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/handlers/ -run TestThumbnailRouteLetsTheOwnersBrowserKeepIt",
+       "./internal/handlers/ -run TestExploreThumbnailIsCachedOnlyBriefly"
+      ],
+      "observed": "both FAIL: 'private, no-store' does not contain 'max-age=', and the explore route's signed-in bound is not the five minutes its own anonymous branch uses"
+     }
+    },
+    {
+     "id": "cache-R2",
+     "summary": "a grid mounted twenty-four tiles and every one of them fetched at once, including the twenty below the fold that may never be looked at; the browser's own lazy loading cannot help, because these are fetches made by script rather than an image tag reading a src",
+     "found_by": "E1",
+     "fix_commit": "e222f3f4d",
+     "control": {
+      "patch": ".review/controls/cache-R2.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatMediaAssetView.test.tsx -t 'fetches nothing until the tile comes near the screen'"
+      ],
+      "observed": "FAIL with 'expected vi.fn() to not be called at all, but actually been called 1 times' -- the tile fetched before the observer reported it anywhere near the screen"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Both routes' headers printed once more after the commits. Owner private and long, explore private and brief, anonymous unchanged, asset content uncached on both."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. The two headers and the deferral touch neither."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract in scope."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor in scope."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state. IntersectionObserver's callback runs on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All four controls in this ledger apply at HEAD and each fails as an assertion."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over e222f3f4d with both changes in place; nothing new."
+    }
+   ],
+   "findings": []
   }
  ],
  "gates": {
@@ -371,6 +733,6 @@
   "vet": "go vet ./internal/... ./cmd/... clean",
   "lint": "gofmt -l clean",
   "types": "npx tsc -b clean",
-  "tests": "go test -p 1 on queue, models, database and handlers: all ok. vitest: 159 files, 906 passed, 1 skipped."
+  "tests": "go test -p 1 on handlers: ok. vitest: 159 files, 908 passed, 1 skipped."
  }
 }
