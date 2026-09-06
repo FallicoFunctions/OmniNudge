@@ -131,16 +131,20 @@ describe('OmniChatMediaAssetView', () => {
     expect(image.getAttribute('src')).toContain('?retry=1');
   });
 
-  // The separator depends on the URL it is appended to. One suffix computed
-  // from the content URL and pasted onto the thumbnail produces
-  // "...jpg&retry=1" with no question mark the moment the two differ.
+  // The separator depends on the URL it is appended to, and the two URLs here
+  // are different URLs. A suffix computed once from the content URL and pasted
+  // onto the thumbnail produces "...jpg&retry=1" with no question mark the
+  // moment only one of them carries a query -- which is why this asks for the
+  // tile, where the thumbnail is the URL being appended to.
   it('joins the retry to whichever url it is appending to', async () => {
     render(
       <OmniChatMediaAssetView
         asset={{
-          ...baseAsset,
+          ...clip,
           content_url: '/api/v1/omnichat/media/asset-1/content?v=2',
+          thumbnail_url: '/api/v1/omnichat/media/asset-1/thumbnail',
         }}
+        preview
       />
     );
 
@@ -148,8 +152,8 @@ describe('OmniChatMediaAssetView', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
 
     const src = (await screen.findByRole('img', { name: 'Sadie at the park' })).getAttribute('src');
-    expect(src).toContain('?v=2&retry=1');
-    expect(src).not.toContain('??');
+    expect(src).toContain('/thumbnail?retry=1');
+    expect(src).not.toContain('&retry=1');
   });
 
   describe('as a grid tile', () => {
