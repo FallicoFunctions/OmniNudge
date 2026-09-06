@@ -900,14 +900,13 @@ func (h *OmniChatGenerationHandler) persistGeneratedMedia(
 		if metrics.Duration > 0 {
 			clipDuration = metrics.Duration
 		}
-		// Reduced here, after the review has looked at the clip the model
-		// actually made and before anything is stored, so what goes into
-		// storage is the file the user will play and the row describes it.
-		reducedWidth, reducedHeight, releaseRendition := applyPlaybackRendition(ctx, job, download, metrics)
-		defer releaseRendition()
-		if reducedWidth > 0 && reducedHeight > 0 {
-			width, height = reducedWidth, reducedHeight
-		}
+		// The clip is stored exactly as the model made it.
+		//
+		// It used to be re-encoded down to 1080 first, on the reasoning that
+		// the whole file crossed the wire before anything could play. That
+		// stopped being true when the routes learned byte ranges: only the
+		// watched part is fetched now, progressively, so the argument for
+		// throwing away two thirds of a 2K render went with it.
 	}
 
 	file, err := os.Open(download.Path)
