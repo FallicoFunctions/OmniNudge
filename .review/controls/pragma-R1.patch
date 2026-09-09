@@ -1,0 +1,13 @@
+diff --git a/backend/internal/handlers/media_range.go b/backend/internal/handlers/media_range.go
+index eac57fb8e..a2768a12c 100644
+--- a/backend/internal/handlers/media_range.go
++++ b/backend/internal/handlers/media_range.go
+@@ -38,8 +38,6 @@ import (
+ // that fix, where the media routes can reach it.
+ func setCacheable(c *gin.Context, value string) {
+ 	c.Header("Cache-Control", value)
+-	c.Writer.Header().Del("Pragma")
+-	c.Writer.Header().Del("Expires")
+ }
+ 
+ // errUnsatisfiableRange means the client asked for bytes this object does not

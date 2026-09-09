@@ -1,0 +1,369 @@
+{
+ "schema_version": 2,
+ "head": "20c0f319e",
+ "base": "20c0f319e",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/media_range.go",
+   "backend/internal/handlers/media_range_test.go",
+   "backend/internal/handlers/omnichat_media.go",
+   "backend/internal/handlers/omnichat_social.go"
+  ],
+  "boundaries": [
+   "a media route -> a browser's cache, and the middleware writing over it",
+   "the cache middleware -> every handler under /api/"
+  ]
+ },
+ "prior_ledgers_read": [
+  "68b74a58aa486af4662388aa3852a694eda0a5e7",
+  "a053fc7ebe0b5a28021865686c30e5392a072cc1",
+  "121713a04"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "One helper and its four call sites. The boundary is a browser's own cache: what a route says it may keep, and what the middleware says over the top of it."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Ledgers 68b74a58a, a053fc7eb and 121713a04, all of this media path. cache-R3 in the second was the same shape one layer up -- a header the client overrode -- and this is the same defect one layer down, where a middleware overrode the route."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed. The tile was READ in the running app, and its markup is what led to the header work, but nothing in it was edited."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The whole finding. Printed the complete response rather than the four headers I expected, and Pragma: no-cache and Expires: 0 were sitting under the max-age. Printed again after the fix: both gone, Cache-Control intact."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The three cache headers now agree on every media route rather than contradicting each other."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "No shape crossing to a client changed; the headers around it did."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The other end is a browser's cache, and it was asked directly rather than reasoned about: force-cache served in 2ms while default took 141ms, which is a stored response that is never fresh."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The measurement environment was the fixture, and it was wrong twice. A hidden pane makes every viewport-driven measurement lie -- lazy loading defers forever, IntersectionObserver never fires -- and I had drawn a whole conclusion from it before checking document.visibilityState. Every measurement in this pass was taken with visibility asserted."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both real cases: a cacheable route clears the blanket headers, a no-store route keeps them."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The no-store routes must not become cacheable by accident, which is asserted rather than assumed."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "The middleware's headers are set before the handler runs, so the test sets them the same way rather than trusting the handler to be reached in isolation."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The uploads handler already deleted both headers for exactly this reason. The media routes were the sibling that never got it -- and finding that is what made this a one-line fix rather than an investigation."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both branches of the explore route reached, signed in and anonymous."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing new is swallowed."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Four copies of a header pattern became one helper."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The shape is 'a middleware writes a header the handler also writes'. Grepped every Pragma and Expires in the tree: the middleware, the uploads fix, and now this. No fourth writer."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "No transaction. The header write happens before the body, which is why it can be cleared at all."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing new is persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "One control, built after the commit, replayed by hand: both tests fail with named assertions."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The helper is the only way these routes set a cache lifetime now, so a future route cannot set max-age without clearing the blanket headers."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet, gofmt clean. The handlers package passes with -p 1."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument. C7 earned its keep on the measurement environment rather than a code fixture, and that reading is now recorded in gotchas.md as well as here."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Applied in the sense that matters here: the running app, in a visible browser, timing the same thumbnail three ways before and after. 141ms default against 2ms force-cache before; 2 to 6ms default after; a second visit to Explore drawing its tile in 2ms with no request."
+    }
+   ],
+   "findings": [
+    {
+     "id": "pragma-R1",
+     "summary": "the cache middleware stamps Pragma: no-cache and Expires: 0 on every response under /api/, so a media route's own max-age was stored but never treated as fresh -- every visit revalidated and the entire caching change was decoration",
+     "found_by": "B3",
+     "fix_commit": "20c0f319e",
+     "control": {
+      "patch": ".review/controls/pragma-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/handlers/ -run TestSettingACacheLifetimeClearsTheBlanketNoCacheHeaders",
+       "./internal/handlers/ -run TestAThumbnailRouteIsActuallyCacheableEndToEnd"
+      ],
+      "observed": "both FAIL: 'Pragma: no-cache outlived the max-age'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled string or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed. The tile was READ in the running app, and its markup is what led to the header work, but nothing in it was edited."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped or reflective accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing new is persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "pragma-R1 applies at HEAD and fails as an assertion."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over 20c0f319e with the fix in place and the browser pane open; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-measured in the running app after the commit: default cache mode 2 to 6ms, and a second visit to Explore drew its tile from cache with no network request."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... clean",
+  "lint": "gofmt -l clean",
+  "types": "unchanged this pass",
+  "tests": "go test -p 1 on handlers: ok"
+ }
+}
