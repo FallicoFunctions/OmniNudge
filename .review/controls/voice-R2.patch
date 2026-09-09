@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_call_transcription.go b/backend/internal/services/omnichat_call_transcription.go
+index 908609dde..faba902a7 100644
+--- a/backend/internal/services/omnichat_call_transcription.go
++++ b/backend/internal/services/omnichat_call_transcription.go
+@@ -105,7 +105,7 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
+ 	}
+ 	defer func() { _ = os.RemoveAll(directory) }()
+ 
+-	if !looksLikeRecordedMedia(recording) {
++	if false && !looksLikeRecordedMedia(recording) {
+ 		// Sniffed, never trusted from a header: the voice-message upload beside
+ 		// this one says the same thing, because a Content-Type is whatever the
+ 		// client typed. ffmpeg parsing arbitrary uploaded bytes is a wide

@@ -1,0 +1,11 @@
+diff --git a/backend/internal/api/middleware/redis_rate_limit.go b/backend/internal/api/middleware/redis_rate_limit.go
+index f9dfa4593..9dee1be4d 100644
+--- a/backend/internal/api/middleware/redis_rate_limit.go
++++ b/backend/internal/api/middleware/redis_rate_limit.go
+@@ -213,5 +213,5 @@ func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
+ // model request, and a runaway recorder must not be able to spend without
+ // limit.
+ func OmniChatCallTranscriptionRateLimiter(cache services.Cache) *RedisRateLimiter {
+-	return NewRedisRateLimiter(cache, 200, time.Hour, "rate:omnichat_call_transcription").FailClosed()
++	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call").FailClosed()
+ }

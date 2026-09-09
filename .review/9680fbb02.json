@@ -1,0 +1,394 @@
+{
+ "schema_version": 2,
+ "head": "0b4a895c5",
+ "base": "9680fbb02",
+ "scope": {
+  "files": [
+   "backend/internal/services/openrouter/transcribe.go",
+   "backend/internal/services/openrouter/transcribe_test.go",
+   "backend/internal/services/omnichat_call_transcription.go",
+   "backend/internal/services/omnichat_call_transcription_test.go",
+   "backend/internal/handlers/omnichat_voice.go",
+   "backend/internal/api/middleware/redis_rate_limit.go",
+   "backend/internal/api/middleware/omnichat_call_transcription_limit_test.go",
+   "backend/internal/config/config.go",
+   "backend/cmd/server/main.go",
+   "frontend/src/components/omnichat/callRecorder.ts",
+   "frontend/src/components/omnichat/__tests__/callRecorder.test.ts",
+   "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+   "frontend/src/services/omnichatService.ts"
+  ],
+  "boundaries": [
+   "browser -> route: a multipart upload of bytes nobody has looked at",
+   "route -> ffmpeg: a parser fed by a client",
+   "service -> OpenRouter: audio in, words out, and what a model does with silence",
+   "one rate limiter shared by events of very different frequency"
+  ]
+ },
+ "prior_ledgers_read": [
+  "121713a04",
+  "a053fc7ebe0b5a28021865686c30e5392a072cc1",
+  "68b74a58aa486af4662388aa3852a694eda0a5e7"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "The voice call rebuilt on server-side transcription: a recorder in the browser, a transcode-and-transcribe service, a route, a config field, and the removal of every browser-recognition workaround. Boundaries: browser -> route (a multipart upload of untrusted bytes), route -> ffmpeg (a parser fed by a client), service -> OpenRouter (audio in, words out), and one rate limiter shared by things of very different frequency."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Ledgers 121713a04, a053fc7eb and 68b74a58a. The pattern that repeats across all three -- a header, a default or a limit that says one thing while something beside it decides -- is what E1 was pointed at here, and it found voice-R1."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the transcription instruction and read it. It is narrow on purpose: asked loosely a conversational model answers the speech instead of transcribing it. Confirmed against two real recordings rather than assumed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Read the call modal's states: the microphone button is mute rather than the only way to be heard, and the amber notice now names which kind of silence happened. Not rendered in a browser -- see B5."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed the route's real status and body for six inputs: speech (200 with text), silence (200 with an empty string, not an error), a provider failure (502), unconfigured (503), a call that is not the caller's (404), and no file at all (400). Every branch says what happened."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. A recording is never persisted."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Run for real, and it is what found the worst defect. A webm/opus recording of 'Hello Sadie, can you hear me now' went through ffmpeg and OpenRouter and came back exactly. Two seconds of digital silence came back as an invented sentence -- twice, with two different sentences -- which is what the silence gate now prevents. UNVERIFIED: the browser half. The pane will not navigate to the dev server, so the recorder itself has never run in a browser, and all three wrong guesses this session came from reasoning about that half instead of running it."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The provider's accepted formats are wav and mp3 and are checked in one place; the browser's containers are webm, mp4 and ogg and are converted in one place. Neither side guesses what the other takes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The route returns {\"text\": ...} and the client reads body.text, both exercised: an empty string is a real answer meaning nothing was said, and the client treats it as one rather than as a failure."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations. The browser recogniser was the second implementation and it is gone."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The other end is OpenRouter's audio input part. Confirmed by sending real audio to two models before writing any of this, rather than by reading a specification."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "A nil *openrouter.Client stored in an interface is not a nil interface, so Configured() reported an ear the service had not got. Found by a test asserting the accessor rather than the field, and fixed in the constructor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixture that mattered was the container. Every test recording is made as webm/opus, which is what a browser actually produces, rather than as the wav the provider accepts -- testing with a wav would have proved nothing about the conversion that exists for exactly this reason."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real speech, a sine tone, and both browser containers are accepted."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A script, an HTML page, a three-byte blob and an empty body are refused before ffmpeg is asked to parse them, and the refusal is distinguishable from a broken recording that did reach it."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty audio, a truncated container, silence, audio over the size cap, an unaccepted format, an absent model and an absent key are each refused with their own reason."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "What found both findings. The route was compared against the voice-message upload beside it, which sniffs its bytes and says why; and the limiter it borrowed was compared against what that limiter exists to bound."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of the route is exercised, and the client's three outcomes -- words, nothing heard, and a failure -- each have a distinct notice."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed. Silence is an answer rather than an error; a provider failure is logged with the call id and returned as 502; and the recorder now reports which kind of nothing happened, with the measurement, because three attempts were spent guessing between kinds that looked identical."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One transcription path, not two. The browser recogniser and everything written to work around it -- the error-code notices, the twelve-second timeout, the recognition types -- were deleted rather than left beside the replacement."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Grepped every other place an upload becomes a file for a parser. The voice-message route is the only other one and it already sniffs, so there is no third instance of the shape voice-R2 fixed. Also checked which routes share the call limiter: it is now only on the two that genuinely happen once per call."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state. The recorder's callbacks run on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The transcode workspace is removed on every path including failure, and the microphone is released on the recorder's own stop event and on cancel."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing is persisted: the recording lives in a temp directory for one ffmpeg call and is deleted. Ending a call cancels the recorder, which stops the tracks, so the browser's recording indicator does not outlive the call."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two controls built after the commit and replayed. Each fails as a named assertion."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The silence gate is reachable and proved so: with ffmpeg at -loglevel error the measurement never arrived and the gate never fired, which is how the second hallucination got through. The level is now read at info and the parser has its own tests."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet, gofmt, tsc -b and eslint clean. services, middleware and openrouter pass; frontend 923 passed, 1 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. E1 found both, which is the third ledger running where comparing a thing against its neighbour found what reading it did not."
+    }
+   ],
+   "findings": [
+    {
+     "id": "voice-R1",
+     "summary": "the transcribe route was behind the call rate limiter -- ten an hour, sized for starting a call -- but it fires once per sentence, so a hands-free conversation got ten sentences an hour and then spent the allowance that exists to let somebody start a call at all",
+     "found_by": "E1",
+     "fix_commit": "0b4a895c5",
+     "control": {
+      "patch": ".review/controls/voice-R1.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/api/middleware/ -run TestTranscriptionHasItsOwnBudgetAndItsOwnKey"
+      ],
+      "observed": "FAIL: 'Should not be: rate:omnichat_call' -- one key means one budget"
+     }
+    },
+    {
+     "id": "voice-R2",
+     "summary": "an uploaded recording reached ffmpeg without anyone looking at it, while the voice-message upload beside it sniffs its bytes and says why: a Content-Type is whatever the client typed",
+     "found_by": "E1",
+     "fix_commit": "0b4a895c5",
+     "control": {
+      "patch": ".review/controls/voice-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestOnlySomethingThatLooksLikeMediaReachesFFmpeg"
+      ],
+      "observed": "FAIL: a shell script reached ffmpeg and failed there instead of being refused before it"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed. A recording is never persisted."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Nothing further was rendered or spoken. The browser half remains unverified for the reason recorded in pass 1, and it is the honest gap in this ledger."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations. The browser recogniser was the second implementation and it is gone."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over the fixes: no other upload reaches a parser unsniffed, and no other route borrows a limiter sized for a rarer event."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state. The recorder's callbacks run on the main thread."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls apply at HEAD and each produces a named assertion failure."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over 0b4a895c5 with both fixes in place; nothing new."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... ./cmd/... clean",
+  "lint": "gofmt -l clean; eslint clean",
+  "types": "npx tsc -b clean",
+  "tests": "go test -p 1: services, middleware, openrouter all ok. vitest: 923 passed, 1 skipped."
+ }
+}
