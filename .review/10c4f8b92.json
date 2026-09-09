@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "eb5a00390",
+ "head": "76a2d4b5b",
  "base": "10c4f8b92",
  "scope": {
   "files": [
@@ -375,6 +375,343 @@
      "id": "Z1",
      "status": "applied",
      "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    }
+   ],
+   "findings": []
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "One file: the hands-free tests' own mock setup. Boundary: a test and the state it inherits from whichever test ran before it."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "This ledger's own pass 1, whose control the hook refused."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled prompt or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The defect exactly. A test that passes inside its file and fails alone is a test whose fixture is the file, not the case -- and a control built on one proves less than nothing, which is what the hook said."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "call-R1 rebuilt against the corrected test and replayed by hand: it passes at HEAD alone, and fails alone with the fix reverted. Every other test in the hands-free block was checked the same way, one at a time."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The hook is the guard here, and it worked: it refused a control whose test could not stand up on its own. Nothing about that was visible from running the suite, which passed throughout."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b, eslint clean; the call modal suite passes as a file and every hands-free test passes in isolation."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique. The hook caught what the review did not, which is the point of having it."
+    }
+   ],
+   "findings": [
+    {
+     "id": "call-R1-blind",
+     "summary": "the control for call-R1 rested on a test that only passed as part of its file: it inherited endCall's resolved value from whichever test ran before it, so alone it hit an undefined promise -- the hook refused it, correctly, because a failure after reverting a fix proves nothing when the test cannot pass before",
+     "found_by": "C7",
+     "fix_commit": "76a2d4b5b",
+     "control": {
+      "patch": ".review/controls/call-R1.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatCallModal.test.tsx -t 'starts a new call when the conversation changes'"
+      ],
+      "observed": "passes alone at HEAD; fails alone with the guard reverted, which is what it could not do before"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled prompt or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over 76a2d4b5b with the test fixed; nothing new."
     }
    ],
    "findings": []
