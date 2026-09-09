@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -104,6 +105,14 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 	}
 	defer func() { _ = os.RemoveAll(directory) }()
 
+	if !looksLikeRecordedMedia(recording) {
+		// Sniffed, never trusted from a header: the voice-message upload beside
+		// this one says the same thing, because a Content-Type is whatever the
+		// client typed. ffmpeg parsing arbitrary uploaded bytes is a wide
+		// surface, and narrowing it to things that are actually media costs one
+		// comparison.
+		return nil, fmt.Errorf("the upload is not a recording")
+	}
 	source := filepath.Join(directory, "recording")
 	if err := os.WriteFile(source, recording, 0o600); err != nil {
 		return nil, fmt.Errorf("write recording: %w", err)
@@ -158,6 +167,20 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 		return nil, ErrNoSpeechHeard
 	}
 	return wav, nil
+}
+
+// looksLikeRecordedMedia reports whether the bytes are a media container.
+//
+// Browsers record webm, mp4 or ogg depending on the platform, and all three
+// sniff as media. Anything else never reaches ffmpeg.
+func looksLikeRecordedMedia(recording []byte) bool {
+	if len(recording) < 12 {
+		return false
+	}
+	detected := http.DetectContentType(recording)
+	return strings.HasPrefix(detected, "audio/") ||
+		strings.HasPrefix(detected, "video/") ||
+		detected == "application/ogg"
 }
 
 // silenceCeilingDB is the loudest a recording may peak and still count as

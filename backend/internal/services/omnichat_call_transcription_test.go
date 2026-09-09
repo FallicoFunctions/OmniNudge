@@ -57,14 +57,25 @@ func TestAudibleAudioIsPassedThrough(t *testing.T) {
 }
 
 // A bad upload is not an outage, and the two must not read the same way.
-func TestAFileThatIsNotAudioIsRefusedAsContent(t *testing.T) {
+//
+// Media ffmpeg cannot parse and bytes that were never media fail differently
+// on purpose: the first is a broken recording, the second never reached ffmpeg
+// at all. Neither is "you said nothing".
+func TestABadUploadIsRefusedAsContentRatherThanAsAnOutage(t *testing.T) {
 	ffmpegOrSkip(t)
 
-	_, err := toSpeechWAV(context.Background(), []byte("this is not audio at all"))
+	notMedia, err := toSpeechWAV(context.Background(), []byte("this is not audio at all"))
+	require.Error(t, err)
+	require.Nil(t, notMedia)
+	require.NotErrorIs(t, err, ErrNoSpeechHeard)
+	require.Contains(t, err.Error(), "not a recording")
 
+	// A real container with a corrupt body: this one does reach ffmpeg, and
+	// fails there.
+	truncated := recordingLike(t, "sine=frequency=440:duration=1")[:64]
+	_, err = toSpeechWAV(context.Background(), truncated)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, ErrNoSpeechHeard)
-	require.Contains(t, err.Error(), "could not be read")
 }
 
 // The measurement is read out of ffmpeg's own report, and a report it cannot
@@ -87,4 +98,32 @@ func TestTranscriptionSaysWhenItIsNotConfigured(t *testing.T) {
 	// caller spoke, and the server had no ear.
 	_, err := (&OmniChatCallTranscription{}).Transcribe(context.Background(), []byte("x"))
 	require.ErrorContains(t, err, "not configured")
+}
+
+// Sniffed, never trusted from a header. The voice-message upload beside this
+// one says the same thing, because a Content-Type is whatever the client typed
+// -- and ffmpeg parsing arbitrary uploaded bytes is a wide surface to leave
+// open on an authenticated route.
+func TestOnlySomethingThatLooksLikeMediaReachesFFmpeg(t *testing.T) {
+	ffmpegOrSkip(t)
+
+	for name, payload := range map[string][]byte{
+		"a script":     []byte("#!/bin/sh\nrm -rf /\n"),
+		"html":         []byte("<!doctype html><html><body>hello</body></html>"),
+		"a short blob": []byte("abc"),
+		"nothing":      {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := toSpeechWAV(context.Background(), payload)
+			require.Error(t, err)
+			require.NotContains(t, err.Error(), "could not be read",
+				"it must be refused before ffmpeg is asked to parse it")
+		})
+	}
+}
+
+// What browsers really record still gets through. A gate that refuses the real
+// input is worse than no gate.
+func TestWhatABrowserRecordsIsAcceptedByTheGate(t *testing.T) {
+	require.True(t, looksLikeRecordedMedia(recordingLike(t, "sine=frequency=440:duration=1")))
 }

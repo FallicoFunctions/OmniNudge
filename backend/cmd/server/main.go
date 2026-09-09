@@ -887,6 +887,7 @@ func main() {
 	omniChatSocialRateLimiter := middleware.OmniChatSocialRateLimiter(cache)
 	omniChatVoiceRateLimiter := middleware.OmniChatVoiceRateLimiter(cache)
 	omniChatCallRateLimiter := middleware.OmniChatCallRateLimiter(cache)
+	omniChatTranscriptionRateLimiter := middleware.OmniChatCallTranscriptionRateLimiter(cache)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -1560,7 +1561,7 @@ func main() {
 			protected.DELETE("/omnichat/calls/:call_id", omniChatVoiceHandler.EndCall)
 			protected.POST("/omnichat/calls/:call_id/token", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.RefreshCallToken)
 			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
-			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
+			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatTranscriptionRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)

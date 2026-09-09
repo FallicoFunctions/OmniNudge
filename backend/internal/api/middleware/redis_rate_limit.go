@@ -200,3 +200,18 @@ func OmniChatVoiceRateLimiter(cache services.Cache) *RedisRateLimiter {
 func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call").FailClosed()
 }
+
+// OmniChatCallTranscriptionRateLimiter bounds transcribing what somebody said,
+// which happens once per sentence rather than once per call.
+//
+// Its own budget, and its own key. Sharing the call limiter would give a
+// hands-free conversation ten sentences an hour and then spend the rest of the
+// allowance that exists to let somebody start a call at all -- so talking for
+// a minute would lock the phone for the next hour.
+//
+// Two hundred is a long conversation and still bounds the cost: each one is a
+// model request, and a runaway recorder must not be able to spend without
+// limit.
+func OmniChatCallTranscriptionRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 200, time.Hour, "rate:omnichat_call_transcription").FailClosed()
+}

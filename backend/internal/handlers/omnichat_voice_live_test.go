@@ -16,6 +16,7 @@ import (
 )
 
 type liveCallVoiceData struct {
+	notActive        bool
 	attachedProvider string
 	attachedSession  string
 	startResult      *models.OmniChatCallSession
@@ -177,7 +178,7 @@ func (d *liveCallVoiceData) AttachCallProviderOwned(_ context.Context, _ uuid.UU
 	return true, nil
 }
 func (d *liveCallVoiceData) GetActiveCallProviderOwned(context.Context, uuid.UUID, int) (string, string, bool, error) {
-	return d.activeProvider, d.activeSession, true, nil
+	return d.activeProvider, d.activeSession, !d.notActive, nil
 }
 func (d *liveCallVoiceData) ListActiveCallProvidersOwned(context.Context, int) ([]models.OmniChatCallProviderSession, error) {
 	return d.activeProviders, nil
