@@ -112,6 +112,14 @@ export default function OmniChatCallModal({
 }) {
   const [listeningNotice, setListeningNotice] = useState('');
   const listenTimeoutRef = useRef<number | undefined>(undefined);
+  // A call listens by itself. Pressing the phone is what starts it, and she
+  // keeps listening between turns -- pressing a second button to be heard is
+  // not how a phone call works.
+  const [handsFree, setHandsFree] = useState(true);
+  // One failure stops the automatic restart. Without this a recogniser that
+  // ends immediately would be restarted immediately, forever, which is a hot
+  // loop wearing the costume of a feature.
+  const autoListenBlockedRef = useRef(false);
   const [status, setStatus] = useState<
     'connecting' | 'ready' | 'listening' | 'thinking' | 'speaking' | 'error'
   >('connecting');
@@ -374,6 +382,7 @@ export default function OmniChatCallModal({
     }
   };
 
+  const startListeningRef = useRef<() => void>(() => {});
   const startListening = () => {
     const browserWindow = window as Window & {
       SpeechRecognition?: RecognitionConstructor;
@@ -381,6 +390,7 @@ export default function OmniChatCallModal({
     };
     const Recognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
     if (!Recognition) {
+      autoListenBlockedRef.current = true;
       setListeningNotice(
         'This browser has no speech recognition. Type below, or use Chrome or Safari to talk.'
       );
@@ -401,6 +411,7 @@ export default function OmniChatCallModal({
       const text = event.results[0]?.[0]?.transcript || '';
       if (!text.trim()) return;
       heardSomething = true;
+      autoListenBlockedRef.current = false;
       setListeningNotice('');
       void sendTranscript(text);
     };
@@ -409,13 +420,15 @@ export default function OmniChatCallModal({
     // that was denied the microphone, and both looked like nothing at all.
     recognition.onerror = (event: RecognitionErrorEvent) => {
       heardSomething = true;
+      autoListenBlockedRef.current = true;
       setListeningNotice(speechRecognitionNotice(event.error));
       setStatus('ready');
     };
     recognition.onend = () => {
       window.clearTimeout(listenTimeoutRef.current);
       if (!heardSomething) {
-        setListeningNotice("I didn't catch anything. Hold the button while you speak, or type below.");
+        autoListenBlockedRef.current = true;
+        setListeningNotice("I didn't catch anything. Press the microphone to try again, or type below.");
       }
       setStatus((current) => (current === 'listening' ? 'ready' : current));
     };
@@ -433,6 +446,7 @@ export default function OmniChatCallModal({
     listenTimeoutRef.current = window.setTimeout(() => {
       if (heardSomething || closedRef.current) return;
       heardSomething = true;
+      autoListenBlockedRef.current = true;
       try {
         recognition.stop();
       } catch {
@@ -444,6 +458,24 @@ export default function OmniChatCallModal({
       setStatus('ready');
     }, listenTimeoutMs);
   };
+  startListeningRef.current = startListening;
+
+  // Pressing the phone starts the call, and the call starts listening. Nothing
+  // else should have to be pressed: she listens on connect and again after
+  // every turn she takes, which is what a phone call is.
+  //
+  // Only from 'ready', so it cannot interrupt her while she is speaking or
+  // thinking, and never after a failed attempt -- that latch is what keeps a
+  // recogniser which ends instantly from being restarted instantly, forever.
+  useEffect(() => {
+    if (status !== 'ready' || !handsFree || closedRef.current) return;
+    if (autoListenBlockedRef.current) return;
+    const timer = window.setTimeout(() => {
+      if (!closedRef.current) startListeningRef.current();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [status, handsFree]);
+
   function endCall() {
     if (closedRef.current) return;
     closedRef.current = true;
@@ -586,12 +618,24 @@ export default function OmniChatCallModal({
             {status !== 'error' && (
               <button
                 type="button"
-                onClick={() =>
-                  status === 'listening' ? recognitionRef.current?.stop() : startListening()
-                }
+                onClick={() => {
+                  // The call listens by itself, so this is mute -- and the way
+                  // back after a recogniser that failed, because pressing it
+                  // deliberately clears the latch that stopped the automatic
+                  // restart.
+                  if (handsFree) {
+                    setHandsFree(false);
+                    window.clearTimeout(listenTimeoutRef.current);
+                    recognitionRef.current?.stop();
+                    return;
+                  }
+                  autoListenBlockedRef.current = false;
+                  setListeningNotice('');
+                  setHandsFree(true);
+                }}
                 disabled={status === 'connecting' || status === 'thinking' || status === 'speaking'}
-                aria-label={status === 'listening' ? 'Stop listening' : 'Talk'}
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${status === 'listening' ? 'bg-white text-black' : 'bg-white/15 backdrop-blur'} disabled:opacity-40`}
+                aria-label={handsFree ? 'Mute the microphone' : 'Unmute the microphone'}
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${!handsFree ? 'bg-white/15 backdrop-blur' : status === 'listening' ? 'bg-white text-black' : 'bg-white/25 backdrop-blur'} disabled:opacity-40`}
               >
                 {status === 'thinking' ? (
                   <Loader2 className="animate-spin" />

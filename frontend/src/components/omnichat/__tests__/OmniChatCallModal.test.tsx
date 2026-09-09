@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OmniChatCallModal, { isTrustedOmniChatCallUrl } from '../OmniChatCallModal';
 import { omnichatService } from '../../../services/omnichatService';
 import { speakOmniChatMessage } from '../OmniChatSpeakButton';
@@ -416,5 +416,86 @@ describe('OmniChatCallModal', () => {
     await waitFor(() => expect(onPaymentRequired).toHaveBeenCalledOnce());
     expect(onClose).toHaveBeenCalledOnce();
     expect(screen.queryByText('Connection needs attention')).not.toBeInTheDocument();
+  });
+
+  // Pressing the phone is what starts a call. Nothing else should have to be
+  // pressed to be heard.
+  //
+  // Reported as "the call starts and I speak but she is not hearing me": the
+  // only caller of startListening was the microphone button, so a call sat
+  // silently until somebody found and pressed a second control. Three call
+  // sessions in the database, every one turn_count 0, and no user message ever
+  // written.
+  describe('hands free', () => {
+    class FakeRecognition {
+      static instances: FakeRecognition[] = [];
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      onresult: ((event: unknown) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      started = false;
+      constructor() {
+        FakeRecognition.instances.push(this);
+      }
+      start() {
+        this.started = true;
+      }
+      stop() {}
+    }
+
+    beforeEach(() => {
+      FakeRecognition.instances = [];
+      vi.stubGlobal('SpeechRecognition', FakeRecognition);
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('starts listening once the call connects, with nothing else pressed', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
+      await waitFor(() => expect(FakeRecognition.instances.length).toBeGreaterThan(0), {
+        timeout: 3000,
+      });
+      expect(FakeRecognition.instances[0].started).toBe(true);
+      view.unmount();
+    });
+
+    // A recogniser that ends the instant it starts must not be restarted the
+    // instant it ends. That is a hot loop wearing the costume of a feature.
+    it('does not restart a listener that failed', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(FakeRecognition.instances.length).toBe(1), { timeout: 3000 });
+      await act(async () => {
+        FakeRecognition.instances[0].onend?.();
+      });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      expect(FakeRecognition.instances.length).toBe(1);
+      expect(screen.getByTestId('omnichat-call-listening-notice')).toHaveTextContent(
+        /didn't catch anything/i
+      );
+      view.unmount();
+    });
   });
 });
