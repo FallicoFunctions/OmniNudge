@@ -30,6 +30,18 @@ const (
 
 var ErrConversationSceneStateUnavailable = errors.New("conversation scene state is unavailable")
 
+// TurnAudience says whether the reply being written is read or heard.
+//
+// A heard turn is a different job from a read one, and two places act on it.
+// Scene extraction is left out, because it is a model call -- measured at 1.5
+// seconds -- spent reading a scene nobody can see, and the spoken register
+// forbids narrating the room anyway. And the reply itself is streamed, because
+// a caller waits for the first sentence rather than for the whole reply.
+type TurnAudience bool
+
+// Heard marks a turn on a live call.
+const Heard TurnAudience = true
+
 type conversationSceneStatePreparer interface {
 	PrepareForGeneration(
 		context.Context,
@@ -37,6 +49,7 @@ type conversationSceneStatePreparer interface {
 		int,
 		*models.BotPersona,
 		[]*models.BotMessage,
+		...TurnAudience,
 	) (*models.OmniChatConversationSceneState, error)
 }
 
@@ -75,6 +88,7 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 	ownerUserID, conversationID int,
 	persona *models.BotPersona,
 	history []*models.BotMessage,
+	audience ...TurnAudience,
 ) (*models.OmniChatConversationSceneState, error) {
 	if c == nil || c.store == nil {
 		return nil, errors.New("conversation scene state: coordinator is unavailable")
@@ -130,7 +144,11 @@ func (c *ConversationSceneStateCoordinator) PrepareForGeneration(
 	}
 
 	next := conservativeConversationSceneDelta(base, delta)
-	if c.extractor != nil {
+	// The conservative delta always runs, so a call still carries her state
+	// forward and the first written message afterwards extracts from the same
+	// checkpoint and catches up on what the call added.
+	heard := len(audience) > 0 && audience[0] == Heard
+	if c.extractor != nil && !heard {
 		extractCtx, cancel := context.WithTimeout(ctx, conversationSceneExtractionTimeout)
 		extracted, extractErr := c.extractor.Extract(extractCtx, base, persona, delta)
 		cancel()

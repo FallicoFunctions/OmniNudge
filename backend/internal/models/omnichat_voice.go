@@ -215,6 +215,32 @@ func (r *OmniChatVoiceRepository) GetPersonaVoice(ctx context.Context, personaID
 	return voice, err
 }
 
+// GetConversationVoiceOwned returns the voice of the character in a
+// conversation the caller owns.
+//
+// One query decides both questions a live call has to answer -- is this
+// conversation yours, and whose voice is it -- because asking them separately
+// is what turns a speech route into an IDOR.
+func (r *OmniChatVoiceRepository) GetConversationVoiceOwned(ctx context.Context, userID, conversationID int) (*OmniChatPersonaVoice, error) {
+	if r == nil || r.pool == nil || userID < 1 || conversationID < 1 {
+		return nil, nil
+	}
+	var personaID int
+	err := r.pool.QueryRow(ctx, `
+		SELECT p.id
+		FROM bot_conversations c JOIN bot_personas p ON p.id=c.persona_id
+		WHERE c.id=$1 AND c.user_id=$2 AND c.archived_at IS NULL AND p.is_active=TRUE
+		  AND ((p.owner_user_id IS NULL AND p.visibility='public') OR p.owner_user_id=$2)
+	`, conversationID, userID).Scan(&personaID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.GetPersonaVoice(ctx, personaID)
+}
+
 // GetPersonaVoiceAccessible prevents a voice identifier and configuration for
 // a private character from becoming an IDOR. Internal speech creation uses
 // GetPersonaVoice only after it has authorized the owning conversation.

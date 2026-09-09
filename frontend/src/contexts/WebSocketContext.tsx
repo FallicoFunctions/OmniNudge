@@ -692,6 +692,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          // A call reply is spoken sentence by sentence, so each sentence is
+          // announced the moment it is written rather than when the reply ends.
+          // Only the number travels here: the audio is fetched over HTTP,
+          // because this channel drops messages when it is busy and a lost
+          // sentence of speech is a hole in her voice.
+          case 'omnichat_call_sentence':
+          case 'omnichat_call_sentences_done': {
+            window.dispatchEvent(new CustomEvent(data.type, { detail: data.payload }));
+            break;
+          }
+
           case 'omnichat_group_message': {
             const message = data.payload as OmniChatGroupMessage;
             queryClient.setQueryData<InfiniteData<OmniChatGroupMessage[]> | undefined>(

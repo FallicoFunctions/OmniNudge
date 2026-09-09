@@ -46,6 +46,7 @@ vi.mock('../../../services/omnichatService', async (importOriginal) => ({
     refreshCallToken: vi.fn(),
     sendMessage: vi.fn(),
     recordCallTurn: vi.fn(),
+    getCallSentenceSpeech: vi.fn(),
   },
 }));
 
@@ -502,6 +503,91 @@ describe('OmniChatCallModal', () => {
       vi.stubGlobal('cancelAnimationFrame', () => {});
     });
     afterEach(() => vi.unstubAllGlobals());
+
+    // She speaks once, not twice.
+    //
+    // The sentence run starts at the top of the turn, before the code knows
+    // whether the avatar will say the reply over its own connection -- and the
+    // avatar decision is made after the reply arrives, far too late to stop a
+    // run that is already talking. In video mode that put her voice on the
+    // local speaker and in the avatar's stream at the same time, half a beat
+    // apart.
+    it('does not speak sentences locally when the avatar is speaking them', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue({ ...call, mode: 'video' });
+      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+      vi.mocked(omnichatService.sendMessage).mockResolvedValue({ accepted: true });
+      vi.mocked(omnichatService.getCallSentenceSpeech).mockResolvedValue(null);
+
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="video"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
+
+      const box = await screen.findByPlaceholderText(/type/i);
+      fireEvent.change(box, { target: { value: 'are you there' } });
+      fireEvent.click(screen.getByRole('button', { name: /send/i }));
+      await waitFor(() => expect(omnichatService.sendMessage).toHaveBeenCalled());
+
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('omnichat_call_sentence', {
+            detail: { conversation_id: 12, turn: '3f2504e0-4f89-11d3-9a0c-0305e82c3301', sequence: 1 },
+          })
+        );
+      });
+
+      expect(omnichatService.getCallSentenceSpeech).not.toHaveBeenCalled();
+      view.unmount();
+    });
+
+    // And on an ordinary voice call she does speak them, which is the whole
+    // point: the first sentence is fetched while the rest of the reply is
+    // still being written.
+    it('fetches a sentence as soon as it is announced on a voice call', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+      vi.mocked(omnichatService.sendMessage).mockResolvedValue({ accepted: true });
+      vi.mocked(omnichatService.getCallSentenceSpeech).mockResolvedValue(null);
+
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+      await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
+
+      const box = await screen.findByPlaceholderText(/type/i);
+      fireEvent.change(box, { target: { value: 'are you there' } });
+      fireEvent.click(screen.getByRole('button', { name: /send/i }));
+      await waitFor(() => expect(omnichatService.sendMessage).toHaveBeenCalled());
+
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('omnichat_call_sentence', {
+            detail: { conversation_id: 12, turn: '3f2504e0-4f89-11d3-9a0c-0305e82c3301', sequence: 1 },
+          })
+        );
+      });
+
+      await waitFor(() =>
+        expect(omnichatService.getCallSentenceSpeech).toHaveBeenCalledWith(
+          12,
+          '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+          1
+        )
+      );
+      view.unmount();
+    });
 
     it('opens the microphone once the call connects, with nothing else pressed', async () => {
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);

@@ -173,6 +173,10 @@ type ChatbotService struct {
 	// turn that failed.
 	calls omniChatCallStateReader
 
+	// Optional, like calls above. Absent, a call still works and she is simply
+	// heard when the whole reply is ready, which is what she did before.
+	callSpeech omniChatCallSpeaker
+
 	hub *websocket.Hub
 }
 
@@ -181,6 +185,29 @@ type ChatbotService struct {
 // cannot tell the generator; the call session can.
 type omniChatCallStateReader interface {
 	ConversationIsOnACall(ctx context.Context, conversationID int) bool
+}
+
+// omniChatCallSpeaker is handed each sentence of a call reply as it finishes.
+//
+// Nothing here synthesises. The sentence is stored where the browser can ask
+// for it and the browser is told it is ready, so the audio is made when it is
+// wanted -- a caller who hangs up mid-reply is not billed for words nobody
+// heard, and a dropped notice costs a sentence rather than the whole turn.
+type omniChatCallSpeaker interface {
+	// Sentence stores one sentence of this turn and announces it. The turn is
+	// passed because sequence numbers restart at one, and the caller has to be
+	// able to tell this turn's first sentence from the last turn's.
+	Sentence(ctx context.Context, userID, conversationID int, turn string, sequence int, sentence string) error
+	// Done says the turn has no more sentences coming.
+	Done(ctx context.Context, userID, conversationID int, turn string, spoken int) error
+}
+
+// SetCallSpeech gives the service somewhere to put each sentence of a call.
+func (s *ChatbotService) SetCallSpeech(speaker omniChatCallSpeaker) *ChatbotService {
+	if s != nil {
+		s.callSpeech = speaker
+	}
+	return s
 }
 
 // SetCallState gives the service the reader that tells it she is on the phone.
@@ -506,9 +533,17 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	conversationOutgrewWindow := len(history) == maxHistoryMessages
 	history = filterArtifactContaminatedAssistantHistory(history)
 
+	// Read before the scene state, because a call changes what preparing it is
+	// allowed to cost.
+	onACall := s.onACall(chatCtx, conversationID)
+
 	var sceneState *models.OmniChatConversationSceneState
 	if s.sceneState != nil && models.PersonaPerformsAScene(persona) {
-		sceneState, err = s.sceneState.PrepareForGeneration(chatCtx, userID, conversationID, persona, history)
+		audience := []TurnAudience{}
+		if onACall {
+			audience = append(audience, Heard)
+		}
+		sceneState, err = s.sceneState.PrepareForGeneration(chatCtx, userID, conversationID, persona, history, audience...)
 		if err != nil {
 			sceneErr := fmt.Errorf("%w: %v", ErrConversationSceneStateUnavailable, err)
 			assistantMsg, persistErr := s.persistAssistantFallback(ctx, userID, conversationID, userFacingGenerationError(sceneErr))
@@ -534,7 +569,6 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	reading := recentReadingFor(chatCtx, s.reading, persona)
 
 	messages := make([]openrouter.Message, 0, len(history)+1)
-	onACall := s.onACall(chatCtx, conversationID)
 
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
@@ -552,7 +586,35 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	// text once, whole, and then take it away to send it again a line at a time.
 	// A character who arrives in messages is buffered instead, and the pause
 	// between them is what the reader sees.
+	// On a call each sentence is handed on as it finishes, so the first one can
+	// be synthesised while the rest is still being written. This is the whole
+	// reason a call streams for real and nothing else does.
+	var sentences *sentenceStream
+	announceDone := func() {}
+	if onACall && s.callSpeech != nil {
+		spoken := 0
+		turn := uuid.NewString()
+		sentences = newSentenceStream(func(sentence string) {
+			spoken++
+			if err := s.callSpeech.Sentence(chatCtx, userID, conversationID, turn, spoken, sentence); err != nil {
+				zlog.Warn().Err(err).Int("conversation_id", conversationID).Int("sequence", spoken).
+					Msg("chatbot: a sentence of a call could not be offered to the caller")
+			}
+		})
+		// Announced the moment generation ends, not when this function returns:
+		// what follows is persistence, and on a character who delivers a burst
+		// it is several seconds of deliberate typing pauses. A caller waiting to
+		// hear whether she has finished must not wait for any of that.
+		announceDone = func() {
+			if err := s.callSpeech.Done(chatCtx, userID, conversationID, turn, spoken); err != nil {
+				zlog.Warn().Err(err).Int("conversation_id", conversationID).
+					Msg("chatbot: the end of a call reply could not be announced")
+			}
+		}
+	}
+
 	streamTokens := func(token string) {
+		sentences.push(token)
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: userID,
 			Type:        "omnichat_token",
@@ -563,10 +625,26 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 		})
 	}
 	if personaDeliversSeparateMessages(persona) {
-		streamTokens = func(string) {}
+		// She is heard whatever her written delivery looks like: a burst of
+		// short messages is a written shape, and on a call there is one voice.
+		streamTokens = func(token string) { sentences.push(token) }
 	}
 
-	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, streamTokens)
+	audience := []TurnAudience{}
+	if onACall {
+		audience = append(audience, Heard)
+	}
+	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, streamTokens, audience...)
+	if genErr != nil {
+		// The caller has heard part of a reply that is not going to finish.
+		// Saying the rest of it now, out of a failed turn, is worse than
+		// stopping.
+		sentences.stop()
+	} else {
+		// The last sentence rarely ends on a terminator the stream saw.
+		sentences.flush()
+	}
+	announceDone()
 
 	failed := genErr != nil
 	if failed {

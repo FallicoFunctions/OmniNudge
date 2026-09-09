@@ -10,6 +10,7 @@ import {
 } from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
 import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton';
+import { playCallSentences } from './callSentenceSpeech';
 import {
   openMicrophone,
   recordUtterance,
@@ -348,6 +349,28 @@ export default function OmniChatCallModal({
     try {
       // Listen first: the reply can land before the send call settles.
       const replyArrived = waitForOmniChatReply(conversationId, turnController.signal);
+      // And listen for her voice before that: the first sentence is announced
+      // while the rest of the reply is still being written, which is the whole
+      // reason a call no longer waits for the reply to finish.
+      // Not in video mode. There the avatar says the reply itself over its own
+      // connection, and a sentence run beside it would speak every word a
+      // second time, out of the local speaker, half a beat apart. The avatar
+      // decision is made further down, after the reply arrives -- too late to
+      // stop a run that has already started talking.
+      const play = mode === 'video' ? undefined : microphoneRef.current?.play;
+      const sentences = play
+        ? playCallSentences({
+            conversationId,
+            fetchSentence: (turn, sequence) =>
+              omnichatService.getCallSentenceSpeech(conversationId, turn, sequence),
+            play,
+            onSpeaking: (speaking) => {
+              if (!closedRef.current && callEpochRef.current === callEpoch)
+                setStatus(speaking ? 'speaking' : 'ready');
+            },
+          })
+        : null;
+      turnController.signal.addEventListener('abort', () => sentences?.cancel(), { once: true });
       // If the send itself fails, nothing below ever awaits this one, and an
       // unobserved rejection is an unhandled promise rejection.
       void replyArrived.catch(() => undefined);
@@ -358,7 +381,10 @@ export default function OmniChatCallModal({
         turnController.signal
       );
       const assistant = await replyArrived;
-      if (closedRef.current || callEpochRef.current !== callEpoch) return;
+      if (closedRef.current || callEpochRef.current !== callEpoch) {
+        sentences?.cancel();
+        return;
+      }
       onAssistant(assistant);
       let avatarHandledSpeech = false;
       const liveKitRoom = liveKitRoomRef.current;
@@ -385,7 +411,13 @@ export default function OmniChatCallModal({
       const activeSession = sessionRef.current;
       if (activeSession)
         void omnichatService.recordCallTurn(activeSession.id).catch(() => undefined);
-      if (!avatarHandledSpeech) {
+      if (avatarHandledSpeech) sentences?.cancel();
+      // She may already have said all of this, a sentence at a time, while the
+      // reply was still being written. Speaking it again from the top would be
+      // the machinery showing through at the worst possible moment.
+      const alreadySpoken = sentences ? await sentences.finished : false;
+      if (closedRef.current || callEpochRef.current !== callEpoch) return;
+      if (!avatarHandledSpeech && !alreadySpoken) {
         try {
           await speakOmniChatMessage({
             personaId: persona.id,

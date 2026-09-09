@@ -16,8 +16,12 @@ import (
 
 type voicePreviewFake struct{}
 
-func (*voicePreviewFake) GetOrCreateSpeech(context.Context, int, int, int) (*models.OmniChatSpeechAudio, error) {
+func (*voicePreviewFake) GetOrCreateSpeech(context.Context, int, int, int) (*services.OmniChatSpeech, error) {
 	return nil, nil
+}
+
+func (*voicePreviewFake) SpeakSentence(_ context.Context, _ *models.OmniChatPersonaVoice, sentence string) (*speech.Audio, error) {
+	return &speech.Audio{Bytes: append([]byte("RIFF\x24\x00\x00\x00WAVE"), make([]byte, len(sentence))...), ContentType: "audio/wav", Extension: ".wav"}, nil
 }
 
 func (*voicePreviewFake) PreviewPresetSpeech(_ context.Context, preset services.OmniChatVoicePreset) (*speech.Audio, error) {

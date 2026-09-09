@@ -457,6 +457,7 @@ func generatePersonaCompletionWithClientAndSceneState(
 	messages []openrouter.Message,
 	sceneState *models.OmniChatConversationSceneState,
 	onChunk openrouter.StreamCallback,
+	audience ...TurnAudience,
 ) (string, error) {
 	if completion == nil {
 		return "", errors.New("chatbot: completion provider is unavailable")
@@ -492,6 +493,31 @@ func generatePersonaCompletionWithClientAndSceneState(
 	constraints := personalResponseConstraints{}
 	if personalMode {
 		constraints = derivePersonalResponseConstraints(messages, sceneState)
+	}
+
+	// On a call the reply is streamed for real, and nothing else is.
+	//
+	// Everywhere else onChunk receives a finished reply replayed as tokens, so
+	// the contract below can judge the whole thing before a word of it is
+	// delivered. A call cannot wait for that: the caller is holding a phone.
+	//
+	// What the contract protects against, a voice is already protected from --
+	// the spoken register instruction forbids narration, and SpokenText strips
+	// what survives it before anything is synthesised.
+	//
+	// There is one attempt, deliberately. Speech cannot be unsaid, and a retry
+	// that repeats a sentence the caller already heard is worse than the error
+	// a failed turn shows today.
+	if len(audience) > 0 && audience[0] == Heard {
+		streamed, err := completion.Generate(generationCtx, messages, onChunk)
+		if err != nil {
+			return "", err
+		}
+		streamed = normalizeAssistantMessageContent(streamed)
+		if streamed == "" {
+			return "", fmt.Errorf("%w: provider returned an empty response", ErrAssistantOutputHygiene)
+		}
+		return streamed, nil
 	}
 
 	var lastErr error

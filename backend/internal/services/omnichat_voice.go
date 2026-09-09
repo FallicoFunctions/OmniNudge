@@ -58,7 +58,24 @@ func NewOmniChatVoiceService(store OmniChatVoiceStore, storage StorageService, p
 	return &OmniChatVoiceService{store: store, storage: storage, providers: providers, defaultModels: defaultModels}
 }
 
-func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, conversationID, messageID int) (*models.OmniChatSpeechAudio, error) {
+// OmniChatSpeech is the stored audio, plus the bytes themselves when this
+// request is the one that made them.
+//
+// The call path synthesised a reply, uploaded it to object storage, and then
+// immediately asked storage for the same object back -- a HEAD, a GET, and the
+// whole file over the network, for bytes that were already in memory. Measured
+// on a real call, the whole speech step took 3.7 seconds, and on a phone call
+// every part of that is time the caller spends in silence.
+type OmniChatSpeech struct {
+	Audio *models.OmniChatSpeechAudio
+	// Fresh is nil when the audio came from the cache, or when a concurrent
+	// request won the cache upsert and the canonical object is a different one.
+	// Then the caller reads storage, as it always did. It is never a partial
+	// copy: all the bytes, or none.
+	Fresh []byte
+}
+
+func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, conversationID, messageID int) (*OmniChatSpeech, error) {
 	source, err := s.store.GetSpeechSourceOwned(ctx, userID, conversationID, messageID)
 	if err != nil {
 		return nil, err
@@ -107,7 +124,7 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 		if err := s.captureCachedSpeech(ctx, userID, cached); err != nil {
 			return nil, err
 		}
-		return cached, nil
+		return &OmniChatSpeech{Audio: cached}, nil
 	}
 	if s.billing == nil {
 		return nil, errors.New("character speech billing is unavailable")
@@ -126,7 +143,7 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 			if err := s.captureCachedSpeech(workCtx, userID, cached); err != nil {
 				return nil, err
 			}
-			return cached, nil
+			return &OmniChatSpeech{Audio: cached}, nil
 		}
 		var billingOperation uuid.UUID
 		included, err := s.billing.Included(workCtx, &userID, models.OmniCreditsUsageVoice)
@@ -165,8 +182,8 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 		if shared.Err != nil {
 			return nil, shared.Err
 		}
-		audio, ok := shared.Val.(*models.OmniChatSpeechAudio)
-		if !ok || audio == nil {
+		audio, ok := shared.Val.(*OmniChatSpeech)
+		if !ok || audio == nil || audio.Audio == nil {
 			return nil, errors.New("character speech generation returned an invalid result")
 		}
 		return audio, nil
@@ -186,7 +203,7 @@ func (s *OmniChatVoiceService) captureCachedSpeech(ctx context.Context, userID i
 	return nil
 }
 
-func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer speech.Synthesizer, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string, billingOperation uuid.UUID) (*models.OmniChatSpeechAudio, error) {
+func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer speech.Synthesizer, source *models.OmniChatSpeechSource, userID, messageID int, textHash, voiceHash string, billingOperation uuid.UUID) (*OmniChatSpeech, error) {
 	model := source.Voice.ModelID
 	if strings.TrimSpace(model) == "" {
 		model = s.defaultModels[source.Voice.Provider]
@@ -224,8 +241,12 @@ func (s *OmniChatVoiceService) generateSpeech(ctx context.Context, synthesizer s
 	// object returned by the repository and remove this request's unused upload.
 	if audio.StoragePath != path {
 		s.deleteSpeechObject(ctx, path)
+		// These bytes are a different synthesis of the same words, so their
+		// length no longer matches the row the caller was handed. Serving them
+		// would describe one object and send another.
+		return &OmniChatSpeech{Audio: audio}, nil
 	}
-	return audio, nil
+	return &OmniChatSpeech{Audio: audio, Fresh: generated.Bytes}, nil
 }
 
 func validOmniChatSpeechAudio(audio *speech.Audio) bool {
@@ -255,6 +276,59 @@ func (s *OmniChatVoiceService) PreviewPresetSpeech(ctx context.Context, preset O
 		ModelID:      preset.ModelID,
 		LanguageCode: preset.LanguageCode,
 	})
+}
+
+// SpeakSentence synthesises one sentence of a live call in her own voice.
+//
+// Nothing is stored. A call sentence is heard once, and writing 100 KB to
+// object storage for every sentence of every call would cost more than it could
+// ever save -- the ordinary speak button still synthesises and caches the whole
+// message the usual way.
+func (s *OmniChatVoiceService) SpeakSentence(ctx context.Context, voice *models.OmniChatPersonaVoice, sentence string) (*speech.Audio, error) {
+	if s == nil {
+		return nil, errors.New("character speech is unavailable")
+	}
+	if voice == nil {
+		return nil, ErrNotFound
+	}
+	if voice.Provider == "browser" {
+		return nil, ErrOmniChatBrowserVoice
+	}
+	sentence = SpokenText(sentence)
+	if strings.TrimSpace(sentence) == "" {
+		// A sentence that was nothing but narration has nothing to say aloud.
+		return nil, ErrNotFound
+	}
+	synthesizer := s.providers[voice.Provider]
+	if synthesizer == nil {
+		return nil, errors.New("character speech provider is unavailable")
+	}
+	model := voice.ModelID
+	if strings.TrimSpace(model) == "" {
+		model = s.defaultModels[voice.Provider]
+	}
+	languageCode := ""
+	if voice.LanguageCode != nil {
+		languageCode = strings.TrimSpace(*voice.LanguageCode)
+	}
+	// Shorter than the whole-message timeout on purpose: a sentence that takes
+	// a minute has already lost the call it was meant to keep moving.
+	sentenceCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	generated, err := synthesizer.Synthesize(sentenceCtx, voice.VoiceID, speech.Request{
+		Text: sentence, VoiceName: voice.VoiceName, ModelID: model, LanguageCode: languageCode,
+		VoiceSettings: &speech.VoiceSettings{
+			Stability: voice.Stability, SimilarityBoost: voice.SimilarityBoost,
+			Style: voice.Style, Speed: voice.Speed,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !validOmniChatSpeechAudio(generated) {
+		return nil, errors.New("speech provider returned invalid audio metadata")
+	}
+	return generated, nil
 }
 
 func (s *OmniChatVoiceService) deleteSpeechObject(ctx context.Context, path string) {

@@ -45,6 +45,7 @@ type conversationSceneStatePreparerFake struct {
 	state          *models.OmniChatConversationSceneState
 	lastHistoryID  int
 	conversationID int
+	audience       []TurnAudience
 }
 
 func (f *conversationSceneStatePreparerFake) PrepareForGeneration(
@@ -52,8 +53,10 @@ func (f *conversationSceneStatePreparerFake) PrepareForGeneration(
 	_, conversationID int,
 	_ *models.BotPersona,
 	history []*models.BotMessage,
+	audience ...TurnAudience,
 ) (*models.OmniChatConversationSceneState, error) {
 	f.conversationID = conversationID
+	f.audience = audience
 	if len(history) > 0 {
 		f.lastHistoryID = history[len(history)-1].ID
 	}

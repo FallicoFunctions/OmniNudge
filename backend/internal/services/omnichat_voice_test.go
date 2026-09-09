@@ -280,8 +280,11 @@ func TestOmniChatVoiceServiceRoutesVoiceboxAndStoresWAV(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "kokoro", voicebox.request.ModelID)
-	require.Equal(t, "audio/wav", audio.FileType)
-	require.Contains(t, audio.StoragePath, ".wav")
+	require.Equal(t, "audio/wav", audio.Audio.FileType)
+	require.Contains(t, audio.Audio.StoragePath, ".wav")
+	// The request that synthesised it carries the bytes, so the call path does
+	// not upload to storage and immediately read the same object back.
+	require.NotEmpty(t, audio.Fresh)
 }
 
 func TestOmniChatVoiceServiceRejectsMismatchedAudioMetadata(t *testing.T) {

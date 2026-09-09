@@ -752,6 +752,10 @@ func main() {
 			openrouter.NewClient(cfg.OpenRouter.APIKey, standardSceneModel),
 		),
 	)
+	// Each sentence of a call reply is offered to the caller as it is written,
+	// so she starts talking while the rest is still being generated.
+	omniChatCallSpeech := services.NewOmniChatCallSpeech(cache, hub)
+
 	chatbotService := services.NewChatbotService(
 		db.Pool,
 		botPersonaRepo,
@@ -766,7 +770,8 @@ func main() {
 		SetCharacterTraits(models.NewOmniChatCharacterTraitRepository(db.Pool)).
 		// On a call she is speaking, not writing. Without this the reply comes
 		// back as prose with stage directions in it, and the voice reads them.
-		SetCallState(omniChatVoiceRepo)
+		SetCallState(omniChatVoiceRepo).
+		SetCallSpeech(omniChatCallSpeech)
 	// A nil queue means no worker will ever extract, so the persona recalls what
 	// it already knows and learns nothing new. That degrades cleanly rather than
 	// moving a 20-second model call onto the send path.
@@ -878,7 +883,8 @@ func main() {
 		// nobody should have to find; this needs only the microphone permission
 		// the browser already asks for.
 		SetCallTranscription(services.NewOmniChatCallTranscription(
-			openrouterClient, cfg.OpenRouter.TranscriptionModel))
+			openrouterClient, cfg.OpenRouter.TranscriptionModel)).
+		SetCallSentences(omniChatCallSpeech)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	adminOmniChatNurseryHandler := handlers.NewAdminOmniChatNurseryHandler(botPersonaRepo)
@@ -888,6 +894,7 @@ func main() {
 	omniChatVoiceRateLimiter := middleware.OmniChatVoiceRateLimiter(cache)
 	omniChatCallRateLimiter := middleware.OmniChatCallRateLimiter(cache)
 	omniChatTranscriptionRateLimiter := middleware.OmniChatCallTranscriptionRateLimiter(cache)
+	omniChatCallSentenceRateLimiter := middleware.OmniChatCallSentenceRateLimiter(cache)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -1562,6 +1569,7 @@ func main() {
 			protected.POST("/omnichat/calls/:call_id/token", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.RefreshCallToken)
 			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
 			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatTranscriptionRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
+			protected.GET("/omnichat/conversations/:id/call-speech/:turn/:sequence", omniChatCallSentenceRateLimiter.Middleware(), omniChatVoiceHandler.GetCallSentenceSpeech)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)
