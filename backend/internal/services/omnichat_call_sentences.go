@@ -34,8 +34,16 @@ const maxSpokenSentenceRunes = 320
 var abbreviations = map[string]bool{
 	"mr": true, "mrs": true, "ms": true, "dr": true, "prof": true, "st": true,
 	"sr": true, "jr": true, "vs": true, "etc": true, "eg": true, "ie": true,
-	"approx": true, "dept": true, "no": true, "co": true, "inc": true, "ltd": true,
+	"approx": true, "dept": true, "co": true, "inc": true, "ltd": true,
 }
+
+// "no" is deliberately absent, and this line is why.
+//
+// It belongs on the list as the abbreviation for "number", and putting it
+// there cost far more than it bought: "No." is one of the commonest complete
+// sentences anybody says on a telephone, and while it was listed she could
+// never say it on its own -- it was glued to whatever followed, so her answer
+// waited for the sentence after it. "No. 5" in speech is rare enough to lose.
 
 // sentenceStream turns a token stream into finished sentences.
 //

@@ -41,6 +41,22 @@ func TestAShortOpenerIsSpokenOnItsOwn(t *testing.T) {
 		streamed(t, "Really? That's amazing! Tell me everything.", 7))
 }
 
+// "No." is a sentence.
+//
+// It is also the abbreviation for "number", and it was on the abbreviation list
+// for exactly that reason -- which meant the commonest one-word answer on a
+// telephone could never be said on its own. This is the cost of the list, and
+// it is why the list is short.
+func TestNoIsASentenceRatherThanAnAbbreviation(t *testing.T) {
+	require.Equal(t,
+		[]string{"No.", "I don't think so."},
+		streamed(t, "No. I don't think so.", 2))
+
+	require.Equal(t,
+		[]string{"It cost fifty quid.", "No.", "Sixty."},
+		streamed(t, "It cost fifty quid. No. Sixty.", 3))
+}
+
 // A full stop after an abbreviation does not end a sentence.
 //
 // Without this she says "I went to see Mister." and then, as a separate
