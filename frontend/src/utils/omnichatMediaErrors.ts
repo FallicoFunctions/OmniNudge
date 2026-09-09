@@ -42,6 +42,29 @@ export function mediaGenerationErrorMessage(status?: number, errorCode?: string)
       return 'The render finished but could not be virus-scanned, so it was discarded. Check the scanner, then retry.';
     case 'malware_detected':
       return 'The generated file failed its security scan and was discarded.';
+    // The render happened and was refused on what it showed. Saying "could not
+    // be started" about it sends the reader to the wrong end of the system --
+    // and this one has an answer the reader can act on.
+    case 'explicit_content_refused':
+      return 'The picture came out explicit, and adult content is turned off for your account. Turn it on in Settings, or describe a less explicit scene.';
+    case 'portrait_standard_refused':
+      return 'The portrait did not meet the framing standard for a character portrait. Try generating it again.';
+    case 'reference_standard_refused':
+      return 'The picture did not meet the standard for an identity reference. Try generating it again.';
+    case 'persona_not_found':
+      return 'That character is no longer available.';
+    case 'persona_reference_unavailable':
+      return "The character's reference pictures could not be read, so the render would not have looked like her.";
+    case 'source_unavailable':
+    case 'source_unreachable':
+      return 'The picture this was going to animate could not be read. Pick another one from the gallery.';
+    case 'invalid_provider_request':
+    case 'provider_state_invalid':
+      return 'The media service rejected the request as malformed. This is a server problem — check the backend logs.';
+    case 'job_not_found':
+      return 'This media request no longer exists.';
+    case 'provider_cancelled':
+      return 'This media request was cancelled.';
     default:
       return status !== undefined && status >= 500
         ? 'Media generation is temporarily unavailable. Please try again shortly.'

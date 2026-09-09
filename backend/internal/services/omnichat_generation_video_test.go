@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -213,16 +214,6 @@ func TestAdministratorsCanReproduceWhatPremiumSees(t *testing.T) {
 	require.True(t, createEntitlementJob(t, service).AllowNSFW)
 }
 
-func TestAdministratorsStillHonourTheAccountPreference(t *testing.T) {
-	store := &generationStoreFake{}
-	admin := entitledUser(models.PlanFree, nil)
-	admin.Role = "admin"
-	admin.NSFW = false
-	service := newEntitlementService(store, &generationUserReaderFake{user: admin})
-
-	require.False(t, createEntitlementJob(t, service).AllowNSFW)
-}
-
 func TestEntitlementLookupFailureDeniesRatherThanFailingTheRequest(t *testing.T) {
 	// The render is still worth producing; it just goes to the standard
 	// endpoint. Escalating on an error would be the wrong way to fail, and
@@ -248,3 +239,38 @@ func TestEntitlementDefaultsToDeniedWhenUnwired(t *testing.T) {
 }
 
 func intPointer(value int) *int { return &value }
+
+// An administrator is blocked by nothing: not the global switch, not a plan,
+// and not their own nsfw preference.
+//
+// That last one used to come first, and the result was the person who
+// administers the feature being unable to exercise it -- discovered when a
+// scene photo was generated, paid for, judged explicit and discarded, and the
+// browser reported that generation "could not be started".
+func TestAnAdministratorIsNotBlockedByTheirOwnPreference(t *testing.T) {
+	admin := entitledUser(models.PlanFree, nil)
+	admin.Role = "admin"
+	admin.NSFW = false
+	service := newEntitlementService(&generationStoreFake{}, &generationUserReaderFake{user: admin})
+
+	require.True(t, createEntitlementJob(t, service).AllowNSFW,
+		"an administrator with the preference switched off was still refused")
+}
+
+// The exemption is the role and nothing else. A free account with the
+// preference off stays where it was.
+func TestTheAdministratorExemptionDoesNotLeakToAnyoneElse(t *testing.T) {
+	for _, role := range []string{"user", "moderator", "", "administrator", "Admin "} {
+		account := entitledUser(models.PlanFree, nil)
+		account.Role = role
+		account.NSFW = false
+		service := newEntitlementService(&generationStoreFake{}, &generationUserReaderFake{user: account})
+
+		allowed := createEntitlementJob(t, service).AllowNSFW
+		if strings.EqualFold(strings.TrimSpace(role), "admin") {
+			require.True(t, allowed, "role %q is an administrator", role)
+			continue
+		}
+		require.Falsef(t, allowed, "role %q was treated as an administrator", role)
+	}
+}

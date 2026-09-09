@@ -40,8 +40,9 @@ func NewOmniChatContentEntitlement(users OmniChatUserReader) *OmniChatContentEnt
 // preference, and gets the non-explicit variant until this is turned back on.
 //
 // Administrators are deliberately exempt so the feature stays exercisable
-// while it is switched off -- they still need the premium entitlement and
-// their own nsfw preference, so this is not a way to see it by accident.
+// while it is switched off. They are exempt from the plan and from their own
+// nsfw preference too: an administrator is the person who has to be able to
+// see what the feature does.
 func (e *OmniChatContentEntitlement) SetExplicitContentEnabled(enabled bool) *OmniChatContentEntitlement {
 	if e != nil {
 		e.enabled = enabled
@@ -51,11 +52,12 @@ func (e *OmniChatContentEntitlement) SetExplicitContentEnabled(enabled bool) *Om
 
 // AllowsExplicit reports whether explicit content may be produced for a user.
 //
-// Two independent conditions, both required. The plan is the entitlement:
-// explicit content is premium, and administrators are treated as premium so
-// they can reproduce what a paying account sees. users.nsfw is the account's
-// own preference, which a subscriber may switch off; the explore feed has
-// always honoured it, and chat contradicting the feed would read as a bug.
+// An administrator always may. Everybody else needs two independent
+// conditions: the plan, because explicit content is premium, and users.nsfw,
+// the account's own preference, which a subscriber may switch off. The explore
+// feed honours that preference, and chat contradicting the feed would read as
+// a bug -- so for an administrator the two surfaces can disagree, and that is
+// the deliberate cost of an administrator never being blocked.
 //
 // Every failure path denies. An unset reader, a missing user, or a lookup
 // outage must never escalate an account. Denying is also cheap: the request
@@ -70,11 +72,22 @@ func (e *OmniChatContentEntitlement) AllowsExplicit(ctx context.Context, userID 
 			Msg("omnichat: entitlement lookup failed; treating account as standard content")
 		return false
 	}
-	if user == nil || !user.NSFW {
+	if user == nil {
 		return false
 	}
+	// An administrator is not gated on anything: not the global switch, not a
+	// plan, and not their own nsfw preference.
+	//
+	// That preference used to come first, which is a defensible reading of
+	// "honour what the account asked for" and a bad one in practice: it left an
+	// administrator unable to exercise the feature they administer, and the
+	// refusal arrived as a rendered picture being discarded after it had been
+	// paid for and generated.
 	if strings.EqualFold(strings.TrimSpace(user.Role), "admin") {
 		return true
+	}
+	if !user.NSFW {
+		return false
 	}
 	// Everybody else, whatever they pay, until this is switched back on. After
 	// the administrator branch so the feature can still be exercised, and after

@@ -113,11 +113,14 @@ func TestAnAdministratorCanStillExerciseIt(t *testing.T) {
 }
 
 func TestSwitchingItOffDoesNotOverrideSomebodysOwnPreference(t *testing.T) {
-	// An administrator who has turned it off for themselves stays off. The
-	// switch takes things away; it never grants.
-	admin := adminUser()
-	admin.NSFW = false
-	entitlement := NewOmniChatContentEntitlement(&entitlementUserFake{user: admin})
+	// This asserted the same thing about an administrator and no longer can:
+	// an administrator is blocked by nothing, including their own preference.
+	// The rule it was really written to protect -- that the switch takes
+	// things away and never grants -- belongs to everybody else, so that is
+	// who it asks about now.
+	subscriber := premiumUser()
+	subscriber.NSFW = false
+	entitlement := NewOmniChatContentEntitlement(&entitlementUserFake{user: subscriber})
 	require.False(t, entitlement.AllowsExplicit(context.Background(), 9))
 
 	entitlement.SetExplicitContentEnabled(true)
