@@ -1525,3 +1525,20 @@ func TestDirectMessageStyleDoesNotInviteTheNarrationItForbids(t *testing.T) {
 	require.Contains(t, prompt, `habitual rhetorical contrasts such as "not X, but Y."`)
 	require.Contains(t, prompt, "Let sentence length and rhythm vary naturally.")
 }
+
+// The history window and the provider's request cap are two constants in two
+// packages that have to agree, and they did not.
+//
+// maxHistoryMessages was deliberately raised from 40 to 200. The client's cap
+// stayed at 128, so every conversation past about 127 messages failed with
+// "message count is invalid", permanently, and the user was told the bot was
+// busy and to try again in a moment. Conversation 27 had 643 messages and had
+// been broken for as long as it had been that long.
+func TestTheHistoryWindowFitsInsideWhatTheProviderAccepts(t *testing.T) {
+	// The system prompt and the turn being answered ride along with the window.
+	const alongsideHistory = 2
+
+	require.LessOrEqual(t, maxHistoryMessages+alongsideHistory, openrouter.MaxMessages,
+		"a full history window plus its system prompt and the new message is more than the client will send, "+
+			"so every conversation that reaches the window fails permanently")
+}

@@ -22,8 +22,21 @@ import (
 )
 
 const (
-	apiURL                    = "https://openrouter.ai/api/v1/chat/completions"
-	maxMessages               = 128
+	apiURL = "https://openrouter.ai/api/v1/chat/completions"
+	// MaxMessages bounds how many messages one request may carry.
+	//
+	// Exported, and larger than it looks like it needs to be, because a caller
+	// cannot honour a limit it cannot see. It was 128 while the chat service
+	// deliberately raised its history window from 40 to 200 -- so every
+	// conversation past about 127 messages failed here, permanently, and told
+	// the user the bot was busy and to try again in a moment. The three longest
+	// conversations in the database were all past it.
+	//
+	// Request size is bounded by maxRequestRunes, which is the limit that
+	// actually protects anything; this one only stops a pathological array of
+	// tiny messages. 256 leaves room above the 200-message window plus its
+	// system prompt and the new turn.
+	MaxMessages               = 256
 	maxMessageRunes           = 64_000
 	maxRequestRunes           = 256_000
 	maxStreamLineBytes        = 1 << 20
@@ -61,6 +74,15 @@ var ErrAccessDenied = errors.New("openrouter: provider access denied")
 // keep provider bodies, request IDs, routes, and transport topology out of
 // their user-visible message.
 var ErrTransportOrProvider = errors.New("openrouter: transport or provider failure")
+
+// ErrRequestInvalid means this request was refused before it was sent, by our
+// own validation.
+//
+// It is deterministic: the same request fails the same way every time, so
+// telling somebody to try again in a moment is advice that can never work.
+// That is exactly what happened when the history window outgrew MaxMessages --
+// every long conversation reported "the bot is busy" forever.
+var ErrRequestInvalid = errors.New("openrouter: request is invalid")
 
 type transportOrProviderError struct {
 	message string
@@ -756,23 +778,24 @@ func streamErrorCodeIsAccessDenied(code json.RawMessage) bool {
 
 func validateRequest(model string, messages []Message) error {
 	if !IsValidModelRoute(model) {
-		return errors.New("openrouter: model is invalid")
+		return fmt.Errorf("%w: model", ErrRequestInvalid)
 	}
-	if len(messages) == 0 || len(messages) > maxMessages {
-		return errors.New("openrouter: message count is invalid")
+	if len(messages) == 0 || len(messages) > MaxMessages {
+		return fmt.Errorf("%w: message count is %d, and the limit is %d",
+			ErrRequestInvalid, len(messages), MaxMessages)
 	}
 	totalRunes := 0
 	for _, message := range messages {
 		if message.Role != RoleSystem && message.Role != RoleUser && message.Role != RoleAssistant {
-			return errors.New("openrouter: message role is invalid")
+			return fmt.Errorf("%w: message role", ErrRequestInvalid)
 		}
 		messageRunes := utf8RuneCount(message.Content)
 		if messageRunes == 0 || messageRunes > maxMessageRunes {
-			return errors.New("openrouter: message content is invalid")
+			return fmt.Errorf("%w: message content", ErrRequestInvalid)
 		}
 		totalRunes += messageRunes
 		if totalRunes > maxRequestRunes {
-			return errors.New("openrouter: request exceeds size limit")
+			return fmt.Errorf("%w: request exceeds the size limit", ErrRequestInvalid)
 		}
 	}
 	return nil

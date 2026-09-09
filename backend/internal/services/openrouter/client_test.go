@@ -126,7 +126,11 @@ func TestClientRejectsOversizedRequestBeforeCallingProvider(t *testing.T) {
 
 	_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: strings.Repeat("x", maxMessageRunes+1)}}, nil)
 
-	require.EqualError(t, err, "openrouter: message content is invalid")
+	// Sentinel rather than string, because the caller has to be able to tell a
+	// deterministic refusal from a busy provider: the same request fails the
+	// same way every time, so "try again in a moment" is advice that can never
+	// work.
+	require.ErrorIs(t, err, ErrRequestInvalid)
 	require.Zero(t, calls.Load())
 }
 
@@ -338,4 +342,34 @@ func TestProcessStreamIgnoresEmptyContentChunksBeforeText(t *testing.T) {
 	require.Equal(t, int64(3), telemetry.PromptTokens)
 	require.Equal(t, int64(1), telemetry.CompletionTokens)
 	require.Equal(t, 1, telemetry.UsageSamples)
+}
+
+// Every arm of validateRequest is a refusal we made, not one the provider made.
+// They were plain errors, so a caller could only match them by string and in
+// practice matched none of them -- which is how a permanent failure came out as
+// "the bot is busy right now, please try again in a moment".
+func TestEveryRequestRefusalIsRecognisable(t *testing.T) {
+	long := strings.Repeat("x", maxMessageRunes+1)
+	for name, messages := range map[string][]Message{
+		"no messages":     {},
+		"too many":        make([]Message, MaxMessages+1),
+		"empty content":   {{Role: RoleUser, Content: ""}},
+		"content too big": {{Role: RoleUser, Content: long}},
+		"unknown role":    {{Role: "narrator", Content: "hello"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, validateRequest("openrouter/free", messages), ErrRequestInvalid)
+		})
+	}
+	require.ErrorIs(t, validateRequest("not a route", []Message{{Role: RoleUser, Content: "hi"}}), ErrRequestInvalid)
+}
+
+// The count and the limit belong in the message. Without them the log said
+// "message count is invalid" and left the reader to discover that one constant
+// was 200 and another was 128.
+func TestTheMessageCountRefusalNamesBothNumbers(t *testing.T) {
+	err := validateRequest("openrouter/free", make([]Message, MaxMessages+1))
+
+	require.ErrorContains(t, err, "257")
+	require.ErrorContains(t, err, "256")
 }

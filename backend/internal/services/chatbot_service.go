@@ -1296,5 +1296,12 @@ func userFacingGenerationError(err error) string {
 	if errors.Is(err, ErrConversationSceneStateUnavailable) {
 		return "I couldn't safely maintain the conversation state — please try again."
 	}
+	// Deterministic, so "try again in a moment" is advice that can never work.
+	// This arm exists because it did not: when the history window outgrew the
+	// client's message cap, every long conversation reported "busy" forever and
+	// the real reason was only in a log.
+	if errors.Is(err, openrouter.ErrRequestInvalid) {
+		return "This conversation could not be sent to the model. This is a server problem, not a busy one — check the backend logs."
+	}
 	return "The bot is busy right now — please try again in a moment."
 }
