@@ -584,6 +584,42 @@ describe('OmniChatCallModal', () => {
       view.unmount();
     });
 
+    // The guard remembers which call it started, not merely that it did.
+    //
+    // Tied to the mount, it blocks the effect's own re-runs: change the
+    // conversation or the mode and the effect fires again, finds the flag set,
+    // and starts nothing at all -- silently, for as long as the modal stays
+    // open.
+    it('starts a new call when the conversation changes', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalledTimes(1));
+
+      view.rerender(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={13}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalledTimes(2), {
+        timeout: 3000,
+      });
+      expect(vi.mocked(omnichatService.startCall).mock.calls[1][0]).toBe(13);
+      view.unmount();
+    });
+
     // A rate limit is not a connection problem, and saying so sends whoever
     // reads it to the wrong place. It cost an evening once.
     it('says a rate limit is a rate limit', async () => {

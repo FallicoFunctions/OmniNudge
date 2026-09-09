@@ -115,7 +115,14 @@ export default function OmniChatCallModal({
   const remoteAudioRef = useRef<HTMLDivElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
   const closedRef = useRef(false);
-  const startedRef = useRef(false);
+  // Which call was started, not merely whether one was.
+  //
+  // A boolean here is tied to the mount while the effect is tied to the
+  // conversation and the mode. Change either and the effect re-runs, finds the
+  // flag already set, and starts nothing -- silently, for as long as the modal
+  // stays open. Remembering what was started makes a different call a
+  // different answer.
+  const startedRef = useRef('');
   const callEpochRef = useRef(0);
   const onCloseRef = useRef(onClose);
   const onPaymentRequiredRef = useRef(onPaymentRequired);
@@ -144,8 +151,9 @@ export default function OmniChatCallModal({
     // database, every attempt, and two of the ten hourly starts spent on one
     // press of the phone. It was visible three separate times before anybody
     // read it as a bug rather than as noise.
-    if (startedRef.current) return;
-    startedRef.current = true;
+    const callIdentity = `${conversationId}:${mode}`;
+    if (startedRef.current === callIdentity) return;
+    startedRef.current = callIdentity;
     let active = true;
     closedRef.current = false;
     const callEpoch = ++callEpochRef.current;
@@ -182,7 +190,7 @@ export default function OmniChatCallModal({
           return;
         }
         // A start that never happened, retried, is a start that never happens.
-        startedRef.current = false;
+        startedRef.current = '';
         // "Could not be connected" for a rate limit sends whoever reads it
         // looking at the network, when the answer is simply to wait. It cost
         // an evening once.

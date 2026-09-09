@@ -68,7 +68,9 @@ func TestABadUploadIsRefusedAsContentRatherThanAsAnOutage(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, notMedia)
 	require.NotErrorIs(t, err, ErrNoSpeechHeard)
-	require.Contains(t, err.Error(), "not a recording")
+	// A sentinel, not a sentence: the handler tells these apart with errors.Is,
+	// and matching wording across two files is a contract nothing holds.
+	require.ErrorIs(t, err, ErrNotARecording)
 
 	// A real container with a corrupt body: this one does reach ffmpeg, and
 	// fails there.
@@ -76,6 +78,8 @@ func TestABadUploadIsRefusedAsContentRatherThanAsAnOutage(t *testing.T) {
 	_, err = toSpeechWAV(context.Background(), truncated)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, ErrNoSpeechHeard)
+	require.ErrorIs(t, err, ErrRecordingUnreadable)
+	require.NotErrorIs(t, err, ErrNotARecording, "it was media; it just could not be decoded")
 }
 
 // The measurement is read out of ffmpeg's own report, and a report it cannot
@@ -116,7 +120,7 @@ func TestOnlySomethingThatLooksLikeMediaReachesFFmpeg(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := toSpeechWAV(context.Background(), payload)
 			require.Error(t, err)
-			require.NotContains(t, err.Error(), "could not be read",
+			require.ErrorIs(t, err, ErrNotARecording,
 				"it must be refused before ffmpeg is asked to parse it")
 		})
 	}

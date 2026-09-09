@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/services/liveavatar"
 	"github.com/stretchr/testify/require"
 )
@@ -314,17 +316,28 @@ func TestOmniChatVoiceHandlerRejectsVideoCallWithInsufficientCredits(t *testing.
 // transcoder that is not installed and a provider outage need three different
 // things done about them, and the media path already learned that lesson.
 func TestTranscriptionFailureNamesWhichFailureItWas(t *testing.T) {
-	for message, expected := range map[string]struct {
+	// The service's own sentinels, wrapped the way it wraps them. Matching a
+	// message here would pass while the contract silently broke.
+	for name, testCase := range map[string]struct {
+		err    error
 		reason string
 		status int
 	}{
-		"the upload is not a recording":            {"recording_invalid", 400},
-		"the recording could not be read: exit 1":  {"recording_unreadable", 400},
-		"audio conversion is unavailable: no such": {"transcoder_unavailable", 503},
-		"openrouter: transcription returned 500":   {"transcription_failed", 502},
+		"never was media": {services.ErrNotARecording, "recording_invalid", 400},
+		"undecodable": {
+			fmt.Errorf("%w: exit status 183", services.ErrRecordingUnreadable),
+			"recording_unreadable", 400,
+		},
+		"no ffmpeg": {
+			fmt.Errorf("%w: executable not found", services.ErrTranscoderUnavailable),
+			"transcoder_unavailable", 503,
+		},
+		"the provider": {errors.New("openrouter: returned HTTP 500"), "transcription_failed", 502},
 	} {
-		reason, status := transcriptionFailureReason(errors.New(message))
-		require.Equal(t, expected.reason, reason, message)
-		require.Equal(t, expected.status, status, message)
+		t.Run(name, func(t *testing.T) {
+			reason, status := transcriptionFailureReason(testCase.err)
+			require.Equal(t, testCase.reason, reason)
+			require.Equal(t, testCase.status, status)
+		})
 	}
 }

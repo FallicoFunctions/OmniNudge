@@ -32,6 +32,21 @@ import (
 // fault: somebody pressed the button and did not speak, or spoke too quietly.
 var ErrNoSpeechHeard = errors.New("no speech was heard in the recording")
 
+// The three ways a recording fails before it ever reaches the provider. They
+// are sentinels rather than sentences because the handler has to tell them
+// apart, and it was doing that by matching substrings of an error message --
+// a contract written in two files with nothing holding them together, where
+// rewording one line here would have silently collapsed three answers into
+// one.
+var (
+	// ErrNotARecording means the upload never was media.
+	ErrNotARecording = errors.New("the upload is not a recording")
+	// ErrRecordingUnreadable means it was media and could not be decoded.
+	ErrRecordingUnreadable = errors.New("the recording could not be read")
+	// ErrTranscoderUnavailable means ffmpeg could not be run at all.
+	ErrTranscoderUnavailable = errors.New("audio conversion is unavailable")
+)
+
 // transcriptionSampleRate is what speech models are trained on. Sending more
 // costs bytes and buys nothing.
 const transcriptionSampleRate = "16000"
@@ -116,7 +131,7 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 		// client typed. ffmpeg parsing arbitrary uploaded bytes is a wide
 		// surface, and narrowing it to things that are actually media costs one
 		// comparison.
-		return nil, fmt.Errorf("the upload is not a recording")
+		return nil, ErrNotARecording
 	}
 	source := filepath.Join(directory, "recording")
 	if err := os.WriteFile(source, recording, 0o600); err != nil {
@@ -153,11 +168,11 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 	if err := command.Run(); err != nil {
 		var missing *exec.Error
 		if errors.As(err, &missing) {
-			return nil, fmt.Errorf("audio conversion is unavailable: %w", err)
+			return nil, fmt.Errorf("%w: %v", ErrTranscoderUnavailable, err)
 		}
 		// A recording ffmpeg cannot read is a bad upload, not an outage, and
 		// the two must not be reported the same way.
-		return nil, fmt.Errorf("the recording could not be read: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrRecordingUnreadable, err)
 	}
 	wav, err := os.ReadFile(output)
 	if err != nil {

@@ -609,11 +609,11 @@ func (h *OmniChatVoiceHandler) TranscribeCallTurn(c *gin.Context) {
 // the browser's, and everything else is ours or the provider's.
 func transcriptionFailureReason(err error) (string, int) {
 	switch {
-	case strings.Contains(err.Error(), "not a recording"):
+	case errors.Is(err, services.ErrNotARecording):
 		return "recording_invalid", http.StatusBadRequest
-	case strings.Contains(err.Error(), "could not be read"):
+	case errors.Is(err, services.ErrRecordingUnreadable):
 		return "recording_unreadable", http.StatusBadRequest
-	case strings.Contains(err.Error(), "conversion is unavailable"):
+	case errors.Is(err, services.ErrTranscoderUnavailable):
 		return "transcoder_unavailable", http.StatusServiceUnavailable
 	default:
 		return "transcription_failed", http.StatusBadGateway
