@@ -44,7 +44,7 @@ func TestThePromptOnlyCarriesAClockWhenSomebodyHandsItOne(t *testing.T) {
 
 	// And the live path does carry it, or the whole block would be dead.
 	withClock := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{},
-		models.OmniChatDisposition{}, time.Date(2026, time.August, 26, 18, 55, 0, 0, time.UTC))
+		models.OmniChatDisposition{}, time.Date(2026, time.August, 26, 18, 55, 0, 0, time.UTC), false)
 	require.Contains(t, withClock, "[Right Now]")
 	require.Contains(t, withClock, "6:55pm")
 }

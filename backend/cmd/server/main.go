@@ -763,7 +763,10 @@ func main() {
 	).SetConversationSceneStateCoordinator(omniChatSceneStateCoordinator).
 		SetContentEntitlement(omniChatContentEntitlement).
 		SetReading(models.NewOmniChatFeedRepository(db.Pool)).
-		SetCharacterTraits(models.NewOmniChatCharacterTraitRepository(db.Pool))
+		SetCharacterTraits(models.NewOmniChatCharacterTraitRepository(db.Pool)).
+		// On a call she is speaking, not writing. Without this the reply comes
+		// back as prose with stage directions in it, and the voice reads them.
+		SetCallState(omniChatVoiceRepo)
 	// A nil queue means no worker will ever extract, so the persona recalls what
 	// it already knows and learns nothing new. That degrades cleanly rather than
 	// moving a 20-second model call onto the send path.

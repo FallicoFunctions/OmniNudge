@@ -167,7 +167,7 @@ func TestNoBaselineLeavesThePromptByteIdentical(t *testing.T) {
 	require.Empty(t, renderCharacterDisposition(disposition.Composed))
 
 	before := buildConversationSystemPromptWithMemory(persona, nil, nil, nil, nil)
-	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{}, disposition.Composed, time.Time{})
+	after := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil, promptRecall{}, disposition.Composed, time.Time{}, false)
 	require.Equal(t, before, after)
 }
 

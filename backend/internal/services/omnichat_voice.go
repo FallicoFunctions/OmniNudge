@@ -73,6 +73,24 @@ func (s *OmniChatVoiceService) GetOrCreateSpeech(ctx context.Context, userID, co
 	if synthesizer == nil || s.storage == nil {
 		return nil, errors.New("character speech provider is unavailable")
 	}
+	// What is spoken, not what was written.
+	//
+	// The prompt tells her not to narrate on a call, and a prompt is not a
+	// guarantee -- one leaked stage direction is her own voice reading "she
+	// laughs" aloud. Stripping here also covers every reply written before the
+	// call register existed, and the ordinary speak button on a roleplay
+	// message, which had the same problem and nobody had called it a bug.
+	//
+	// The stored message keeps what she said. Only the audio changes, so a
+	// transcript read later still matches the conversation that happened.
+	spoken := SpokenText(source.Text)
+	if strings.TrimSpace(spoken) == "" {
+		// A turn that was nothing but narration has nothing to say out loud.
+		// Silence is the honest answer; synthesising the asterisks is not.
+		return nil, ErrNotFound
+	}
+	source.Text = spoken
+
 	textHashBytes := sha256.Sum256([]byte(source.Text))
 	textHash := hex.EncodeToString(textHashBytes[:])
 	voiceConfig, err := json.Marshal(source.Voice)

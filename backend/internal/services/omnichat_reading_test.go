@@ -305,12 +305,12 @@ func TestTheReadingReachesThePromptAndOnlyWhenThereIsSome(t *testing.T) {
 	persona.SystemPrompt = "You are someone."
 
 	without := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil,
-		promptRecall{}, models.OmniChatDisposition{}, time.Time{})
+		promptRecall{}, models.OmniChatDisposition{}, time.Time{}, false)
 	require.NotContains(t, without, "[What You Have Seen]")
 
 	with := buildConversationSystemPromptWithDisposition(persona, nil, nil, nil,
 		promptRecall{Reading: []models.OmniChatFeedItem{{Source: "PC Gamer", Title: "A patch landed"}}},
-		models.OmniChatDisposition{}, time.Time{})
+		models.OmniChatDisposition{}, time.Time{}, false)
 	require.Contains(t, with, "[What You Have Seen]")
 	require.Contains(t, with, "PC Gamer: A patch landed")
 

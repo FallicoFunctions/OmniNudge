@@ -410,3 +410,30 @@ func (r *OmniChatVoiceRepository) ClearCallProviderSessionOwned(ctx context.Cont
 	`, id, userID, providerSessionID)
 	return err
 }
+
+// ConversationIsOnACall reports whether a call is in progress for a
+// conversation.
+//
+// The reply is generated asynchronously, long after the send returned, so the
+// browser cannot usefully tell the generator that this turn is spoken. The call
+// session already knows: if one is active for this conversation, she is on the
+// phone, and that is true for a turn typed during the call as well as a spoken
+// one.
+//
+// Errors report false. A lookup outage should cost the spoken register, not the
+// reply.
+func (r *OmniChatVoiceRepository) ConversationIsOnACall(ctx context.Context, conversationID int) bool {
+	if r == nil || r.pool == nil || conversationID < 1 {
+		return false
+	}
+	var onACall bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM omnichat_call_sessions
+			WHERE conversation_id = $1 AND status = 'active'
+		)`, conversationID).Scan(&onACall)
+	if err != nil {
+		return false
+	}
+	return onACall
+}
