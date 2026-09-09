@@ -13,12 +13,15 @@ import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton'
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 type RecognitionResultEvent = { results: ArrayLike<{ 0: { transcript: string } }> };
+// The error carries a code, and the code is the only thing that says why this
+// attempt heard nothing. Typed here because the shape was thrown away before.
+type RecognitionErrorEvent = { error?: string };
 type BrowserRecognition = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onresult: ((event: RecognitionResultEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: RecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -55,6 +58,33 @@ export function isTrustedOmniChatCallUrl(value: string): boolean {
   }
 }
 
+// speechRecognitionNotice turns a SpeechRecognition error code into something
+// worth reading.
+//
+// The codes are the API's own. They were being thrown away, so every failure
+// looked identical from the outside: press the button, speak, nothing happens.
+// "not-allowed" and "no-speech" need completely different things from the
+// person holding the phone.
+export function speechRecognitionNotice(code?: string): string {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'This browser will not let the page listen. Allow microphone access for this site, then press the button again.';
+    case 'no-speech':
+      return "I didn't hear anything. Hold the button while you speak, or type below.";
+    case 'audio-capture':
+      return 'No microphone was available to record from. Check which input the browser is using.';
+    case 'network':
+      return 'Speech recognition needs a network service this browser could not reach. Chrome and Safari are the reliable ones; you can also type below.';
+    case 'aborted':
+      return '';
+    default:
+      return code
+        ? `Speech recognition stopped: ${code}. You can type below instead.`
+        : 'Speech recognition stopped before it heard anything. You can type below instead.';
+  }
+}
+
 export default function OmniChatCallModal({
   persona,
   conversationId,
@@ -70,6 +100,7 @@ export default function OmniChatCallModal({
   onAssistant: (message: BotMessage) => void;
   onPaymentRequired?: () => void;
 }) {
+  const [listeningNotice, setListeningNotice] = useState('');
   const [status, setStatus] = useState<
     'connecting' | 'ready' | 'listening' | 'thinking' | 'speaking' | 'error'
   >('connecting');
@@ -339,6 +370,9 @@ export default function OmniChatCallModal({
     };
     const Recognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
     if (!Recognition) {
+      setListeningNotice(
+        'This browser has no speech recognition. Type below, or use Chrome or Safari to talk.'
+      );
       setStatus('ready');
       return;
     }
@@ -347,13 +381,33 @@ export default function OmniChatCallModal({
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = navigator.language || 'en-US';
+    // Whether this attempt produced anything. Recognition can end cleanly
+    // having heard nothing, which is the case that used to leave the call
+    // sitting silently in 'ready' with no explanation at all.
+    let heardSomething = false;
     recognition.onresult = (event) => {
       const text = event.results[0]?.[0]?.transcript || '';
+      if (!text.trim()) return;
+      heardSomething = true;
+      setListeningNotice('');
       void sendTranscript(text);
     };
-    recognition.onerror = () => setStatus('error');
-    recognition.onend = () => setStatus((current) => (current === 'listening' ? 'ready' : current));
+    // The error code is the only thing that says why, and it used to be
+    // discarded -- so a call that heard nothing looked exactly like a call
+    // that was denied the microphone, and both looked like nothing at all.
+    recognition.onerror = (event: RecognitionErrorEvent) => {
+      heardSomething = true;
+      setListeningNotice(speechRecognitionNotice(event.error));
+      setStatus('ready');
+    };
+    recognition.onend = () => {
+      if (!heardSomething) {
+        setListeningNotice("I didn't catch anything. Hold the button while you speak, or type below.");
+      }
+      setStatus((current) => (current === 'listening' ? 'ready' : current));
+    };
     recognitionRef.current = recognition;
+    setListeningNotice('');
     setStatus('listening');
     recognition.start();
   };
@@ -451,6 +505,15 @@ export default function OmniChatCallModal({
           {transcript && (
             <p className="mb-4 rounded-2xl bg-black/40 px-4 py-3 text-center text-sm text-white/70 backdrop-blur">
               “{transcript}”
+            </p>
+          )}
+          {listeningNotice && status !== 'error' && (
+            <p
+              role="status"
+              data-testid="omnichat-call-listening-notice"
+              className="mb-5 rounded-2xl bg-amber-500/15 px-4 py-3 text-center text-sm text-amber-100 backdrop-blur"
+            >
+              {listeningNotice}
             </p>
           )}
           {status === 'error' && (
