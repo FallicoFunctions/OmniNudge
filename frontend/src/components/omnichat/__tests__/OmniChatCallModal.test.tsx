@@ -457,6 +457,11 @@ describe('OmniChatCallModal', () => {
 
     beforeEach(() => {
       FakeRecorder.instances = [];
+      // Configured here rather than inherited. Without it these tests pass
+      // only when something earlier in the file has set it, which is a test
+      // that proves nothing on its own -- and a control built on one proves
+      // less than nothing.
+      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
       getUserMedia.mockResolvedValue({
         getTracks: () => [{ stop: vi.fn() }],
         getAudioTracks: () => [{ label: 'Fake input', muted: false, enabled: true, readyState: 'live' }],
