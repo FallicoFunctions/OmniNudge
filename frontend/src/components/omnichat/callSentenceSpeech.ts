@@ -83,7 +83,18 @@ export function playCallSentences(options: SentenceRunOptions): SentenceRun {
     try {
       while (!settled) {
         const waiting = pending.get(next);
-        if (!waiting) break;
+        if (!waiting) {
+          // Nothing for this number. Before the turn ends that means the
+          // sentence has not been announced yet, so wait for it.
+          if (expected === null || next > expected) break;
+          // After it ends, it means the notice was lost -- which the websocket
+          // is allowed to do, and is why the audio does not travel on it. Skip
+          // the gap. Stalling here cost every sentence after the lost one and
+          // hung the turn until the timeout, rather than costing the one
+          // sentence the design accepts losing.
+          next += 1;
+          continue;
+        }
         pending.delete(next);
         next += 1;
         let audio: Blob | null = null;
