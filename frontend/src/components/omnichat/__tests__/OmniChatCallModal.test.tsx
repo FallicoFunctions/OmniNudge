@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OmniChatCallModal, { isTrustedOmniChatCallUrl } from '../OmniChatCallModal';
@@ -622,6 +623,39 @@ describe('OmniChatCallModal', () => {
         timeout: 3000,
       });
       expect(vi.mocked(omnichatService.startCall).mock.calls[1][0]).toBe(13);
+      view.unmount();
+    });
+
+    // Under StrictMode, which is what production development actually runs.
+    //
+    // The log said it exactly: POST /calls 201, then DELETE that same call
+    // milliseconds later, then nothing. The cleanup between the two effect
+    // invocations marked the modal closed and moved the epoch on, so the call
+    // arrived looking stale and was torn down -- the screen stayed on
+    // Connecting and the end button did nothing, because it returns early when
+    // the modal is marked closed.
+    it('keeps the call it started when the effect is invoked twice', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <StrictMode>
+          <OmniChatCallModal
+            persona={persona}
+            conversationId={12}
+            mode="voice"
+            onClose={vi.fn()}
+            onAssistant={vi.fn()}
+          />
+        </StrictMode>
+      );
+
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalledTimes(1));
+      // Long enough for the start to resolve and be torn down if it were going
+      // to be.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      expect(omnichatService.endCall).not.toHaveBeenCalled();
+      // And it left Connecting, which is the thing that was reported.
+      expect(screen.queryByText(/connecting/i)).toBeNull();
       view.unmount();
     });
 

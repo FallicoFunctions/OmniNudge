@@ -123,6 +123,9 @@ export default function OmniChatCallModal({
   // stays open. Remembering what was started makes a different call a
   // different answer.
   const startedRef = useRef('');
+  // The epoch the in-flight call was started under, so a re-invoked effect can
+  // put back the one its own cleanup moved past.
+  const startedEpochRef = useRef(0);
   const callEpochRef = useRef(0);
   const onCloseRef = useRef(onClose);
   const onPaymentRequiredRef = useRef(onPaymentRequired);
@@ -152,15 +155,30 @@ export default function OmniChatCallModal({
     // press of the phone. It was visible three separate times before anybody
     // read it as a bug rather than as noise.
     const callIdentity = `${conversationId}:${mode}`;
-    if (startedRef.current === callIdentity) return;
+    if (startedRef.current === callIdentity) {
+      // The development double-invoke ran the cleanup between the two
+      // invocations, and that cleanup marked this modal closed and moved the
+      // epoch on. The call it tore down is the one still in flight and about
+      // to arrive, so returning without undoing either left the arriving call
+      // looking stale: it was deleted on arrival, no session was ever set, the
+      // screen stayed on Connecting, and endCall returned immediately because
+      // closedRef said the modal had already gone.
+      closedRef.current = false;
+      callEpochRef.current = startedEpochRef.current;
+      return;
+    }
     startedRef.current = callIdentity;
-    let active = true;
     closedRef.current = false;
     const callEpoch = ++callEpochRef.current;
+    startedEpochRef.current = callEpoch;
     void omnichatService
       .startCall(conversationId, mode)
       .then((created) => {
-        if (active && !closedRef.current && callEpochRef.current === callEpoch) {
+        // Not `active`: that is a closure variable of one invocation, and the
+        // development double-invoke sets it false in a cleanup the next
+        // invocation never replaces. The epoch says the same thing and is
+        // restorable, which is what the guard above does.
+        if (!closedRef.current && callEpochRef.current === callEpoch) {
           if (
             mode === 'video' &&
             created.live_video_url &&
@@ -179,7 +197,7 @@ export default function OmniChatCallModal({
         }
       })
       .catch((error: unknown) => {
-        if (!active || closedRef.current || callEpochRef.current !== callEpoch) return;
+        if (closedRef.current || callEpochRef.current !== callEpoch) return;
         if (
           mode === 'video' &&
           (error as Error & { status?: number }).status === 402 &&
@@ -200,7 +218,6 @@ export default function OmniChatCallModal({
         setStatus('error');
       });
     return () => {
-      active = false;
       if (callEpochRef.current === callEpoch) {
         closedRef.current = true;
         callEpochRef.current += 1;
