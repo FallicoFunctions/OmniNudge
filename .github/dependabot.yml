@@ -1,3 +1,16 @@
+# Dependabot has two halves, and only one of them was configured.
+#
+# ALERTS are raised for every manifest GitHub can find, whether or not this file
+# mentions it. UPDATES -- the pull requests that actually fix an alert -- are
+# opened only for the ecosystems and directories listed here.
+#
+# This file listed three of the seven manifests in the repository, so the other
+# four raised alerts that nothing could ever close. They arrived and stayed:
+# 79 of the 89 open alerts came from directories with no update mechanism, and
+# 54 of those were one package, Pillow, counted once per worker that pins it.
+#
+# Every manifest belongs here. A directory that is worth scanning is worth
+# being able to fix.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -22,4 +35,47 @@ updates:
       interval: weekly
     groups:
       frontend-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /omnirave-web
+    schedule:
+      interval: weekly
+    groups:
+      omnirave-web-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /omnirave-babylon
+    schedule:
+      interval: weekly
+    groups:
+      omnirave-babylon-dependencies:
+        patterns: ['*']
+
+  # The three workers pin the same imaging and model stack, so one CVE in
+  # Pillow or transformers arrives three times. Grouped per worker, because a
+  # worker is what gets rebuilt and redeployed as a unit.
+  - package-ecosystem: pip
+    directory: /infra/runpod/image-worker
+    schedule:
+      interval: weekly
+    groups:
+      image-worker-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /infra/runpod/video-worker
+    schedule:
+      interval: weekly
+    groups:
+      video-worker-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /infra/avatar-worker
+    schedule:
+      interval: weekly
+    groups:
+      avatar-worker-dependencies:
         patterns: ['*']
