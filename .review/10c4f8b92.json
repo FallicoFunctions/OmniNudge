@@ -1,0 +1,390 @@
+{
+ "schema_version": 2,
+ "head": "eb5a00390",
+ "base": "10c4f8b92",
+ "scope": {
+  "files": [
+   "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+   "frontend/src/components/omnichat/callRecorder.ts",
+   "frontend/src/components/omnichat/__tests__/callRecorder.test.ts",
+   "frontend/src/components/omnichat/OmniChatSpeakButton.tsx",
+   "backend/internal/api/middleware/redis_rate_limit.go",
+   "backend/internal/api/middleware/omnichat_call_transcription_limit_test.go",
+   "backend/internal/handlers/omnichat_voice.go",
+   "backend/internal/handlers/omnichat_voice_live_test.go",
+   "backend/internal/services/omnichat_call_transcription.go",
+   "backend/internal/services/omnichat_call_transcription_test.go"
+  ],
+  "boundaries": [
+   "a React effect and the props it depends on, against a guard that does not",
+   "the service's failures and the route that must tell them apart",
+   "a rate limiter and the billing that already polices the same cost"
+  ]
+ },
+ "prior_ledgers_read": [
+  "9680fbb02",
+  "121713a04",
+  "a053fc7ebe0b5a28021865686c30e5392a072cc1"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Four commits: her voice through the call's own audio graph, one start per press of the phone, a rate limit sized for a runaway loop rather than for cost, and a 429 that says what it is. Boundaries: the modal's effects and the props they depend on; the service's failures and the route that must tell them apart; the limiter and what billing already polices."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Ledger 9680fbb02 and the three before it. Its own honest gap -- the browser half unverified -- is what this session finally closed by taking the backend over and reading its log, which is how the 429 was found at all."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled prompt or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Read the call's states again, including the meter and the four failure notices. The meter is what told a working microphone apart from a refused call start: it stayed green while nothing happened, which located the fault on the server rather than in the audio."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "This is what found the whole thing. The running server's log, read directly: POST /calls -> 429, twice. The call was refused before it started, so no session existed and there was nothing to send a voice to. Every audio theory of the evening was wrong because the audio was never the question."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the call_sessions rows: pairs milliseconds apart, every attempt. Those pairs had been in query output three times before they were read as a bug rather than as noise."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Run for real against the live server all evening, and it is the only reason this was found. UNVERIFIED still: her voice actually playing. The call has not yet survived long enough to reach that step, so the audio-graph fix is reasoned and unit-tested but never heard."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The transcription failures are sentinels shared between the service that raises them and the route that names them, rather than sentences matched by substring in two files."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "A 429 from startCall now reaches the modal as a distinct message instead of collapsing into the connection error, and the test asserts the connection wording is absent."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The start guard is read through its own value rather than a boolean: what it remembers is which call was started, so the accessor answers a different question for a different call."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The failure-reason test wraps the service's sentinels the way the service wraps them. Asserting on message text there would have passed while the contract broke, which is the defect being fixed."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A start that succeeds, a start refused with 429, a conversation that changes, and an effect invoked twice."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A 429 must not read as a connection fault, and a re-run effect must not silently start nothing. Both asserted."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "The limiter's bounds are asserted from both sides: enough for redialling twice, still low enough that a loop hits something."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the new guard against the effect it guards, which is how the mount/props mismatch showed. Compared the route's failure-telling against how the rest of the repository tells its own errors apart."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of the start effect is reachable: success, payment required, rate limited, and a genuinely different call."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed. A refused start resets the guard so a retry is a real retry, and the reason reaches the screen."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The three failure sentences existed in two files; they are one set of sentinels now."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Looked for the same two shapes elsewhere. No other guard in this component is tied to a mount while its effect is tied to props. The other error-text matches in the repository read Postgres driver errors, which is the conventional way to read those and not a contract of ours."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A start that fails leaves nothing half-made: the guard is cleared, and a session created after the modal closed is ended rather than left active."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The duplicate sessions this fixes were the orphans: one of each pair was ended immediately, but both existed and both were charged against the limit."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two controls built after the commit and replayed; each fails as a named assertion."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is exercised by the test invoking the effect twice, which is what production does in development -- the condition that created the bug."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet, gofmt, tsc -b and eslint clean. services, middleware, openrouter and handlers pass. Frontend omnichat and service suites: 153 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique, but one worth recording in the evidence rather than the list: the same query output showed the duplicate sessions three times and was read as noise each time. Reading what is already on the screen is not a new instrument; it is B4, and it was skipped while it was answering."
+    }
+   ],
+   "findings": [
+    {
+     "id": "call-R1",
+     "summary": "the duplicate-start guard was tied to the mount while the effect it guards is tied to the conversation and the mode, so changing either while the modal is open re-ran the effect, found the flag set, and started nothing at all -- silently, for as long as the modal stayed open",
+     "found_by": "E1",
+     "fix_commit": "eb5a00390",
+     "control": {
+      "patch": ".review/controls/call-R1.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatCallModal.test.tsx -t 'starts a new call when the conversation changes'"
+      ],
+      "observed": "FAIL: the second conversation never started a call"
+     }
+    },
+    {
+     "id": "call-R2",
+     "summary": "the route told four transcription failures apart by matching substrings of the service's error messages, a contract written in two files with nothing holding them together: rewording one line would have collapsed three answers into one with nothing failing",
+     "found_by": "E5",
+     "fix_commit": "eb5a00390",
+     "control": {
+      "patch": ".review/controls/call-R2.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/handlers/ -run TestTranscriptionFailureNamesWhichFailureItWas"
+      ],
+      "observed": "FAIL: every failure collapsed into transcription_failed once the wording moved"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No assembled prompt or provider payload changed."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Still unverified in the one place that matters: her voice has never been heard. Recorded here rather than buried, and it is the next thing to run."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule lives in two implementations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No provider or worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No field added to a struct that crosses a boundary."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Nothing new is gated on a flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-asked: no third instance of either shape inside this work."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared server state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls apply at HEAD and each produces a named assertion failure."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Re-asked over eb5a00390 with both fixes in place; nothing new."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/... ./cmd/... clean",
+  "lint": "gofmt -l clean; eslint clean",
+  "types": "npx tsc -b clean",
+  "tests": "go -p 1: services, middleware, openrouter, handlers ok. vitest omnichat + services: 153 passed."
+ }
+}

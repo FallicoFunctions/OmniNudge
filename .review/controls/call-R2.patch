@@ -1,0 +1,19 @@
+diff --git a/backend/internal/handlers/omnichat_voice.go b/backend/internal/handlers/omnichat_voice.go
+index dd2909340..e7640064b 100644
+--- a/backend/internal/handlers/omnichat_voice.go
++++ b/backend/internal/handlers/omnichat_voice.go
+@@ -609,11 +609,11 @@ func (h *OmniChatVoiceHandler) TranscribeCallTurn(c *gin.Context) {
+ // the browser's, and everything else is ours or the provider's.
+ func transcriptionFailureReason(err error) (string, int) {
+ 	switch {
+-	case errors.Is(err, services.ErrNotARecording):
++	case strings.Contains(err.Error(), "is not a recording exactly"):
+ 		return "recording_invalid", http.StatusBadRequest
+-	case errors.Is(err, services.ErrRecordingUnreadable):
++	case strings.Contains(err.Error(), "could not be read exactly"):
+ 		return "recording_unreadable", http.StatusBadRequest
+-	case errors.Is(err, services.ErrTranscoderUnavailable):
++	case strings.Contains(err.Error(), "conversion is unavailable exactly"):
+ 		return "transcoder_unavailable", http.StatusServiceUnavailable
+ 	default:
+ 		return "transcription_failed", http.StatusBadGateway

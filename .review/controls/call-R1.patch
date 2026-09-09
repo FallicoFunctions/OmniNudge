@@ -1,0 +1,16 @@
+diff --git a/frontend/src/components/omnichat/OmniChatCallModal.tsx b/frontend/src/components/omnichat/OmniChatCallModal.tsx
+index e673cc01a..7cb879fb4 100644
+--- a/frontend/src/components/omnichat/OmniChatCallModal.tsx
++++ b/frontend/src/components/omnichat/OmniChatCallModal.tsx
+@@ -151,9 +151,8 @@ export default function OmniChatCallModal({
+     // database, every attempt, and two of the ten hourly starts spent on one
+     // press of the phone. It was visible three separate times before anybody
+     // read it as a bug rather than as noise.
+-    const callIdentity = `${conversationId}:${mode}`;
+-    if (startedRef.current === callIdentity) return;
+-    startedRef.current = callIdentity;
++    if (startedRef.current) return;
++    startedRef.current = 'started';
+     let active = true;
+     closedRef.current = false;
+     const callEpoch = ++callEpochRef.current;
