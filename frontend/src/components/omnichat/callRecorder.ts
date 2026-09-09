@@ -13,8 +13,18 @@
 
 /** Below this, the microphone is hearing a room rather than a voice. */
 const SILENCE_THRESHOLD = 0.012;
-/** Silence this long ends an utterance. Long enough to think mid-sentence. */
-const SILENCE_MS = 1400;
+/**
+ * Silence this long ends an utterance.
+ *
+ * This is the first thing in the reply chain, and it is pure waiting: nothing
+ * starts until it expires. At 1400 ms it was a fifth of the delay before she
+ * said a word.
+ *
+ * 700 ms is where endpointing sits on the phone systems that feel live. Below
+ * about 600 ms it starts cutting people off between clauses, which costs a whole
+ * extra turn and feels far worse than the wait it saved.
+ */
+const SILENCE_MS = 700;
 /** Nobody is allowed to hold the line open forever. */
 const MAX_UTTERANCE_MS = 30_000;
 /** Below this there is no utterance, only a button press. */
