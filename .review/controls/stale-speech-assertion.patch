@@ -1,20 +1,3 @@
-diff --git a/.review/instruments.json b/.review/instruments.json
-index 8ce7d24c8..125b3d5a4 100644
---- a/.review/instruments.json
-+++ b/.review/instruments.json
-@@ -187,6 +187,12 @@
-    "name": "Run it against the real thing and compare the outputs to each other",
-    "trigger": "anything whose output is produced by a model, a provider, or another system",
-    "asks": "Not just: is each output correct? Also: are the outputs different from each other in the ways the feature promises, and does anyone looking at them agree they are what was asked for? This may NOT be marked na because it costs money or GPU time. If a prompt or any other model input changed and nothing has been rendered since, that is a finding with no fix yet: record it as an explicit unverified row and say so to the user, rather than burying it among twenty other na lines. Applied once in the first 23 passes and skipped fifteen times -- and meanwhile every product defect that actually reached a picture was found by running it, none of them by a review."
-+  },
-+  {
-+   "id": "E7",
-+   "name": "Does anything start before the decision that governs it?",
-+   "trigger": "work is kicked off early to save time -- a prefetch, a stream, a subscription, a goroutine",
-+   "asks": "Find every side effect started before a later branch decides whether it was wanted, and ask what happens on the branch that did not want it. Cancelling afterwards is not enough when the side effect is not undoable. A call started its sentence playback at the top of the turn, to overlap synthesis with generation; the choice of whether the AVATAR speaks the reply is made further down, after the reply arrives -- so in video mode she was heard twice, once from the local speaker and once from the avatar's stream, half a beat apart, and the cancel that followed could not unsay the words already spoken. Speech, sends, writes and payments are all in this class: pull the decision earlier, or do not start early on that branch."
-   }
-  ],
-  "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
 diff --git a/backend/internal/services/omnichat_voice_test.go b/backend/internal/services/omnichat_voice_test.go
 index 378263460..51104c781 100644
 --- a/backend/internal/services/omnichat_voice_test.go
