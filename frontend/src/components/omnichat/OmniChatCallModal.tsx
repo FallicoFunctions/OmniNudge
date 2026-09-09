@@ -342,16 +342,31 @@ export default function OmniChatCallModal({
       if (activeSession)
         void omnichatService.recordCallTurn(activeSession.id).catch(() => undefined);
       if (!avatarHandledSpeech) {
-        await speakOmniChatMessage({
-          personaId: persona.id,
-          conversationId,
-          messageId: assistant.id,
-          text: assistant.content,
-          onState: (speaking) => {
-            if (!closedRef.current && callEpochRef.current === callEpoch)
-              setStatus(speaking ? 'speaking' : 'ready');
-          },
-        });
+        try {
+          await speakOmniChatMessage({
+            personaId: persona.id,
+            conversationId,
+            messageId: assistant.id,
+            text: assistant.content,
+            // Her voice goes through the call's own audio graph, which was
+            // unlocked when the call started and is still allowed to make
+            // sound. A fresh Audio element is not, by the time she has been
+            // transcribed, answered and synthesised.
+            play: microphoneRef.current?.play,
+            onState: (speaking) => {
+              if (!closedRef.current && callEpochRef.current === callEpoch)
+                setStatus(speaking ? 'speaking' : 'ready');
+            },
+          });
+        } catch {
+          // Her words are already in the conversation. Losing the audio is not
+          // losing the call, and ending it here threw away a working
+          // conversation over a speaker.
+          if (!closedRef.current && callEpochRef.current === callEpoch) {
+            setListeningNotice('Her voice could not be played, but she replied in the chat.');
+            setStatus('ready');
+          }
+        }
       }
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;

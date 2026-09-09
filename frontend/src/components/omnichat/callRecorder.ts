@@ -105,6 +105,16 @@ export function describeSilence(peak: number, chunks: number, contextState: stri
  */
 export type CallMicrophone = {
   stream: MediaStream;
+  /**
+   * Plays her voice through the call's own audio graph.
+   *
+   * A fresh Audio element is refused by Safari once the click that started the
+   * call is no longer recent user activation -- and by the time she has been
+   * transcribed, answered and synthesised, it is not. This context was created
+   * and resumed while the call was starting, so it is already allowed to make
+   * sound, and it stays allowed for the whole call.
+   */
+  play: (audio: Blob) => Promise<void>;
   /** Live loudness, so a caller can see they are being heard immediately. */
   level: () => number;
   /** Which input the browser actually opened, for when the level stays flat. */
@@ -156,8 +166,31 @@ export async function openMicrophone(): Promise<CallMicrophone | string> {
 
   const samples = new Float32Array(analyser.fftSize);
 
+  let playing: AudioBufferSourceNode | null = null;
+
   return {
     stream,
+    play: async (blob: Blob) => {
+      playing?.stop();
+      playing = null;
+      const buffer = await audioContext.decodeAudioData(await blob.arrayBuffer());
+      await new Promise<void>((resolve, reject) => {
+        const node = audioContext.createBufferSource();
+        node.buffer = buffer;
+        node.connect(audioContext.destination);
+        node.onended = () => {
+          if (playing === node) playing = null;
+          resolve();
+        };
+        playing = node;
+        try {
+          node.start();
+        } catch (error) {
+          playing = null;
+          reject(error instanceof Error ? error : new Error('playback failed'));
+        }
+      });
+    },
     level: () => {
       if (audioContext.state !== 'running') return -1;
       analyser.getFloatTimeDomainData(samples);
@@ -173,6 +206,8 @@ export async function openMicrophone(): Promise<CallMicrophone | string> {
       }, ${track.readyState}`;
     },
     release: () => {
+      playing?.stop();
+      playing = null;
       // Kept alive until here, so nothing in this graph can be collected while
       // the call is still using it.
       source.disconnect();

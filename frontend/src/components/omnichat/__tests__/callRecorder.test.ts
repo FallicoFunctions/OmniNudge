@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { describeSilence } from '../callRecorder';
+import { describe, expect, it, vi } from 'vitest';
+import { describeSilence, openMicrophone } from '../callRecorder';
 
 // Three different faults wear one appearance: a quiet room, an analyser reading
 // silence while somebody talks, and a recorder producing no data. Three
@@ -39,5 +39,82 @@ describe('describeSilence', () => {
   // guessing, which is what this replaced.
   it('carries the measurement, not just a verdict', () => {
     expect(describeSilence(0.0001, 4, 'running')).toMatch(/0\.000/);
+  });
+});
+
+// Her voice goes through the call's own audio graph.
+//
+// A fresh Audio element is refused once the click that started the call has
+// stopped counting as recent user activation -- and by the time she has been
+// transcribed, answered and synthesised, it has. Reported as "it broke when it
+// came time for her to speak", with the server having already returned her
+// audio successfully.
+describe('the call audio graph', () => {
+  it('plays sound through a context the call has already unlocked', async () => {
+    const decode = vi.fn().mockResolvedValue({ duration: 1 });
+    const started: string[] = [];
+    vi.stubGlobal(
+      'MediaRecorder',
+      class {
+        static isTypeSupported = () => true;
+      }
+    );
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop: vi.fn() }],
+          getAudioTracks: () => [{ label: 'x', muted: false, enabled: true, readyState: 'live' }],
+        }),
+      },
+    });
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        state = 'running';
+        destination = {};
+        resume = () => Promise.resolve();
+        decodeAudioData = decode;
+        createAnalyser = () => ({
+          fftSize: 2048,
+          getFloatTimeDomainData: () => {},
+          connect: () => {},
+          disconnect: () => {},
+        });
+        createMediaStreamSource = () => ({ connect: () => {}, disconnect: () => {} });
+        createGain = () => ({ gain: { value: 0 }, connect: () => {}, disconnect: () => {} });
+        createBufferSource = () => {
+          const node = {
+            buffer: null,
+            onended: null as (() => void) | null,
+            connect: () => {},
+            stop: () => {},
+            start: () => {
+              started.push('started');
+              setTimeout(() => node.onended?.(), 0);
+            },
+          };
+          return node;
+        };
+        close = () => Promise.resolve();
+      }
+    );
+
+    const microphone = await openMicrophone();
+    expect(typeof microphone).not.toBe('string');
+    if (typeof microphone === 'string') return;
+
+    expect(microphone.play).toBeTypeOf('function');
+    // jsdom's Blob has no arrayBuffer, so the real shape is supplied here.
+    const recording = Object.assign(new Blob(['audio'], { type: 'audio/wav' }), {
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+    await microphone.play(recording);
+
+    // Decoded and played through this context, not handed to a new element.
+    expect(decode).toHaveBeenCalled();
+    expect(started).toEqual(['started']);
+    microphone.release();
+    vi.unstubAllGlobals();
   });
 });

@@ -57,12 +57,22 @@ export async function speakOmniChatMessage({
   messageId,
   text,
   onState,
+  play,
 }: {
   personaId: number;
   conversationId: number;
   messageId: number;
   text: string;
   onState: (speaking: boolean) => void;
+  /**
+   * Plays the audio somewhere already allowed to make sound.
+   *
+   * A call passes its own audio graph, which was unlocked while the call was
+   * starting. A fresh Audio element is refused by Safari once the click has
+   * stopped counting as recent activation, and by the time she has been
+   * transcribed, answered and synthesised it has.
+   */
+  play?: (audio: Blob) => Promise<void>;
 }) {
   stopOmniChatSpeech();
   const requestVersion = speechRequestVersion;
@@ -74,6 +84,15 @@ export async function speakOmniChatMessage({
   }
   const blob = await omnichatService.getMessageSpeech(conversationId, messageId);
   if (requestVersion !== speechRequestVersion) return;
+  if (play) {
+    onState(true);
+    try {
+      await play(blob);
+    } finally {
+      onState(false);
+    }
+    return;
+  }
   const objectUrl = URL.createObjectURL(blob);
   const audio = new Audio(objectUrl);
   activeAudio = audio;
