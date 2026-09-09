@@ -589,9 +589,33 @@ func (h *OmniChatVoiceHandler) TranscribeCallTurn(c *gin.Context) {
 		return
 	}
 	if err != nil {
+		// One opaque message for every failure is what the media path already
+		// learned not to do: a completely broken route and a transient provider
+		// blip read identically, and whoever is debugging it is sent nowhere.
+		// The reason never carries the provider's words, only which of ours it
+		// was.
 		zlog.Warn().Err(err).Str("call_id", callID.String()).Msg("omnichat: call transcription failed")
-		RespondError(c, http.StatusBadGateway, "The recording could not be transcribed")
+		reason, status := transcriptionFailureReason(err)
+		RespondErrorCoded(c, status, reason, "The recording could not be transcribed")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"text": text})
+}
+
+// transcriptionFailureReason names which of our own failures happened.
+//
+// Three things go wrong here and they need three different answers: an upload
+// that was never a recording is the caller's, a recording ffmpeg cannot read is
+// the browser's, and everything else is ours or the provider's.
+func transcriptionFailureReason(err error) (string, int) {
+	switch {
+	case strings.Contains(err.Error(), "not a recording"):
+		return "recording_invalid", http.StatusBadRequest
+	case strings.Contains(err.Error(), "could not be read"):
+		return "recording_unreadable", http.StatusBadRequest
+	case strings.Contains(err.Error(), "conversion is unavailable"):
+		return "transcoder_unavailable", http.StatusServiceUnavailable
+	default:
+		return "transcription_failed", http.StatusBadGateway
+	}
 }

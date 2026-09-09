@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -307,4 +308,23 @@ func TestOmniChatVoiceHandlerRejectsVideoCallWithInsufficientCredits(t *testing.
 	router.ServeHTTP(response, request)
 	require.Equal(t, http.StatusPaymentRequired, response.Code)
 	require.Equal(t, 1, data.endCalls)
+}
+
+// Four failures used to read as one. A recording the server could not parse, a
+// transcoder that is not installed and a provider outage need three different
+// things done about them, and the media path already learned that lesson.
+func TestTranscriptionFailureNamesWhichFailureItWas(t *testing.T) {
+	for message, expected := range map[string]struct {
+		reason string
+		status int
+	}{
+		"the upload is not a recording":            {"recording_invalid", 400},
+		"the recording could not be read: exit 1":  {"recording_unreadable", 400},
+		"audio conversion is unavailable: no such": {"transcoder_unavailable", 503},
+		"openrouter: transcription returned 500":   {"transcription_failed", 502},
+	} {
+		reason, status := transcriptionFailureReason(errors.New(message))
+		require.Equal(t, expected.reason, reason, message)
+		require.Equal(t, expected.status, status, message)
+	}
 }

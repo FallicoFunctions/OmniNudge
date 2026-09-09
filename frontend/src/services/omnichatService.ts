@@ -961,8 +961,15 @@ export const omnichatService = {
       { method: 'POST', body: form }
     );
     if (!response.ok) {
-      const error = new Error('Failed to transcribe the recording') as Error & { status?: number };
+      // The reason, not just the status. One opaque failure for four different
+      // causes is what the media path already learned not to ship.
+      const body = (await response.json().catch(() => null)) as { code?: string } | null;
+      const error = new Error('Failed to transcribe the recording') as Error & {
+        status?: number;
+        code?: string;
+      };
       error.status = response.status;
+      error.code = body?.code;
       throw error;
     }
     const body = (await response.json()) as { text?: string };

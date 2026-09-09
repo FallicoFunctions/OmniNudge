@@ -48,6 +48,28 @@ export function isTrustedOmniChatCallUrl(value: string): boolean {
   }
 }
 
+/**
+ * Says which failure happened, because four of them used to read the same.
+ *
+ * "That could not be transcribed" sends whoever reads it nowhere: a recording
+ * the server could not parse, a transcoder that is not installed, and a
+ * provider outage need three different things done about them.
+ */
+export function transcriptionFailureNotice(code?: string): string {
+  switch (code) {
+    case 'recording_invalid':
+      return 'What the browser recorded was not audio the server could read. Reload the page and try the call again.';
+    case 'recording_unreadable':
+      return 'The recording arrived damaged and could not be decoded. Reload the page and try the call again.';
+    case 'transcoder_unavailable':
+      return 'The server cannot convert audio right now, so nothing can be transcribed. You can type below.';
+    case 'transcription_failed':
+      return 'The transcription service could not be reached. You can type below and try speaking again shortly.';
+    default:
+      return 'That could not be transcribed. You can type below instead.';
+  }
+}
+
 export default function OmniChatCallModal({
   persona,
   conversationId,
@@ -84,6 +106,7 @@ export default function OmniChatCallModal({
   // permission per sentence, which no other site does.
   const microphoneRef = useRef<CallMicrophone | null>(null);
   const [heardLevel, setHeardLevel] = useState(0);
+  const [microphoneReady, setMicrophoneReady] = useState(false);
   const sessionRef = useRef<OmniChatCallSession | null>(null);
   const liveKitRoomRef = useRef<Room | null>(null);
   const liveVideoTokenRef = useRef('');
@@ -342,9 +365,11 @@ export default function OmniChatCallModal({
   const startListening = () => {
     const microphone = microphoneRef.current;
     if (!microphone) {
-      // The microphone is opened once when the call connects. Without it there
-      // is nothing to listen with, and the notice set there already says why.
-      autoListenBlockedRef.current = true;
+      // Not open YET is not the same as cannot open. Opening it is asynchronous
+      // and the call reaches 'ready' first, so latching here stopped the
+      // automatic start for the whole call -- which is why the microphone
+      // button had to be pressed twice to begin talking. The effect below
+      // starts listening the moment it arrives.
       setStatus('ready');
       return;
     }
@@ -383,10 +408,10 @@ export default function OmniChatCallModal({
             setListeningNotice('');
             void sendTranscript(text);
           })
-          .catch(() => {
+          .catch((error: Error & { code?: string }) => {
             if (closedRef.current || callEpochRef.current !== callEpoch) return;
             autoListenBlockedRef.current = true;
-            setListeningNotice('That could not be transcribed. You can type below instead.');
+            setListeningNotice(transcriptionFailureNotice(error.code));
             setStatus('ready');
           });
       },
@@ -416,6 +441,10 @@ export default function OmniChatCallModal({
         return;
       }
       microphoneRef.current = result;
+      // The call is already 'ready' by now, so the effect that starts
+      // listening has been and gone. Start it here instead of waiting for the
+      // next thing to change.
+      setMicrophoneReady(true);
     });
     return () => {
       released = true;
@@ -451,12 +480,12 @@ export default function OmniChatCallModal({
   // recogniser which ends instantly from being restarted instantly, forever.
   useEffect(() => {
     if (status !== 'ready' || !handsFree || closedRef.current) return;
-    if (autoListenBlockedRef.current) return;
+    if (!microphoneReady || autoListenBlockedRef.current) return;
     const timer = window.setTimeout(() => {
       if (!closedRef.current) startListeningRef.current();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [status, handsFree]);
+  }, [status, handsFree, microphoneReady]);
 
   function endCall() {
     if (closedRef.current) return;
