@@ -68,8 +68,13 @@ export function isTrustedOmniChatCallUrl(value: string): boolean {
 export function speechRecognitionNotice(code?: string): string {
   switch (code) {
     case 'not-allowed':
-    case 'service-not-allowed':
       return 'This browser will not let the page listen. Allow microphone access for this site, then press the button again.';
+    // Not a site permission. The browser reached its speech service and was
+    // refused by it -- on macOS that is almost always Dictation being switched
+    // off, because Safari builds this on the system recogniser. Saying "allow
+    // microphone access" sends somebody to a setting that is already correct.
+    case 'service-not-allowed':
+      return 'The browser could not use its speech service. On a Mac, turn on Dictation in System Settings > Keyboard, then press the button again.';
     case 'no-speech':
       return "I didn't hear anything. Hold the button while you speak, or type below.";
     case 'audio-capture':
@@ -84,6 +89,11 @@ export function speechRecognitionNotice(code?: string): string {
         : 'Speech recognition stopped before it heard anything. You can type below instead.';
   }
 }
+
+// listenTimeoutMs bounds one attempt to hear something. Long enough for
+// somebody to gather a sentence, short enough that a recogniser which will
+// never answer says so while they are still looking at the screen.
+const listenTimeoutMs = 12_000;
 
 export default function OmniChatCallModal({
   persona,
@@ -101,6 +111,7 @@ export default function OmniChatCallModal({
   onPaymentRequired?: () => void;
 }) {
   const [listeningNotice, setListeningNotice] = useState('');
+  const listenTimeoutRef = useRef<number | undefined>(undefined);
   const [status, setStatus] = useState<
     'connecting' | 'ready' | 'listening' | 'thinking' | 'speaking' | 'error'
   >('connecting');
@@ -377,6 +388,7 @@ export default function OmniChatCallModal({
       return;
     }
     recognitionRef.current?.stop();
+    window.clearTimeout(listenTimeoutRef.current);
     const recognition = new Recognition();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -401,6 +413,7 @@ export default function OmniChatCallModal({
       setStatus('ready');
     };
     recognition.onend = () => {
+      window.clearTimeout(listenTimeoutRef.current);
       if (!heardSomething) {
         setListeningNotice("I didn't catch anything. Hold the button while you speak, or type below.");
       }
@@ -410,11 +423,32 @@ export default function OmniChatCallModal({
     setListeningNotice('');
     setStatus('listening');
     recognition.start();
+
+    // Recognition can start and then never finish: no result, no error, no
+    // end. Safari does it when the system recogniser will not serve the page,
+    // and the call sits on "Listening..." for as long as somebody is willing
+    // to wait, which is the worst version of this -- every other failure at
+    // least stops. Nothing else bounds it, so this does.
+    window.clearTimeout(listenTimeoutRef.current);
+    listenTimeoutRef.current = window.setTimeout(() => {
+      if (heardSomething || closedRef.current) return;
+      heardSomething = true;
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped, or never really started. Either way, say so below.
+      }
+      setListeningNotice(
+        'Speech recognition started but never returned anything. On a Mac, turn on Dictation in System Settings > Keyboard. You can type below in the meantime.'
+      );
+      setStatus('ready');
+    }, listenTimeoutMs);
   };
   function endCall() {
     if (closedRef.current) return;
     closedRef.current = true;
     callEpochRef.current += 1;
+    window.clearTimeout(listenTimeoutRef.current);
     recognitionRef.current?.stop();
     turnAbortRef.current?.abort(
       new DOMException('The call ended before the AI turn completed', 'AbortError')

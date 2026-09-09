@@ -7,9 +7,18 @@ import { speechRecognitionNotice } from '../OmniChatCallModal';
 // the phone.
 describe('speechRecognitionNotice', () => {
   it('tells somebody whose microphone was refused what to do about it', () => {
-    for (const code of ['not-allowed', 'service-not-allowed']) {
-      expect(speechRecognitionNotice(code)).toContain('microphone');
-    }
+    expect(speechRecognitionNotice('not-allowed')).toContain('microphone');
+  });
+
+  // A different setting entirely. The browser reached its speech service and
+  // was refused by it, which on a Mac is Dictation being off -- sending
+  // somebody to the microphone permission points at a setting that is already
+  // correct, which is how this was first reported: permission granted, the
+  // page listening, and nothing ever transcribed.
+  it('points at the speech service rather than the microphone when the service refuses', () => {
+    const notice = speechRecognitionNotice('service-not-allowed');
+    expect(notice).toContain('Dictation');
+    expect(notice).not.toContain('microphone access');
   });
 
   it('says plainly when it simply heard nothing', () => {
