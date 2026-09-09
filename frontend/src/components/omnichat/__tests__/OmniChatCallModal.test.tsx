@@ -547,6 +547,65 @@ describe('OmniChatCallModal', () => {
       view.unmount();
     });
 
+    // One start per press of the phone.
+    //
+    // The effect is invoked twice in development on purpose, and each
+    // invocation started a call: two sessions milliseconds apart in the
+    // database, every attempt, spending two of the ten hourly starts on one
+    // press. It was visible three separate times before it was read as a bug,
+    // and it is what eventually exhausted the limit and made the call fail
+    // with an error about the connection.
+    it('starts the call once even when the effect runs twice', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
+      // The second invocation React makes in development must not start another.
+      view.rerender(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(omnichatService.startCall).toHaveBeenCalledTimes(1);
+      view.unmount();
+    });
+
+    // A rate limit is not a connection problem, and saying so sends whoever
+    // reads it to the wrong place. It cost an evening once.
+    it('says a rate limit is a rate limit', async () => {
+      const refused = Object.assign(new Error('too many'), { status: 429 });
+      vi.mocked(omnichatService.startCall).mockRejectedValue(refused);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/too many calls/i), {
+        timeout: 3000,
+      });
+      expect(screen.queryByText(/could not be connected/i)).toBeNull();
+      view.unmount();
+    });
+
     // A browser that cannot record says so instead of listening forever. This
     // is the whole complaint the recorder replaced: a call that holds the
     // microphone and never answers.

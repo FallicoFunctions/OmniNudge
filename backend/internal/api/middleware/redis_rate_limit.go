@@ -197,8 +197,16 @@ func OmniChatVoiceRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 60, time.Hour, "rate:omnichat_voice").FailClosed()
 }
 
+// OmniChatCallRateLimiter bounds how fast calls can be started, not how many
+// somebody may have.
+//
+// Cost is handled by billing: a call charges credits when it starts and then
+// per minute. Ten an hour was policing a price that is already policed, and it
+// turned an ordinary evening of use into "the call could not be connected"
+// with no way to tell that from a network fault. Five a minute stops a runaway
+// loop and nothing else.
 func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 10, time.Hour, "rate:omnichat_call").FailClosed()
+	return NewRedisRateLimiter(cache, 5, time.Minute, "rate:omnichat_call").FailClosed()
 }
 
 // OmniChatCallTranscriptionRateLimiter bounds transcribing what somebody said,

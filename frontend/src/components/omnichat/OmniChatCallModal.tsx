@@ -107,6 +107,7 @@ export default function OmniChatCallModal({
   const microphoneRef = useRef<CallMicrophone | null>(null);
   const [heardLevel, setHeardLevel] = useState(0);
   const [microphoneReady, setMicrophoneReady] = useState(false);
+  const [startFailure, setStartFailure] = useState('');
   const sessionRef = useRef<OmniChatCallSession | null>(null);
   const liveKitRoomRef = useRef<Room | null>(null);
   const liveVideoTokenRef = useRef('');
@@ -114,6 +115,7 @@ export default function OmniChatCallModal({
   const remoteAudioRef = useRef<HTMLDivElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
   const closedRef = useRef(false);
+  const startedRef = useRef(false);
   const callEpochRef = useRef(0);
   const onCloseRef = useRef(onClose);
   const onPaymentRequiredRef = useRef(onPaymentRequired);
@@ -135,6 +137,15 @@ export default function OmniChatCallModal({
   }, []);
 
   useEffect(() => {
+    // One start per mount, whatever React does with the effect.
+    //
+    // In development the effect is invoked twice on purpose, and each
+    // invocation started a call: two sessions milliseconds apart in the
+    // database, every attempt, and two of the ten hourly starts spent on one
+    // press of the phone. It was visible three separate times before anybody
+    // read it as a bug rather than as noise.
+    if (startedRef.current) return;
+    startedRef.current = true;
     let active = true;
     closedRef.current = false;
     const callEpoch = ++callEpochRef.current;
@@ -169,6 +180,14 @@ export default function OmniChatCallModal({
           onPaymentRequiredRef.current();
           onCloseRef.current();
           return;
+        }
+        // A start that never happened, retried, is a start that never happens.
+        startedRef.current = false;
+        // "Could not be connected" for a rate limit sends whoever reads it
+        // looking at the network, when the answer is simply to wait. It cost
+        // an evening once.
+        if ((error as Error & { status?: number }).status === 429) {
+          setStartFailure('Too many calls started recently. Wait a few minutes and try again.');
         }
         setStatus('error');
       });
@@ -630,7 +649,7 @@ export default function OmniChatCallModal({
               role="alert"
               className="mb-5 rounded-2xl bg-rose-500/15 px-4 py-3 text-center text-sm text-rose-100 backdrop-blur"
             >
-              The call could not be connected. End the call and try again.
+              {startFailure || 'The call could not be connected. End the call and try again.'}
             </p>
           )}
           {status !== 'error' && (

@@ -123,7 +123,33 @@ func TestOnlySomethingThatLooksLikeMediaReachesFFmpeg(t *testing.T) {
 }
 
 // What browsers really record still gets through. A gate that refuses the real
-// input is worse than no gate.
-func TestWhatABrowserRecordsIsAcceptedByTheGate(t *testing.T) {
+// input is worse than no gate -- and this one did exactly that: it was written
+// against files ffmpeg had produced and it refused what Safari records, so the
+// hardening kept the feature out rather than an attacker.
+func TestEveryContainerABrowserRecordsIsAccepted(t *testing.T) {
+	for name, header := range map[string][]byte{
+		// Chrome and Firefox.
+		"webm": {0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x86, 0x81, 0x01, 0x42, 0xF7, 0x81},
+		// Safari, and every ISO-BMFF brand rather than the few a stdlib
+		// sniffer recognises.
+		"mp4 brand isom": append([]byte{0, 0, 0, 0x18}, []byte("ftypisom....")...),
+		"mp4 brand iso5": append([]byte{0, 0, 0, 0x18}, []byte("ftypiso5....")...),
+		"mp4 brand mp42": append([]byte{0, 0, 0, 0x18}, []byte("ftypmp42....")...),
+		"m4a brand M4A ": append([]byte{0, 0, 0, 0x18}, []byte("ftypM4A ....")...),
+		"ogg":            []byte("OggS\x00\x02\x00\x00\x00\x00\x00\x00"),
+		"wav":            append([]byte("RIFF\x24\x08\x00\x00"), []byte("WAVE")...),
+		"caf":            []byte("caff\x00\x01\x00\x00\x00\x00\x00\x00"),
+		"mp3 with a tag": []byte("ID3\x03\x00\x00\x00\x00\x00\x00\x00\x00"),
+		"mp3 bare frame": {0xFF, 0xFB, 0x90, 0x00, 0, 0, 0, 0, 0, 0, 0, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, looksLikeRecordedMedia(header), "% x", header[:12])
+		})
+	}
+}
+
+// And a real one, made the way a browser makes it rather than the way this
+// repository's other fixtures are made.
+func TestARealRecordingIsAcceptedByTheGate(t *testing.T) {
 	require.True(t, looksLikeRecordedMedia(recordingLike(t, "sine=frequency=440:duration=1")))
 }

@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/omninudge/backend/internal/services/openrouter"
 )
@@ -106,6 +107,10 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 	defer func() { _ = os.RemoveAll(directory) }()
 
 	if !looksLikeRecordedMedia(recording) {
+		// The first bytes, so a container this does not know is one log line
+		// away from being added rather than another round trip.
+		zlog.Warn().Str("first_bytes", fmt.Sprintf("% x", recording[:min(16, len(recording))])).
+			Int("size", len(recording)).Msg("omnichat: an upload was refused as not a recording")
 		// Sniffed, never trusted from a header: the voice-message upload beside
 		// this one says the same thing, because a Content-Type is whatever the
 		// client typed. ffmpeg parsing arbitrary uploaded bytes is a wide
@@ -169,18 +174,43 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
 	return wav, nil
 }
 
-// looksLikeRecordedMedia reports whether the bytes are a media container.
+// looksLikeRecordedMedia reports whether the bytes open like a media container.
 //
-// Browsers record webm, mp4 or ogg depending on the platform, and all three
-// sniff as media. Anything else never reaches ffmpeg.
+// Read from the magic bytes, not from http.DetectContentType. That sniffer is
+// narrow about ISO-BMFF brands and knows nothing about what MediaRecorder
+// emits, and it refused real Safari recordings outright -- the gate meant to
+// keep hostile uploads away from ffmpeg kept the actual feature away instead.
+//
+// It was written against files ffmpeg had produced rather than files a browser
+// had produced, which is the difference the fixture rule exists to catch.
 func looksLikeRecordedMedia(recording []byte) bool {
 	if len(recording) < 12 {
 		return false
 	}
-	detected := http.DetectContentType(recording)
-	return strings.HasPrefix(detected, "audio/") ||
-		strings.HasPrefix(detected, "video/") ||
-		detected == "application/ogg"
+	switch {
+	// Matroska and WebM: Chrome and Firefox.
+	case bytes.HasPrefix(recording, []byte{0x1A, 0x45, 0xDF, 0xA3}):
+		return true
+	// ISO base media: Safari's mp4 and m4a, any brand. The brand is
+	// deliberately not checked -- that is what excluded real recordings.
+	case bytes.Equal(recording[4:8], []byte("ftyp")):
+		return true
+	case bytes.HasPrefix(recording, []byte("OggS")):
+		return true
+	case bytes.HasPrefix(recording, []byte("RIFF")) && bytes.Equal(recording[8:12], []byte("WAVE")):
+		return true
+	case bytes.HasPrefix(recording, []byte("FORM")) && bytes.HasPrefix(recording[8:12], []byte("AIF")):
+		return true
+	// Core Audio Format, which Safari has been known to hand back.
+	case bytes.HasPrefix(recording, []byte("caff")):
+		return true
+	// MP3, tagged or bare.
+	case bytes.HasPrefix(recording, []byte("ID3")):
+		return true
+	case recording[0] == 0xFF && recording[1]&0xE0 == 0xE0:
+		return true
+	}
+	return false
 }
 
 // silenceCeilingDB is the loudest a recording may peak and still count as

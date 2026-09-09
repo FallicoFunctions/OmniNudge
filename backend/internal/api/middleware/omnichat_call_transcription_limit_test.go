@@ -19,6 +19,8 @@ func TestTranscriptionHasItsOwnBudgetAndItsOwnKey(t *testing.T) {
 		"one key means one budget, and these are counted per sentence and per call")
 	require.Greater(t, transcription.limit, call.limit,
 		"a conversation is many sentences and one call")
+	require.NotEqual(t, call.window, transcription.window,
+		"starting a call is bounded per minute against a runaway loop; sentences are bounded per hour against cost")
 	require.GreaterOrEqual(t, transcription.limit, 100,
 		"a long conversation must not run out of allowance mid-sentence")
 }
@@ -32,4 +34,18 @@ func TestTranscriptionIsStillBounded(t *testing.T) {
 	require.Equal(t, time.Hour, transcription.window)
 	require.True(t, transcription.failClosed,
 		"a limiter that cannot reach its store must refuse, not wave everything through")
+}
+
+// Starting a call is bounded against a runaway loop, not against cost.
+//
+// Billing charges credits when a call starts and then per minute, so a limiter
+// counting ten an hour was policing a price that is already policed -- and it
+// turned ordinary use into "the call could not be connected", which reads as a
+// network fault.
+func TestStartingACallIsBoundedPerMinuteRatherThanPerHour(t *testing.T) {
+	call := OmniChatCallRateLimiter(nil)
+
+	require.Equal(t, time.Minute, call.window)
+	require.GreaterOrEqual(t, call.limit, 5, "redialling twice in a row is ordinary use")
+	require.LessOrEqual(t, call.limit, 20, "still a bound, because a loop must hit something")
 }
