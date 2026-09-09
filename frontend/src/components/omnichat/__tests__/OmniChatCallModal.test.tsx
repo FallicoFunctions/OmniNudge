@@ -463,6 +463,10 @@ describe('OmniChatCallModal', () => {
       vi.stubGlobal(
         'AudioContext',
         class {
+          state = 'running';
+          resume() {
+            return Promise.resolve();
+          }
           createAnalyser() {
             return { fftSize: 2048, getFloatTimeDomainData: () => {} };
           }
@@ -493,7 +497,39 @@ describe('OmniChatCallModal', () => {
 
       await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
       await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
-      expect(FakeRecorder.instances.length).toBeGreaterThan(0);
+      await waitFor(() => expect(FakeRecorder.instances.length).toBeGreaterThan(0), {
+        timeout: 3000,
+      });
+      view.unmount();
+    });
+
+    // Reported as "it asks me for microphone permission every time". Opening
+    // the microphone per sentence prompts per sentence, which no other site
+    // does -- and every utterance waited on a dialog instead of recording.
+    it('asks for the microphone once for the whole call, not once per sentence', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
+      await waitFor(() => expect(FakeRecorder.instances.length).toBeGreaterThan(0), {
+        timeout: 3000,
+      });
+      // A second listening cycle: the recorder is made again, the microphone
+      // is not asked for again.
+      await act(async () => {
+        FakeRecorder.instances[0].onstop?.();
+      });
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      expect(getUserMedia).toHaveBeenCalledTimes(1);
       view.unmount();
     });
 

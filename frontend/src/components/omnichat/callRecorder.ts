@@ -95,24 +95,68 @@ export function describeSilence(peak: number, chunks: number, contextState: stri
   return "I didn't catch that.";
 }
 
-export async function recordUtterance(callbacks: RecorderCallbacks): Promise<RecorderHandle> {
-  if (!browserCanRecord()) {
-    callbacks.onNothingHeard('This browser cannot record audio. You can type instead.');
-    return { stop: () => {}, cancel: () => {} };
-  }
+/**
+ * The microphone, held open for a whole call.
+ *
+ * Asking for it per sentence prompts for permission per sentence, which no
+ * other site does and which is the behaviour that was reported. It is also
+ * slower and more fragile: every utterance waited on a dialog instead of
+ * recording.
+ */
+export type CallMicrophone = {
+  stream: MediaStream;
+  /** Live loudness, so a caller can see they are being heard immediately. */
+  level: () => number;
+  release: () => void;
+};
 
+/** Opens the microphone once. The caller keeps it until the call ends. */
+export async function openMicrophone(): Promise<CallMicrophone | string> {
+  if (!browserCanRecord()) {
+    return 'This browser cannot record audio. You can type instead.';
+  }
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
   } catch {
-    callbacks.onNothingHeard(
-      'The microphone is not available. Allow microphone access for this site, then try again.'
-    );
-    return { stop: () => {}, cancel: () => {} };
+    return 'The microphone is not available. Allow microphone access for this site, then try again.';
   }
 
+  const audioContext = new AudioContext();
+  // Created after an await, so the gesture that opened the call may be out of
+  // scope -- Safari starts a context suspended in that case, and a suspended
+  // analyser reads pure silence however loudly anybody talks.
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume().catch(() => undefined);
+  }
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 2048;
+  audioContext.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Float32Array(analyser.fftSize);
+
+  return {
+    stream,
+    level: () => {
+      if (audioContext.state !== 'running') return -1;
+      analyser.getFloatTimeDomainData(samples);
+      let sum = 0;
+      for (const sample of samples) sum += sample * sample;
+      return Math.sqrt(sum / samples.length);
+    },
+    release: () => {
+      stream.getTracks().forEach((track) => track.stop());
+      void audioContext.close().catch(() => undefined);
+    },
+  };
+}
+
+export async function recordUtterance(
+  microphone: CallMicrophone,
+  callbacks: RecorderCallbacks
+): Promise<RecorderHandle> {
+  const stream = microphone.stream;
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: Blob[] = [];
@@ -124,39 +168,20 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
   // completely different fixes. Three attempts were spent guessing between
   // them.
   let peakLevel = 0;
+  let contextState = 'running';
   let finished = false;
   // One holder, because release() closes over these before either is set and
   // a timer assigned exactly once is not a variable worth reassigning.
   const timers: { silence?: number; maximum?: number } = {};
   let frame = 0;
 
-  const audioContext = new AudioContext();
-  // Created after an await, so the user gesture that opened the call may no
-  // longer be in scope -- Safari starts a context suspended in that case, and a
-  // suspended analyser reads pure silence for as long as anybody talks. That is
-  // indistinguishable from a broken microphone and was exactly the symptom:
-  // "she still could not hear me".
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume().catch(() => undefined);
-  }
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 2048;
-  audioContext.createMediaStreamSource(stream).connect(analyser);
-  const samples = new Float32Array(analyser.fftSize);
-
-  // Everything except the microphone itself. The stream is released later, on
-  // the recorder's own stop event, because a MediaRecorder whose tracks have
-  // already been stopped can emit no final chunk -- which left every recording
-  // empty however long somebody spoke.
+  // Everything except the microphone, which belongs to the call rather than to
+  // this sentence. A MediaRecorder whose tracks have already been stopped can
+  // emit no final chunk, and the microphone must outlive this recording anyway.
   const releaseWatchers = () => {
     window.clearTimeout(timers.silence);
     window.clearTimeout(timers.maximum);
     cancelAnimationFrame(frame);
-    void audioContext.close().catch(() => undefined);
-  };
-
-  const releaseMicrophone = () => {
-    stream.getTracks().forEach((track) => track.stop());
   };
 
   // Stops. It does not report: onstop is the single place that decides whether
@@ -167,8 +192,7 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
     finished = true;
     releaseWatchers();
     if (recorder.state === 'inactive') {
-      releaseMicrophone();
-      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, audioContext.state));
+      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, contextState));
       return;
     }
     recorder.stop();
@@ -178,10 +202,9 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
     if (event.data && event.data.size > 0) chunks.push(event.data);
   };
   recorder.onstop = () => {
-    releaseMicrophone();
     const spokenFor = speechStartedAt ? Date.now() - speechStartedAt : 0;
     if (!heardSpeech || spokenFor < MIN_SPEECH_MS || chunks.length === 0) {
-      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, audioContext.state));
+      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, contextState));
       return;
     }
     callbacks.onUtterance(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
@@ -191,11 +214,14 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
   // goes quiet for long enough, which is what makes this hands free.
   const watchLevel = () => {
     if (finished) return;
-    analyser.getFloatTimeDomainData(samples);
-    let sum = 0;
-    for (const sample of samples) sum += sample * sample;
-    const level = Math.sqrt(sum / samples.length);
-    if (level > peakLevel) peakLevel = level;
+    const level = microphone.level();
+    // -1 means the analyser is not running, which reads as silence however
+    // loudly anybody talks. Recorded so the notice can say so.
+    if (level < 0) {
+      contextState = 'suspended';
+    } else if (level > peakLevel) {
+      peakLevel = level;
+    }
 
     if (level > SILENCE_THRESHOLD) {
       if (!heardSpeech) {
@@ -223,7 +249,6 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
       // reports an utterance nobody asked for.
       recorder.onstop = null;
       if (recorder.state !== 'inactive') recorder.stop();
-      releaseMicrophone();
     },
   };
 }

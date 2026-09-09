@@ -10,7 +10,12 @@ import {
 } from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
 import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton';
-import { browserCanRecord, recordUtterance, type RecorderHandle } from './callRecorder';
+import {
+  openMicrophone,
+  recordUtterance,
+  type CallMicrophone,
+  type RecorderHandle,
+} from './callRecorder';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export function isTrustedOmniChatCallUrl(value: string): boolean {
@@ -75,6 +80,10 @@ export default function OmniChatCallModal({
   const [liveVideoURL, setLiveVideoURL] = useState('');
   const [liveVideoConnected, setLiveVideoConnected] = useState(false);
   const recorderRef = useRef<RecorderHandle | null>(null);
+  // One microphone for the whole call. Asking per sentence prompts for
+  // permission per sentence, which no other site does.
+  const microphoneRef = useRef<CallMicrophone | null>(null);
+  const [heardLevel, setHeardLevel] = useState(0);
   const sessionRef = useRef<OmniChatCallSession | null>(null);
   const liveKitRoomRef = useRef<Room | null>(null);
   const liveVideoTokenRef = useRef('');
@@ -331,9 +340,11 @@ export default function OmniChatCallModal({
 
   const startListeningRef = useRef<() => void>(() => {});
   const startListening = () => {
-    if (!browserCanRecord()) {
+    const microphone = microphoneRef.current;
+    if (!microphone) {
+      // The microphone is opened once when the call connects. Without it there
+      // is nothing to listen with, and the notice set there already says why.
       autoListenBlockedRef.current = true;
-      setListeningNotice('This browser cannot record audio. You can type below instead.');
       setStatus('ready');
       return;
     }
@@ -341,7 +352,7 @@ export default function OmniChatCallModal({
     setListeningNotice('');
     setStatus('listening');
     const callEpoch = callEpochRef.current;
-    void recordUtterance({
+    void recordUtterance(microphone, {
       onListening: () => {
         if (closedRef.current || callEpochRef.current !== callEpoch) return;
         setStatus('listening');
@@ -389,6 +400,47 @@ export default function OmniChatCallModal({
   };
 
   startListeningRef.current = startListening;
+
+  // The microphone is opened once, when the call connects, and held until it
+  // ends. Opening it per sentence prompted for permission per sentence.
+  useEffect(() => {
+    let released = false;
+    void openMicrophone().then((result) => {
+      if (typeof result === 'string') {
+        autoListenBlockedRef.current = true;
+        setListeningNotice(result);
+        return;
+      }
+      if (released || closedRef.current) {
+        result.release();
+        return;
+      }
+      microphoneRef.current = result;
+    });
+    return () => {
+      released = true;
+      microphoneRef.current?.release();
+      microphoneRef.current = null;
+    };
+  }, []);
+
+  // A live meter while listening. Somebody can see they are being heard
+  // immediately, instead of finding out from a message thirty seconds later
+  // -- which is what made three separate faults look like one silence.
+  useEffect(() => {
+    if (status !== 'listening') {
+      setHeardLevel(0);
+      return;
+    }
+    let frame = 0;
+    const sample = () => {
+      const level = microphoneRef.current?.level() ?? 0;
+      setHeardLevel(level < 0 ? -1 : level);
+      frame = requestAnimationFrame(sample);
+    };
+    frame = requestAnimationFrame(sample);
+    return () => cancelAnimationFrame(frame);
+  }, [status]);
 
   // Pressing the phone starts the call, and the call starts listening. Nothing
   // else should have to be pressed: she listens on connect and again after
@@ -501,6 +553,20 @@ export default function OmniChatCallModal({
             <p className="mb-4 rounded-2xl bg-black/40 px-4 py-3 text-center text-sm text-white/70 backdrop-blur">
               “{transcript}”
             </p>
+          )}
+          {status === 'listening' && (
+            <div
+              data-testid="omnichat-call-level"
+              className="mb-4 flex items-center justify-center gap-3 text-xs text-white/45"
+            >
+              <span className="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
+                <span
+                  className={`block h-full rounded-full transition-[width] duration-75 ${heardLevel < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                  style={{ width: `${heardLevel < 0 ? 100 : Math.min(100, heardLevel * 900)}%` }}
+                />
+              </span>
+              {heardLevel < 0 ? 'the microphone is not being measured' : 'listening'}
+            </div>
           )}
           {listeningNotice && status !== 'error' && (
             <p
