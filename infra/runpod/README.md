@@ -208,7 +208,17 @@ pushing, and never assume the other worker's number means anything.
 to `v58`, with a 60 GB container disk, a 1800 s execution timeout, and
 `workersMin: 0`.
 
-The current build is **`v59`**. It raises `DEFAULT_VIDEO_MAX_FRAMES` from 121
+**As of 2026-09-09.** The current builds are **`omnichat-video-worker:v60`**
+and **`omnichat-image-worker:v54`**. They are `v59` and `v53` with one change:
+`Pillow==12.3.0` in place of `11.3.0`, which closed 54 of the repository's 89
+Dependabot alerts -- every worker pins Pillow, so each advisory was counted
+three times. The imaging calls this code makes were run against 12.3.0 inside
+both pushed images before this was written; nothing else in either pin moved.
+
+Neither template is repointed. **A pushed tag changes nothing until the RunPod
+template names it**, which is the same trap the paragraphs above record.
+
+`v59` raises `DEFAULT_VIDEO_MAX_FRAMES` from 121
 to 145, so a clip runs six seconds at 24fps rather than five. That is above the
 121 frames Wan 2.2 was trained at, and `video_frame_count` says the model
 degrades away from that length rather than failing -- the trade buys a gesture
@@ -254,14 +264,14 @@ cd backend && go run ./cmd/migrate -action=dry-run && go run ./cmd/migrate -acti
 the image worker so the two stay legible together:
 
 ```bash
-TAG=v59 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
+TAG=v61 && docker buildx build --platform linux/amd64 --provenance=false --sbom=false --build-arg OMNICHAT_WORKER_BUILD="$TAG" --output type=image,name=docker.io/nickf579/omnichat-video-worker:"$TAG",oci-mediatypes=false,push=true -f infra/runpod/video-worker/Dockerfile .
 ```
 
 The buildx flags are load-bearing; see the Build section above for what happens
 without them. Verify the manifest type before going further:
 
 ```bash
-docker buildx imagetools inspect nickf579/omnichat-video-worker:v59
+docker buildx imagetools inspect nickf579/omnichat-video-worker:"$TAG"
 ```
 
 `MediaType` must be `application/vnd.docker.distribution.manifest.v2+json`. An
