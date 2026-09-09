@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -246,4 +248,54 @@ func TestARangeIsKeptApartFromTheWholeFileInACache(t *testing.T) {
 	require.Equal(t, http.StatusOK, whole.Code)
 	require.Contains(t, whole.Header().Values("Vary"), "Range",
 		"a cache stores the whole answer under the same key, so it has to be told too")
+}
+
+// A max-age is decoration while the API's blanket no-cache headers stand.
+//
+// The cache middleware stamps "Pragma: no-cache" and "Expires: 0" on every
+// response under /api/. A route that then sets its own max-age gets all three,
+// and a browser stores the response but never calls it fresh. Measured in the
+// running app before this: the same thumbnail took 141ms on the default cache
+// mode and 2ms on force-cache -- cached, and never used.
+func TestSettingACacheLifetimeClearsTheBlanketNoCacheHeaders(t *testing.T) {
+	router := gin.New()
+	router.GET("/x", func(c *gin.Context) {
+		// Exactly what the middleware leaves behind.
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		setCacheable(c, "private, max-age=604800, immutable")
+		c.Status(http.StatusOK)
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/x", nil))
+
+	require.Equal(t, "private, max-age=604800, immutable", response.Header().Get("Cache-Control"))
+	require.Empty(t, response.Header().Get("Pragma"), "Pragma: no-cache outlived the max-age")
+	require.Empty(t, response.Header().Get("Expires"), "Expires: 0 outlived the max-age")
+}
+
+// The routes that mean no-store keep the middleware's headers: three ways of
+// saying the same thing is belt and braces, not a contradiction.
+func TestAThumbnailRouteIsActuallyCacheableEndToEnd(t *testing.T) {
+	id := uuid.New()
+	asset := thumbnailAsset(id, models.OmniChatMediaKindImage, "/uploads/omnichat/generated/9/"+id.String()+".png-thumb.jpg")
+	handler := NewOmniChatMediaHandler(&omniChatGenerationCreatorFake{},
+		&omniChatMediaReaderFake{asset: asset}, &omniChatMediaStorageFake{body: []byte("jpeg")})
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 9)
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		c.Next()
+	})
+	router.GET("/media/:id/thumbnail", handler.GetAssetThumbnail)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/media/"+id.String()+"/thumbnail", nil))
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Header().Get("Cache-Control"), "max-age=")
+	require.Empty(t, response.Header().Get("Pragma"))
+	require.Empty(t, response.Header().Get("Expires"))
 }

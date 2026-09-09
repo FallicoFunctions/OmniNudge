@@ -515,7 +515,7 @@ func (h *OmniChatSocialHandler) GetPublicMediaContent(c *gin.Context) {
 		// Anonymous authorization has no viewer-specific block or preference
 		// state. A short shared cache reduces storage bandwidth while bounding
 		// the delay before an unpublish takes effect.
-		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
+		setCacheable(c, "public, max-age=300, s-maxage=300")
 	} else {
 		c.Header("Cache-Control", "private, no-store")
 		c.Writer.Header().Add("Vary", "Authorization")
@@ -578,9 +578,9 @@ func (h *OmniChatSocialHandler) GetPublicMediaThumbnail(c *gin.Context) {
 	// long as it is allowed to live, and five minutes is what the anonymous
 	// branch beside it already decided that bound should be.
 	if viewer == nil {
-		c.Header("Cache-Control", "public, max-age=300, s-maxage=300")
+		setCacheable(c, "public, max-age=300, s-maxage=300")
 	} else {
-		c.Header("Cache-Control", "private, max-age=300")
+		setCacheable(c, "private, max-age=300")
 		c.Writer.Header().Add("Vary", "Authorization")
 		c.Writer.Header().Add("Vary", "Cookie")
 	}

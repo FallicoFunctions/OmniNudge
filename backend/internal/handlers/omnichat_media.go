@@ -643,7 +643,7 @@ func (h *OmniChatMediaHandler) GetAssetThumbnail(c *gin.Context) {
 	//
 	// Without this a gallery re-fetched every tile on every visit, which is
 	// most of what the thumbnail was introduced to stop.
-	c.Header("Cache-Control", "private, max-age=604800, immutable")
+	setCacheable(c, "private, max-age=604800, immutable")
 	c.Writer.Header().Add("Vary", "Authorization")
 	c.Writer.Header().Add("Vary", "Cookie")
 	c.Header("X-Content-Type-Options", "nosniff")

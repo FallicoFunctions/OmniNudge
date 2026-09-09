@@ -24,6 +24,24 @@ import (
 // offset+length-1, and Content-Range states the whole object's size after the
 // slash rather than the slice's.
 
+// setCacheable sets Cache-Control and clears the two headers the API's cache
+// middleware stamps on every response under /api/.
+//
+// That middleware sends "Pragma: no-cache" and "Expires: 0" alongside its own
+// no-store default. A route that then sets its own max-age gets all three, and
+// a browser stores the response but never treats it as fresh -- so every visit
+// revalidates and the max-age is decoration. Measured in the running app: the
+// same thumbnail took 141ms with the default cache mode and 2ms with
+// force-cache, which is a response that is cached and never used.
+//
+// The uploads handler already deletes both for exactly this reason. This is
+// that fix, where the media routes can reach it.
+func setCacheable(c *gin.Context, value string) {
+	c.Header("Cache-Control", value)
+	c.Writer.Header().Del("Pragma")
+	c.Writer.Header().Del("Expires")
+}
+
 // errUnsatisfiableRange means the client asked for bytes this object does not
 // have. It is answered with 416 and the object's real size, which is how a
 // player learns what it should have asked for.
