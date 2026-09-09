@@ -9,6 +9,7 @@ import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywa
 import { Modal } from '../components/common/Modal';
 import PersonaAvatar from '../components/omnichat/PersonaAvatar';
 import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
+import { mediaJobPercent } from '../utils/omnichatMediaProgress';
 import {
   createOmniChatRequestId,
   omnichatQueryKeys,
@@ -37,6 +38,7 @@ export function OmniChatCreateWorkspace() {
   const [duration, setDuration] = useState(5);
   const [sourceAssetId, setSourceAssetId] = useState('');
   const [activeJob, setActiveJob] = useState<OmniChatGenerationJob | null>(null);
+  const [progressNow, setProgressNow] = useState(() => Date.now());
   const [lastRequest, setLastRequest] = useState<MediaCreateRequest | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<'generate' | 'gallery'>('generate');
   const [showCommerce, setShowCommerce] = useState(false);
@@ -111,6 +113,17 @@ export function OmniChatCreateWorkspace() {
     enabled: Boolean(activeJob?.id && !TERMINAL_STATUSES.has(activeJob.status)),
     refetchInterval: 2000,
   });
+
+  // The percentage is time-based, so it needs a clock to move between polls.
+  // Keyed on the job rather than the object: activeJob is replaced every two
+  // seconds by the poll, and depending on it would rebuild the interval each
+  // time.
+  const jobIsRunning = Boolean(activeJob?.id && !TERMINAL_STATUSES.has(activeJob.status));
+  useEffect(() => {
+    if (!jobIsRunning) return;
+    const ticker = window.setInterval(() => setProgressNow(Date.now()), 1000);
+    return () => window.clearInterval(ticker);
+  }, [jobIsRunning]);
 
   useEffect(() => {
     const job = activeJobQuery.data;
@@ -387,14 +400,17 @@ export function OmniChatCreateWorkspace() {
                         <p className="mt-2 text-sm text-white/45">
                           You can leave this page. The result will still be saved to your gallery.
                         </p>
+                        {/* Not activeJob.progress: it caps at 90 within about
+                            thirty seconds and then sits there, which on a video
+                            is ten more minutes of a bar that looks stuck. */}
                         <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all"
-                            style={{ width: `${Math.max(4, activeJob.progress)}%` }}
+                            style={{ width: `${Math.max(4, mediaJobPercent(activeJob, progressNow))}%` }}
                           />
                         </div>
                         <p className="mt-2 text-xs text-white/35">
-                          {activeJob.progress}% · {activeJob.status}
+                          {mediaJobPercent(activeJob, progressNow)}% · {activeJob.status}
                         </p>
                         <button
                           type="button"
