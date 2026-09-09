@@ -107,6 +107,8 @@ export type CallMicrophone = {
   stream: MediaStream;
   /** Live loudness, so a caller can see they are being heard immediately. */
   level: () => number;
+  /** Which input the browser actually opened, for when the level stays flat. */
+  describeInput: () => string;
   release: () => void;
 };
 
@@ -133,7 +135,25 @@ export async function openMicrophone(): Promise<CallMicrophone | string> {
   }
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 2048;
-  audioContext.createMediaStreamSource(stream).connect(analyser);
+
+  // The source node is kept, and that is the whole point of this line.
+  //
+  // Written as createMediaStreamSource(stream).connect(analyser) it has no
+  // JavaScript reference, and WebKit collects it -- after which the analyser
+  // reads exactly zero for ever while the context still reports "running".
+  // That is indistinguishable from a silent room and is what a call looked
+  // like: listening, meter flat, nothing ever heard.
+  const source = audioContext.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  // An analyser on a graph that reaches no destination is not guaranteed to be
+  // pulled. Silence is routed to the speakers so the graph is live, at a gain
+  // of zero so nobody hears their own microphone.
+  const silent = audioContext.createGain();
+  silent.gain.value = 0;
+  analyser.connect(silent);
+  silent.connect(audioContext.destination);
+
   const samples = new Float32Array(analyser.fftSize);
 
   return {
@@ -145,7 +165,19 @@ export async function openMicrophone(): Promise<CallMicrophone | string> {
       for (const sample of samples) sum += sample * sample;
       return Math.sqrt(sum / samples.length);
     },
+    describeInput: () => {
+      const track = stream.getAudioTracks()[0];
+      if (!track) return 'no audio track';
+      return `${track.label || 'unnamed input'}${track.muted ? ', muted' : ''}${
+        track.enabled ? '' : ', disabled'
+      }, ${track.readyState}`;
+    },
     release: () => {
+      // Kept alive until here, so nothing in this graph can be collected while
+      // the call is still using it.
+      source.disconnect();
+      analyser.disconnect();
+      silent.disconnect();
       stream.getTracks().forEach((track) => track.stop());
       void audioContext.close().catch(() => undefined);
     },

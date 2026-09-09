@@ -457,21 +457,35 @@ describe('OmniChatCallModal', () => {
 
     beforeEach(() => {
       FakeRecorder.instances = [];
-      getUserMedia.mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+      getUserMedia.mockResolvedValue({
+        getTracks: () => [{ stop: vi.fn() }],
+        getAudioTracks: () => [{ label: 'Fake input', muted: false, enabled: true, readyState: 'live' }],
+      });
       vi.stubGlobal('MediaRecorder', FakeRecorder);
       vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia } });
       vi.stubGlobal(
         'AudioContext',
         class {
           state = 'running';
+          destination = {};
           resume() {
             return Promise.resolve();
           }
           createAnalyser() {
-            return { fftSize: 2048, getFloatTimeDomainData: () => {} };
+            return {
+              fftSize: 2048,
+              getFloatTimeDomainData: () => {},
+              connect: () => {},
+              disconnect: () => {},
+            };
           }
           createMediaStreamSource() {
-            return { connect: () => {} };
+            return { connect: () => {}, disconnect: () => {} };
+          }
+          // The silent path that keeps the graph live. A stub without it hid a
+          // real call from its own tests.
+          createGain() {
+            return { gain: { value: 0 }, connect: () => {}, disconnect: () => {} };
           }
           close() {
             return Promise.resolve();

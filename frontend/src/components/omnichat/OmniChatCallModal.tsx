@@ -565,7 +565,11 @@ export default function OmniChatCallModal({
                   style={{ width: `${heardLevel < 0 ? 100 : Math.min(100, heardLevel * 900)}%` }}
                 />
               </span>
-              {heardLevel < 0 ? 'the microphone is not being measured' : 'listening'}
+              {heardLevel < 0
+                ? 'the microphone is not being measured'
+                : heardLevel > 0.002
+                  ? 'hearing you'
+                  : `no sound from ${microphoneRef.current?.describeInput() ?? 'the microphone'}`}
             </div>
           )}
           {listeningNotice && status !== 'error' && (
