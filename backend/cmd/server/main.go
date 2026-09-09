@@ -430,9 +430,12 @@ func main() {
 			cfg.VirusScan.FailClosed,
 		).SetMediaReferenceReader(mediaRepo).
 			SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
-			SetThumbnails(queueThumbnailService).
 			SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 				SetAdminReader(workerOmniChatUserRepo))
+		// This server and the standalone worker consume the same queue, so they
+		// have to agree about what a job can do. One function, called by both.
+		omniChatGenerationWorker = queue.ConfigureOmniChatGeneration(
+			omniChatGenerationWorker, cfg, queueThumbnailService)
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),

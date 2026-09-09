@@ -33,6 +33,15 @@ export function mediaGenerationErrorMessage(status?: number, errorCode?: string)
       return 'Your media storage is full. Delete an item from the gallery and retry.';
     case 'provider_failed':
       return 'The media GPU worker failed. Check its RunPod endpoint environment, then retry.';
+    // The render happened. It is the check that could not run, and saying
+    // "could not be started" about a job that ran for eighty-three seconds
+    // sends whoever reads it to the wrong end of the system.
+    case 'image_review_unavailable':
+      return 'The render finished but could not be safety-checked, so it was discarded. Check the image review model settings, then retry.';
+    case 'scanner_unavailable':
+      return 'The render finished but could not be virus-scanned, so it was discarded. Check the scanner, then retry.';
+    case 'malware_detected':
+      return 'The generated file failed its security scan and was discarded.';
     default:
       return status !== undefined && status >= 500
         ? 'Media generation is temporarily unavailable. Please try again shortly.'

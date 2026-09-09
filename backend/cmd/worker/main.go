@@ -148,44 +148,14 @@ func main() {
 		cfg.VirusScan.FailClosed,
 	).SetMediaReferenceReader(mediaRepo).
 		SetStorageQuotas(cfg.Media.FreeTierQuotaBytes, cfg.Media.ProTierQuotaBytes).
-		// Without this every render is stored with no tile image, and a gallery
-		// has to fetch each asset whole to draw a grid.
-		SetThumbnails(services.NewThumbnailService()).
 		SetBilling(services.NewOmniChatBillingService(models.NewOmniCreditsRepository(db.Pool), workerOmniChatUserRepo).
 			SetAdminReader(workerOmniChatUserRepo))
 
-	// Clips go to a hosted model; stills stay on the self-hosted worker. Only
-	// wired when a key exists, so an unconfigured deployment degrades to a slow
-	// clip rather than to a failing one.
-	if queue.UsesHostedVideo(cfg.OmniChatMedia) && cfg.OpenRouter.APIKey != "" {
-		omniChatGenerationWorker = omniChatGenerationWorker.SetVideoProvider(
-			queue.NewOpenRouterVideoProvider(openrouter.NewClient(cfg.OpenRouter.APIKey, "")))
-		// The finished clip lives behind OpenRouter's own API and needs the key
-		// to fetch: "unsigned_urls" names the URL's lack of a signature, not
-		// public access. Scoped to that host so the account credential cannot
-		// follow a result URL somewhere else.
-		omniChatGenerationWorker = omniChatGenerationWorker.SetMediaBearer(
-			config.OpenRouterMediaHost, cfg.OpenRouter.APIKey)
-		zlog.Info().
-			Str("provider", cfg.OmniChatMedia.VideoProvider).
-			Str("model", cfg.OmniChatMedia.VideoModel).
-			Str("resolution", cfg.OmniChatMedia.VideoResolution).
-			Msg("omnichat video: hosted provider wired")
-	} else if queue.UsesHostedVideo(cfg.OmniChatMedia) {
-		zlog.Error().
-			Str("check", "media_endpoint").
-			Msg("OMNICHAT_VIDEO_PROVIDER is openrouter but OPENROUTER_API_KEY is not set: clips fall back to the self-hosted worker")
-	}
-	// Looks at what the provider returned, on the paths where explicit output
-	// would be a defect. Without it the handler falls back to failClosed, so an
-	// unset review is a refusal rather than a silent gap.
-	if imageReviewModel := strings.TrimSpace(cfg.OpenRouter.ImageReviewModel); imageReviewModel != "" && strings.TrimSpace(cfg.OpenRouter.APIKey) != "" {
-		omniChatGenerationWorker = omniChatGenerationWorker.SetRenderedImageReview(
-			services.NewOpenRouterRenderedImageReview(
-				openrouter.NewClient(cfg.OpenRouter.APIKey, imageReviewModel),
-			),
-		)
-	}
+	// This worker and the API server's embedded one consume the same queue, so
+	// they have to agree about what a job can do. One function, called by both.
+	omniChatGenerationWorker = queue.ConfigureOmniChatGeneration(
+		omniChatGenerationWorker, cfg, services.NewThumbnailService())
+
 	// Character memory extraction. This is the only place the extraction model
 	// is called, which is what keeps a 20-second reasoning pass off the send
 	// path entirely.

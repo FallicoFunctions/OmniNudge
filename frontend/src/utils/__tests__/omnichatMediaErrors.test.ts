@@ -65,4 +65,21 @@ describe('distinct 5xx causes', () => {
   it('still falls back for an unrecognised 5xx', () => {
     expect(mediaGenerationErrorMessage(500, 'something_new')).toContain('temporarily unavailable');
   });
+  // A render that ran and then could not be checked did not fail to start.
+  // These fell through to the default and told the user to "try again" while
+  // pointing at the wrong end of the system.
+  it('says what actually happened when the render could not be checked', () => {
+    expect(mediaGenerationErrorMessage(undefined, 'image_review_unavailable')).toContain(
+      'could not be safety-checked'
+    );
+    expect(mediaGenerationErrorMessage(undefined, 'image_review_unavailable')).not.toContain(
+      'could not be started'
+    );
+    expect(mediaGenerationErrorMessage(undefined, 'scanner_unavailable')).toContain(
+      'could not be virus-scanned'
+    );
+    expect(mediaGenerationErrorMessage(undefined, 'malware_detected')).toContain(
+      'failed its security scan'
+    );
+  });
 });
