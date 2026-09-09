@@ -27,7 +27,18 @@ type omniChatVoiceStoreFake struct {
 func (f *omniChatVoiceStoreFake) GetSpeechSourceOwned(context.Context, int, int, int) (*models.OmniChatSpeechSource, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return f.source, nil
+	if f.source == nil {
+		return nil, nil
+	}
+	// A copy, because the repository scans a fresh struct out of the database
+	// for every call and this must not be the one thing about it that differs.
+	//
+	// Handing every caller the same pointer made two concurrent requests write
+	// to one struct -- the service rewrites source.Text with its spoken form --
+	// and the race detector reported it against the service. The service is
+	// right: nothing it is ever given is shared. The fake was wrong.
+	copied := *f.source
+	return &copied, nil
 }
 func (f *omniChatVoiceStoreFake) GetCachedSpeechOwned(context.Context, int, int, string, string) (*models.OmniChatSpeechAudio, error) {
 	f.mu.RLock()
@@ -104,7 +115,8 @@ func TestOmniChatVoiceServiceRetriesCaptureBeforeServingCachedSpeech(t *testing.
 	billing.captureErr = nil
 	audio, err := service.GetOrCreateSpeech(context.Background(), 7, 11, 33)
 	require.NoError(t, err)
-	require.Equal(t, store.cached, audio)
+	require.Equal(t, store.cached, audio.Audio)
+	require.Empty(t, audio.Fresh, "it came from the cache, so there are no fresh bytes to serve")
 	require.Len(t, billing.captures, 2)
 	require.Equal(t, billing.captures[0], billing.captures[1])
 }
