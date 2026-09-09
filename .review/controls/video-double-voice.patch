@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/OmniChatCallModal.tsx b/frontend/src/components/omnichat/OmniChatCallModal.tsx
+index bbd99d06a..893156e2b 100644
+--- a/frontend/src/components/omnichat/OmniChatCallModal.tsx
++++ b/frontend/src/components/omnichat/OmniChatCallModal.tsx
+@@ -357,7 +357,7 @@ export default function OmniChatCallModal({
+       // second time, out of the local speaker, half a beat apart. The avatar
+       // decision is made further down, after the reply arrives -- too late to
+       // stop a run that has already started talking.
+-      const play = mode === 'video' ? undefined : microphoneRef.current?.play;
++      const play = microphoneRef.current?.play;
+       const sentences = play
+         ? playCallSentences({
+             conversationId,

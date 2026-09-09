@@ -1,0 +1,42 @@
+diff --git a/backend/internal/services/omnichat_call_sentences.go b/backend/internal/services/omnichat_call_sentences.go
+index 26c30fb9f..ad703b6f0 100644
+--- a/backend/internal/services/omnichat_call_sentences.go
++++ b/backend/internal/services/omnichat_call_sentences.go
+@@ -62,10 +62,6 @@ func (s *sentenceStream) push(token string) {
+ 		s.pending = append(s.pending, r)
+ 		if s.complete() {
+ 			s.flush()
+-			continue
+-		}
+-		if len(s.pending) >= maxSpokenSentenceRunes {
+-			s.breakAtWord()
+ 		}
+ 	}
+ }
+@@ -133,7 +129,13 @@ func (s *sentenceStream) stop() {
+ 
+ // complete reports whether what is held ends a sentence.
+ func (s *sentenceStream) complete() bool {
+-	if len(s.pending) == 0 || narrationIsOpen(s.pending) {
++	if len(s.pending) < 12 {
++		return false
++	}
++	if len(s.pending) >= maxSpokenSentenceRunes {
++		return true
++	}
++	if narrationIsOpen(s.pending) {
+ 		return false
+ 	}
+ 	last := s.pending[len(s.pending)-1]
+@@ -163,10 +165,8 @@ func (s *sentenceStream) complete() bool {
+ 		return false
+ 	}
+ 	switch s.pending[end] {
+-	case '?', '!', '…':
++	case '?', '!', '…', '.':
+ 		return true
+-	case '.':
+-		return !endsWithAbbreviation(s.pending[:end])
+ 	}
+ 	return false
+ }

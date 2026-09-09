@@ -1,0 +1,841 @@
+{
+ "schema_version": 2,
+ "head": "e21573a96",
+ "base": "464c678c8",
+ "scope": {
+  "files": [
+   "backend/cmd/server/main.go",
+   "backend/internal/api/middleware/redis_rate_limit.go",
+   "backend/internal/handlers/omnichat_voice.go",
+   "backend/internal/handlers/omnichat_voice_live_test.go",
+   "backend/internal/handlers/omnichat_voice_test.go",
+   "backend/internal/models/omnichat_voice.go",
+   "backend/internal/services/chatbot_service.go",
+   "backend/internal/services/chatbot_service_test.go",
+   "backend/internal/services/conversation_scene_state.go",
+   "backend/internal/services/conversational_response_contract.go",
+   "backend/internal/services/omnichat_call_sentences.go",
+   "backend/internal/services/omnichat_call_sentences_test.go",
+   "backend/internal/services/omnichat_call_speech.go",
+   "backend/internal/services/omnichat_voice.go",
+   "backend/internal/services/omnichat_voice_test.go",
+   "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+   "frontend/src/components/omnichat/callRecorder.ts",
+   "frontend/src/components/omnichat/callSentenceSpeech.ts",
+   "frontend/src/contexts/WebSocketContext.tsx",
+   "frontend/src/services/omnichatService.ts"
+  ],
+  "boundaries": [
+   "Go service -> Go handler (OmniChatSpeech result type)",
+   "Go handler -> browser (new call-speech route)",
+   "Go -> Redis (call sentence keys)",
+   "Go -> websocket -> browser (two new message types)",
+   "Go -> OpenRouter (a streaming callback that was previously discarded)",
+   "browser -> Go (turn and sequence as URL parameters)"
+  ]
+ },
+ "prior_ledgers_read": [
+  "9680fbb02.json",
+  "10c4f8b92.json",
+  "a053fc7ebe0b5a28021865686c30e5392a072cc1.json",
+  "20c0f319e.json",
+  "121713a04.json",
+  "68b74a58aa486af4662388aa3852a694eda0a5e7.json",
+  "982264d473060ceb5adc796467a6096a3a8c7960.json",
+  "58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+  "390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+  "418a22c2a793fe582ae6a797feb68b8add89edda.json",
+  "2a7c8bec4e5e83369d6d143d3966db3839341afb.json",
+  "10bced22ade5619b9aff93a4a41b05d6d83eba92.json",
+  "a1712456328c6abd1111176e3de4b1197b645920.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "20 files. Boundaries: Go service->handler (new OmniChatSpeech result type); handler->browser (new GET /omnichat/conversations/:id/call-speech/:turn/:sequence); Go->Redis (call sentence keys); Go->websocket->browser (two new message types); Go->OpenRouter (a real streaming callback where the callback was previously discarded); browser->Go (turn and sequence as URL parameters)."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read 13 prior ledgers. voice-R1 (a per-sentence route behind a per-call rate limiter) is the same shape as the new route and was guarded before this review by giving it its own budget. cache-R3 (authenticatedFetch defaults to cache no-store) and pragma-R1 (the API middleware stamps Pragma/Expires) both bear on the new route's headers and agree with the private,no-store it sets. stream-R1 (cross-origin credentials) is satisfied by authenticatedFetch. call-R1-blind: control tests must pass standalone, so both new vitest tests configure every mock in their own body."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the real artifact -- the sequence of sentences she speaks -- for 16 materially different token streams, at chunk sizes 2,3,4,6,7 and 10000 (one-shot). Found R1, R2 and R3. Re-printed after the fix: short openers stand alone, Mr./J. R. stay whole, 3.5 stays one number, narration is stripped and never split, and the overlong break lands on a word."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "OmniChatCallModal's markup is unchanged; only the turn logic changed. Confirmed the two status values the new code sets, 'speaking' and 'ready', are both rendered (the pulse animation and the disabled mic button at OmniChatCallModal.tsx:649 and :749) rather than invented."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed status, every header and the body for the new route across 8 inputs: a real sentence (200 audio/wav, private no-store, nosniff, correct Content-Length), a narration-only sentence (204, no body), an expired turn (404), a path-traversal turn (404 at the router), a Redis wildcard turn (400), sequence 0, -1 and an overflowing sequence (400). Also printed GetMessageSpeech for the fresh, cached and lost-the-upsert paths: identical header shape, correct bytes and length on each."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "One new query, GetConversationVoiceOwned. Read it against the sibling it replaces: it decides ownership and voice in one statement, keeping the archived_at, is_active and owner/visibility predicates the live-call context query already used. No migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Both websocket type strings and all four payload keys grepped on both sides and matched exactly: omnichat_call_sentence and omnichat_call_sentences_done; conversation_id, turn, sequence, spoken."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The field the browser reads is the field the server sets, verified by printing both HTTP paths and by the key match above. OmniChatSpeech.Fresh is set in generateSpeech and read in the handler; the round trip is asserted in omnichat_voice_test.go."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "SpokenText runs in the splitter and again in SpeakSentence. It is idempotent and the two are separated by Redis, so this is defence across a boundary rather than drift. The narration rule itself lives in one place, narrationIsOpen."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The provider genuinely streams -- processStreamWithTelemetry calls onChunk per SSE delta -- so the call path now receives real tokens where the contract layer previously passed func(string){}. Generation is bounded at 25s (personalGenerationTimeout), comfortably inside the browser player's 45s give-up, so the server can never still be emitting sentences for a turn the browser has abandoned."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "OmniChatSpeech.Fresh crosses a boundary but is a plain Go struct field, not a hand-written decoder or column list. Traced it from generateSpeech through the singleflight result to the handler write."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Broke the reader rather than the writer: printed the handler's response for a result carrying Fresh and for one without, and confirmed the fresh path serves the fresh bytes with a matching Content-Length rather than silently falling through to storage."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixtures mint values the way production does: the sentence tests push text in small chunks the way the provider streams it rather than whole sentences, and the turn identifier in the handler probes is a real UUID because that is what uuid.NewString produces and what ValidCallTurn requires."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs pass: ordinary replies, quoted speech, ellipses, decimals, abbreviations, initials, stage directions and one-shot non-streamed replies all produce the right sentences; a real UUID turn returns audio."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile inputs are refused: a Redis wildcard turn and a path-traversal turn never reach the key builder, and the sentence route asks by number so it can never be made to synthesise client-supplied text."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundaries probed: empty pending, sequence 0, -1, and a value that overflows Atoi; a sentence longer than the store cap is truncated; a reply with no terminator at all is still spoken; a reply that is only narration produces nothing."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared with the two siblings. GetMessageSpeech validates content type and size -- the new route gets the same protection through validOmniChatSpeechAudio inside SpeakSentence, which enforces both. TranscribeCallTurn's active-call ownership check has no counterpart, but the new route grants no capability without one, because a sentence only exists in Redis if a call produced it."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The buffered contract loop is now unreachable for calls, deliberately and documented. Every other branch stays reachable: the whole-reply speech still runs when no sentence was spoken, when the run was cancelled, and on every non-call message."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Sentence and Done failures are logged with conversation_id and sequence. A cache write that fails returns before announcing, so the browser is never told to fetch something that was not stored. A fetch the browser cannot complete degrades to the whole-reply voice, which reports its own failure on screen."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Checked every generation path is wired: NewChatbotService is constructed once, in cmd/server, and the reply scheduler shares that instance, so no binary generates replies without the sentence sink. cmd/worker builds no ChatbotService."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "maxSpokenSentenceRunes (320, the splitter) and maxCallSentenceRunes (600, the store) are two bounds on the same value, kept because the store does not trust its caller and the second can never fire given the first. No other constant is duplicated."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "The shape behind R1-R3 is a splitter deciding a boundary from a length rather than from content. Grepped every other place this repository splits prose: splitDeliverableMessages cuts on blank lines, not terminators, so it carries neither the abbreviation nor the mid-word defect."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Found R4. The sentence run is started at the top of the turn to overlap synthesis with generation, while the avatar decision is made after the reply arrives."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "sentenceStream is touched only from the goroutine that runs generation: onChunk is invoked synchronously inside GenerateWithOptions, and flush/stop run after it returns. The browser player is single-threaded and guards re-entry with a pumping flag."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A turn that fails half way calls stop() and announces Done with the count actually produced, so the caller hears what was already said and no more; the user-facing error is still persisted and delivered as the message, and is not spoken over the top."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Sentences are the only thing persisted and they expire on their own after three minutes, so a caller who hangs up mid-reply leaves nothing behind. No object storage is written on the call path at all, which is one of the three latency fixes."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Two control patches built and replayed by hand. sentence-boundary.patch restores the buffer-length rule and produces three real assertion failures showing exactly the defects (\"Hey. I missed you today.\" as one sentence, \"I went to see Mr.\" split, and \"...aaa ext\" cut mid-word). video-double-voice.patch produces \"Number of calls: 1\" against a not.toHaveBeenCalled assertion. Both build cleanly with the fix reverted, so each fails as a test rather than as a compile error. Artifact re-printed after restoring."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No check, guard, hook or script was added or changed."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./..., go vet ./..., gofmt -l, tsc -b and eslint all clean after the restore. Targeted Go and vitest selectors pass. The full suites are not run until the review closes."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "R4 was found by tracing a side effect started early against a decision made later, which no instrument named. Added as E7 before this ledger was written, and named as R4's found_by."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "UNVERIFIED, and recorded as such rather than buried. The sentence splitter's output has never been through a real synthesiser or a real call: every sentence above was printed, not heard. Two things only a real call can answer -- whether a one-word clip such as \"Hey.\" sounds natural from Voicebox rather than clipped, and whether the silence between consecutive clips reads as a natural pause or as stuttering. Said to the user in the session."
+    }
+   ],
+   "findings": [
+    {
+     "id": "R1",
+     "summary": "a minimum sentence length glued every short opener to the sentence after it, so \"Hey. I missed you today.\" was one utterance and her first word waited for the whole reply -- which is the delay the feature exists to remove",
+     "found_by": "B1",
+     "fix_commit": "fd1c25e46",
+     "control": {
+      "patch": ".review/controls/sentence-boundary.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestAShortOpenerIsSpokenOnItsOwn"
+      ],
+      "observed": "expected [\"Hey.\" \"I missed you today.\"], actual [\"Hey. I missed you today.\"]"
+     }
+    },
+    {
+     "id": "R2",
+     "summary": "a full stop after an abbreviation ended a sentence, so \"I went to see Mr. Yang about the roof.\" was spoken as \"I went to see Mister.\" and then \"Yang about the roof.\" -- the length minimum hid this rather than fixing it, because it measured the buffer instead of looking at the word",
+     "found_by": "B1",
+     "fix_commit": "fd1c25e46",
+     "control": {
+      "patch": ".review/controls/sentence-boundary.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestAnAbbreviationDoesNotEndASentence"
+      ],
+      "observed": "actual [\"I went to see Mr.\" \"Yang about the roof.\"]"
+     }
+    },
+    {
+     "id": "R3",
+     "summary": "the give-up break for a clause with no terminator cut at whatever rune happened to be number 320, splitting \"extraordinary\" into \"ext\" and \"raordinary\" -- and a synthesiser handed \"raordinary\" says it",
+     "found_by": "B1",
+     "fix_commit": "fd1c25e46",
+     "control": {
+      "patch": ".review/controls/sentence-boundary.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestAnOverlongClauseBreaksOnAWholeWord"
+      ],
+      "observed": "first sentence ended \"...aaa ext\" and the second began \"raordinary thing happened.\""
+     }
+    },
+    {
+     "id": "R4",
+     "summary": "the sentence run started at the top of the turn while the choice of whether the avatar speaks the reply is made after the reply arrives, so on a video call she was heard twice -- once from the local speaker and once from the avatar's stream -- and the cancel that followed could not unsay what was already spoken",
+     "found_by": "E7",
+     "fix_commit": "fd1c25e46",
+     "control": {
+      "patch": ".review/controls/video-double-voice.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/OmniChatCallModal.test.tsx -t \"avatar is speaking\""
+      ],
+      "observed": "getCallSentenceSpeech: Number of calls: 1, against not.toHaveBeenCalled"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Same 21 files, now including the pass 1 fixes: a new boundary rule in the splitter and a new gate in the modal. Review-time code is the least reviewed code in the repository, so this pass targets it first."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Prior ledgers already read in pass 1; re-checked call-R1-blind against the two new vitest tests, both of which configure every mock in their own body and were each run alone."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the artifact again for 12 inputs chosen to stress the NEW abbreviation rule rather than the old one: \"No.\", \"NO.\", \"Yes.\", \"Ok.\", \"Hi.\", a bare capital letter, a street abbreviation, a non-breaking space, and \"No.\" mid-reply. Found R5."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The pass 1 fixes changed no HTTP behaviour: the splitter is behind the route and the modal gate is client-side. Responses unchanged from the eight printed in pass 1."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-applied to the changed return type and found the reader that no longer matched: require.Equal takes any, so an assertion still comparing against *models.OmniChatSpeechAudio was invisible to both the compiler and go vet. That is R6."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Found R7. The store fake returned the same *OmniChatSpeechSource pointer to every caller while the repository scans a fresh struct per call, and the service rewrites source.Text with its spoken form -- so the fixture differed from the producer in the one attribute the code under test mutates."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "For R5 the shape is a lookup entry that swallows a real word. The only sibling word list on this path is cleanTranscript's refusal list, which matches the whole transcript rather than a substring, and whose alternative -- letting a model's description of silence through as speech -- is worse than losing a caller who says nothing but \"silence\". Judged correct as it stands. For R7 the shape is a fake sharing a pointer production never shares: omnichat_voice_test.go is the only file in scope with a concurrent test, and it is fixed."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Ran the race detector rather than reasoning about it, which is what surfaced R6 and R7. The whole voice-service and sentence group now passes under -race."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 fixes. Nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Three more controls built and replayed by hand. no-is-a-sentence.patch puts \"no\" back on the list and produces expected [\"No.\" \"I don't think so.\"] against actual [\"No. I don't think so.\"]. stale-speech-assertion.patch restores the old comparison and fails on a type mismatch. shared-source-fixture.patch restores the shared pointer and the coalescing test fails with two DATA RACE reports. All three build cleanly reverted."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No check, guard, hook or script was added or changed."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "This is the pass where the gate actually ran rather than being asserted: build, vet, gofmt, tsc and eslint were clean in pass 1 and yet a test was broken, because require.Equal hides a type change. Targeted Go tests now run under -race and pass."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Nothing new needed. R5 came from B1, R6 from C6 and R7 from C7, all already on the list. E7, added in pass 1, is what made the modal gate legible this pass."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "UNVERIFIED, unchanged from pass 1 and repeated rather than quietly dropped: no call has been made against any of this. The splitter's output has been printed, never heard. What only a real call can answer is whether a one-word clip such as \"No.\" sounds natural from Voicebox or clipped, and whether the gaps between consecutive clips read as pauses or as stuttering -- and R5 makes one-word clips more common, not less. Said to the user in the session."
+    }
+   ],
+   "findings": [
+    {
+     "id": "R5",
+     "summary": "\"no\" was listed as an abbreviation, correctly -- it is how \"number\" is written -- so \"No.\" could never be spoken as its own sentence and the shortest possible answer on a phone call was glued to whatever followed it",
+     "found_by": "B1",
+     "fix_commit": "c0cde53b9",
+     "control": {
+      "patch": ".review/controls/no-is-a-sentence.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestNoIsASentenceRatherThanAnAbbreviation"
+      ],
+      "observed": "expected [\"No.\" \"I don't think so.\"], actual [\"No. I don't think so.\"]"
+     }
+    },
+    {
+     "id": "R6",
+     "summary": "changing the speech result type left an assertion comparing against the old one; require.Equal takes any, so build, vet and lint were all clean while the test was broken and nothing had run it",
+     "found_by": "C6",
+     "fix_commit": "69cdd3c69",
+     "control": {
+      "patch": ".review/controls/stale-speech-assertion.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestOmniChatVoiceServiceRetriesCaptureBeforeServingCachedSpeech"
+      ],
+      "observed": "Not equal: expected *models.OmniChatSpeechAudio, actual *services.OmniChatSpeech"
+     }
+    },
+    {
+     "id": "R7",
+     "summary": "the store fake handed every caller the same source pointer while the repository scans a fresh struct per call, so two concurrent requests wrote to one struct through the coalescing path and the race detector reported it against the service, which was not at fault",
+     "found_by": "C7",
+     "fix_commit": "69cdd3c69",
+     "control": {
+      "patch": ".review/controls/shared-source-fixture.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -race -run TestOmniChatVoiceServiceCoalescesConcurrentSpeechGeneration"
+      ],
+      "observed": "two DATA RACE reports at omnichat_voice.go:103 and :109, test FAIL"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Same scope. This pass targets the browser player, which pass 1 read but never ran, and the pass 2 fixes."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Prior ledgers read in pass 1. call-R1-blind re-checked against the new player tests: callSentenceSpeech.test.ts has no shared setup at all, and each test was run alone."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Re-printed nothing new. The splitter artifact was printed in passes 1 and 2 and is unchanged since R5."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Unchanged. The player is not a component and renders nothing; the modal's markup is still untouched."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Unchanged since pass 1."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Applied to my own new fixture and it caught one: the first version of the player test read Blob.text(), which jsdom does not implement, and the read threw inside the player where the catch for a refusing speaker swallowed it -- so the test reported an empty list with no sign of why. Rewritten to record blob identity."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "R8 is the swallowed-failure instrument's twin: the dropped notice reached nobody and the turn simply stopped. It now skips and continues, and a fetch that fails still degrades to the whole-reply voice, which reports itself on screen."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Found R8. Asked what happens when the websocket does the one thing the design explicitly allows it to do -- drop a notice -- and traced the player's pump through the gap rather than trusting the comment above it."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Re-applied over the pass 1 and pass 2 fixes. Nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "dropped-notice-stall.patch restores the stall and produces \"expected 'still waiting' to be true\" in 68ms. Raced against a short timer on purpose, because the defect is a hang and a test that waits out the 45-second give-up proves the same thing far more slowly."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No check, guard, hook or script was added or changed."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc, eslint and the five player tests clean; targeted Go tests still pass under -race."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Nothing new. R8 came from F2, already on the list."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "UNVERIFIED, repeated for the third pass rather than dropped. Nothing here has been heard. R5 and R8 both change what the caller hears, and neither has been through a real synthesiser or a real call."
+    }
+   ],
+   "findings": [
+    {
+     "id": "R8",
+     "summary": "the audio deliberately avoids the websocket because the hub drops messages when busy, and the comment said a dropped notice costs one sentence -- it cost every sentence after it, because the player stalled on the missing number, could never reach its terminal check, and hung the turn with her half-way through a reply until the 45-second give-up",
+     "found_by": "F2",
+     "fix_commit": "e21573a96",
+     "control": {
+      "patch": ".review/controls/dropped-notice-stall.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/omnichat/__tests__/callSentenceSpeech.test.ts -t \"skips a lost notice\""
+      ],
+      "observed": "expected 'still waiting' to be true, in 68ms"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Same scope, fourth time over it. This pass went after the wiring and the lifecycle rather than the logic, on the grounds that both had been read and neither had been traced."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Prior ledgers read in pass 1; nothing in this pass touched an area they cover that had not already been re-checked."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the artifact one final time before closing, as G1 requires. \"Hey. I missed you today. How was work?\" -> three sentences; \"No. I already told you.\" -> two; \"*she laughs* I went to see Mr. Yang about the roof. It's fine.\" -> narration stripped, abbreviation kept, two sentences."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Unchanged. Confirmed again that endCall unmounts the modal, so the microphone effect's cleanup runs, releases the graph and closes the AudioContext -- which is what actually cuts a clip that is mid-word when somebody hangs up. cancel() alone cannot: an in-flight play() has no handle to stop."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Unchanged since pass 1. Re-confirmed from the pass 1 output that the 204 carries no Content-Length and no Content-Type, which is what a 204 requires."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the new query once more. Two tables, joined on a primary key, with the same archived_at, is_active and owner/visibility predicates the live-call context query already used."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Re-matched. One constant for the silence wait, one use, and no test hardcodes the old 1400."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The 600-rune truncation in the store is unreachable, because the splitter never emits more than about 320. Kept: the store does not trust its caller, and the cost is one comparison."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Traced the wiring rather than reading it. cache is assigned at main.go:250/257/261 and hub at :197, both long before NewOmniChatCallSpeech at :757 -- a nil cache there would have made every Sentence call fail, no notice would ever be sent, and the feature would have degraded silently into the old slow path while every test still passed."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-applied over every fix from passes 1 to 3. Nothing new."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Sentences expire on their own after three minutes and nothing else is persisted on the call path. Ending a call aborts the turn, which cancels the run, and unmounting releases the audio graph."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Six controls built and every one replayed by hand, each failing as a test rather than as a compile error. Artifact printed once more after the last fix."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No check, guard, hook or script was added or changed."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./..., go vet ./..., gofmt -l, tsc -b and eslint all clean. Targeted Go tests pass under -race; 27 vitest tests across the player and the call modal pass. The full suites are held for the user, who asks to be consulted before they run."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Nothing found this pass, so nothing to add. E7 was the one instrument this review contributed."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "UNVERIFIED, and this is the fourth pass it has been recorded rather than dropped. Nothing in this change has been heard. Every sentence above was printed, not spoken. Two questions only a real call answers: whether a one-word clip such as \"No.\" or \"Hey.\" sounds natural from Voicebox or clipped, and whether the silence between consecutive clips reads as a pause or as stuttering. R1 and R5 both make one-word clips more common than they were, so this got more important during the review, not less. Said to the user in the session."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean; tsc -b clean",
+  "vet": "go vet ./... clean; gofmt -l clean",
+  "lint": "eslint clean across src/components/omnichat, src/services/omnichatService.ts and src/contexts/WebSocketContext.tsx",
+  "types": "tsc -b clean",
+  "tests": "Targeted: go test -race across the sentence splitter and the whole voice service group, pass; vitest 27 tests across callSentenceSpeech.test.ts and OmniChatCallModal.test.tsx, pass. Full suites not run -- the user asks to be consulted first."
+ }
+}
