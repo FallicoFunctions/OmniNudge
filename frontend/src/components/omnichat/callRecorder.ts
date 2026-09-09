@@ -71,6 +71,30 @@ export function browserCanRecord(): boolean {
  * released either way: a call that leaves a microphone open is a call that
  * leaves the browser's recording indicator on after it ends.
  */
+/**
+ * Says which kind of nothing was heard.
+ *
+ * A quiet room, an analyser reading silence while somebody talks, and a
+ * recorder producing no data are three different faults with one appearance,
+ * and three attempts were spent guessing between them. The numbers are ugly in
+ * a call window and worth it: they name the fault in one reading.
+ */
+export function describeSilence(peak: number, chunks: number, contextState: string): string {
+  if (contextState !== 'running') {
+    return `The microphone could not be measured (audio ${contextState}). Reload the page and try the call again.`;
+  }
+  if (chunks === 0) {
+    return 'The recorder produced no audio. Reload the page and try the call again.';
+  }
+  if (peak < SILENCE_THRESHOLD / 4) {
+    return `I heard nothing at all (peak ${peak.toFixed(4)}). Check the input device the browser is using.`;
+  }
+  if (peak < SILENCE_THRESHOLD) {
+    return `That was too quiet to make out (peak ${peak.toFixed(4)}). Try speaking a little louder.`;
+  }
+  return "I didn't catch that.";
+}
+
 export async function recordUtterance(callbacks: RecorderCallbacks): Promise<RecorderHandle> {
   if (!browserCanRecord()) {
     callbacks.onNothingHeard('This browser cannot record audio. You can type instead.');
@@ -94,6 +118,12 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
   const chunks: Blob[] = [];
   let heardSpeech = false;
   let speechStartedAt = 0;
+  // The loudest thing the microphone heard. Reported when nothing was
+  // understood, because "the room was silent" and "the analyser was reading
+  // silence while somebody talked" look identical from the outside and need
+  // completely different fixes. Three attempts were spent guessing between
+  // them.
+  let peakLevel = 0;
   let finished = false;
   // One holder, because release() closes over these before either is set and
   // a timer assigned exactly once is not a variable worth reassigning.
@@ -101,41 +131,57 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
   let frame = 0;
 
   const audioContext = new AudioContext();
+  // Created after an await, so the user gesture that opened the call may no
+  // longer be in scope -- Safari starts a context suspended in that case, and a
+  // suspended analyser reads pure silence for as long as anybody talks. That is
+  // indistinguishable from a broken microphone and was exactly the symptom:
+  // "she still could not hear me".
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume().catch(() => undefined);
+  }
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 2048;
   audioContext.createMediaStreamSource(stream).connect(analyser);
   const samples = new Float32Array(analyser.fftSize);
 
-  const release = () => {
+  // Everything except the microphone itself. The stream is released later, on
+  // the recorder's own stop event, because a MediaRecorder whose tracks have
+  // already been stopped can emit no final chunk -- which left every recording
+  // empty however long somebody spoke.
+  const releaseWatchers = () => {
     window.clearTimeout(timers.silence);
     window.clearTimeout(timers.maximum);
     cancelAnimationFrame(frame);
-    stream.getTracks().forEach((track) => track.stop());
     void audioContext.close().catch(() => undefined);
   };
 
-  const finish = (deliver: boolean) => {
+  const releaseMicrophone = () => {
+    stream.getTracks().forEach((track) => track.stop());
+  };
+
+  // Stops. It does not report: onstop is the single place that decides whether
+  // an utterance happened, so a stop can never announce one answer while the
+  // recorder announces another.
+  const finish = () => {
     if (finished) return;
     finished = true;
-    release();
-    if (recorder.state !== 'inactive') recorder.stop();
-    if (!deliver) return;
-    const spokenFor = speechStartedAt ? Date.now() - speechStartedAt : 0;
-    if (!heardSpeech || spokenFor < MIN_SPEECH_MS) {
-      callbacks.onNothingHeard("I didn't catch that.");
+    releaseWatchers();
+    if (recorder.state === 'inactive') {
+      releaseMicrophone();
+      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, audioContext.state));
       return;
     }
-    // The chunks arrive on the recorder's own stop event, so delivery waits
-    // for that rather than for this call.
+    recorder.stop();
   };
 
   recorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) chunks.push(event.data);
   };
   recorder.onstop = () => {
+    releaseMicrophone();
     const spokenFor = speechStartedAt ? Date.now() - speechStartedAt : 0;
     if (!heardSpeech || spokenFor < MIN_SPEECH_MS || chunks.length === 0) {
-      callbacks.onNothingHeard("I didn't catch that.");
+      callbacks.onNothingHeard(describeSilence(peakLevel, chunks.length, audioContext.state));
       return;
     }
     callbacks.onUtterance(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
@@ -149,6 +195,7 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
     let sum = 0;
     for (const sample of samples) sum += sample * sample;
     const level = Math.sqrt(sum / samples.length);
+    if (level > peakLevel) peakLevel = level;
 
     if (level > SILENCE_THRESHOLD) {
       if (!heardSpeech) {
@@ -156,7 +203,7 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
         speechStartedAt = Date.now();
       }
       window.clearTimeout(timers.silence);
-      timers.silence = window.setTimeout(() => finish(true), SILENCE_MS);
+      timers.silence = window.setTimeout(finish, SILENCE_MS);
     }
     frame = requestAnimationFrame(watchLevel);
   };
@@ -164,18 +211,19 @@ export async function recordUtterance(callbacks: RecorderCallbacks): Promise<Rec
   recorder.start();
   callbacks.onListening?.();
   frame = requestAnimationFrame(watchLevel);
-  timers.maximum = window.setTimeout(() => finish(true), MAX_UTTERANCE_MS);
+  timers.maximum = window.setTimeout(finish, MAX_UTTERANCE_MS);
 
   return {
-    stop: () => finish(true),
+    stop: finish,
     cancel: () => {
       if (finished) return;
       finished = true;
-      release();
+      releaseWatchers();
       // Silence the delivery handler before stopping, so cancelling never
       // reports an utterance nobody asked for.
       recorder.onstop = null;
       if (recorder.state !== 'inactive') recorder.stop();
+      releaseMicrophone();
     },
   };
 }
