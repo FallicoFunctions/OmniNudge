@@ -97,6 +97,7 @@ type OmniChatVoiceHandler struct {
 	liveVideo           liveVideoClient
 	voiceboxAvailable   bool
 	voiceCloningEnabled bool
+	transcription       omniChatCallTranscriber
 	billing             interface {
 		ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
 		CaptureOwned(context.Context, int, uuid.UUID) error
@@ -504,4 +505,93 @@ func (h *OmniChatVoiceHandler) RecordCallTurn(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// omniChatCallTranscriber turns a recording from a call into words.
+type omniChatCallTranscriber interface {
+	Configured() bool
+	Transcribe(ctx context.Context, recording []byte) (string, error)
+}
+
+// SetCallTranscription gives the handler the server-side ear.
+//
+// Without it the transcribe route reports that it is unconfigured, which is a
+// far better answer than the browser's own recognition gave: that held the
+// microphone and never replied at all.
+func (h *OmniChatVoiceHandler) SetCallTranscription(transcription omniChatCallTranscriber) *OmniChatVoiceHandler {
+	if h != nil {
+		h.transcription = transcription
+	}
+	return h
+}
+
+// maxCallUploadBytes bounds one upload before any of it is read into memory.
+// Two minutes of browser-recorded opus is well under a megabyte; this leaves
+// room for a wasteful codec without leaving room for an attack.
+const maxCallUploadBytes = 25 << 20
+
+// TranscribeCallTurn turns one recorded utterance into text.
+//
+// The browser records; the server listens. SpeechRecognition in the browser was
+// tried first and cannot be relied on -- Chromium browsers other than Chrome
+// hold the microphone and never answer, and Safari needs macOS Dictation
+// switched on -- so a call depended on a setting nobody should have to find.
+// MediaRecorder needs only the microphone permission the browser already asks
+// for when the call starts.
+func (h *OmniChatVoiceHandler) TranscribeCallTurn(c *gin.Context) {
+	callID, ok := parseUUIDParam(c, "call_id")
+	if !ok {
+		return
+	}
+	if h.transcription == nil || !h.transcription.Configured() {
+		RespondError(c, http.StatusServiceUnavailable, "Voice transcription is not configured")
+		return
+	}
+	// The call has to belong to this user, and be live. Otherwise the route is
+	// an open transcription service attached to somebody's session.
+	// GetActiveCallProviderOwned answers "is this call live and this user's"
+	// without writing anything. IncrementCallTurnOwned would answer it too and
+	// would count a turn per recording, including the ones that turn out to be
+	// silence.
+	_, _, active, err := h.data.GetActiveCallProviderOwned(c.Request.Context(), callID, c.GetInt("user_id"))
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to check the call")
+		return
+	}
+	if !active {
+		RespondError(c, http.StatusNotFound, "Active call not found")
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxCallUploadBytes)
+	file, header, err := c.Request.FormFile("audio")
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "An audio recording is required")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	if header.Size > maxCallUploadBytes {
+		RespondError(c, http.StatusRequestEntityTooLarge, "The recording is too large")
+		return
+	}
+	recording, err := io.ReadAll(io.LimitReader(file, maxCallUploadBytes))
+	if err != nil {
+		RespondError(c, http.StatusBadRequest, "The recording could not be read")
+		return
+	}
+
+	text, err := h.transcription.Transcribe(c.Request.Context(), recording)
+	if errors.Is(err, services.ErrNoSpeechHeard) {
+		// Not a failure. Somebody pressed the button and said nothing, or said
+		// it too quietly, and the call should say so rather than report a
+		// fault.
+		c.JSON(http.StatusOK, gin.H{"text": ""})
+		return
+	}
+	if err != nil {
+		zlog.Warn().Err(err).Str("call_id", callID.String()).Msg("omnichat: call transcription failed")
+		RespondError(c, http.StatusBadGateway, "The recording could not be transcribed")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"text": text})
 }

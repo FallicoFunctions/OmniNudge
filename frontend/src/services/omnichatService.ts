@@ -943,6 +943,32 @@ export const omnichatService = {
     return response.live_video_token;
   },
 
+  /**
+   * Sends one recorded utterance and gets back the words in it.
+   *
+   * The server listens, not the browser. Browser speech recognition needs a
+   * Chrome-only key or macOS Dictation switched on, so a call depended on a
+   * setting nobody should have to find; recording needs only the microphone
+   * permission the browser already asks for when the call starts.
+   *
+   * An empty string is a real answer: the recording carried no speech.
+   */
+  async transcribeCallTurn(callId: string, recording: Blob): Promise<string> {
+    const form = new FormData();
+    form.append('audio', recording, 'utterance.webm');
+    const response = await authenticatedFetch(
+      getApiUrl(`/omnichat/calls/${encodeURIComponent(callId)}/transcribe`).toString(),
+      { method: 'POST', body: form }
+    );
+    if (!response.ok) {
+      const error = new Error('Failed to transcribe the recording') as Error & { status?: number };
+      error.status = response.status;
+      throw error;
+    }
+    const body = (await response.json()) as { text?: string };
+    return (body.text ?? '').trim();
+  },
+
   async recordCallTurn(callId: string): Promise<void> {
     await api.post(`/omnichat/calls/${encodeURIComponent(callId)}/turns`);
   },

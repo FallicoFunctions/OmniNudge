@@ -10,23 +10,8 @@ import {
 } from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
 import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton';
+import { browserCanRecord, recordUtterance, type RecorderHandle } from './callRecorder';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
-
-type RecognitionResultEvent = { results: ArrayLike<{ 0: { transcript: string } }> };
-// The error carries a code, and the code is the only thing that says why this
-// attempt heard nothing. Typed here because the shape was thrown away before.
-type RecognitionErrorEvent = { error?: string };
-type BrowserRecognition = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: RecognitionResultEvent) => void) | null;
-  onerror: ((event: RecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-type RecognitionConstructor = new () => BrowserRecognition;
 
 export function isTrustedOmniChatCallUrl(value: string): boolean {
   try {
@@ -58,43 +43,6 @@ export function isTrustedOmniChatCallUrl(value: string): boolean {
   }
 }
 
-// speechRecognitionNotice turns a SpeechRecognition error code into something
-// worth reading.
-//
-// The codes are the API's own. They were being thrown away, so every failure
-// looked identical from the outside: press the button, speak, nothing happens.
-// "not-allowed" and "no-speech" need completely different things from the
-// person holding the phone.
-export function speechRecognitionNotice(code?: string): string {
-  switch (code) {
-    case 'not-allowed':
-      return 'This browser will not let the page listen. Allow microphone access for this site, then press the button again.';
-    // Not a site permission. The browser reached its speech service and was
-    // refused by it -- on macOS that is almost always Dictation being switched
-    // off, because Safari builds this on the system recogniser. Saying "allow
-    // microphone access" sends somebody to a setting that is already correct.
-    case 'service-not-allowed':
-      return 'The browser could not use its speech service. On a Mac, turn on Dictation in System Settings > Keyboard, then press the button again.';
-    case 'no-speech':
-      return "I didn't hear anything. Hold the button while you speak, or type below.";
-    case 'audio-capture':
-      return 'No microphone was available to record from. Check which input the browser is using.';
-    case 'network':
-      return 'Speech recognition needs a network service this browser could not reach. Chrome and Safari are the reliable ones; you can also type below.';
-    case 'aborted':
-      return '';
-    default:
-      return code
-        ? `Speech recognition stopped: ${code}. You can type below instead.`
-        : 'Speech recognition stopped before it heard anything. You can type below instead.';
-  }
-}
-
-// listenTimeoutMs bounds one attempt to hear something. Long enough for
-// somebody to gather a sentence, short enough that a recogniser which will
-// never answer says so while they are still looking at the screen.
-const listenTimeoutMs = 12_000;
-
 export default function OmniChatCallModal({
   persona,
   conversationId,
@@ -111,7 +59,6 @@ export default function OmniChatCallModal({
   onPaymentRequired?: () => void;
 }) {
   const [listeningNotice, setListeningNotice] = useState('');
-  const listenTimeoutRef = useRef<number | undefined>(undefined);
   // A call listens by itself. Pressing the phone is what starts it, and she
   // keeps listening between turns -- pressing a second button to be heard is
   // not how a phone call works.
@@ -127,7 +74,7 @@ export default function OmniChatCallModal({
   const [manualText, setManualText] = useState('');
   const [liveVideoURL, setLiveVideoURL] = useState('');
   const [liveVideoConnected, setLiveVideoConnected] = useState(false);
-  const recognitionRef = useRef<BrowserRecognition | null>(null);
+  const recorderRef = useRef<RecorderHandle | null>(null);
   const sessionRef = useRef<OmniChatCallSession | null>(null);
   const liveKitRoomRef = useRef<Room | null>(null);
   const liveVideoTokenRef = useRef('');
@@ -199,7 +146,7 @@ export default function OmniChatCallModal({
         closedRef.current = true;
         callEpochRef.current += 1;
       }
-      recognitionRef.current?.stop();
+      recorderRef.current?.cancel();
       turnAbortRef.current?.abort(
         new DOMException('The call ended before the AI turn completed', 'AbortError')
       );
@@ -384,80 +331,63 @@ export default function OmniChatCallModal({
 
   const startListeningRef = useRef<() => void>(() => {});
   const startListening = () => {
-    const browserWindow = window as Window & {
-      SpeechRecognition?: RecognitionConstructor;
-      webkitSpeechRecognition?: RecognitionConstructor;
-    };
-    const Recognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
-    if (!Recognition) {
+    if (!browserCanRecord()) {
       autoListenBlockedRef.current = true;
-      setListeningNotice(
-        'This browser has no speech recognition. Type below, or use Chrome or Safari to talk.'
-      );
+      setListeningNotice('This browser cannot record audio. You can type below instead.');
       setStatus('ready');
       return;
     }
-    recognitionRef.current?.stop();
-    window.clearTimeout(listenTimeoutRef.current);
-    const recognition = new Recognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = navigator.language || 'en-US';
-    // Whether this attempt produced anything. Recognition can end cleanly
-    // having heard nothing, which is the case that used to leave the call
-    // sitting silently in 'ready' with no explanation at all.
-    let heardSomething = false;
-    recognition.onresult = (event) => {
-      const text = event.results[0]?.[0]?.transcript || '';
-      if (!text.trim()) return;
-      heardSomething = true;
-      autoListenBlockedRef.current = false;
-      setListeningNotice('');
-      void sendTranscript(text);
-    };
-    // The error code is the only thing that says why, and it used to be
-    // discarded -- so a call that heard nothing looked exactly like a call
-    // that was denied the microphone, and both looked like nothing at all.
-    recognition.onerror = (event: RecognitionErrorEvent) => {
-      heardSomething = true;
-      autoListenBlockedRef.current = true;
-      setListeningNotice(speechRecognitionNotice(event.error));
-      setStatus('ready');
-    };
-    recognition.onend = () => {
-      window.clearTimeout(listenTimeoutRef.current);
-      if (!heardSomething) {
-        autoListenBlockedRef.current = true;
-        setListeningNotice("I didn't catch anything. Press the microphone to try again, or type below.");
-      }
-      setStatus((current) => (current === 'listening' ? 'ready' : current));
-    };
-    recognitionRef.current = recognition;
+    recorderRef.current?.cancel();
     setListeningNotice('');
     setStatus('listening');
-    recognition.start();
-
-    // Recognition can start and then never finish: no result, no error, no
-    // end. Safari does it when the system recogniser will not serve the page,
-    // and the call sits on "Listening..." for as long as somebody is willing
-    // to wait, which is the worst version of this -- every other failure at
-    // least stops. Nothing else bounds it, so this does.
-    window.clearTimeout(listenTimeoutRef.current);
-    listenTimeoutRef.current = window.setTimeout(() => {
-      if (heardSomething || closedRef.current) return;
-      heardSomething = true;
-      autoListenBlockedRef.current = true;
-      try {
-        recognition.stop();
-      } catch {
-        // Already stopped, or never really started. Either way, say so below.
+    const callEpoch = callEpochRef.current;
+    void recordUtterance({
+      onListening: () => {
+        if (closedRef.current || callEpochRef.current !== callEpoch) return;
+        setStatus('listening');
+      },
+      onNothingHeard: (reason) => {
+        if (closedRef.current || callEpochRef.current !== callEpoch) return;
+        // One quiet attempt should not stop the call listening; a broken one
+        // should. Anything beyond "I didn't catch that" is the second kind.
+        autoListenBlockedRef.current = !reason.startsWith("I didn't catch");
+        setListeningNotice(reason);
+        setStatus('ready');
+      },
+      onUtterance: (recording) => {
+        if (closedRef.current || callEpochRef.current !== callEpoch) return;
+        const activeSession = sessionRef.current;
+        if (!activeSession) return;
+        setStatus('thinking');
+        void omnichatService
+          .transcribeCallTurn(activeSession.id, recording)
+          .then((text) => {
+            if (closedRef.current || callEpochRef.current !== callEpoch) return;
+            if (!text) {
+              setListeningNotice("I didn't catch that.");
+              setStatus('ready');
+              return;
+            }
+            autoListenBlockedRef.current = false;
+            setListeningNotice('');
+            void sendTranscript(text);
+          })
+          .catch(() => {
+            if (closedRef.current || callEpochRef.current !== callEpoch) return;
+            autoListenBlockedRef.current = true;
+            setListeningNotice('That could not be transcribed. You can type below instead.');
+            setStatus('ready');
+          });
+      },
+    }).then((handle) => {
+      if (closedRef.current || callEpochRef.current !== callEpoch) {
+        handle.cancel();
+        return;
       }
-      setListeningNotice(
-        'Speech recognition started but never returned anything. On a Mac, turn on Dictation in System Settings > Keyboard. You can type below in the meantime.'
-      );
-      setStatus('ready');
-    }, listenTimeoutMs);
+      recorderRef.current = handle;
+    });
   };
+
   startListeningRef.current = startListening;
 
   // Pressing the phone starts the call, and the call starts listening. Nothing
@@ -480,8 +410,7 @@ export default function OmniChatCallModal({
     if (closedRef.current) return;
     closedRef.current = true;
     callEpochRef.current += 1;
-    window.clearTimeout(listenTimeoutRef.current);
-    recognitionRef.current?.stop();
+    recorderRef.current?.cancel();
     turnAbortRef.current?.abort(
       new DOMException('The call ended before the AI turn completed', 'AbortError')
     );
@@ -625,8 +554,7 @@ export default function OmniChatCallModal({
                   // restart.
                   if (handsFree) {
                     setHandsFree(false);
-                    window.clearTimeout(listenTimeoutRef.current);
-                    recognitionRef.current?.stop();
+                    recorderRef.current?.cancel();
                     return;
                   }
                   autoListenBlockedRef.current = false;

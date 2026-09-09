@@ -426,32 +426,60 @@ describe('OmniChatCallModal', () => {
   // silently until somebody found and pressed a second control. Three call
   // sessions in the database, every one turn_count 0, and no user message ever
   // written.
+  // Pressing the phone is what starts a call. Nothing else should have to be
+  // pressed to be heard.
+  //
+  // Reported as "the call starts and I speak but she is not hearing me": the
+  // only caller of startListening was the microphone button, so a call sat
+  // silently until somebody found and pressed a second control. Three call
+  // sessions in the database, every one turn_count 0, and no user message ever
+  // written.
   describe('hands free', () => {
-    class FakeRecognition {
-      static instances: FakeRecognition[] = [];
-      continuous = false;
-      interimResults = false;
-      lang = '';
-      onresult: ((event: unknown) => void) | null = null;
-      onerror: ((event: unknown) => void) | null = null;
-      onend: (() => void) | null = null;
-      started = false;
+    const getUserMedia = vi.fn();
+
+    class FakeRecorder {
+      static instances: FakeRecorder[] = [];
+      static isTypeSupported = () => true;
+      state = 'inactive';
+      mimeType = 'audio/webm';
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
       constructor() {
-        FakeRecognition.instances.push(this);
+        FakeRecorder.instances.push(this);
       }
       start() {
-        this.started = true;
+        this.state = 'recording';
       }
-      stop() {}
+      stop() {
+        this.state = 'inactive';
+      }
     }
 
     beforeEach(() => {
-      FakeRecognition.instances = [];
-      vi.stubGlobal('SpeechRecognition', FakeRecognition);
+      FakeRecorder.instances = [];
+      getUserMedia.mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+      vi.stubGlobal('MediaRecorder', FakeRecorder);
+      vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia } });
+      vi.stubGlobal(
+        'AudioContext',
+        class {
+          createAnalyser() {
+            return { fftSize: 2048, getFloatTimeDomainData: () => {} };
+          }
+          createMediaStreamSource() {
+            return { connect: () => {} };
+          }
+          close() {
+            return Promise.resolve();
+          }
+        }
+      );
+      vi.stubGlobal('requestAnimationFrame', () => 0);
+      vi.stubGlobal('cancelAnimationFrame', () => {});
     });
     afterEach(() => vi.unstubAllGlobals());
 
-    it('starts listening once the call connects, with nothing else pressed', async () => {
+    it('opens the microphone once the call connects, with nothing else pressed', async () => {
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);
       const view = render(
         <OmniChatCallModal
@@ -464,16 +492,16 @@ describe('OmniChatCallModal', () => {
       );
 
       await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
-      await waitFor(() => expect(FakeRecognition.instances.length).toBeGreaterThan(0), {
-        timeout: 3000,
-      });
-      expect(FakeRecognition.instances[0].started).toBe(true);
+      await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
+      expect(FakeRecorder.instances.length).toBeGreaterThan(0);
       view.unmount();
     });
 
-    // A recogniser that ends the instant it starts must not be restarted the
-    // instant it ends. That is a hot loop wearing the costume of a feature.
-    it('does not restart a listener that failed', async () => {
+    // A browser that cannot record says so instead of listening forever. This
+    // is the whole complaint the recorder replaced: a call that holds the
+    // microphone and never answers.
+    it('says so when the browser cannot record at all', async () => {
+      vi.stubGlobal('MediaRecorder', undefined);
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);
       const view = render(
         <OmniChatCallModal
@@ -485,16 +513,14 @@ describe('OmniChatCallModal', () => {
         />
       );
 
-      await waitFor(() => expect(FakeRecognition.instances.length).toBe(1), { timeout: 3000 });
-      await act(async () => {
-        FakeRecognition.instances[0].onend?.();
-      });
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      expect(FakeRecognition.instances.length).toBe(1);
-      expect(screen.getByTestId('omnichat-call-listening-notice')).toHaveTextContent(
-        /didn't catch anything/i
+      await waitFor(
+        () =>
+          expect(screen.getByTestId('omnichat-call-listening-notice')).toHaveTextContent(
+            /cannot record audio/i
+          ),
+        { timeout: 3000 }
       );
+      expect(getUserMedia).not.toHaveBeenCalled();
       view.unmount();
     });
   });

@@ -872,7 +872,13 @@ func main() {
 		omniChatVoiceRepo, omniChatVoiceService, voiceStorage,
 		liveVideoClient,
 	).ConfigureVoiceCatalog(voiceboxAvailable, cfg.OmniChatVoice.VoiceCloningEnabled).
-		SetBilling(omniChatBilling)
+		SetBilling(omniChatBilling).
+		// The server listens, not the browser. Browser speech recognition needs
+		// a Chrome-only key or macOS Dictation, so a call depended on a setting
+		// nobody should have to find; this needs only the microphone permission
+		// the browser already asks for.
+		SetCallTranscription(services.NewOmniChatCallTranscription(
+			openrouterClient, cfg.OpenRouter.TranscriptionModel))
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	adminOmniChatNurseryHandler := handlers.NewAdminOmniChatNurseryHandler(botPersonaRepo)
@@ -1554,6 +1560,7 @@ func main() {
 			protected.DELETE("/omnichat/calls/:call_id", omniChatVoiceHandler.EndCall)
 			protected.POST("/omnichat/calls/:call_id/token", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.RefreshCallToken)
 			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
+			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)

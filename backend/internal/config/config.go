@@ -101,6 +101,9 @@ type OpenRouterConfig struct {
 	// It has to be a model that accepts images; a text-only one refuses every
 	// render, which fails closed and is at least loud.
 	ImageReviewModel string // OMNICHAT_MODEL_IMAGE_REVIEW
+	// TranscriptionModel turns a caller's speech into text. Gemini takes audio
+	// as an input part, so the provider that writes her replies also listens.
+	TranscriptionModel string // OPENROUTER_TRANSCRIPTION_MODEL
 
 	StandardFallback  string // OMNICHAT_MODEL_STANDARD_FALLBACK
 	PlusModel         string // OMNICHAT_MODEL_PLUS_PRIMARY
@@ -471,13 +474,17 @@ func Load() (*Config, error) {
 			// used to be the paid upgrade -- passes 8. There was never a quality
 			// argument for the ladder. 3.5-flash-lite is the one that also holds
 			// the extraction distinctions, at a third of Sonnet's input price.
-			StandardModel:     getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.5-flash-lite"),
-			ExtractionModel:   getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3.5-flash-lite"),
-			ImageReviewModel:  getEnv("OMNICHAT_MODEL_IMAGE_REVIEW", "google/gemini-3.5-flash-lite"),
-			StandardFallback:  getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "google/gemini-3-flash-preview"),
-			PlusModel:         getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "google/gemini-3.5-flash-lite"),
-			PremiumQuickModel: getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "google/gemini-3.5-flash-lite"),
-			PremiumDeepModel:  getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "google/gemini-3.5-flash-lite"),
+			StandardModel:   getEnv("OMNICHAT_MODEL_STANDARD_PRIMARY", "google/gemini-3.5-flash-lite"),
+			ExtractionModel: getEnv("OMNICHAT_MODEL_EXTRACTION", "google/gemini-3.5-flash-lite"),
+			// Speech to text for a call. The same provider that writes her
+			// replies: Gemini accepts audio as an input part, so this needs no
+			// second key and no second account.
+			TranscriptionModel: getEnv("OPENROUTER_TRANSCRIPTION_MODEL", "google/gemini-3-flash-preview"),
+			ImageReviewModel:   getEnv("OMNICHAT_MODEL_IMAGE_REVIEW", "google/gemini-3.5-flash-lite"),
+			StandardFallback:   getEnv("OMNICHAT_MODEL_STANDARD_FALLBACK", "google/gemini-3-flash-preview"),
+			PlusModel:          getEnv("OMNICHAT_MODEL_PLUS_PRIMARY", "google/gemini-3.5-flash-lite"),
+			PremiumQuickModel:  getEnv("OMNICHAT_MODEL_PREMIUM_QUICK_PRIMARY", "google/gemini-3.5-flash-lite"),
+			PremiumDeepModel:   getEnv("OMNICHAT_MODEL_PREMIUM_DEEP_PRIMARY", "google/gemini-3.5-flash-lite"),
 		},
 		OmniChatMedia: OmniChatMediaConfig{
 			Provider:                    getEnv("OMNICHAT_MEDIA_PROVIDER", "runpod"),
