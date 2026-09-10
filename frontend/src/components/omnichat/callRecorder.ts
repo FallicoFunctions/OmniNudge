@@ -16,15 +16,18 @@ const SILENCE_THRESHOLD = 0.012;
 /**
  * Silence this long ends an utterance.
  *
- * This is the first thing in the reply chain, and it is pure waiting: nothing
- * starts until it expires. At 1400 ms it was a fifth of the delay before she
- * said a word.
+ * It is the first thing in the reply chain, and it is pure waiting: nothing
+ * starts until it expires. So it was cut from 1400 ms to 700 -- and on the
+ * next real call it cut somebody off mid-sentence. "I have to play it to make
+ * sure t" went to her as a whole turn, she asked whether he had frozen, and
+ * the rest of his sentence arrived as the next turn.
  *
- * 700 ms is where endpointing sits on the phone systems that feel live. Below
- * about 600 ms it starts cutting people off between clauses, which costs a whole
- * extra turn and feels far worse than the wait it saved.
+ * A pause to find the next word is longer than a phone system's endpointing
+ * assumes, and a sentence cut in half costs a whole extra turn -- far more than
+ * the fraction of a second a shorter wait saves. 1100 ms leaves room to think
+ * and still ends the turn well before 1400 did.
  */
-const SILENCE_MS = 700;
+const SILENCE_MS = 1100;
 /** Nobody is allowed to hold the line open forever. */
 const MAX_UTTERANCE_MS = 30_000;
 /** Below this there is no utterance, only a button press. */
