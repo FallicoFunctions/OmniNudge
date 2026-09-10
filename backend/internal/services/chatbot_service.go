@@ -187,6 +187,44 @@ type omniChatCallStateReader interface {
 	ConversationIsOnACall(ctx context.Context, conversationID int) bool
 }
 
+// omniChatGenerationCostReader is how a live turn learns what it cost.
+//
+// The client already accumulates content-free usage totals, and the log event
+// that wraps every generation is deliberately blind -- putting cost in there
+// would let a blind bake-off infer which model it had been routed to, because
+// price is a very good fingerprint of a model. So a call turn reads the totals
+// here instead, where the conversation is known and no bake-off is running.
+type omniChatGenerationCostReader interface {
+	TelemetrySnapshot() openrouter.GenerationTelemetry
+}
+
+// logCallTurnCost records what one turn of a phone call cost.
+//
+// A call bills by the minute, not by the request, so the question that decides
+// whether the feature pays for itself is what a minute of talking costs
+// against what a minute sells for. Nothing on the live path measured that: the
+// usage was collected on every generation and only the bake-off ever read it,
+// which left the cost of a call a matter of arithmetic and assumption.
+//
+// Paired with the transcription usage line, these two are the whole paid cost
+// of a turn -- speech synthesis is self-hosted and is charged in GPU time
+// rather than per request.
+func logCallTurnCost(conversationID int, spent openrouter.GenerationTelemetry) {
+	if spent.UsageSamples <= 0 {
+		return
+	}
+	event := zlog.Info().
+		Str("operation", "call_turn").
+		Int("conversation_id", conversationID).
+		Int64("prompt_tokens", spent.PromptTokens).
+		Int64("cached_tokens", spent.CachedTokens).
+		Int64("completion_tokens", spent.CompletionTokens)
+	if spent.CostSamples > 0 {
+		event = event.Float64("cost_usd", spent.CostUSD)
+	}
+	event.Msg("omnichat: call turn usage")
+}
+
 // omniChatCallSpeaker is handed each sentence of a call reply as it finishes.
 //
 // Nothing here synthesises. The sentence is stored where the browser can ask
@@ -634,7 +672,21 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	if onACall {
 		audience = append(audience, Heard)
 	}
+
+	// Read before and after, and subtract. The totals are cumulative for the
+	// whole client, so only the difference belongs to this turn.
+	costReader, costIsReadable := completion.(omniChatGenerationCostReader)
+	costIsReadable = costIsReadable && onACall
+	var costBefore openrouter.GenerationTelemetry
+	if costIsReadable {
+		costBefore = costReader.TelemetrySnapshot()
+	}
+
 	fullText, genErr := generatePersonaCompletionWithClientAndSceneState(chatCtx, completion, persona, messages, sceneState, streamTokens, audience...)
+
+	if costIsReadable {
+		logCallTurnCost(conversationID, subtractGenerationTelemetry(costReader.TelemetrySnapshot(), costBefore))
+	}
 	if genErr != nil {
 		// The caller has heard part of a reply that is not going to finish.
 		// Saying the rest of it now, out of a failed turn, is worse than

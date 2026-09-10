@@ -242,6 +242,7 @@ type GenerationTelemetry struct {
 	PromptTokens        int64
 	CompletionTokens    int64
 	ReasoningTokens     int64
+	CachedTokens        int64
 	CostUSD             float64
 	UsageSamples        int
 	CostSamples         int
@@ -254,6 +255,7 @@ func (t *GenerationTelemetry) add(other GenerationTelemetry) {
 	t.TotalAttemptLatency += other.TotalAttemptLatency
 	t.RetryBackoff += other.RetryBackoff
 	t.PromptTokens += other.PromptTokens
+	t.CachedTokens += other.CachedTokens
 	t.CompletionTokens += other.CompletionTokens
 	t.ReasoningTokens += other.ReasoningTokens
 	t.CostUSD += other.CostUSD
@@ -352,14 +354,29 @@ type streamChunk struct {
 	Error *struct {
 		Code json.RawMessage `json:"code"`
 	} `json:"error"`
-	Usage *struct {
-		PromptTokens      int64 `json:"prompt_tokens"`
-		CompletionTokens  int64 `json:"completion_tokens"`
-		CompletionDetails struct {
-			ReasoningTokens int64 `json:"reasoning_tokens"`
-		} `json:"completion_tokens_details"`
-		Cost *float64 `json:"cost"`
-	} `json:"usage"`
+	Usage *usageReport `json:"usage"`
+}
+
+// usageReport is what OpenRouter says a generation cost.
+//
+// Shared with the transcription path, which is a chat completion whose content
+// happens to be audio and which reports usage the same way.
+//
+// CachedTokens is carried because it is the one number that says whether
+// prompt caching is doing anything. Nothing sets a cache breakpoint today, so
+// it should read zero; when that changes, this is how it will be confirmed
+// rather than assumed.
+type usageReport struct {
+	PromptTokens     int64 `json:"prompt_tokens"`
+	CompletionTokens int64 `json:"completion_tokens"`
+	PromptDetails    struct {
+		CachedTokens int64 `json:"cached_tokens"`
+		AudioTokens  int64 `json:"audio_tokens"`
+	} `json:"prompt_tokens_details"`
+	CompletionDetails struct {
+		ReasoningTokens int64 `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+	Cost *float64 `json:"cost"`
 }
 
 // streamMetadata contains only provider routing identifiers. It deliberately
@@ -727,6 +744,7 @@ func processStreamWithTelemetry(body io.ReadCloser, onChunk StreamCallback) (str
 			telemetry.PromptTokens += chunk.Usage.PromptTokens
 			telemetry.CompletionTokens += chunk.Usage.CompletionTokens
 			telemetry.ReasoningTokens += chunk.Usage.CompletionDetails.ReasoningTokens
+			telemetry.CachedTokens += chunk.Usage.PromptDetails.CachedTokens
 			telemetry.UsageSamples++
 			if chunk.Usage.Cost != nil {
 				telemetry.CostUSD += *chunk.Usage.Cost

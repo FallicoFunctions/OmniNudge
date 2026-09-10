@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	zlog "github.com/rs/zerolog/log"
 )
 
 // Turning speech into text with a model we already pay for.
@@ -136,9 +138,31 @@ func (c *Client) Transcribe(ctx context.Context, model string, audio []byte, for
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage *usageReport `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		return "", fmt.Errorf("openrouter: decode transcription response: %w", err)
+	}
+	// What the ear costs.
+	//
+	// This is one of the two paid calls in a phone-call turn and it was the
+	// invisible one: nothing decoded usage here at all, so the cost of
+	// listening to somebody could not be measured, only guessed at. Logged
+	// rather than accumulated, because unlike the completion path this client
+	// method has exactly one caller and no bake-off to keep blind.
+	if decoded.Usage != nil {
+		event := zlog.Info().
+			Str("operation", "call_transcription").
+			Int("audio_bytes", len(audio)).
+			Int64("prompt_tokens", decoded.Usage.PromptTokens).
+			Int64("completion_tokens", decoded.Usage.CompletionTokens).
+			// The audio is nearly all of the prompt here, so this separates
+			// what listening costs from what the instruction costs.
+			Int64("audio_tokens", decoded.Usage.PromptDetails.AudioTokens)
+		if decoded.Usage.Cost != nil {
+			event = event.Float64("cost_usd", *decoded.Usage.Cost)
+		}
+		event.Msg("openrouter: transcription usage")
 	}
 	if len(decoded.Choices) == 0 {
 		return "", ErrTranscriptionEmpty

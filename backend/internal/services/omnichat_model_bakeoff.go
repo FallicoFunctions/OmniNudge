@@ -1093,6 +1093,7 @@ func subtractGenerationTelemetry(after, before openrouter.GenerationTelemetry) o
 		PromptTokens:        after.PromptTokens - before.PromptTokens,
 		CompletionTokens:    after.CompletionTokens - before.CompletionTokens,
 		ReasoningTokens:     after.ReasoningTokens - before.ReasoningTokens,
+		CachedTokens:        after.CachedTokens - before.CachedTokens,
 		CostUSD:             after.CostUSD - before.CostUSD,
 		UsageSamples:        after.UsageSamples - before.UsageSamples,
 		CostSamples:         after.CostSamples - before.CostSamples,
