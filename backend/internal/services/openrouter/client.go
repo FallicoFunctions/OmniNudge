@@ -689,7 +689,10 @@ func (c *Client) TelemetrySnapshot() GenerationTelemetry {
 
 func validReasoningEffort(effort string) bool {
 	switch effort {
-	case "", "low", "medium", "high", "xhigh", "max":
+	// minimal is the floor Gemini 3 routes accept for thinking; there is no
+	// "off". Verified against the live call model before it was allowed here,
+	// because a value the provider rejects fails every request that carries it.
+	case "", "minimal", "low", "medium", "high", "xhigh", "max":
 		return true
 	default:
 		return false

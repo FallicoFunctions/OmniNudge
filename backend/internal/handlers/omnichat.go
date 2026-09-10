@@ -778,7 +778,16 @@ func (h *OmniChatHandler) SendMessage(c *gin.Context) {
 	}
 
 	leaseSettled = true
-	h.replies.Schedule(userID, conversationID, services.OmniChatSettleWindow, settleLease)
+	// The settle window lets somebody finish typing a burst before she reads
+	// it. On a call there is no burst: a transcript is one whole turn, and the
+	// window was two seconds of silence added to every reply -- measured on a
+	// real call as the gap between the message being accepted and the model
+	// being asked.
+	settle := services.OmniChatSettleWindow
+	if h.chatbotService.ConversationIsOnACall(c.Request.Context(), conversationID) {
+		settle = 0
+	}
+	h.replies.Schedule(userID, conversationID, settle, settleLease)
 
 	c.JSON(http.StatusAccepted, accepted)
 }

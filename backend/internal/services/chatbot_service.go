@@ -231,7 +231,11 @@ func logCallTurnCost(conversationID int, spent openrouter.GenerationTelemetry) {
 		Int("conversation_id", conversationID).
 		Int64("prompt_tokens", spent.PromptTokens).
 		Int64("cached_tokens", spent.CachedTokens).
-		Int64("completion_tokens", spent.CompletionTokens)
+		Int64("completion_tokens", spent.CompletionTokens).
+		// Counted inside completion_tokens, and on a call it is most of them:
+		// a spoken reply of thirty words arrived with four hundred completion
+		// tokens behind it, the rest thinking nobody hears.
+		Int64("reasoning_tokens", spent.ReasoningTokens)
 	if spent.CostSamples > 0 {
 		event = event.Float64("cost_usd", spent.CostUSD)
 	}
@@ -267,6 +271,13 @@ func (s *ChatbotService) SetCallState(calls omniChatCallStateReader) *ChatbotSer
 		s.calls = calls
 	}
 	return s
+}
+
+// ConversationIsOnACall reports whether a reply to this conversation will be
+// heard rather than read, for callers outside this package that have to
+// decide how long to wait before asking for one.
+func (s *ChatbotService) ConversationIsOnACall(ctx context.Context, conversationID int) bool {
+	return s.onACall(ctx, conversationID)
 }
 
 // onACall reports whether this turn is spoken aloud.

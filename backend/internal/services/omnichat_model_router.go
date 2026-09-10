@@ -365,7 +365,7 @@ func (c *profileChatCompletionClient) GenerateWithOptions(ctx context.Context, m
 	// a parameter it does not implement. Verified by hand against the models
 	// named here; anything else gets nothing, which is what it got before.
 	if omniChatProviderAcceptsReasoningEffort(c.profile.ModelKey) {
-		options.ReasoningEffort = string(c.profile.ReasoningEffort)
+		options.ReasoningEffort = reasoningEffortNoHigherThan(string(c.profile.ReasoningEffort), options.ReasoningEffort)
 	} else {
 		options.ReasoningEffort = ""
 	}
@@ -383,6 +383,26 @@ func (c *profileChatCompletionClient) GenerateWithOptions(ctx context.Context, m
 // upstream error, never a completed draft. Completed drafts still travel
 // through the universal hygiene contract, where a corrective retry remains
 // necessary to preserve the character's instructions.
+// reasoningEffortRank orders the efforts a profile can carry.
+var reasoningEffortRank = map[string]int{"minimal": 0, "low": 1, "medium": 2, "high": 3, "xhigh": 4, "max": 5}
+
+// reasoningEffortNoHigherThan lets a caller ask for less thinking than the
+// profile buys, and never more.
+//
+// A tier's effort is a ceiling it paid for, not a floor it is owed. A phone
+// call asks for the least there is, because on a call thinking is not heard
+// as depth -- it is heard as silence before she answers. A caller cannot use
+// this to raise a free profile to a paid one's effort, and a profile that
+// carries no effort at all is not given one.
+func reasoningEffortNoHigherThan(ceiling, requested string) string {
+	want, wanted := reasoningEffortRank[strings.ToLower(strings.TrimSpace(requested))]
+	have, limited := reasoningEffortRank[ceiling]
+	if wanted && limited && want < have {
+		return strings.ToLower(strings.TrimSpace(requested))
+	}
+	return ceiling
+}
+
 type fallbackChatCompletionClient struct {
 	primary  chatCompletionClient
 	fallback chatCompletionClient

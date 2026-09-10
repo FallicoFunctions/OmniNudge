@@ -516,7 +516,15 @@ func generatePersonaCompletionWithClientAndSceneState(
 		// with no ceiling on its length. Measured on a real call it pushed
 		// generation from about 1.8 seconds to 3.4 -- the caller waited longer
 		// for a reply that was longer than the spoken register asks for.
-		options := openrouter.GenerationOptions{}
+		// The least thinking the provider offers, whatever the tier buys.
+		//
+		// A spoken reply of thirty words arrived with three to four hundred
+		// completion tokens behind it on a real call, and the raw model gives
+		// the same kind of reply in under a second when it is not asked to
+		// think. Whatever is spent before the first token is silence the caller
+		// sits through. The profile wrapper lowers, never raises, so this
+		// cannot lift a free profile above what it pays for.
+		options := openrouter.GenerationOptions{ReasoningEffort: "minimal"}
 		if personalMode {
 			options.MaxTokens = personalConversationMaxTokens
 		}
