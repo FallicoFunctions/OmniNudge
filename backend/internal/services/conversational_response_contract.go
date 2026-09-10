@@ -509,7 +509,24 @@ func generatePersonaCompletionWithClientAndSceneState(
 	// that repeats a sentence the caller already heard is worse than the error
 	// a failed turn shows today.
 	if len(audience) > 0 && audience[0] == Heard {
-		streamed, err := completion.Generate(generationCtx, messages, onChunk)
+		// The same output bound the buffered path applies.
+		//
+		// Streaming here used to call Generate directly, which sends no
+		// options at all, so a spoken reply was the one reply in the product
+		// with no ceiling on its length. Measured on a real call it pushed
+		// generation from about 1.8 seconds to 3.4 -- the caller waited longer
+		// for a reply that was longer than the spoken register asks for.
+		options := openrouter.GenerationOptions{}
+		if personalMode {
+			options.MaxTokens = personalConversationMaxTokens
+		}
+		var streamed string
+		var err error
+		if optioned, ok := completion.(generationOptionsClient); ok {
+			streamed, err = optioned.GenerateWithOptions(generationCtx, messages, onChunk, options)
+		} else {
+			streamed, err = completion.Generate(generationCtx, messages, onChunk)
+		}
 		if err != nil {
 			return "", err
 		}

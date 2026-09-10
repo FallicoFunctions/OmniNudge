@@ -707,6 +707,15 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	// Read before and after, and subtract. The totals are cumulative for the
 	// whole client, so only the difference belongs to this turn.
 	costReader, costIsReadable := completion.(omniChatGenerationCostReader)
+	if onACall && !costIsReadable {
+		// Said out loud rather than swallowed. A snapshot this cannot read
+		// produces no cost line at all, and silence here reads exactly like a
+		// call that cost nothing -- which is how the first call after cost
+		// logging shipped came back with no completion cost while the
+		// transcription line beside it worked.
+		zlog.Warn().Int("conversation_id", conversationID).
+			Msg("omnichat: the completion client cannot report usage; call cost will not be logged")
+	}
 	costIsReadable = costIsReadable && onACall
 	var costBefore openrouter.GenerationTelemetry
 	if costIsReadable {

@@ -388,6 +388,33 @@ type fallbackChatCompletionClient struct {
 	fallback chatCompletionClient
 }
 
+// TelemetrySnapshot forwards what the client underneath has counted.
+//
+// Without this the wrapper hides it. A call turn asks the client it was handed
+// for a usage snapshot, and a type assertion that does not match returns
+// nothing at all rather than failing -- so the first real call after cost
+// logging shipped produced no cost line, silently, while the transcription
+// line beside it worked.
+func (c *fallbackChatCompletionClient) TelemetrySnapshot() openrouter.GenerationTelemetry {
+	return chatCompletionTelemetry(c.primary)
+}
+
+func (c *profileChatCompletionClient) TelemetrySnapshot() openrouter.GenerationTelemetry {
+	return chatCompletionTelemetry(c.completion)
+}
+
+// chatCompletionTelemetry reads usage through however many wrappers are in the
+// way.
+func chatCompletionTelemetry(client chatCompletionClient) openrouter.GenerationTelemetry {
+	reader, ok := client.(interface {
+		TelemetrySnapshot() openrouter.GenerationTelemetry
+	})
+	if !ok {
+		return openrouter.GenerationTelemetry{}
+	}
+	return reader.TelemetrySnapshot()
+}
+
 func (c *fallbackChatCompletionClient) Generate(ctx context.Context, messages []openrouter.Message, onChunk openrouter.StreamCallback) (string, error) {
 	return c.generate(ctx, messages, onChunk, openrouter.GenerationOptions{}, false)
 }
