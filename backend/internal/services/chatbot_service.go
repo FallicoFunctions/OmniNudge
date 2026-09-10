@@ -38,6 +38,19 @@ import (
 // at any size -- retrieval over the stored transcript.
 const maxHistoryMessages = 200
 
+// maxCallHistoryMessages is the window on a live call.
+//
+// Every turn re-sends the whole window, and at two hundred messages that was
+// roughly ten thousand input tokens per turn -- several times a minute, for a
+// conversation the caller is holding in their own head anyway. What a spoken
+// exchange refers back to is the last few things said; anything older reaches
+// the reply through recall, which is cued by the latest turn rather than
+// re-sent in full.
+//
+// It buys latency as well as money: a smaller prompt is a faster first token,
+// and on a call the first token is the first word she says.
+const maxCallHistoryMessages = 20
+
 // A provider should never hold an interactive chat request for the full HTTP
 // timeout. The shared personal-generation schedule reserves bounded time for
 // every recovery attempt inside this total budget.
@@ -555,7 +568,14 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	chatCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), generationRequestTimeout)
 	defer cancel()
 
-	history, err := s.messageRepo.ListByConversationID(chatCtx, conversationID, maxHistoryMessages)
+	// Read before the history, because a call carries less of it.
+	onACall := s.onACall(chatCtx, conversationID)
+	historyWindow := maxHistoryMessages
+	if onACall {
+		historyWindow = maxCallHistoryMessages
+	}
+
+	history, err := s.messageRepo.ListByConversationID(chatCtx, conversationID, historyWindow)
 	if err != nil {
 		assistantMsg, persistErr := s.persistAssistantFallback(ctx, userID, conversationID, "The bot is busy right now — please try again in a moment.")
 		if persistErr == nil {
@@ -568,12 +588,8 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	// Whether anything older than the window exists has to be read before
 	// filtering. Filtering removes failed and contaminated turns, so the length
 	// afterwards is not evidence about the conversation's true length.
-	conversationOutgrewWindow := len(history) == maxHistoryMessages
+	conversationOutgrewWindow := len(history) == historyWindow
 	history = filterArtifactContaminatedAssistantHistory(history)
-
-	// Read before the scene state, because a call changes what preparing it is
-	// allowed to cost.
-	onACall := s.onACall(chatCtx, conversationID)
 
 	var sceneState *models.OmniChatConversationSceneState
 	if s.sceneState != nil && models.PersonaPerformsAScene(persona) {
@@ -611,7 +627,22 @@ func (s *ChatbotService) GenerateReply(ctx context.Context, userID, conversation
 	// Build the system prompt with structured persona instructions + user context.
 	systemContent := s.clampSystemPrompt(ctx,
 		buildConversationSystemPromptWithDisposition(persona, conv.Settings, history, sceneState, promptRecall{Memories: memories, LookedUp: lookedUp, Outstanding: outstanding, Reading: reading}, disposition.Composed, time.Now(), onACall), userID)
-	messages = append(messages, openrouter.Message{Role: openrouter.RoleSystem, Content: systemContent})
+	// The system prompt is the same bytes on the next turn, so ask the provider
+	// to keep it. Gemini through OpenRouter needs the breakpoint stated, the way
+	// Anthropic does -- implicit caching is not applied on this route.
+	//
+	// This field has existed on Message since the client was written and no
+	// caller had ever set it, so every turn of every conversation paid full
+	// price for a prefix that had not changed.
+	//
+	// The hit rate is capped by the prompt itself: renderCurrentMoment writes
+	// the wall clock into it to the minute, so the prefix changes whenever the
+	// minute does. On a call, turns come faster than that and most of them
+	// land inside the same minute. The cached_tokens field on the turn-cost log
+	// says what is actually being saved, which is why it is logged.
+	messages = append(messages, openrouter.Message{
+		Role: openrouter.RoleSystem, Content: systemContent, CacheBreakpoint: true,
+	})
 	for _, m := range history {
 		role := openrouter.RoleUser
 		if m.Role == models.BotMessageRoleAssistant {

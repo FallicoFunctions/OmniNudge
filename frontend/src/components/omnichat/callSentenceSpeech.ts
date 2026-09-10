@@ -49,9 +49,30 @@ export function playCallSentences(options: SentenceRunOptions): SentenceRun {
   const { conversationId, fetchSentence, play, onSpeaking } = options;
 
   // Keyed by sequence, and holding the fetch rather than the audio: a sentence
-  // is requested the moment it is announced, so the wait for one overlaps the
+  // is requested ahead of when it is needed, so the wait for one overlaps the
   // playing of the one before it.
   const pending = new Map<number, Promise<Blob | null>>();
+
+  // One synthesis at a time, and this is the whole reason the chain exists.
+  //
+  // Every announced sentence used to be fetched the instant it was announced,
+  // which meant a four-sentence reply asked the synthesiser for four clips at
+  // once. The synthesiser is one local process on one GPU: it took the first
+  // reply, and the concurrency wedged its worker for good -- every later
+  // request returned 500, she stopped mid-reply, and it stayed broken after
+  // the call had ended.
+  //
+  // Chaining costs nothing that matters. The clips are still fetched ahead of
+  // the one being played, which is where the overlap comes from; they are just
+  // no longer all in the air together.
+  let fetchChain: Promise<unknown> = Promise.resolve();
+  const fetchInTurn = (turn: string, sequence: number): Promise<Blob | null> => {
+    const audio = fetchChain.then(() => (settled ? null : fetchSentence(turn, sequence)));
+    // The chain must not break on a failure, or every later sentence inherits
+    // the rejection and is never fetched at all.
+    fetchChain = audio.catch(() => undefined);
+    return audio;
+  };
   let turn: string | null = null;
   let expected: number | null = null;
   let spokeSomething = false;
@@ -138,7 +159,7 @@ export function playCallSentences(options: SentenceRunOptions): SentenceRun {
     if (turn === null) turn = detail.turn;
     if (detail.turn !== turn || detail.sequence < next) return;
     if (pending.has(detail.sequence)) return;
-    pending.set(detail.sequence, fetchSentence(detail.turn, detail.sequence));
+    pending.set(detail.sequence, fetchInTurn(detail.turn, detail.sequence));
     void pump();
   }
 

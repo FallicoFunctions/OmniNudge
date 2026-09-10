@@ -86,6 +86,45 @@ describe('playCallSentences', () => {
     expect(played).toEqual([1, 3]);
   });
 
+  // The synthesiser is one local process on one GPU.
+  //
+  // Every announced sentence used to be fetched the instant it was announced,
+  // so a four-sentence reply asked for four clips at once. That wedged the
+  // synthesiser's worker during a real call: the first reply was spoken, and
+  // every request after it returned 500 -- she stopped mid-reply, and it was
+  // still broken after the call ended.
+  it('never asks the synthesiser for two sentences at once', async () => {
+    let inFlight = 0;
+    let mostAtOnce = 0;
+    const release: Array<() => void> = [];
+    const { handle, played } = run({
+      fetchSentence: async (_turn: string, sequence: number) => {
+        inFlight += 1;
+        mostAtOnce = Math.max(mostAtOnce, inFlight);
+        await new Promise<void>((resolve) => release.push(resolve));
+        inFlight -= 1;
+        return new Blob([`sentence ${sequence}`]);
+      },
+    });
+
+    announce(1);
+    announce(2);
+    announce(3);
+    done(3);
+    await settle();
+
+    // Let each fetch finish in turn. If they were all started at once, the
+    // count above has already recorded it.
+    for (let i = 0; i < 6; i += 1) {
+      release.shift()?.();
+      await settle();
+    }
+
+    expect(mostAtOnce).toBe(1);
+    expect(played.length).toBeGreaterThan(0);
+    handle.cancel();
+  });
+
   it('reports that nothing was spoken when she wrote nothing to say', async () => {
     const { handle, fetchSentence } = run();
     done(0);
