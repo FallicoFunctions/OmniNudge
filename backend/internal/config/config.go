@@ -67,6 +67,9 @@ type CryptoConfig struct {
 type GeminiConfig struct {
 	APIKey string // GEMINI_API_KEY
 	Model  string // GEMINI_MODEL — defaults to gemini-2.5-flash
+	// LiveModel carries an OmniChat phone call: it hears the caller and speaks
+	// back in one model, which is what gets the first sound under a second.
+	LiveModel string // GEMINI_LIVE_MODEL
 }
 
 // OpenRouterConfig holds OpenRouter API configuration for OmniChat bot personas.
@@ -457,8 +460,9 @@ func Load() (*Config, error) {
 			Secret:  getEnv("TURN_SECRET", ""),
 		},
 		Gemini: GeminiConfig{
-			APIKey: getEnv("GEMINI_API_KEY", ""),
-			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+			APIKey:    getEnv("GEMINI_API_KEY", ""),
+			Model:     getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+			LiveModel: getEnvUnlessBlank("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
 		},
 		OpenRouter: OpenRouterConfig{
 			APIKey: getEnv("OPENROUTER_API_KEY", ""),
@@ -636,6 +640,16 @@ func requireEnv(key string) string {
 // getEnv reads an environment variable or returns a default value
 func getEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
+
+// getEnvUnlessBlank treats a variable that is present but empty as unset.
+// .env.example lists optional settings with no value, and plain getEnv would
+// turn every copy of that file into a deployment with the setting blanked out.
+func getEnvUnlessBlank(key, defaultValue string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value
 	}
 	return defaultValue

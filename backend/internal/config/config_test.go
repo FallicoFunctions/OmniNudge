@@ -37,6 +37,18 @@ func TestGetEnvAsStringListNormalizesAndDeduplicates(t *testing.T) {
 	require.Nil(t, getEnvAsStringList("TEST_STRING_LIST"))
 }
 
+func TestLoadGivesACallAModelWhenTheExampleLeavesItBlank(t *testing.T) {
+	t.Setenv("DB_USER", "test")
+	t.Setenv("JWT_SECRET", "test")
+	t.Setenv("ENCRYPTION_KEY", "test")
+	// Present and empty, exactly as a copy of .env.example leaves it.
+	t.Setenv("GEMINI_LIVE_MODEL", "")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "gemini-3.1-flash-live-preview", cfg.Gemini.LiveModel)
+}
+
 func TestAppendHTTPSOriginHostAddsConfiguredStorageOriginWithoutTrustingUnsafeURLs(t *testing.T) {
 	hosts := []string{"storage.googleapis.com"}
 	hosts = appendHTTPSOriginHost(hosts, "https://R2.Example.test")
