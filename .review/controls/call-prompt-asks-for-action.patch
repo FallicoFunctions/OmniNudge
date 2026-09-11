@@ -1,0 +1,17 @@
+diff --git a/backend/internal/services/chatbot_service.go b/backend/internal/services/chatbot_service.go
+index 785ceb397..0246e4c44 100644
+--- a/backend/internal/services/chatbot_service.go
++++ b/backend/internal/services/chatbot_service.go
+@@ -1286,11 +1286,7 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona, on
+ 
+ 	style := base + "\n\n" + naturalDialogueStyleV1
+ 	if profile == models.ResponseStyleProfileNaturalDialogue || profile == models.ResponseStyleProfileProfessional {
+-		if onACall {
+-			style += "\n" + personalConversationCallModeV1
+-		} else {
+-			style += "\n" + personalConversationModeV1
+-		}
++		style += "\n" + personalConversationModeV1
+ 	}
+ 	// The notation exists so asterisked narration renders grey and drives the
+ 	// scene's pictures. On a call nothing is rendered: Live speaks whatever she

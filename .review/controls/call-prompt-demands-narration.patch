@@ -1,0 +1,15 @@
+diff --git a/backend/internal/services/chatbot_service.go b/backend/internal/services/chatbot_service.go
+index c257d26b0..1a4f5e650 100644
+--- a/backend/internal/services/chatbot_service.go
++++ b/backend/internal/services/chatbot_service.go
+@@ -1285,9 +1285,7 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona, on
+ 	// scene's pictures. On a call nothing is rendered: Live speaks whatever she
+ 	// produces, so a block demanding narration beside one forbidding it would be
+ 	// settled by her reading "I lean closer" aloud.
+-	if !onACall {
+-		style += "\n" + omniChatNotationV1
+-	}
++	style += "\n" + omniChatNotationV1
+ 	switch profile {
+ 	case models.ResponseStyleProfileNaturalDialogue:
+ 		style += "\n" + naturalDialogueQuestionBudgetV1

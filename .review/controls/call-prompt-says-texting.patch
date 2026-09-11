@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/chatbot_service.go b/backend/internal/services/chatbot_service.go
+index c257d26b0..6aa7892ce 100644
+--- a/backend/internal/services/chatbot_service.go
++++ b/backend/internal/services/chatbot_service.go
+@@ -1255,9 +1255,6 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona, on
+ 	// machinery, and a texting character must be given neither.
+ 	if profile == models.ResponseStyleProfileDirectMessage {
+ 		mode := directMessageModeV1
+-		if onACall {
+-			mode = directMessageCallModeV1
+-		}
+ 		return base + "\n\n" + directMessageBaseStyleV1 + "\n" + mode
+ 	}
+ 

@@ -1,0 +1,148 @@
+{
+ "schema_version": 2,
+ "head": "7da9785ee",
+ "base": "e76a5639e",
+ "scope": {
+  "files": [
+   "backend/internal/services/omnichat_live_call.go",
+   "backend/internal/services/omnichat_live_call_test.go",
+   "backend/internal/services/chatbot_service.go",
+   "backend/internal/services/chatbot_service_test.go",
+   "backend/internal/services/omnichat_spoken_register_test.go"
+  ],
+  "boundaries": [
+   "chat prompt builder -> Live system instruction (one string, spoken by the model)",
+   "Live events -> relay -> browser peer (audio, transcripts, interruptions)",
+   "Live tool call -> RecallForCall -> memory store and transcript search -> tool response",
+   "relay -> SaveCallTurn -> bot_messages and the memory extraction queue",
+   "Live connection rotation -> resume handle -> redial"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/d5a86a375.json",
+  ".review/6420295f5.json",
+  ".review/464c678c8.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 2a: a new service file and its tests. PrepareLiveCall reuses the typed-turn prompt builder with onACall=true, so the builder's call path is in scope too, and the review followed it into chatbot_service.go."},
+    {"id": "A2", "status": "applied", "evidence": "Grepped every ledger for live call, SaveCallTurn, RunLiveCall, PrepareLiveCall: none. Grepped for texting, Direct Message Mode and the spoken register: no ledger had judged the call prompt's blocks against each other, for the old call path or any other."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the full Live instruction through a throwaway test for two personas that differ on the dimension the builder branches on: direct_message (an OmniAI) and natural_dialogue (roleplay), each with 26 messages of history. The OmniAI instruction said \"You are texting ... a blank line sends them as two separate messages ... typos are yours\" above \"You are on a live call\" (LC1). The roleplay instruction carried [OmniChat Notation], \"every narration beat must be wrapped in single asterisks\", beside the register forbidding narration (LC2). Also printed RecallForCall for three topics: each returned the Biscuit message from outside the window, rendered with date and speaker."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler yet; the route is Phase 2b."},
+    {"id": "B4", "status": "applied", "evidence": "Read back the rows SaveCallTurn wrote after two real calls: user and assistant messages in spoken order, the interrupted reply holding exactly the words she said before Live cut her off (\"...Cute name! What's\")."},
+    {"id": "C1", "status": "applied", "evidence": "Event kinds the relay switches on are the geminilive constants; the tool name in the declaration and in answerLiveCallTool is one constant, RecallMemoryTool."},
+    {"id": "C2", "status": "applied", "evidence": "The tool reads args.topic, the property the declaration names; in the real run Live sent {\"topic\": \"user's dog's name\"} and the search received it."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The relay was run against the real Live API: history, tool call, recall, speech, a barge-in, and the rows saved. Before the run I suspected a barge-in's words would be saved with the interrupted turn; the real event order is interrupted, turnComplete, then the new speech, so they are not -- not a finding, and the relay needs no reordering."},
+    {"id": "C5", "status": "applied", "evidence": "LiveCallPlan's unexported window fields are set in PrepareLiveCall and read in RecallForCall; the round trip is exercised by the real recall reaching a message outside the window."},
+    {"id": "C6", "status": "applied", "evidence": "The relay's reader is the event switch; the fake-session tests read every relayed kind back through the peer and the saved turns and assert the values, not only the counts."},
+    {"id": "C7", "status": "applied", "evidence": "The transcripts in the fake-session tests are split the way the real server splits them -- output in word-sized chunks with leading spaces, input as one chunk -- as seen in the real runs."},
+    {"id": "D1", "status": "applied", "evidence": "Real topics Live produced (\"user's dog's name\") and ones a person would say (\"Biscuit\", \"my dog\") all found the message; the OR tsquery is what makes the first one match."},
+    {"id": "D2", "status": "applied", "evidence": "An unknown tool name is refused with an error answer rather than routed anywhere; another user's conversation is refused ErrNotFound by both PrepareLiveCall and SaveCallTurn."},
+    {"id": "D3", "status": "applied", "evidence": "An empty or whitespace topic returns nothing without a query; a topic over 200 runes is cut; an empty heard and said saves nothing."},
+    {"id": "E1", "status": "applied", "evidence": "Against AcceptUserTurn: the same conversation ownership, active-persona and block checks run in PrepareLiveCall. SaveCallTurn checks ownership; it does not re-check a block mid-call, because nothing in a live call could act on it before the call ends, and the typed path's recheck exists to stop a reply being generated, which Live does itself."},
+    {"id": "E2", "status": "applied", "evidence": "Every branch of the relay is reached by a test or the real run: rotation with and without a handle, tool known and unknown, interruption, hang-up mid-turn."},
+    {"id": "E3", "status": "applied", "evidence": "A failed save is logged with the conversation id; a failed transcript search is logged and degrades to memories alone; a tool answer that cannot be delivered is logged."},
+    {"id": "E4", "status": "applied", "evidence": "The scene state is only prepared for personas that perform a scene, as on the typed path; its failure opens the call without it rather than refusing the call."},
+    {"id": "E5", "status": "applied", "evidence": "The history renderer reuses collapseTranscriptWhitespace and truncateTranscriptQuote; the tool answer reuses renderRecalledMemories and renderTranscriptLookup. Nothing is copied."},
+    {"id": "E6", "status": "applied", "evidence": "Having found two text-medium blocks on a call, read every block the call prompt carries, in the LC2 control's output: [Personal Conversation Mode] still prescribed \"*One brief observable action.* Spoken words\" and paragraph blocks of counted words (LC3). The one remaining sentence of the kind, \"Use actions and sensory detail only when they add something specific\", permits rather than demands, and the register after it forbids; left, deliberately."},
+    {"id": "F1", "status": "applied", "evidence": "The relay and prompt tests pass under -race."},
+    {"id": "F2", "status": "applied", "evidence": "A half-saved turn is possible if the second insert fails; it is logged, and the chat simply shows her side missing, as a failed typed reply would."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "Hanging up mid-turn saves the turn under a detached five-second context; the Live session is closed on every exit path."},
+    {"id": "G1", "status": "applied", "evidence": "All three fixes controlled, see findings. Afterwards the instruction was printed again for both kinds -- no texting, asterisk or counted-block language remains -- and a real call run for both kinds, each recalling the fact and handling the barge-in."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "go build ./..., go vet on services, gofmt clean; relay, preparation, saving, recall and prompt tests pass under -race. The full suite has not been run."},
+    {"id": "Z1", "status": "applied", "evidence": "Found by B1 and E6, both listed. Nothing to add."},
+    {"id": "B5", "status": "applied", "evidence": "Two real calls through RunLiveCall against gemini-3.1-flash-live-preview, an OmniAI and a roleplay persona, both after the fixes: each heard the question, called recall_memory, got Biscuit from 25 messages back in 2 ms, started speaking about 0.7 s after hearing it, stopped when talked over, and answered the interruption. The two differed in wording and length as two characters should."},
+    {"id": "E7", "status": "applied", "evidence": "Nothing is started before its decision: the dial happens after the plan is built, and a reconnect only after the session has ended with a handle."}
+   ],
+   "findings": [
+    {
+     "id": "LC1",
+     "summary": "an OmniAI on a call was told \"You are texting\", that a blank line sends a second message and that typos are hers, a few lines above being told every word is spoken",
+     "found_by": "B1",
+     "fix_commit": "4d38c9ba6",
+     "control": {
+      "patch": ".review/controls/call-prompt-says-texting.patch",
+      "runner": "go",
+      "tests": ["./internal/services/ -run TestACallPromptNamesOneMedium"],
+      "observed": "the call prompt should not contain \"You are texting\""
+     }
+    },
+    {
+     "id": "LC2",
+     "summary": "a roleplay character on a call was told to wrap every narration beat in asterisks beside a register forbidding narration; Live speaks what she produces, so the narration would have been heard",
+     "found_by": "B1",
+     "fix_commit": "4d38c9ba6",
+     "control": {
+      "patch": ".review/controls/call-prompt-demands-narration.patch",
+      "runner": "go",
+      "tests": ["./internal/services/ -run TestACallPromptNamesOneMedium"],
+      "observed": "the call prompt should not contain \"[OmniChat Notation]\""
+     }
+    },
+    {
+     "id": "LC3",
+     "summary": "the roleplay call prompt still prescribed \"*One brief observable action.* Spoken words\" and paragraph blocks of counted words through personal conversation mode",
+     "found_by": "E6",
+     "fix_commit": "1424cffb3",
+     "control": {
+      "patch": ".review/controls/call-prompt-asks-for-action.patch",
+      "runner": "go",
+      "tests": ["./internal/services/ -run TestACallPromptNamesOneMedium"],
+      "observed": "the call prompt should not contain \"*One brief observable action.*\""
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the fixes: two call-only constants and the onACall branches that pick them, plus the test."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing further applies."},
+    {"id": "B1", "status": "applied", "evidence": "Printed both instructions after the fixes. Headers for the OmniAI: Conversation Integrity, Right Now, Platform Response Style, Direct Message Mode (call version), Spoken Conversation, Content boundary, This Conversation So Far, On This Call. For roleplay: the same plus Actor and State Continuity, Personal Conversation Mode (call version) and Companion Question Budget, with no OmniChat Notation."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler."},
+    {"id": "B4", "status": "applied", "evidence": "The rows from the post-fix real calls read back in spoken order."},
+    {"id": "C1", "status": "na", "why": "The fixes add no key or code across a seam."},
+    {"id": "C2", "status": "na", "why": "As C1."},
+    {"id": "C3", "status": "applied", "evidence": "Each call constant has a typed counterpart; the test asserts the typed prompt still carries the typed block, so the two cannot silently become one."},
+    {"id": "C4", "status": "applied", "evidence": "Post-fix real calls for both kinds; see B5."},
+    {"id": "C5", "status": "na", "why": "No field added."},
+    {"id": "C6", "status": "applied", "evidence": "The test reads the assembled prompt from buildConversationSystemPromptWithDisposition, not the constants."},
+    {"id": "C7", "status": "na", "why": "No fixture."},
+    {"id": "D1", "status": "na", "why": "No parsing."},
+    {"id": "D2", "status": "na", "why": "No parsing."},
+    {"id": "D3", "status": "na", "why": "No parsing."},
+    {"id": "E1", "status": "applied", "evidence": "The call versions keep the protective rules the typed ones carry: she never speaks or acts for the user, and she is not obliged to keep the conversation going. The test asserts both."},
+    {"id": "E2", "status": "applied", "evidence": "Both sides of every new onACall branch are asserted."},
+    {"id": "E3", "status": "na", "why": "No error path."},
+    {"id": "E4", "status": "applied", "evidence": "The persona quality evaluator uses the typed personal conversation block and judges typed chat, so it is right to be unchanged. The lean-narrative (game master) ending still asks for narration on a call and the register forbids describing the room; that is a product decision about how a game master sounds on a call, raised with the user rather than changed here."},
+    {"id": "E5", "status": "applied", "evidence": "The call constants are new text, not copies: each keeps only the lines that make sense on a call."},
+    {"id": "E6", "status": "applied", "evidence": "Re-read every header in both post-fix prompts; no other block names a written medium."},
+    {"id": "F1", "status": "applied", "evidence": "Tests pass under -race after the fixes."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted by the fixes."},
+    {"id": "G1", "status": "applied", "evidence": "All three controls replayed by hand: each fails TestACallPromptNamesOneMedium with a real assertion naming the forbidden text."},
+    {"id": "G2", "status": "na", "why": "No guard."},
+    {"id": "H1", "status": "applied", "evidence": "Build, vet, gofmt clean; narrow tests pass under -race."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "The post-fix real calls recorded in pass 1's B5 are the current behaviour: both kinds answered in speech only, with no narration spoken."},
+    {"id": "E7", "status": "na", "why": "Nothing started early by the fixes."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/services clean",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "narrow: relay, preparation, saving, recall and prompt tests pass under -race; the full suite has not been run"
+ }
+}
