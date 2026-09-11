@@ -1,0 +1,72 @@
+{
+ "schema_version": 2,
+ "head": "28266de3b",
+ "base": "6a2482b9f",
+ "scope": {
+  "files": [
+   "frontend/src/components/omnichat/callRecorder.ts",
+   "frontend/src/components/omnichat/useLiveVoiceCall.ts",
+   "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+   "frontend/src/pages/OmniChatChatPage.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx"
+  ],
+  "boundaries": [
+   "call modal -> live connection hook -> call socket and audio module",
+   "React effect lifecycle (StrictMode double invoke) -> server hang-up semantics",
+   "call close -> react-query cache for the conversation",
+   "rendered call screen -> screen reader"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/d5a2feabe.json",
+  ".review/41824b03d.json",
+  ".review/464c678c8.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 3b: the call modal's voice mode moves onto a live-connection hook; the microphone exposes its context; the chat page refreshes the conversation when a call closes. Video mode keeps its avatar path, and the sentence-by-sentence speech the voice call used is no longer reached."},
+    {"id": "A2", "status": "applied", "evidence": "d5a2feabe.json left one item for this phase: speaker echo, unverifiable headless. 41824b03d.json says the server ends a call when its socket closes, which is why the effect lifecycle was examined. 464c678c8.json's R4 (video spoke twice) is kept: video never opens the live connection."},
+    {"id": "B1", "status": "na", "why": "No prompt or request payload is assembled here; the socket's URL was printed in the previous phase."},
+    {"id": "B2", "status": "applied", "evidence": "Printed the dialog through a throwaway test for four states. Voice listening: 'Listening… no sound from Fake input, live', controls Mute and End call only, no typing box. Voice speaking: 'Speaking' and the caller's words in quotes, Mute still enabled. Voice dropped: 'Connection needs attention' and 'The call dropped. End the call and try again.', End call only. Video ready: the typing box, Send, Mute and End call, unchanged."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "Nothing persisted by the browser; the server saves the turns."},
+    {"id": "C1", "status": "applied", "evidence": "The hook handles all four event types the socket passes on; the status values it sets are members of the modal's status union, checked by tsc."},
+    {"id": "C2", "status": "applied", "evidence": "Input transcripts arrive in pieces and are concatenated for the turn, then reset on turn_complete; the test feeds two pieces and reads the joined line off the screen."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The capture uses the call's already-resumed context from openMicrophone, the one the Safari lesson in callRecorder requires."},
+    {"id": "C5", "status": "applied", "evidence": "CallMicrophone.context is set in the one place CallMicrophone is built, openMicrophone, and read only by the hook."},
+    {"id": "C6", "status": "applied", "evidence": "The modal tests drive the hook through the real modal and assert what reaches the socket, the player and the screen, not what the hook was called with."},
+    {"id": "C7", "status": "applied", "evidence": "The mocked socket and audio modules have the real modules' signatures, enforced by tsc on the test file."},
+    {"id": "D1", "status": "applied", "evidence": "A normal voice call connects with nothing pressed, streams out and plays back."},
+    {"id": "D2", "status": "applied", "evidence": "A server-ended socket shows an error rather than a frozen screen; a failure to connect or to start the capture does the same."},
+    {"id": "D3", "status": "applied", "evidence": "Mute while she is speaking stops what goes out and unmuting resumes it; the button is no longer disabled in that state."},
+    {"id": "E1", "status": "applied", "evidence": "The sibling start-call effect needed a StrictMode guard, because a double-invoked start made two calls. Asked the same of the live-connection effect: a close in its cleanup is a hang-up the server ends the call on. Added a StrictMode test and ran it against the unfixed code: one connection, never closed while mounted, because React double-invokes only on mount and the call id is still null then. Not a finding; the test stays as the guard."},
+    {"id": "E2", "status": "applied", "evidence": "The auto-listen loop, the recorder and the typing box are now reached only in video mode; the sentence-speech branch was reachable only in voice mode and is removed, not left dead."},
+    {"id": "E3", "status": "applied", "evidence": "Every failure path in the hook ends in onFailed, which the modal shows unless the user has already ended the call."},
+    {"id": "E4", "status": "applied", "evidence": "The live connection is gated on mode === 'voice' in the hook's arguments and the old loop on mode !== 'voice'; each test mode reaches only its own path."},
+    {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+    {"id": "E6", "status": "applied", "evidence": "The old voice path recorded call turns with recordCallTurn; that is now reached only from video. The Live path does not increment turn_count either, and nothing reads turn_count but the repository itself."},
+    {"id": "F1", "status": "na", "why": "Single-threaded UI state."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "Unmounting closes the socket, stops the capture and clears the player, asserted in the first voice test; the microphone is released by the modal's own effect as before."},
+    {"id": "G1", "status": "na", "why": "No finding, so nothing to control."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "tsc -b exit 0, eslint exit 0 on the five files, 42 tests pass across the modal and the two live-call test files; exit codes captured directly. The full suite has not been run."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "Recorded as unverified, not skipped. The server side was run end to end against Live in Phase 2b and the browser audio against a real tone in Phase 3a; the joined path -- a logged-in browser, a real microphone, real speakers -- needs the user's own login, which may not be entered on their behalf. It is asked of the user as the next step, with speaker echo the thing to listen for."},
+    {"id": "E7", "status": "na", "why": "Nothing starts ahead of its decision: the connection opens only once both the call and the microphone exist."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b exit 0",
+  "vet": "n/a, TypeScript only",
+  "lint": "eslint exit 0 on the five files",
+  "types": "tsc -b exit 0",
+  "tests": "42 pass across OmniChatCallModal, liveCallAudio and liveCallSocket; the full suite has not been run"
+ }
+}
