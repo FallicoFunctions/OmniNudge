@@ -1,0 +1,74 @@
+{
+ "schema_version": 2,
+ "head": "94d32f021",
+ "base": "d5a2feabe",
+ "scope": {
+  "files": [
+   "frontend/public/omnichat/live-call-capture.js",
+   "frontend/src/components/omnichat/liveCallAudio.ts",
+   "frontend/src/components/omnichat/liveCallSocket.ts",
+   "frontend/src/components/omnichat/__tests__/liveCallAudio.test.ts",
+   "frontend/src/components/omnichat/__tests__/liveCallSocket.test.ts"
+  ],
+  "boundaries": [
+   "microphone MediaStream -> AudioWorklet (render thread) -> page (message port)",
+   "page -> call socket -> Go relay (16 kHz PCM binary frames)",
+   "Go relay -> call socket -> page (24 kHz PCM binary frames, JSON events)",
+   "page -> Web Audio destination (scheduled playback)"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/464c678c8.json",
+  ".review/9680fbb02.json",
+  ".review/10c4f8b92.json",
+  ".review/41824b03d.json",
+  ".review/e76a5639e.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 3a: a capture worklet served from public/, the PCM conversion, chunker and player, and the call socket client, with their tests. Nothing on screen uses them yet; Phase 3b wires them into the call modal."},
+    {"id": "A2", "status": "applied", "evidence": "Read the call-audio findings of five ledgers. R8 (a dropped notice stalled every later sentence) cannot recur: each binary frame is played on its own and nothing waits on a notice. R4 (video spoke twice) is untouched, since video mode is not changed. The WebKit lesson in callRecorder -- keep a JavaScript reference to the source node or it is collected and reads silence -- is kept: the capture's stop() closes over the source, the worklet node and the gain."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the socket URL for two bases that differ on what the builder branches on: http with a path gives ws://localhost:8080/api/v1/omnichat/calls/call-1/live?token=tok; https with a trailing slash and a query gives wss://.../api/v1/omnichat/calls/a%2Fb/live?token=t, the base's query dropped and the id escaped."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "Nothing persisted."},
+    {"id": "C1", "status": "applied", "evidence": "The four event types the client accepts are spelled as the Go constants LiveCallEventHeard, Said, Interrupted and TurnComplete; the capture processor name matches between the worklet's registerProcessor and the AudioWorkletNode."},
+    {"id": "C2", "status": "applied", "evidence": "The relay writes audio as binary frames and events as JSON with type and text; the client routes ArrayBuffer to audio and parses strings as events, requiring text for heard and said, which the relay only sends non-empty."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The relay expects 16 kHz mono PCM and reads frames up to 64 KB; a chunk is 3,200 bytes. Live answers in 24 kHz mono PCM, which is the rate the player tags its buffers with."},
+    {"id": "C5", "status": "na", "why": "No field added to a struct."},
+    {"id": "C6", "status": "applied", "evidence": "The chunker's output was read back through a real browser's audio graph rather than trusted from the unit test's arrays; see B5."},
+    {"id": "C7", "status": "applied", "evidence": "The unit tests feed the chunker 128-sample frames, the size a real worklet render quantum delivers, and the player's fake context mirrors createBuffer's duration arithmetic; the real browser run confirms both."},
+    {"id": "D1", "status": "applied", "evidence": "48 kHz and 44.1 kHz input both produce exactly 1,600 samples per 100 ms; the real browser ran at 44.1 kHz."},
+    {"id": "D2", "status": "applied", "evidence": "Unknown event types, a heard event without text, and non-JSON are ignored; an odd trailing byte of audio is dropped rather than misread."},
+    {"id": "D3", "status": "applied", "evidence": "Samples beyond full scale clip to 32767 and -32768 rather than wrapping; an empty chunk plays nothing; a frame larger than the chunker's buffer grows it."},
+    {"id": "E1", "status": "applied", "evidence": "Against openMicrophone: the same zero-gain route to the destination keeps the graph pulled, and the context is the caller's, already resumed during the click that started the call, which is what Safari requires."},
+    {"id": "E2", "status": "applied", "evidence": "Every branch of the socket client -- open, refused before open, audio, event, unknown event, dropped send when closed or backed up -- is reached by a test."},
+    {"id": "E3", "status": "applied", "evidence": "A refusal before open rejects with a message; a close after open is reported with its code and reason, so the caller can say why the call ended."},
+    {"id": "E4", "status": "na", "why": "No flag gates any path."},
+    {"id": "E5", "status": "applied", "evidence": "The socket URL follows the /ws construction but for a different path; the token fetch is the same endpoint. Nothing duplicated beyond the one URL rule each owns."},
+    {"id": "E6", "status": "applied", "evidence": "Suspected that loading the capture module twice on one context would reject a second registerProcessor and break a capture restarted on the same context; the real browser accepted a second capture on the same context. Not a finding."},
+    {"id": "F1", "status": "applied", "evidence": "The only cross-thread traffic is the worklet's message port, which copies each batch; the page's state is touched on one thread."},
+    {"id": "F2", "status": "na", "why": "No transaction or queue."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "stop() disconnects every node it made and detaches the port handler; clear() stops and disconnects every scheduled source."},
+    {"id": "G1", "status": "na", "why": "No finding, so no fix to control."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "tsc -b exit 0 and eslint exit 0 on the five files, both exit codes captured directly this time rather than through a pipe; the 18 new tests pass. The full suite has not been run."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "Ran the real module in a real browser page (the Vite dev server, a 44.1 kHz AudioContext) with a 440 Hz tone at half scale through a real MediaStream: 9 chunks in about a second, every one 3,200 bytes; peak 16,375 against the ideal 16,384; 88 zero crossings per 100 ms, which is exactly 440 Hz, so the rate conversion keeps pitch; the real player reported playing after enqueue and stopped after clear, signalling [true, false]. Unverified and recorded as such: whether the browser's echo cancellation removes her voice from the microphone when it is played through Web Audio on speakers. A headless page has neither, so it is a Phase 3b test on a real machine with speakers, not a pass here."},
+    {"id": "E7", "status": "na", "why": "Nothing is started ahead of a decision."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b exit 0",
+  "vet": "n/a, TypeScript only",
+  "lint": "eslint exit 0 on the five files",
+  "types": "tsc -b exit 0",
+  "tests": "the 18 new tests pass; the full suite has not been run"
+ }
+}
