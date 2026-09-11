@@ -399,6 +399,10 @@ func reasoningEffortNoHigherThan(ceiling, requested string) string {
 	return ceiling
 }
 
+// fallbackChatCompletionClient is deliberately narrow: it retries only an
+// upstream error, never a completed draft. Completed drafts still travel
+// through the universal hygiene contract, where a corrective retry remains
+// necessary to preserve the character's instructions.
 type fallbackChatCompletionClient struct {
 	primary  chatCompletionClient
 	fallback chatCompletionClient
