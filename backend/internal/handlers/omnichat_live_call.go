@@ -77,6 +77,7 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 
 	call, err := h.calls.GetActiveCallOwned(ctx, callID, userID)
 	if err != nil {
+		zlog.Error().Err(err).Str("call_id", callID.String()).Msg("omnichat live call: failed to read the call")
 		RespondError(c, http.StatusInternalServerError, "Failed to open the call")
 		return
 	}
@@ -97,6 +98,7 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 		RespondError(c, http.StatusForbidden, "This character is not taking calls from you")
 		return
 	case err != nil:
+		zlog.Error().Err(err).Str("call_id", callID.String()).Msg("omnichat live call: failed to prepare the call")
 		RespondError(c, http.StatusInternalServerError, "Failed to open the call")
 		return
 	}
@@ -105,6 +107,7 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 	// own Live session on the platform's key while the call is billed once.
 	claimed, err := h.calls.ClaimLiveCallOwned(ctx, callID, userID, uuid.NewString())
 	if err != nil {
+		zlog.Error().Err(err).Str("call_id", callID.String()).Msg("omnichat live call: failed to claim the call")
 		RespondError(c, http.StatusInternalServerError, "Failed to open the call")
 		return
 	}
