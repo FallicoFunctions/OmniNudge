@@ -379,10 +379,6 @@ func (c *profileChatCompletionClient) GenerateWithOptions(ctx context.Context, m
 	return generateWithOptionalOptions(ctx, c.completion, messages, onChunk, options, true)
 }
 
-// fallbackChatCompletionClient is deliberately narrow: it retries only an
-// upstream error, never a completed draft. Completed drafts still travel
-// through the universal hygiene contract, where a corrective retry remains
-// necessary to preserve the character's instructions.
 // reasoningEffortRank orders the efforts a profile can carry.
 var reasoningEffortRank = map[string]int{"minimal": 0, "low": 1, "medium": 2, "high": 3, "xhigh": 4, "max": 5}
 
