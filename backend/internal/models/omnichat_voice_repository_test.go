@@ -44,6 +44,80 @@ func TestOmniChatVoiceRepositoryStartsOnlyOneActiveCallPerUser(t *testing.T) {
 	require.False(t, updated, "a foreign call ID must not be reported as updated")
 }
 
+func TestOmniChatVoiceRepositoryFindsOnlyTheCallersActiveCall(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	user := &models.User{Username: "live_call_owner", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
+	var personaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `INSERT INTO bot_personas(slug,name,category,system_prompt,visibility,source_format,is_active) VALUES('live-call-owner','Live Call','original','Stay in character.','public','native',TRUE) RETURNING id`).Scan(&personaID))
+	conversation, err := models.NewBotConversationRepository(db.Pool).Create(ctx, user.ID, personaID, nil, nil)
+	require.NoError(t, err)
+	repository := models.NewOmniChatVoiceRepository(db.Pool)
+
+	started, err := repository.StartCallOwned(ctx, user.ID, conversation.ID, "voice")
+	require.NoError(t, err)
+
+	active, err := repository.GetActiveCallOwned(ctx, started.ID, user.ID)
+	require.NoError(t, err)
+	require.NotNil(t, active)
+	require.Equal(t, started.ID, active.ID)
+	require.Equal(t, conversation.ID, active.ConversationID)
+	require.Equal(t, personaID, active.PersonaID)
+	require.Equal(t, "voice", active.Mode)
+
+	foreign, err := repository.GetActiveCallOwned(ctx, started.ID, user.ID+1000)
+	require.NoError(t, err)
+	require.Nil(t, foreign, "somebody else's call id finds nothing")
+
+	ended, err := repository.EndCallOwned(ctx, started.ID, user.ID)
+	require.NoError(t, err)
+	require.True(t, ended)
+	gone, err := repository.GetActiveCallOwned(ctx, started.ID, user.ID)
+	require.NoError(t, err)
+	require.Nil(t, gone, "an ended call cannot be reopened")
+}
+
+func TestOmniChatVoiceRepositoryGivesAVoiceCallToOneSocket(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	user := &models.User{Username: "live_call_claimer", PasswordHash: "hash", Role: "user"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, user))
+	var personaID int
+	require.NoError(t, db.Pool.QueryRow(ctx, `INSERT INTO bot_personas(slug,name,category,system_prompt,visibility,source_format,is_active) VALUES('live-call-claimer','Live Call','original','Stay in character.','public','native',TRUE) RETURNING id`).Scan(&personaID))
+	conversation, err := models.NewBotConversationRepository(db.Pool).Create(ctx, user.ID, personaID, nil, nil)
+	require.NoError(t, err)
+	repository := models.NewOmniChatVoiceRepository(db.Pool)
+
+	voice, err := repository.StartCallOwned(ctx, user.ID, conversation.ID, "voice")
+	require.NoError(t, err)
+	claimed, err := repository.ClaimLiveCallOwned(ctx, voice.ID, user.ID+1000, "socket-x")
+	require.NoError(t, err)
+	require.False(t, claimed, "somebody else cannot claim the call")
+	claimed, err = repository.ClaimLiveCallOwned(ctx, voice.ID, user.ID, "socket-1")
+	require.NoError(t, err)
+	require.True(t, claimed)
+	claimed, err = repository.ClaimLiveCallOwned(ctx, voice.ID, user.ID, "socket-2")
+	require.NoError(t, err)
+	require.False(t, claimed, "a second socket for the same call is refused")
+
+	video, err := repository.StartCallOwned(ctx, user.ID, conversation.ID, "video")
+	require.NoError(t, err)
+	claimed, err = repository.ClaimLiveCallOwned(ctx, video.ID, user.ID, "socket-3")
+	require.NoError(t, err)
+	require.False(t, claimed, "a video call is never carried by Live")
+}
+
 func TestOmniChatVoiceRepositorySpeechCacheUpsertReturnsCanonicalRow(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

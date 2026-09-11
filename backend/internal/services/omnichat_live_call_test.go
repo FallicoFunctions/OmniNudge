@@ -357,6 +357,58 @@ func TestSaveCallTurn_KeepsBothHalvesAsMessages(t *testing.T) {
 	require.ErrorIs(t, f.service.SaveCallTurn(ctx, f.userID+1000, f.conversation.ID, "hi", ""), ErrNotFound)
 }
 
+type sceneStateRecorder struct {
+	calls     int
+	audiences [][]TurnAudience
+	lastSeen  string
+}
+
+func (r *sceneStateRecorder) PrepareForGeneration(_ context.Context, _, _ int, _ *models.BotPersona, history []*models.BotMessage, audience ...TurnAudience) (*models.OmniChatConversationSceneState, error) {
+	r.calls++
+	r.audiences = append(r.audiences, audience)
+	if len(history) > 0 {
+		r.lastSeen = history[len(history)-1].Content
+	}
+	return nil, nil
+}
+
+func TestFinishLiveCall_ExtractsTheSceneOnceForAPersonaThatPerformsOne(t *testing.T) {
+	f := newLiveCallFixture(t, "Game Master", "You run a fantasy campaign.")
+	ctx := context.Background()
+	require.NoError(t, f.service.SaveCallTurn(ctx, f.userID, f.conversation.ID, "I open the door.", "It creaks open onto a dark hall."))
+	recorder := &sceneStateRecorder{}
+	f.service.SetConversationSceneStateCoordinator(recorder)
+
+	f.service.FinishLiveCall(ctx, f.userID, f.conversation.ID)
+
+	require.Equal(t, 1, recorder.calls)
+	require.Empty(t, recorder.audiences[0], "not Heard: the call is over, so this is the full extraction it put off")
+	require.Equal(t, "It creaks open onto a dark hall.", recorder.lastSeen, "the extraction reads through the last thing said on the call")
+
+	f.service.FinishLiveCall(ctx, f.userID+1000, f.conversation.ID)
+	require.Equal(t, 1, recorder.calls, "somebody else's conversation is never touched")
+}
+
+func TestFinishLiveCall_LeavesAnOmniAIAlone(t *testing.T) {
+	f := newLiveCallFixture(t, "Sadie", "You are Sadie.")
+	ctx := context.Background()
+	persona, err := f.service.personaRepo.CreateOwned(ctx, f.userID, &models.BotPersona{
+		Slug: fmt.Sprintf("u%d-dm-%d", f.userID, time.Now().UnixNano()), Name: "Sadie",
+		Category: models.PersonaCategoryOriginal, Visibility: "private", SourceFormat: "native",
+		SystemPrompt: "You are Sadie.", ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
+		AlternateGreetings: []string{}, Tags: []string{}, GalleryURLs: []string{}, ExtensionsJSON: json.RawMessage(`{}`),
+	}, 100)
+	require.NoError(t, err)
+	conversation, err := f.service.convRepo.CreateWithMessages(ctx, f.userID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, f.service.SaveCallTurn(ctx, f.userID, conversation.ID, "Hi", "Hey you."))
+	recorder := &sceneStateRecorder{}
+	f.service.SetConversationSceneStateCoordinator(recorder)
+
+	f.service.FinishLiveCall(ctx, f.userID, conversation.ID)
+	require.Zero(t, recorder.calls, "an OmniAI has no scene to update")
+}
+
 func TestRecallForCall_NoTopicIsNothingToRemember(t *testing.T) {
 	f := newLiveCallFixture(t, "Sadie", "You are Sadie.")
 	result := f.service.RecallForCall(context.Background(), f.userID, &LiveCallPlan{ConversationID: f.conversation.ID, PersonaName: "Sadie"}, "   ")

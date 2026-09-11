@@ -346,6 +346,37 @@ func (r *OmniChatVoiceRepository) EndCallOwned(ctx context.Context, id uuid.UUID
 	tag, err := r.pool.Exec(ctx, `UPDATE omnichat_call_sessions SET status='ended',ended_at=NOW(),last_activity_at=NOW() WHERE id=$1 AND user_id=$2 AND status='active'`, id, userID)
 	return tag.RowsAffected() > 0, err
 }
+
+// GetActiveCallOwned returns the caller's call while it is still active, and
+// nil once it has ended or if it was never theirs.
+func (r *OmniChatVoiceRepository) GetActiveCallOwned(ctx context.Context, id uuid.UUID, userID int) (*OmniChatCallSession, error) {
+	s := &OmniChatCallSession{}
+	err := r.pool.QueryRow(ctx, `
+		SELECT id,user_id,persona_id,conversation_id,mode,status,recording_enabled,turn_count,started_at,last_activity_at
+		FROM omnichat_call_sessions
+		WHERE id=$1 AND user_id=$2 AND status='active'
+	`, id, userID).Scan(&s.ID, &s.UserID, &s.PersonaID, &s.ConversationID, &s.Mode, &s.Status, &s.RecordingEnabled, &s.TurnCount, &s.StartedAt, &s.LastActivityAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// ClaimLiveCallOwned gives an active voice call to one socket. It succeeds once
+// per call: a second socket, from another tab or another server, is refused,
+// because each one would open its own Live session on the platform's key.
+func (r *OmniChatVoiceRepository) ClaimLiveCallOwned(ctx context.Context, id uuid.UUID, userID int, socketID string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE omnichat_call_sessions
+		SET provider='gemini_live',provider_session_id=$3,last_activity_at=NOW()
+		WHERE id=$1 AND user_id=$2 AND status='active' AND mode='voice' AND provider_session_id IS NULL
+	`, id, userID, socketID)
+	return tag.RowsAffected() > 0, err
+}
+
 func (r *OmniChatVoiceRepository) IncrementCallTurnOwned(ctx context.Context, id uuid.UUID, userID int) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `UPDATE omnichat_call_sessions SET turn_count=turn_count+1,last_activity_at=NOW() WHERE id=$1 AND user_id=$2 AND status='active'`, id, userID)
 	return tag.RowsAffected() > 0, err

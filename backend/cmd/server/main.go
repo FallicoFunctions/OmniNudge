@@ -885,6 +885,10 @@ func main() {
 		SetCallTranscription(services.NewOmniChatCallTranscription(
 			openrouterClient, cfg.OpenRouter.TranscriptionModel)).
 		SetCallSentences(omniChatCallSpeech)
+	omniChatLiveCallHandler := handlers.NewOmniChatLiveCallHandler(
+		omniChatVoiceRepo, chatbotService,
+		services.GeminiLiveDialer(cfg.Gemini.APIKey, cfg.Gemini.LiveModel),
+	)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	adminOmniChatNurseryHandler := handlers.NewAdminOmniChatNurseryHandler(botPersonaRepo)
@@ -1569,6 +1573,7 @@ func main() {
 			protected.POST("/omnichat/calls/:call_id/token", omniChatCallRateLimiter.Middleware(), omniChatVoiceHandler.RefreshCallToken)
 			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
 			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatTranscriptionRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
+			protected.GET("/omnichat/calls/:call_id/live", omniChatCallRateLimiter.Middleware(), omniChatLiveCallHandler.Connect)
 			protected.GET("/omnichat/conversations/:id/call-speech/:turn/:sequence", omniChatCallSentenceRateLimiter.Middleware(), omniChatVoiceHandler.GetCallSentenceSpeech)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)

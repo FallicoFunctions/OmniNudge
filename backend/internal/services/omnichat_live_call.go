@@ -262,6 +262,61 @@ func (s *ChatbotService) SaveCallTurn(ctx context.Context, userID, conversationI
 	return nil
 }
 
+// FinishLiveCall brings a scene up to date once a call ends. During the call
+// turns are Heard, so only the conservative delta ran; a game master's world
+// would otherwise wait for the next typed message to learn what happened on
+// the phone. Best effort: the call is over whether or not this lands.
+func (s *ChatbotService) FinishLiveCall(ctx context.Context, userID, conversationID int) {
+	if s == nil || s.sceneState == nil {
+		return
+	}
+	conv, err := s.convRepo.GetByID(ctx, conversationID, userID)
+	if err != nil || conv == nil {
+		return
+	}
+	persona, err := s.personaRepo.GetByID(ctx, conv.PersonaID)
+	if err != nil || persona == nil || !models.PersonaPerformsAScene(persona) {
+		return
+	}
+	history, err := s.messageRepo.ListByConversationID(ctx, conversationID, maxHistoryMessages)
+	if err != nil {
+		zlog.Warn().Err(err).Int("conversation_id", conversationID).Msg("omnichat live call: scene update could not read the call")
+		return
+	}
+	history = filterArtifactContaminatedAssistantHistory(history)
+	if len(history) == 0 {
+		return
+	}
+	if _, err := s.sceneState.PrepareForGeneration(ctx, userID, conversationID, persona, history); err != nil {
+		zlog.Warn().Err(err).Int("conversation_id", conversationID).Msg("omnichat live call: scene update after the call failed")
+	}
+}
+
+// DefaultLiveCallVoice speaks for every persona until each has a voice of its
+// own.
+const DefaultLiveCallVoice = "Sulafat"
+
+// GeminiLiveDialer opens Live sessions for a plan with the deployment's key.
+func GeminiLiveDialer(apiKey, model string) func(plan *LiveCallPlan) LiveCallDialer {
+	return func(plan *LiveCallPlan) LiveCallDialer {
+		return func(ctx context.Context, resumeHandle string) (LiveCallSession, error) {
+			session, err := geminilive.Dial(ctx, geminilive.Config{
+				APIKey:            apiKey,
+				Model:             model,
+				Voice:             DefaultLiveCallVoice,
+				SystemInstruction: plan.Instruction,
+				Tools:             plan.Tools,
+				ResumeHandle:      resumeHandle,
+			})
+			if err != nil {
+				// Never a typed nil inside the interface.
+				return nil, err
+			}
+			return session, nil
+		}
+	}
+}
+
 // LiveCallSession is one Live connection. *geminilive.Session is the real one.
 type LiveCallSession interface {
 	Events() <-chan geminilive.Event
