@@ -206,8 +206,8 @@ func TestProfileClientOverridesProviderControlsWithServerOwnedProfile(t *testing
 	require.True(t, ok)
 	client := &profileChatCompletionClient{completion: upstream, profile: profile}
 
-	// A caller asking for low effort on a high-effort profile is overruled: the
-	// profile owns its controls, not the request.
+	// The profile's effort is a ceiling. A caller may ask for less -- a phone
+	// call asks for minimal so she answers at once -- and is never given more.
 	_, err := client.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{
 		MaxTokens:       256,
 		ReasoningEffort: "low",
@@ -215,8 +215,14 @@ func TestProfileClientOverridesProviderControlsWithServerOwnedProfile(t *testing
 
 	require.NoError(t, err)
 	require.Equal(t, 256, upstream.options.MaxTokens)
-	require.Equal(t, "high", upstream.options.ReasoningEffort)
+	require.Equal(t, "low", upstream.options.ReasoningEffort, "a caller may lower the effort")
 	require.Empty(t, upstream.options.Speed, "no profile asks for fast routing any more")
+
+	_, err = client.GenerateWithOptions(context.Background(), nil, nil, openrouter.GenerationOptions{
+		ReasoningEffort: "max",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "high", upstream.options.ReasoningEffort, "a caller may never raise it past the profile")
 }
 
 func TestNewOmniChatProfileEvaluationClientAppliesServerOwnedControls(t *testing.T) {
