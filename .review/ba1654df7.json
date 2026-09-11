@@ -1,0 +1,72 @@
+{
+ "schema_version": 2,
+ "head": "d3a0e9798",
+ "base": "ba1654df7",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/omnichat_live_call.go",
+   "backend/internal/queue/omnichat_memory_wiring.go",
+   "backend/internal/queue/omnichat_memory_wiring_test.go",
+   "backend/internal/queue/worker.go",
+   "backend/cmd/server/main.go",
+   "backend/cmd/worker/main.go"
+  ],
+  "boundaries": [
+   "shared Redis queue -> two consuming processes (API server's embedded worker, standalone worker)",
+   "memory job -> extraction model -> omnichat_memory_episodes and omnichat_commitments",
+   "omnichat_commitments -> the [Still Outstanding] block in her instructions",
+   "live call route failures -> server log"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/6a2482b9f.json",
+  ".review/41824b03d.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Two commits from the first real call. 495c2a619 logs the error behind each 500 in the live call route. 025a51b4b gives the API server's embedded worker the memory handler it lacked, through one builder both processes call, refuses a handler set with any type missing, and gives extraction the commitment store the standalone worker never had."},
+    {"id": "A2", "status": "applied", "evidence": "Grepped every ledger for the embedded worker, RegisterAllHandlers, ConfigureOmniChatGeneration and the shared queue: none. The generation handler's own drift was fixed in code with a source-reading gate, which the memory gate copies."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the instruction a live call assembles after a real extraction had recorded two promises: [Still Outstanding], 'You said you would:' and both, split by direction, offered rather than ordered -- 'raise one only if it would come up naturally'."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "The route's responses are unchanged; only what it logs."},
+    {"id": "B4", "status": "applied", "evidence": "Read back the rows a real extraction wrote through the shared builder: two omnichat_commitments, direction hers, status open, summaries 'Text the user on Thursday night to find out how the job interview went.' and 'Remind the user on Wednesday evening to bring their portfolio.'. On the development database, the call's conversation went from watermark 0 across 1,961 messages to 1,961, with 3 episodes and 6 entities -- it had never been extracted."},
+    {"id": "C1", "status": "applied", "evidence": "The guard's table names every JobType constant, JobTypeWaveform included, which lives in another file."},
+    {"id": "C2", "status": "applied", "evidence": "The handler both processes register decodes OmniChatMemoryPayload, the payload EnqueueOmniChatMemory writes; a job enqueued through the real queue client on the development database was run by the API server's worker and moved the watermark."},
+    {"id": "C3", "status": "applied", "evidence": "The two processes used to build the memory handler in two ways, and only one existed at all; they now call one function, and the gate test fails if either main builds the queue handler itself."},
+    {"id": "C4", "status": "applied", "evidence": "The extraction model was called for real through the shared builder: 1.2 to 1.7 seconds for a four-message exchange."},
+    {"id": "C5", "status": "applied", "evidence": "SetCommitments was the one setter the server applied to its memory service and the worker did not; the server's main calls no other."},
+    {"id": "C6", "status": "applied", "evidence": "The commitment store is private to services, so it is checked by reading the builder's source and, once, by running the builder against the real model and reading the rows back."},
+    {"id": "C7", "status": "applied", "evidence": "The real run enqueued through queue.NewQueueClient and EnqueueOmniChatMemory, the path the chat service uses, not a hand-built task."},
+    {"id": "D1", "status": "applied", "evidence": "A full handler set registers; a real memory job completes."},
+    {"id": "D2", "status": "applied", "evidence": "Each of the twelve handlers left out in turn is refused, by name."},
+    {"id": "D3", "status": "applied", "evidence": "An empty extraction model falls back to the standard one, trimmed."},
+    {"id": "E1", "status": "applied", "evidence": "The sibling generation handler already went through a shared function with a gate; memory now does the same, and the gate is the same kind of test."},
+    {"id": "E2", "status": "applied", "evidence": "RegisterAllHandlers used to skip a nil handler, so the missing memory handler was unreachable by any error; that branch is now an error at startup."},
+    {"id": "E3", "status": "applied", "evidence": "The failure that hid this was a job discarded after three retries with nothing at startup; a missing handler now stops the process with the gap named, and the live call route logs what it hid."},
+    {"id": "E4", "status": "na", "why": "No flag gates the change."},
+    {"id": "E5", "status": "applied", "evidence": "The memory service construction existed once, in the standalone worker; it now exists once, in the builder."},
+    {"id": "E6", "status": "applied", "evidence": "The guard is a table, so a handler added to JobHandlers and not to the table would be silently skipped: the memory job's own shape. Added a test that clears each field by reflection and requires a refusal; all twelve are refused. Also looked for the same drift among the memory service's setters: the server set only SetCommitments, and the builder now does."},
+    {"id": "F1", "status": "na", "why": "No shared state changed."},
+    {"id": "F2", "status": "applied", "evidence": "Extraction is watermarked, so a job lost before the fix loses nothing for good: the next successful job read everything after the mark, as the development run showed."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing deleted or cancelled."},
+    {"id": "G1", "status": "na", "why": "No finding in this pass, so nothing to control; the bugs themselves were fixed with their tests before the review, which the gate and guard tests cover."},
+    {"id": "G2", "status": "applied", "evidence": "The guard is reachable: both mains call RegisterAllHandlers and stop on its error; the gate test reads both mains. The guard's own wiring is asserted beside its behaviour, per field."},
+    {"id": "H1", "status": "applied", "evidence": "go build ./..., go vet on queue, server and worker: clean. The queue wiring, gate and guard tests pass. The full suite has not been run."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "Ran the real extraction model through the shared builder on a conversation with two promises: both recorded, and a live call for that conversation then carried them in [Still Outstanding]. Ran a real memory job on the development database through the API server's worker: the call's conversation was extracted for the first time, through message 1,961."},
+    {"id": "E7", "status": "na", "why": "Nothing starts ahead of its decision."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet on queue, server and worker clean",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "queue wiring, gate and guard tests pass; the full suite has not been run"
+ }
+}
