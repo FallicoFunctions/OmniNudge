@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -42,6 +43,22 @@ func TestRegisteringAHandlerSetWithAGapIsRefused(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), string(JobTypeOmniChatMemory))
+}
+
+// Every field, not only memory: a handler added to JobHandlers but left out of
+// the guard's table would be registered by nobody and refused by nothing, which
+// is the same silence the memory job fell into.
+func TestEveryMissingHandlerIsRefusedByName(t *testing.T) {
+	fields := reflect.TypeOf(JobHandlers{})
+	for i := 0; i < fields.NumField(); i++ {
+		name := fields.Field(i).Name
+		t.Run(name, func(t *testing.T) {
+			handlers := everyHandler()
+			reflect.ValueOf(&handlers).Elem().Field(i).Set(reflect.Zero(fields.Field(i).Type))
+			err := NewWorker("127.0.0.1:0", "", 1).RegisterAllHandlers(handlers)
+			require.Errorf(t, err, "leaving %s out was not refused", name)
+		})
+	}
 }
 
 func TestRegisteringEveryHandlerSucceeds(t *testing.T) {
