@@ -436,7 +436,7 @@ func main() {
 		// have to agree about what a job can do. One function, called by both.
 		omniChatGenerationWorker = queue.ConfigureOmniChatGeneration(
 			omniChatGenerationWorker, cfg, queueThumbnailService)
-		jobWorker.RegisterAllHandlers(queue.JobHandlers{
+		if err := jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
 			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
@@ -453,7 +453,10 @@ func main() {
 				return queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle
 			}(),
 			OmniChatGeneration: omniChatGenerationWorker.Handle,
-		})
+			OmniChatMemory:     queue.NewOmniChatMemoryJobHandler(cfg, db.Pool),
+		}); err != nil {
+			zlog.Fatal().Err(err).Msg("Embedded job worker is missing a handler")
+		}
 
 		// Start worker in background
 		go func() {

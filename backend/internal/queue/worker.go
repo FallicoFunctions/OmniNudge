@@ -3,8 +3,11 @@ package queue
 import (
 	"context"
 	"errors"
-	zlog "github.com/rs/zerolog/log"
+	"fmt"
+	"strings"
 	"time"
+
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/hibiken/asynq"
 )
@@ -100,45 +103,45 @@ func (w *Worker) RegisterHandler(jobType JobType, handler JobHandler) {
 	w.mux.HandleFunc(string(jobType), handler)
 }
 
-// RegisterAllHandlers registers all default job handlers
-func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
-	// Register each job type handler
-	if handlers.VirusScan != nil {
-		w.RegisterHandler(JobTypeVirusScan, handlers.VirusScan)
+// RegisterAllHandlers registers every job handler, and refuses a set with any
+// missing.
+//
+// The API server and the standalone worker consume one queue, so a job type
+// either of them lacks is a job that fails permanently whenever that process
+// picks it up. Leaving a handler out used to be silent: the server went
+// without the memory handler, and every memory job it took was discarded. A
+// type with nothing to do registers NewUnsupportedHandler, which says so.
+func (w *Worker) RegisterAllHandlers(handlers JobHandlers) error {
+	all := []struct {
+		jobType JobType
+		handler JobHandler
+	}{
+		{JobTypeVirusScan, handlers.VirusScan},
+		{JobTypeTranscription, handlers.Transcription},
+		{JobTypeNotification, handlers.Notification},
+		{JobTypeThumbnailGeneration, handlers.ThumbnailGeneration},
+		{JobTypeEmailSend, handlers.EmailSend},
+		{JobTypeDataExport, handlers.DataExport},
+		{JobTypeContentModeration, handlers.ContentModeration},
+		{JobTypeMessageReencrypt, handlers.MessageReencrypt},
+		{JobTypeWaveform, handlers.WaveformGeneration},
+		{JobTypeVideoTranscode, handlers.VideoTranscode},
+		{JobTypeOmniChatGeneration, handlers.OmniChatGeneration},
+		{JobTypeOmniChatMemory, handlers.OmniChatMemory},
 	}
-	if handlers.Transcription != nil {
-		w.RegisterHandler(JobTypeTranscription, handlers.Transcription)
+	var missing []string
+	for _, entry := range all {
+		if entry.handler == nil {
+			missing = append(missing, string(entry.jobType))
+		}
 	}
-	if handlers.Notification != nil {
-		w.RegisterHandler(JobTypeNotification, handlers.Notification)
+	if len(missing) > 0 {
+		return fmt.Errorf("queue: no handler registered for %s", strings.Join(missing, ", "))
 	}
-	if handlers.ThumbnailGeneration != nil {
-		w.RegisterHandler(JobTypeThumbnailGeneration, handlers.ThumbnailGeneration)
+	for _, entry := range all {
+		w.RegisterHandler(entry.jobType, entry.handler)
 	}
-	if handlers.EmailSend != nil {
-		w.RegisterHandler(JobTypeEmailSend, handlers.EmailSend)
-	}
-	if handlers.DataExport != nil {
-		w.RegisterHandler(JobTypeDataExport, handlers.DataExport)
-	}
-	if handlers.ContentModeration != nil {
-		w.RegisterHandler(JobTypeContentModeration, handlers.ContentModeration)
-	}
-	if handlers.MessageReencrypt != nil {
-		w.RegisterHandler(JobTypeMessageReencrypt, handlers.MessageReencrypt)
-	}
-	if handlers.WaveformGeneration != nil {
-		w.RegisterHandler(JobTypeWaveform, handlers.WaveformGeneration)
-	}
-	if handlers.VideoTranscode != nil {
-		w.RegisterHandler(JobTypeVideoTranscode, handlers.VideoTranscode)
-	}
-	if handlers.OmniChatGeneration != nil {
-		w.RegisterHandler(JobTypeOmniChatGeneration, handlers.OmniChatGeneration)
-	}
-	if handlers.OmniChatMemory != nil {
-		w.RegisterHandler(JobTypeOmniChatMemory, handlers.OmniChatMemory)
-	}
+	return nil
 }
 
 // JobHandlers groups all job handler functions

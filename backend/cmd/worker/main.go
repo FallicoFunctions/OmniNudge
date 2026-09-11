@@ -15,7 +15,6 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/services/openrouter"
 	"github.com/omninudge/backend/internal/services/runpod"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -156,24 +155,6 @@ func main() {
 	omniChatGenerationWorker = queue.ConfigureOmniChatGeneration(
 		omniChatGenerationWorker, cfg, services.NewThumbnailService())
 
-	// Character memory extraction. This is the only place the extraction model
-	// is called, which is what keeps a 20-second reasoning pass off the send
-	// path entirely.
-	workerBotConversationRepo := models.NewBotConversationRepository(db.Pool)
-	memoryExtractionModel := strings.TrimSpace(cfg.OpenRouter.ExtractionModel)
-	if memoryExtractionModel == "" {
-		memoryExtractionModel = strings.TrimSpace(cfg.OpenRouter.StandardFallback)
-	}
-	omniChatMemoryService := services.NewOmniChatMemoryService(
-		models.NewOmniChatMemoryRepository(db.Pool),
-		models.NewBotMessageRepository(db.Pool),
-		workerBotConversationRepo,
-		models.NewBotPersonaRepository(db.Pool),
-		services.NewModelOmniChatMemoryExtractor(
-			openrouter.NewClient(cfg.OpenRouter.APIKey, memoryExtractionModel),
-		),
-	)
-
 	handlers := queue.JobHandlers{
 		VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 		Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
@@ -186,10 +167,12 @@ func main() {
 		WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
 		VideoTranscode:      queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle,
 		OmniChatGeneration:  omniChatGenerationWorker.Handle,
-		OmniChatMemory:      queue.NewOmniChatMemoryHandler(omniChatMemoryService, workerBotConversationRepo),
+		OmniChatMemory:      queue.NewOmniChatMemoryJobHandler(cfg, db.Pool),
 	}
 
-	worker.RegisterAllHandlers(handlers)
+	if err := worker.RegisterAllHandlers(handlers); err != nil {
+		zlog.Fatal().Err(err).Msg("Worker is missing a job handler")
+	}
 
 	zlog.Info().Int("concurrency", concurrency).Msg("Worker configured")
 	zlog.Info().Strs("handlers", []string{"virus_scan", "transcription", "notification", "thumbnail_generation", "email_send", "data_export", "content_moderation", "message_reencrypt", "waveform_generation", "video_transcode", "omnichat_generation", "omnichat_memory_extract"}).Msg("Registered job handlers")
