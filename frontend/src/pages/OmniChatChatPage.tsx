@@ -3187,7 +3187,14 @@ export default function OmniChatChatPage() {
           persona={activePersona}
           conversationId={selectedConversationId}
           mode={callMode}
-          onClose={() => setCallMode(null)}
+          onClose={() => {
+            setCallMode(null);
+            // A voice call saves its turns on the server as they are spoken and
+            // nothing pushes them here, so this is when the chat catches up.
+            void queryClient.invalidateQueries({
+              queryKey: omnichatQueryKeys.conversation(selectedConversationId),
+            });
+          }}
           onPaymentRequired={() => setVideoPaywallFeature('video_call')}
           onAssistant={(message) => {
             queryClient.setQueryData<BotConversationDetail | undefined>(

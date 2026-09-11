@@ -119,6 +119,12 @@ export function describeSilence(peak: number, chunks: number, contextState: stri
 export type CallMicrophone = {
   stream: MediaStream;
   /**
+   * The call's audio graph, resumed while the call was starting. A live call
+   * captures and plays through it for the same reason play() does: a context
+   * made later may not be allowed to make sound.
+   */
+  context: AudioContext;
+  /**
    * Plays her voice through the call's own audio graph.
    *
    * A fresh Audio element is refused by Safari once the click that started the
@@ -183,6 +189,7 @@ export async function openMicrophone(): Promise<CallMicrophone | string> {
 
   return {
     stream,
+    context: audioContext,
     play: async (blob: Blob) => {
       playing?.stop();
       playing = null;

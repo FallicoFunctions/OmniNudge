@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OmniChatCallModal, { isTrustedOmniChatCallUrl } from '../OmniChatCallModal';
 import { omnichatService } from '../../../services/omnichatService';
 import { speakOmniChatMessage } from '../OmniChatSpeakButton';
+import { openLiveCallSocket, type LiveCallSocketHandlers } from '../liveCallSocket';
 import type { BotPersona, OmniChatCallSession } from '../../../types/omnichat';
 
 const roomMock = vi.hoisted(() => ({
@@ -53,6 +54,37 @@ vi.mock('../../../services/omnichatService', async (importOriginal) => ({
 vi.mock('../OmniChatSpeakButton', () => ({
   speakOmniChatMessage: vi.fn(),
   stopOmniChatSpeech: vi.fn(),
+}));
+
+// The live connection and its audio, with a hand on each end: what the
+// microphone produces, what the socket delivers, and when she starts and stops.
+const live = vi.hoisted(() => ({
+  socket: { sendAudio: vi.fn(), close: vi.fn() },
+  capture: { stop: vi.fn() },
+  player: { enqueue: vi.fn(), clear: vi.fn(), isPlaying: vi.fn(() => false) },
+  handlers: null as null | LiveCallSocketHandlers,
+  onChunk: null as null | ((pcm: ArrayBuffer) => void),
+  onPlaying: null as null | ((playing: boolean) => void),
+}));
+
+vi.mock('../liveCallSocket', () => ({
+  openLiveCallSocket: vi.fn(async (_callId: string, handlers: LiveCallSocketHandlers) => {
+    live.handlers = handlers;
+    return live.socket;
+  }),
+}));
+
+vi.mock('../liveCallAudio', () => ({
+  startLiveCallCapture: vi.fn(
+    async (_context: AudioContext, _stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void) => {
+      live.onChunk = onChunk;
+      return live.capture;
+    }
+  ),
+  createLivePcmPlayer: vi.fn((_context: AudioContext, onPlaying: (playing: boolean) => void) => {
+    live.onPlaying = onPlaying;
+    return live.player;
+  }),
 }));
 
 const persona: BotPersona = {
@@ -322,7 +354,7 @@ describe('OmniChatCallModal', () => {
       <OmniChatCallModal
         persona={persona}
         conversationId={12}
-        mode="voice"
+        mode="video"
         onClose={vi.fn()}
         onAssistant={onAssistant}
       />
@@ -365,7 +397,7 @@ describe('OmniChatCallModal', () => {
       <OmniChatCallModal
         persona={persona}
         conversationId={12}
-        mode="voice"
+        mode="video"
         onClose={vi.fn()}
         onAssistant={vi.fn()}
       />
@@ -459,6 +491,9 @@ describe('OmniChatCallModal', () => {
 
     beforeEach(() => {
       FakeRecorder.instances = [];
+      live.handlers = null;
+      live.onChunk = null;
+      live.onPlaying = null;
       // Configured here rather than inherited. Without it these tests pass
       // only when something earlier in the file has set it, which is a test
       // that proves nothing on its own -- and a control built on one proves
@@ -546,15 +581,8 @@ describe('OmniChatCallModal', () => {
       view.unmount();
     });
 
-    // And on an ordinary voice call she does speak them, which is the whole
-    // point: the first sentence is fetched while the rest of the reply is
-    // still being written.
-    it('fetches a sentence as soon as it is announced on a voice call', async () => {
+    const renderVoiceCall = async () => {
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);
-      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
-      vi.mocked(omnichatService.sendMessage).mockResolvedValue({ accepted: true });
-      vi.mocked(omnichatService.getCallSentenceSpeech).mockResolvedValue(null);
-
       const view = render(
         <OmniChatCallModal
           persona={persona}
@@ -564,48 +592,90 @@ describe('OmniChatCallModal', () => {
           onAssistant={vi.fn()}
         />
       );
-      await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
-
-      const box = await screen.findByPlaceholderText(/type/i);
-      fireEvent.change(box, { target: { value: 'are you there' } });
-      fireEvent.click(screen.getByRole('button', { name: /send/i }));
-      await waitFor(() => expect(omnichatService.sendMessage).toHaveBeenCalled());
-
-      await act(async () => {
-        window.dispatchEvent(
-          new CustomEvent('omnichat_call_sentence', {
-            detail: { conversation_id: 12, turn: '3f2504e0-4f89-11d3-9a0c-0305e82c3301', sequence: 1 },
-          })
-        );
+      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()), {
+        timeout: 3000,
       });
+      await waitFor(() => expect(live.onChunk).not.toBeNull());
+      return view;
+    };
 
-      await waitFor(() =>
-        expect(omnichatService.getCallSentenceSpeech).toHaveBeenCalledWith(
-          12,
-          '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
-          1
-        )
-      );
+    // Pressing the phone is the whole of it: the microphone opens, the live
+    // connection opens, and she is heard and heard back with nothing else
+    // pressed and nothing recorded, transcribed or sent a turn at a time.
+    it('carries a voice call over one live connection', async () => {
+      const view = await renderVoiceCall();
+      expect(FakeRecorder.instances).toHaveLength(0);
+      expect(screen.queryByLabelText('Type during call')).toBeNull();
+
+      const said = new ArrayBuffer(3200);
+      act(() => live.onChunk?.(said));
+      expect(live.socket.sendAudio).toHaveBeenCalledWith(said);
+
+      const reply = new ArrayBuffer(4800);
+      act(() => {
+        live.handlers?.onAudio(reply);
+        live.onPlaying?.(true);
+      });
+      expect(live.player.enqueue).toHaveBeenCalledWith(reply);
+      expect(screen.getByText('Speaking')).toBeInTheDocument();
+
+      act(() => {
+        live.handlers?.onEvent({ type: 'heard', text: 'Wait, ' });
+        live.handlers?.onEvent({ type: 'heard', text: 'hold on' });
+      });
+      expect(screen.getByText('“Wait, hold on”')).toBeInTheDocument();
+      act(() => live.handlers?.onEvent({ type: 'interrupted' }));
+      expect(live.player.clear).toHaveBeenCalled();
+
+      view.unmount();
+      expect(live.socket.close).toHaveBeenCalled();
+      expect(live.capture.stop).toHaveBeenCalled();
+    });
+
+    // Muting on a phone call is for when she is talking as much as when she
+    // is not. The turn-based button was disabled while she spoke.
+    it('mutes what goes out, even while she is speaking', async () => {
+      const view = await renderVoiceCall();
+      act(() => live.onPlaying?.(true));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mute the microphone' }));
+      act(() => live.onChunk?.(new ArrayBuffer(3200)));
+      expect(live.socket.sendAudio).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Unmute the microphone' }));
+      act(() => live.onChunk?.(new ArrayBuffer(3200)));
+      expect(live.socket.sendAudio).toHaveBeenCalledTimes(1);
       view.unmount();
     });
 
-    it('opens the microphone once the call connects, with nothing else pressed', async () => {
+    // Development runs under StrictMode, which invokes an effect, cleans it up
+    // and invokes it again. A connection closed in that cleanup is a hang-up to
+    // the server, and the server ends the call on a hang-up.
+    it('keeps one live connection under StrictMode', async () => {
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);
       const view = render(
-        <OmniChatCallModal
-          persona={persona}
-          conversationId={12}
-          mode="voice"
-          onClose={vi.fn()}
-          onAssistant={vi.fn()}
-        />
+        <StrictMode>
+          <OmniChatCallModal
+            persona={persona}
+            conversationId={12}
+            mode="voice"
+            onClose={vi.fn()}
+            onAssistant={vi.fn()}
+          />
+        </StrictMode>
       );
+      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalled(), { timeout: 3000 });
+      await waitFor(() => expect(live.onChunk).not.toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(openLiveCallSocket).toHaveBeenCalledTimes(1);
+      expect(live.socket.close).not.toHaveBeenCalled();
+      view.unmount();
+    });
 
-      await waitFor(() => expect(omnichatService.startCall).toHaveBeenCalled());
-      await waitFor(() => expect(getUserMedia).toHaveBeenCalled(), { timeout: 3000 });
-      await waitFor(() => expect(FakeRecorder.instances.length).toBeGreaterThan(0), {
-        timeout: 3000,
-      });
+    it('says the call dropped when the server ends it', async () => {
+      const view = await renderVoiceCall();
+      act(() => live.handlers?.onClose({ code: 1011, reason: 'The call dropped', clean: true }));
+      expect(screen.getByRole('alert')).toHaveTextContent(/call dropped/i);
       view.unmount();
     });
 
@@ -618,7 +688,7 @@ describe('OmniChatCallModal', () => {
         <OmniChatCallModal
           persona={persona}
           conversationId={12}
-          mode="voice"
+          mode="video"
           onClose={vi.fn()}
           onAssistant={vi.fn()}
         />

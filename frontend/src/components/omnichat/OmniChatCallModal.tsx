@@ -10,7 +10,7 @@ import {
 } from '../../services/omnichatService';
 import type { BotMessage, BotPersona, OmniChatCallSession } from '../../types/omnichat';
 import { speakOmniChatMessage, stopOmniChatSpeech } from './OmniChatSpeakButton';
-import { playCallSentences } from './callSentenceSpeech';
+import { useLiveVoiceCall } from './useLiveVoiceCall';
 import {
   openMicrophone,
   recordUtterance,
@@ -109,6 +109,9 @@ export default function OmniChatCallModal({
   const [heardLevel, setHeardLevel] = useState(0);
   const [microphoneReady, setMicrophoneReady] = useState(false);
   const [startFailure, setStartFailure] = useState('');
+  // The session a voice call's live connection belongs to. State rather than
+  // the session ref, so the connection opens when it arrives.
+  const [liveCallId, setLiveCallId] = useState<string | null>(null);
   const sessionRef = useRef<OmniChatCallSession | null>(null);
   const liveKitRoomRef = useRef<Room | null>(null);
   const liveVideoTokenRef = useRef('');
@@ -190,6 +193,7 @@ export default function OmniChatCallModal({
             return;
           }
           sessionRef.current = created;
+          if (mode === 'voice') setLiveCallId(created.id);
           setLiveVideoURL(created.live_video_url ?? '');
           liveVideoTokenRef.current = created.live_video_token ?? '';
           setStatus('ready');
@@ -231,6 +235,7 @@ export default function OmniChatCallModal({
       stopOmniChatSpeech();
       const currentSession = sessionRef.current;
       sessionRef.current = null;
+      setLiveCallId(null);
       liveVideoTokenRef.current = '';
       if (currentSession?.status === 'active')
         void omnichatService.endCall(currentSession.id).catch(() => undefined);
@@ -349,28 +354,6 @@ export default function OmniChatCallModal({
     try {
       // Listen first: the reply can land before the send call settles.
       const replyArrived = waitForOmniChatReply(conversationId, turnController.signal);
-      // And listen for her voice before that: the first sentence is announced
-      // while the rest of the reply is still being written, which is the whole
-      // reason a call no longer waits for the reply to finish.
-      // Not in video mode. There the avatar says the reply itself over its own
-      // connection, and a sentence run beside it would speak every word a
-      // second time, out of the local speaker, half a beat apart. The avatar
-      // decision is made further down, after the reply arrives -- too late to
-      // stop a run that has already started talking.
-      const play = mode === 'video' ? undefined : microphoneRef.current?.play;
-      const sentences = play
-        ? playCallSentences({
-            conversationId,
-            fetchSentence: (turn, sequence) =>
-              omnichatService.getCallSentenceSpeech(conversationId, turn, sequence),
-            play,
-            onSpeaking: (speaking) => {
-              if (!closedRef.current && callEpochRef.current === callEpoch)
-                setStatus(speaking ? 'speaking' : 'ready');
-            },
-          })
-        : null;
-      turnController.signal.addEventListener('abort', () => sentences?.cancel(), { once: true });
       // If the send itself fails, nothing below ever awaits this one, and an
       // unobserved rejection is an unhandled promise rejection.
       void replyArrived.catch(() => undefined);
@@ -381,10 +364,7 @@ export default function OmniChatCallModal({
         turnController.signal
       );
       const assistant = await replyArrived;
-      if (closedRef.current || callEpochRef.current !== callEpoch) {
-        sentences?.cancel();
-        return;
-      }
+      if (closedRef.current || callEpochRef.current !== callEpoch) return;
       onAssistant(assistant);
       let avatarHandledSpeech = false;
       const liveKitRoom = liveKitRoomRef.current;
@@ -411,13 +391,7 @@ export default function OmniChatCallModal({
       const activeSession = sessionRef.current;
       if (activeSession)
         void omnichatService.recordCallTurn(activeSession.id).catch(() => undefined);
-      if (avatarHandledSpeech) sentences?.cancel();
-      // She may already have said all of this, a sentence at a time, while the
-      // reply was still being written. Speaking it again from the top would be
-      // the machinery showing through at the worst possible moment.
-      const alreadySpoken = sentences ? await sentences.finished : false;
-      if (closedRef.current || callEpochRef.current !== callEpoch) return;
-      if (!avatarHandledSpeech && !alreadySpoken) {
+      if (!avatarHandledSpeech) {
         try {
           await speakOmniChatMessage({
             personaId: persona.id,
@@ -570,13 +544,30 @@ export default function OmniChatCallModal({
   // thinking, and never after a failed attempt -- that latch is what keeps a
   // recogniser which ends instantly from being restarted instantly, forever.
   useEffect(() => {
+    // A voice call listens over its live connection, all the time.
+    if (mode === 'voice') return;
     if (status !== 'ready' || !handsFree || closedRef.current) return;
     if (!microphoneReady || autoListenBlockedRef.current) return;
     const timer = window.setTimeout(() => {
       if (!closedRef.current) startListeningRef.current();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [status, handsFree, microphoneReady]);
+  }, [mode, status, handsFree, microphoneReady]);
+
+  // A voice call is one live connection: the caller and she are heard as they
+  // speak, so there is no turn to record, transcribe and send.
+  useLiveVoiceCall({
+    callId: mode === 'voice' ? liveCallId : null,
+    microphone: mode === 'voice' && microphoneReady ? microphoneRef.current : null,
+    muted: !handsFree,
+    onState: setStatus,
+    onHeard: setTranscript,
+    onFailed: (message) => {
+      if (closedRef.current) return;
+      setStartFailure(message);
+      setStatus('error');
+    },
+  });
 
   function endCall() {
     if (closedRef.current) return;
@@ -590,6 +581,7 @@ export default function OmniChatCallModal({
     stopOmniChatSpeech();
     const activeSession = sessionRef.current;
     sessionRef.current = null;
+    setLiveCallId(null);
     setLiveVideoURL('');
     liveVideoTokenRef.current = '';
     liveKitRoomRef.current?.disconnect();
@@ -709,7 +701,7 @@ export default function OmniChatCallModal({
               {startFailure || 'The call could not be connected. End the call and try again.'}
             </p>
           )}
-          {status !== 'error' && (
+          {status !== 'error' && mode === 'video' && (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -751,7 +743,12 @@ export default function OmniChatCallModal({
                   setListeningNotice('');
                   setHandsFree(true);
                 }}
-                disabled={status === 'connecting' || status === 'thinking' || status === 'speaking'}
+                // On a voice call, muting while she speaks is exactly when it
+                // is wanted; only the turn-based video call locks it then.
+                disabled={
+                  status === 'connecting' ||
+                  (mode === 'video' && (status === 'thinking' || status === 'speaking'))
+                }
                 aria-label={handsFree ? 'Mute the microphone' : 'Unmute the microphone'}
                 className={`flex h-16 w-16 items-center justify-center rounded-full ${!handsFree ? 'bg-white/15 backdrop-blur' : status === 'listening' ? 'bg-white text-black' : 'bg-white/25 backdrop-blur'} disabled:opacity-40`}
               >
