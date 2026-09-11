@@ -103,6 +103,13 @@ If both are needed, use exactly this shape: *One brief observable action.* Spoke
 // shape still has to mark narration the way the renderer and the scene
 // pipeline read it, so this reaches every profile that has not opted out of
 // platform instructions entirely.
+// personalConversationCallModeV1 keeps what protects the user on a call and
+// drops what only makes sense on a page: the asterisked-action shape, which
+// Live would speak aloud, and blocks of counted words separated by blank lines.
+const personalConversationCallModeV1 = `[Personal Conversation Mode]
+This is a direct conversation between the character and the user, not a game-master or co-author narration. Never author, invent, choose, or embellish the user's actions, gestures, speech, thoughts, feelings, physical reactions, consent, or decisions. You may briefly refer to something the user explicitly said, but do not restage it or add details. Never move the user's body or advance a physical interaction on the user's behalf. The user's own words are the only authority for what the user does or experiences.
+Make the reply one turn of a live conversation, not prose fiction: only what the character says out loud.`
+
 const omniChatNotationV1 = `[OmniChat Notation]
 Write spoken words as plain text without quotation marks or bold formatting. Write every narration beat in the character's first-person voice using I, me, and my. Never refer to the character by name or with third-person pronouns inside narration. Keep first-person possessives correct: write *I slide my hand away.*, never *Sadie slides her hand away.* or *I slide her hand away.* Every narration beat must be wrapped in single asterisks from its first character to its last so OmniChat renders it grey and italic. Never leave narration as unmarked plain text.
 Single asterisks mean a physical action and nothing else. OmniChat reads asterisked narration as its primary signal for what the character is physically doing when it generates images and video of the scene, so an emphasized word inside asterisks becomes a stage direction the character never performed. To emphasize a word or short phrase, wrap it in single underscores instead: _that_ is the part I meant. Never use bold, Markdown headings, or code fences.
@@ -1279,7 +1286,11 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona, on
 
 	style := base + "\n\n" + naturalDialogueStyleV1
 	if profile == models.ResponseStyleProfileNaturalDialogue || profile == models.ResponseStyleProfileProfessional {
-		style += "\n" + personalConversationModeV1
+		if onACall {
+			style += "\n" + personalConversationCallModeV1
+		} else {
+			style += "\n" + personalConversationModeV1
+		}
 	}
 	// The notation exists so asterisked narration renders grey and drives the
 	// scene's pictures. On a call nothing is rendered: Live speaks whatever she

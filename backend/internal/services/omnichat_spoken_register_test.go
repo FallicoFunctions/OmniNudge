@@ -120,6 +120,14 @@ func TestACallPromptNamesOneMedium(t *testing.T) {
 	require.Contains(t, roleplayText, "[OmniChat Notation]", "typed roleplay keeps its narration markup")
 	require.NotContains(t, roleplayCall, "[OmniChat Notation]")
 	require.NotContains(t, roleplayCall, "wrapped in single asterisks")
+
+	// The same shape one block over: personal conversation mode prescribes an
+	// asterisked action and paragraph blocks of counted words.
+	require.Contains(t, roleplayText, "*One brief observable action.*")
+	require.NotContains(t, roleplayCall, "*One brief observable action.*")
+	require.NotContains(t, roleplayCall, "medium block")
+	require.Contains(t, roleplayCall, "Never author, invent, choose, or embellish the user's actions",
+		"a call keeps the rule that she never speaks or acts for the other person")
 }
 
 // It says what to do, not only what to avoid: "no asterisks" invites a model to
