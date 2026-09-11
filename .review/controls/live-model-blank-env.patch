@@ -1,0 +1,13 @@
+diff --git a/backend/internal/config/config.go b/backend/internal/config/config.go
+index 2ca699518..1001e6527 100644
+--- a/backend/internal/config/config.go
++++ b/backend/internal/config/config.go
+@@ -462,7 +462,7 @@ func Load() (*Config, error) {
+ 		Gemini: GeminiConfig{
+ 			APIKey:    getEnv("GEMINI_API_KEY", ""),
+ 			Model:     getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+-			LiveModel: getEnvUnlessBlank("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
++			LiveModel: getEnv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
+ 		},
+ 		OpenRouter: OpenRouterConfig{
+ 			APIKey: getEnv("OPENROUTER_API_KEY", ""),

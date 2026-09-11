@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/geminilive/session.go b/backend/internal/services/geminilive/session.go
+index f94bf7528..b26acf398 100644
+--- a/backend/internal/services/geminilive/session.go
++++ b/backend/internal/services/geminilive/session.go
+@@ -120,8 +120,6 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
+ 	conn.SetReadLimit(maxServerFrame)
+ 	// A read deadline only covers the timeout; a caller who hangs up during
+ 	// setup cancels ctx, and only closing the socket unblocks the read.
+-	stopWatching := context.AfterFunc(ctx, func() { conn.Close() })
+-	defer stopWatching()
+ 
+ 	s := &Session{conn: conn, events: make(chan Event, eventBuffer), done: make(chan struct{})}
+ 	err = s.write(clientMessage{Setup: buildSetup(cfg)})

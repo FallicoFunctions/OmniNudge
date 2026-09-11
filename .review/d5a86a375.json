@@ -1,0 +1,134 @@
+{
+ "schema_version": 2,
+ "head": "4e0efdfe4",
+ "base": "d5a86a375",
+ "scope": {
+  "files": [
+   "backend/.env.example",
+   "backend/internal/config/config.go",
+   "backend/internal/config/config_test.go",
+   "backend/internal/services/geminilive/messages.go",
+   "backend/internal/services/geminilive/session.go",
+   "backend/internal/services/geminilive/session_test.go"
+  ],
+  "boundaries": [
+   "environment -> config (GEMINI_LIVE_MODEL)",
+   "Go -> Gemini Live websocket (setup, realtimeInput, toolResponse frames)",
+   "Gemini Live websocket -> Go (serverContent, toolCall, goAway, resumption, usage frames)",
+   "caller context -> Dial (cancellation during setup)"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/464c678c8.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Six files: a new Live client package with its tests, one config field and its example line. Boundaries are the environment, the Live websocket in both directions, and the caller's context."},
+    {"id": "A2", "status": "applied", "evidence": "Grepped every ledger for geminilive, Gemini Live and BidiGenerateContent: none. Read 464c678c8.json, the last call-pipeline review; this package replaces that pipeline and inherits none of its code, so nothing already found applies."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the setup frame through a throwaway test for two configs: a bare model, and a model with voice, system instruction, a tool and a resume handle. The model prefix is added once and not doubled for models/x; optional blocks are absent when unset; sessionResumption is {} when there is no handle, which still asks for handles."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "No query or migration."},
+    {"id": "C1", "status": "applied", "evidence": "Every wire key checked against frames the real server sent in the raw probe: setupComplete, serverContent.inputTranscription/outputTranscription/modelTurn.parts[].inlineData, turnComplete, toolCall.functionCalls[].id/name/args. mimeType audio/pcm;rate=16000 in and audio/pcm;rate=24000 out, as observed."},
+    {"id": "C2", "status": "applied", "evidence": "The tool response the server received was answered and used: she said the caller had been nervous about the coding test, a fact present only in the tool response."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "Run against the real API with spoken 16 kHz audio and a recall_memory tool, twice. Both heard every word, both called the tool, both answered with the recalled fact. The first probe hung: one second of digital silence does not end a turn for the server's activity detection, three seconds or audioStreamEnd does. That is a property of the provider, not a defect here, and is recorded for the relay, which streams a live microphone."},
+    {"id": "C5", "status": "applied", "evidence": "The (de)serialiser is encoding/json on tagged structs, so no hand-written path can miss a field. LiveModel is read in Load and nowhere else yet."},
+    {"id": "C6", "status": "applied", "evidence": "The reader is eventsFrom. TestSession_EventsArriveInOrder reads every kind back through it and asserts the decoded values, not only presence: the PCM bytes, both transcripts, the handle, timeLeft and the token total."},
+    {"id": "C7", "status": "applied", "evidence": "Fake-server frames are copied from the shapes the real server produced in the raw probe, including base64 audio in inlineData.data."},
+    {"id": "D1", "status": "applied", "evidence": "Real config values: a bare model name and a models/-prefixed one both produce one models/ prefix."},
+    {"id": "D2", "status": "applied", "evidence": "An empty key or model is refused before dialling; a setup refused by close frame or by an error frame returns ErrSetupRefused."},
+    {"id": "D3", "status": "applied", "evidence": "Empty values: GEMINI_LIVE_MODEL present and blank, as .env.example ships it, became an empty model because getEnv only defaults when the variable is absent. Every call would have failed ErrNotConfigured on any deployment copied from the example. Finding L1."},
+    {"id": "E1", "status": "applied", "evidence": "Siblings in the same function: DialContext honours cancellation, the setup read that follows it did not, so a caller who hung up during setup waited out the fifteen-second timeout. Finding L2."},
+    {"id": "E2", "status": "applied", "evidence": "Every event kind is produced by some frame the server sends; EventToolCancel is the one not seen live, and is in the documented protocol."},
+    {"id": "E3", "status": "applied", "evidence": "A read error or error frame ends the session and is kept for Err; a normal close leaves Err nil. Undecodable frames end the session loudly rather than being skipped."},
+    {"id": "E4", "status": "na", "why": "No flag gates any path."},
+    {"id": "E5", "status": "applied", "evidence": "The endpoint and audio rates are named once as constants. The model default lives only in config."},
+    {"id": "E6", "status": "applied", "evidence": "Scanned every getEnv with a non-empty default whose .env.example line is blank: GEMINI_MODEL is the only other one, and NewHubAIDesignerHandler already falls back when it is empty. No other instance."},
+    {"id": "F1", "status": "applied", "evidence": "go test -race on the package: clean."},
+    {"id": "F2", "status": "na", "why": "No transaction or queue."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "Close is idempotent and closes the socket, which ends the read loop and closes Events; a send after Close returns ErrClosed. Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "Both fixes controlled; see the findings."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "go build ./..., go vet on both packages, gofmt: clean. The narrow tests pass under -race."},
+    {"id": "Z1", "status": "applied", "evidence": "Both findings came from listed instruments, D3 and E1. Nothing new to add."},
+    {"id": "B5", "status": "applied", "evidence": "Three live probes against gemini-3.1-flash-live-preview. With audioStreamEnd: heard at 0.32 s, tool call at 0.75 s, first sound at 1.45 s. With trailing silence: first sound at 0.80 s. Both replies used the recalled fact and differed in wording, as two turns should."},
+    {"id": "E7", "status": "applied", "evidence": "The read loop starts only after setupComplete, and the context watcher is stopped before Dial returns -- deferred after cancel, so it runs first -- so cancelling the dial context later cannot close a live session."}
+   ],
+   "findings": [
+    {
+     "id": "L1",
+     "summary": "GEMINI_LIVE_MODEL blank in a copy of .env.example meant no model at all, so every call would fail ErrNotConfigured",
+     "found_by": "D3",
+     "fix_commit": "4e0efdfe4",
+     "control": {
+      "patch": ".review/controls/live-model-blank-env.patch",
+      "runner": "go",
+      "tests": ["./internal/config/ -run TestLoadGivesACallAModelWhenTheExampleLeavesItBlank"],
+      "observed": "expected: \"gemini-3.1-flash-live-preview\", actual: \"\""
+     }
+    },
+    {
+     "id": "L2",
+     "summary": "a caller who hung up during Live setup waited out the fifteen-second timeout, because the setup read ignored cancellation",
+     "found_by": "E1",
+     "fix_commit": "4e0efdfe4",
+     "control": {
+      "patch": ".review/controls/live-setup-ignores-hangup.patch",
+      "runner": "go",
+      "tests": ["./internal/services/geminilive/ -run TestDial_HangingUpDuringSetupReturnsAtOnce"],
+      "observed": "Dial took 15.001100959s after the caller hung up, want well under the 15s setup timeout"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the two fixes: getEnvUnlessBlank and the context watcher in Dial, plus their tests."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers as pass 1; nothing new applies."},
+    {"id": "B1", "status": "applied", "evidence": "The setup frame is unchanged by either fix; the pass 1 printout stands. The config value was printed through the control test: blank gives the default, and the control shows the empty string it replaced."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "No query or migration."},
+    {"id": "C1", "status": "applied", "evidence": "The fixes change no wire key."},
+    {"id": "C2", "status": "applied", "evidence": "Dial still returns a session whose events arrive: the event, tool and audio tests pass after the fix, which they would not if the watcher closed the socket on return."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The provider contract is untouched by the fixes; the live result of pass 1 stands."},
+    {"id": "C5", "status": "applied", "evidence": "LiveModel is still read in one place, now through getEnvUnlessBlank."},
+    {"id": "C6", "status": "applied", "evidence": "The control test reads the value back through Load, the real accessor, not through the helper alone, so reverting the Load line fails it -- which the control shows."},
+    {"id": "C7", "status": "applied", "evidence": "The config test sets the variable present and empty with t.Setenv, which is exactly the state a copied .env.example produces."},
+    {"id": "D1", "status": "applied", "evidence": "A real model name set in the variable is still used as given."},
+    {"id": "D2", "status": "na", "why": "The fixes add no refusal."},
+    {"id": "D3", "status": "applied", "evidence": "Whitespace-only is treated as blank, via TrimSpace; a set value is returned trimmed."},
+    {"id": "E1", "status": "applied", "evidence": "The setup write and read now both stop on cancellation, like the dial before them."},
+    {"id": "E2", "status": "applied", "evidence": "The ctx.Err branch is reached by the control test; the plain error branch by the refusal tests."},
+    {"id": "E3", "status": "applied", "evidence": "A cancelled setup reports context.Canceled wrapped, not a misleading closed-connection error."},
+    {"id": "E4", "status": "na", "why": "No flag gates any path."},
+    {"id": "E5", "status": "applied", "evidence": "getEnvUnlessBlank is the one helper for this rule; nothing duplicates it."},
+    {"id": "E6", "status": "applied", "evidence": "The blank-default scan from pass 1 found only GEMINI_MODEL, which its handler already defaults. No other Dial-like wait on a socket exists in the package."},
+    {"id": "F1", "status": "applied", "evidence": "The package and config tests pass under -race after the fixes."},
+    {"id": "F2", "status": "na", "why": "No transaction or queue."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "A cancelled setup closes the socket; nothing is left open."},
+    {"id": "G1", "status": "applied", "evidence": "Both controls applied by hand and fail as tests with real assertions, recorded in pass 1."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "gofmt, go vet and the narrow tests with -race: clean."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "The fixes touch neither the frames nor the model input; the three live probes of pass 1 are the current behaviour."},
+    {"id": "E7", "status": "applied", "evidence": "The watcher is the one thing started early in Dial, and it is stopped before Dial returns on every path."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet ./internal/config ./internal/services/geminilive clean",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "narrow: geminilive and the new config test pass under -race; full suite not yet run, pending the user"
+ }
+}
