@@ -1,0 +1,142 @@
+{
+ "schema_version": 2,
+ "head": "8de52877b",
+ "base": "41824b03d",
+ "scope": {
+  "files": [
+   "backend/cmd/server/main.go",
+   "backend/internal/handlers/omnichat_live_call.go",
+   "backend/internal/handlers/omnichat_live_call_test.go",
+   "backend/internal/models/omnichat_voice.go",
+   "backend/internal/models/omnichat_voice_repository_test.go",
+   "backend/internal/services/omnichat_live_call.go",
+   "backend/internal/services/omnichat_live_call_test.go",
+   "backend/internal/database/migrations/208_omnichat_gemini_live_calls.up.sql",
+   "backend/internal/database/migrations/208_omnichat_gemini_live_calls.down.sql",
+   "backend/internal/database/omnichat_expansion_migration_test.go",
+   "backend/internal/database/omnichat_omniai_appearance_migration_test.go"
+  ],
+  "boundaries": [
+   "browser -> router middleware -> websocket upgrade (auth token, origin, rate limit, request deadline)",
+   "browser socket <-> relay <-> Gemini Live (binary PCM, JSON events)",
+   "handler -> omnichat_call_sessions (active-call read, one-socket claim, end)",
+   "provider column -> every existing reader of it (avatar cleanup, EndCall, token refresh, retention)",
+   "hang-up -> detached scene extraction"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/e76a5639e.json",
+  ".review/d5a86a375.json",
+  ".review/464c678c8.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 2b: a websocket route and handler, a browser adapter, an active-call read, the end-of-call scene update, and the Gemini dialer wired in main. The review followed the route through the router's global middleware, not only the handler."},
+    {"id": "A2", "status": "applied", "evidence": "e76a5639e.json covered the service side of the relay; nothing in it applies to the route, the router or the call row. No ledger had looked at the global Timeout middleware or at the provider column."},
+    {"id": "B1", "status": "applied", "evidence": "The Live instruction and tool payloads are unchanged from Phase 2a, printed there for two kinds of persona; the route passes the plan through untouched, as the real run confirms."},
+    {"id": "B2", "status": "na", "why": "No component changed; the browser side is Phase 3."},
+    {"id": "B3", "status": "applied", "evidence": "Printed through the real route: a second socket for the same call gets HTTP 409 {\"error\":\"This call is already connected\",\"code\":\"conflict\",...}; a video call gets 409 \"Live audio is only for voice calls\". The refusal table covers 400, 404 (none, somebody else's, conversation gone), 403 (blocked) and 409, each asserted to happen before any dial."},
+    {"id": "B4", "status": "applied", "evidence": "After a real call through the route: the call row reads status=ended provider=gemini_live, and the turn is saved as a user and an assistant message in spoken order."},
+    {"id": "C1", "status": "applied", "evidence": "The event type strings the browser will read are the services constants; the provider value 'gemini_live' is written once, in ClaimLiveCallOwned, and allowed once, in migration 208."},
+    {"id": "C2", "status": "applied", "evidence": "The browser adapter writes her audio as binary frames and events as JSON text frames; the websocket test reads both back and decodes the event into services.LiveCallEvent."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The real GeminiLiveDialer, which had never run, was run through the real handler: setup accepted, speech heard, recall answered, audio relayed."},
+    {"id": "C5", "status": "applied", "evidence": "GetActiveCallOwned scans every column it selects into the session, and the repository test asserts id, conversation, persona and mode came back."},
+    {"id": "C6", "status": "applied", "evidence": "The repository tests read through the real accessor against Postgres rather than a fake."},
+    {"id": "C7", "status": "applied", "evidence": "The websocket tests dial with a local development Origin, the only kind the real upgrader accepts outside production."},
+    {"id": "D1", "status": "applied", "evidence": "A real call id, a real voice call and real audio all pass."},
+    {"id": "D2", "status": "applied", "evidence": "A malformed id, another user's call, an ended call, a video call and a blocked persona are refused; text frames on the socket are ignored rather than sent to Live."},
+    {"id": "D3", "status": "applied", "evidence": "Frames over 64 KB are refused by the read limit; empty binary frames are dropped."},
+    {"id": "E1", "status": "applied", "evidence": "The sibling /ws handler never reads the request context; this one ran the whole call on it. Found LV1 by reading the router's global middleware: Timeout(30s) puts a deadline on every request context, with no websocket exemption, so every call would have ended thirty seconds in."},
+    {"id": "E2", "status": "applied", "evidence": "Every refusal branch and the relay branch are reached by a test; the upgrade-failure branch ends the call so its claim is not stranded."},
+    {"id": "E3", "status": "applied", "evidence": "A provider end is logged and closes the socket with 1011; failing to mark the call ended is logged; the scene update logs its own failures."},
+    {"id": "E4", "status": "applied", "evidence": "The retention sweep that ends abandoned calls filters on provider='runpod_livekit', so a Live call is never swept however long it runs; checked because the Live path never touches last_activity_at."},
+    {"id": "E5", "status": "applied", "evidence": "The route reuses the package's upgrader, its origin check and the call rate limiter; nothing is copied."},
+    {"id": "E6", "status": "applied", "evidence": "One call, one Live session: nothing stopped two sockets for the same call, each dialling its own Live session on the platform key while the call is billed once, and the call rate limiter allows five a minute. Found LV2. Then every reader of the provider column the fix writes: endProviderSessionBestEffort, EndCall and RefreshCallToken all require the avatar provider, and the retention sweep requires runpod_livekit, so a gemini_live row is never sent to the avatar provider."},
+    {"id": "F1", "status": "applied", "evidence": "Handler, model and service tests pass under -race; the socket has one reader and serialised writers."},
+    {"id": "F2", "status": "applied", "evidence": "The claim is one conditional UPDATE, atomic across servers; the scene update runs after the call is marked ended and is best effort."},
+    {"id": "F3", "status": "applied", "evidence": "Migration 208 has an up and a down; the down clears gemini_live rows before restoring the old constraint, so it cannot fail on existing data. Running the database package found three rollback ladders naming 207 as the newest -- two in the expansion test, one in the appearance test, the last invisible to a name-filtered run -- and all three now name 208. The full database package passes."},
+    {"id": "F4", "status": "applied", "evidence": "Hang-up, provider end and upgrade failure all end the call row; a claimed call is never left active without a socket."},
+    {"id": "G1", "status": "applied", "evidence": "Both fixes controlled; see findings. Afterwards the real route was run once more, with a real two-second request deadline: the call carried on past it and answered from memory."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "go build ./..., go vet on handlers, models, services and database, gofmt: clean. Handler and repository tests pass under -race; the full database package passes. The full suite has not been run."},
+    {"id": "Z1", "status": "applied", "evidence": "Found by E1 and E6, both listed. Nothing to add."},
+    {"id": "B5", "status": "applied", "evidence": "One real call through the real route, handler, repositories, chat service and Live, with the router's Timeout middleware mounted at two seconds and the question asked after it had passed: heard at 7.16 s, her first sound at 7.79 s, the fact from 25 messages back recalled and spoken, the call row ended and the turn saved."},
+    {"id": "E7", "status": "applied", "evidence": "The claim is taken last, after every refusal, so a refused request never holds it; the dial happens only after the upgrade."}
+   ],
+   "findings": [
+    {
+     "id": "LV1",
+     "summary": "the relay ran on the request context, which the router's global Timeout gives a thirty-second deadline, so every call would have hung up thirty seconds in",
+     "found_by": "E1",
+     "fix_commit": "8de52877b",
+     "control": {
+      "patch": ".review/controls/live-call-dies-with-the-request.patch",
+      "runner": "go",
+      "tests": ["./internal/handlers/ -run TestLiveCallConnect_OutlivesTheRequestTimeout"],
+      "observed": "Should be zero, but was 1: the call ended when the request deadline passed"
+     }
+    },
+    {
+     "id": "LV2",
+     "summary": "nothing stopped a second socket for the same call, so two tabs or a script could each open a Live session on the platform's key while the call is billed once",
+     "found_by": "E6",
+     "fix_commit": "8de52877b",
+     "control": {
+      "patch": ".review/controls/live-call-second-socket.patch",
+      "runner": "go",
+      "tests": ["./internal/handlers/ -run TestLiveCallConnect_ASecondSocketForTheSameCallIsRefused"],
+      "observed": "An error is expected but got nil: a second socket connected to a call that already has one"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the fixes: the detached call context, the claim query, migration 208, the three ladder entries, and the handler's claim and upgrade-failure branch."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing applies."},
+    {"id": "B1", "status": "na", "why": "No model input changed."},
+    {"id": "B2", "status": "na", "why": "No component."},
+    {"id": "B3", "status": "applied", "evidence": "The 409 body for a second socket, printed through the real route in pass 1, is the fix's own output."},
+    {"id": "B4", "status": "applied", "evidence": "The claim's row was read back after the real call: provider=gemini_live on an ended call, which no reader acts on."},
+    {"id": "C1", "status": "applied", "evidence": "'gemini_live' is spelled the same in the claim and the constraint; the down migration clears exactly that value."},
+    {"id": "C2", "status": "na", "why": "The fixes add no field across a seam."},
+    {"id": "C3", "status": "na", "why": "No rule in two places."},
+    {"id": "C4", "status": "applied", "evidence": "The real run in pass 1 came after both fixes."},
+    {"id": "C5", "status": "na", "why": "No field added."},
+    {"id": "C6", "status": "applied", "evidence": "The claim is tested against Postgres through the repository, not a fake: second claim, foreign user and video call all refused."},
+    {"id": "C7", "status": "na", "why": "No new fixture shape."},
+    {"id": "D1", "status": "applied", "evidence": "The first socket of a real voice call claims and connects."},
+    {"id": "D2", "status": "applied", "evidence": "A second socket, another user and a video call are refused the claim."},
+    {"id": "D3", "status": "na", "why": "No parsing."},
+    {"id": "E1", "status": "applied", "evidence": "The end-of-call and scene-update contexts now derive from the same detached call context instead of a second WithoutCancel."},
+    {"id": "E2", "status": "applied", "evidence": "Both sides of the claim branch are reached by tests."},
+    {"id": "E3", "status": "applied", "evidence": "A claim error answers 500 before the upgrade; nothing is swallowed."},
+    {"id": "E4", "status": "applied", "evidence": "The claim requires mode='voice' and status='active' in SQL, so neither can be bypassed by a stale read."},
+    {"id": "E5", "status": "applied", "evidence": "The claim reuses the existing provider columns and unique index rather than adding a lock table or a Redis lease."},
+    {"id": "E6", "status": "applied", "evidence": "Re-checked every reader of provider after the fix, listed in pass 1; none is affected. No other migration ladder names 207."},
+    {"id": "F1", "status": "applied", "evidence": "Tests pass under -race after the fixes."},
+    {"id": "F2", "status": "applied", "evidence": "Two sockets racing for one call both run the same conditional UPDATE; Postgres lets exactly one change the row."},
+    {"id": "F3", "status": "applied", "evidence": "Up and down both present, all ladders updated, the full database package passes, including the roll-back-and-reapply tests."},
+    {"id": "F4", "status": "applied", "evidence": "An upgrade that fails after the claim ends the call, so the claim is never stranded on a live row."},
+    {"id": "G1", "status": "applied", "evidence": "Both controls replayed by hand and fail with real assertions."},
+    {"id": "G2", "status": "na", "why": "No guard."},
+    {"id": "H1", "status": "applied", "evidence": "Build, vet, gofmt clean; handler, repository and database tests pass."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "applied", "evidence": "The real route run recorded in pass 1 is the current behaviour."},
+    {"id": "E7", "status": "applied", "evidence": "The claim is the last thing before the upgrade."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet on handlers, models, services, database clean",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "handler and repository tests pass under -race; the full database package passes; the full suite has not been run"
+ }
+}

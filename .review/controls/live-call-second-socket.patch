@@ -1,0 +1,23 @@
+diff --git a/backend/internal/handlers/omnichat_live_call.go b/backend/internal/handlers/omnichat_live_call.go
+index a653658fb..d656247bb 100644
+--- a/backend/internal/handlers/omnichat_live_call.go
++++ b/backend/internal/handlers/omnichat_live_call.go
+@@ -101,18 +101,6 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
+ 		return
+ 	}
+ 
+-	// Last, so a refused call never holds the claim. Each socket would open its
+-	// own Live session on the platform's key while the call is billed once.
+-	claimed, err := h.calls.ClaimLiveCallOwned(ctx, callID, userID, uuid.NewString())
+-	if err != nil {
+-		RespondError(c, http.StatusInternalServerError, "Failed to open the call")
+-		return
+-	}
+-	if !claimed {
+-		RespondError(c, http.StatusConflict, "This call is already connected")
+-		return
+-	}
+-
+ 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+ 	if err != nil {
+ 		// The upgrader has already answered the browser. The claim cannot be
