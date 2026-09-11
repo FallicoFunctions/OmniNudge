@@ -1,0 +1,117 @@
+{
+ "schema_version": 2,
+ "head": "b9e4f976c",
+ "base": "6420295f5",
+ "scope": {
+  "files": [
+   "backend/internal/services/omnichat_model_router_test.go",
+   "backend/internal/services/omnichat_model_router.go"
+  ],
+  "boundaries": [
+   "caller GenerationOptions -> profile client (reasoning effort ceiling)",
+   "source comments -> godoc"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/d5a86a375.json",
+  ".review/464c678c8.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "baa7dca50 rewrote one stale test to the rule d5a86a375 introduced: a caller may lower a profile's reasoning effort and never raise it. The rule's own file was read alongside it because the test is only as good as what it pins there."},
+    {"id": "A2", "status": "applied", "evidence": "Grepped every ledger for reasoning effort: none. d5a86a375.json covers the Live client only; 464c678c8.json predates the rule."},
+    {"id": "B1", "status": "applied", "evidence": "Printed reasoningEffortNoHigherThan for nine inputs through a throwaway test: high/low -> low, high/minimal -> minimal, high/max -> high, low/minimal -> minimal, low/medium -> low, high/\" LOW \" -> low, high/turbo -> high, high/empty -> high, empty/minimal -> empty. Every one matches the comment's promise."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "No query or migration."},
+    {"id": "C1", "status": "applied", "evidence": "The effort names in reasoningEffortRank are the ones the profile constants and the Heard path (\"minimal\") use."},
+    {"id": "C2", "status": "applied", "evidence": "The test reads upstream.options.ReasoningEffort, the field the profile client actually forwards."},
+    {"id": "C3", "status": "na", "why": "The rule lives in one function."},
+    {"id": "C4", "status": "na", "why": "No provider contract changed; the effort values were verified against OpenRouter when d5a86a375 was made."},
+    {"id": "C5", "status": "na", "why": "No field added."},
+    {"id": "C6", "status": "applied", "evidence": "Mutated the accessor twice. Always returning the ceiling fails the test on the lowering half (expected low, actual high); always returning the request fails it on the capping half (expected high, actual max). The branch where a profile carries no effort is unguarded by any test, but every profile in the catalogue carries one, so no real input reaches it -- see E2."},
+    {"id": "C7", "status": "applied", "evidence": "The test uses the real PremiumDeep profile from the catalogue, not a hand-built one."},
+    {"id": "D1", "status": "applied", "evidence": "Real requests: minimal from a call, low, and nothing at all all behave as promised in the B1 print."},
+    {"id": "D2", "status": "applied", "evidence": "A request above the ceiling and an unknown name both fall back to the ceiling."},
+    {"id": "D3", "status": "applied", "evidence": "Mixed case with surrounding spaces is normalised; an empty request gets the ceiling."},
+    {"id": "E1", "status": "applied", "evidence": "Read the neighbours of the rule d5a86a375 added. It placed reasoningEffortRank between fallbackChatCompletionClient and that type's doc comment; go doc showed the comment attached to the map and the type undocumented. Finding G-DOC."},
+    {"id": "E2", "status": "applied", "evidence": "The no-effort branch is reachable only by a profile without an effort, and the catalogue has none; not tested, deliberately, rather than guarding an imagined profile."},
+    {"id": "E3", "status": "na", "why": "No error path."},
+    {"id": "E4", "status": "applied", "evidence": "The rule is gated by omniChatProviderAcceptsReasoningEffort; the non-accepting branch is covered by the router test asserting an empty effort."},
+    {"id": "E5", "status": "applied", "evidence": "The effort names exist once as the rank map; the profiles use typed constants with the same spellings."},
+    {"id": "E6", "status": "applied", "evidence": "Checked go doc on every declaration d5a86a375 inserted into the router file: only the fallback type lost its comment."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "na", "why": "No transaction or queue."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "The first fix, 60b7edcaf, deleted the comment rather than moving it; printing go doc after the commit showed the type still bare. b9e4f976c put it on the type, and go doc now shows it there. The control restores the d5a86a375 placement and fails."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "The services package passed in full after baa7dca50 (68 s); the router tests pass after the comment fix."},
+    {"id": "Z1", "status": "applied", "evidence": "Found by E1, reading the neighbours, and confirmed by printing godoc -- the artifact a comment actually produces. Both are listed instruments; nothing to add."},
+    {"id": "B5", "status": "na", "why": "No model input changed: the test and a comment only."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": [
+    {
+     "id": "G-DOC",
+     "summary": "the effort rank was inserted between fallbackChatCompletionClient and its doc comment, so godoc gave the fallback client's explanation to a map and left the type undocumented",
+     "found_by": "E1",
+     "fix_commit": "b9e4f976c",
+     "control": {
+      "patch": ".review/controls/fallback-doc-detached.patch",
+      "runner": "bash",
+      "tests": ["cd backend && GO=$(command -v go || echo /opt/homebrew/bin/go) && if $GO doc -u ./internal/services fallbackChatCompletionClient | grep -q \"deliberately narrow\"; then echo \"0 failed\"; else echo \"1 failed\"; exit 1; fi"],
+      "observed": "0 failed at HEAD; 1 failed with the patch applied"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers b9e4f976c, a comment moved onto its type."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing applies."},
+    {"id": "B1", "status": "applied", "evidence": "Printed go doc for both declarations after the fix: fallbackChatCompletionClient carries its comment, reasoningEffortRank carries only its own line."},
+    {"id": "B2", "status": "na", "why": "No component changed."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "No query or migration."},
+    {"id": "C1", "status": "na", "why": "A comment crosses no seam."},
+    {"id": "C2", "status": "na", "why": "A comment crosses no seam."},
+    {"id": "C3", "status": "na", "why": "No rule in two places."},
+    {"id": "C4", "status": "na", "why": "No provider contract."},
+    {"id": "C5", "status": "na", "why": "No field added."},
+    {"id": "C6", "status": "applied", "evidence": "The control reads the comment through go doc, the real consumer, not by grepping the source."},
+    {"id": "C7", "status": "na", "why": "No fixture."},
+    {"id": "D1", "status": "na", "why": "No parsing."},
+    {"id": "D2", "status": "na", "why": "No parsing."},
+    {"id": "D3", "status": "na", "why": "No parsing."},
+    {"id": "E1", "status": "applied", "evidence": "The declarations either side of the moved comment each carry their own comment."},
+    {"id": "E2", "status": "na", "why": "No branch changed."},
+    {"id": "E3", "status": "na", "why": "No error path."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "applied", "evidence": "The comment exists once."},
+    {"id": "E6", "status": "applied", "evidence": "No other declaration in the file is undocumented by the move."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "Control replayed by hand: 0 failed at HEAD, 1 failed with the patch."},
+    {"id": "G2", "status": "na", "why": "No guard."},
+    {"id": "H1", "status": "applied", "evidence": "go build clean; the router tests pass."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "na", "why": "No model input changed."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build clean",
+  "vet": "go vet clean on the package",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "internal/services passed in full after baa7dca50; router tests pass at b9e4f976c"
+ }
+}
