@@ -196,10 +196,10 @@ func TestNotationSplitReproducesTheLegacyConversationModeText(t *testing.T) {
 
 	natural := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
-	})
+	}, false)
 	professional := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileProfessional,
-	})
+	}, false)
 	for _, prompt := range []string{natural, professional} {
 		require.Contains(t, prompt, personalConversationModeV1)
 		require.Contains(t, prompt, omniChatNotationV1)
@@ -209,10 +209,10 @@ func TestNotationSplitReproducesTheLegacyConversationModeText(t *testing.T) {
 func TestNotationReachesFreeFormCharactersWithoutShapeRules(t *testing.T) {
 	narrative := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileLeanNarrative,
-	})
+	}, false)
 	characterOnly := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileCharacterOnly,
-	})
+	}, false)
 
 	require.Contains(t, narrative, omniChatNotationV1)
 	require.NotContains(t, narrative, personalConversationModeV1)
@@ -234,13 +234,13 @@ func TestNotationReservesAsterisksForPhysicalActionAndNamesUnderscoreEmphasis(t 
 func TestResponseStyleQuestionBudgetsAreServerOwnedAndProfileSpecific(t *testing.T) {
 	natural := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileNaturalDialogue,
-	})
+	}, false)
 	professional := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileProfessional,
-	})
+	}, false)
 	narrative := appendResponseStyleInstructions("character-authored prompt", &models.BotPersona{
 		ResponseStyleProfile: models.ResponseStyleProfileLeanNarrative,
-	})
+	}, false)
 
 	require.Contains(t, natural, naturalDialogueQuestionBudgetV1)
 	require.NotContains(t, natural, professionalQuestionBudgetV1)
@@ -1484,7 +1484,7 @@ func TestDirectMessageStyleOmitsRoleplayInstructions(t *testing.T) {
 		Name:                 "Twin",
 		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
 	}
-	prompt := appendResponseStyleInstructions("base", persona)
+	prompt := appendResponseStyleInstructions("base", persona, false)
 
 	require.Contains(t, prompt, "[Direct Message Mode]")
 	require.Contains(t, prompt, directMessageBaseStyleV1)
@@ -1516,7 +1516,7 @@ func TestDirectMessageStyleDoesNotInviteTheNarrationItForbids(t *testing.T) {
 		Name:                 "Twin",
 		ResponseStyleProfile: models.ResponseStyleProfileDirectMessage,
 	}
-	prompt := appendResponseStyleInstructions("base", persona)
+	prompt := appendResponseStyleInstructions("base", persona, false)
 
 	// Telling her to use actions sparingly presumes she may use them, while the
 	// next block tells her never to narrate at all. Both in one prompt is how

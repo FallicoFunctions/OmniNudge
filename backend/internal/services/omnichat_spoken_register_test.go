@@ -96,6 +96,32 @@ func TestTheCallRegisterIsTheLastThingTheModelReads(t *testing.T) {
 		"something is appended after the call register, so the last word on how to answer is not the medium")
 }
 
+// A call names one medium. Printing the assembled prompt for a call showed an
+// OmniAI told "You are texting" a few lines above "You are on a live call", and a
+// roleplay character told to wrap every narration beat in asterisks beside a
+// register forbidding narration -- which Live settles by speaking it, because
+// nothing strips a Live reply before it is heard.
+func TestACallPromptNamesOneMedium(t *testing.T) {
+	build := func(style string, onACall bool) string {
+		persona := &models.BotPersona{Name: "Sadie", ResponseStyleProfile: style}
+		return buildConversationSystemPromptWithDisposition(
+			persona, nil, nil, nil, promptRecall{}, models.OmniChatDisposition{}, time.Time{}, onACall)
+	}
+
+	omniAIText, omniAICall := build(models.ResponseStyleProfileDirectMessage, false), build(models.ResponseStyleProfileDirectMessage, true)
+	require.Contains(t, omniAIText, "You are texting", "a typed chat keeps the texting mode")
+	require.NotContains(t, omniAICall, "You are texting")
+	require.NotContains(t, omniAICall, "sends them as two separate messages")
+	require.Contains(t, omniAICall, "You are on a phone call")
+	require.Contains(t, omniAICall, "Do not ask a question just to hand the turn back",
+		"the call keeps what makes her a person, not only what makes her brief")
+
+	roleplayText, roleplayCall := build(models.ResponseStyleProfileNaturalDialogue, false), build(models.ResponseStyleProfileNaturalDialogue, true)
+	require.Contains(t, roleplayText, "[OmniChat Notation]", "typed roleplay keeps its narration markup")
+	require.NotContains(t, roleplayCall, "[OmniChat Notation]")
+	require.NotContains(t, roleplayCall, "wrapped in single asterisks")
+}
+
 // It says what to do, not only what to avoid: "no asterisks" invites a model to
 // narrate without them, which keeps the narration and loses the only marker
 // that it was narration.

@@ -120,6 +120,17 @@ Type the way you type. Punctuation, capitalisation, abbreviations, and typos are
 You are under no obligation to keep the conversation going. You can be brief, distracted, unimpressed, or busy. You can answer a question and stop. You can decline to talk about something. Do not ask a question just to hand the turn back.
 Only the other person's own messages say what they said, did, think, or feel. Never write their side, and never claim they said something they did not.`
 
+// directMessageCallModeV1 is the same person on the phone. The texting block
+// cannot simply be kept on a call: it tells her she is typing, that a blank
+// line sends a second message and that typos are hers, beside a block telling
+// her every word is spoken. What survives is what makes her a person rather
+// than a service, and length is left to the spoken register.
+const directMessageCallModeV1 = `[Direct Message Mode]
+You are on a phone call. This is a real conversation between you and the person you are talking to, and you both know that is what it is. There is no scene, no setting, no scenario, and no story being told. Nothing is being acted out.
+Say only what you would actually say. Never describe your actions, your surroundings, your expressions, or your tone. If you are smiling, it can be heard in how you talk; you do not narrate it.
+You are under no obligation to keep the conversation going. You can be brief, distracted, unimpressed, or busy. You can answer a question and stop. You can decline to talk about something. Do not ask a question just to hand the turn back.
+Only the other person's own words say what they said, did, think, or feel. Never speak for their side, and never claim they said something they did not.`
+
 const naturalDialogueEndingV1 = `Do not habitually end the reply with a question, invitation, recap, or call to action. Normal conversation does not need a prompt for the user to continue. Otherwise prefer a statement, reaction, joke, disagreement, or moment of silence. Before sending, remove any reflexive or unnecessary closing question.`
 
 const naturalDialogueQuestionBudgetV1 = `[Companion Question Budget]
@@ -1223,7 +1234,7 @@ func buildConversationSystemPromptWithDisposition(
 	// listener. Printing the assembled prompt is what found that; the unit test
 	// beside it was happy, because it tested the function rather than the
 	// prompt.
-	return withSpokenRegister(appendResponseStyleInstructions(base, persona), onACall)
+	return withSpokenRegister(appendResponseStyleInstructions(base, persona, onACall), onACall)
 }
 
 func appendPostHistoryInstructions(base string, persona *models.BotPersona) string {
@@ -1234,7 +1245,7 @@ func appendPostHistoryInstructions(base string, persona *models.BotPersona) stri
 	return base + "\n\n[Post-History Instructions]\n" + postHistory
 }
 
-func appendResponseStyleInstructions(base string, persona *models.BotPersona) string {
+func appendResponseStyleInstructions(base string, persona *models.BotPersona, onACall bool) string {
 	profile := models.ResponseStyleProfileInherit
 	if persona != nil && strings.TrimSpace(persona.ResponseStyleProfile) != "" {
 		profile = strings.TrimSpace(persona.ResponseStyleProfile)
@@ -1243,7 +1254,11 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona) st
 	// and the notation block mandates asterisked narration. Both are roleplay
 	// machinery, and a texting character must be given neither.
 	if profile == models.ResponseStyleProfileDirectMessage {
-		return base + "\n\n" + directMessageBaseStyleV1 + "\n" + directMessageModeV1
+		mode := directMessageModeV1
+		if onACall {
+			mode = directMessageCallModeV1
+		}
+		return base + "\n\n" + directMessageBaseStyleV1 + "\n" + mode
 	}
 
 	base += "\n\n" + actorAndStateContinuityV1
@@ -1266,7 +1281,13 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona) st
 	if profile == models.ResponseStyleProfileNaturalDialogue || profile == models.ResponseStyleProfileProfessional {
 		style += "\n" + personalConversationModeV1
 	}
-	style += "\n" + omniChatNotationV1
+	// The notation exists so asterisked narration renders grey and drives the
+	// scene's pictures. On a call nothing is rendered: Live speaks whatever she
+	// produces, so a block demanding narration beside one forbidding it would be
+	// settled by her reading "I lean closer" aloud.
+	if !onACall {
+		style += "\n" + omniChatNotationV1
+	}
 	switch profile {
 	case models.ResponseStyleProfileNaturalDialogue:
 		style += "\n" + naturalDialogueQuestionBudgetV1
