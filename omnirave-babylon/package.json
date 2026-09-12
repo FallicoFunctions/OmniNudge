@@ -9,16 +9,16 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@babylonjs/core": "^8.1.0",
-    "@babylonjs/loaders": "^8.1.0"
+    "@babylonjs/core": "^9.25.0",
+    "@babylonjs/loaders": "^9.25.0"
   },
   "devDependencies": {
-    "@gltf-transform/cli": "^4.4.1",
-    "@types/node": "^24.10.1",
-    "jsdom": "^27.0.1",
-    "typescript": "~5.9.3",
-    "vite": "^7.3.6",
-    "vitest": "^3.2.4"
+    "@gltf-transform/cli": "^4.5.0",
+    "@types/node": "^26.5.0",
+    "jsdom": "^30.0.1",
+    "typescript": "~7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   },
   "overrides": {
     "sharp": "^0.35.3"
