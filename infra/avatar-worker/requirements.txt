@@ -1,5 +1,5 @@
-livekit==1.0.17
+livekit==1.1.18
 kokoro==0.9.4
 Pillow==12.3.0
-numpy==2.2.6
-soundfile==0.13.1
+numpy==2.5.3
+soundfile==0.14.0
