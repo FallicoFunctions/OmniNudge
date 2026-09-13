@@ -32,6 +32,8 @@ const (
 	OmniCreditsUsageVoice = "voice"
 	OmniCreditsUsageImage = "image"
 	OmniCreditsUsageVideo = "video"
+	// One minute of a live call, charged as the minute begins.
+	OmniCreditsUsageCallMinute = "call_minute"
 
 	OmniCreditsReservationReserved = "reserved"
 	OmniCreditsReservationCaptured = "captured"

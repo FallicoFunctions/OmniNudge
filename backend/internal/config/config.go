@@ -218,6 +218,10 @@ type OmniChatVoiceConfig struct {
 	VoiceboxBaseURL         string
 	VoiceboxTimeoutSeconds  int
 	VoiceCloningEnabled     bool
+	// CallCreditsPerMinute is what one minute of a live call costs, charged as
+	// each minute begins. A setting rather than a constant because the price is
+	// a business decision that will move.
+	CallCreditsPerMinute int
 }
 
 // LiveKitConfig contains only server-side room-signing credentials. The API
@@ -538,6 +542,7 @@ func Load() (*Config, error) {
 			VoiceboxBaseURL:         getEnv("VOICEBOX_BASE_URL", "http://127.0.0.1:17493"),
 			VoiceboxTimeoutSeconds:  getEnvAsPositiveInt("VOICEBOX_TIMEOUT_SECONDS", 120),
 			VoiceCloningEnabled:     getEnvAsBool("OMNICHAT_VOICE_CLONING_ENABLED", false),
+			CallCreditsPerMinute:    getEnvAsPositiveInt("OMNICHAT_CALL_CREDITS_PER_MINUTE", 3),
 		},
 		LiveKit: LiveKitConfig{
 			URL:            getEnv("LIVEKIT_URL", ""),

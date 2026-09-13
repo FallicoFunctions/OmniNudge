@@ -4075,9 +4075,10 @@
       },
       "usage": {
         "chat": "Message",
-        "voice": "Voice call",
+        "voice": "Spoken message",
         "image": "Image generation",
         "video": "Video generation",
+        "call_minute": "Call",
         "other": "Credit adjustment"
       },
       "errors": {

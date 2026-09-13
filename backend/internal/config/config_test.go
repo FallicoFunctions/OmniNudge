@@ -49,6 +49,20 @@ func TestLoadGivesACallAModelWhenTheExampleLeavesItBlank(t *testing.T) {
 	require.Equal(t, "gemini-3.1-flash-live-preview", cfg.Gemini.LiveModel)
 }
 
+func TestACallMinuteCostsThreeCreditsUnlessConfigured(t *testing.T) {
+	t.Setenv("DB_USER", "test")
+	t.Setenv("JWT_SECRET", "test")
+	t.Setenv("ENCRYPTION_KEY", "test")
+	for value, want := range map[string]int{"": 3, "5": 5, "0": 3, "three": 3} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("OMNICHAT_CALL_CREDITS_PER_MINUTE", value)
+			cfg, err := Load()
+			require.NoError(t, err)
+			require.Equal(t, want, cfg.OmniChatVoice.CallCreditsPerMinute)
+		})
+	}
+}
+
 func TestAppendHTTPSOriginHostAddsConfiguredStorageOriginWithoutTrustingUnsafeURLs(t *testing.T) {
 	hosts := []string{"storage.googleapis.com"}
 	hosts = appendHTTPSOriginHost(hosts, "https://R2.Example.test")

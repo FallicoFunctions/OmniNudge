@@ -194,10 +194,11 @@ func (s *OmniChatBillingService) Catalog() []OmniChatBillingOffer {
 
 func (s *OmniChatBillingService) UsageCosts() map[string]int64 {
 	return map[string]int64{
-		models.OmniCreditsUsageChat:  s.costs[models.OmniCreditsUsageChat],
-		models.OmniCreditsUsageVoice: s.costs[models.OmniCreditsUsageVoice],
-		models.OmniCreditsUsageImage: s.costs[models.OmniCreditsUsageImage],
-		models.OmniCreditsUsageVideo: s.costs[models.OmniCreditsUsageVideo],
+		models.OmniCreditsUsageChat:       s.costs[models.OmniCreditsUsageChat],
+		models.OmniCreditsUsageVoice:      s.costs[models.OmniCreditsUsageVoice],
+		models.OmniCreditsUsageImage:      s.costs[models.OmniCreditsUsageImage],
+		models.OmniCreditsUsageVideo:      s.costs[models.OmniCreditsUsageVideo],
+		models.OmniCreditsUsageCallMinute: s.costs[models.OmniCreditsUsageCallMinute],
 	}
 }
 
@@ -225,11 +226,22 @@ func (s *OmniChatBillingService) WalletOwned(ctx context.Context, userID int) (*
 }
 
 func (s *OmniChatBillingService) CanReserveVideoOwned(ctx context.Context, userID int) (bool, int64, error) {
+	return s.canAffordOwned(ctx, userID, models.OmniCreditsUsageVideo)
+}
+
+// CanAffordCallMinuteOwned says whether the caller can pay for the first
+// minute of a call. Asked before a call starts, so nobody is connected to a
+// call they cannot pay for.
+func (s *OmniChatBillingService) CanAffordCallMinuteOwned(ctx context.Context, userID int) (bool, int64, error) {
+	return s.canAffordOwned(ctx, userID, models.OmniCreditsUsageCallMinute)
+}
+
+func (s *OmniChatBillingService) canAffordOwned(ctx context.Context, userID int, usageKind string) (bool, int64, error) {
 	admin, err := isOmniChatAdmin(ctx, s.adminReader, userID)
 	if err != nil {
 		return false, 0, fmt.Errorf("omnichat billing: administrator entitlement lookup: %w", err)
 	}
-	cost := s.costs[models.OmniCreditsUsageVideo]
+	cost := s.costs[usageKind]
 	if admin {
 		return true, cost, nil
 	}
@@ -292,7 +304,20 @@ type OmniChatBillingService struct {
 func NewOmniChatBillingService(credits OmniChatBillingCredits, plans OmniChatPlanReader) *OmniChatBillingService {
 	return &OmniChatBillingService{credits: credits, plans: plans, costs: map[string]int64{
 		models.OmniCreditsUsageChat: 1, models.OmniCreditsUsageVoice: 2, models.OmniCreditsUsageImage: 10, models.OmniCreditsUsageVideo: 40,
+		models.OmniCreditsUsageCallMinute: defaultOmniChatCallMinuteCost,
 	}}
+}
+
+const defaultOmniChatCallMinuteCost = 3
+
+// SetCallMinuteCost prices a minute of a live call from configuration. A
+// price below one credit is ignored: a free minute is decided by the admin
+// entitlement, never by a misread setting.
+func (s *OmniChatBillingService) SetCallMinuteCost(credits int64) *OmniChatBillingService {
+	if s != nil && credits >= 1 {
+		s.costs[models.OmniCreditsUsageCallMinute] = credits
+	}
+	return s
 }
 
 // SetAdminReader enables the server-owned administrator entitlement. The

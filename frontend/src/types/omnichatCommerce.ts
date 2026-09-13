@@ -26,7 +26,7 @@ export interface OmniChatWallet {
  * omnichat.commerce.usage; the modal builds that key at runtime, so a member
  * with no label renders the key itself into the usage list.
  */
-export type OmniChatCreditUsageKind = 'chat' | 'voice' | 'image' | 'video';
+export type OmniChatCreditUsageKind = 'chat' | 'voice' | 'image' | 'video' | 'call_minute';
 
 export interface OmniChatCreditUsageItem {
   id: number;
