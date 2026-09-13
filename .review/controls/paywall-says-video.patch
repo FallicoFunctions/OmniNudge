@@ -1,0 +1,13 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 2f0607dc2..61ef24148 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -4088,7 +4088,7 @@
+     },
+     "videoPaywall": {
+       "title": "Unlock {{feature}}",
+-      "description": "This needs OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
++      "description": "Video requires OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
+       "viewOptions": "View plans and credits",
+       "features": {
+         "scene_video": "scene video",

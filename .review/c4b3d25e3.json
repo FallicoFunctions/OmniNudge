@@ -1,0 +1,151 @@
+{
+ "schema_version": 2,
+ "head": "7f0c2b997",
+ "base": "c4b3d25e3",
+ "scope": {
+  "files": [
+   "backend/cmd/server/main.go",
+   "backend/internal/handlers/omnichat_voice.go",
+   "backend/internal/handlers/omnichat_voice_live_test.go",
+   "frontend/public/locales/en.json",
+   "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+   "frontend/src/components/omnichat/OmniChatVideoPaywallModal.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+   "frontend/src/components/omnichat/__tests__/OmniChatVideoPaywallModal.test.tsx",
+   "frontend/src/pages/OmniChatChatPage.tsx",
+   "frontend/src/i18n/__tests__/TranslationKeysExist.test.ts"
+  ],
+  "boundaries": [
+   "POST /omnichat/conversations/:id/calls -> 402/503 before a call exists",
+   "configuration -> billing service price for a call minute",
+   "402 on start -> call modal -> chat page -> paywall feature",
+   "paywall feature -> runtime translation key and icon"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/b80cc0909.json",
+  ".review/41824b03d.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 4a-2: the voice start is gated on the first minute, the configured price is wired into the billing service, and a 402 on a voice start opens the paywall with its own feature."},
+    {"id": "A2", "status": "applied", "evidence": "b80cc0909.json found a runtime translation key with no guard (call_minute); the paywall builds another from its feature, so that shape was looked for first here. 41824b03d.json covers the live route, untouched."},
+    {"id": "B1", "status": "na", "why": "No prompt or model payload assembled."},
+    {"id": "B2", "status": "applied", "evidence": "Read what the paywall renders for a voice call: its label is correct, but the icon was a film strip for every feature, so the voice paywall showed a film icon. Finding R3."},
+    {"id": "B3", "status": "applied", "evidence": "Printed StartCall's response for three voice cases through a throwaway test: no billing 503 'Voice calls are not available right now' code service_unavailable; cannot afford 402 'Voice calls require OmniCredits' code payment_required; credits unreadable 503 'Voice billing is temporarily unavailable'."},
+    {"id": "B4", "status": "applied", "evidence": "The gate test asserts no call row is created in any refused case: startCalls is 0 for 402 and both 503s, 1 when affordable."},
+    {"id": "C1", "status": "applied", "evidence": "The frontend's 402 check reads error.status, which lib/api.ts sets from response.status on the request path startCall uses."},
+    {"id": "C2", "status": "applied", "evidence": "The page chooses voice_call or video_call from the call mode it opened the modal with."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places after the change; the paywall feature list is one exported type."},
+    {"id": "C4", "status": "na", "why": "No external contract."},
+    {"id": "C5", "status": "applied", "evidence": "CallCreditsPerMinute is read in main and passed to SetCallMinuteCost; the billing interface gained one method, which both real service and fake implement, checked by the build."},
+    {"id": "C6", "status": "applied", "evidence": "The gate is tested through the real handler with a fake that answers the affordability read, for every branch."},
+    {"id": "C7", "status": "applied", "evidence": "The paywall test asserted the old copy, 'video requires omnicredits', so the new description broke it -- unseen, because only tsc and lint had run. It also rendered only scene_video. Finding R1."},
+    {"id": "D1", "status": "applied", "evidence": "An affordable caller gets 201."},
+    {"id": "D2", "status": "applied", "evidence": "An unaffordable caller gets 402 and no call; missing or failing billing gets 503 and no call."},
+    {"id": "D3", "status": "na", "why": "No parsing."},
+    {"id": "E1", "status": "applied", "evidence": "Video already refuses with 503 when billing is missing; voice now does the same rather than falling open."},
+    {"id": "E2", "status": "applied", "evidence": "All four branches of the gate are reached by the table test."},
+    {"id": "E3", "status": "applied", "evidence": "A failed credit read is logged with the user id and answered 503."},
+    {"id": "E4", "status": "applied", "evidence": "The 402 path in the call modal was gated on video; it now applies to both modes."},
+    {"id": "E5", "status": "applied", "evidence": "The billing interface was written twice, in the struct and in SetBilling; it is one named interface now."},
+    {"id": "E6", "status": "applied", "evidence": "Looked for every runtime translation key the change touched: the paywall builds omnichat.videoPaywall.features.${feature} from a union written inline in its props, which the translation guard cannot read, so a feature added without a label would show its key in the heading. Finding R2."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "applied", "evidence": "The gate runs before StartCallOwned, so a refusal leaves nothing to clean up."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "A refused start creates no call, so nothing is left behind."},
+    {"id": "G1", "status": "applied", "evidence": "All three controlled; see findings."},
+    {"id": "G2", "status": "applied", "evidence": "The new guard row runs in the frontend suite with the others."},
+    {"id": "H1", "status": "applied", "evidence": "go build, go vet on handlers and server clean; the voice handler tests pass. tsc -b and eslint exit 0; 36 tests pass across the call modal, paywall and translation-key files. The full suites have not been run."},
+    {"id": "Z1", "status": "applied", "evidence": "Found by C7, E6 and B2, all listed. Nothing to add."},
+    {"id": "B5", "status": "na", "why": "No model or provider output. The paywall only appears after a login, which may not be entered on the user's behalf; the rendered component was read through its tests instead."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": [
+    {
+     "id": "R1",
+     "summary": "the paywall's description was made general, but its test still asserted 'video requires omnicredits' and rendered only scene video, so the change broke it and nothing covered a voice call",
+     "found_by": "C7",
+     "fix_commit": "7f0c2b997",
+     "control": {
+      "patch": ".review/controls/paywall-says-video.patch",
+      "runner": "vitest",
+      "tests": ["src/components/omnichat/__tests__/OmniChatVideoPaywallModal.test.tsx"],
+      "observed": "Unable to find an element with the text: /this needs omnicredits/i"
+     }
+    },
+    {
+     "id": "R2",
+     "summary": "the paywall builds its label key from a feature union written inline in its props, which the translation guard cannot read, so a feature added without a label would have shown its key in the heading",
+     "found_by": "E6",
+     "fix_commit": "7f0c2b997",
+     "control": {
+      "patch": ".review/controls/paywall-feature-unguarded.patch",
+      "runner": "vitest",
+      "tests": ["src/i18n/__tests__/TranslationKeysExist.test.ts -t OmniChatPaywallFeature"],
+      "observed": "every member of 'OmniChatPaywallFeature' has its translation: expected [ Array(1) ] to deeply equal []"
+     }
+    },
+    {
+     "id": "R3",
+     "summary": "the paywall showed a film icon for every feature, including a voice call",
+     "found_by": "B2",
+     "fix_commit": "7f0c2b997",
+     "control": {
+      "patch": ".review/controls/paywall-film-icon-for-voice.patch",
+      "runner": "vitest",
+      "tests": ["src/components/omnichat/__tests__/OmniChatVideoPaywallModal.test.tsx -t 'offers a voice call without calling it video'"],
+      "observed": "AssertionError: expected null not to be null (no phone icon)"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the fixes: the exported paywall feature type, the page's use of it, the icon choice, the new guard row and the rewritten paywall tests."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing applies."},
+    {"id": "B1", "status": "na", "why": "No payload."},
+    {"id": "B2", "status": "applied", "evidence": "The voice paywall renders 'Unlock voice calls', the general description, no word 'video' and a phone icon; the scene video paywall keeps its film icon."},
+    {"id": "B3", "status": "na", "why": "No handler changed by the fixes."},
+    {"id": "B4", "status": "na", "why": "Nothing persisted."},
+    {"id": "C1", "status": "applied", "evidence": "The page's state and the modal's prop are the same exported type, checked by tsc."},
+    {"id": "C2", "status": "na", "why": "No field added."},
+    {"id": "C3", "status": "applied", "evidence": "The feature list exists once, as OmniChatPaywallFeature."},
+    {"id": "C4", "status": "na", "why": "No external contract."},
+    {"id": "C5", "status": "na", "why": "No struct field."},
+    {"id": "C6", "status": "applied", "evidence": "The guard reads the exported type from the modal's own source file."},
+    {"id": "C7", "status": "applied", "evidence": "The paywall tests now render two materially different features, voice_call and scene_video."},
+    {"id": "D1", "status": "na", "why": "No parsing."},
+    {"id": "D2", "status": "na", "why": "No parsing."},
+    {"id": "D3", "status": "na", "why": "No parsing."},
+    {"id": "E1", "status": "na", "why": "No sibling path affected."},
+    {"id": "E2", "status": "applied", "evidence": "Both sides of the icon choice are asserted."},
+    {"id": "E3", "status": "na", "why": "No error path."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "applied", "evidence": "The inline union in the page state is replaced by the exported type."},
+    {"id": "E6", "status": "applied", "evidence": "The page is the only caller of the paywall's feature prop."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "The three controls were replayed by hand; each fails with a real assertion and reverses cleanly."},
+    {"id": "G2", "status": "applied", "evidence": "The guard row runs in the suite."},
+    {"id": "H1", "status": "applied", "evidence": "tsc -b and eslint exit 0; the paywall, call modal and translation-key tests pass after the fixes."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "na", "why": "No model output."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean; tsc -b exit 0",
+  "vet": "go vet on handlers and server clean",
+  "lint": "gofmt clean; eslint exit 0",
+  "types": "tsc -b exit 0",
+  "tests": "voice handler tests pass; 36 frontend tests pass across the call modal, paywall and translation-key files; the full suites have not been run"
+ }
+}

@@ -1,0 +1,14 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 2f0607dc2..4cd5bbe79 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -4092,8 +4092,7 @@
+       "viewOptions": "View plans and credits",
+       "features": {
+         "scene_video": "scene video",
+-        "video_call": "video calls",
+-        "voice_call": "voice calls"
++        "video_call": "video calls"
+       }
+     },
+     "categories": {

@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/OmniChatVideoPaywallModal.tsx b/frontend/src/components/omnichat/OmniChatVideoPaywallModal.tsx
+index 3204b1908..a7572bc5e 100644
+--- a/frontend/src/components/omnichat/OmniChatVideoPaywallModal.tsx
++++ b/frontend/src/components/omnichat/OmniChatVideoPaywallModal.tsx
+@@ -30,7 +30,7 @@ export default function OmniChatVideoPaywallModal({
+     >
+       <div className="flex justify-between">
+         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
+-          {feature === 'voice_call' ? <Phone /> : <Film />}
++          {feature === 'voice_call' ? <Film /> : <Film />}
+         </div>
+         <button
+           type="button"
