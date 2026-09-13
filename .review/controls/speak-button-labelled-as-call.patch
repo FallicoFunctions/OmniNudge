@@ -1,0 +1,13 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 9c9d548dc..38572b84f 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -4075,7 +4075,7 @@
+       },
+       "usage": {
+         "chat": "Message",
+-        "voice": "Spoken message",
++        "voice": "Voice call",
+         "image": "Image generation",
+         "video": "Video generation",
+         "call_minute": "Call",

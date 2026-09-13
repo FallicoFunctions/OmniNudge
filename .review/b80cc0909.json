@@ -1,0 +1,150 @@
+{
+ "schema_version": 2,
+ "head": "24ff15515",
+ "base": "b80cc0909",
+ "scope": {
+  "files": [
+   "backend/.env.example",
+   "backend/internal/config/config.go",
+   "backend/internal/config/config_test.go",
+   "backend/internal/models/omnicredits.go",
+   "backend/internal/services/omnichat_billing.go",
+   "backend/internal/services/omnichat_billing_test.go",
+   "frontend/src/types/omnichatCommerce.ts",
+   "frontend/public/locales/en.json",
+   "frontend/src/i18n/__tests__/TranslationKeysExist.test.ts"
+  ],
+  "boundaries": [
+   "environment -> config (OMNICHAT_CALL_CREDITS_PER_MINUTE)",
+   "billing service -> usage response costs map -> credits panel",
+   "credit ledger usage_kind -> credits panel label, built at runtime from the kind",
+   "Go usage-kind constants -> TypeScript OmniChatCreditUsageKind union"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/ba1654df7.json",
+  ".review/6a2482b9f.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 4a-1: a price setting for a call minute, a call_minute usage kind, and the billing service pricing it and checking the first minute is affordable. The kind leaves the backend in the usage response and in every ledger row a call will write, so the review followed it to the credits panel."},
+    {"id": "A2", "status": "applied", "evidence": "No ledger covers billing or usage kinds. The TranslationKeysExist test's own comments record the same failure once before: 'chat' had no label and the usage list read omnichat.commerce.usage.chat down the page."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the setting for four inputs through the config test: empty 3, '5' 5, '0' 3, 'three' 3. Printed the usage-cost map: call_minute 3 by default, 5 after SetCallMinuteCost(5), still 5 after SetCallMinuteCost(0)."},
+    {"id": "B2", "status": "applied", "evidence": "Read the labels the credits panel renders from en.json: chat Message, voice 'Voice call', image, video, other -- and no call_minute. The voice kind is charged in omnichat_voice.go:149-155, the speak button reading one message aloud, so beside real call minutes it would read as a second kind of call. Finding R2."},
+    {"id": "B3", "status": "applied", "evidence": "The usage endpoint returns {usage, costs: UsageCosts(), limit}; costs now carries call_minute. Its one frontend reader takes costs.image, so the extra key is inert."},
+    {"id": "B4", "status": "applied", "evidence": "usage_kind is VARCHAR(64); the ledger's CHECK only requires it on debits, so call_minute needs no migration."},
+    {"id": "C1", "status": "applied", "evidence": "The backend now writes call_minute; the TypeScript union stopped at video, and en.json had no label, so the panel builds omnichat.commerce.usage.call_minute and renders the key itself. Finding R1."},
+    {"id": "C2", "status": "applied", "evidence": "OmniChatCreditUsageItem.usage_kind is typed by the union the panel reads; OmniChatBillingCosts names only voice, image and video, and nothing reads the others."},
+    {"id": "C3", "status": "applied", "evidence": "Two lists of usage kinds -- the Go constants and the TypeScript union -- and the guard compared the union with its labels, never with the Go list, so a kind added in Go alone passed it. Finding R3."},
+    {"id": "C4", "status": "na", "why": "No external provider or worker contract."},
+    {"id": "C5", "status": "applied", "evidence": "CallCreditsPerMinute is read in Load and asserted through Load; the cost map is written in the constructor and the setter and read by UsageCosts, ReserveOwned and the affordability check."},
+    {"id": "C6", "status": "applied", "evidence": "The affordability check is tested through a wallet fake that answers the real GetWallet read, on both balances."},
+    {"id": "C7", "status": "applied", "evidence": "The new guard reads the real backend source file, not a copied list."},
+    {"id": "D1", "status": "applied", "evidence": "A configured price is used; enough credits across both balances pass."},
+    {"id": "D2", "status": "applied", "evidence": "Zero, negative and non-numeric prices fall back to 3 in config and are ignored by the setter; a subscriber is not included."},
+    {"id": "D3", "status": "applied", "evidence": "Exactly the price in credits is affordable; one short is not."},
+    {"id": "E1", "status": "applied", "evidence": "The video affordability check and the call-minute one now share one function."},
+    {"id": "E2", "status": "applied", "evidence": "Included special-cases image and video and returns false for them before the plan lookup; call_minute reaches the plan lookup and still returns false, which the subscriber test asserts."},
+    {"id": "E3", "status": "na", "why": "No new error path."},
+    {"id": "E4", "status": "applied", "evidence": "Admins pass the affordability check and ReserveOwned bypasses them, as for video."},
+    {"id": "E5", "status": "applied", "evidence": "The default price is one named constant."},
+    {"id": "E6", "status": "applied", "evidence": "After R1 and R2, searched for every other place that spells the usage kinds or promises calls: no backend switch over kinds misses call_minute; the platform UpgradeModal's 'Voice calling' is the user-to-user messaging plan, not OmniChat; OmniChatUpgradeModal mentions no calls."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "na", "why": "No transaction added."},
+    {"id": "F3", "status": "na", "why": "No migration needed."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted by this change."},
+    {"id": "G1", "status": "applied", "evidence": "All three controlled; see findings."},
+    {"id": "G2", "status": "applied", "evidence": "The label guard is reachable -- it runs in the frontend suite -- and was blind to the backend; it now reads the Go constants itself."},
+    {"id": "H1", "status": "applied", "evidence": "go build, go vet on config, models and services clean; the billing and config tests pass. tsc -b and eslint exit 0; the translation-key tests pass. Exit codes captured directly. The full suites have not been run."},
+    {"id": "Z1", "status": "applied", "evidence": "Found by C1, B2 and C3, all listed. Nothing to add."},
+    {"id": "B5", "status": "na", "why": "No model or provider output; the rendered artifact is the label, read from the real translation file."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": [
+    {
+     "id": "R1",
+     "summary": "the backend began writing usage kind call_minute with no member in the TypeScript union and no label, so every call minute would have rendered omnichat.commerce.usage.call_minute in the credits panel",
+     "found_by": "C1",
+     "fix_commit": "24ff15515",
+     "control": {
+      "patch": ".review/controls/call-minute-has-no-label.patch",
+      "runner": "vitest",
+      "tests": ["src/i18n/__tests__/TranslationKeysExist.test.ts -t 'every usage kind the backend writes'"],
+      "observed": "AssertionError: expected [ 'call_minute' ] to deeply equal []"
+     }
+    },
+    {
+     "id": "R2",
+     "summary": "the speak button's charge was labelled 'Voice call', so beside real call minutes it read as a second kind of call",
+     "found_by": "B2",
+     "fix_commit": "24ff15515",
+     "control": {
+      "patch": ".review/controls/speak-button-labelled-as-call.patch",
+      "runner": "vitest",
+      "tests": ["src/i18n/__tests__/TranslationKeysExist.test.ts -t 'does not label the speak button as a call'"],
+      "observed": "AssertionError: expected 'voice call' not to contain 'call'"
+     }
+    },
+    {
+     "id": "R3",
+     "summary": "the usage-kind label guard compared the TypeScript union with its labels but never with the kinds the backend writes, so a kind added in Go alone passed it",
+     "found_by": "C3",
+     "fix_commit": "24ff15515",
+     "control": {
+      "patch": ".review/controls/usage-kind-guard-blind-to-backend.patch",
+      "runner": "vitest",
+      "tests": ["src/i18n/__tests__/TranslationKeysExist.test.ts -t 'every usage kind the backend writes'"],
+      "observed": "with the label still present and only the union member removed: AssertionError: expected [ 'call_minute' ] to deeply equal []"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the three fixes: the union member, the two labels, and the two new guard tests."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing applies."},
+    {"id": "B1", "status": "na", "why": "No payload changed by the fixes."},
+    {"id": "B2", "status": "applied", "evidence": "Printed the usage labels after the fix: chat Message, voice Spoken message, image Image generation, video Video generation, call_minute Call, other Credit adjustment."},
+    {"id": "B3", "status": "na", "why": "No handler changed."},
+    {"id": "B4", "status": "na", "why": "Nothing persisted."},
+    {"id": "C1", "status": "applied", "evidence": "The Go constants and the union now name the same five kinds, which the new guard asserts."},
+    {"id": "C2", "status": "na", "why": "No field added across the seam by the fixes."},
+    {"id": "C3", "status": "applied", "evidence": "The guard now reads both lists; its control shows it failing on a Go-only kind even with the label present."},
+    {"id": "C4", "status": "na", "why": "No external contract."},
+    {"id": "C5", "status": "na", "why": "No field added."},
+    {"id": "C6", "status": "applied", "evidence": "The guard parses the real Go file with a pattern matched against its current constants: it found more than three, which the test asserts so a pattern that matches nothing cannot pass."},
+    {"id": "C7", "status": "na", "why": "No fixture."},
+    {"id": "D1", "status": "na", "why": "No parsing of user input."},
+    {"id": "D2", "status": "na", "why": "As D1."},
+    {"id": "D3", "status": "na", "why": "As D1."},
+    {"id": "E1", "status": "applied", "evidence": "The new label sits in the same usage block the runtime key reads."},
+    {"id": "E2", "status": "na", "why": "No branch changed."},
+    {"id": "E3", "status": "na", "why": "No error path."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "applied", "evidence": "The label edit touched only the usage block; the unrelated voiceCall key for user-to-user calls is left as it is."},
+    {"id": "E6", "status": "applied", "evidence": "Searched every OmniChat string mentioning call or voice: none promises a subscription includes calls. The studio voice description still names Voicebox, which Phase 5 replaces."},
+    {"id": "F1", "status": "na", "why": "No shared state."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "The three controls were replayed by hand; each fails its test with a real assertion and reverses cleanly."},
+    {"id": "G2", "status": "applied", "evidence": "The guard runs in the frontend suite; nothing else needed wiring."},
+    {"id": "H1", "status": "applied", "evidence": "tsc -b, eslint and the seven translation-key tests pass after the fixes."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "na", "why": "No model output."},
+    {"id": "E7", "status": "na", "why": "Nothing started early."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean; tsc -b exit 0",
+  "vet": "go vet on config, models and services clean",
+  "lint": "gofmt clean; eslint exit 0",
+  "types": "tsc -b exit 0",
+  "tests": "billing, config and translation-key tests pass; the full suites have not been run"
+ }
+}

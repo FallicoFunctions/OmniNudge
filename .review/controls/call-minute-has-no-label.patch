@@ -1,0 +1,25 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 9c9d548dc..3d5ad05fd 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -4078,7 +4078,6 @@
+         "voice": "Spoken message",
+         "image": "Image generation",
+         "video": "Video generation",
+-        "call_minute": "Call",
+         "other": "Credit adjustment"
+       },
+       "errors": {
+diff --git a/frontend/src/types/omnichatCommerce.ts b/frontend/src/types/omnichatCommerce.ts
+index 14587484c..327a63280 100644
+--- a/frontend/src/types/omnichatCommerce.ts
++++ b/frontend/src/types/omnichatCommerce.ts
+@@ -26,7 +26,7 @@ export interface OmniChatWallet {
+  * omnichat.commerce.usage; the modal builds that key at runtime, so a member
+  * with no label renders the key itself into the usage list.
+  */
+-export type OmniChatCreditUsageKind = 'chat' | 'voice' | 'image' | 'video' | 'call_minute';
++export type OmniChatCreditUsageKind = 'chat' | 'voice' | 'image' | 'video';
+ 
+ export interface OmniChatCreditUsageItem {
+   id: number;
