@@ -1,0 +1,13 @@
+diff --git a/backend/internal/services/omnichat_live_call.go b/backend/internal/services/omnichat_live_call.go
+index 7c7db4bd4..9f647bcc4 100644
+--- a/backend/internal/services/omnichat_live_call.go
++++ b/backend/internal/services/omnichat_live_call.go
+@@ -559,7 +559,7 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
+ 			// A resume while the call is paid for would charge a minute that
+ 			// has not begun, and one straight after another adds nothing but
+ 			// another ledger write.
+-			if control.Type == LiveCallControlResume && paused.Load() && time.Since(lastResume) >= liveCallResumeInterval {
++			if control.Type == LiveCallControlResume && paused.Load() && time.Since(lastResume) >= 0 {
+ 				lastResume = time.Now()
+ 				if err := charge(true); err != nil {
+ 					return nil

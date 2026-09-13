@@ -1,0 +1,135 @@
+{
+ "schema_version": 2,
+ "head": "13d7eecce",
+ "base": "0c0038fc6",
+ "scope": {
+  "files": [
+   "backend/cmd/server/main.go",
+   "backend/internal/handlers/omnichat_live_call.go",
+   "backend/internal/handlers/omnichat_live_call_test.go",
+   "backend/internal/services/omnichat_live_call.go",
+   "backend/internal/services/omnichat_live_call_test.go"
+  ],
+  "boundaries": [
+   "relay -> meter -> billing service -> omnicredits ledger and reservations",
+   "browser text frames -> resume control -> a ledger write",
+   "call row started_at -> the first minute's anchor",
+   "relay -> browser paused and resumed events"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/c4b3d25e3.json",
+  ".review/b80cc0909.json",
+  ".review/41824b03d.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Phase 4a-3: the relay charges each minute as it begins through a meter, pauses on a minute it cannot pay, resumes on a browser control, and ends a call left unpaid; the handler's meter reserves and captures one minute per operation and refuses a call without billing."},
+    {"id": "A2", "status": "applied", "evidence": "c4b3d25e3.json and b80cc0909.json priced the minute and gated the start; 41824b03d.json established that one call has one socket, which the meter relies on to charge each minute once per call."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the relay's timeline through its tests at two materially different anchors: a call pressed now charges minute 1 at connect and minute 2 a minute length later; a call pressed a minute and a half before Live answered charges minutes 1 and 2 at once."},
+    {"id": "B2", "status": "na", "why": "No component changed; the paused screen is Phase 4b."},
+    {"id": "B3", "status": "applied", "evidence": "A call without billing is refused 503 before the upgrade, in the refusal table."},
+    {"id": "B4", "status": "applied", "evidence": "Ran the meter against the real billing service and repository on the test database with 5 credits at 3 a minute: minute 1 nil; minute 1 again nil with no second debit; minute 2 'omnicredits: insufficient balance', recognised by errors.Is. Read back: wallet purchased 2; ledger purchase +5 and one usage_debit call_minute -3; one reservation call_minute cost 3 captured."},
+    {"id": "C1", "status": "applied", "evidence": "The event and control names are one set of constants; the browser's parser will learn paused and resumed in Phase 4b."},
+    {"id": "C2", "status": "applied", "evidence": "The socket decodes a text frame into LiveCallControl and the relay reads its Type; malformed or empty controls are dropped."},
+    {"id": "C3", "status": "na", "why": "No rule lives in two places."},
+    {"id": "C4", "status": "applied", "evidence": "ReserveUsage returns the original hold for the same operation and returns ErrOmniCreditsInsufficient without writing anything, so a minute refused for want of credits can be charged under the same operation after a purchase; confirmed against the real repository."},
+    {"id": "C5", "status": "applied", "evidence": "StartedAt comes from the call row read in the handler; the meter's billing, user and call are set where RunLiveCall is called."},
+    {"id": "C6", "status": "applied", "evidence": "The meter was run through the real accessor chain -- ReserveOwned, ReserveUsage, CaptureOwned, CaptureUsage -- not only against a fake."},
+    {"id": "C7", "status": "applied", "evidence": "The relay tests use the relay's real minute arithmetic with shortened lengths, not a stubbed clock."},
+    {"id": "D1", "status": "applied", "evidence": "A funded call is charged minute by minute and relays normally."},
+    {"id": "D2", "status": "applied", "evidence": "Asked what a browser, or a script, sending resume repeatedly does to an unpaid call. Each failed resume reset the unpaid limit, so asking every few minutes kept the call and its Live session open forever (LM1); and every resume was a ledger write under a wallet lock, so a burst of them was a burst of writes (LM2)."},
+    {"id": "D3", "status": "applied", "evidence": "A resume while paid charges nothing; a call pressed long before Live answered is charged for the time since the press."},
+    {"id": "E1", "status": "applied", "evidence": "The start gate already refuses a voice call without billing; the live route now refuses it too, so neither door carries a call free."},
+    {"id": "E2", "status": "applied", "evidence": "Every branch of the minute arithmetic -- first minute anchored, first minute unanchored, after a pause, steady state -- is reached by a test."},
+    {"id": "E3", "status": "applied", "evidence": "A charge that fails for any reason but insufficient credits is logged and pauses the call, failing closed; a refund that fails is logged."},
+    {"id": "E4", "status": "applied", "evidence": "Admins pass through ReserveOwned's bypass, so they are metered but never debited."},
+    {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+    {"id": "E6", "status": "applied", "evidence": "Looked for other ways to hold an unpaid call: hanging up ends it; a paused call's Live session still rotates and resumes as before; the pause limit is the only thing that ends an abandoned one, which is what LM1 protects."},
+    {"id": "F1", "status": "applied", "evidence": "The paused flag crosses goroutines as an atomic; the timers and the minute count are touched only by the relay's loop. All relay tests pass under -race."},
+    {"id": "F2", "status": "applied", "evidence": "A capture that fails after a reservation is refunded; that minute's operation is then refunded, so it cannot be charged again and the call stays paused until its limit. Chosen deliberately: a ledger fault must never become a free minute."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "applied", "evidence": "A call that ends while paused leaves no held credits: a refused reservation writes nothing."},
+    {"id": "G1", "status": "applied", "evidence": "Both controlled; see findings."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "go build, go vet on services, handlers and server clean; twelve relay tests pass under -race; the handler meter, refusal and relay tests pass. The full suite has not been run."},
+    {"id": "Z1", "status": "applied", "evidence": "Both found by D2, which is listed. Nothing to add."},
+    {"id": "B5", "status": "applied", "evidence": "The real billing service and ledger were exercised; see B4. The live provider is unchanged by this phase and was run for real in Phase 2b."},
+    {"id": "E7", "status": "applied", "evidence": "Live is dialled before the first minute is charged, on purpose: a call that never connects must cost nothing. The price of the order is an idle Live session for a caller who cannot pay, which the pause limit ends."}
+   ],
+   "findings": [
+    {
+     "id": "LM1",
+     "summary": "each resume that could not pay restarted the unpaid limit, so a browser or script asking every few minutes held an unpaid call and its Live session open forever",
+     "found_by": "D2",
+     "fix_commit": "13d7eecce",
+     "control": {
+      "patch": ".review/controls/resume-restarts-unpaid-limit.patch",
+      "runner": "go",
+      "tests": ["./internal/services/ -run TestRunLiveCall_AskingToResumeDoesNotKeepAnUnpaidCallOpen"],
+      "observed": "--- FAIL at 3.00s: repeated resumes kept an unpaid call open"
+     }
+    },
+    {
+     "id": "LM2",
+     "summary": "every resume was a ledger write under a wallet lock, so a burst of resumes was a burst of writes",
+     "found_by": "D2",
+     "fix_commit": "13d7eecce",
+     "control": {
+      "patch": ".review/controls/resume-burst-hammers-ledger.patch",
+      "runner": "go",
+      "tests": ["./internal/services/ -run TestRunLiveCall_ABurstOfResumesIsOneAttempt"],
+      "observed": "expected: 2, actual: 4 -- the charge at connect and one resume; the rest of the burst wrote nothing"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the fixes: the pause limit started once, on the first unpaid minute, and the one-second spacing between resumes."},
+    {"id": "A2", "status": "applied", "evidence": "Same ledgers; nothing applies."},
+    {"id": "B1", "status": "applied", "evidence": "The timelines of pass 1 still hold after the fixes; the first charge failing at connect starts the limit, a later failed resume does not move it."},
+    {"id": "B2", "status": "na", "why": "No component."},
+    {"id": "B3", "status": "na", "why": "No handler changed by the fixes."},
+    {"id": "B4", "status": "na", "why": "The fixes write nothing new."},
+    {"id": "C1", "status": "na", "why": "No names changed."},
+    {"id": "C2", "status": "na", "why": "No field added."},
+    {"id": "C3", "status": "na", "why": "No rule in two places."},
+    {"id": "C4", "status": "na", "why": "No contract changed."},
+    {"id": "C5", "status": "na", "why": "No field."},
+    {"id": "C6", "status": "na", "why": "No accessor changed."},
+    {"id": "C7", "status": "applied", "evidence": "The limit test shortens the resume spacing so every resume is tried; with the default spacing the throttle alone would hide the limit fault, which is why the two are tested apart."},
+    {"id": "D1", "status": "applied", "evidence": "The first resume after a pause is always allowed; a paid resume succeeds."},
+    {"id": "D2", "status": "applied", "evidence": "Resumes every 60 ms end at the limit; a burst of three is one attempt."},
+    {"id": "D3", "status": "applied", "evidence": "The spacing starts from the zero time, so the first resume is never refused."},
+    {"id": "E1", "status": "na", "why": "No sibling affected."},
+    {"id": "E2", "status": "applied", "evidence": "Both branches of the paused swap are reached: entering a pause starts the limit, a pause that continues does not."},
+    {"id": "E3", "status": "na", "why": "No error path changed."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+    {"id": "E6", "status": "applied", "evidence": "The only other way into the pause is the first charge at connect, which starts the limit like any other."},
+    {"id": "F1", "status": "applied", "evidence": "The swap is the same atomic as the flag it replaces; the relay tests pass under -race after the fixes."},
+    {"id": "F2", "status": "na", "why": "No transaction."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "Nothing persisted."},
+    {"id": "G1", "status": "applied", "evidence": "Both controls replayed by hand; each fails with a real assertion and reverses cleanly."},
+    {"id": "G2", "status": "na", "why": "No guard."},
+    {"id": "H1", "status": "applied", "evidence": "go vet clean; the relay tests pass under -race."},
+    {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+    {"id": "B5", "status": "na", "why": "The fixes change no provider or ledger interaction."},
+    {"id": "E7", "status": "na", "why": "Nothing started early by the fixes."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet on services, handlers and server clean",
+  "lint": "gofmt clean",
+  "types": "n/a, Go only",
+  "tests": "relay tests pass under -race; handler meter, refusal and relay tests pass; the meter was run against the real ledger; the full suite has not been run"
+ }
+}

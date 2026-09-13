@@ -1,0 +1,18 @@
+diff --git a/backend/internal/services/omnichat_live_call.go b/backend/internal/services/omnichat_live_call.go
+index 7c7db4bd4..b7d57dd06 100644
+--- a/backend/internal/services/omnichat_live_call.go
++++ b/backend/internal/services/omnichat_live_call.go
+@@ -498,10 +498,9 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
+ 			// The limit starts when the call first goes unpaid. A resume that
+ 			// still cannot pay does not restart it, or a caller could hold an
+ 			// unpaid call -- and its Live session -- open forever by asking.
+-			if !paused.Swap(true) {
+-				pauseTimer.Reset(maxLiveCallPause)
+-				pauseExpired = pauseTimer.C
+-			}
++			paused.Store(true)
++			pauseTimer.Reset(maxLiveCallPause)
++			pauseExpired = pauseTimer.C
+ 			minuteDue = nil
+ 			return peer.SendEvent(LiveCallEvent{Type: LiveCallEventPaused})
+ 		}
