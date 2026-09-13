@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -332,6 +333,8 @@ type LiveCallDialer func(ctx context.Context, resumeHandle string) (LiveCallSess
 // LiveCallPeer is the caller's browser. Audio closes when they hang up.
 type LiveCallPeer interface {
 	Audio() <-chan []byte
+	// Controls is what the browser asks of the call besides being heard.
+	Controls() <-chan LiveCallControl
 	SendAudio(pcm []byte) error
 	SendEvent(event LiveCallEvent) error
 }
@@ -342,12 +345,83 @@ type LiveCallEvent struct {
 	Text string `json:"text,omitempty"`
 }
 
+// LiveCallControl is a request from the browser, sent as a JSON text frame.
+type LiveCallControl struct {
+	Type string `json:"type"`
+}
+
 const (
 	LiveCallEventHeard        = "heard"
 	LiveCallEventSaid         = "said"
 	LiveCallEventInterrupted  = "interrupted"
 	LiveCallEventTurnComplete = "turn_complete"
+	// LiveCallEventPaused says a minute could not be paid: nothing crosses the
+	// call in either direction until it is.
+	LiveCallEventPaused  = "paused"
+	LiveCallEventResumed = "resumed"
+
+	// LiveCallControlResume asks to pay for a minute and carry on, typically
+	// after the caller has bought credits.
+	LiveCallControlResume = "resume"
 )
+
+// LiveCallMeter charges a call by the minute. Minutes are numbered from one,
+// and charging the same minute twice is the same charge.
+type LiveCallMeter interface {
+	ChargeMinute(ctx context.Context, minute int) error
+}
+
+// LiveCallBilling is how a call is paid for. A nil Meter bills nothing,
+// which only tests rely on; a real call is refused without one.
+type LiveCallBilling struct {
+	Meter LiveCallMeter
+	// StartedAt is when the phone was pressed. The first minute counts from
+	// there, not from when Live answered.
+	StartedAt time.Time
+}
+
+var (
+	liveCallMinuteLength = time.Minute
+	// A call left unpaid this long is over: nobody is coming back to it.
+	maxLiveCallPause = 10 * time.Minute
+)
+
+const liveCallChargeTimeout = 10 * time.Second
+
+// A resume is a ledger write under a wallet lock. One a second is more than a
+// person pressing a button can send; a script sending more gets nothing for it.
+var liveCallResumeInterval = time.Second
+
+// liveCallMinutes keeps count of what a call has paid for.
+type liveCallMinutes struct {
+	billing   LiveCallBilling
+	charged   int
+	paidUntil time.Time
+}
+
+// chargeNext pays for the next minute. Each minute is charged as it begins,
+// so a call that runs into its third minute has paid for three. After a pause
+// the new minute begins when the call resumes, because the time spent paused
+// was not a call anybody was on.
+func (m *liveCallMinutes) chargeNext(ctx context.Context, now time.Time, afterPause bool) error {
+	chargeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), liveCallChargeTimeout)
+	defer cancel()
+	if err := m.billing.Meter.ChargeMinute(chargeCtx, m.charged+1); err != nil {
+		return err
+	}
+	m.charged++
+	switch {
+	case afterPause:
+		m.paidUntil = now.Add(liveCallMinuteLength)
+	case m.charged == 1 && !m.billing.StartedAt.IsZero():
+		m.paidUntil = m.billing.StartedAt.Add(liveCallMinuteLength)
+	case m.charged == 1:
+		m.paidUntil = now.Add(liveCallMinuteLength)
+	default:
+		m.paidUntil = m.paidUntil.Add(liveCallMinuteLength)
+	}
+	return nil
+}
 
 // LiveCallTurns is what the relay needs from the chat service.
 type LiveCallTurns interface {
@@ -355,9 +429,12 @@ type LiveCallTurns interface {
 	SaveCallTurn(ctx context.Context, userID, conversationID int, heard, said string) error
 }
 
-// RunLiveCall relays one call until the caller hangs up or the provider ends
-// it. It returns nil when the caller hung up.
-func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveCallDialer, peer LiveCallPeer, turns LiveCallTurns) error {
+// RunLiveCall relays one call until the caller hangs up, the provider ends it,
+// or it stays unpaid too long. It returns nil when the caller hung up.
+//
+// Nothing is charged until Live has answered, so a call that never connects
+// costs nothing.
+func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveCallDialer, peer LiveCallPeer, turns LiveCallTurns, billing LiveCallBilling) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -373,6 +450,9 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 	}
 	defer func() { current().Close() }()
 
+	// Set while a minute is unpaid. The caller is not heard and hears nothing.
+	var paused atomic.Bool
+
 	go func() {
 		// The caller hanging up is the end of the call.
 		defer cancel()
@@ -382,6 +462,9 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 				if !ok {
 					return
 				}
+				if paused.Load() {
+					continue
+				}
 				// Dropped while a reconnect is under way; the caller is heard
 				// again as soon as it lands.
 				_ = current().SendAudio(pcm)
@@ -390,6 +473,53 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 			}
 		}
 	}()
+
+	minutes := &liveCallMinutes{billing: billing}
+	minuteTimer := time.NewTimer(time.Hour)
+	minuteTimer.Stop()
+	defer minuteTimer.Stop()
+	pauseTimer := time.NewTimer(time.Hour)
+	pauseTimer.Stop()
+	defer pauseTimer.Stop()
+	var minuteDue, pauseExpired <-chan time.Time
+
+	// charge pays for the next minute and arms the timer for the one after it.
+	// A minute that cannot be paid pauses the call instead of ending it, so the
+	// caller can buy credits and carry on. It returns an error only when the
+	// browser is gone.
+	charge := func(afterPause bool) error {
+		if billing.Meter == nil {
+			return nil
+		}
+		if err := minutes.chargeNext(ctx, time.Now(), afterPause); err != nil {
+			if !errors.Is(err, models.ErrOmniCreditsInsufficient) {
+				zlog.Error().Err(err).Int("conversation_id", plan.ConversationID).Msg("omnichat live call: a minute could not be charged")
+			}
+			// The limit starts when the call first goes unpaid. A resume that
+			// still cannot pay does not restart it, or a caller could hold an
+			// unpaid call -- and its Live session -- open forever by asking.
+			if !paused.Swap(true) {
+				pauseTimer.Reset(maxLiveCallPause)
+				pauseExpired = pauseTimer.C
+			}
+			minuteDue = nil
+			return peer.SendEvent(LiveCallEvent{Type: LiveCallEventPaused})
+		}
+		wasPaused := paused.Swap(false)
+		pauseTimer.Stop()
+		pauseExpired = nil
+		minuteTimer.Reset(time.Until(minutes.paidUntil))
+		minuteDue = minuteTimer.C
+		if wasPaused {
+			return peer.SendEvent(LiveCallEvent{Type: LiveCallEventResumed})
+		}
+		return nil
+	}
+	if err := charge(false); err != nil {
+		return nil
+	}
+	controls := peer.Controls()
+	var lastResume time.Time
 
 	var heard, said strings.Builder
 	save := func() {
@@ -415,6 +545,29 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 		var open bool
 		select {
 		case <-ctx.Done():
+			return nil
+		case <-minuteDue:
+			if err := charge(false); err != nil {
+				return nil
+			}
+			continue
+		case control, ok := <-controls:
+			if !ok {
+				controls = nil
+				continue
+			}
+			// A resume while the call is paid for would charge a minute that
+			// has not begun, and one straight after another adds nothing but
+			// another ledger write.
+			if control.Type == LiveCallControlResume && paused.Load() && time.Since(lastResume) >= liveCallResumeInterval {
+				lastResume = time.Now()
+				if err := charge(true); err != nil {
+					return nil
+				}
+			}
+			continue
+		case <-pauseExpired:
+			zlog.Info().Int("conversation_id", plan.ConversationID).Msg("omnichat live call: ended after staying unpaid")
 			return nil
 		case event, open = <-current().Events():
 		}
@@ -444,6 +597,16 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 			continue
 		}
 		failedReconnects = 0
+
+		// While a minute is unpaid, what she says reaches nobody, so it is
+		// neither played nor kept as said.
+		if paused.Load() {
+			switch event.Kind {
+			case geminilive.EventAudio, geminilive.EventInputTranscript,
+				geminilive.EventOutputTranscript, geminilive.EventInterrupted:
+				continue
+			}
+		}
 
 		var sendErr error
 		switch event.Kind {

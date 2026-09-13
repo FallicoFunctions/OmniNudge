@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -52,15 +53,19 @@ func (f *fakeLiveSession) Close() error {
 func (f *fakeLiveSession) Err() error { return nil }
 
 type fakeLivePeer struct {
-	audioIn chan []byte
-	mu      sync.Mutex
-	audio   [][]byte
-	events  []LiveCallEvent
+	audioIn  chan []byte
+	controls chan LiveCallControl
+	mu       sync.Mutex
+	audio    [][]byte
+	events   []LiveCallEvent
 }
 
-func newFakeLivePeer() *fakeLivePeer { return &fakeLivePeer{audioIn: make(chan []byte, 8)} }
+func newFakeLivePeer() *fakeLivePeer {
+	return &fakeLivePeer{audioIn: make(chan []byte, 8), controls: make(chan LiveCallControl, 4)}
+}
 
-func (p *fakeLivePeer) Audio() <-chan []byte { return p.audioIn }
+func (p *fakeLivePeer) Audio() <-chan []byte             { return p.audioIn }
+func (p *fakeLivePeer) Controls() <-chan LiveCallControl { return p.controls }
 func (p *fakeLivePeer) SendAudio(pcm []byte) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -120,8 +125,231 @@ func dialOnce(session LiveCallSession) (LiveCallDialer, *[]string) {
 func runLiveCallAsync(t *testing.T, ctx context.Context, dial LiveCallDialer, peer LiveCallPeer, turns LiveCallTurns) <-chan error {
 	t.Helper()
 	done := make(chan error, 1)
-	go func() { done <- RunLiveCall(ctx, 7, &LiveCallPlan{ConversationID: 11}, dial, peer, turns) }()
+	go func() {
+		done <- RunLiveCall(ctx, 7, &LiveCallPlan{ConversationID: 11}, dial, peer, turns, LiveCallBilling{})
+	}()
 	return done
+}
+
+func runLiveCallBilled(t *testing.T, dial LiveCallDialer, peer LiveCallPeer, billing LiveCallBilling) <-chan error {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() {
+		done <- RunLiveCall(context.Background(), 7, &LiveCallPlan{ConversationID: 11}, dial, peer, &fakeLiveTurns{}, billing)
+	}()
+	return done
+}
+
+type fakeMeter struct {
+	mu       sync.Mutex
+	minutes  []int
+	refuse   bool
+	attempts int
+}
+
+func (m *fakeMeter) tries() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.attempts
+}
+
+func (m *fakeMeter) ChargeMinute(_ context.Context, minute int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.attempts++
+	if m.refuse {
+		return models.ErrOmniCreditsInsufficient
+	}
+	m.minutes = append(m.minutes, minute)
+	return nil
+}
+
+func (m *fakeMeter) charged() []int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]int(nil), m.minutes...)
+}
+
+func (m *fakeMeter) setRefuse(refuse bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.refuse = refuse
+}
+
+func withShortCallTimes(t *testing.T, minute, pause time.Duration) {
+	t.Helper()
+	oldMinute, oldPause := liveCallMinuteLength, maxLiveCallPause
+	liveCallMinuteLength, maxLiveCallPause = minute, pause
+	t.Cleanup(func() { liveCallMinuteLength, maxLiveCallPause = oldMinute, oldPause })
+}
+
+// Every minute is charged as it begins, so a call that runs into its third
+// minute has paid for three.
+func TestRunLiveCall_ChargesEachMinuteAsItBegins(t *testing.T) {
+	withShortCallTimes(t, 80*time.Millisecond, time.Minute)
+	meter := &fakeMeter{}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	waitFor(t, "the first minute", func() bool { return len(meter.charged()) >= 1 })
+	time.Sleep(200 * time.Millisecond)
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+
+	got := meter.charged()
+	require.GreaterOrEqual(t, len(got), 3, "two and a half minutes pays for three")
+	require.LessOrEqual(t, len(got), 4)
+	for i, minute := range got {
+		require.Equal(t, i+1, minute, "minutes are numbered in order, each once")
+	}
+}
+
+// The timer starts when the phone is pressed, not when Live answers: a call
+// that took most of its first minute to connect is already into its second.
+func TestRunLiveCall_TheFirstMinuteCountsFromThePress(t *testing.T) {
+	withShortCallTimes(t, time.Second, time.Minute)
+	meter := &fakeMeter{}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now().Add(-1500 * time.Millisecond)})
+
+	deadline := time.Now().Add(400 * time.Millisecond)
+	for len(meter.charged()) < 2 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the second minute was not charged at once, though the press was a minute and a half ago: %v", meter.charged())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+}
+
+// An unpaid minute pauses the call instead of ending it. Nothing crosses while
+// it is paused, and a resume that can pay picks the call back up.
+func TestRunLiveCall_AnUnpaidMinutePausesUntilItIsPaid(t *testing.T) {
+	withShortCallTimes(t, time.Hour, time.Minute)
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	waitFor(t, "the pause", func() bool { return slices.Contains(peer.eventTypes(), LiveCallEventPaused) })
+	peer.audioIn <- []byte{1}
+	session.events <- geminilive.Event{Kind: geminilive.EventAudio, Audio: []byte{9}}
+	session.events <- geminilive.Event{Kind: geminilive.EventOutputTranscript, Text: "into the void"}
+	time.Sleep(50 * time.Millisecond)
+	session.mu.Lock()
+	require.Empty(t, session.audio, "the caller was heard while the minute was unpaid")
+	session.mu.Unlock()
+	peer.mu.Lock()
+	require.Empty(t, peer.audio, "she was heard while the minute was unpaid")
+	peer.mu.Unlock()
+	require.NotContains(t, peer.eventTypes(), LiveCallEventSaid)
+
+	meter.setRefuse(false)
+	peer.controls <- LiveCallControl{Type: LiveCallControlResume}
+	waitFor(t, "the resume", func() bool { return slices.Contains(peer.eventTypes(), LiveCallEventResumed) })
+	peer.audioIn <- []byte{2}
+	waitFor(t, "the caller to be heard again", func() bool {
+		session.mu.Lock()
+		defer session.mu.Unlock()
+		return len(session.audio) == 1
+	})
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+	require.Equal(t, []int{1}, meter.charged(), "the minute that could not be paid is the one paid on resume")
+}
+
+func TestRunLiveCall_EndsWhenLeftUnpaid(t *testing.T) {
+	withShortCallTimes(t, time.Hour, 100*time.Millisecond)
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("a call nobody paid for stayed open")
+	}
+	require.Contains(t, peer.eventTypes(), LiveCallEventPaused)
+}
+
+// Asking to resume, and failing to pay each time, must not keep an unpaid call
+// open: every failed resume used to restart the limit, so a script asking
+// every few minutes held the call and its Live session forever.
+func TestRunLiveCall_AskingToResumeDoesNotKeepAnUnpaidCallOpen(t *testing.T) {
+	withShortCallTimes(t, time.Hour, 300*time.Millisecond)
+	// Every resume is tried here, so only the limit can end the call.
+	oldInterval := liveCallResumeInterval
+	liveCallResumeInterval = 10 * time.Millisecond
+	t.Cleanup(func() { liveCallResumeInterval = oldInterval })
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	started := time.Now()
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(60 * time.Millisecond):
+				select {
+				case peer.controls <- LiveCallControl{Type: LiveCallControlResume}:
+				default:
+				}
+			}
+		}
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("repeated resumes kept an unpaid call open")
+	}
+	require.Less(t, time.Since(started), time.Second, "the unpaid limit was restarted by the resumes")
+}
+
+// A resume is a ledger write under a wallet lock, so a burst of them is one.
+func TestRunLiveCall_ABurstOfResumesIsOneAttempt(t *testing.T) {
+	withShortCallTimes(t, time.Hour, time.Minute)
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	waitFor(t, "the pause", func() bool { return slices.Contains(peer.eventTypes(), LiveCallEventPaused) })
+	for range 3 {
+		peer.controls <- LiveCallControl{Type: LiveCallControlResume}
+	}
+	time.Sleep(100 * time.Millisecond)
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+	require.Equal(t, 2, meter.tries(), "the charge at connect and one resume; the rest of the burst wrote nothing")
+}
+
+// A resume while the call is paid for would charge a minute that has not begun.
+func TestRunLiveCall_AResumeWhilePaidChargesNothing(t *testing.T) {
+	withShortCallTimes(t, time.Hour, time.Minute)
+	meter := &fakeMeter{}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	waitFor(t, "the first minute", func() bool { return len(meter.charged()) == 1 })
+	peer.controls <- LiveCallControl{Type: LiveCallControlResume}
+	time.Sleep(50 * time.Millisecond)
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+	require.Equal(t, []int{1}, meter.charged())
+	require.NotContains(t, peer.eventTypes(), LiveCallEventResumed)
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {

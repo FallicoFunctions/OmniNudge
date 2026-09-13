@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,64 @@ import (
 	"github.com/omninudge/backend/internal/services/geminilive"
 	"github.com/stretchr/testify/require"
 )
+
+type liveMinuteBilling struct {
+	mu         sync.Mutex
+	reserved   []uuid.UUID
+	kinds      []string
+	captured   []uuid.UUID
+	refunded   []uuid.UUID
+	captureErr error
+}
+
+func (b *liveMinuteBilling) ReserveOwned(_ context.Context, _ int, operation uuid.UUID, kind string) (*models.OmniCreditsUsageReservation, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.reserved = append(b.reserved, operation)
+	b.kinds = append(b.kinds, kind)
+	return &models.OmniCreditsUsageReservation{OperationID: operation, UsageKind: kind}, nil
+}
+
+func (b *liveMinuteBilling) CaptureOwned(_ context.Context, _ int, operation uuid.UUID) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.captured = append(b.captured, operation)
+	return b.captureErr
+}
+
+func (b *liveMinuteBilling) RefundOwned(_ context.Context, _ int, operation uuid.UUID) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.refunded = append(b.refunded, operation)
+	return nil
+}
+
+// A minute is the call and its number: charging it again is the same charge,
+// and no two minutes, of one call or of two, ever share an operation.
+func TestLiveCallMinuteMeterChargesEachMinuteOnce(t *testing.T) {
+	billing := &liveMinuteBilling{}
+	meter := liveCallMinuteMeter{billing: billing, userID: 9, callID: uuid.New()}
+	ctx := context.Background()
+
+	require.NoError(t, meter.ChargeMinute(ctx, 1))
+	require.NoError(t, meter.ChargeMinute(ctx, 1))
+	require.NoError(t, meter.ChargeMinute(ctx, 2))
+
+	require.Equal(t, billing.reserved[0], billing.reserved[1], "a retried minute must be the same operation")
+	require.NotEqual(t, billing.reserved[0], billing.reserved[2])
+	require.Equal(t, []string{models.OmniCreditsUsageCallMinute, models.OmniCreditsUsageCallMinute, models.OmniCreditsUsageCallMinute}, billing.kinds)
+	require.Len(t, billing.captured, 3)
+	other := liveCallMinuteMeter{billing: billing, userID: 9, callID: uuid.New()}
+	require.NotEqual(t, meter.operation(1), other.operation(1), "two calls never share a minute")
+}
+
+func TestLiveCallMinuteMeterRefundsWhatItCouldNotCapture(t *testing.T) {
+	billing := &liveMinuteBilling{captureErr: errors.New("ledger unavailable")}
+	meter := liveCallMinuteMeter{billing: billing, userID: 9, callID: uuid.New()}
+
+	require.Error(t, meter.ChargeMinute(context.Background(), 1))
+	require.Equal(t, billing.reserved, billing.refunded, "credits held for a minute that was not taken must be given back")
+}
 
 type liveCallsFake struct {
 	mu      sync.Mutex
@@ -152,6 +211,7 @@ func TestLiveCallConnect_RefusesBeforeUpgrading(t *testing.T) {
 		session    *models.OmniChatCallSession
 		prepareErr error
 		path       string
+		noBilling  bool
 		want       int
 	}{
 		{name: "not a call id", session: voice, path: "/omnichat/calls/not-a-uuid/live", want: http.StatusBadRequest},
@@ -160,6 +220,7 @@ func TestLiveCallConnect_RefusesBeforeUpgrading(t *testing.T) {
 		{name: "a video call", session: video, want: http.StatusConflict},
 		{name: "she blocked them", session: voice, prepareErr: services.ErrOmniChatBlockedByPersona, want: http.StatusForbidden},
 		{name: "the conversation is gone", session: voice, prepareErr: services.ErrNotFound, want: http.StatusNotFound},
+		{name: "billing is not configured", session: voice, noBilling: true, want: http.StatusServiceUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -171,6 +232,9 @@ func TestLiveCallConnect_RefusesBeforeUpgrading(t *testing.T) {
 						return nil, nil
 					}
 				})
+			if !tt.noBilling {
+				handler.SetBilling(&liveMinuteBilling{})
+			}
 			path := tt.path
 			if path == "" {
 				path = "/omnichat/calls/" + callID.String() + "/live"
@@ -194,6 +258,7 @@ func TestLiveCallConnect_OutlivesTheRequestTimeout(t *testing.T) {
 	handler := NewOmniChatLiveCallHandler(calls, &liveCallChatFake{}, func(*services.LiveCallPlan) services.LiveCallDialer {
 		return func(context.Context, string) (services.LiveCallSession, error) { return session, nil }
 	})
+	handler.SetBilling(&liveMinuteBilling{})
 	server := httptest.NewServer(liveCallRouter(handler, middleware.Timeout(100*time.Millisecond)))
 	defer server.Close()
 
@@ -230,6 +295,7 @@ func TestLiveCallConnect_ASecondSocketForTheSameCallIsRefused(t *testing.T) {
 			return &handlerLiveSession{events: make(chan geminilive.Event, 1)}, nil
 		}
 	})
+	handler.SetBilling(&liveMinuteBilling{})
 	server := httptest.NewServer(liveCallRouter(handler))
 	defer server.Close()
 	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/omnichat/calls/" + callID.String() + "/live"
@@ -266,6 +332,7 @@ func TestLiveCallConnect_RelaysAudioAndEndsTheCallWhenTheBrowserHangsUp(t *testi
 		require.Equal(t, 44, plan.ConversationID)
 		return func(context.Context, string) (services.LiveCallSession, error) { return session, nil }
 	})
+	handler.SetBilling(&liveMinuteBilling{})
 	server := httptest.NewServer(liveCallRouter(handler))
 	defer server.Close()
 

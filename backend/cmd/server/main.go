@@ -893,7 +893,7 @@ func main() {
 	omniChatLiveCallHandler := handlers.NewOmniChatLiveCallHandler(
 		omniChatVoiceRepo, chatbotService,
 		services.GeminiLiveDialer(cfg.Gemini.APIKey, cfg.Gemini.LiveModel),
-	)
+	).SetBilling(omniChatBilling)
 	adminPersonaHandler := handlers.NewAdminPersonaHandler(botPersonaRepo, omniChatVoiceRepo)
 	adminOmniChatBlockHandler := handlers.NewAdminOmniChatBlockHandler(omniChatBlockRepo)
 	adminOmniChatNurseryHandler := handlers.NewAdminOmniChatNurseryHandler(botPersonaRepo)

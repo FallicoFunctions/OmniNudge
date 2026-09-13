@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -25,7 +27,43 @@ const (
 	// of room a typed turn's extraction does, detached from the socket.
 	liveCallFinishTimeout = 2 * time.Minute
 	liveCallEndTimeout    = 5 * time.Second
+	liveCallControlQueue  = 4
 )
+
+// omniChatLiveCallBilling is what paying for a call by the minute needs.
+type omniChatLiveCallBilling interface {
+	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+	CaptureOwned(context.Context, int, uuid.UUID) error
+	RefundOwned(context.Context, int, uuid.UUID) error
+}
+
+// liveCallMinuteMeter takes one minute's credits at a time. The operation is
+// the call and the minute, so charging a minute again -- a retry, or a resume
+// after the caller bought credits -- is the same charge, never a second one.
+type liveCallMinuteMeter struct {
+	billing omniChatLiveCallBilling
+	userID  int
+	callID  uuid.UUID
+}
+
+func (m liveCallMinuteMeter) operation(minute int) uuid.UUID {
+	return uuid.NewSHA1(m.callID, []byte(fmt.Sprintf("call-minute-%d", minute)))
+}
+
+func (m liveCallMinuteMeter) ChargeMinute(ctx context.Context, minute int) error {
+	operation := m.operation(minute)
+	if _, err := m.billing.ReserveOwned(ctx, m.userID, operation, models.OmniCreditsUsageCallMinute); err != nil {
+		return err
+	}
+	if err := m.billing.CaptureOwned(ctx, m.userID, operation); err != nil {
+		// Held but not taken: give it back rather than leave it in limbo.
+		if refundErr := m.billing.RefundOwned(ctx, m.userID, operation); refundErr != nil {
+			zlog.Error().Err(refundErr).Str("call_id", m.callID.String()).Int("minute", minute).Msg("omnichat live call: failed to refund a minute that was not captured")
+		}
+		return err
+	}
+	return nil
+}
 
 type omniChatLiveCalls interface {
 	GetActiveCallOwned(ctx context.Context, id uuid.UUID, userID int) (*models.OmniChatCallSession, error)
@@ -45,6 +83,7 @@ type OmniChatLiveCallHandler struct {
 	calls   omniChatLiveCalls
 	chat    omniChatLiveCallConversation
 	dialFor func(plan *services.LiveCallPlan) services.LiveCallDialer
+	billing omniChatLiveCallBilling
 }
 
 func NewOmniChatLiveCallHandler(
@@ -53,6 +92,12 @@ func NewOmniChatLiveCallHandler(
 	dialFor func(plan *services.LiveCallPlan) services.LiveCallDialer,
 ) *OmniChatLiveCallHandler {
 	return &OmniChatLiveCallHandler{calls: calls, chat: chat, dialFor: dialFor}
+}
+
+// SetBilling wires the per-minute charge. Without it no call is carried.
+func (h *OmniChatLiveCallHandler) SetBilling(billing omniChatLiveCallBilling) *OmniChatLiveCallHandler {
+	h.billing = billing
+	return h
 }
 
 // Connect opens the audio socket for an active voice call.
@@ -103,6 +148,13 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 		return
 	}
 
+	// A call is paid by the minute; without billing it is not carried at all,
+	// never carried free.
+	if h.billing == nil {
+		RespondError(c, http.StatusServiceUnavailable, "Voice calls are not available right now")
+		return
+	}
+
 	// Last, so a refused call never holds the claim. Each socket would open its
 	// own Live session on the platform's key while the call is billed once.
 	claimed, err := h.calls.ClaimLiveCallOwned(ctx, callID, userID, uuid.NewString())
@@ -132,7 +184,10 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 	// Detached: every request carries the router's thirty-second deadline, and
 	// a call is not a request. The browser closing its socket ends the call.
 	callCtx := context.WithoutCancel(ctx)
-	runErr := services.RunLiveCall(callCtx, userID, plan, h.dialFor(plan), socket, h.chat)
+	runErr := services.RunLiveCall(callCtx, userID, plan, h.dialFor(plan), socket, h.chat, services.LiveCallBilling{
+		Meter:     liveCallMinuteMeter{billing: h.billing, userID: userID, callID: callID},
+		StartedAt: call.StartedAt,
+	})
 	if runErr != nil {
 		zlog.Warn().Err(runErr).Str("call_id", callID.String()).Msg("omnichat live call: ended by the provider")
 		socket.closeWith(ws.CloseInternalServerErr, "The call dropped")
@@ -156,37 +211,59 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
 // liveCallSocket is the browser's end of a call: one reader goroutine, and
 // writes serialised because the relay and the close both write.
 type liveCallSocket struct {
-	conn    *ws.Conn
-	audio   chan []byte
-	done    chan struct{}
-	once    sync.Once
-	writeMu sync.Mutex
+	conn     *ws.Conn
+	audio    chan []byte
+	controls chan services.LiveCallControl
+	done     chan struct{}
+	once     sync.Once
+	writeMu  sync.Mutex
 }
 
 func newLiveCallSocket(conn *ws.Conn) *liveCallSocket {
 	conn.SetReadLimit(liveCallMaxAudioFrame)
-	return &liveCallSocket{conn: conn, audio: make(chan []byte, liveCallAudioQueue), done: make(chan struct{})}
+	return &liveCallSocket{
+		conn:     conn,
+		audio:    make(chan []byte, liveCallAudioQueue),
+		controls: make(chan services.LiveCallControl, liveCallControlQueue),
+		done:     make(chan struct{}),
+	}
 }
 
+// readLoop sorts the browser's frames: binary is her caller's voice, text is a
+// control. Anything else is ignored.
 func (s *liveCallSocket) readLoop() {
 	defer close(s.audio)
+	defer close(s.controls)
 	for {
 		kind, data, err := s.conn.ReadMessage()
 		if err != nil {
 			return
 		}
-		if kind != ws.BinaryMessage || len(data) == 0 {
-			continue
-		}
-		select {
-		case s.audio <- data:
-		case <-s.done:
-			return
+		switch {
+		case kind == ws.BinaryMessage && len(data) > 0:
+			select {
+			case s.audio <- data:
+			case <-s.done:
+				return
+			}
+		case kind == ws.TextMessage:
+			var control services.LiveCallControl
+			if json.Unmarshal(data, &control) != nil || control.Type == "" {
+				continue
+			}
+			// A control queue that is full is one the relay has not read; a
+			// second identical request adds nothing.
+			select {
+			case s.controls <- control:
+			default:
+			}
 		}
 	}
 }
 
 func (s *liveCallSocket) Audio() <-chan []byte { return s.audio }
+
+func (s *liveCallSocket) Controls() <-chan services.LiveCallControl { return s.controls }
 
 func (s *liveCallSocket) SendAudio(pcm []byte) error {
 	s.writeMu.Lock()
