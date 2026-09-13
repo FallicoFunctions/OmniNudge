@@ -692,7 +692,9 @@ func main() {
 	// media generation cannot disagree about what an account is entitled to.
 	omniChatContentEntitlement := services.NewOmniChatContentEntitlement(omniChatUserRepo).
 		SetExplicitContentEnabled(cfg.OmniChatMedia.ExplicitContentEnabled)
-	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, omniChatUserRepo).SetAdminReader(omniChatUserRepo)
+	omniChatBilling := services.NewOmniChatBillingService(omniCreditsRepo, omniChatUserRepo).
+		SetAdminReader(omniChatUserRepo).
+		SetCallMinuteCost(int64(cfg.OmniChatVoice.CallCreditsPerMinute))
 	omniChatBillingOffers, billingOffersErr := services.ParseOmniChatBillingOffers(cfg.OmniChatBillingOffersJSON)
 	if billingOffersErr != nil {
 		zlog.Fatal().Err(billingOffersErr).Msg("Invalid OmniChat billing offer configuration")

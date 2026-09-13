@@ -41,6 +41,16 @@ type liveCallBilling struct {
 	reserveErr error
 	captures   int
 	refunds    int
+	// cannotAfford refuses the first minute of a voice call.
+	cannotAfford bool
+	affordErr    error
+}
+
+func (b *liveCallBilling) CanAffordCallMinuteOwned(context.Context, int) (bool, int64, error) {
+	if b.affordErr != nil {
+		return false, 0, b.affordErr
+	}
+	return !b.cannotAfford, 3, nil
 }
 
 type fakeLiveAvatar struct {
@@ -320,6 +330,41 @@ func TestOmniChatVoiceHandlerRejectsVideoCallWithInsufficientCredits(t *testing.
 	router.ServeHTTP(response, request)
 	require.Equal(t, http.StatusPaymentRequired, response.Code)
 	require.Equal(t, 1, data.endCalls)
+}
+
+// A voice call is paid from the moment the phone is pressed, so a caller who
+// cannot pay for the first minute never gets a call at all.
+func TestOmniChatVoiceHandlerGatesAVoiceCallOnItsFirstMinute(t *testing.T) {
+	tests := []struct {
+		name       string
+		billing    *liveCallBilling
+		want       int
+		wantStarts int
+	}{
+		{name: "the first minute is affordable", billing: &liveCallBilling{}, want: http.StatusCreated, wantStarts: 1},
+		{name: "the first minute is not affordable", billing: &liveCallBilling{cannotAfford: true}, want: http.StatusPaymentRequired},
+		{name: "the credits cannot be read", billing: &liveCallBilling{affordErr: errors.New("wallet down")}, want: http.StatusServiceUnavailable},
+		{name: "billing is not configured", billing: nil, want: http.StatusServiceUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &liveCallVoiceData{}
+			handler := NewOmniChatVoiceHandler(data, nil, nil, nil)
+			if tt.billing != nil {
+				handler.SetBilling(tt.billing)
+			}
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			router.POST("/omnichat/conversations/:id/calls", func(c *gin.Context) { c.Set("user_id", 9); handler.StartCall(c) })
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/omnichat/conversations/81/calls", strings.NewReader(`{"mode":"voice"}`))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(response, request)
+
+			require.Equal(t, tt.want, response.Code, response.Body.String())
+			require.Equal(t, tt.wantStarts, data.startCalls, "a call was created for a caller who could not pay for it")
+		})
+	}
 }
 
 // Four failures used to read as one. A recording the server could not parse, a

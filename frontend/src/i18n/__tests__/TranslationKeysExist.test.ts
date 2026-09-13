@@ -127,6 +127,13 @@ describe('i18n usage', () => {
       type: 'OmniChatCreditUsageKind',
       keyOf: (member) => [`omnichat.commerce.usage.${member}`],
     },
+    // Written inline in the modal's props, this list had no entry here at all:
+    // a feature added without a label would have put the key in the heading.
+    {
+      file: 'src/components/omnichat/OmniChatVideoPaywallModal.tsx',
+      type: 'OmniChatPaywallFeature',
+      keyOf: (member) => [`omnichat.videoPaywall.features.${member}`],
+    },
   ];
 
   it.each(UNION_KEYS)('every member of $type has its translation', ({ file, type, keyOf }) => {

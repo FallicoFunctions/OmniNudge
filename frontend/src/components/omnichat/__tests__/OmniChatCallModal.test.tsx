@@ -430,6 +430,30 @@ describe('OmniChatCallModal', () => {
     expect(screen.getByRole('button', { name: 'End call' })).toBeInTheDocument();
   });
 
+  // A voice call is paid by the minute, so a caller who cannot pay for the first
+  // one is offered credits, not told the connection failed.
+  it('routes a voice-call 402 to the paywall too', async () => {
+    const error = Object.assign(new Error('payment required'), { status: 402 });
+    vi.mocked(omnichatService.startCall).mockRejectedValue(error);
+    const onPaymentRequired = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <OmniChatCallModal
+        persona={persona}
+        conversationId={12}
+        mode="voice"
+        onClose={onClose}
+        onAssistant={vi.fn()}
+        onPaymentRequired={onPaymentRequired}
+      />
+    );
+
+    await waitFor(() => expect(onPaymentRequired).toHaveBeenCalledOnce());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Connection needs attention')).not.toBeInTheDocument();
+  });
+
   it('routes a video-call 402 to the paywall instead of a generic connection error', async () => {
     const error = Object.assign(new Error('payment required'), { status: 402 });
     vi.mocked(omnichatService.startCall).mockRejectedValue(error);

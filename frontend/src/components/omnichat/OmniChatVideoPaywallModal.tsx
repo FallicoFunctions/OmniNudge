@@ -1,6 +1,9 @@
-import { Film, X } from 'lucide-react';
+import { Film, Phone, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../common/Modal';
+
+/** What the paywall is unlocking. Each one is a label under omnichat.videoPaywall.features. */
+export type OmniChatPaywallFeature = 'scene_video' | 'video_call' | 'voice_call';
 
 export default function OmniChatVideoPaywallModal({
   isOpen,
@@ -9,7 +12,7 @@ export default function OmniChatVideoPaywallModal({
   onViewOptions,
 }: {
   isOpen: boolean;
-  feature: 'scene_video' | 'video_call';
+  feature: OmniChatPaywallFeature;
   onClose: () => void;
   onViewOptions: () => void;
 }) {
@@ -27,7 +30,7 @@ export default function OmniChatVideoPaywallModal({
     >
       <div className="flex justify-between">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
-          <Film />
+          {feature === 'voice_call' ? <Phone /> : <Film />}
         </div>
         <button
           type="button"

@@ -45,7 +45,9 @@ import OmniChatModelSelectorModal from '../components/omnichat/OmniChatModelSele
 import OmniChatUpgradeModal from '../components/omnichat/OmniChatUpgradeModal';
 import OmniChatResponseReportModal from '../components/omnichat/OmniChatResponseReportModal';
 import OmniChatCommerceModal from '../components/omnichat/OmniChatCommerceModal';
-import OmniChatVideoPaywallModal from '../components/omnichat/OmniChatVideoPaywallModal';
+import OmniChatVideoPaywallModal, {
+  type OmniChatPaywallFeature,
+} from '../components/omnichat/OmniChatVideoPaywallModal';
 import DirectCharacterNotice from '../components/omnichat/DirectCharacterNotice';
 import LikenessPicker from '../components/omnichat/omniai/LikenessPicker';
 import {
@@ -493,9 +495,9 @@ export default function OmniChatChatPage() {
   } | null>(null);
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [showCommerce, setShowCommerce] = useState(false);
-  const [videoPaywallFeature, setVideoPaywallFeature] = useState<
-    'scene_video' | 'video_call' | null
-  >(null);
+  const [videoPaywallFeature, setVideoPaywallFeature] = useState<OmniChatPaywallFeature | null>(
+    null
+  );
   const [activeMediaJob, setActiveMediaJob] = useState<OmniChatGenerationJob | null>(null);
   const [guestMessages, setGuestMessages] = useState<BotMessage[]>([]);
   const [guestPersona, setGuestPersona] = useState<BotPersona | null>(null);
@@ -3195,7 +3197,9 @@ export default function OmniChatChatPage() {
               queryKey: omnichatQueryKeys.conversation(selectedConversationId),
             });
           }}
-          onPaymentRequired={() => setVideoPaywallFeature('video_call')}
+          onPaymentRequired={() =>
+            setVideoPaywallFeature(callMode === 'voice' ? 'voice_call' : 'video_call')
+          }
           onAssistant={(message) => {
             queryClient.setQueryData<BotConversationDetail | undefined>(
               omnichatQueryKeys.conversation(selectedConversationId),

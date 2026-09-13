@@ -4088,11 +4088,12 @@
     },
     "videoPaywall": {
       "title": "Unlock {{feature}}",
-      "description": "Video requires OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
+      "description": "This needs OmniCredits. An eligible plan may include credits; availability and cost are confirmed securely before use.",
       "viewOptions": "View plans and credits",
       "features": {
         "scene_video": "scene video",
-        "video_call": "video calls"
+        "video_call": "video calls",
+        "voice_call": "voice calls"
       }
     },
     "categories": {

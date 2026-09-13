@@ -203,11 +203,9 @@ export default function OmniChatCallModal({
       })
       .catch((error: unknown) => {
         if (closedRef.current || callEpochRef.current !== callEpoch) return;
-        if (
-          mode === 'video' &&
-          (error as Error & { status?: number }).status === 402 &&
-          onPaymentRequiredRef.current
-        ) {
+        // Both kinds of call are paid: a video call per session, a voice call
+        // per minute. Either way a 402 is an offer to buy, not a failure.
+        if ((error as Error & { status?: number }).status === 402 && onPaymentRequiredRef.current) {
           onPaymentRequiredRef.current();
           onCloseRef.current();
           return;

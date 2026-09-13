@@ -115,11 +115,16 @@ type OmniChatVoiceHandler struct {
 	voiceCloningEnabled bool
 	transcription       omniChatCallTranscriber
 	callSentences       omniChatCallSentenceReader
-	billing             interface {
-		ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
-		CaptureOwned(context.Context, int, uuid.UUID) error
-		RefundOwned(context.Context, int, uuid.UUID) error
-	}
+	billing             omniChatCallBilling
+}
+
+// omniChatCallBilling is what starting a call needs from billing: the video
+// reservation, and whether a voice caller can pay for the first minute.
+type omniChatCallBilling interface {
+	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
+	CaptureOwned(context.Context, int, uuid.UUID) error
+	RefundOwned(context.Context, int, uuid.UUID) error
+	CanAffordCallMinuteOwned(context.Context, int) (bool, int64, error)
 }
 
 type liveVideoClient interface {
@@ -132,11 +137,7 @@ type liveVideoTokenRefresher interface {
 	RefreshToken(context.Context, uuid.UUID, int) (string, error)
 }
 
-func (h *OmniChatVoiceHandler) SetBilling(billing interface {
-	ReserveOwned(context.Context, int, uuid.UUID, string) (*models.OmniCreditsUsageReservation, error)
-	CaptureOwned(context.Context, int, uuid.UUID) error
-	RefundOwned(context.Context, int, uuid.UUID) error
-}) *OmniChatVoiceHandler {
+func (h *OmniChatVoiceHandler) SetBilling(billing omniChatCallBilling) *OmniChatVoiceHandler {
 	h.billing = billing
 	return h
 }
@@ -406,6 +407,25 @@ func (h *OmniChatVoiceHandler) StartCall(c *gin.Context) {
 		return
 	}
 	userID := c.GetInt("user_id")
+	// A voice call is paid by the minute from the moment the phone is
+	// pressed, so a caller who cannot pay for the first one is stopped here,
+	// before a call exists. Without billing the answer is no, never free.
+	if request.Mode == "voice" {
+		if h.billing == nil {
+			RespondError(c, http.StatusServiceUnavailable, "Voice calls are not available right now")
+			return
+		}
+		affordable, _, err := h.billing.CanAffordCallMinuteOwned(c.Request.Context(), userID)
+		if err != nil {
+			zlog.Error().Err(err).Int("user_id", userID).Msg("omnichat call: could not check the caller's credits")
+			RespondError(c, http.StatusServiceUnavailable, "Voice billing is temporarily unavailable")
+			return
+		}
+		if !affordable {
+			RespondError(c, http.StatusPaymentRequired, "Voice calls require OmniCredits")
+			return
+		}
+	}
 	var activeProviders []models.OmniChatCallProviderSession
 	if h.liveVideo != nil && h.liveVideo.Configured() {
 		var providerErr error
