@@ -167,7 +167,10 @@ jobs:
 
       - name: TypeScript type check
         working-directory: frontend
-        run: npx tsc --noEmit
+        # -b, not --noEmit: the root tsconfig lists no files and only points at
+        # the real configs, so --noEmit checked an empty project and passed
+        # every run, type errors and all.
+        run: npx tsc -b
 
       - name: Lint
         working-directory: frontend
