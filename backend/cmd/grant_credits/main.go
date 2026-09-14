@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -62,17 +63,40 @@ func main() {
 	}
 	defer db.Close()
 
-	ctx := context.Background()
-	user, err := models.NewUserRepository(db.Pool).GetByUsername(ctx, name)
-	if err != nil || user == nil {
-		fatalf("no account named %q", name)
-	}
-	wallet, err := models.NewOmniCreditsRepository(db.Pool).GrantAdminCredits(ctx, user.ID, operationID, *credits)
+	userID, wallet, err := grant(context.Background(), models.NewUserRepository(db.Pool),
+		models.NewOmniCreditsRepository(db.Pool), name, operationID, *credits)
 	if err != nil {
-		fatalf("grant credits: %v", err)
+		fatalf("%v", err)
 	}
 	fmt.Printf("Gave %d credits to %s (user %d). Balance: %d purchased, %d subscription. Operation %s.\n",
-		*credits, name, user.ID, wallet.PurchasedBalance, wallet.SubscriptionBalance, operationID)
+		*credits, name, userID, wallet.PurchasedBalance, wallet.SubscriptionBalance, operationID)
+}
+
+type accountFinder interface {
+	GetByUsername(context.Context, string) (*models.User, error)
+}
+
+type creditGranter interface {
+	GrantAdminCredits(context.Context, int, uuid.UUID, int64) (*models.OmniCreditsWallet, error)
+}
+
+var errNoAccount = errors.New("no account")
+
+// grant keeps a lookup that failed apart from an account that is not there:
+// told "no account" while the database is down, you go looking for a typo.
+func grant(ctx context.Context, users accountFinder, credits creditGranter, name string, operationID uuid.UUID, amount int64) (int, *models.OmniCreditsWallet, error) {
+	user, err := users.GetByUsername(ctx, name)
+	if err != nil {
+		return 0, nil, fmt.Errorf("look up %q: %w", name, err)
+	}
+	if user == nil {
+		return 0, nil, fmt.Errorf("%w named %q", errNoAccount, name)
+	}
+	wallet, err := credits.GrantAdminCredits(ctx, user.ID, operationID, amount)
+	if err != nil {
+		return 0, nil, fmt.Errorf("grant credits: %w", err)
+	}
+	return user.ID, wallet, nil
 }
 
 func fatalf(format string, args ...any) {
