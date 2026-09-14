@@ -1,0 +1,124 @@
+{
+  "schema_version": 2,
+  "head": "b5ede02c5",
+  "base": "19353074d",
+  "scope": {
+    "files": [
+      "frontend/src/components/common/Modal.tsx",
+      "frontend/src/components/common/__tests__/Modal.test.tsx",
+      "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+      "frontend/src/components/omnichat/OmniChatCommerceModal.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+      "frontend/src/components/omnichat/__tests__/liveCallSocket.test.ts",
+      "frontend/src/components/omnichat/liveCallSocket.ts",
+      "frontend/src/components/omnichat/useLiveVoiceCall.ts",
+      "frontend/src/pages/OmniChatChatPage.tsx",
+      "backend/internal/services/omnichat_live_call.go",
+      "backend/internal/services/omnichat_live_call_test.go"
+    ],
+    "boundaries": [
+      "browser -> relay: the resume control as a JSON text frame",
+      "relay -> browser: paused and resumed events as JSON text frames",
+      "call screen <-> credits screen: stacking layer and the document-wide key listener"
+    ]
+  },
+  "prior_ledgers_read": [".review/0c0038fc6.json", ".review/c4b3d25e3.json", ".review/b80cc0909.json"],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "9 frontend files; crosses the live-call socket in both directions and the stacking/keyboard seam between two dialogs."},
+        {"id": "A2", "status": "applied", "evidence": "0c0038fc6 controlled resume-restarts-unpaid-limit and resume-burst-hammers-ledger: the one-second resume throttle came from there, and is what this pass found the browser could not see."},
+        {"id": "B1", "status": "applied", "evidence": "The resume frame is JSON.stringify({type:'resume'}); liveCallSocket test asserts the exact string, and only while OPEN."},
+        {"id": "B2", "status": "applied", "evidence": "Deferred to pass 2, after the fix, so the printed markup is of the final code."},
+        {"id": "B3", "status": "na", "why": "No HTTP handler changed; the socket frames are covered under C1/C2."},
+        {"id": "B4", "status": "na", "why": "No query or migration."},
+        {"id": "C1", "status": "applied", "evidence": "LiveCallEventPaused='paused', LiveCallEventResumed='resumed', LiveCallControlResume='resume' match the browser's parseEvent cases and resume() frame."},
+        {"id": "C2", "status": "applied", "evidence": "LiveCallEvent{Type json:type} via WriteJSON; LiveCallControl{Type json:type} decoded from text frames in liveCallSocket.read."},
+        {"id": "C3", "status": "na", "why": "No rule is implemented twice."},
+        {"id": "C4", "status": "applied", "evidence": "Read RunLiveCall's control branch: a resume inside liveCallResumeInterval of the last was dropped with no reply, while the browser holds Continue at 'Checking…' until a reply. Finding resume-too-soon-unanswered."},
+        {"id": "C5", "status": "na", "why": "No struct field added across a boundary."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor; parseEvent is a typed switch covered by the socket test."},
+        {"id": "C7", "status": "applied", "evidence": "The call-screen tests deliver events through the real handler signature of openLiveCallSocket, the same object shape the socket produces."},
+        {"id": "D1", "status": "na", "why": "No validation or parsing added beyond two enum cases."},
+        {"id": "D2", "status": "applied", "evidence": "Unknown event types still return null (socket test 'delete_everything')."},
+        {"id": "D3", "status": "na", "why": "No length or range handling."},
+        {"id": "E1", "status": "applied", "evidence": "Other dialogs over the call: the paywall modal already ends the call before it opens; the credits modal is the only one opened over a live call."},
+        {"id": "E2", "status": "applied", "evidence": "The 'still not enough credits' branch was reachable only when the server replied; a throttled resume never reached it. Same finding."},
+        {"id": "E3", "status": "applied", "evidence": "The throttled resume was a silent drop. Same finding. resume() on a closed socket is a no-op, but the close reaches onFailed and replaces the panel with the error."},
+        {"id": "E4", "status": "applied", "evidence": "The panel is gated on status 'paused', which only the voice path sets; video calls are billed elsewhere and never pause."},
+        {"id": "E5", "status": "applied", "evidence": "The throttle interval lives only on the server; the fix answers there rather than copying the interval into the browser."},
+        {"id": "E6", "status": "applied", "evidence": "grep for other buttons waiting on a socket reply: Continue is the only one."},
+        {"id": "F1", "status": "applied", "evidence": "go test -race on TestRunLiveCall_* and handler LiveCall tests: ok."},
+        {"id": "F2", "status": "na", "why": "No transaction changed."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "applied", "evidence": "Unmount clears socketRef only if it is still this effect's socket, so a late cleanup does not null a newer connection."},
+        {"id": "G1", "status": "applied", "evidence": "resume-too-soon-unanswered: patch reverts the reply; the new test times out waiting for the answer."},
+        {"id": "G2", "status": "na", "why": "No guard or hook added."},
+        {"id": "H1", "status": "applied", "evidence": "tsc -b 0, eslint 0 on the 9 files; vitest on the 3 changed test files 38/38; go vet services ok; TestRunLiveCall_* ok."},
+        {"id": "Z1", "status": "applied", "evidence": "Found by C4 (reading the other end of the socket for what it does with each request); already a row."},
+        {"id": "B5", "status": "na", "why": "No model or provider input changed. The pause itself is only reachable in a real call by a non-admin account with too few credits, which needs the user's login; unverified in real use and said so in the session."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."}
+      ],
+      "findings": [
+        {
+          "id": "resume-too-soon-unanswered",
+          "summary": "A resume within one second of the last was dropped with no reply, so Continue stayed at 'Checking…' and disabled for the rest of the call.",
+          "found_by": "C4",
+          "fix_commit": "b5ede02c5",
+          "control": {
+            "patch": ".review/controls/resume-too-soon-unanswered.patch",
+            "runner": "go",
+            "tests": ["./internal/services/ -run TestRunLiveCall_AResumeTooSoonIsStillAnswered"],
+            "observed": "With the patch: 'timed out waiting for an answer to the resume that came too soon' (assertion failure, package compiles). Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Adds the relay's control branch (services) to the scope."},
+        {"id": "A2", "status": "applied", "evidence": "Burst test from 0c0038fc6 still holds: 2 ledger tries for 3 resumes; the extra two now get paused replies."},
+        {"id": "B1", "status": "applied", "evidence": "The reply to a throttled resume is the same LiveCallEvent{Type:'paused'} frame the browser already parses."},
+        {"id": "B2", "status": "applied", "evidence": "Printed the panel via a throwaway test for: first pause without onBuyCredits (text + Continue only), asking (Buy credits + disabled 'Checking…'), refused with onBuyCredits ('still not enough credits', Continue enabled). All correct; throwaway removed."},
+        {"id": "B3", "status": "na", "why": "No HTTP handler changed."},
+        {"id": "B4", "status": "na", "why": "No query or migration."},
+        {"id": "C1", "status": "applied", "evidence": "Reply uses LiveCallEventPaused, matched by parseEvent."},
+        {"id": "C2", "status": "applied", "evidence": "The browser's onPaused reads resumeAskedRef and shows the refusal text: the same field the reply now reaches."},
+        {"id": "C3", "status": "na", "why": "No rule implemented twice."},
+        {"id": "C4", "status": "applied", "evidence": "Every resume the browser can send while paused now gets paused or resumed back; a full control queue drops only a flood the UI cannot send (Continue is disabled while asked)."},
+        {"id": "C5", "status": "na", "why": "No field added."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor."},
+        {"id": "C7", "status": "applied", "evidence": "New test drives the real RunLiveCall with the shared fake peer and meter."},
+        {"id": "D1", "status": "na", "why": "No parsing."},
+        {"id": "D2", "status": "applied", "evidence": "A resume while paid is still ignored with no reply and no charge (AResumeWhilePaidChargesNothing)."},
+        {"id": "D3", "status": "na", "why": "No range handling."},
+        {"id": "E1", "status": "applied", "evidence": "Both refusal paths (charge failed, throttled) now send the same event."},
+        {"id": "E2", "status": "applied", "evidence": "Every branch of the control case is reached by a test: not resume/not paused, throttled, charged."},
+        {"id": "E3", "status": "applied", "evidence": "A failed SendEvent on the throttled path ends the relay as every other SendEvent failure does."},
+        {"id": "E4", "status": "applied", "evidence": "Reply is gated on paused, as the charge is."},
+        {"id": "E5", "status": "applied", "evidence": "No second copy of the interval."},
+        {"id": "E6", "status": "applied", "evidence": "No other request-reply control exists on the socket."},
+        {"id": "F1", "status": "applied", "evidence": "-race on relay and handler tests: ok."},
+        {"id": "F2", "status": "na", "why": "No transaction."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "na", "why": "Nothing persisted by the fix."},
+        {"id": "G1", "status": "applied", "evidence": "Control built and run by hand; the reply code re-read after restoring."},
+        {"id": "G2", "status": "na", "why": "No guard added."},
+        {"id": "H1", "status": "applied", "evidence": "go vet services ok; TestRunLiveCall_* ok; frontend unchanged since pass 1 gates."},
+        {"id": "Z1", "status": "na", "why": "Pass found nothing."},
+        {"id": "B5", "status": "na", "why": "No model input changed; the real pause flow needs the user's non-admin login and stays unverified in real use."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."}
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet ./internal/services ok; tsc -b 0",
+    "vet": "ok",
+    "lint": "eslint 0 on the 9 frontend files",
+    "types": "tsc -b 0",
+    "tests": "vitest 3 files 38/38; go TestRunLiveCall_* ok, -race ok; full suites not run (after review)"
+  }
+}

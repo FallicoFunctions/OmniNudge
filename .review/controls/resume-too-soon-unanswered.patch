@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/omnichat_live_call.go b/backend/internal/services/omnichat_live_call.go
+index b4448c115..519856983 100644
+--- a/backend/internal/services/omnichat_live_call.go
++++ b/backend/internal/services/omnichat_live_call.go
+@@ -565,9 +565,6 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
+ 			// write. It is still answered: the caller is waiting to hear
+ 			// whether the call carries on.
+ 			if time.Since(lastResume) < liveCallResumeInterval {
+-				if err := peer.SendEvent(LiveCallEvent{Type: LiveCallEventPaused}); err != nil {
+-					return nil
+-				}
+ 				continue
+ 			}
+ 			lastResume = time.Now()
