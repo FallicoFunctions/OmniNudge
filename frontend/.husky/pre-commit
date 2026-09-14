@@ -8,5 +8,10 @@
 # fires only when it is not needed.
 bash scripts/no-build-artifacts.sh || exit 1
 
+# CI's required lint and formatting checks, on what this commit touches. A
+# commit here goes straight to main, so this is the last place they can run
+# before main is red for everyone, Dependabot included.
+bash scripts/ci-checks-on-staged.sh || exit 1
+
 cd frontend
 npm run i18n:verify
