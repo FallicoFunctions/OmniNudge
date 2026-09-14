@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ConversationSettings } from '../../types/omnichat';
 import OmniChatDefaultsModal from './OmniChatDefaultsModal';
+import OmniChatCreditsMenu from './OmniChatCreditsMenu';
 
 export default function OmniChatHeader({
   defaults,
@@ -42,6 +43,7 @@ export default function OmniChatHeader({
           </Link>
 
           <div className="flex items-center gap-2.5">
+            {isAuthenticated && <OmniChatCreditsMenu />}
             <div className="relative">
               {isAuthenticated ? (
                 <button

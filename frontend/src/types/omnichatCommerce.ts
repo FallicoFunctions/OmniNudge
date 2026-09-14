@@ -38,9 +38,11 @@ export interface OmniChatCreditUsageItem {
 }
 
 export interface OmniChatBillingCosts {
+  chat: number;
   voice: number;
   image: number;
   video: number;
+  call_minute: number;
 }
 
 export interface OmniChatBillingUsage {

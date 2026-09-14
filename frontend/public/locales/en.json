@@ -4239,7 +4239,13 @@
     "header": {
       "defaults": "Defaults",
       "defaultsDescription": "Set the name, age, and profile details OmniChat should use by default.",
-      "saveDefaults": "Save defaults"
+      "saveDefaults": "Save defaults",
+      "credits": {
+        "balance": "{{balance}} OmniCredits",
+        "prices": "Prices in OmniCredits",
+        "perMinute": "{{cost}}/min",
+        "buyMore": "Buy more"
+      }
     },
     "sidebar": {
       "discover": "Discover",

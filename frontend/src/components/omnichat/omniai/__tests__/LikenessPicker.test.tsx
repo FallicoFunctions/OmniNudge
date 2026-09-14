@@ -41,7 +41,7 @@ beforeEach(() => {
   vi.mocked(omnichatService.rerollLikeness).mockResolvedValue({ started: 4 });
   vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
     usage: [],
-    costs: { voice: 2, image: 10, video: 40 },
+    costs: { chat: 1, voice: 2, image: 10, video: 40, call_minute: 3 },
     limit: 50,
   });
 });
@@ -215,7 +215,7 @@ describe('drawing another set', () => {
     vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
     vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
       usage: [],
-      costs: { voice: 2, image: 25, video: 40 },
+      costs: { chat: 1, voice: 2, image: 25, video: 40, call_minute: 3 },
       limit: 50,
     });
     renderPicker();

@@ -51,7 +51,7 @@ describe('OmniChatCommerceModal', () => {
     });
     vi.mocked(omnichatService.getBillingUsage).mockResolvedValue({
       usage: [],
-      costs: { voice: 1, image: 4, video: 10 },
+      costs: { chat: 1, voice: 1, image: 4, video: 10, call_minute: 3 },
       limit: 50,
     });
   });
