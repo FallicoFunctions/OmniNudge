@@ -237,8 +237,8 @@ describe('omnichatService billing adapters', () => {
   });
 
   it('refuses a cross-origin thumbnail URL', () => {
-    expect(() => mediaAssetThumbnailUrl('asset-1', 'https://attacker.example/thumbnail.jpg')).toThrow(
-      'untrusted origin'
-    );
+    expect(() =>
+      mediaAssetThumbnailUrl('asset-1', 'https://attacker.example/thumbnail.jpg')
+    ).toThrow('untrusted origin');
   });
 });

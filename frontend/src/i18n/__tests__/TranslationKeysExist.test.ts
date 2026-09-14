@@ -152,8 +152,13 @@ describe('i18n usage', () => {
   // every minute of every call -- while the union stopped at 'video', and the
   // label check above had nothing to catch: the kind was in neither list.
   it('every usage kind the backend writes is a member of OmniChatCreditUsageKind', () => {
-    const backend = readFileSync(join(process.cwd(), '../backend/internal/models/omnicredits.go'), 'utf8');
-    const written = [...backend.matchAll(/OmniCreditsUsage[A-Z]\w*\s*=\s*"([a-z_]+)"/g)].map((m) => m[1]);
+    const backend = readFileSync(
+      join(process.cwd(), '../backend/internal/models/omnicredits.go'),
+      'utf8'
+    );
+    const written = [...backend.matchAll(/OmniCreditsUsage[A-Z]\w*\s*=\s*"([a-z_]+)"/g)].map(
+      (m) => m[1]
+    );
     expect(written.length).toBeGreaterThan(3);
 
     const types = readFileSync(join(process.cwd(), 'src/types/omnichatCommerce.ts'), 'utf8');
@@ -167,8 +172,8 @@ describe('i18n usage', () => {
   // 'voice' is the speak button reading one message aloud. Labelled "Voice
   // call", it sat beside real call minutes looking like a second kind of call.
   it('does not label the speak button as a call', () => {
-    const labels = JSON.parse(readFileSync(join(process.cwd(), 'public/locales/en.json'), 'utf8')).omnichat
-      .commerce.usage as Record<string, string>;
+    const labels = JSON.parse(readFileSync(join(process.cwd(), 'public/locales/en.json'), 'utf8'))
+      .omnichat.commerce.usage as Record<string, string>;
     expect(labels.voice.toLowerCase()).not.toContain('call');
     expect(labels.call_minute).toBeTruthy();
     expect(labels.call_minute).not.toBe(labels.voice);

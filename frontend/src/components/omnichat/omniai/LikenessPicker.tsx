@@ -204,11 +204,7 @@ export default function LikenessPicker({
                   )}
           </button>
           <span id="omniai-reroll-replaces" className="text-[12px] text-white/35">
-            {translate(
-              t,
-              'omnichat.omniai.likeness.rerollReplaces',
-              'These four are replaced.'
-            )}
+            {translate(t, 'omnichat.omniai.likeness.rerollReplaces', 'These four are replaced.')}
           </span>
         </div>
       ) : null}

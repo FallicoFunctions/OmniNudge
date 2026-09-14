@@ -101,7 +101,11 @@ describe('openLiveCallSocket', () => {
     call.close();
     expect(socket().closedWith).toBe(1000);
     socket().onclose?.({ code: 1011, reason: 'The call dropped', wasClean: true });
-    expect(handlers.onClose).toHaveBeenCalledWith({ code: 1011, reason: 'The call dropped', clean: true });
+    expect(handlers.onClose).toHaveBeenCalledWith({
+      code: 1011,
+      reason: 'The call dropped',
+      clean: true,
+    });
   });
 
   it('passes a pause and a resume through, and asks to resume only while open', async () => {

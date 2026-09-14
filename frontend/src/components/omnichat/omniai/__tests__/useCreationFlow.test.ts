@@ -26,14 +26,26 @@ const options = {
         curly: ['natural', 'bob', 'pixie', 'afro'],
         coily: ['natural', 'bob', 'pixie', 'afro'],
       },
-      man: { straight: ['natural', 'fade'], wavy: ['natural', 'fade'],
-             curly: ['natural', 'fade', 'afro'], coily: ['natural', 'fade', 'afro'] },
+      man: {
+        straight: ['natural', 'fade'],
+        wavy: ['natural', 'fade'],
+        curly: ['natural', 'fade', 'afro'],
+        coily: ['natural', 'fade', 'afro'],
+      },
     },
     anime: {
-      woman: { straight: ['natural', 'bob', 'pixie', 'afro'], wavy: ['natural', 'afro'],
-               curly: ['natural', 'afro'], coily: ['natural', 'afro'] },
-      man: { straight: ['natural', 'afro'], wavy: ['natural', 'afro'],
-             curly: ['natural', 'afro'], coily: ['natural', 'afro'] },
+      woman: {
+        straight: ['natural', 'bob', 'pixie', 'afro'],
+        wavy: ['natural', 'afro'],
+        curly: ['natural', 'afro'],
+        coily: ['natural', 'afro'],
+      },
+      man: {
+        straight: ['natural', 'afro'],
+        wavy: ['natural', 'afro'],
+        curly: ['natural', 'afro'],
+        coily: ['natural', 'afro'],
+      },
     },
   },
 } as unknown as OmniAIOptions;

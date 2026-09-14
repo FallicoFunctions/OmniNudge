@@ -14,7 +14,9 @@ function axiosError(status: number, data: Record<string, unknown>) {
 describe('reading what the server said', () => {
   it('takes the code from the body, not from axios', () => {
     // error.code is axios's own. Reading it found "ERR_BAD_REQUEST" every time.
-    const read = serverErrorFrom(axiosError(400, { code: 'omniai_underage', message: 'Characters must be 18 or older.' }));
+    const read = serverErrorFrom(
+      axiosError(400, { code: 'omniai_underage', message: 'Characters must be 18 or older.' })
+    );
     expect(read.code).toBe('omniai_underage');
     expect(read.status).toBe(400);
     expect(read.message).toBe('Characters must be 18 or older.');

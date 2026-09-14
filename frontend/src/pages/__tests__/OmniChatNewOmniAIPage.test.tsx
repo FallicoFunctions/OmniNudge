@@ -125,7 +125,7 @@ describe('somebody with a free slot', () => {
     expect(screen.queryByText('You already have one')).toBeNull();
   });
 
-  it('does not reuse another account\'s cached entitlement', async () => {
+  it("does not reuse another account's cached entitlement", async () => {
     const client = newClient();
     client.setQueryData(omnichatQueryKeys.omniAIOptions(8), {
       ...options,

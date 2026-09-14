@@ -602,11 +602,11 @@ export default function OmniChatCallModal({
               ? 'Speaking'
               : status === 'paused'
                 ? 'Paused'
-              : status === 'listening'
-                ? 'Listening…'
-                : status === 'error'
-                  ? 'Connection needs attention'
-                  : `${mode} call`}
+                : status === 'listening'
+                  ? 'Listening…'
+                  : status === 'error'
+                    ? 'Connection needs attention'
+                    : `${mode} call`}
       </p>
     </header>
   );
@@ -697,7 +697,11 @@ export default function OmniChatCallModal({
             </p>
           )}
           {status === 'paused' && (
-            <OmniChatCommerceModal isOpen onClose={endCall} pausedCall={{ onCreditsAdded: resume }} />
+            <OmniChatCommerceModal
+              isOpen
+              onClose={endCall}
+              pausedCall={{ onCreditsAdded: resume }}
+            />
           )}
           {status === 'error' && (
             <p

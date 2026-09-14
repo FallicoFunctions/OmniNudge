@@ -58,7 +58,8 @@ export default function OmniChatMediaAssetView({
   const thumbnailPath = 'thumbnail_url' in asset ? asset.thumbnail_url : undefined;
   const isVideo = asset.kind === 'video';
   const showsThumbnailOnly = preview && !opened;
-  const alt = 'prompt' in asset && asset.prompt ? asset.prompt : `Generated character ${asset.kind}`;
+  const alt =
+    'prompt' in asset && asset.prompt ? asset.prompt : `Generated character ${asset.kind}`;
 
   useEffect(() => {
     setOpened(false);

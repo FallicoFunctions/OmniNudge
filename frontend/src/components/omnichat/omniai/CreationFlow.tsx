@@ -34,7 +34,8 @@ interface CreationFlowProps {
 
 export default function CreationFlow({ options, onMade, onRefused }: CreationFlowProps) {
   const { t } = useTranslation();
-  const tab = (key: string, fallback: string) => translate(t, `omnichat.omniai.tab.${key}`, fallback);
+  const tab = (key: string, fallback: string) =>
+    translate(t, `omnichat.omniai.tab.${key}`, fallback);
 
   const flow = useCreationFlow(options);
   const { step, answers, answer, setName, toggle, ready, goBack, goForward, jumpTo } = flow;
@@ -412,7 +413,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                   placeholder={translate(
                     t,
                     'omnichat.omniai.styleNotePlaceholder',
-                    'Always in black. Never wears trainers.',
+                    'Always in black. Never wears trainers.'
                   )}
                   className="min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-base font-medium text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
                 />
@@ -551,7 +552,8 @@ function ReviewPanel({
     },
     {
       label: translate(t, 'omnichat.omniai.review.build', 'Build'),
-      value: said('build', answers.build) || translate(t, 'omnichat.omniai.review.open', 'Left open'),
+      value:
+        said('build', answers.build) || translate(t, 'omnichat.omniai.review.open', 'Left open'),
     },
     {
       label: `${pronouns.Subj} start${pronouns.s}`,

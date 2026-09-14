@@ -8,7 +8,8 @@ const isDev = import.meta.env.DEV;
 // A build stamps its own version. Dev has none, and one fixed value let the
 // browser keep a cached en.json after new labels were added, so dev asks for
 // a fresh copy on every page load.
-const localeBuildVersion = import.meta.env.VITE_APP_BUILD_ID || (isDev ? String(Date.now()) : 'dev');
+const localeBuildVersion =
+  import.meta.env.VITE_APP_BUILD_ID || (isDev ? String(Date.now()) : 'dev');
 const loggedMissingTranslations = new Set<string>();
 
 export function buildLocaleLoadPath(language: string): string {

@@ -235,7 +235,10 @@ export function useCreationFlow(options: OmniAIOptions | undefined) {
   }, []);
 
   const appearance = useMemo((): OmniAIAppearanceAnswers => {
-    const payload: OmniAIAppearanceAnswers = { age: answers.age, height_inches: answers.heightInches };
+    const payload: OmniAIAppearanceAnswers = {
+      age: answers.age,
+      height_inches: answers.heightInches,
+    };
     if (answers.style) payload.style = answers.style;
     if (answers.gender) payload.gender = answers.gender;
     if (answers.ethnicity) payload.ethnicity = answers.ethnicity;

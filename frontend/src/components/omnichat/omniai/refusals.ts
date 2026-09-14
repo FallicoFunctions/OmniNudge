@@ -20,7 +20,11 @@ export type CreationRefusal = 'already_has_one' | 'needs_upgrade' | 'underage' |
  * A flat shape is still accepted, because a caller that has already unwrapped
  * the body should not have to wrap it again.
  */
-export function serverErrorFrom(error: unknown): { code?: string; status?: number; message?: string } {
+export function serverErrorFrom(error: unknown): {
+  code?: string;
+  status?: number;
+  message?: string;
+} {
   const typed = error as
     | {
         code?: string;

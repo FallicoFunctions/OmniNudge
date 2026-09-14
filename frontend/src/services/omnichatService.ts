@@ -133,7 +133,7 @@ export function mediaAssetThumbnailUrl(assetId: string, thumbnailUrl?: string): 
 function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): string {
   return resolveApiMediaUrl(
     getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/content`),
-    publicContentUrl,
+    publicContentUrl
   );
 }
 
@@ -146,7 +146,7 @@ function resolveApiMediaContentUrl(assetId: string, publicContentUrl?: string): 
 function resolveApiMediaThumbnailUrl(assetId: string, posterUrl?: string): string {
   return resolveApiMediaUrl(
     getApiUrl(`/omnichat/media/${encodeURIComponent(assetId)}/thumbnail`),
-    posterUrl,
+    posterUrl
   );
 }
 
@@ -426,7 +426,10 @@ export const omnichatService = {
   },
 
   async pickLikeness(personaId: number, candidateId: number): Promise<{ asset_id: string }> {
-    return api.post<{ asset_id: string }>(`/omnichat/omniai/${personaId}/likeness/${candidateId}`, {});
+    return api.post<{ asset_id: string }>(
+      `/omnichat/omniai/${personaId}/likeness/${candidateId}`,
+      {}
+    );
   },
 
   /**

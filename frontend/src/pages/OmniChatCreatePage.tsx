@@ -406,7 +406,9 @@ export function OmniChatCreateWorkspace() {
                         <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all"
-                            style={{ width: `${Math.max(4, mediaJobPercent(activeJob, progressNow))}%` }}
+                            style={{
+                              width: `${Math.max(4, mediaJobPercent(activeJob, progressNow))}%`,
+                            }}
                           />
                         </div>
                         <p className="mt-2 text-xs text-white/35">
@@ -561,7 +563,11 @@ function GalleryGrid({
             key={asset.id}
             className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.04] p-3"
           >
-            <OmniChatMediaAssetView asset={asset} preview className="aspect-[4/5] min-h-60 w-full" />
+            <OmniChatMediaAssetView
+              asset={asset}
+              preview
+              className="aspect-[4/5] min-h-60 w-full"
+            />
             <p className="mt-3 line-clamp-2 text-sm text-white/65">{asset.prompt}</p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="text-xs capitalize text-white/30">

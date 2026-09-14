@@ -50,7 +50,6 @@ function getSafePublicationShareUrl(path: string, publicationId: string): string
   return url.toString();
 }
 
-
 export function OmniChatExploreWorkspace() {
   const [filter, setFilter] = useState<ExploreFilter>('all');
   const exploreQuery = useInfiniteQuery({

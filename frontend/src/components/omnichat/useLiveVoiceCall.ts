@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { CallMicrophone } from './callRecorder';
+import { createLivePcmPlayer, startLiveCallCapture, type LiveCallCapture } from './liveCallAudio';
 import {
-  createLivePcmPlayer,
-  startLiveCallCapture,
-  type LiveCallCapture,
-} from './liveCallAudio';
-import { openLiveCallSocket, type LiveCallSocket, type LiveCallSocketClose } from './liveCallSocket';
+  openLiveCallSocket,
+  type LiveCallSocket,
+  type LiveCallSocketClose,
+} from './liveCallSocket';
 
 export type LiveVoiceCallState = 'connecting' | 'listening' | 'speaking' | 'paused';
 
@@ -121,7 +121,9 @@ export function useLiveVoiceCall({
         handlersRef.current.onState('listening');
       } catch {
         if (!disposed) {
-          handlersRef.current.onFailed('The call could not be connected. End the call and try again.');
+          handlersRef.current.onFailed(
+            'The call could not be connected. End the call and try again.'
+          );
         }
       }
     })();

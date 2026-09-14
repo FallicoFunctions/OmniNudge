@@ -36,7 +36,11 @@ export type LiveCallSocket = {
  */
 const MAX_BUFFERED_BYTES = 256 * 1024;
 
-export function liveCallSocketUrl(callId: string, token: string, base: string = API_BASE_URL): string {
+export function liveCallSocketUrl(
+  callId: string,
+  token: string,
+  base: string = API_BASE_URL
+): string {
   const url = new URL(base);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.pathname = `${url.pathname.replace(/\/$/, '')}/omnichat/calls/${encodeURIComponent(callId)}/live`;

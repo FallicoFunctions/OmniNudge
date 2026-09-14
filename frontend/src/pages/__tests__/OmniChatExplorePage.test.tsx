@@ -331,7 +331,9 @@ describe('OmniChatExploreWorkspace', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(exploreMediaProps.some((props) => props.kind === 'video')).toBe(true));
+    await waitFor(() =>
+      expect(exploreMediaProps.some((props) => props.kind === 'video')).toBe(true)
+    );
     const videoCards = exploreMediaProps.filter((props) => props.kind === 'video');
     expect(videoCards.every((card) => card.preview === true)).toBe(true);
   });

@@ -221,7 +221,9 @@ describe('drawing another set', () => {
     renderPicker();
 
     await screen.findByText('Choose how she looks');
-    expect(await screen.findByRole('button', { name: /Draw four more \(100 credits\)/ })).toBeEnabled();
+    expect(
+      await screen.findByRole('button', { name: /Draw four more \(100 credits\)/ })
+    ).toBeEnabled();
   });
 
   it('names no price at all when it does not know one', async () => {

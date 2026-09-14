@@ -173,8 +173,18 @@ describe('OmniChatCommerceModal', () => {
   it('over a paused call, offers to end it and carries it on when the balance rises', async () => {
     vi.mocked(omnichatService.getBillingCatalog).mockResolvedValue([]);
     vi.mocked(omnichatService.getBillingWallet)
-      .mockResolvedValueOnce({ user_id: 9, purchased_balance: 1, subscription_balance: 0, updated_at: '' })
-      .mockResolvedValue({ user_id: 9, purchased_balance: 101, subscription_balance: 0, updated_at: '' });
+      .mockResolvedValueOnce({
+        user_id: 9,
+        purchased_balance: 1,
+        subscription_balance: 0,
+        updated_at: '',
+      })
+      .mockResolvedValue({
+        user_id: 9,
+        purchased_balance: 101,
+        subscription_balance: 0,
+        updated_at: '',
+      });
     const onClose = vi.fn();
     const onCreditsAdded = vi.fn();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

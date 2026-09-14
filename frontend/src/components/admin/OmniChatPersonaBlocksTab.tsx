@@ -179,7 +179,10 @@ export default function OmniChatPersonaBlocksTab() {
             {!block.overturned_at &&
               (noteFor === block.id ? (
                 <div className="mt-4 space-y-2">
-                  <label htmlFor={`overturn-note-${block.id}`} className="block text-sm font-medium">
+                  <label
+                    htmlFor={`overturn-note-${block.id}`}
+                    className="block text-sm font-medium"
+                  >
                     Why was this unfair?
                   </label>
                   <textarea

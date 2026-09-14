@@ -16,9 +16,9 @@ describe('personaSpeaksFirst', () => {
     expect(
       personaSpeaksFirst({ response_style_profile: 'lean_narrative', first_message: 'The fire.' })
     ).toBe(true);
-    expect(personaSpeaksFirst({ response_style_profile: 'lean_narrative', first_message: '  ' })).toBe(
-      false
-    );
+    expect(
+      personaSpeaksFirst({ response_style_profile: 'lean_narrative', first_message: '  ' })
+    ).toBe(false);
     expect(personaSpeaksFirst(null)).toBe(false);
   });
 });

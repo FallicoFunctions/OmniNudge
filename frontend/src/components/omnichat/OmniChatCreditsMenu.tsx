@@ -45,7 +45,9 @@ export default function OmniChatCreditsMenu() {
   }, [open]);
 
   const wallet = walletQuery.data;
-  const balance = wallet ? (wallet.purchased_balance + wallet.subscription_balance).toLocaleString(locale) : '…';
+  const balance = wallet
+    ? (wallet.purchased_balance + wallet.subscription_balance).toLocaleString(locale)
+    : '…';
   const costs = usageQuery.data?.costs;
   const prices = costs
     ? [

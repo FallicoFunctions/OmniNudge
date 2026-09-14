@@ -22,19 +22,40 @@ export interface Pronouns {
 export function pronounsFor(gender: string | undefined): Pronouns {
   if (gender === 'man') {
     return {
-      subj: 'he', Subj: 'He', obj: 'him', Obj: 'Him',
-      poss: 'his', Poss: 'His', is: 'is', s: 's', noun: 'man',
+      subj: 'he',
+      Subj: 'He',
+      obj: 'him',
+      Obj: 'Him',
+      poss: 'his',
+      Poss: 'His',
+      is: 'is',
+      s: 's',
+      noun: 'man',
     };
   }
   if (gender === 'woman') {
     return {
-      subj: 'she', Subj: 'She', obj: 'her', Obj: 'Her',
-      poss: 'her', Poss: 'Her', is: 'is', s: 's', noun: 'woman',
+      subj: 'she',
+      Subj: 'She',
+      obj: 'her',
+      Obj: 'Her',
+      poss: 'her',
+      Poss: 'Her',
+      is: 'is',
+      s: 's',
+      noun: 'woman',
     };
   }
   return {
-    subj: 'they', Subj: 'They', obj: 'them', Obj: 'Them',
-    poss: 'their', Poss: 'Their', is: 'are', s: '', noun: 'character',
+    subj: 'they',
+    Subj: 'They',
+    obj: 'them',
+    Obj: 'Them',
+    poss: 'their',
+    Poss: 'Their',
+    is: 'are',
+    s: '',
+    noun: 'character',
   };
 }
 

@@ -481,4 +481,4 @@ describe('the style note on the way out', () => {
     await waitFor(() => expect(omnichatService.createOmniAI).toHaveBeenCalled());
     expect(vi.mocked(omnichatService.createOmniAI).mock.calls[0][0].style_note).toBeUndefined();
   });
-})
+});

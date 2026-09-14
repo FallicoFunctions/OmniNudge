@@ -111,7 +111,9 @@ describe('OmniChatMediaAssetView', () => {
   // A URL from a compromised publication record must never be assigned.
   it('refuses a content URL from another origin', () => {
     render(
-      <OmniChatMediaAssetView asset={{ ...baseAsset, content_url: 'https://evil.test/steal.png' }} />
+      <OmniChatMediaAssetView
+        asset={{ ...baseAsset, content_url: 'https://evil.test/steal.png' }}
+      />
     );
 
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();

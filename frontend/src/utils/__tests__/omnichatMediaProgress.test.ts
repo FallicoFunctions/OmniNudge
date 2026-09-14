@@ -23,7 +23,12 @@ describe('mediaJobPercent', () => {
   // The whole point. job.progress caps at 90 in about thirty seconds and then
   // sits there; a video job would show that number for the next ten minutes.
   it('keeps rising long after job.progress has stopped', () => {
-    const clip = job({ kind: 'video', mode: 'image_to_video', source_asset_id: 'a1', progress: 90 });
+    const clip = job({
+      kind: 'video',
+      mode: 'image_to_video',
+      source_asset_id: 'a1',
+      progress: 90,
+    });
     const oneMinute = mediaJobPercent(clip, at(60));
     const fiveMinutes = mediaJobPercent(clip, at(300));
     const fifteenMinutes = mediaJobPercent(clip, at(900));
@@ -70,7 +75,10 @@ describe('mediaJobPercent', () => {
 
   // A row with an unreadable timestamp must not produce NaN%.
   it('survives a timestamp it cannot read', () => {
-    const broken = mediaJobPercent(job({ started_at: 'not a date', created_at: 'not a date' }), at(60));
+    const broken = mediaJobPercent(
+      job({ started_at: 'not a date', created_at: 'not a date' }),
+      at(60)
+    );
     expect(Number.isFinite(broken)).toBe(true);
     expect(broken).toBeGreaterThanOrEqual(0);
   });

@@ -28,7 +28,12 @@ describe('OmniChatVideoPaywallModal', () => {
   // wording is not about video, because this is not video.
   it('offers a voice call without calling it video', () => {
     render(
-      <OmniChatVideoPaywallModal isOpen feature="voice_call" onClose={vi.fn()} onViewOptions={vi.fn()} />
+      <OmniChatVideoPaywallModal
+        isOpen
+        feature="voice_call"
+        onClose={vi.fn()}
+        onViewOptions={vi.fn()}
+      />
     );
     expect(screen.getByRole('heading', { name: /unlock voice calls/i })).toBeInTheDocument();
     expect(screen.getByText(/this needs omnicredits/i)).toBeInTheDocument();
@@ -40,7 +45,12 @@ describe('OmniChatVideoPaywallModal', () => {
 
   it('keeps the film icon for video', () => {
     render(
-      <OmniChatVideoPaywallModal isOpen feature="scene_video" onClose={vi.fn()} onViewOptions={vi.fn()} />
+      <OmniChatVideoPaywallModal
+        isOpen
+        feature="scene_video"
+        onClose={vi.fn()}
+        onViewOptions={vi.fn()}
+      />
     );
     expect(screen.getByRole('dialog').querySelector('.lucide-film')).not.toBeNull();
   });

@@ -527,7 +527,10 @@ describe('OmniChatCreateWorkspace', () => {
     fireEvent.click(await screen.findByRole('button', { name: /gallery/i }));
 
     await waitFor(() => expect(mediaViewProps.length).toBeGreaterThan(0));
-    expect([...new Set(mediaViewProps.map((tile) => tile.kind))].sort()).toEqual(['image', 'video']);
+    expect([...new Set(mediaViewProps.map((tile) => tile.kind))].sort()).toEqual([
+      'image',
+      'video',
+    ]);
     expect(mediaViewProps.every((tile) => tile.preview === true)).toBe(true);
   });
 });

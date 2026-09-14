@@ -778,7 +778,9 @@ describe('OmniChatChatPage', () => {
     // retry button, which appeared only because the old component fetched the
     // bytes itself and jsdom had no fetch to answer with -- an accident of the
     // implementation standing in for the thing being tested.
-    expect(await screen.findByRole('img', { name: /generated character image/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('img', { name: /generated character image/i })
+    ).toBeInTheDocument();
     expect(screen.queryByText('Here is the scene you asked for.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /regenerate response/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /speak message/i })).not.toBeInTheDocument();

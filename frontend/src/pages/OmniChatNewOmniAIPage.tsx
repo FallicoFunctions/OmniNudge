@@ -54,7 +54,8 @@ export default function OmniChatNewOmniAIPage() {
   });
   const atTheLimit = Boolean(options && options.omniai_owned >= options.omniai_limit);
   const needsUpgrade = Boolean(options && !options.omniai_allowed);
-  const blockedBy = refusal ?? (needsUpgrade ? 'needs_upgrade' : atTheLimit ? 'already_has_one' : null);
+  const blockedBy =
+    refusal ?? (needsUpgrade ? 'needs_upgrade' : atTheLimit ? 'already_has_one' : null);
 
   /**
    * Straight into the conversation. The flow ends by meeting her, and a
@@ -110,9 +111,7 @@ export default function OmniChatNewOmniAIPage() {
           <CreationFlow options={options} onMade={handleMade} onRefused={setRefusal} />
         )}
       </div>
-      <span className="sr-only">
-        {translate(t, 'omnichat.omniai.pageTitle', 'New OmniAI')}
-      </span>
+      <span className="sr-only">{translate(t, 'omnichat.omniai.pageTitle', 'New OmniAI')}</span>
     </OmniChatShell>
   );
 }

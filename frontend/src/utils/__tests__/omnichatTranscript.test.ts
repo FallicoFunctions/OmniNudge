@@ -45,10 +45,7 @@ describe('mergeFetchedTranscript', () => {
   // has_more describes what lies before the oldest message still held, which
   // the fresh page never reached back far enough to know.
   it('takes has_more from the view that actually reached back', () => {
-    const merged = mergeFetchedTranscript(
-      detail([50, 51, 100], false),
-      detail([100], true)
-    );
+    const merged = mergeFetchedTranscript(detail([50, 51, 100], false), detail([100], true));
     expect(merged.has_more).toBe(false);
   });
 

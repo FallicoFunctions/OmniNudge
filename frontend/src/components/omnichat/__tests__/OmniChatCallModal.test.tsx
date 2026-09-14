@@ -38,9 +38,8 @@ vi.mock('../../../services/omnichatService', async (importOriginal) => ({
   createOmniChatRequestId: () => '123e4567-e89b-42d3-a456-426614174000',
   // Real, not stubbed: waiting for the reply is the behaviour under test in the
   // call path now that sending no longer returns one.
-  waitForOmniChatReply: (
-    await importOriginal<typeof import('../../../services/omnichatService')>()
-  ).waitForOmniChatReply,
+  waitForOmniChatReply: (await importOriginal<typeof import('../../../services/omnichatService')>())
+    .waitForOmniChatReply,
   omnichatService: {
     startCall: vi.fn(),
     endCall: vi.fn(),
@@ -545,7 +544,9 @@ describe('OmniChatCallModal', () => {
       vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
       getUserMedia.mockResolvedValue({
         getTracks: () => [{ stop: vi.fn() }],
-        getAudioTracks: () => [{ label: 'Fake input', muted: false, enabled: true, readyState: 'live' }],
+        getAudioTracks: () => [
+          { label: 'Fake input', muted: false, enabled: true, readyState: 'live' },
+        ],
       });
       vi.stubGlobal('MediaRecorder', FakeRecorder);
       vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia } });
@@ -616,7 +617,11 @@ describe('OmniChatCallModal', () => {
       await act(async () => {
         window.dispatchEvent(
           new CustomEvent('omnichat_call_sentence', {
-            detail: { conversation_id: 12, turn: '3f2504e0-4f89-11d3-9a0c-0305e82c3301', sequence: 1 },
+            detail: {
+              conversation_id: 12,
+              turn: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+              sequence: 1,
+            },
           })
         );
       });
@@ -636,9 +641,12 @@ describe('OmniChatCallModal', () => {
           onAssistant={vi.fn()}
         />
       );
-      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()), {
-        timeout: 3000,
-      });
+      await waitFor(
+        () => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()),
+        {
+          timeout: 3000,
+        }
+      );
       await waitFor(() => expect(live.onChunk).not.toBeNull());
       return view;
     };
@@ -657,9 +665,12 @@ describe('OmniChatCallModal', () => {
           {...props}
         />
       );
-      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()), {
-        timeout: 3000,
-      });
+      await waitFor(
+        () => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()),
+        {
+          timeout: 3000,
+        }
+      );
       await waitFor(() => expect(live.onChunk).not.toBeNull());
       return view;
     };
