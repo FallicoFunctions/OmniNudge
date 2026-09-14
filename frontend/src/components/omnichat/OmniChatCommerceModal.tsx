@@ -197,7 +197,8 @@ export default function OmniChatCommerceModal({
               </h3>
             </div>
             <p className="mt-3 text-3xl font-bold">
-              {totalBalance.toLocaleString(locale)}{' '}
+              {/* Zero while loading would tell someone with credits they have none. */}
+              {wallet ? totalBalance.toLocaleString(locale) : '…'}{' '}
               <span className="text-sm font-medium text-white/55">OmniCredits</span>
             </p>
             {wallet && (

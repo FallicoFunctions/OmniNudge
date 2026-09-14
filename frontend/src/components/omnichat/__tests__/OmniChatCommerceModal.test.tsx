@@ -149,6 +149,18 @@ describe('OmniChatCommerceModal', () => {
     expect(mockCreateCheckoutIdempotencyId).toHaveBeenCalledTimes(1);
   });
 
+  // The wallet arrives after the screen opens. Until then there is no balance
+  // to show, and a zero would tell someone with credits that they have none.
+  it('shows no balance until the wallet arrives', async () => {
+    vi.mocked(omnichatService.getBillingCatalog).mockResolvedValue([]);
+    vi.mocked(omnichatService.getBillingWallet).mockReturnValue(new Promise(() => undefined));
+    renderModal();
+
+    const wallet = screen.getByRole('region', { name: 'Wallet' });
+    expect(wallet).toHaveTextContent('… OmniCredits');
+    expect(wallet).not.toHaveTextContent(/\b0 OmniCredits/);
+  });
+
   it('shows a localized not-configured state for an empty server catalog', async () => {
     vi.mocked(omnichatService.getBillingCatalog).mockResolvedValue([]);
     renderModal();
