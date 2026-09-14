@@ -4047,6 +4047,8 @@
     "commerce": {
       "title": "Plans and OmniCredits",
       "subtitle": "Your balance and every displayed offer come from the server.",
+      "callPaused": "Your call is paused and nothing is being charged. It carries on as soon as your credits arrive.",
+      "endCall": "End call",
       "wallet": "Wallet",
       "balanceBreakdown": "{{purchased}} purchased · {{subscription}} subscription",
       "plans": "Plans",

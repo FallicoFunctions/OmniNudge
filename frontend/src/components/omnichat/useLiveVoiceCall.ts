@@ -18,11 +18,6 @@ type LiveVoiceCallOptions = {
   /** What the caller has said this turn, as Live transcribes it. */
   onHeard: (text: string) => void;
   onFailed: (message: string) => void;
-  /**
-   * The server could not pay for a minute. Called on every pause, including
-   * one that answers a resume which still could not pay.
-   */
-  onPaused?: () => void;
 };
 
 function closeMessage(close: LiveCallSocketClose): string {
@@ -47,19 +42,18 @@ export function useLiveVoiceCall({
   onState,
   onHeard,
   onFailed,
-  onPaused,
 }: LiveVoiceCallOptions) {
   // Read by callbacks that outlive the render that made them: the microphone
   // chunk handler and the socket's events. Kept current after each render,
   // before the connection effect below can run.
   const mutedRef = useRef(muted);
-  const handlersRef = useRef({ onState, onHeard, onFailed, onPaused });
+  const handlersRef = useRef({ onState, onHeard, onFailed });
   const socketRef = useRef<LiveCallSocket | null>(null);
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
   useEffect(() => {
-    handlersRef.current = { onState, onHeard, onFailed, onPaused };
+    handlersRef.current = { onState, onHeard, onFailed };
   });
 
   useEffect(() => {
@@ -98,7 +92,6 @@ export function useLiveVoiceCall({
                 // and the pause is what the call is, not a return to listening.
                 player.clear();
                 handlersRef.current.onState('paused');
-                handlersRef.current.onPaused?.();
                 break;
               case 'resumed':
                 handlersRef.current.onState('listening');

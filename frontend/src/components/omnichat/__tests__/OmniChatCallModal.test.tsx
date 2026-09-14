@@ -74,6 +74,26 @@ vi.mock('../liveCallSocket', () => ({
   }),
 }));
 
+// The credits screen has its own tests; here it is only what a pause opens.
+vi.mock('../OmniChatCommerceModal', () => ({
+  default: ({
+    onClose,
+    pausedCall,
+  }: {
+    onClose: () => void;
+    pausedCall?: { onCreditsAdded: () => void };
+  }) => (
+    <div role="dialog" aria-label="Buy OmniCredits">
+      <button type="button" onClick={onClose}>
+        End call
+      </button>
+      <button type="button" onClick={() => pausedCall?.onCreditsAdded()}>
+        Credits arrived
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock('../liveCallAudio', () => ({
   startLiveCallCapture: vi.fn(
     async (_context: AudioContext, _stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void) => {
@@ -644,56 +664,49 @@ describe('OmniChatCallModal', () => {
       return view;
     };
 
-    // Out of credits is a pause, not a hang-up: her voice stops at once, and
-    // buying credits happens over the call rather than instead of it.
-    it('pauses when a minute cannot be paid, and buying credits keeps the call', async () => {
-      const onBuyCredits = vi.fn();
+    // Out of credits is a pause, not a hang-up: her voice stops at once and
+    // the credits screen opens over the call.
+    it('opens the credits screen over a paused call, and carries on when credits arrive', async () => {
       const onClose = vi.fn();
-      const view = await renderVoiceCallWith({ onBuyCredits, onClose });
+      const view = await renderVoiceCallWith({ onClose });
       act(() => live.onPlaying?.(true));
       act(() => live.handlers?.onEvent({ type: 'paused' }));
 
-      expect(screen.getByTestId('omnichat-call-paused')).toHaveTextContent(/out of omnicredits/i);
+      expect(screen.getByRole('dialog', { name: 'Buy OmniCredits' })).toBeInTheDocument();
       expect(screen.getByText('Paused')).toBeInTheDocument();
       expect(live.player.clear).toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Buy credits' }));
-      expect(onBuyCredits).toHaveBeenCalledOnce();
+      fireEvent.click(screen.getByRole('button', { name: 'Credits arrived' }));
+      expect(live.socket.resume).toHaveBeenCalledOnce();
       expect(onClose).not.toHaveBeenCalled();
       expect(live.socket.close).not.toHaveBeenCalled();
-      view.unmount();
-    });
 
-    it('carries on after Continue, and says so when the credits are still missing', async () => {
-      const view = await renderVoiceCallWith({ onBuyCredits: vi.fn() });
-      act(() => live.handlers?.onEvent({ type: 'paused' }));
-
-      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-      expect(live.socket.resume).toHaveBeenCalledOnce();
-      expect(screen.getByRole('button', { name: 'Checking…' })).toBeDisabled();
-
-      act(() => live.handlers?.onEvent({ type: 'paused' }));
-      expect(screen.getByTestId('omnichat-call-paused')).toHaveTextContent(/still not enough credits/i);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
       act(() => live.handlers?.onEvent({ type: 'resumed' }));
-      expect(screen.queryByTestId('omnichat-call-paused')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Buy OmniCredits' })).toBeNull();
       expect(screen.getByText('Listening…')).toBeInTheDocument();
-
-      // A later pause is a new one, not a repeat of the refusal.
-      act(() => live.handlers?.onEvent({ type: 'paused' }));
-      expect(screen.getByTestId('omnichat-call-paused')).not.toHaveTextContent(/still not enough/i);
       view.unmount();
     });
 
-    // The focus trap listens on the whole document, so Escape pressed to close
-    // the credits screen would otherwise end the call behind it.
-    it('leaves Escape to the dialog open over the call', async () => {
+    it('ends the call when the credits screen is closed', async () => {
       const onClose = vi.fn();
-      const view = await renderVoiceCallWith({ onClose, suspended: true });
+      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+      const view = await renderVoiceCallWith({ onClose });
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'End call' }));
+      expect(onClose).toHaveBeenCalledOnce();
+      expect(omnichatService.endCall).toHaveBeenCalledWith('call-1');
+      view.unmount();
+    });
+
+    // The call's focus trap listens on the whole document. While paused the
+    // keys belong to the credits screen, whose own Escape ends the call once.
+    it('leaves the keys to the credits screen while paused', async () => {
+      const onClose = vi.fn();
+      const view = await renderVoiceCallWith({ onClose });
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onClose).not.toHaveBeenCalled();
-      expect(omnichatService.endCall).not.toHaveBeenCalled();
       view.unmount();
     });
 

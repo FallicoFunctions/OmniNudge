@@ -3200,9 +3200,6 @@ export default function OmniChatChatPage() {
           onPaymentRequired={() =>
             setVideoPaywallFeature(callMode === 'voice' ? 'voice_call' : 'video_call')
           }
-          // A paused call stays up while its caller buys credits over it.
-          onBuyCredits={() => setShowCommerce(true)}
-          suspended={showCommerce}
           onAssistant={(message) => {
             queryClient.setQueryData<BotConversationDetail | undefined>(
               omnichatQueryKeys.conversation(selectedConversationId),
@@ -3227,11 +3224,7 @@ export default function OmniChatChatPage() {
           setShowCommerce(true);
         }}
       />
-      <OmniChatCommerceModal
-        isOpen={showCommerce}
-        onClose={() => setShowCommerce(false)}
-        aboveCall={callMode !== null}
-      />
+      <OmniChatCommerceModal isOpen={showCommerce} onClose={() => setShowCommerce(false)} />
 
       <OmniChatResponseReportModal
         isOpen={reportingMessageId !== null}

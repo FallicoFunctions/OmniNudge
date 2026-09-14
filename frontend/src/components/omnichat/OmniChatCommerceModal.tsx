@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Coins, Crown, Loader2, X } from 'lucide-react';
+import { Coins, Crown, Loader2, PhoneOff, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   createOmniChatCheckoutIdempotencyId,
@@ -15,9 +15,16 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (url: string) => void;
-  /** Opened from inside a call, so it has to sit above the call screen. */
-  aboveCall?: boolean;
+  /**
+   * A call ran out of credits and is paused under this screen. Closing it ends
+   * the call; credits arriving carry the call on.
+   */
+  pausedCall?: { onCreditsAdded: () => void };
 };
+
+// Credits land in the wallet when the payment provider says so, not when
+// checkout returns, so a paused call watches the balance.
+const PAUSED_CALL_WALLET_POLL_MS = 3000;
 
 export function formatOmniChatOfferPrice(offer: OmniChatBillingOffer, locale: string): string {
   try {
@@ -34,7 +41,7 @@ export default function OmniChatCommerceModal({
   isOpen,
   onClose,
   onNavigate = (url) => window.location.assign(url),
-  aboveCall = false,
+  pausedCall,
 }: Props) {
   const { t, i18n } = useTranslation();
   const [checkoutError, setCheckoutError] = useState('');
@@ -48,7 +55,23 @@ export default function OmniChatCommerceModal({
     queryKey: omnichatQueryKeys.billingWallet,
     queryFn: () => omnichatService.getBillingWallet(),
     enabled: isOpen,
+    refetchInterval: pausedCall ? PAUSED_CALL_WALLET_POLL_MS : false,
   });
+
+  // Any rise asks the call to carry on. One that is still short of a minute
+  // is refused by the server and the call stays paused, so the next rise
+  // asks again.
+  const walletTotal = walletQuery.data
+    ? walletQuery.data.purchased_balance + walletQuery.data.subscription_balance
+    : null;
+  const lastWalletTotalRef = useRef<number | null>(null);
+  const onCreditsAdded = pausedCall?.onCreditsAdded;
+  useEffect(() => {
+    if (walletTotal === null) return;
+    const previous = lastWalletTotalRef.current;
+    lastWalletTotalRef.current = walletTotal;
+    if (previous !== null && walletTotal > previous) onCreditsAdded?.();
+  }, [walletTotal, onCreditsAdded]);
   const usageQuery = useQuery({
     queryKey: omnichatQueryKeys.billingUsage(),
     queryFn: () => omnichatService.getBillingUsage(),
@@ -113,8 +136,8 @@ export default function OmniChatCommerceModal({
       ariaLabelledBy="omnichat-commerce-title"
       ariaDescribedBy={`${descriptionId} ${statusId}`}
       overlayClassName="bg-black/80 backdrop-blur-md"
-      // The call screen is z-[100]; a paused call sends people here to buy.
-      layerClassName={aboveCall ? 'z-[110]' : undefined}
+      // The call screen is z-[100], and a paused call opens this over it.
+      layerClassName={pausedCall ? 'z-[110]' : undefined}
       className="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-[#11131b] text-white shadow-2xl"
       animation="quick-chat"
     >
@@ -128,18 +151,30 @@ export default function OmniChatCommerceModal({
               {t('omnichat.commerce.title')}
             </h2>
             <p id={descriptionId} className="mt-1 text-sm text-white/55">
-              {t('omnichat.commerce.subtitle')}
+              {t(pausedCall ? 'omnichat.commerce.callPaused' : 'omnichat.commerce.subtitle')}
             </p>
           </div>
-          <button
-            type="button"
-            aria-label={t('common.close')}
-            onClick={onClose}
-            disabled={checkoutMutation.isPending}
-            className="rounded-full p-2 text-white/55 hover:bg-white/10 disabled:opacity-40"
-          >
-            <X size={20} />
-          </button>
+          {pausedCall ? (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={checkoutMutation.isPending}
+              className="flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+            >
+              <PhoneOff size={16} aria-hidden="true" />
+              {t('omnichat.commerce.endCall')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={t('common.close')}
+              onClick={onClose}
+              disabled={checkoutMutation.isPending}
+              className="rounded-full p-2 text-white/55 hover:bg-white/10 disabled:opacity-40"
+            >
+              <X size={20} />
+            </button>
+          )}
         </header>
 
         <div className="overflow-y-auto p-5 sm:p-7">

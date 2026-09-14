@@ -156,6 +156,31 @@ describe('OmniChatCommerceModal', () => {
     expect(await screen.findByText(/purchase options are not configured/i)).toBeInTheDocument();
   });
 
+  // Opened by a paused call: closing it is ending the call, and credits
+  // arriving in the wallet are what carry the call on.
+  it('over a paused call, offers to end it and carries it on when the balance rises', async () => {
+    vi.mocked(omnichatService.getBillingCatalog).mockResolvedValue([]);
+    vi.mocked(omnichatService.getBillingWallet)
+      .mockResolvedValueOnce({ user_id: 9, purchased_balance: 1, subscription_balance: 0, updated_at: '' })
+      .mockResolvedValue({ user_id: 9, purchased_balance: 101, subscription_balance: 0, updated_at: '' });
+    const onClose = vi.fn();
+    const onCreditsAdded = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OmniChatCommerceModal isOpen onClose={onClose} pausedCall={{ onCreditsAdded }} />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText(/your call is paused/i)).toBeInTheDocument();
+    expect(screen.getByRole('dialog').parentElement).toHaveClass('z-[110]');
+    expect(onCreditsAdded).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onCreditsAdded).toHaveBeenCalledOnce(), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: /end call/i }));
+    expect(onClose).toHaveBeenCalledOnce();
+  }, 10000);
+
   it('formats server cents and currency codes with the active locale', () => {
     const offer = {
       id: 'plus-monthly-v1',
