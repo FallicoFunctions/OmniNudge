@@ -44,6 +44,13 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    # TypeScript 7 cannot install beside typescript-eslint 8, which accepts
+    # TypeScript below 6.1. The weekly group carried the major bump anyway, so
+    # npm refused the whole install and all 48 updates in it were blocked by
+    # the one. Remove this once typescript-eslint supports TypeScript 7.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       frontend-dependencies:
         patterns: ['*']
