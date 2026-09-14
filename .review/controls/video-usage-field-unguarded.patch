@@ -1,0 +1,21 @@
+diff --git a/backend/internal/services/openrouter/video_test.go b/backend/internal/services/openrouter/video_test.go
+index a8ffe4416..184399db5 100644
+--- a/backend/internal/services/openrouter/video_test.go
++++ b/backend/internal/services/openrouter/video_test.go
+@@ -253,15 +253,10 @@ func TestWaitForVideoPollsUntilTerminal(t *testing.T) {
+ // struct, decoded by nothing and stored nowhere, for a month.
+ func TestEveryFieldOnVideoStatusIsDecoded(t *testing.T) {
+ 	const everyKey = `{"id":"job-1","status":"completed",
+-	  "unsigned_urls":["https://x/1.mp4"],"error":"something","usage":{"cost":0.65}}`
++	  "unsigned_urls":["https://x/1.mp4"],"error":"something"}`
+ 
+ 	var status VideoStatus
+ 	require.NoError(t, json.Unmarshal([]byte(everyKey), &status))
+-	// A usage object with no cost would pass the loop below; the cost log
+-	// needs the number itself.
+-	require.NotNil(t, status.Usage)
+-	require.NotNil(t, status.Usage.Cost)
+-	require.InDelta(t, 0.65, *status.Usage.Cost, 1e-9)
+ 
+ 	value := reflect.ValueOf(status)
+ 	for i := 0; i < value.NumField(); i++ {

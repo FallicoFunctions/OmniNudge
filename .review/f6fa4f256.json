@@ -1,0 +1,596 @@
+{
+  "schema_version": 2,
+  "head": "eb7762c39",
+  "base": "f6fa4f256",
+  "scope": {
+    "files": [
+      "frontend/src/components/omnichat/OmniChatCreditsMenu.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatCreditsMenu.test.tsx",
+      "frontend/src/components/omnichat/OmniChatHeader.tsx",
+      "frontend/src/types/omnichatCommerce.ts",
+      "frontend/public/locales/en.json",
+      "frontend/src/components/omnichat/__tests__/OmniChatCommerceModal.test.tsx",
+      "frontend/src/components/omnichat/omniai/__tests__/LikenessPicker.test.tsx",
+      "frontend/src/i18n/config.ts",
+      "backend/internal/queue/omnichat_generation_handler.go",
+      "backend/internal/queue/openrouter_video_provider.go",
+      "backend/internal/services/geminilive/messages.go",
+      "backend/internal/services/geminilive/session.go",
+      "backend/internal/services/geminilive/session_test.go",
+      "backend/internal/services/omnichat_live_call.go",
+      "backend/internal/services/openrouter/video.go",
+      "backend/internal/database/migrations/210_bot_messages_via_call.up.sql",
+      "backend/internal/database/migrations/210_bot_messages_via_call.down.sql",
+      "backend/internal/models/chatbot.go",
+      "backend/internal/models/chatbot_test.go",
+      "backend/internal/models/omnichat_transcript_search.go",
+      "backend/internal/database/omnichat_expansion_migration_test.go",
+      "backend/internal/database/omnichat_omniai_appearance_migration_test.go"
+    ],
+    "boundaries": [
+      "header -> wallet and usage API: the balance and the prices",
+      "browser -> /locales/en.json: the versioned label fetch",
+      "relay -> Gemini Live setup: the context-compression limit",
+      "Gemini Live usageMetadata -> cost log",
+      "OpenRouter video status -> cost log",
+      "RunPod job status -> cost log",
+      "bot_messages.via_call -> every message read and rewrite path"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/da6885d45.json",
+    ".review/19353074d.json",
+    ".review/0c0038fc6.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Four scopes: credits menu (10c437d9a), dev label fix (588f795d2), cost logs + Live context limit (819dc1587), call-message mark A1 (c51158d3a)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "da6885d45 found a lookup error and an ambiguous test, neither in these files; 19353074d and 0c0038fc6 covered the relay's pause, not its setup or usage."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The Live setup Google receives now carries contextWindowCompression {triggerTokens 20000, slidingWindow {targetTokens 10000}}; session_test asserts both strings in the marshalled setup."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the credits menu via a throwaway for two inputs: loading (aria-label '\u2026 OmniCredits') and loaded with the panel open (1,234; Spoken message 2, Image 10, Video 40, Call 3/min, Buy more; aria-expanded true). The loading label is read aloud as a placeholder: finding credits-loading-label-read-aloud. Throwaway deleted."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "BotMessage marshals via_call with omitempty, so a call message carries \"via_call\":true and a normal one omits it; no handler rebuilds messages into its own struct (see C5)."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "TestBotMessageRepositoryCallTurnKeepsItsMarkOnEveryRead writes one plain and two call messages and reads them back through 7 paths; migration 210 applied on the dev database is left to the user's server restart."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "en.json omnichat.header.credits.{balance,prices,perMinute,buyMore} match the t() calls; the prices type now lists chat and call_minute, the five keys UsageCosts sends."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The menu reads costs.voice/image/video/call_minute and purchased_balance + subscription_balance, the fields the usage and wallet endpoints send."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule implemented twice."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "B5 below: Google accepts the new setup. OpenRouter's video status really carries usage.cost (the user's clip logged cost_usd=0.65)."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "ViaCall added to all 12 BotMessage scans (11 in chatbot.go, 1 in the transcript search); grep finds no column list without it. Four struct-literal mappers (preview history, imported messages, block transcript, prompt history) are not chat responses."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The every-field guard on VideoStatus failed: Usage was declared and its test payload did not set it. Finding video-usage-field-unguarded; the fix also reads the cost back, not only the object."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The usage fixture uses 0.65, the cost OpenRouter actually reported for a real clip."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No parsing of user input."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No parsing of user input."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No parsing of user input."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The RunPod completion log also fires for the OpenRouter video phase with zero seconds and the model as endpoint_id; the clip's real cost is on the separate 'clip completed' line. Readable as is."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every read path returns via_call; nothing selects on it yet (Phase C will)."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A video status without usage logs no cost_usd rather than a zero."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The menu renders only for signed-in users."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The credit prices come from UsageCosts; the menu holds no copy."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Copy paths into bot_messages: only a historic migration and the stale-turn repair, which inserts a new failed reply. Placeholder-as-value shape: checked in pass 2."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state changed."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction changed; CreateCallMessage is one insert."
+        },
+        {
+          "id": "F3",
+          "status": "applied",
+          "evidence": "210 added to both expansion ladders and the appearance list. First version failed TestTheBaselineMigrationsAreSafeToRunTwice; now ADD COLUMN IF NOT EXISTS, both ladders pass (fixed before commit)."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The down migration drops the column; nothing else references it."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both controls built, each diff limited to its own file after the first label patch picked up an uncommitted test change; both fail as tests."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ok; vet models/geminilive/services/openrouter/queue ok; gofmt clean. Tests: models readback, both ladders, geminilive, queue OpenRouterVideo ok; openrouter FAILED on the every-field guard (finding). vitest i18n + credits menu + shell 18/18; tsc -b 0; eslint 0."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both findings came from listed instruments (B2, C6)."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real geminilive.Dial with the production setup and the configured key: SETUP ACCEPTED by gemini-3.1-flash-live-preview in 587ms. The cost logs were exercised by the user's real call, image and video (usage by modality, delay/execution ms, cost_usd 0.65). Probe deleted."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        }
+      ],
+      "findings": [
+        {
+          "id": "credits-loading-label-read-aloud",
+          "summary": "While the balance loaded, the credits button's accessible name was '\u2026 OmniCredits', read aloud as a placeholder.",
+          "found_by": "B2",
+          "fix_commit": "a6bd37923",
+          "control": {
+            "patch": ".review/controls/credits-loading-label-read-aloud.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatCreditsMenu.test.tsx -t 'names the balance as loading until it arrives'"
+            ],
+            "observed": "With the patch: Unable to find an accessible element with the role button and name 'Loading OmniCredits'. Without: passes."
+          }
+        },
+        {
+          "id": "video-usage-field-unguarded",
+          "summary": "VideoStatus gained Usage for the cost log and the every-field decode guard failed, its payload never setting usage.",
+          "found_by": "C6",
+          "fix_commit": "40f61f246",
+          "control": {
+            "patch": ".review/controls/video-usage-field-unguarded.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/openrouter -run TestEveryFieldOnVideoStatusIsDecoded"
+            ],
+            "observed": "With the patch: 'Should be false' (VideoStatus.Usage stayed zero). Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass-1 fixes: the credits button's loading label (a6bd37923) and the video every-field payload (40f61f246)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "This ledger's pass 1; nothing earlier covered the credits screen's loading state."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "No built string changed in pass 1's fixes."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The loading label now reads 'Loading OmniCredits' (asserted by name). The same placeholder shape on the credits screen: 'totalBalance' falls back to 0, so it showed '0 OmniCredits' while the wallet loaded. Finding credits-screen-zero-while-loading."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "en.json omnichat.header.credits.loading matches the t() call."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No new seam."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule twice."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No new external contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added in pass 1's fixes."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The video guard now asserts Usage.Cost == 0.65, reading the value back through the struct."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No new fixture beyond the real 0.65."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The header menu and the credits screen show the same wallet; only the menu handled loading."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "No branch removed."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "No error handling changed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Placeholder shown as a value: found on the credits screen's wallet (0 while loading). Same finding."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No concurrency."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "credits-screen-zero-while-loading: patch restores the 0 fallback; the new test fails on toHaveTextContent."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "vitest credits menu 5/5 and credits screen 7/7; eslint 0; go openrouter ok."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by E6, a listed instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model input changed since pass 1's real Live setup run."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        }
+      ],
+      "findings": [
+        {
+          "id": "credits-screen-zero-while-loading",
+          "summary": "The credits screen showed '0 OmniCredits' until the wallet loaded, telling someone with credits they had none.",
+          "found_by": "E6",
+          "fix_commit": "eb7762c39",
+          "control": {
+            "patch": ".review/controls/credits-screen-zero-while-loading.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatCommerceModal.test.tsx -t 'shows no balance until the wallet arrives'"
+            ],
+            "observed": "With the patch: toHaveTextContent fails, the wallet reading '0 OmniCredits'. Without: passes."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass-2 fix: the credits screen's loading balance (eb7762c39)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Passes 1 and 2 of this ledger re-read; all three controls fail with their patch."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No built string changed."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The wallet region reads '\u2026 OmniCredits' while loading and the real balance once loaded (the pre-existing test still finds 55)."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No new key."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No new seam."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule twice."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No external contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Both balance displays now handle loading the same way."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The loaded branch is still reached (the first credits screen test asserts 55)."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "No error handling."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "No other balance or price renders before its data: the menu's price rows render only when costs exist; the usage list renders only loaded rows."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No concurrency."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All three controls built and run by hand."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b and the tests named above; full suites run after the review."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model input changed."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet models, geminilive, services, openrouter, queue ok; gofmt clean",
+    "lint": "eslint 0 on every changed frontend file",
+    "types": "tsc -b 0",
+    "tests": "go: models readback, both ladders, geminilive, openrouter, queue OpenRouterVideo ok; vitest: i18n, credits menu, credits screen, shell ok; real Live setup accepted; full suites not run"
+  }
+}

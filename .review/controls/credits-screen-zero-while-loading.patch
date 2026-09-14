@@ -1,0 +1,14 @@
+diff --git a/frontend/src/components/omnichat/OmniChatCommerceModal.tsx b/frontend/src/components/omnichat/OmniChatCommerceModal.tsx
+index f2af586ec..33917ac67 100644
+--- a/frontend/src/components/omnichat/OmniChatCommerceModal.tsx
++++ b/frontend/src/components/omnichat/OmniChatCommerceModal.tsx
+@@ -197,8 +197,7 @@ export default function OmniChatCommerceModal({
+               </h3>
+             </div>
+             <p className="mt-3 text-3xl font-bold">
+-              {/* Zero while loading would tell someone with credits they have none. */}
+-              {wallet ? totalBalance.toLocaleString(locale) : '…'}{' '}
++              {totalBalance.toLocaleString(locale)}{' '}
+               <span className="text-sm font-medium text-white/55">OmniCredits</span>
+             </p>
+             {wallet && (
