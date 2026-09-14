@@ -21,6 +21,7 @@ var (
 
 const (
 	OmniCreditsEntryPurchase           = "purchase"
+	OmniCreditsEntryAdminGrant         = "admin_grant"
 	OmniCreditsEntrySubscriptionGrant  = "subscription_grant"
 	OmniCreditsEntrySubscriptionExpiry = "subscription_expiry"
 	OmniCreditsEntryUsageDebit         = "usage_debit"
@@ -156,6 +157,15 @@ func (r *OmniCreditsRepository) CreditPurchased(ctx context.Context, userID int,
 		return nil, fmt.Errorf("omnicredits: purchase amount must be positive")
 	}
 	return r.credit(ctx, userID, operationID, amount, 0, nil, OmniCreditsEntryPurchase)
+}
+
+// GrantAdminCredits gives credits that nobody paid for. They spend like
+// purchased credits and never expire, but are recorded as a gift.
+func (r *OmniCreditsRepository) GrantAdminCredits(ctx context.Context, userID int, operationID uuid.UUID, amount int64) (*OmniCreditsWallet, error) {
+	if amount <= 0 {
+		return nil, fmt.Errorf("omnicredits: grant amount must be positive")
+	}
+	return r.credit(ctx, userID, operationID, amount, 0, nil, OmniCreditsEntryAdminGrant)
 }
 
 // GrantSubscription records an expiring grant. A later expiry extends the

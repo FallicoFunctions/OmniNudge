@@ -52,6 +52,32 @@ func TestOmniCreditsAuthorizeUsageDebitsGrantBeforePurchaseAndIsIdempotent(t *te
 	assert.Zero(t, wallet.SubscriptionBalance)
 }
 
+// A gift spends like a purchase but is never recorded as one, and running the
+// same grant twice gives it once.
+func TestOmniCreditsAdminGrantIsAGiftNotAPurchase(t *testing.T) {
+	repo, userID := newOmniCreditsRepo(t)
+	ctx := context.Background()
+	op := uuid.New()
+	wallet, err := repo.GrantAdminCredits(ctx, userID, op, 5)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), wallet.PurchasedBalance)
+	wallet, err = repo.GrantAdminCredits(ctx, userID, op, 5)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), wallet.PurchasedBalance, "the same operation granted twice")
+	_, err = repo.CreditPurchased(ctx, userID, op, 5)
+	assert.ErrorIs(t, err, models.ErrOmniCreditsConflict, "a grant's operation was reused as a purchase")
+
+	entries, err := repo.ListUsageOwned(ctx, userID, 10)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, models.OmniCreditsEntryAdminGrant, entries[0].EntryType)
+
+	_, err = repo.AuthorizeUsage(ctx, userID, uuid.New(), "call_minute", 3)
+	require.NoError(t, err)
+	_, err = repo.GrantAdminCredits(ctx, userID, uuid.New(), 0)
+	assert.Error(t, err)
+}
+
 func TestOmniCreditsAuthorizationRejectsInsufficientAndConflictingRetries(t *testing.T) {
 	repo, userID := newOmniCreditsRepo(t)
 	ctx := context.Background()
