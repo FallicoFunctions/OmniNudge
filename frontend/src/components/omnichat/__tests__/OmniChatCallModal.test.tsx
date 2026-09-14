@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OmniChatCallModal, { isTrustedOmniChatCallUrl } from '../OmniChatCallModal';
 import { omnichatService } from '../../../services/omnichatService';
@@ -693,7 +693,9 @@ describe('OmniChatCallModal', () => {
       const view = await renderVoiceCallWith({ onClose });
       act(() => live.handlers?.onEvent({ type: 'paused' }));
 
-      fireEvent.click(screen.getByRole('button', { name: 'End call' }));
+      // The call screen has its own End call; this is the credits screen's.
+      const credits = screen.getByRole('dialog', { name: 'Buy OmniCredits' });
+      fireEvent.click(within(credits).getByRole('button', { name: 'End call' }));
       expect(onClose).toHaveBeenCalledOnce();
       expect(omnichatService.endCall).toHaveBeenCalledWith('call-1');
       view.unmount();
