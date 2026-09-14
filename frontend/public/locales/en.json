@@ -4248,6 +4248,12 @@
         "buyMore": "Buy more"
       }
     },
+    "liveCall": {
+      "mute": "Mute the microphone",
+      "unmute": "Unmute the microphone",
+      "hangUp": "End the call with {{name}}, {{time}}",
+      "dismiss": "Dismiss"
+    },
     "sidebar": {
       "discover": "Discover",
       "search": "Search",
