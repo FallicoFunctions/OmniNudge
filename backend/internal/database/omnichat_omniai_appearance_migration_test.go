@@ -334,6 +334,7 @@ func TestTheBaselineMigrationsAreSafeToRunTwice(t *testing.T) {
 		"208_omnichat_gemini_live_calls",
 		"207_likeness_reference_mode",
 		"209_omnicredits_admin_grants",
+		"210_bot_messages_via_call",
 	} {
 		statement, err := os.ReadFile(filepath.Join("migrations", name+".up.sql"))
 		require.NoError(t, err)

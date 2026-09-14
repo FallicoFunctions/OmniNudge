@@ -160,6 +160,7 @@ type BotMessage struct {
 	Role           string                       `json:"role"` // 'user' or 'assistant'
 	Content        string                       `json:"content"`
 	Failed         bool                         `json:"failed"`
+	ViaCall        bool                         `json:"via_call,omitempty"` // said or typed during a live call
 	MediaOnly      bool                         `json:"-"`
 	RequestID      *uuid.UUID                   `json:"request_id,omitempty"`
 	Attachments    []*OmniChatMessageMediaAsset `json:"attachments,omitempty"`
@@ -1154,8 +1155,8 @@ func (r *BotMessageRepository) CreateUserTurnWithRequestID(ctx context.Context, 
 		VALUES($1,'user',$2,FALSE,$3)
 		ON CONFLICT (conversation_id,client_request_id) WHERE role='user' AND client_request_id IS NOT NULL
 		DO NOTHING
-		RETURNING id,conversation_id,role,content,failed,created_at
-	`, conversationID, content, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+		RETURNING id,conversation_id,role,content,failed,via_call,created_at
+	`, conversationID, content, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if err == nil {
 		m.RequestID = &requestID
 		return m, false, nil
@@ -1164,10 +1165,10 @@ func (r *BotMessageRepository) CreateUserTurnWithRequestID(ctx context.Context, 
 		return nil, false, err
 	}
 	err = r.pool.QueryRow(ctx, `
-		SELECT id,conversation_id,role,content,failed,created_at
+		SELECT id,conversation_id,role,content,failed,via_call,created_at
 		FROM bot_messages
 		WHERE conversation_id=$1 AND role='user' AND client_request_id=$2
-	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1184,10 +1185,10 @@ func (r *BotMessageRepository) GetUserTurnByRequestID(ctx context.Context, conve
 	}
 	m := &BotMessage{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id,conversation_id,role,content,failed,created_at
+		SELECT id,conversation_id,role,content,failed,via_call,created_at
 		FROM bot_messages
 		WHERE conversation_id=$1 AND role='user' AND client_request_id=$2
-	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	`, conversationID, requestID).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -1235,6 +1236,21 @@ func (r *BotMessageRepository) Create(ctx context.Context, conversationID int, r
 	return m, nil
 }
 
+// CreateCallMessage records a turn from a live call, marked so the chat can
+// show it happened on the phone.
+func (r *BotMessageRepository) CreateCallMessage(ctx context.Context, conversationID int, role, content string) (*BotMessage, error) {
+	m := &BotMessage{ConversationID: conversationID, Role: role, Content: content, ViaCall: true}
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO bot_messages (conversation_id, role, content, failed, via_call)
+		VALUES ($1, $2, $3, FALSE, TRUE)
+		RETURNING id, created_at
+	`, conversationID, role, content).Scan(&m.ID, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // RepairStaleDanglingUserTurn inserts a failed assistant fallback when the
 // latest message in a conversation is an old user turn with no assistant
 // response. It returns nil when there is nothing to repair.
@@ -1276,9 +1292,9 @@ func (r *BotMessageRepository) RepairStaleDanglingUserTurn(ctx context.Context, 
 			JOIN bot_messages m ON m.id = lm.id
 			WHERE m.role = $4
 			  AND lm.created_at <= NOW() - ($5::DOUBLE PRECISION * INTERVAL '1 second')
-			RETURNING id, conversation_id, role, content, failed, created_at
+			RETURNING id, conversation_id, role, content, failed, via_call, created_at
 		)
-		SELECT id, conversation_id, role, content, failed, created_at
+		SELECT id, conversation_id, role, content, failed, via_call, created_at
 		FROM inserted
 	`
 	m := &BotMessage{}
@@ -1288,7 +1304,7 @@ func (r *BotMessageRepository) RepairStaleDanglingUserTurn(ctx context.Context, 
 		content,
 		BotMessageRoleUser,
 		staleAfter.Seconds(),
-	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			if err := tx.Commit(ctx); err != nil {
@@ -1331,9 +1347,9 @@ func (r *BotMessageRepository) ListByConversationIDBefore(
 		limit = 1
 	}
 	query := `
-		SELECT id, conversation_id, role, content, failed, created_at
+		SELECT id, conversation_id, role, content, failed, via_call, created_at
 		FROM (
-			SELECT id, conversation_id, role, content, failed, created_at
+			SELECT id, conversation_id, role, content, failed, via_call, created_at
 			FROM bot_messages
 			WHERE conversation_id = $1
 			  AND ($2 = 0 OR id < $2)
@@ -1353,7 +1369,7 @@ func (r *BotMessageRepository) ListByConversationIDBefore(
 	messages := []*BotMessage{}
 	for rows.Next() {
 		m := &BotMessage{}
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt); err != nil {
 			return nil, false, err
 		}
 		messages = append(messages, m)
@@ -1419,7 +1435,7 @@ func (r *BotMessageRepository) hydrateAttachments(ctx context.Context, conversat
 // regeneration from rewriting earlier history after the user has continued.
 func (r *BotMessageRepository) GetLatestAssistantForRegeneration(ctx context.Context, conversationID, messageID int) (*BotMessage, error) {
 	query := `
-		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.created_at
+		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.via_call, m.created_at
 		FROM bot_messages m
 		WHERE m.id = $1
 		  AND m.conversation_id = $2
@@ -1434,7 +1450,7 @@ func (r *BotMessageRepository) GetLatestAssistantForRegeneration(ctx context.Con
 	`
 	m := &BotMessage{}
 	err := r.pool.QueryRow(ctx, query, messageID, conversationID, BotMessageRoleAssistant).
-		Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+		Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -1449,9 +1465,9 @@ func (r *BotMessageRepository) GetLatestAssistantForRegeneration(ctx context.Con
 // excluded so a regeneration is based on the same conversation state.
 func (r *BotMessageRepository) ListBeforeMessageID(ctx context.Context, conversationID, messageID, limit int) ([]*BotMessage, error) {
 	query := `
-		SELECT id, conversation_id, role, content, failed, created_at
+		SELECT id, conversation_id, role, content, failed, via_call, created_at
 		FROM (
-			SELECT id, conversation_id, role, content, failed, created_at
+			SELECT id, conversation_id, role, content, failed, via_call, created_at
 			FROM bot_messages
 			WHERE conversation_id = $1 AND id < $2
 			ORDER BY id DESC
@@ -1468,7 +1484,7 @@ func (r *BotMessageRepository) ListBeforeMessageID(ctx context.Context, conversa
 	messages := []*BotMessage{}
 	for rows.Next() {
 		m := &BotMessage{}
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
@@ -1496,7 +1512,7 @@ func (r *BotConversationRepository) GetOwnerUserID(ctx context.Context, conversa
 // from generation, which always reads backward from the newest turn.
 func (r *BotMessageRepository) ListAfterMessageID(ctx context.Context, conversationID, messageID, limit int) ([]*BotMessage, error) {
 	query := `
-		SELECT id, conversation_id, role, content, failed, created_at
+		SELECT id, conversation_id, role, content, failed, via_call, created_at
 		FROM bot_messages
 		WHERE conversation_id = $1 AND id > $2
 		ORDER BY id
@@ -1511,7 +1527,7 @@ func (r *BotMessageRepository) ListAfterMessageID(ctx context.Context, conversat
 	messages := []*BotMessage{}
 	for rows.Next() {
 		m := &BotMessage{}
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
@@ -1545,7 +1561,7 @@ func (r *BotMessageRepository) ReplaceLatestAssistantContent(
 			WHERE newer.conversation_id = target.conversation_id
 			  AND newer.id > target.id
 		  )
-		RETURNING target.id, target.conversation_id, target.role, target.content, target.failed, target.created_at
+		RETURNING target.id, target.conversation_id, target.role, target.content, target.failed, target.via_call, target.created_at
 	`
 	var tx pgx.Tx
 	queryer := interface {
@@ -1563,7 +1579,7 @@ func (r *BotMessageRepository) ReplaceLatestAssistantContent(
 	m := &BotMessage{}
 	err = queryer.QueryRow(
 		ctx, query, messageID, conversationID, BotMessageRoleAssistant, content, expectedContent,
-	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.CreatedAt)
+	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Failed, &m.ViaCall, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -1624,7 +1640,7 @@ func (r *BotMessageRepository) EditLatestAssistantContent(ctx context.Context, u
 
 	current := &BotMessage{}
 	query := `
-		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.created_at
+		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.via_call, m.created_at
 		FROM bot_messages m
 		JOIN bot_conversations c ON c.id = m.conversation_id
 		WHERE c.user_id = $1
@@ -1638,7 +1654,7 @@ func (r *BotMessageRepository) EditLatestAssistantContent(ctx context.Context, u
 		FOR UPDATE OF m
 	`
 	err = tx.QueryRow(ctx, query, userID, conversationID, messageID, BotMessageRoleAssistant).
-		Scan(&current.ID, &current.ConversationID, &current.Role, &current.Content, &current.Failed, &current.CreatedAt)
+		Scan(&current.ID, &current.ConversationID, &current.Role, &current.Content, &current.Failed, &current.ViaCall, &current.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -1667,10 +1683,10 @@ func (r *BotMessageRepository) EditLatestAssistantContent(ctx context.Context, u
 			SELECT 1 FROM bot_messages newer
 			WHERE newer.conversation_id = target.conversation_id AND newer.id > target.id
 		  )
-		RETURNING id, conversation_id, role, content, failed, created_at
+		RETURNING id, conversation_id, role, content, failed, via_call, created_at
 	`, messageID, content, conversationID, BotMessageRoleAssistant).Scan(
 		&updated.ID, &updated.ConversationID, &updated.Role,
-		&updated.Content, &updated.Failed, &updated.CreatedAt,
+		&updated.Content, &updated.Failed, &updated.ViaCall, &updated.CreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -38,7 +38,7 @@ func (r *BotMessageRepository) SearchOlderThan(
 				''
 			)::tsquery AS tsq
 		)
-		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.created_at
+		SELECT m.id, m.conversation_id, m.role, m.content, m.failed, m.via_call, m.created_at
 		FROM bot_messages m, cue_query q
 		WHERE m.conversation_id = $1
 		  AND m.id < $2
@@ -58,7 +58,7 @@ func (r *BotMessageRepository) SearchOlderThan(
 		message := &BotMessage{}
 		if err := rows.Scan(
 			&message.ID, &message.ConversationID, &message.Role,
-			&message.Content, &message.Failed, &message.CreatedAt,
+			&message.Content, &message.Failed, &message.ViaCall, &message.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("omnichat transcript: scan: %w", err)
 		}

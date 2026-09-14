@@ -558,6 +558,89 @@ func TestBotMessageRepositoryDoesNotRepairFreshDanglingUserTurn(t *testing.T) {
 	require.Nil(t, repaired)
 }
 
+// A call turn keeps its mark through every read and rewrite that hands a
+// message back. Every one of them spells out its own columns, so a column
+// missed in one scan would drop the mark there and nowhere else.
+func TestBotMessageRepositoryCallTurnKeepsItsMarkOnEveryRead(t *testing.T) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := NewUserRepository(db.Pool)
+	user := &User{
+		Username:     fmt.Sprintf("omnichat_call_mark_%d", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+	persona, err := NewBotPersonaRepository(db.Pool).CreateOwned(ctx, user.ID, &BotPersona{
+		Slug:               fmt.Sprintf("u%d-call-mark-%d", user.ID, time.Now().UnixNano()),
+		Name:               "Call Mark Persona",
+		Category:           PersonaCategoryOriginal,
+		Visibility:         "private",
+		SourceFormat:       "native",
+		SystemPrompt:       "Answer the phone.",
+		AlternateGreetings: []string{},
+		Tags:               []string{},
+		GalleryURLs:        []string{},
+		ExtensionsJSON:     json.RawMessage(`{}`),
+	}, 100)
+	require.NoError(t, err)
+	conversation, err := NewBotConversationRepository(db.Pool).CreateWithMessages(ctx, user.ID, persona.ID, nil, nil, nil)
+	require.NoError(t, err)
+
+	messages := NewBotMessageRepository(db.Pool)
+	typed, err := messages.Create(ctx, conversation.ID, BotMessageRoleUser, "typed before the call", false)
+	require.NoError(t, err)
+	heard, err := messages.CreateCallMessage(ctx, conversation.ID, BotMessageRoleUser, "tell me about the lighthouse")
+	require.NoError(t, err)
+	said, err := messages.CreateCallMessage(ctx, conversation.ID, BotMessageRoleAssistant, "the lighthouse keeper waved")
+	require.NoError(t, err)
+	require.True(t, said.ViaCall)
+
+	marks := func(list []*BotMessage) map[int]bool {
+		out := map[int]bool{}
+		for _, m := range list {
+			out[m.ID] = m.ViaCall
+		}
+		return out
+	}
+
+	listed, _, err := messages.ListByConversationIDBefore(ctx, conversation.ID, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{typed.ID: false, heard.ID: true, said.ID: true}, marks(listed), "the chat's own list")
+
+	before, err := messages.ListBeforeMessageID(ctx, conversation.ID, said.ID, 10)
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{typed.ID: false, heard.ID: true}, marks(before), "the history a regeneration reads")
+
+	after, err := messages.ListAfterMessageID(ctx, conversation.ID, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{typed.ID: false, heard.ID: true, said.ID: true}, marks(after), "the memory watermark read")
+
+	found, err := messages.SearchOlderThan(ctx, conversation.ID, said.ID, "lighthouse", 4)
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{heard.ID: true}, marks(found), "the transcript search")
+
+	latest, err := messages.GetLatestAssistantForRegeneration(ctx, conversation.ID, said.ID)
+	require.NoError(t, err)
+	require.NotNil(t, latest)
+	require.True(t, latest.ViaCall, "the reply a regeneration replaces")
+
+	replaced, err := messages.ReplaceLatestAssistantContent(ctx, conversation.ID, said.ID, said.Content, "the keeper waved back")
+	require.NoError(t, err)
+	require.NotNil(t, replaced)
+	require.True(t, replaced.ViaCall, "a regenerated call reply")
+
+	edited, err := messages.EditLatestAssistantContent(ctx, user.ID, conversation.ID, said.ID, "the keeper waved twice")
+	require.NoError(t, err)
+	require.NotNil(t, edited)
+	require.True(t, edited.ViaCall, "an edited call reply")
+}
+
 func TestBotMessageRepositoryListsMostRecentWindowChronologically(t *testing.T) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
