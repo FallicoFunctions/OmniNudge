@@ -33,6 +33,13 @@ printf 'export const   fixture = {a:1}\n' >"$ts_fixture"
 expect "unformatted TypeScript is refused" fail env CI_CHECKS_FILES="$ts_fixture" bash "$gate"
 printf 'export const fixture = { a: 1 };\n' >"$ts_fixture"
 expect "formatted TypeScript passes" pass env CI_CHECKS_FILES="$ts_fixture" bash "$gate"
+
+# The other two steps of the same required check. Each fixture is formatted,
+# so it is the check named here that refuses it, not prettier.
+printf 'export const fixture = 1;\nconst unused = 2;\n' >"$ts_fixture"
+expect "an eslint error is refused" fail env CI_CHECKS_FILES="$ts_fixture" bash "$gate"
+printf "export const fixture: number = 'not a number';\n" >"$ts_fixture"
+expect "a type error is refused by tsc -b" fail env CI_CHECKS_FILES="$ts_fixture" bash "$gate"
 rm -f "$ts_fixture"
 
 # Lint, the check that blocked every Go pull request.

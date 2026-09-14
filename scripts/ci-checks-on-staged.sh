@@ -51,6 +51,20 @@ if [ -n "$frontend_files" ]; then
     echo "FAIL: prettier (CI's required 'Frontend (TypeScript)' check); run: npx prettier --write <files>"
     failed=$((failed+1))
   fi
+
+  script_files=$(printf '%s\n' $frontend_files | grep -E '\.(ts|tsx)$')
+  if [ -n "$script_files" ]; then
+    if ! (cd frontend && npx eslint $script_files); then
+      echo "FAIL: eslint (CI's 'Lint' step)"
+      failed=$((failed+1))
+    fi
+    # The whole project, because a change in one file can break the types of
+    # another. -b, not --noEmit: the root tsconfig lists no files.
+    if ! (cd frontend && npx tsc -b); then
+      echo "FAIL: tsc -b (CI's 'TypeScript type check' step)"
+      failed=$((failed+1))
+    fi
+  fi
 fi
 
 echo "$failed failed (CI checks on the commit)"
