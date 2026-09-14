@@ -577,6 +577,11 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 					zlog.Warn().Err(err).Int("conversation_id", plan.ConversationID).Msg("omnichat live call: typed text not delivered")
 					continue
 				}
+				// Typed while she is talking, the words start a new turn: what
+				// she has said so far is saved first, so it keeps its place.
+				if said.Len() > 0 {
+					save()
+				}
 				// Kept with the turn she answers, as the spoken half is.
 				if heard.Len() > 0 {
 					heard.WriteString(" ")

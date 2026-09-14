@@ -460,6 +460,31 @@ func TestRunLiveCall_TypedTextIsATurnSheAnswers(t *testing.T) {
 	require.Equal(t, []savedTurn{{"where are you?", "At the harbour."}}, turns.savedTurns())
 }
 
+// Typing while she is still talking starts a new turn. Kept with the turn in
+// progress, the typed words would be saved ahead of what she had already
+// said, and the chat would show the caller answering something not yet asked.
+func TestRunLiveCall_TypingWhileSheTalksKeepsTheOrder(t *testing.T) {
+	session, peer, turns := newFakeLiveSession(), newFakeLivePeer(), &fakeLiveTurns{}
+	dial, _ := dialOnce(session)
+	done := runLiveCallAsync(t, context.Background(), dial, peer, turns)
+
+	session.events <- geminilive.Event{Kind: geminilive.EventOutputTranscript, Text: "Good, thanks."}
+	waitFor(t, "her words to reach the caller", func() bool { return slices.Contains(peer.eventTypes(), LiveCallEventSaid) })
+	peer.controls <- LiveCallControl{Type: LiveCallControlText, Text: "wait, where are you?"}
+	waitFor(t, "the typed words to reach her", func() bool { return len(session.sentTexts()) == 1 })
+	session.events <- geminilive.Event{Kind: geminilive.EventOutputTranscript, Text: "At the harbour."}
+	session.events <- geminilive.Event{Kind: geminilive.EventTurnComplete}
+	waitFor(t, "the typed turn to be saved", func() bool {
+		saved := turns.savedTurns()
+		return len(saved) > 0 && saved[len(saved)-1].heard != ""
+	})
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+
+	require.Equal(t, []savedTurn{{"", "Good, thanks."}, {"wait, where are you?", "At the harbour."}}, turns.savedTurns(),
+		"what she said before the caller typed is saved first, and the typed words start the next turn")
+}
+
 func TestRunLiveCall_TypedTextWhileUnpaidReachesNobody(t *testing.T) {
 	withShortCallTimes(t, time.Hour, time.Minute)
 	meter := &fakeMeter{refuse: true}
