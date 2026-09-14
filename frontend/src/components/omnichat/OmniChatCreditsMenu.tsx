@@ -66,7 +66,12 @@ export default function OmniChatCreditsMenu() {
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={t('omnichat.header.credits.balance', { balance })}
+        // Read aloud, the placeholder would be "dot dot dot OmniCredits".
+        aria-label={
+          wallet
+            ? t('omnichat.header.credits.balance', { balance })
+            : t('omnichat.header.credits.loading')
+        }
         onClick={() => setOpen((isOpen) => !isOpen)}
         className="omnichat-touch-target flex items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.16)] transition hover:border-white/20 hover:bg-white/10"
       >

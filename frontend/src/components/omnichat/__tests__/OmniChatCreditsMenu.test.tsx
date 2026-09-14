@@ -53,6 +53,14 @@ describe('OmniChatCreditsMenu', () => {
     expect(await screen.findByRole('button', { name: '55 OmniCredits' })).toBeInTheDocument();
   });
 
+  // OmniChat has to work by ear. Until the balance arrives the button says so,
+  // rather than reading its visual placeholder aloud.
+  it('names the balance as loading until it arrives', () => {
+    vi.mocked(omnichatService.getBillingWallet).mockReturnValue(new Promise(() => undefined));
+    renderMenu();
+    expect(screen.getByRole('button', { name: 'Loading OmniCredits' })).toBeInTheDocument();
+  });
+
   it('lists what things cost, with a call priced by the minute', async () => {
     renderMenu();
     fireEvent.click(await screen.findByRole('button', { name: '55 OmniCredits' }));

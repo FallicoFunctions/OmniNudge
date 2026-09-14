@@ -4242,6 +4242,7 @@
       "saveDefaults": "Save defaults",
       "credits": {
         "balance": "{{balance}} OmniCredits",
+        "loading": "Loading OmniCredits",
         "prices": "Prices in OmniCredits",
         "perMinute": "{{cost}}/min",
         "buyMore": "Buy more"
