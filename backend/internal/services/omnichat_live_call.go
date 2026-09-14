@@ -557,13 +557,22 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 				continue
 			}
 			// A resume while the call is paid for would charge a minute that
-			// has not begun, and one straight after another adds nothing but
-			// another ledger write.
-			if control.Type == LiveCallControlResume && paused.Load() && time.Since(lastResume) >= liveCallResumeInterval {
-				lastResume = time.Now()
-				if err := charge(true); err != nil {
+			// has not begun.
+			if control.Type != LiveCallControlResume || !paused.Load() {
+				continue
+			}
+			// One straight after another adds nothing but another ledger
+			// write. It is still answered: the caller is waiting to hear
+			// whether the call carries on.
+			if time.Since(lastResume) < liveCallResumeInterval {
+				if err := peer.SendEvent(LiveCallEvent{Type: LiveCallEventPaused}); err != nil {
 					return nil
 				}
+				continue
+			}
+			lastResume = time.Now()
+			if err := charge(true); err != nil {
+				return nil
 			}
 			continue
 		case <-pauseExpired:

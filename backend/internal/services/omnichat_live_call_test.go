@@ -335,6 +335,34 @@ func TestRunLiveCall_ABurstOfResumesIsOneAttempt(t *testing.T) {
 	require.Equal(t, 2, meter.tries(), "the charge at connect and one resume; the rest of the burst wrote nothing")
 }
 
+// The browser holds Continue at "Checking…" until it hears back, so a resume
+// too soon after the last one is answered even though nothing is tried.
+func TestRunLiveCall_AResumeTooSoonIsStillAnswered(t *testing.T) {
+	withShortCallTimes(t, time.Hour, time.Minute)
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	pauses := func() int {
+		n := 0
+		for _, kind := range peer.eventTypes() {
+			if kind == LiveCallEventPaused {
+				n++
+			}
+		}
+		return n
+	}
+	waitFor(t, "the pause", func() bool { return pauses() == 1 })
+	peer.controls <- LiveCallControl{Type: LiveCallControlResume}
+	waitFor(t, "the refused resume", func() bool { return pauses() == 2 })
+	peer.controls <- LiveCallControl{Type: LiveCallControlResume}
+	waitFor(t, "an answer to the resume that came too soon", func() bool { return pauses() == 3 })
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+	require.Equal(t, 2, meter.tries(), "the charge at connect and the first resume; the second wrote nothing")
+}
+
 // A resume while the call is paid for would charge a minute that has not begun.
 func TestRunLiveCall_AResumeWhilePaidChargesNothing(t *testing.T) {
 	withShortCallTimes(t, time.Hour, time.Minute)
