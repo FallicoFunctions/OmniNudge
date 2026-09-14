@@ -11,6 +11,11 @@
 #
 # Every manifest belongs here. A directory that is worth scanning is worth
 # being able to fix.
+#
+# Each directory has two groups, because a group applies to version updates
+# only unless it says otherwise. With one group, every security fix still
+# arrived as a pull request of its own: eight of fifteen open pull requests
+# were single-package security bumps that no group could collect.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -20,6 +25,9 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+      github-actions-security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: gomod
     directory: /backend
@@ -27,6 +35,9 @@ updates:
       interval: weekly
     groups:
       go-dependencies:
+        patterns: ['*']
+      go-security:
+        applies-to: security-updates
         patterns: ['*']
 
   - package-ecosystem: npm
@@ -36,6 +47,9 @@ updates:
     groups:
       frontend-dependencies:
         patterns: ['*']
+      frontend-security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: npm
     directory: /omnirave-web
@@ -44,6 +58,9 @@ updates:
     groups:
       omnirave-web-dependencies:
         patterns: ['*']
+      omnirave-web-security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: npm
     directory: /omnirave-babylon
@@ -51,6 +68,9 @@ updates:
       interval: weekly
     groups:
       omnirave-babylon-dependencies:
+        patterns: ['*']
+      omnirave-babylon-security:
+        applies-to: security-updates
         patterns: ['*']
 
   # The three workers pin the same imaging and model stack, so one CVE in
@@ -63,6 +83,9 @@ updates:
     groups:
       image-worker-dependencies:
         patterns: ['*']
+      image-worker-security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: pip
     directory: /infra/runpod/video-worker
@@ -71,6 +94,9 @@ updates:
     groups:
       video-worker-dependencies:
         patterns: ['*']
+      video-worker-security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: pip
     directory: /infra/avatar-worker
@@ -78,4 +104,7 @@ updates:
       interval: weekly
     groups:
       avatar-worker-dependencies:
+        patterns: ['*']
+      avatar-worker-security:
+        applies-to: security-updates
         patterns: ['*']
