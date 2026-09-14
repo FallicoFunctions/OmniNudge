@@ -120,7 +120,7 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 	conn.SetReadLimit(maxServerFrame)
 	// A read deadline only covers the timeout; a caller who hangs up during
 	// setup cancels ctx, and only closing the socket unblocks the read.
-	stopWatching := context.AfterFunc(ctx, func() { conn.Close() })
+	stopWatching := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stopWatching()
 
 	s := &Session{conn: conn, events: make(chan Event, eventBuffer), done: make(chan struct{})}
@@ -129,7 +129,7 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 		err = s.awaitSetup(ctx)
 	}
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, fmt.Errorf("geminilive: setup abandoned: %w", ctxErr)
 		}
@@ -181,8 +181,10 @@ func buildSetup(cfg Config) *setupMessage {
 
 func (s *Session) awaitSetup(ctx context.Context) error {
 	deadline, _ := ctx.Deadline()
-	s.conn.SetReadDeadline(deadline)
-	defer s.conn.SetReadDeadline(time.Time{})
+	if err := s.conn.SetReadDeadline(deadline); err != nil {
+		return fmt.Errorf("geminilive: waiting for setup: %w", err)
+	}
+	defer func() { _ = s.conn.SetReadDeadline(time.Time{}) }()
 	for {
 		msg, err := s.read()
 		if err != nil {
@@ -321,7 +323,9 @@ func (s *Session) write(msg clientMessage) error {
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
-	s.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	if err := s.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+		return err
+	}
 	if err := s.conn.WriteJSON(msg); err != nil {
 		return fmt.Errorf("geminilive: write failed: %w", err)
 	}

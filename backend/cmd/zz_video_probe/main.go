@@ -273,7 +273,7 @@ func saveClip(jobID, dir string) error {
 	if err != nil {
 		return fmt.Errorf("download %s: %w", path, err)
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	name := dir + "/" + jobID[:8] + "-" + path[strings.LastIndex(path, "/")+1:]
 	out, err := os.Create(name)
 	if err != nil {

@@ -152,16 +152,10 @@ type cacheControl struct {
 	Type string `json:"type"`
 }
 
-// imagePart carries a picture alongside the text of a message.
-//
-// The wire format already accepts an array of parts -- that is how a cache
-// breakpoint is marked -- so an image is another kind of part rather than a
-// different request shape.
-type imagePart struct {
-	Type     string       `json:"type"`
-	ImageURL imagePartURL `json:"image_url"`
-}
-
+// imagePartURL carries a picture alongside the text of a message. The wire
+// format already accepts an array of parts -- that is how a cache breakpoint
+// is marked -- so an image is another kind of part rather than a different
+// request shape.
 type imagePartURL struct {
 	URL string `json:"url"`
 }

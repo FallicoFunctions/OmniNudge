@@ -375,7 +375,6 @@ func TestAGroupClampsLikeEveryOtherSurface(t *testing.T) {
 
 func TestAnUnwiredGroupEntitlementClampsRatherThanExposes(t *testing.T) {
 	// Losing the wiring should cost tone, never containment.
-	var service *OmniChatGroupService
-	service = &OmniChatGroupService{}
+	service := &OmniChatGroupService{}
 	require.False(t, service.entitlement.AllowsExplicit(context.Background(), 7))
 }

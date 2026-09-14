@@ -26,7 +26,7 @@ func fakeLive(t *testing.T, handle func(conn *websocket.Conn)) (endpoint string,
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		var first map[string]any
 		if err := conn.ReadJSON(&first); err != nil {
 			return
@@ -59,7 +59,7 @@ func TestDial_SendsSetupAndKeyHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	if got := <-keys; got != "test-key" {
 		t.Fatalf("key header = %q, want test-key", got)
@@ -176,7 +176,7 @@ func TestSession_EventsArriveInOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	var got []Event
 	timeout := time.After(5 * time.Second)
@@ -235,7 +235,7 @@ func TestSession_ToolCallRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	event := <-session.Events()
 	if event.Kind != EventToolCall || len(event.Calls) != 1 {
@@ -278,7 +278,7 @@ func TestSession_AudioIsBase64PCMAt16k(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	if err := session.SendAudio([]byte{1, 2, 3, 4}); err != nil {
 		t.Fatalf("SendAudio: %v", err)
@@ -311,8 +311,8 @@ func TestSession_SendAfterCloseFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	session.Close()
-	session.Close()
+	_ = session.Close()
+	_ = session.Close()
 	if err := session.SendText("hello"); !errors.Is(err, ErrClosed) {
 		t.Fatalf("SendText after Close = %v, want ErrClosed", err)
 	}

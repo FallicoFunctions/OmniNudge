@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -68,34 +68,42 @@ func TestEverySystemPromptTakingUserTextSaysItIsData(t *testing.T) {
 // TestEverySystemPromptIsInTheInventory is the ratchet. A prompt added without
 // a row is a prompt nobody decided about, and the decision is the point.
 func TestEverySystemPromptIsInTheInventory(t *testing.T) {
+	// One file at a time: parser.ParseDir is deprecated because it ignores
+	// build tags, and this package has none, so the files are the package.
 	set := token.NewFileSet()
-	pkgs, err := parser.ParseDir(set, ".", func(f fs.FileInfo) bool {
-		return !strings.HasSuffix(f.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(".")
 	require.NoError(t, err)
+	var files []*ast.File
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(set, name, nil, 0)
+		require.NoError(t, err)
+		files = append(files, file)
+	}
 
 	found := map[string]string{}
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Files {
-			ast.Inspect(file, func(n ast.Node) bool {
-				spec, ok := n.(*ast.ValueSpec)
-				if !ok {
-					return true
-				}
-				for i, ident := range spec.Names {
-					if !strings.HasSuffix(ident.Name, "SystemPrompt") {
-						continue
-					}
-					found[ident.Name] = ""
-					if i < len(spec.Values) {
-						if lit, isLit := spec.Values[i].(*ast.BasicLit); isLit {
-							found[ident.Name] = strings.Trim(lit.Value, "`\"")
-						}
-					}
-				}
+	for _, file := range files {
+		ast.Inspect(file, func(n ast.Node) bool {
+			spec, ok := n.(*ast.ValueSpec)
+			if !ok {
 				return true
-			})
-		}
+			}
+			for i, ident := range spec.Names {
+				if !strings.HasSuffix(ident.Name, "SystemPrompt") {
+					continue
+				}
+				found[ident.Name] = ""
+				if i < len(spec.Values) {
+					if lit, isLit := spec.Values[i].(*ast.BasicLit); isLit {
+						found[ident.Name] = strings.Trim(lit.Value, "`\"")
+					}
+				}
+			}
+			return true
+		})
 	}
 	require.NotEmpty(t, found, "the source scan found no system prompts, so it is checking nothing")
 

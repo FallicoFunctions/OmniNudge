@@ -279,14 +279,18 @@ func (s *liveCallSocket) Controls() <-chan services.LiveCallControl { return s.c
 func (s *liveCallSocket) SendAudio(pcm []byte) error {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
-	s.conn.SetWriteDeadline(time.Now().Add(liveCallWriteTimeout))
+	if err := s.conn.SetWriteDeadline(time.Now().Add(liveCallWriteTimeout)); err != nil {
+		return err
+	}
 	return s.conn.WriteMessage(ws.BinaryMessage, pcm)
 }
 
 func (s *liveCallSocket) SendEvent(event services.LiveCallEvent) error {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
-	s.conn.SetWriteDeadline(time.Now().Add(liveCallWriteTimeout))
+	if err := s.conn.SetWriteDeadline(time.Now().Add(liveCallWriteTimeout)); err != nil {
+		return err
+	}
 	return s.conn.WriteJSON(event)
 }
 

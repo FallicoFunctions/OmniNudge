@@ -104,11 +104,6 @@ type VideoJob struct {
 // VideoStatus is one poll. UnsignedURLs is populated only once Status is
 // completed, and an empty list on a completed job is a provider fault rather
 // than an empty result -- see PollVideo.
-// VideoUsage is OpenRouter's account of a clip. Cost is in US dollars.
-type VideoUsage struct {
-	Cost *float64 `json:"cost,omitempty"`
-}
-
 type VideoStatus struct {
 	ID           string   `json:"id"`
 	Status       string   `json:"status"`
@@ -116,6 +111,11 @@ type VideoStatus struct {
 	Error        string   `json:"error,omitempty"`
 	// What OpenRouter charged for the clip, when it says.
 	Usage *VideoUsage `json:"usage,omitempty"`
+}
+
+// VideoUsage is OpenRouter's account of a clip. Cost is in US dollars.
+type VideoUsage struct {
+	Cost *float64 `json:"cost,omitempty"`
 }
 
 const (
@@ -244,7 +244,7 @@ func (c *Client) doVideoJSON(ctx context.Context, method, url string, body io.Re
 	if err != nil {
 		return newTransportOrProviderError("openrouter: video request failed", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	payload, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {

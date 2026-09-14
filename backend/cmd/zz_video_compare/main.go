@@ -211,7 +211,7 @@ func download(ctx context.Context, url, path, apiKey string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode >= 400 {
 		return 0, fmt.Errorf("http %d", response.StatusCode)
 	}
@@ -219,8 +219,12 @@ func download(ctx context.Context, url, path, apiKey string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
-	return io.Copy(file, response.Body)
+	written, err := io.Copy(file, response.Body)
+	// A write is not finished until the close succeeds.
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return written, err
 }
 
 func signAsset(ctx context.Context, cfg *config.Config, db *database.DB, assetID string) (string, error) {

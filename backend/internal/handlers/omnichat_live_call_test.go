@@ -285,7 +285,7 @@ func TestLiveCallConnect_OutlivesTheRequestTimeout(t *testing.T) {
 	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/omnichat/calls/" + callID.String() + "/live"
 	conn, _, err := ws.DefaultDialer.Dial(url, http.Header{"Origin": {"http://localhost:5173"}})
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	time.Sleep(300 * time.Millisecond)
 	require.Zero(t, calls.endedCount(), "the call ended when the request deadline passed")
@@ -293,7 +293,7 @@ func TestLiveCallConnect_OutlivesTheRequestTimeout(t *testing.T) {
 	require.NoError(t, conn.WriteMessage(ws.BinaryMessage, []byte{5}))
 	eventually(t, "audio after the request deadline to reach Live", func() bool { return session.received() == 1 })
 	session.events <- geminilive.Event{Kind: geminilive.EventAudio, Audio: []byte{6}}
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(3*time.Second)))
 	kind, data, err := conn.ReadMessage()
 	require.NoError(t, err, "her voice after the request deadline never arrived")
 	require.Equal(t, ws.BinaryMessage, kind)
@@ -323,11 +323,11 @@ func TestLiveCallConnect_ASecondSocketForTheSameCallIsRefused(t *testing.T) {
 
 	first, _, err := ws.DefaultDialer.Dial(url, origin)
 	require.NoError(t, err)
-	defer first.Close()
+	defer func() { _ = first.Close() }()
 
 	second, response, err := ws.DefaultDialer.Dial(url, origin)
 	if second != nil {
-		second.Close()
+		_ = second.Close()
 	}
 	require.Error(t, err, "a second socket connected to a call that already has one")
 	require.NotNil(t, response)
@@ -367,7 +367,7 @@ func TestLiveCallConnect_RelaysAudioAndEndsTheCallWhenTheBrowserHangsUp(t *testi
 	session.events <- geminilive.Event{Kind: geminilive.EventAudio, Audio: []byte{7, 7}}
 	session.events <- geminilive.Event{Kind: geminilive.EventOutputTranscript, Text: "Hey you."}
 
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(3*time.Second)))
 	kind, data, err := conn.ReadMessage()
 	require.NoError(t, err)
 	require.Equal(t, ws.BinaryMessage, kind)

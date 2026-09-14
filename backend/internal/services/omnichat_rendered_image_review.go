@@ -34,7 +34,6 @@ import (
 // render costs nothing and waits for nothing.
 type OpenRouterRenderedImageReview struct {
 	client chatCompletionClient
-	model  string
 }
 
 func NewOpenRouterRenderedImageReview(client chatCompletionClient) *OpenRouterRenderedImageReview {

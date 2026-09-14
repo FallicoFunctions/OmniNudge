@@ -456,7 +456,7 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 		defer sessionMu.Unlock()
 		return session
 	}
-	defer func() { current().Close() }()
+	defer func() { _ = current().Close() }()
 
 	// Set while a minute is unpaid. The caller is not heard and hears nothing.
 	var paused atomic.Bool

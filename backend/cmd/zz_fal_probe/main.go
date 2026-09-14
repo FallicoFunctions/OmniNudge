@@ -219,7 +219,7 @@ func call(ctx context.Context, method, url, apiKey string, body io.Reader, targe
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	payload, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func download(ctx context.Context, url, path string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode >= 400 {
 		return 0, fmt.Errorf("download returned %d", response.StatusCode)
 	}
@@ -244,8 +244,12 @@ func download(ctx context.Context, url, path string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
-	return io.Copy(file, response.Body)
+	written, err := io.Copy(file, response.Body)
+	// A write is not finished until the close succeeds.
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return written, err
 }
 
 func signStill(ctx context.Context, cfg *config.Config, db *database.DB,
@@ -304,7 +308,7 @@ func uploadClip(ctx context.Context, cfg *config.Config, path string) (string, e
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	storage, err := storageFor(cfg)
 	if err != nil {
 		return "", err
