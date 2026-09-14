@@ -1,0 +1,180 @@
+{
+  "schema_version": 2,
+  "head": "4331fd171",
+  "base": "da6885d45",
+  "scope": {
+    "files": [
+      "frontend/src/components/omnichat/OmniChatCallModal.tsx",
+      "frontend/src/components/omnichat/OmniChatCommerceModal.tsx",
+      "frontend/src/components/omnichat/useLiveVoiceCall.ts",
+      "frontend/src/pages/OmniChatChatPage.tsx",
+      "frontend/public/locales/en.json",
+      "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatCommerceModal.test.tsx",
+      "backend/internal/database/migrations/209_omnicredits_admin_grants.up.sql",
+      "backend/internal/database/migrations/209_omnicredits_admin_grants.down.sql",
+      "backend/internal/models/omnicredits.go",
+      "backend/internal/models/omnicredits_test.go",
+      "backend/cmd/grant_credits/main.go",
+      "backend/cmd/grant_credits/main_test.go",
+      "backend/internal/database/omnichat_expansion_migration_test.go",
+      "backend/internal/database/omnichat_omniai_appearance_migration_test.go"
+    ],
+    "boundaries": [
+      "call screen -> credits screen: pausedCall.onCreditsAdded is the socket resume",
+      "credits screen -> wallet API: polled while a call is paused",
+      "operator -> dev database: the grant_credits command",
+      "ledger rows: the admin_grant entry type and its CHECK constraints"
+    ]
+  },
+  "prior_ledgers_read": [".review/19353074d.json", ".review/0c0038fc6.json", ".review/c4b3d25e3.json"],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Two scopes: the pause now opens the credits screen (7 frontend files), and a hand-grant command with migration 209 (7 backend files)."},
+        {"id": "A2", "status": "applied", "evidence": "19353074d made the server answer every resume while paused; the wallet-rise resume relies on that, since a refused or throttled resume must come back as paused rather than nothing."},
+        {"id": "B1", "status": "applied", "evidence": "The resume frame is unchanged (socket test asserts it); the grant command's message printed for a missing account and an over-limit amount."},
+        {"id": "B2", "status": "applied", "evidence": "Deferred to pass 2, after pass 1's fix."},
+        {"id": "B3", "status": "na", "why": "No HTTP handler changed; the wallet endpoint is only polled more often."},
+        {"id": "B4", "status": "applied", "evidence": "TestOmniCreditsAdminGrantIsAGiftNotAPurchase against the test database: the stored row reads back as admin_grant, the wallet shows 5 purchased, the repeat is idempotent, and the same operation as a purchase conflicts."},
+        {"id": "C1", "status": "applied", "evidence": "OmniCreditsEntryAdminGrant='admin_grant' matches both CHECKs in 209.up; en.json keys omnichat.commerce.callPaused/endCall match the t() calls."},
+        {"id": "C2", "status": "applied", "evidence": "The usage list reads usage_kind; an admin grant has none and renders the existing 'Credit adjustment' label."},
+        {"id": "C3", "status": "na", "why": "No rule implemented twice."},
+        {"id": "C4", "status": "applied", "evidence": "UserRepository.GetByUsername returns (nil, nil) for no row and (nil, err) for a failure; the command joined both into 'no account named'. Finding grant-lookup-error-as-missing."},
+        {"id": "C5", "status": "na", "why": "No struct field added across a boundary."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor."},
+        {"id": "C7", "status": "applied", "evidence": "The wallet fixture in the commerce test has the real WalletResponse fields (purchased_balance, subscription_balance)."},
+        {"id": "D1", "status": "applied", "evidence": "Usernames are normalised by GetByUsername (lower-case, trimmed); the command trims too."},
+        {"id": "D2", "status": "applied", "evidence": "-credits 100001 refused before any database access; 0 refused by flag check and by GrantAdminCredits."},
+        {"id": "D3", "status": "applied", "evidence": "1 and 100000 accepted by the flag check; -operation that is not a UUID refused."},
+        {"id": "E1", "status": "applied", "evidence": "The credits command writes through credit(), the same locked wallet + ledger path as CreditPurchased."},
+        {"id": "E2", "status": "applied", "evidence": "The panel's refused/asking branches were removed with their state; no dead props remain (grep for onBuyCredits, suspended, aboveCall, onPaused is empty)."},
+        {"id": "E3", "status": "applied", "evidence": "The lookup error was swallowed into a wrong message. Same finding."},
+        {"id": "E4", "status": "applied", "evidence": "The credits screen opens only on status 'paused', which only the voice path sets."},
+        {"id": "E5", "status": "applied", "evidence": "The purchase and admin_grant row shapes share one CHECK clause rather than two copies."},
+        {"id": "E6", "status": "applied", "evidence": "grep of backend/cmd for 'err != nil || x == nil': no other command merges a failure with not-found."},
+        {"id": "F1", "status": "na", "why": "No goroutine or shared state changed."},
+        {"id": "F2", "status": "applied", "evidence": "The grant is one transaction in credit(): wallet lock, ledger insert, wallet save."},
+        {"id": "F3", "status": "applied", "evidence": "209 added at the head of both expansion ladders and to the appearance list; TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly and TestTheBaselineMigrationsAreSafeToRunTwice pass; down refuses while admin_grant rows exist."},
+        {"id": "F4", "status": "applied", "evidence": "A grant cannot be undone by rolling back 209 while it exists; the credits screen unmounts on resume or error, and a later pause mounts it fresh."},
+        {"id": "G1", "status": "applied", "evidence": "grant-lookup-error-as-missing: patch merges the checks again; the new test fails on 'Target error should be in err chain'."},
+        {"id": "G2", "status": "na", "why": "No guard added."},
+        {"id": "H1", "status": "applied", "evidence": "go build and vet ok; model and ladder tests ok; frontend test run deferred to pass 2."},
+        {"id": "Z1", "status": "applied", "evidence": "Found by C4, reading the other end's contract for not-found versus failure; already a row."},
+        {"id": "B5", "status": "applied", "evidence": "Migrated the dev database (209 applied) and ran the real command: a missing account and an over-limit amount. No real grant was made: that needs the user's test account."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."}
+      ],
+      "findings": [
+        {
+          "id": "grant-lookup-error-as-missing",
+          "summary": "grant_credits reported a failed database lookup as 'no account named ...'.",
+          "found_by": "C4",
+          "fix_commit": "24415227c",
+          "control": {
+            "patch": ".review/controls/grant-lookup-error-as-missing.patch",
+            "runner": "go",
+            "tests": ["./cmd/grant_credits -run TestGrantTellsAFailedLookupFromAMissingAccount"],
+            "observed": "With the patch: 'Target error should be in err chain' at main_test.go:35. Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Adds the command's grant function and its test."},
+        {"id": "A2", "status": "applied", "evidence": "Nothing prior covered the command."},
+        {"id": "B1", "status": "applied", "evidence": "The real command after the fix still prints 'no account named' for a missing account, and would print 'look up ...: <error>' for a failure."},
+        {"id": "B2", "status": "applied", "evidence": "Printed the credits screen header both ways via a throwaway: normal (Close icon, subtitle, z-50) and paused call (red 'End call' as the accessible name, the paused text as aria-describedby, z-[110]). Throwaway removed."},
+        {"id": "B3", "status": "na", "why": "No handler."},
+        {"id": "B4", "status": "na", "why": "The fix touches no query."},
+        {"id": "C1", "status": "applied", "evidence": "errNoAccount is matched with errors.Is in the test."},
+        {"id": "C2", "status": "applied", "evidence": "grant returns the user id the message prints."},
+        {"id": "C3", "status": "na", "why": "No rule twice."},
+        {"id": "C4", "status": "applied", "evidence": "The fakes follow GetByUsername's (nil, nil) / (nil, err) contract."},
+        {"id": "C5", "status": "na", "why": "No field."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor."},
+        {"id": "C7", "status": "applied", "evidence": "The call-screen stub of the credits screen renders a dialog with its own 'End call', as the real one does."},
+        {"id": "D1", "status": "na", "why": "No new parsing."},
+        {"id": "D2", "status": "na", "why": "No new parsing."},
+        {"id": "D3", "status": "na", "why": "No new parsing."},
+        {"id": "E1", "status": "applied", "evidence": "Both error paths now name their cause."},
+        {"id": "E2", "status": "applied", "evidence": "Each branch of grant is reached by the test."},
+        {"id": "E3", "status": "applied", "evidence": "No error dropped in grant."},
+        {"id": "E4", "status": "na", "why": "No flag."},
+        {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+        {"id": "E6", "status": "applied", "evidence": "Other tests pressing 'End call' in the call screen: only this one runs with a second dialog open."},
+        {"id": "F1", "status": "na", "why": "No concurrency."},
+        {"id": "F2", "status": "na", "why": "No transaction change."},
+        {"id": "F3", "status": "na", "why": "No migration change."},
+        {"id": "F4", "status": "na", "why": "Nothing persisted by the fix."},
+        {"id": "G1", "status": "applied", "evidence": "credits-end-call-ambiguous: patch restores screen.getByRole; the test fails on 'Found multiple elements with the role button and name End call'."},
+        {"id": "G2", "status": "na", "why": "No guard."},
+        {"id": "H1", "status": "applied", "evidence": "The two screen test files ran for the first time: 1 failure, 'ends the call when the credits screen is closed' found two 'End call' buttons. Finding credits-end-call-ambiguous."},
+        {"id": "Z1", "status": "applied", "evidence": "Found by H1, running the tests that had been written and not run; already a row."},
+        {"id": "B5", "status": "applied", "evidence": "The real command re-run after the fix, as in pass 1."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."}
+      ],
+      "findings": [
+        {
+          "id": "credits-end-call-ambiguous",
+          "summary": "The test for ending a paused call pressed 'End call' across the whole page, found both the call screen's and the credits screen's, and failed before asserting anything.",
+          "found_by": "H1",
+          "fix_commit": "4331fd171",
+          "control": {
+            "patch": ".review/controls/credits-end-call-ambiguous.patch",
+            "runner": "vitest",
+            "tests": ["src/components/omnichat/__tests__/OmniChatCallModal.test.tsx -t 'ends the call when the credits screen is closed'"],
+            "observed": "With the patch: TestingLibraryElementError, multiple elements named 'End call'. Without: passes."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Adds the call-screen test fix to the scope."},
+        {"id": "A2", "status": "applied", "evidence": "Both findings of this ledger re-checked: controls fail with their patch."},
+        {"id": "B1", "status": "applied", "evidence": "No built string changed in pass 2's fix."},
+        {"id": "B2", "status": "applied", "evidence": "The markup printed in pass 2 is of the final components; the fix touched only a test."},
+        {"id": "B3", "status": "na", "why": "No handler."},
+        {"id": "B4", "status": "na", "why": "No query."},
+        {"id": "C1", "status": "applied", "evidence": "The stub's dialog name 'Buy OmniCredits' is what the test scopes to."},
+        {"id": "C2", "status": "na", "why": "No new seam."},
+        {"id": "C3", "status": "na", "why": "No rule twice."},
+        {"id": "C4", "status": "na", "why": "No new contract."},
+        {"id": "C5", "status": "na", "why": "No field."},
+        {"id": "C6", "status": "na", "why": "No accessor."},
+        {"id": "C7", "status": "applied", "evidence": "Stub unchanged and still mirrors the real screen's End call."},
+        {"id": "D1", "status": "na", "why": "No parsing."},
+        {"id": "D2", "status": "na", "why": "No parsing."},
+        {"id": "D3", "status": "na", "why": "No parsing."},
+        {"id": "E1", "status": "na", "why": "No new path."},
+        {"id": "E2", "status": "applied", "evidence": "All three pause tests run and reach their assertions (34/34)."},
+        {"id": "E3", "status": "na", "why": "No error handling changed."},
+        {"id": "E4", "status": "na", "why": "No flag."},
+        {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+        {"id": "E6", "status": "applied", "evidence": "No other test in the file opens a second dialog."},
+        {"id": "F1", "status": "na", "why": "No concurrency."},
+        {"id": "F2", "status": "na", "why": "No transaction."},
+        {"id": "F3", "status": "na", "why": "No migration change."},
+        {"id": "F4", "status": "na", "why": "Nothing persisted."},
+        {"id": "G1", "status": "applied", "evidence": "Both controls built and run by hand."},
+        {"id": "G2", "status": "na", "why": "No guard."},
+        {"id": "H1", "status": "applied", "evidence": "tsc -b 0; eslint 0 on the test file; vitest call and credits screen files 34/34; go vet cmd/grant_credits, models, database ok; command test ok."},
+        {"id": "Z1", "status": "na", "why": "Pass found nothing."},
+        {"id": "B5", "status": "applied", "evidence": "No change since the pass-2 run of the real command; the pause over a real call waits on the user's non-admin account and stays unverified in real use."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."}
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build/vet ok; tsc -b 0",
+    "vet": "ok",
+    "lint": "eslint 0",
+    "types": "tsc -b 0",
+    "tests": "vitest call + credits screens 34/34; go: grant_credits, admin grant repository test, both ladders ok; full suites not run"
+  }
+}

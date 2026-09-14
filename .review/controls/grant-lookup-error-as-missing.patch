@@ -1,0 +1,16 @@
+diff --git a/backend/cmd/grant_credits/main.go b/backend/cmd/grant_credits/main.go
+index d4ab36733..89bc9b190 100644
+--- a/backend/cmd/grant_credits/main.go
++++ b/backend/cmd/grant_credits/main.go
+@@ -86,10 +86,7 @@ var errNoAccount = errors.New("no account")
+ // told "no account" while the database is down, you go looking for a typo.
+ func grant(ctx context.Context, users accountFinder, credits creditGranter, name string, operationID uuid.UUID, amount int64) (int, *models.OmniCreditsWallet, error) {
+ 	user, err := users.GetByUsername(ctx, name)
+-	if err != nil {
+-		return 0, nil, fmt.Errorf("look up %q: %w", name, err)
+-	}
+-	if user == nil {
++	if err != nil || user == nil {
+ 		return 0, nil, fmt.Errorf("%w named %q", errNoAccount, name)
+ 	}
+ 	wallet, err := credits.GrantAdminCredits(ctx, user.ID, operationID, amount)
