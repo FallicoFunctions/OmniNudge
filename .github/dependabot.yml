@@ -12,10 +12,19 @@
 # Every manifest belongs here. A directory that is worth scanning is worth
 # being able to fix.
 #
-# Each directory has two groups, because a group applies to version updates
-# only unless it says otherwise. With one group, every security fix still
-# arrived as a pull request of its own: eight of fifteen open pull requests
-# were single-package security bumps that no group could collect.
+# Each directory has three groups:
+#
+# - minor and patch updates, which rarely break and can merge every week;
+# - major updates, one visible upgrade pull request per directory, which may
+#   need a migration and must not hold back anything else;
+# - security updates, because a group covers version updates only unless it
+#   says otherwise, so every security fix used to open a pull request of its
+#   own: eight of fifteen open pull requests were single-package bumps.
+#
+# One group for everything is what made the pile-up: the frontend group
+# carried 19 major versions among 47 updates (ESLint 10, Vite 8, Vitest 5,
+# Tailwind 4 and more), any one of them could fail the whole group, and none of
+# the 47 could merge until all of them could.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -25,6 +34,10 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      github-actions-majors:
+        patterns: ['*']
+        update-types: ['major']
       github-actions-security:
         applies-to: security-updates
         patterns: ['*']
@@ -36,6 +49,10 @@ updates:
     groups:
       go-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      go-majors:
+        patterns: ['*']
+        update-types: ['major']
       go-security:
         applies-to: security-updates
         patterns: ['*']
@@ -45,15 +62,19 @@ updates:
     schedule:
       interval: weekly
     # TypeScript 7 cannot install beside typescript-eslint 8, which accepts
-    # TypeScript below 6.1. The weekly group carried the major bump anyway, so
-    # npm refused the whole install and all 48 updates in it were blocked by
-    # the one. Remove this once typescript-eslint supports TypeScript 7.
+    # TypeScript below 6.1: npm refuses the install outright, so even the majors
+    # group could never run with it inside. Remove this once typescript-eslint
+    # supports TypeScript 7.
     ignore:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
     groups:
       frontend-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      frontend-majors:
+        patterns: ['*']
+        update-types: ['major']
       frontend-security:
         applies-to: security-updates
         patterns: ['*']
@@ -65,6 +86,10 @@ updates:
     groups:
       omnirave-web-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      omnirave-web-majors:
+        patterns: ['*']
+        update-types: ['major']
       omnirave-web-security:
         applies-to: security-updates
         patterns: ['*']
@@ -76,6 +101,10 @@ updates:
     groups:
       omnirave-babylon-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      omnirave-babylon-majors:
+        patterns: ['*']
+        update-types: ['major']
       omnirave-babylon-security:
         applies-to: security-updates
         patterns: ['*']
@@ -90,6 +119,10 @@ updates:
     groups:
       image-worker-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      image-worker-majors:
+        patterns: ['*']
+        update-types: ['major']
       image-worker-security:
         applies-to: security-updates
         patterns: ['*']
@@ -101,6 +134,10 @@ updates:
     groups:
       video-worker-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      video-worker-majors:
+        patterns: ['*']
+        update-types: ['major']
       video-worker-security:
         applies-to: security-updates
         patterns: ['*']
@@ -112,6 +149,10 @@ updates:
     groups:
       avatar-worker-dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']
+      avatar-worker-majors:
+        patterns: ['*']
+        update-types: ['major']
       avatar-worker-security:
         applies-to: security-updates
         patterns: ['*']
