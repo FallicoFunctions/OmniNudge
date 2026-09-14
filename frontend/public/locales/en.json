@@ -4251,7 +4251,8 @@
     "liveCall": {
       "mute": "Mute the microphone",
       "unmute": "Unmute the microphone",
-      "hangUp": "End the call with {{name}}, {{time}}",
+      "hangUp": "End the call with {{name}}",
+      "elapsed": "Call time {{time}}",
       "dismiss": "Dismiss"
     },
     "sidebar": {

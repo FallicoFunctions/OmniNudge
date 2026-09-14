@@ -79,15 +79,23 @@ export default function LiveCallControls() {
           <Mic size={17} aria-hidden="true" />
         )}
       </button>
+      {/* The name stays still: a focused button whose name changes is read out
+          again, every second, to a caller who is listening rather than looking.
+          The time is a separate timer, which is never announced by itself. */}
       <button
         type="button"
-        aria-label={t('omnichat.liveCall.hangUp', { name: call.persona.name, time })}
+        aria-label={t('omnichat.liveCall.hangUp', { name: call.persona.name })}
         onClick={calls.endCall}
         className="omnichat-touch-target flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 text-emerald-200 transition hover:bg-rose-500/25 hover:text-rose-100"
       >
         <PhoneCall size={16} aria-hidden="true" className="animate-pulse" />
-        <span className="text-sm font-semibold tabular-nums">{time}</span>
+        <span aria-hidden="true" className="text-sm font-semibold tabular-nums">
+          {time}
+        </span>
       </button>
+      <span role="timer" className="sr-only">
+        {t('omnichat.liveCall.elapsed', { time })}
+      </span>
     </div>
   );
 }

@@ -54,12 +54,15 @@ describe('LiveCallControls', () => {
         muted: false,
       },
     });
+    const hangUp = screen.getByRole('button', { name: 'End the call with Sadie' });
+    expect(screen.getByRole('timer')).toHaveTextContent('Call time 1:02');
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(
-      screen.getByRole('button', { name: /end the call with sadie, 1:03/i })
-    ).toHaveTextContent('1:03');
+    // A focused control whose name changes is read out again. The time moves
+    // on; the button's name does not.
+    expect(hangUp).toHaveAccessibleName('End the call with Sadie');
+    expect(screen.getByRole('timer')).toHaveTextContent('Call time 1:03');
   });
 
   it('mutes from the button to the left, and hangs up from the live icon', () => {
