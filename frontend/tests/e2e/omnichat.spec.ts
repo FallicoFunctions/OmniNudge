@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route, type WebSocketRoute } from '@playwright/test';
 
 type MockPersona = {
   id: number;
@@ -133,40 +133,20 @@ async function installOmniChatApi(page: Page) {
     messagesByConversationId: {} as Record<number, MockMessage[]>,
   };
 
-  await page.addInitScript(() => {
-    class MockWebSocket {
-      static CONNECTING = 0;
-      static OPEN = 1;
-      static CLOSING = 2;
-      static CLOSED = 3;
-
-      readyState = MockWebSocket.OPEN;
-      onopen: ((event: Event) => void) | null = null;
-      onmessage: ((event: MessageEvent) => void) | null = null;
-      onclose: ((event: Event) => void) | null = null;
-      onerror: ((event: Event) => void) | null = null;
-
-      constructor() {
-        window.setTimeout(() => {
-          this.onopen?.(new Event('open'));
-        }, 0);
-      }
-
-      send() {}
-
-      close() {
-        this.readyState = MockWebSocket.CLOSED;
-        this.onclose?.(new Event('close'));
-      }
-
-      addEventListener() {}
-
-      removeEventListener() {}
-    }
-
-    // @ts-expect-error browser stub for deterministic e2e.
-    window.WebSocket = MockWebSocket;
+  // A reply arrives on the websocket, never in the answer to the send. The page
+  // used to get an in-page stand-in that opened and then could deliver nothing,
+  // so once sending stopped returning the reply, no reply could ever appear.
+  // Playwright plays the server end here; the page runs its real socket code.
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/api\/v1\/ws(\?|$)/, (socket) => {
+    sockets.push(socket);
+    socket.onClose(() => {
+      sockets.splice(sockets.indexOf(socket), 1);
+    });
   });
+  const pushToSockets = (event: { type: string; payload: unknown }) => {
+    for (const socket of sockets) socket.send(JSON.stringify(event));
+  };
 
   await page.route('http://localhost:8080/api/v1/**', async (route) => {
     const request = route.request();
@@ -396,6 +376,14 @@ async function installOmniChatApi(page: Page) {
       const conversationId = Number(messageMatch[1]);
       const payload = JSON.parse(request.postData() ?? '{}') as { content?: string };
       const conversation = state.conversations.find((entry) => entry.id === conversationId);
+      const userMessage: MockMessage = {
+        id: state.nextMessageId++,
+        conversation_id: conversationId,
+        role: 'user',
+        content: payload.content ?? '',
+        failed: false,
+        created_at: now,
+      };
       const assistantMessage: MockMessage = {
         id: state.nextMessageId++,
         conversation_id: conversationId,
@@ -406,21 +394,17 @@ async function installOmniChatApi(page: Page) {
       };
       state.messagesByConversationId[conversationId] = [
         ...(state.messagesByConversationId[conversationId] ?? []),
-        {
-          id: state.nextMessageId++,
-          conversation_id: conversationId,
-          role: 'user',
-          content: payload.content ?? '',
-          failed: false,
-          created_at: now,
-        },
+        userMessage,
         assistantMessage,
       ];
       if (conversation) {
         conversation.last_message_preview = assistantMessage.content;
         conversation.last_message_at = now;
       }
-      await fulfillJson(route, assistantMessage);
+      // As the real server answers: the turn is accepted, and the reply follows
+      // on the socket once it is written.
+      await fulfillJson(route, { accepted: true, user_message: userMessage });
+      pushToSockets({ type: 'omnichat_message_complete', payload: assistantMessage });
       return;
     }
 
