@@ -18,8 +18,12 @@ probe=frontend/src/__ci_typecheck_probe__.ts
 trap 'rm -f "$probe"' EXIT
 printf "export const probe: number = 'not a number';\n" >"$probe"
 
+# A tally, printed either way: a bare exit code cannot be told apart from a
+# test that could not run, and the review hook reads "N failed".
 if (cd frontend && eval "$cmd") >/dev/null 2>&1; then
   echo "FAIL: CI's type check ($cmd) passed a file with a type error"
+  echo "1 failed"
   exit 1
 fi
 echo "ok: CI's type check ($cmd) refuses a type error"
+echo "0 failed"

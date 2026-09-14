@@ -240,7 +240,7 @@
             "patch": ".review/controls/hang-up-name-changes-every-second.patch",
             "runner": "vitest",
             "tests": [
-              "frontend/src/components/omnichat/__tests__/LiveCallControls.test.tsx -t 'counts up from when the phone was pressed'"
+              "src/components/omnichat/__tests__/LiveCallControls.test.tsx -t 'counts up from when the phone was pressed'"
             ],
             "observed": "With the patch (time back in the label and in en.json): the test fails. Without: passes."
           }
