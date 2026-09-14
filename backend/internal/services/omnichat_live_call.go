@@ -643,7 +643,14 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 		case geminilive.EventGoAway:
 			zlog.Info().Int("conversation_id", plan.ConversationID).Str("time_left", event.TimeLeft).Msg("omnichat live call: provider rotating the connection")
 		case geminilive.EventUsage:
-			zlog.Debug().Int("conversation_id", plan.ConversationID).Int("total_tokens", event.Usage.TotalTokenCount).Msg("omnichat live call: usage")
+			// The cost log for pricing a minute: what Live says it used, by modality.
+			zlog.Info().Int("conversation_id", plan.ConversationID).
+				Int("prompt_tokens", event.Usage.PromptTokenCount).
+				Int("response_tokens", event.Usage.ResponseTokenCount).
+				Int("total_tokens", event.Usage.TotalTokenCount).
+				Interface("prompt_by_modality", event.Usage.PromptTokensDetails).
+				Interface("response_by_modality", event.Usage.ResponseTokensDetails).
+				Msg("omnichat live call: usage")
 		}
 		if sendErr != nil {
 			// The browser is gone; that is a hang-up.

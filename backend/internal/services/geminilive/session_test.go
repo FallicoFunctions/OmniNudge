@@ -74,7 +74,9 @@ func TestDial_SendsSetupAndKeyHeader(t *testing.T) {
 		`"handle":"handle-1"`,
 		`"inputAudioTranscription":{}`,
 		`"outputAudioTranscription":{}`,
-		`"slidingWindow":{}`,
+		// Bounded, because every turn re-bills the whole context.
+		`"slidingWindow":{"targetTokens":10000}`,
+		`"triggerTokens":20000`,
 		`"responseModalities":["AUDIO"]`,
 	} {
 		if !strings.Contains(string(raw), want) {

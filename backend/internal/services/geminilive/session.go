@@ -139,6 +139,16 @@ func Dial(ctx context.Context, cfg Config) (*Session, error) {
 	return s, nil
 }
 
+// Live bills the whole context again on every turn, and audio adds about
+// 3,400 tokens a minute. Left at the default, a long call's later turns cost
+// more than the minute is sold for. Compressing at 20k down to 10k holds each
+// turn to a few cents; the system instruction (about 2.6k) is always kept, and
+// older conversation stays reachable through recall_memory.
+const (
+	compressionTriggerTokens = 20_000
+	compressionTargetTokens  = 10_000
+)
+
 func buildSetup(cfg Config) *setupMessage {
 	model := cfg.Model
 	if !strings.HasPrefix(model, "models/") {
@@ -151,8 +161,11 @@ func buildSetup(cfg Config) *setupMessage {
 		OutputAudioTranscription: &struct{}{},
 		// Without compression an audio session ends at 15 minutes; with it the
 		// oldest turns fall away and the call carries on.
-		ContextWindowCompression: &contextCompression{},
-		SessionResumption:        &sessionResumptionCfg{Handle: cfg.ResumeHandle},
+		ContextWindowCompression: &contextCompression{
+			TriggerTokens: compressionTriggerTokens,
+			SlidingWindow: slidingWindow{TargetTokens: compressionTargetTokens},
+		},
+		SessionResumption: &sessionResumptionCfg{Handle: cfg.ResumeHandle},
 	}
 	if cfg.Voice != "" {
 		setup.GenerationConfig.SpeechConfig = &speechConfig{VoiceConfig: voiceConfig{PrebuiltVoiceConfig: prebuiltVoice{VoiceName: cfg.Voice}}}

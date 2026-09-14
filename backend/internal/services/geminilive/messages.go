@@ -61,7 +61,12 @@ type FunctionDeclaration struct {
 }
 
 type contextCompression struct {
-	SlidingWindow struct{} `json:"slidingWindow"`
+	TriggerTokens int64         `json:"triggerTokens,omitempty"`
+	SlidingWindow slidingWindow `json:"slidingWindow"`
+}
+
+type slidingWindow struct {
+	TargetTokens int64 `json:"targetTokens,omitempty"`
 }
 
 type sessionResumptionCfg struct {
@@ -146,4 +151,14 @@ type Usage struct {
 	PromptTokenCount   int `json:"promptTokenCount"`
 	ResponseTokenCount int `json:"responseTokenCount"`
 	TotalTokenCount    int `json:"totalTokenCount"`
+	// Audio in, audio out and text are priced differently, so the totals
+	// alone cannot say what a call cost.
+	PromptTokensDetails   []ModalityTokens `json:"promptTokensDetails"`
+	ResponseTokensDetails []ModalityTokens `json:"responseTokensDetails"`
+}
+
+// ModalityTokens is one modality's share of a usage count.
+type ModalityTokens struct {
+	Modality   string `json:"modality"`
+	TokenCount int    `json:"tokenCount"`
 }

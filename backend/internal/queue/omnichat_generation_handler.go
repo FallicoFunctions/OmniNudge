@@ -590,6 +590,11 @@ func (h *OmniChatGenerationHandler) runProviderPhase(ctx context.Context, job *m
 			return nil, permanentGenerationFailure("provider_result_invalid", errors.New("RunPod returned no job status"))
 		}
 		if status.Status == runpod.StatusCompleted {
+			// RunPod bills the seconds a worker spends on the job; this is
+			// the cost log for pricing a render.
+			zlog.Info().Str("generation_id", job.ID.String()).Str("endpoint_id", phase.spec.EndpointID).
+				Int64("delay_ms", status.DelayTimeMS).Int64("execution_ms", status.ExecutionTime).
+				Msg("omnichat generation: runpod job completed")
 			providerCompleted = true
 			break
 		}

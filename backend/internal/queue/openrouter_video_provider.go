@@ -8,6 +8,7 @@ import (
 
 	"github.com/omninudge/backend/internal/services/openrouter"
 	"github.com/omninudge/backend/internal/services/runpod"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // OpenRouterVideoProvider animates stills through OpenRouter, wearing the same
@@ -136,6 +137,12 @@ func (p *OpenRouterVideoProvider) Result(ctx context.Context, endpointID, jobID 
 		// changed underneath us. Fail loudly rather than store an empty asset.
 		return nil, errors.New("openrouter video: completed with no video url")
 	}
+	// The cost log for pricing a clip.
+	logged := zlog.Info().Str("job_id", jobID).Str("model", strings.TrimSpace(endpointID))
+	if status.Usage != nil && status.Usage.Cost != nil {
+		logged = logged.Float64("cost_usd", *status.Usage.Cost)
+	}
+	logged.Msg("openrouter video: clip completed")
 	return &runpod.Result{
 		Video:   &runpod.MediaFile{URL: status.UnsignedURLs[0], ContentType: "video/mp4"},
 		ModelID: strings.TrimSpace(endpointID),
