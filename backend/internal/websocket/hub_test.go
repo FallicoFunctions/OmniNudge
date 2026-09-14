@@ -100,11 +100,21 @@ func TestHubBroadcastFeatureFlagUpdate_FansOutToAllConnectedClients(t *testing.T
 func waitForClosedChannel(t *testing.T, ch <-chan *Message) {
 	t.Helper()
 
-	select {
-	case _, ok := <-ch:
-		require.False(t, ok)
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for channel to close")
+	// Reads past whatever is still queued. The hub announces a new user to
+	// everyone else only after it has sent that user its initial state, so a
+	// test that waited for the initial state and then drained the others can
+	// still find a presence event arrive before the close. Taking that event
+	// for the close failed 278 runs in 500.
+	deadline := time.After(time.Second)
+	for {
+		select {
+		case _, ok := <-ch:
+			if !ok {
+				return
+			}
+		case <-deadline:
+			t.Fatal("timed out waiting for channel to close")
+		}
 	}
 }
 
