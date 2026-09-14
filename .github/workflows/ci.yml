@@ -18,7 +18,10 @@ jobs:
   backend:
     name: Backend (Go)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The unit tests alone take about 21 minutes (race detector, -p 1). With
+    # Dependabot running a dozen pull requests at once the runners slow down, and
+    # 45 minutes cancelled whole runs before any test could fail.
+    timeout-minutes: 60
 
     services:
       postgres:
