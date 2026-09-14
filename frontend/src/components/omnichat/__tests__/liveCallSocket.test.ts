@@ -104,6 +104,24 @@ describe('openLiveCallSocket', () => {
     expect(handlers.onClose).toHaveBeenCalledWith({ code: 1011, reason: 'The call dropped', clean: true });
   });
 
+  it('passes a pause and a resume through, and asks to resume only while open', async () => {
+    const { pending, handlers, socket } = open();
+    await vi.waitFor(() => expect(socket()).toBeDefined());
+    socket().open();
+    const call = await pending;
+
+    socket().onmessage?.({ data: '{"type":"paused"}' });
+    socket().onmessage?.({ data: '{"type":"resumed"}' });
+    const events: LiveCallSocketEvent[] = handlers.onEvent.mock.calls.map(([event]) => event);
+    expect(events).toEqual([{ type: 'paused' }, { type: 'resumed' }]);
+
+    call.resume();
+    expect(socket().sent).toEqual(['{"type":"resume"}']);
+    socket().readyState = WebSocket.CLOSED;
+    call.resume();
+    expect(socket().sent).toHaveLength(1);
+  });
+
   it('rejects when the server refuses the socket', async () => {
     const { pending, handlers, socket } = open();
     await vi.waitFor(() => expect(socket()).toBeDefined());

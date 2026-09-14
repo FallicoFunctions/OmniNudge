@@ -9,7 +9,10 @@ export type LiveCallSocketEvent =
   | { type: 'heard'; text: string }
   | { type: 'said'; text: string }
   | { type: 'interrupted' }
-  | { type: 'turn_complete' };
+  | { type: 'turn_complete' }
+  // A minute could not be paid: nothing crosses the call until it is.
+  | { type: 'paused' }
+  | { type: 'resumed' };
 
 export type LiveCallSocketClose = { code: number; reason: string; clean: boolean };
 
@@ -21,6 +24,8 @@ export type LiveCallSocketHandlers = {
 
 export type LiveCallSocket = {
   sendAudio: (pcm: ArrayBuffer) => void;
+  /** Asks the server to pay for a minute and carry on after a pause. */
+  resume: () => void;
   close: () => void;
 };
 
@@ -55,6 +60,8 @@ function parseEvent(data: string): LiveCallSocketEvent | null {
       return typeof text === 'string' ? { type, text } : null;
     case 'interrupted':
     case 'turn_complete':
+    case 'paused':
+    case 'resumed':
       return { type };
     default:
       return null;
@@ -94,6 +101,9 @@ export async function openLiveCallSocket(
           if (socket.readyState !== WebSocket.OPEN) return;
           if (socket.bufferedAmount > MAX_BUFFERED_BYTES) return;
           socket.send(pcm);
+        },
+        resume: () => {
+          if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'resume' }));
         },
         close: () => {
           if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {

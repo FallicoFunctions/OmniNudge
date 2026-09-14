@@ -28,6 +28,28 @@ describe('Modal', () => {
     returnTarget.remove();
   });
 
+  // A dialog opened over the call screen has to sit above it. Two z- classes on
+  // one element are settled by the stylesheet's order, so the layer replaces
+  // the default rather than joining it.
+  it('takes its stacking layer from its own prop', () => {
+    const { unmount } = render(
+      <Modal isOpen ariaLabelledBy="default-layer-title">
+        <h2 id="default-layer-title">Default layer</h2>
+      </Modal>
+    );
+    expect(screen.getByRole('dialog').parentElement).toHaveClass('z-50');
+    unmount();
+
+    render(
+      <Modal isOpen layerClassName="z-[110]" ariaLabelledBy="raised-layer-title">
+        <h2 id="raised-layer-title">Raised layer</h2>
+      </Modal>
+    );
+    const overlay = screen.getByRole('dialog').parentElement;
+    expect(overlay).toHaveClass('z-[110]');
+    expect(overlay).not.toHaveClass('z-50');
+  });
+
   it('does not animate when animation is disabled', () => {
     render(
       <Modal isOpen animation="none" ariaLabelledBy="static-modal-title">

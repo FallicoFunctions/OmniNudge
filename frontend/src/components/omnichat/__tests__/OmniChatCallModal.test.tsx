@@ -59,7 +59,7 @@ vi.mock('../OmniChatSpeakButton', () => ({
 // The live connection and its audio, with a hand on each end: what the
 // microphone produces, what the socket delivers, and when she starts and stops.
 const live = vi.hoisted(() => ({
-  socket: { sendAudio: vi.fn(), close: vi.fn() },
+  socket: { sendAudio: vi.fn(), close: vi.fn(), resume: vi.fn() },
   capture: { stop: vi.fn() },
   player: { enqueue: vi.fn(), clear: vi.fn(), isPlaying: vi.fn(() => false) },
   handlers: null as null | LiveCallSocketHandlers,
@@ -622,6 +622,80 @@ describe('OmniChatCallModal', () => {
       await waitFor(() => expect(live.onChunk).not.toBeNull());
       return view;
     };
+
+    const renderVoiceCallWith = async (
+      props: Partial<Parameters<typeof OmniChatCallModal>[0]> = {}
+    ) => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+      const view = render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+          {...props}
+        />
+      );
+      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalledWith('call-1', expect.anything()), {
+        timeout: 3000,
+      });
+      await waitFor(() => expect(live.onChunk).not.toBeNull());
+      return view;
+    };
+
+    // Out of credits is a pause, not a hang-up: her voice stops at once, and
+    // buying credits happens over the call rather than instead of it.
+    it('pauses when a minute cannot be paid, and buying credits keeps the call', async () => {
+      const onBuyCredits = vi.fn();
+      const onClose = vi.fn();
+      const view = await renderVoiceCallWith({ onBuyCredits, onClose });
+      act(() => live.onPlaying?.(true));
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
+
+      expect(screen.getByTestId('omnichat-call-paused')).toHaveTextContent(/out of omnicredits/i);
+      expect(screen.getByText('Paused')).toBeInTheDocument();
+      expect(live.player.clear).toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Buy credits' }));
+      expect(onBuyCredits).toHaveBeenCalledOnce();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(live.socket.close).not.toHaveBeenCalled();
+      view.unmount();
+    });
+
+    it('carries on after Continue, and says so when the credits are still missing', async () => {
+      const view = await renderVoiceCallWith({ onBuyCredits: vi.fn() });
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      expect(live.socket.resume).toHaveBeenCalledOnce();
+      expect(screen.getByRole('button', { name: 'Checking…' })).toBeDisabled();
+
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
+      expect(screen.getByTestId('omnichat-call-paused')).toHaveTextContent(/still not enough credits/i);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      act(() => live.handlers?.onEvent({ type: 'resumed' }));
+      expect(screen.queryByTestId('omnichat-call-paused')).toBeNull();
+      expect(screen.getByText('Listening…')).toBeInTheDocument();
+
+      // A later pause is a new one, not a repeat of the refusal.
+      act(() => live.handlers?.onEvent({ type: 'paused' }));
+      expect(screen.getByTestId('omnichat-call-paused')).not.toHaveTextContent(/still not enough/i);
+      view.unmount();
+    });
+
+    // The focus trap listens on the whole document, so Escape pressed to close
+    // the credits screen would otherwise end the call behind it.
+    it('leaves Escape to the dialog open over the call', async () => {
+      const onClose = vi.fn();
+      const view = await renderVoiceCallWith({ onClose, suspended: true });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(omnichatService.endCall).not.toHaveBeenCalled();
+      view.unmount();
+    });
 
     // Pressing the phone is the whole of it: the microphone opens, the live
     // connection opens, and she is heard and heard back with nothing else

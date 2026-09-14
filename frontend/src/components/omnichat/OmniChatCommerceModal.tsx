@@ -15,6 +15,8 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (url: string) => void;
+  /** Opened from inside a call, so it has to sit above the call screen. */
+  aboveCall?: boolean;
 };
 
 export function formatOmniChatOfferPrice(offer: OmniChatBillingOffer, locale: string): string {
@@ -32,6 +34,7 @@ export default function OmniChatCommerceModal({
   isOpen,
   onClose,
   onNavigate = (url) => window.location.assign(url),
+  aboveCall = false,
 }: Props) {
   const { t, i18n } = useTranslation();
   const [checkoutError, setCheckoutError] = useState('');
@@ -110,6 +113,8 @@ export default function OmniChatCommerceModal({
       ariaLabelledBy="omnichat-commerce-title"
       ariaDescribedBy={`${descriptionId} ${statusId}`}
       overlayClassName="bg-black/80 backdrop-blur-md"
+      // The call screen is z-[100]; a paused call sends people here to buy.
+      layerClassName={aboveCall ? 'z-[110]' : undefined}
       className="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-[#11131b] text-white shadow-2xl"
       animation="quick-chat"
     >

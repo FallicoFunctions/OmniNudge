@@ -78,6 +78,8 @@ export default function OmniChatCallModal({
   onClose,
   onAssistant,
   onPaymentRequired,
+  onBuyCredits,
+  suspended = false,
 }: {
   persona: BotPersona;
   conversationId: number;
@@ -85,6 +87,14 @@ export default function OmniChatCallModal({
   onClose: () => void;
   onAssistant: (message: BotMessage) => void;
   onPaymentRequired?: () => void;
+  /** Opens the credits screen over a paused call, without ending it. */
+  onBuyCredits?: () => void;
+  /**
+   * Another dialog is open over the call. Its keys are not the call's: the
+   * trap listens on the whole document, so Escape meant for the credits screen
+   * would otherwise end the call behind it.
+   */
+  suspended?: boolean;
 }) {
   const [listeningNotice, setListeningNotice] = useState('');
   // A call listens by itself. Pressing the phone is what starts it, and she
@@ -96,7 +106,7 @@ export default function OmniChatCallModal({
   // loop wearing the costume of a feature.
   const autoListenBlockedRef = useRef(false);
   const [status, setStatus] = useState<
-    'connecting' | 'ready' | 'listening' | 'thinking' | 'speaking' | 'error'
+    'connecting' | 'ready' | 'listening' | 'thinking' | 'speaking' | 'paused' | 'error'
   >('connecting');
   const [transcript, setTranscript] = useState('');
   const [manualText, setManualText] = useState('');
@@ -136,7 +146,7 @@ export default function OmniChatCallModal({
   onCloseRef.current = onClose;
   onPaymentRequiredRef.current = onPaymentRequired;
   const dialogRef = useDialogFocus({
-    isActive: true,
+    isActive: !suspended,
     onEscape: () => {
       void endCall();
     },
@@ -554,16 +564,35 @@ export default function OmniChatCallModal({
 
   // A voice call is one live connection: the caller and she are heard as they
   // speak, so there is no turn to record, transcribe and send.
-  useLiveVoiceCall({
+  // Continue asks the server to pay for a minute. A pause that comes back
+  // while it is asking means the credits are still not there.
+  const [resumeAsked, setResumeAskedState] = useState(false);
+  const [resumeRefused, setResumeRefused] = useState(false);
+  const resumeAskedRef = useRef(false);
+  const setResumeAsked = (asked: boolean) => {
+    resumeAskedRef.current = asked;
+    setResumeAskedState(asked);
+  };
+  const { resume } = useLiveVoiceCall({
     callId: mode === 'voice' ? liveCallId : null,
     microphone: mode === 'voice' && microphoneReady ? microphoneRef.current : null,
     muted: !handsFree,
-    onState: setStatus,
+    onState: (state) => {
+      if (state !== 'paused') {
+        setResumeAsked(false);
+        setResumeRefused(false);
+      }
+      setStatus(state);
+    },
     onHeard: setTranscript,
     onFailed: (message) => {
       if (closedRef.current) return;
       setStartFailure(message);
       setStatus('error');
+    },
+    onPaused: () => {
+      setResumeRefused(resumeAskedRef.current);
+      setResumeAsked(false);
     },
   });
 
@@ -597,6 +626,8 @@ export default function OmniChatCallModal({
             ? 'Thinking…'
             : status === 'speaking'
               ? 'Speaking'
+              : status === 'paused'
+                ? 'Paused'
               : status === 'listening'
                 ? 'Listening…'
                 : status === 'error'
@@ -690,6 +721,43 @@ export default function OmniChatCallModal({
             >
               {listeningNotice}
             </p>
+          )}
+          {status === 'paused' && (
+            <div
+              role="alert"
+              data-testid="omnichat-call-paused"
+              className="mb-5 rounded-2xl bg-amber-500/15 px-4 py-4 text-center text-sm text-amber-100 backdrop-blur"
+            >
+              <p className="font-semibold">Out of OmniCredits</p>
+              <p className="mt-1 text-amber-100/80">
+                {resumeRefused
+                  ? 'There are still not enough credits for the next minute.'
+                  : 'The call is paused and nothing is being charged. Add credits to carry on, or end the call.'}
+              </p>
+              <div className="mt-3 flex justify-center gap-3">
+                {onBuyCredits && (
+                  <button
+                    type="button"
+                    onClick={onBuyCredits}
+                    className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black"
+                  >
+                    Buy credits
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={resumeAsked}
+                  onClick={() => {
+                    setResumeRefused(false);
+                    setResumeAsked(true);
+                    resume();
+                  }}
+                  className="rounded-full bg-white/15 px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {resumeAsked ? 'Checking…' : 'Continue'}
+                </button>
+              </div>
+            </div>
           )}
           {status === 'error' && (
             <p

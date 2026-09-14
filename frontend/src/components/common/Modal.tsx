@@ -7,6 +7,12 @@ type ModalProps = {
   onClose?: () => void;
   children: ReactNode;
   overlayClassName?: string;
+  /**
+   * The overlay's stacking layer. Its own prop rather than a class passed in
+   * overlayClassName, where two z- classes on one element are settled by the
+   * stylesheet's order, not by which was written last.
+   */
+  layerClassName?: string;
   className?: string;
   closeOnOverlayClick?: boolean;
   ariaLabelledBy?: string;
@@ -21,6 +27,7 @@ export function Modal({
   onClose,
   children,
   overlayClassName = 'bg-black/50', // Standard 50% overlay darkness (MODAL-2)
+  layerClassName = 'z-50',
   className = '',
   closeOnOverlayClick = false,
   ariaLabelledBy,
@@ -43,7 +50,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center px-4 ${overlayClassName} ${overlayAnimationClass}`}
+      className={`fixed inset-0 ${layerClassName} flex items-center justify-center px-4 ${overlayClassName} ${overlayAnimationClass}`}
       style={animation === 'default' ? { animation: 'fadeIn 150ms ease-out' } : undefined}
       onClick={
         closeOnOverlayClick
