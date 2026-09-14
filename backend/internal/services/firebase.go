@@ -20,7 +20,7 @@ func NewFirebaseService(credentialsPath string) (*FirebaseService, error) {
 	ctx := context.Background()
 
 	// Initialize Firebase app with service account
-	opt := option.WithCredentialsFile(credentialsPath)
+	opt := option.WithAuthCredentialsFile(option.ServiceAccount, credentialsPath)
 	app, err := firebase.NewApp(ctx, nil, opt)
 	if err != nil {
 		return nil, err
