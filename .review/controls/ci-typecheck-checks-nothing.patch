@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 8f24f006e..067124d04 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -170,7 +170,7 @@ jobs:
+         # -b, not --noEmit: the root tsconfig lists no files and only points at
+         # the real configs, so --noEmit checked an empty project and passed
+         # every run, type errors and all.
+-        run: npx tsc -b
++        run: npx tsc --noEmit
+ 
+       - name: Lint
+         working-directory: frontend

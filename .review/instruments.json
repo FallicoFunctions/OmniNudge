@@ -193,6 +193,12 @@
    "name": "Does anything start before the decision that governs it?",
    "trigger": "work is kicked off early to save time -- a prefetch, a stream, a subscription, a goroutine",
    "asks": "Find every side effect started before a later branch decides whether it was wanted, and ask what happens on the branch that did not want it. Cancelling afterwards is not enough when the side effect is not undoable. A call started its sentence playback at the top of the turn, to overlap synthesis with generation; the choice of whether the AVATAR speaks the reply is made further down, after the reply arrives -- so in video mode she was heard twice, once from the local speaker and once from the avatar's stream, half a beat apart, and the cancel that followed could not unsay the words already spoken. Speech, sends, writes and payments are all in this class: pull the decision earlier, or do not start early on that branch."
+  },
+  {
+   "id": "G3",
+   "name": "Does the guard refuse a known-bad input?",
+   "trigger": "a check, guard, CI step or hook exists to refuse something",
+   "asks": "Feed it the thing it exists to refuse, and require it to refuse. A guard can be wired in, run on every push, and check nothing: CI's 'TypeScript type check' ran `tsc --noEmit` against a root tsconfig with \"files\": [], so it checked an empty project and passed every run for months, type errors and all. It was found by adding a file containing `const x: number = 'a'` and running CI's exact command: exit 0. G2 asks whether anything runs the guard; this asks whether the guard, when it runs, sees anything. Take the command from where it really runs (the workflow file, the hook), not from memory, and keep the known-bad probe as a test so a later edit cannot blind it again."
   }
  ],
  "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

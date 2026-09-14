@@ -1,0 +1,429 @@
+{
+  "schema_version": 2,
+  "head": "64f583d18",
+  "base": "c7191c885",
+  "scope": {
+    "files": [
+      ".github/workflows/ci.yml",
+      ".github/dependabot.yml",
+      ".gitignore",
+      "frontend/.husky/pre-commit",
+      "scripts/ci-checks-on-staged.sh",
+      "scripts/ci-checks-on-staged.test.sh",
+      "scripts/ci-typecheck.test.sh",
+      "frontend/src/components/omnichat/OmniChatCallProvider.tsx",
+      "frontend/src/components/omnichat/LiveCallControls.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatCallProvider.test.tsx",
+      "frontend/src/components/omnichat/__tests__/LiveCallControls.test.tsx",
+      "frontend/public/locales/en.json",
+      "backend (27 lint fixes across 13 files)",
+      "frontend/src (prettier, 34 files)"
+    ],
+    "boundaries": [
+      "commit -> pre-commit hook -> CI's tools",
+      "push -> GitHub CI required checks",
+      "Dependabot -> grouped pull requests",
+      "provider -> server call + microphone + live connection",
+      "controls -> screen reader"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/ecca4eb66.json",
+    ".review/f6fa4f256.json",
+    ".review/19353074d.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Unreviewed since c7191c885: the pre-commit gate (7da801bc4), prettier on 34 files (817ad1895), Dependabot security groups (ea6701bdd), 27 lint fixes (3334fd174), .husky ignore (3cabf4c87), all pushed; and Phase B1, the call provider and controls (b4bc4902f)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "ecca4eb66 covered the relay's typed text; f6fa4f256 the credits screen's loading state. Neither covered CI, the hook or the provider."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or request body built."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed LiveCallControls for two inputs (not muted across one tick, muted). The hang-up button's accessible name read 'End the call with Sadie, 0:05' then '..., 0:06': a focused control renamed every second. Finding hang-up-name-changes-every-second."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "en.json omnichat.liveCall keys resolve in the printed markup ('Mute the microphone', 'End the call with Sadie')."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The provider hands useLiveVoiceCall the callId and microphone it resolved (provider test asserts both)."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The gate and CI run the same tools: golangci-lint v2.12.2, gofmt -l, prettier with CI's glob, and now eslint and tsc -b."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Dependabot accepted the new config: all 15 'Dependabot Updates' runs on the push succeeded and rebased the groups (#67 replaced by #82)."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field crossing a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The gate's fixtures are real files in the tree the tools read, not stubbed tool output."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The hook already ran the artifact guard and i18n; the gate joins them in the same hook."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Each gate branch reached by a test case (gofmt, golangci-lint, missing linter, prettier, nothing staged)."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A missing golangci-lint refuses the commit rather than skipping (test case)."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The gate reuses CI's commands, not a second definition of them."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "CI's required 'Frontend (TypeScript)' job runs prettier, tsc and eslint; the gate mirrored only prettier. Finding gate-mirrors-only-prettier. Backend: go vet is covered by golangci-lint's default govet; tests and builds stay in CI."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine; the provider's concurrency is its start epoch, tested (a call arriving after hang-up is ended)."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Provider teardown releases the microphone, ends the server call and refreshes the chat; unmounting hangs up (tests)."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls, each diff limited to its fix; all fail as tests."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The hook calls the gate (asserted in the gate's test); the hook file is tracked and no ignore rule matches it now (git check-ignore --no-index)."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint 0, prettier clean; provider + controls 16/16; gate test 10/10; ci-typecheck test ok; golangci-lint 0 issues; backend touched packages ok; Go suite 42/42 and vitest 984/1 skipped before these commits."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "G3 added to instruments.json: CI's type check was found by a technique no row named (feed the guard what it must refuse)."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "CI on the pushed main: 'Frontend (TypeScript)' now passes (it failed on every Dependabot PR), 'Migration rollback safety' passes; 'Backend (Go)' still running at ledger time. The provider is not reachable in the app until Phase B2 wires it; unverified in a real call until then."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The provider opens the microphone and starts the server call together inside the press; a start that loses the race to a hang-up releases the microphone and ends the call."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed CI's frontend type check a file with `const x: number = 'a'`: its exact command `npx tsc --noEmit` exited 0; the root tsconfig has \"files\": []. Finding ci-typecheck-checks-nothing. The gate's own checks each refuse a known-bad fixture (10 cases)."
+        }
+      ],
+      "findings": [
+        {
+          "id": "ci-typecheck-checks-nothing",
+          "summary": "CI's frontend type check ran `tsc --noEmit` against a root tsconfig with no files, so it passed every run while checking nothing.",
+          "found_by": "G3",
+          "fix_commit": "1c8e1e0e1",
+          "control": {
+            "patch": ".review/controls/ci-typecheck-checks-nothing.patch",
+            "runner": "bash",
+            "tests": [
+              "scripts/ci-typecheck.test.sh"
+            ],
+            "observed": "With the patch: FAIL, CI's type check (npx tsc --noEmit) passed a file with a type error. Without: ok."
+          }
+        },
+        {
+          "id": "gate-mirrors-only-prettier",
+          "summary": "The pre-commit gate mirrored only prettier from CI's required frontend job, not its lint or type check.",
+          "found_by": "E6",
+          "fix_commit": "9edf382fe",
+          "control": {
+            "patch": ".review/controls/gate-mirrors-only-prettier.patch",
+            "runner": "bash",
+            "tests": [
+              "scripts/ci-checks-on-staged.test.sh"
+            ],
+            "observed": "With the patch: 8 passed, 2 failed (the eslint and type-error cases). Without: 10 passed."
+          }
+        },
+        {
+          "id": "hang-up-name-changes-every-second",
+          "summary": "The hang-up button's accessible name carried the call time, so a focused button was read out again every second.",
+          "found_by": "B2",
+          "fix_commit": "64f583d18",
+          "control": {
+            "patch": ".review/controls/hang-up-name-changes-every-second.patch",
+            "runner": "vitest",
+            "tests": [
+              "frontend/src/components/omnichat/__tests__/LiveCallControls.test.tsx -t 'counts up from when the phone was pressed'"
+            ],
+            "observed": "With the patch (time back in the label and in en.json): the test fails. Without: passes."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass-1 fixes: ci.yml tsc -b (1c8e1e0e1), gate eslint + tsc -b (9edf382fe), static hang-up name + timer (64f583d18)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Pass 1 of this ledger."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the fixed controls across a tick: names 'Mute the microphone | End the call with Sadie' unchanged; timer 'Call time 0:05' -> '0:06'; visible time aria-hidden."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The credits button's name holds the balance; it changes only when the balance does, which is news, not a per-second tick. Considered, not changed."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Controls replayed by hand: ci-typecheck test fails on --noEmit; gate test 8 passed, 2 failed without the block; controls test fails with the time back in the name."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Gate test 10/10, ci-typecheck test ok, controls + provider 16/16, prettier/eslint clean."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Pushed with this ledger so CI runs tsc -b for real; result read after the push."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "The pass-1 fixes do not touch this axis."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "CI's backend 'Check formatting' step exits 1 when gofmt -l lists a file: a real check. The gate's tsc -b ran on the controls commit itself and passed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ok; tsc -b 0",
+    "vet": "golangci-lint 0 issues (includes govet)",
+    "lint": "eslint 0; prettier clean",
+    "types": "tsc -b 0",
+    "tests": "gate 10/10, ci-typecheck ok, provider + controls 16/16; full suites passed before these commits"
+  }
+}
