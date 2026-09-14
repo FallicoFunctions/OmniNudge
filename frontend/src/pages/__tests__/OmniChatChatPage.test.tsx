@@ -423,7 +423,7 @@ describe('OmniChatChatPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /scene video/i }));
 
     expect(await screen.findByRole('heading', { name: /unlock scene video/i })).toBeInTheDocument();
-    expect(screen.getByText(/video requires omnicredits/i)).toBeInTheDocument();
+    expect(screen.getByText(/this needs omnicredits/i)).toBeInTheDocument();
   });
 
   it('replays a failed scene-generation request when the user chooses Retry', async () => {
