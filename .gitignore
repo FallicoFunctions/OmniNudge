@@ -73,7 +73,6 @@ Firebase_Cloud_Messaging_API.txt
 
 # Additional config files
 .golangci.yml
-.husky/
 COMPLETE_PHASE_0_SETUP_SCRIPT.sh
 PHASE_0_VERIFICATION_SQL.sql
 
