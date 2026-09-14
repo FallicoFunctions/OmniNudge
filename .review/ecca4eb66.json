@@ -1,0 +1,380 @@
+{
+  "schema_version": 2,
+  "head": "c20f01c5b",
+  "base": "ecca4eb66",
+  "scope": {
+    "files": [
+      "backend/internal/services/omnichat_live_call.go",
+      "backend/internal/services/omnichat_live_call_test.go",
+      "backend/internal/handlers/omnichat_live_call.go",
+      "backend/internal/handlers/omnichat_live_call_test.go"
+    ],
+    "boundaries": [
+      "browser -> relay: the typed-text control",
+      "relay -> browser: the saved event",
+      "relay -> Gemini Live: realtimeInput text",
+      "relay -> bot_messages: call turns with via_call"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/f6fa4f256.json",
+    ".review/19353074d.json",
+    ".review/0c0038fc6.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Phase A2 (5ad1b5d7e): relay saves call turns via CreateCallMessage, sends 'saved' after each save, takes a 'text' control into SendText; the socket handler caps typed text at the chat's 4000 runes."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "f6fa4f256 added via_call and CreateCallMessage (this builds on it); 19353074d/0c0038fc6 shaped the control branch this extends (resume throttle, paused gating)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The frames: control {type:'text', text} decoded into LiveCallControl.Text; event {type:'saved'} via WriteJSON; Live receives realtimeInput.text from SendText."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed; the browser does not send text or read 'saved' until Phase C."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No HTTP body changed; socket frames covered under B1."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Printed the saved turns for two interleavings: typed after she finished (one turn, correct) and typed while she was talking. The second saved [{heard:'wait, where are you?', said:'Good, thanks.At the harbour.'}]: typed words ahead of her earlier reply, two replies run together. Finding typed-text-joins-turn-in-progress. TestSaveCallTurn_KeepsBothHalvesAsMessages asserts every saved call message has ViaCall."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "LiveCallControlText='text', LiveCallEventSaved='saved'; the browser's parseEvent ignores unknown events until Phase C adds them."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "LiveCallControl gains Text `json:\"text,omitempty\"`, decoded by the handler's json.Unmarshal into the same struct."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule implemented twice; the message limit stays in the handlers package."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "B5: Live answers realtimeInput text aloud, and sends no input transcript for it, so the relay must record typed text itself, as it does."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "LiveCallSession gained SendText: geminilive.Session has the same method; both test fakes implement it."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The fake session records the text the relay passes to SendText, the production call."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "4000 two-byte characters accepted (TestAcceptLiveCallControl)."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "4001 characters refused; a control with no type refused."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Blank and whitespace-only typed text is not a turn; text is trimmed."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Typed text follows the paused rule spoken audio already had: dropped while unpaid."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the text control reached by a test: blank, paused, sent, sent mid-turn."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A SendText failure is logged and the text is not saved as heard, rather than saved as something she never received."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The 4000 limit reuses maxOmniChatMessageRunes, not a copy."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Spoken barge-in cannot mis-order: Live ends her turn with interrupted + turn_complete. Only typed text arrives outside Live's turn boundaries."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race on TestRunLiveCall_*: ok."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "A save that fails is logged and sends no 'saved', so the chat is never told a turn exists that does not."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The deferred save after a hang-up still saves; its 'saved' send to a closed peer is ignored."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "typed-text-joins-turn-in-progress: patch removes the save before typed text; the new test fails with the run-together turn."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, vet services/handlers/geminilive, gofmt clean; relay, SaveCallTurn and handler LiveCall tests pass."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by B4, a listed instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Real Live session, production SendText: 'Where are you right now?' answered aloud, first audio after 688ms, 13 chunks, said 'I'm just on the phone with you.'; no input transcript for typed text. Probe deleted."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        }
+      ],
+      "findings": [
+        {
+          "id": "typed-text-joins-turn-in-progress",
+          "summary": "Text typed while she was talking joined the turn in progress, so it was saved ahead of her earlier words and her two replies ran together.",
+          "found_by": "B4",
+          "fix_commit": "c20f01c5b",
+          "control": {
+            "patch": ".review/controls/typed-text-joins-turn-in-progress.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services -run TestRunLiveCall_TypingWhileSheTalksKeepsTheOrder"
+            ],
+            "observed": "With the patch: one saved turn {heard:'wait, where are you?', said:'Good, thanks.At the harbour.'}. Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass-1 fix c20f01c5b: save() the turn in progress before typed text joins heard."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Pass 1 of this ledger."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The saved turns for the mid-turn case now read [{'', 'Good, thanks.'}, {'wait, where are you?', 'At the harbour.'}]; the after-her-turn case is unchanged (TestRunLiveCall_TypedTextIsATurnSheAnswers)."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "save() with an empty turn returns at once, so typing twice in a row saves nothing extra."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "save() is now called from the control branch and the turn-complete branch, both on the relay's one goroutine."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "-race on TestRunLiveCall_* after the fix: ok."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control built and replayed by hand."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Relay, SaveCallTurn and handler tests pass; -race ok."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model input changed since the pass-1 probe."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "The pass-1 fix is one save() before typed text; nothing on this axis changed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "services, handlers, geminilive ok; gofmt clean",
+    "lint": "no frontend change",
+    "types": "no frontend change",
+    "tests": "relay + SaveCallTurn + handler LiveCall ok, -race ok; real Live typed-text probe answered aloud; full suites not run"
+  }
+}
