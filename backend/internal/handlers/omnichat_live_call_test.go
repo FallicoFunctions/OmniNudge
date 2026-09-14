@@ -157,6 +157,25 @@ func (f *liveCallChatFake) snapshot() (prepared, finished []int, saved []string)
 	return append([]int(nil), f.prepared...), append([]int(nil), f.finished...), append([]string(nil), f.saved...)
 }
 
+// Typed call text is held to the chat box's own limit, counted in
+// characters rather than bytes.
+func TestAcceptLiveCallControl(t *testing.T) {
+	atLimit := make([]rune, maxOmniChatMessageRunes)
+	for i := range atLimit {
+		atLimit[i] = 'é' // two bytes, one character
+	}
+	overLimit := make([]byte, maxOmniChatMessageRunes+1)
+	for i := range overLimit {
+		overLimit[i] = 'a'
+	}
+
+	require.True(t, acceptLiveCallControl(services.LiveCallControl{Type: services.LiveCallControlText, Text: string(atLimit)}))
+	require.False(t, acceptLiveCallControl(services.LiveCallControl{Type: services.LiveCallControlText, Text: string(overLimit)}))
+	require.False(t, acceptLiveCallControl(services.LiveCallControl{Text: "no type"}))
+	require.True(t, acceptLiveCallControl(services.LiveCallControl{Type: services.LiveCallControlResume, Text: string(overLimit)}),
+		"only typed text is held to the message limit")
+}
+
 type handlerLiveSession struct {
 	events chan geminilive.Event
 	mu     sync.Mutex
@@ -170,6 +189,7 @@ func (s *handlerLiveSession) SendAudio(pcm []byte) error {
 	s.audio = append(s.audio, pcm)
 	return nil
 }
+func (s *handlerLiveSession) SendText(string) error                            { return nil }
 func (s *handlerLiveSession) RespondToTool(geminilive.FunctionCall, any) error { return nil }
 func (s *handlerLiveSession) Close() error                                     { return nil }
 func (s *handlerLiveSession) Err() error                                       { return nil }

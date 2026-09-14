@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -248,7 +249,7 @@ func (s *liveCallSocket) readLoop() {
 			}
 		case kind == ws.TextMessage:
 			var control services.LiveCallControl
-			if json.Unmarshal(data, &control) != nil || control.Type == "" {
+			if json.Unmarshal(data, &control) != nil || !acceptLiveCallControl(control) {
 				continue
 			}
 			// A control queue that is full is one the relay has not read; a
@@ -259,6 +260,16 @@ func (s *liveCallSocket) readLoop() {
 			}
 		}
 	}
+}
+
+// acceptLiveCallControl refuses what the chat box would refuse: typed text
+// past the message limit never reaches her.
+func acceptLiveCallControl(control services.LiveCallControl) bool {
+	if control.Type == "" {
+		return false
+	}
+	return control.Type != services.LiveCallControlText ||
+		utf8.RuneCountInString(control.Text) <= maxOmniChatMessageRunes
 }
 
 func (s *liveCallSocket) Audio() <-chan []byte { return s.audio }

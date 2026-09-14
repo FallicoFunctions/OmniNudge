@@ -23,6 +23,7 @@ type fakeLiveSession struct {
 	audio     [][]byte
 	responses []map[string]any
 	answered  []string
+	texts     []string
 	closed    bool
 }
 
@@ -36,6 +37,17 @@ func (f *fakeLiveSession) SendAudio(pcm []byte) error {
 	defer f.mu.Unlock()
 	f.audio = append(f.audio, pcm)
 	return nil
+}
+func (f *fakeLiveSession) SendText(text string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.texts = append(f.texts, text)
+	return nil
+}
+func (f *fakeLiveSession) sentTexts() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.texts...)
 }
 func (f *fakeLiveSession) RespondToTool(call geminilive.FunctionCall, response any) error {
 	f.mu.Lock()
@@ -422,8 +434,45 @@ func TestRunLiveCall_RelaysBothWaysAndSavesEachTurn(t *testing.T) {
 	require.Equal(t, []savedTurn{{"How are you?", "Good, thanks."}, {"", "Oh, and"}}, turns.savedTurns(),
 		"each turn is saved once, and an interrupted one keeps what she actually said")
 	require.Equal(t, [][]byte{{9}}, peer.audio)
-	require.Equal(t, []string{"heard", "heard", "said", "said", "turn_complete", "said", "interrupted", "turn_complete"}, peer.eventTypes())
+	require.Equal(t, []string{"heard", "heard", "said", "said", "saved", "turn_complete", "said", "interrupted", "saved", "turn_complete"}, peer.eventTypes(),
+		"the chat hears each turn is saved before the turn is over")
 	require.True(t, session.closed)
+}
+
+// Typing is another way to take a turn: the words reach her, she answers
+// aloud, and what was typed is kept with that turn. While a minute is unpaid
+// the typed words go nowhere, as spoken ones do.
+func TestRunLiveCall_TypedTextIsATurnSheAnswers(t *testing.T) {
+	session, peer, turns := newFakeLiveSession(), newFakeLivePeer(), &fakeLiveTurns{}
+	dial, _ := dialOnce(session)
+	done := runLiveCallAsync(t, context.Background(), dial, peer, turns)
+
+	peer.controls <- LiveCallControl{Type: LiveCallControlText, Text: "  where are you?  "}
+	peer.controls <- LiveCallControl{Type: LiveCallControlText, Text: "   "}
+	waitFor(t, "the typed words to reach her", func() bool { return len(session.sentTexts()) == 1 })
+	session.events <- geminilive.Event{Kind: geminilive.EventOutputTranscript, Text: "At the harbour."}
+	session.events <- geminilive.Event{Kind: geminilive.EventTurnComplete}
+	waitFor(t, "the turn to be saved", func() bool { return len(turns.savedTurns()) == 1 })
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+
+	require.Equal(t, []string{"where are you?"}, session.sentTexts(), "trimmed, and blank text is not a turn")
+	require.Equal(t, []savedTurn{{"where are you?", "At the harbour."}}, turns.savedTurns())
+}
+
+func TestRunLiveCall_TypedTextWhileUnpaidReachesNobody(t *testing.T) {
+	withShortCallTimes(t, time.Hour, time.Minute)
+	meter := &fakeMeter{refuse: true}
+	session, peer := newFakeLiveSession(), newFakeLivePeer()
+	dial, _ := dialOnce(session)
+	done := runLiveCallBilled(t, dial, peer, LiveCallBilling{Meter: meter, StartedAt: time.Now()})
+
+	waitFor(t, "the pause", func() bool { return slices.Contains(peer.eventTypes(), LiveCallEventPaused) })
+	peer.controls <- LiveCallControl{Type: LiveCallControlText, Text: "hello?"}
+	time.Sleep(50 * time.Millisecond)
+	close(peer.audioIn)
+	require.NoError(t, <-done)
+	require.Empty(t, session.sentTexts())
 }
 
 func TestRunLiveCall_HangingUpMidTurnKeepsWhatWasSaid(t *testing.T) {
@@ -608,6 +657,7 @@ func TestSaveCallTurn_KeepsBothHalvesAsMessages(t *testing.T) {
 	got := make([]string, 0, len(history))
 	for _, m := range history {
 		got = append(got, m.Role+": "+m.Content)
+		require.True(t, m.ViaCall, "%q was said on a call and is not marked as such", m.Content)
 	}
 	require.Equal(t, []string{"user: How are you?", "assistant: Good, thanks.", "assistant: Oh, and"}, got)
 	require.ErrorIs(t, f.service.SaveCallTurn(ctx, f.userID+1000, f.conversation.ID, "hi", ""), ErrNotFound)

@@ -247,12 +247,12 @@ func (s *ChatbotService) SaveCallTurn(ctx context.Context, userID, conversationI
 		return ErrNotFound
 	}
 	if heard != "" {
-		if _, err := s.messageRepo.Create(ctx, conversationID, models.BotMessageRoleUser, heard, false); err != nil {
+		if _, err := s.messageRepo.CreateCallMessage(ctx, conversationID, models.BotMessageRoleUser, heard); err != nil {
 			return fmt.Errorf("chatbot: save call turn: %w", err)
 		}
 	}
 	if said != "" {
-		if _, err := s.messageRepo.Create(ctx, conversationID, models.BotMessageRoleAssistant, said, false); err != nil {
+		if _, err := s.messageRepo.CreateCallMessage(ctx, conversationID, models.BotMessageRoleAssistant, said); err != nil {
 			return fmt.Errorf("chatbot: save call reply: %w", err)
 		}
 	}
@@ -322,6 +322,8 @@ func GeminiLiveDialer(apiKey, model string) func(plan *LiveCallPlan) LiveCallDia
 type LiveCallSession interface {
 	Events() <-chan geminilive.Event
 	SendAudio(pcm []byte) error
+	// SendText is the caller typing instead of speaking; she answers aloud.
+	SendText(text string) error
 	RespondToTool(call geminilive.FunctionCall, response any) error
 	Close() error
 	Err() error
@@ -348,6 +350,7 @@ type LiveCallEvent struct {
 // LiveCallControl is a request from the browser, sent as a JSON text frame.
 type LiveCallControl struct {
 	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
 }
 
 const (
@@ -359,10 +362,15 @@ const (
 	// call in either direction until it is.
 	LiveCallEventPaused  = "paused"
 	LiveCallEventResumed = "resumed"
+	// LiveCallEventSaved says a turn is now in the conversation, so the chat
+	// can show it while the call goes on.
+	LiveCallEventSaved = "saved"
 
 	// LiveCallControlResume asks to pay for a minute and carry on, typically
 	// after the caller has bought credits.
 	LiveCallControlResume = "resume"
+	// LiveCallControlText is the caller typing instead of speaking.
+	LiveCallControlText = "text"
 )
 
 // LiveCallMeter charges a call by the minute. Minutes are numbered from one,
@@ -532,6 +540,9 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 		defer done()
 		if err := turns.SaveCallTurn(saveCtx, userID, plan.ConversationID, heard.String(), said.String()); err != nil {
 			zlog.Error().Err(err).Int("conversation_id", plan.ConversationID).Msg("omnichat live call: failed to save a turn")
+		} else {
+			// After a hang-up nobody is listening, and that is fine.
+			_ = peer.SendEvent(LiveCallEvent{Type: LiveCallEventSaved})
 		}
 		heard.Reset()
 		said.Reset()
@@ -554,6 +565,23 @@ func RunLiveCall(ctx context.Context, userID int, plan *LiveCallPlan, dial LiveC
 		case control, ok := <-controls:
 			if !ok {
 				controls = nil
+				continue
+			}
+			if control.Type == LiveCallControlText {
+				// Typed while unpaid reaches nobody, as spoken words do.
+				text := strings.TrimSpace(control.Text)
+				if text == "" || paused.Load() {
+					continue
+				}
+				if err := current().SendText(text); err != nil {
+					zlog.Warn().Err(err).Int("conversation_id", plan.ConversationID).Msg("omnichat live call: typed text not delivered")
+					continue
+				}
+				// Kept with the turn she answers, as the spoken half is.
+				if heard.Len() > 0 {
+					heard.WriteString(" ")
+				}
+				heard.WriteString(text)
 				continue
 			}
 			// A resume while the call is paid for would charge a minute that
