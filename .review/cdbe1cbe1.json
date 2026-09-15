@@ -1,0 +1,451 @@
+{
+ "schema_version": 2,
+ "head": "86f0e9f54",
+ "base": "cdbe1cbe1",
+ "scope": {
+  "files": [
+   "frontend/src/components/settings/EncryptionSettings.tsx",
+   "frontend/src/components/settings/__tests__/EncryptionSettings.test.tsx",
+   "frontend/src/pages/SettingsPage.tsx",
+   "frontend/src/components/keys/KeySetupScreen.tsx",
+   "frontend/public/locales/en.json"
+  ],
+  "boundaries": [
+   "GET /auth/key-backup",
+   "accountKeysService replace functions",
+   "AuthContext setAppPassword",
+   "en.json keys"
+  ]
+ },
+ "prior_ledgers_read": [
+  "3a35eb5e4",
+  "1cc82cad7",
+  "dbb370ff8"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "EncryptionSettings (new phrase with the password or the current phrase, shown in RecoveryPhraseStep and saved after three words; app password for an account with no password), an encryption tab in SettingsPage mounted only while open, normalizePhrase exported from KeySetupScreen, keys.settings strings and the tab label."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "3a35eb5e4 (K4e-3a: save before held, fixed), 1cc82cad7, dbb370ff8."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Calls printed through the mocks: replacePhraseWithPassword with the typed password; replacePhraseWithPhrase and setAppPassword with the phrase lower-cased and single-spaced; save() only after the words are typed back."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered for a password account (password field, no app section), an account with no password (phrase fields and the app section) and an old-scheme account (sign in again)."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.settings and settings.tabs.encryption key exists; i18n check passes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The tab reads auth_scheme and has_password from the key backup, as the server sets them."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "normalizePhrase lives once and is imported; the phrase step is the same component as on the gate."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The key backup fixtures follow the server shapes (has_password always sent)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The right password, a phrase with extra spaces and capitals, and a matching app password all work."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password shows its message and no phrase; a mismatched app password is refused before any call."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty secrets keep the start buttons disabled."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling screens compared: like the gate it disables buttons while busy and shows alerts; like the export form it uses the page's input and button classes."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: unavailable, password, phrase, pending, saved, failed save, cancel, app password added and refused."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure shows an alert; a failed load says to reload."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The minimum length is 8 here as in AuthContext and the offer; classes defined once in the file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a message that promises what a failed request did not know': checked every alert text in keys.settings; only saveFailed claimed a state."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Component state only."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Half-way failure of save(): a lost response can leave the server holding the new copy, but the failed-save view said the old phrase still worked and offered Cancel, which would drop the only phrase that opened the copy (k4e3b-failed-save-drops-phrase)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Leaving the tab unmounts it and drops a phrase never saved; the old copy stays."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest 3 files, 39 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "F2 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing is sent until the user submits; the copy waits for save()."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "The tab bar is flex flex-wrap gap-2, so the sixth pill wraps to a new row on a narrow screen instead of overflowing."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the full run."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: Settings 'Make a new recovery phrase' requires the current password; the app password stays available for an account with no password. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One tab; busy disables repeat submits."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer; the tab renders in the page flow."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4e3b-failed-save-drops-phrase",
+     "summary": "After a failed save the tab said the old phrase still worked and offered Cancel, though the save may have reached the server, leaving only the new phrase able to open the copy.",
+     "found_by": "F2",
+     "fix_commit": "86f0e9f54",
+     "control": {
+      "patch": ".review/controls/k4e3b-failed-save-drops-phrase.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/settings/__tests__/EncryptionSettings.test.tsx -t 'save again'"
+      ],
+      "observed": "FAIL: the cancel button is present after a failed save"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "EncryptionSettings (new phrase with the password or the current phrase, shown in RecoveryPhraseStep and saved after three words; app password for an account with no password), an encryption tab in SettingsPage mounted only while open, normalizePhrase exported from KeySetupScreen, keys.settings strings and the tab label."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "3a35eb5e4 (K4e-3a: save before held, fixed), 1cc82cad7, dbb370ff8."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Calls printed through the mocks: replacePhraseWithPassword with the typed password; replacePhraseWithPhrase and setAppPassword with the phrase lower-cased and single-spaced; save() only after the words are typed back."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered for a password account (password field, no app section), an account with no password (phrase fields and the app section) and an old-scheme account (sign in again)."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.settings and settings.tabs.encryption key exists; i18n check passes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The tab reads auth_scheme and has_password from the key backup, as the server sets them."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "normalizePhrase lives once and is imported; the phrase step is the same component as on the gate."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The key backup fixtures follow the server shapes (has_password always sent)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The right password, a phrase with extra spaces and capitals, and a matching app password all work."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password shows its message and no phrase; a mismatched app password is refused before any call."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty secrets keep the start buttons disabled."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling screens compared: like the gate it disables buttons while busy and shows alerts; like the export form it uses the page's input and button classes."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: unavailable, password, phrase, pending, saved, failed save, cancel, app password added and refused."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure shows an alert; a failed load says to reload."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The minimum length is 8 here as in AuthContext and the offer; classes defined once in the file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a message that promises what a failed request did not know': checked every alert text in keys.settings; only saveFailed claimed a state."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Component state only."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Pass 2: after a failed save the only way out is save again, and the text says to keep both phrases."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Leaving the tab unmounts it and drops a phrase never saved; the old copy stays."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Cancel restored in the failed-save view from 86f0e9f54: the failed-save test fails, the cancel button is present."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest 3 files, 39 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing is sent until the user submits; the copy waits for save()."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "The tab bar is flex flex-wrap gap-2, so the sixth pill wraps to a new row on a narrow screen instead of overflowing."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the full run."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: Settings 'Make a new recovery phrase' requires the current password; the app password stays available for an account with no password. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One tab; busy disables repeat submits."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer; the tab renders in the page flow."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest 3 files, 39 passed, 0 failed, 0 skipped"
+ }
+}

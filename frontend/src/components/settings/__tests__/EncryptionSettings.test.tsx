@@ -91,7 +91,7 @@ describe('a new recovery phrase', () => {
     expect(screen.queryByText('keys.phrase.title')).toBeNull();
   });
 
-  it('offers to save again when the save fails, keeping the old phrase until then', async () => {
+  it('offers only a save again when the save fails, since it may have reached the server', async () => {
     const save = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
     vi.mocked(replacePhraseWithPassword).mockResolvedValue({ phrase: NEW_PHRASE, save });
     await renderWith(passwordAccount);

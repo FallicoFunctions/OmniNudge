@@ -1,0 +1,14 @@
+diff --git a/frontend/src/components/settings/EncryptionSettings.tsx b/frontend/src/components/settings/EncryptionSettings.tsx
+index a8d33ae2e..f523ab6f1 100644
+--- a/frontend/src/components/settings/EncryptionSettings.tsx
++++ b/frontend/src/components/settings/EncryptionSettings.tsx
+@@ -173,6 +173,9 @@ function NewPhraseSection({ backup }: { backup: KeyBackup }) {
+         >
+           {busy ? t('keys.working') : t('keys.settings.retry')}
+         </button>
++        <button type="button" onClick={() => setPending(null)} className={textButtonClass}>
++          {t('keys.settings.cancel')}
++        </button>
+       </section>
+     );
+   }
