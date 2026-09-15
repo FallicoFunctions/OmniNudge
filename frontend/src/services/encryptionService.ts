@@ -27,10 +27,14 @@ export const encryptionService = {
   },
 
   /**
-   * Upload encrypted private key to server for cross-browser sync
+   * Upload encrypted private key to server for cross-browser sync. loginKey
+   * proves the account, as the recovery copy's upload does.
    */
-  async uploadEncryptedPrivateKey(encryptedPrivateKey: string): Promise<void> {
-    await api.put('/auth/encrypted-private-key', { encrypted_private_key: encryptedPrivateKey });
+  async uploadEncryptedPrivateKey(encryptedPrivateKey: string, loginKey?: string): Promise<void> {
+    await api.put('/auth/encrypted-private-key', {
+      encrypted_private_key: encryptedPrivateKey,
+      ...(loginKey ? { login_key: loginKey } : {}),
+    });
   },
 
   /**
