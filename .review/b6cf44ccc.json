@@ -1,0 +1,202 @@
+{
+  "schema_version": 2,
+  "head": "206f93ca2",
+  "base": "b6cf44ccc",
+  "scope": {
+    "files": [
+      "frontend/src/components/messages/MessageEditMode.tsx",
+      "frontend/src/components/reddit/RedditPostCard.tsx",
+      "frontend/src/pages/RedditWikiPage.tsx",
+      "frontend/src/pages/SubredditPage.tsx"
+    ],
+    "boundaries": [
+      "component -> React Compiler (eslint-plugin-react-hooks 7.1.1 rules)",
+      "RedditPostCard -> rendered video preview"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/c7191c885.json",
+    ".review/ecca4eb66.json",
+    ".review/f6fa4f256.json"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Phase L1 (206f93ca2): MessageEditMode, RedditPostCard, RedditWikiPage, SubredditPage; the 9 of 24 eslint-plugin-react-hooks 7.1.1 findings in those files."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No earlier ledger names these files (grep of .review/*.json); c7191c885 added G3, used below."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed RedditPostCard for an HLS post and an MP4 post, closed and open, from the L1 file and from b6cf44ccc: identical, 8771 bytes each. Open HLS renders <video>; open MP4 renders <video><source src=.../DASH_480.mp4>. The video memo and reset-effect moves changed nothing on screen. Throwaway deleted."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "SubredditPage's customStart/customEnd read timeOptions.startDate/endDate: useTimeRangeFilter memoizes timeOptions and they are ISO strings (lines 36-43), so the hoisted values are stable primitives and the memo does not recompute per render."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "RedditWikiPage's merged guard (activeTab !== 'view' || !requestedRevisionId) returns null in exactly the cases the two original early returns did."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "SubredditPage filters by custom range only when both ends exist, as before (customStart && customEnd replaces the timeRange === 'custom' && start && end check)."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every fix follows the compiler's stated cause; no eslint-disable anywhere."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The RedditPostCard reset effect is reached when the preview closes; every other video effect returns early exactly then, so moving it above attemptAutoplay cannot change what runs."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The same memo shape elsewhere is what the 7.1.1 lint run lists: 5 more in L2's two files, 10 in the call screen after B2. No other file has it (the run covered the whole frontend in CI's #88)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no fix to control."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "Not on this axis: L1 is four behaviour-preserving component fixes, no boundary data, persistence or model."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; prettier clean; eslint with the committed 7.0.1 clean (pre-commit gate) and with 7.1.1 0 in these files; RedditPostCard, RedditWikiPage, SubredditPage tests 8/8. Stop hook passes from frontend/ with 7.0.1 restored."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "No model or provider output. The rendered artifact was compared directly (B2) instead."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The video memo moved above toggleInlinePreview uses only the post prop and the module constant PREFER_HLS; tsc -b confirms nothing it reads is declared below it."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Confirmed the fixes against the rule that exists to refuse them: with eslint-plugin-react-hooks 7.1.1 the four files report 0 (from 9). An experiment on a backup separated line 567 from lines 831-832 before fixing either."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b 0",
+    "vet": "n/a (frontend)",
+    "lint": "eslint 0 with 7.0.1 (committed) and 0 with 7.1.1 in the four files",
+    "types": "tsc -b 0",
+    "tests": "RedditPostCard, RedditWikiPage, SubredditPage 8/8; full suites not run"
+  }
+}
