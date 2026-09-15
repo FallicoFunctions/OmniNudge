@@ -7,26 +7,17 @@ import (
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSQLInjectionPrevention tests that SQL injection attempts are safely handled
 func TestSQLInjectionPrevention(t *testing.T) {
-	// Setup test database
-	// Setup test database using DSN string
-	dsn := "postgres://omnin_test:test1234@localhost:5432/omninudge_test?sslmode=disable"
-	db, err := database.New(dsn)
-	if err != nil {
-		t.Skip("Database not available for SQL injection tests")
-		return
-	}
-	defer db.Close()
-
 	ctx := context.Background()
-
-	// Run migrations
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
 
 	// Test 1: SQL injection in username search
 	t.Run("Username SQL Injection", func(t *testing.T) {
@@ -37,8 +28,8 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		user, err := userRepo.GetByUsername(ctx, maliciousUsername)
 
-		// Should NOT find a user (parameterized queries prevent injection)
-		assert.Error(t, err, "SQL injection attempt should not succeed")
+		// Not found is (nil, nil); an injected OR would have returned a user.
+		assert.NoError(t, err)
 		assert.Nil(t, user, "Should not return a user for SQL injection attempt")
 	})
 
@@ -56,12 +47,8 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// The query should safely handle the input
 		// Either return empty results or error, but NOT execute the DROP
-		if err != nil {
-			assert.NotContains(t, err.Error(), "table \"users\" does not exist",
-				"SQL injection should not have executed DROP TABLE")
-		} else {
-			assert.NotNil(t, comments, "Query should complete safely")
-		}
+		assert.NoError(t, err)
+		assert.Empty(t, comments)
 
 		// Verify users table still exists
 		var count int
@@ -78,8 +65,8 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		hub, err := hubRepo.GetByName(ctx, maliciousHubName)
 
-		// Should safely return no hub
-		assert.Error(t, err, "SQL injection attempt should not succeed")
+		// Not found is (nil, nil).
+		assert.NoError(t, err)
 		assert.Nil(t, hub, "Should not return a hub for SQL injection attempt")
 	})
 
@@ -135,7 +122,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		userRepo := models.NewUserRepository(db.Pool)
 
 		// Create user with malicious bio
-		maliciousBio := "'; DROP TABLE posts; --"
+		maliciousBio := "'; DROP TABLE platform_posts; --"
 
 		// Create a test user
 		user := &models.User{
@@ -154,7 +141,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Verify posts table still exists
 		var count int
-		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM posts").Scan(&count)
+		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM platform_posts").Scan(&count)
 		assert.NoError(t, err, "Posts table should still exist")
 
 		// Cleanup
