@@ -41,7 +41,8 @@ export function MessageEditMode({
   const [content, setContent] = useState(initialContent);
   const [localSaving, setLocalSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(Date.now());
+  // A function, so the clock is read once on mount rather than on every render.
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   // Fix 2: auto-focus textarea and place cursor at end on mount
   useEffect(() => {

@@ -317,10 +317,11 @@ export default function RedditPage() {
     [hiddenLocalPostsData]
   );
 
+  const localPosts = localPostsData?.posts;
   const visibleLocalPosts = useMemo(() => {
-    if (!localPostsData?.posts) return [];
-    return localPostsData.posts.filter((post) => !hiddenLocalPostIds.has(post.id));
-  }, [localPostsData?.posts, hiddenLocalPostIds]);
+    if (!localPosts) return [];
+    return localPosts.filter((post) => !hiddenLocalPostIds.has(post.id));
+  }, [localPosts, hiddenLocalPostIds]);
 
   const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
@@ -329,33 +330,35 @@ export default function RedditPage() {
     [savedRedditPostsData]
   );
 
+  // Plain values, read once: the memo depends on exactly what it uses, and a
+  // fresh object here would recompute it on every render.
+  const redditPosts = data?.posts;
+  const customStart = timeOptions?.timeRange === 'custom' ? timeOptions.startDate : undefined;
+  const customEnd = timeOptions?.timeRange === 'custom' ? timeOptions.endDate : undefined;
   const filteredRedditPosts = useMemo(() => {
-    if (!data?.posts) {
+    if (!redditPosts) {
       return [];
     }
     if (!isTimedSort) {
-      return data.posts;
+      return redditPosts;
     }
-    if (timeOptions?.timeRange === 'custom' && timeOptions.startDate && timeOptions.endDate) {
-      const startMs = new Date(timeOptions.startDate).getTime();
-      const endMs = new Date(timeOptions.endDate).getTime();
-      return data.posts.filter((post) => {
+    if (customStart && customEnd) {
+      const startMs = new Date(customStart).getTime();
+      const endMs = new Date(customEnd).getTime();
+      return redditPosts.filter((post) => {
         const createdMs = post.created_utc * 1000;
         return createdMs >= startMs && createdMs <= endMs;
       });
     }
-    return data.posts;
-  }, [data?.posts, isTimedSort, timeOptions]);
+    return redditPosts;
+  }, [redditPosts, isTimedSort, customStart, customEnd]);
 
   // Filter out hidden posts
+  const hiddenRedditPosts = hiddenPostsData?.hidden_reddit_posts;
   const visiblePosts = useMemo(() => {
     if (!filteredRedditPosts.length) return [];
-    const hiddenPostIds = hiddenPostsData?.hidden_reddit_posts
-      ? new Set(
-          hiddenPostsData.hidden_reddit_posts.map((p) =>
-            getRedditPostKey(p.subreddit, p.reddit_post_id)
-          )
-        )
+    const hiddenPostIds = hiddenRedditPosts
+      ? new Set(hiddenRedditPosts.map((p) => getRedditPostKey(p.subreddit, p.reddit_post_id)))
       : null;
 
     return filteredRedditPosts.filter((post) => {
@@ -365,7 +368,7 @@ export default function RedditPage() {
       const authorKey = post.author ? post.author.toLowerCase() : '';
       return authorKey ? !blockedUsers.has(authorKey) : true;
     });
-  }, [filteredRedditPosts, hiddenPostsData?.hidden_reddit_posts, blockedUsers]);
+  }, [filteredRedditPosts, hiddenRedditPosts, blockedUsers]);
   const toggleSaveRedditPostMutation = useMutation<
     void,
     Error,

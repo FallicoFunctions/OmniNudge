@@ -431,6 +431,10 @@ function getRedditVideoSource(
   return null;
 }
 
+// Use HLS for Safari (native), Firefox, and Chrome (via HLS.js) to get audio+video
+// in one stream. A module constant, not a dependency of anything.
+const PREFER_HLS = true;
+
 export function RedditPostCard({
   post,
   useRelativeTime,
@@ -467,6 +471,10 @@ export function RedditPostCard({
       minute: '2-digit',
     });
   }, [formatDate, formatRelativeTime, post.created_utc, t, useRelativeTime]);
+
+  // Above the handlers that read it: the compiler reads the component top to
+  // bottom and cannot keep a memo that code above it already depends on.
+  const redditVideoSource = useMemo(() => getRedditVideoSource(post, PREFER_HLS), [post]);
 
   const toggleInlinePreview = async (postId: string) => {
     // For gallery posts, fetch images from API
@@ -560,9 +568,6 @@ export function RedditPostCard({
     !/Chrome|Chromium|Edg|OPR|Firefox|Android/i.test(navigator.userAgent) &&
     Boolean(document.createElement('video').canPlayType('application/vnd.apple.mpegurl'));
   const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
-  // Use HLS for Safari (native), Firefox, and Chrome (via HLS.js) to get audio+video in one stream
-  const preferHls = true;
-  const redditVideoSource = useMemo(() => getRedditVideoSource(post, preferHls), [post, preferHls]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const inlineVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -698,6 +703,19 @@ export function RedditPostCard({
     audioEl.currentTime = 0;
   };
 
+  // Before attemptAutoplay: that callback captures these refs, and the
+  // compiler treats a value handed to a hook as fixed from then on. Resetting
+  // them here, above it, is the same reset without the conflict.
+  useEffect(() => {
+    if (isInlinePreviewOpen) return;
+    autoplayRequestedRef.current = false;
+    autoplayWithSoundRef.current = false;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  }, [isInlinePreviewOpen]);
+
   const attemptAutoplay = useCallback(() => {
     if (!autoplayRequestedRef.current) return;
     const videoEl = videoRef.current;
@@ -823,16 +841,6 @@ export function RedditPostCard({
       return () => clearTimeout(timer);
     }
   }, [isInlinePreviewOpen, redditVideoSource, canNativeHls, attemptAutoplay]);
-
-  useEffect(() => {
-    if (isInlinePreviewOpen) return;
-    autoplayRequestedRef.current = false;
-    autoplayWithSoundRef.current = false;
-    const audioEl = audioRef.current;
-    if (!audioEl) return;
-    audioEl.pause();
-    audioEl.currentTime = 0;
-  }, [isInlinePreviewOpen]);
 
   useEffect(() => {
     if (!isInlinePreviewOpen || inlineMedia?.kind !== 'video') return;

@@ -148,10 +148,11 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     return processWikiContent(wikiData?.content_html);
   }, [wikiData?.content_html]);
 
+  const aboutDescriptionHtml = subredditAbout?.description_html;
   const sidebarDescriptionHtml = useMemo(() => {
-    if (!subredditAbout?.description_html) return null;
-    return sanitizeWikiHtml(subredditAbout.description_html);
-  }, [subredditAbout?.description_html]);
+    if (!aboutDescriptionHtml) return null;
+    return sanitizeWikiHtml(aboutDescriptionHtml);
+  }, [aboutDescriptionHtml]);
 
   const subredditIcon = useMemo(() => {
     if (!subredditAbout) return null;
@@ -317,26 +318,24 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     ];
   }, [currentPage, subreddit, t]);
 
+  // Read once, outside the memo: the memo then depends on exactly what it uses.
+  const requestedRevisionId = searchParams.get('revision');
+  const wikiRevisionDate = wikiData?.revision_date;
   const revisionIndicator = useMemo(() => {
-    if (activeTab !== 'view') {
+    if (activeTab !== 'view' || !requestedRevisionId) {
       return null;
     }
 
-    const revisionId = searchParams.get('revision');
-    if (!revisionId) {
-      return null;
-    }
-
-    const revision = revisionsList.find((rev) => rev.id === revisionId);
+    const revision = revisionsList.find((rev) => rev.id === requestedRevisionId);
     if (revision) {
       return formatRelativeTime(new Date(revision.timestamp * 1000));
     }
 
-    if (typeof wikiData?.revision_date === 'number') {
-      return formatRelativeTime(new Date(wikiData.revision_date * 1000));
+    if (typeof wikiRevisionDate === 'number') {
+      return formatRelativeTime(new Date(wikiRevisionDate * 1000));
     }
     return null;
-  }, [activeTab, revisionsList, searchParams, wikiData?.revision_date, formatRelativeTime]);
+  }, [activeTab, requestedRevisionId, revisionsList, wikiRevisionDate, formatRelativeTime]);
 
   const isCurrentLoading =
     activeTab === 'view'
