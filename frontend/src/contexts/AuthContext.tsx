@@ -87,6 +87,18 @@ async function deviceHoldsAccountKey(account: User): Promise<boolean> {
   );
 }
 
+// An account made outside this app (in OmniRave, say) signs in with no key pair
+// at all: no public key and neither copy. It has no messages to lose, so its
+// first sign-in here makes its keys and phrase, as sign-up does, instead of
+// warning that old messages will be gone.
+async function neverHadKeys(account: User): Promise<boolean> {
+  if (account.public_key) {
+    return false;
+  }
+  const backup = await api.get<KeyBackup>('/auth/key-backup');
+  return !backup.encrypted_private_key && !backup.recovery_wrapped_private_key;
+}
+
 // Decides the key step after sign-in, sign-up, provider sign-in, or an app
 // open with a session still live. It never makes keys unless the account has
 // none to recover: a new account, or a provider account with no recovery copy.
@@ -101,6 +113,9 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
       (await unlockAfterSignIn(held.keys, account.public_key)) === 'unlocked'
     ) {
       return { status: { state: 'ready' }, held };
+    }
+    if (await neverHadKeys(account)) {
+      return { status: phraseShown(await createAccountKeys(held.keys)), held };
     }
     const backup = await api.get<KeyBackup>('/auth/key-backup');
     return {
@@ -117,6 +132,13 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
           held: { kind: 'login-key', keys: moved.keys },
         };
       }
+    }
+    if (await neverHadKeys(account)) {
+      const keys = await moveWithoutKey(held.password);
+      return {
+        status: phraseShown(await createAccountKeys(keys)),
+        held: { kind: 'login-key', keys },
+      };
     }
     // No key the browser can export: the only way on is a fresh start.
     return { status: { state: 'needs-recovery', hasRecoveryCopy: false }, held };

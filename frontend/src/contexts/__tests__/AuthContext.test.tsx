@@ -54,7 +54,7 @@ const backup = (fields: Record<string, unknown>) => ({
 
 // The session check on app open answers with a signed-out session unless a
 // test says otherwise.
-function server(answers: { me?: unknown; backup?: unknown }) {
+function server(answers: { me?: unknown; backup?: unknown; user?: unknown }) {
   mocks.get.mockImplementation(async (path: string) => {
     if (path === '/auth/me') {
       if (!answers.me) throw new Error('not signed in');
@@ -64,7 +64,8 @@ function server(answers: { me?: unknown; backup?: unknown }) {
     throw new Error(`unexpected GET ${path}`);
   });
   mocks.post.mockImplementation(async (path: string) => {
-    if (path === '/auth/login' || path === '/auth/register') return { user: account };
+    if (path === '/auth/login' || path === '/auth/register')
+      return { user: answers.user ?? account };
     throw new Error(`unexpected POST ${path}`);
   });
 }
@@ -178,6 +179,49 @@ describe('sign-in', () => {
       phrase: 'fresh phrase',
       offerAppPassword: false,
     });
+  });
+});
+
+describe('an account made outside this app', () => {
+  const keyless = { ...account, public_key: undefined };
+
+  it('gets its keys and phrase at its first sign-in, with no warning about old messages', async () => {
+    server({ user: keyless, backup: backup({}) });
+    mocks.signInSecret.mockResolvedValue({ scheme: 2, login_key: 'the-login-key', keys });
+    mocks.createAccountKeys.mockResolvedValue('first phrase');
+    const { result } = await renderAuth();
+
+    await act(() => result.current.login({ username: 'raver', password: 'correct horse' }));
+    await waitFor(() => expect(result.current.keyStatus.state).toBe('show-phrase'));
+    expect(result.current.keyStatus).toMatchObject({ phrase: 'first phrase' });
+    expect(mocks.createAccountKeys).toHaveBeenCalledWith(keys);
+    expect(mocks.unlockAfterSignIn).not.toHaveBeenCalled();
+  });
+
+  it('moves an old-scheme account with no keys first, then makes them', async () => {
+    server({ user: keyless, backup: backup({ auth_scheme: 1 }) });
+    mocks.signInSecret.mockResolvedValue({ scheme: 1, password: 'correct horse' });
+    mocks.moveWithoutKey.mockResolvedValue(keys);
+    mocks.createAccountKeys.mockResolvedValue('first phrase');
+    const { result } = await renderAuth();
+
+    await act(() => result.current.login({ username: 'raver', password: 'correct horse' }));
+    await waitFor(() => expect(result.current.keyStatus.state).toBe('show-phrase'));
+    expect(mocks.moveWithoutKey).toHaveBeenCalledWith('correct horse');
+    expect(mocks.createAccountKeys).toHaveBeenCalledWith(keys);
+    expect(mocks.moveAccount).not.toHaveBeenCalled();
+  });
+
+  it('still asks for the phrase when a copy exists but no public key does', async () => {
+    server({ user: keyless, backup: backup({ recovery_wrapped_private_key: 'copy' }) });
+    mocks.signInSecret.mockResolvedValue({ scheme: 2, login_key: 'the-login-key', keys });
+    const { result } = await renderAuth();
+
+    await act(() => result.current.login({ username: 'raver', password: 'correct horse' }));
+    await waitFor(() =>
+      expect(result.current.keyStatus).toEqual({ state: 'needs-recovery', hasRecoveryCopy: true })
+    );
+    expect(mocks.createAccountKeys).not.toHaveBeenCalled();
   });
 });
 
