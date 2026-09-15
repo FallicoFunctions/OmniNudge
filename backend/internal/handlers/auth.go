@@ -671,13 +671,22 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 // @Failure      500  {object}  gin.H
 // @Router       /auth/reset-password [post]
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	// NewPassword is the old scheme. The app sends LoginKey, KDFSalt and
+	// KDFIterations derived from the new password instead.
 	var req struct {
-		Token       string `json:"token" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required,min=8"`
+		Token         string `json:"token" binding:"required"`
+		NewPassword   string `json:"new_password"`
+		LoginKey      string `json:"login_key"`
+		KDFSalt       string `json:"kdf_salt"`
+		KDFIterations int    `json:"kdf_iterations"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || (req.LoginKey == "" && len(req.NewPassword) < 8) {
 		RespondError(c, http.StatusBadRequest, "Invalid request. Password must be at least 8 characters")
+		return
+	}
+	if req.LoginKey != "" && req.NewPassword != "" {
+		RespondError(c, http.StatusBadRequest, "Send a new password or a login key, not both")
 		return
 	}
 
@@ -694,16 +703,26 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "User not found")
 		return
 	}
-
-	// Update password (hash using bcrypt)
-	hashedPassword, err := utils.HashPassword(req.NewPassword)
-	if err != nil {
-		slog.Error("failed to hash password during reset", "error", err)
-		RespondError(c, http.StatusInternalServerError, "Failed to reset password")
+	if user == nil {
+		RespondError(c, http.StatusBadRequest, "Invalid or expired reset token")
 		return
 	}
 
-	err = h.userRepo.UpdatePassword(c.Request.Context(), userID, hashedPassword)
+	if req.LoginKey != "" {
+		// The copy of the private key wrapped by the forgotten password is
+		// cleared; the app unlocks the key with the recovery phrase.
+		err = services.ResetToLoginKey(c.Request.Context(), h.userRepo, userID, req.LoginKey, req.KDFSalt, req.KDFIterations)
+		if errors.Is(err, services.ErrInvalidLoginKey) {
+			RespondError(c, http.StatusBadRequest, "Invalid login key settings")
+			return
+		}
+	} else {
+		var hashedPassword string
+		hashedPassword, err = utils.HashPassword(req.NewPassword)
+		if err == nil {
+			err = h.userRepo.UpdatePassword(c.Request.Context(), userID, hashedPassword)
+		}
+	}
 	if err != nil {
 		slog.Error("failed to update password", "error", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to reset password")

@@ -1109,9 +1109,12 @@ func (h *UsersHandler) GetMyProfile(c *gin.Context) {
 	})
 }
 
+// changePasswordRequest carries the password itself for a scheme 1 account, or
+// the login keys and the rewrapped private key for a scheme 2 account.
 type changePasswordRequest struct {
-	CurrentPassword string `json:"current_password" binding:"required"`
-	NewPassword     string `json:"new_password" binding:"required,min=8"`
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+	services.LoginKeyChangeRequest
 }
 
 // ChangePassword changes the authenticated user's password.
@@ -1133,7 +1136,7 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request. Password must be at least 8 characters")
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -1145,6 +1148,25 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	}
 	if user == nil {
 		RespondError(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	sentPassword := req.CurrentPassword != "" || req.NewPassword != ""
+	sentLoginKey := req.CurrentLoginKey != "" || req.NewLoginKey != ""
+	if user.AuthScheme == 2 {
+		if sentPassword {
+			RespondError(c, http.StatusConflict, "This account changes its password with login keys")
+			return
+		}
+		h.changeLoginKey(c, userID, &req.LoginKeyChangeRequest)
+		return
+	}
+	if sentLoginKey {
+		RespondError(c, http.StatusConflict, "Move this account to a login key before changing it with one")
+		return
+	}
+	if req.CurrentPassword == "" || len(req.NewPassword) < 8 {
+		RespondError(c, http.StatusBadRequest, "Invalid request. Password must be at least 8 characters")
 		return
 	}
 
@@ -1171,6 +1193,24 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+}
+
+// changeLoginKey is ChangePassword for a scheme 2 account.
+func (h *UsersHandler) changeLoginKey(c *gin.Context, userID int, req *services.LoginKeyChangeRequest) {
+	err := services.ChangeLoginKey(c.Request.Context(), h.userRepo, userID, req)
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+	case errors.Is(err, services.ErrCurrentPasswordIncorrect):
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
+	case errors.Is(err, services.ErrInvalidLoginKey):
+		RespondError(c, http.StatusBadRequest, "Invalid login key settings")
+	case errors.Is(err, services.ErrPrivateKeyNotRewrapped):
+		RespondError(c, http.StatusBadRequest, "The private key must be rewrapped with the new key")
+	default:
+		zlog.Error().Err(err).Int("user_id", userID).Msg("Failed to change login key")
+		RespondError(c, http.StatusInternalServerError, "Failed to update password")
+	}
 }
 
 // Ping updates the user's last_seen timestamp without fetching the profile.

@@ -299,6 +299,56 @@ func TestResetPassword_ValidToken(t *testing.T) {
 	assert.Contains(t, resp["message"], "reset")
 }
 
+// TestResetPassword_WithLoginKey resets to a login key derived from the new
+// password: the account moves to scheme 2 and the copy of the private key that
+// only the forgotten password could open is cleared.
+func TestResetPassword_WithLoginKey(t *testing.T) {
+	handler, mockEmail, db, cleanup := setupAuthHandlerForEmailTest(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	username := uniqueAuthEmailUsername("rp_key")
+	user := createVerifiedUserWithEmail(t, db, username, username+"@example.com")
+	_, err := db.Pool.Exec(ctx, `UPDATE users SET encrypted_private_key = 'copy-under-forgotten-password' WHERE id = $1`, user.ID)
+	require.NoError(t, err)
+
+	router := gin.New()
+	router.POST("/auth/forgot-password", handler.ForgotPassword)
+	router.POST("/auth/reset-password", handler.ResetPassword)
+	fpBody, _ := json.Marshal(map[string]interface{}{"username": username})
+	fpReq := httptest.NewRequest(http.MethodPost, "/auth/forgot-password", bytes.NewBuffer(fpBody))
+	fpReq.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(httptest.NewRecorder(), fpReq)
+	token := latestPasswordResetToken(t, mockEmail)
+
+	reset := func(body map[string]interface{}) *httptest.ResponseRecorder {
+		body["token"] = token
+		payload, _ := json.Marshal(body)
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/auth/reset-password", bytes.NewBuffer(payload))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
+	keyFields := func(rounds int) map[string]interface{} {
+		return map[string]interface{}{"login_key": handlerTestLoginKey, "kdf_salt": "MDEyMzQ1Njc4OWFiY2RlZg==", "kdf_iterations": rounds}
+	}
+
+	both := keyFields(600000)
+	both["new_password"] = "NewSecurePass1!"
+	assert.Equal(t, http.StatusBadRequest, reset(both).Code, "a new password or a login key, not both")
+	assert.Equal(t, http.StatusBadRequest, reset(keyFields(1000)).Code, "bad settings are refused and leave the token unused")
+
+	w := reset(keyFields(600000))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	stored, err := models.NewUserRepository(db.Pool).GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stored.AuthScheme)
+	assert.Nil(t, stored.EncryptedPrivateKey, "the copy only the forgotten password could open is cleared")
+	assert.NoError(t, services.CheckAccountSecret(stored.PasswordHash, stored.AuthScheme, "", handlerTestLoginKey))
+}
+
 // TestResetPassword_InvalidToken verifies that an unknown token returns 400.
 func TestResetPassword_InvalidToken(t *testing.T) {
 	handler, _, _, cleanup := setupAuthHandlerForEmailTest(t)
