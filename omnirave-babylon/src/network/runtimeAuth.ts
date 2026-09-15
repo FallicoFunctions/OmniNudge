@@ -10,7 +10,13 @@
 // boot quietly), these calls are direct user actions from a form submit: a
 // failure must surface a real message the popup can show, so failures throw
 // RuntimeAuthError instead.
+import { DEFAULT_KDF_ITERATIONS, deriveLoginKey, newKdfSalt } from './loginKey';
+
 const OMNIGAME_API_URL = import.meta.env.VITE_OMNIGAME_API_URL || 'http://localhost:8091/api/v1';
+
+// The same minimum the main app's sign-up checks; with a login key the server
+// never sees the password, so the client enforces it.
+const MIN_PASSWORD_LENGTH = 8;
 
 // Field names mirror model.SessionExchangeResponse (RuntimeAuthResponse is a
 // type alias of it server-side) - do not rename without checking that struct.
@@ -49,7 +55,7 @@ export interface RuntimeSignupFields {
 
 export class RuntimeAuthError extends Error {}
 
-async function postRuntimeAuth(path: string, body: unknown): Promise<RuntimeAuthSession> {
+async function requestRuntimeAuth(path: string, body: unknown): Promise<Record<string, unknown> | null> {
   let response: Response;
   try {
     response = await fetch(`${OMNIGAME_API_URL}/omnigame/runtime/auth/${path}`, {
@@ -74,7 +80,11 @@ async function postRuntimeAuth(path: string, body: unknown): Promise<RuntimeAuth
     const message = typeof data?.message === 'string' ? data.message : 'Something went wrong. Try again.';
     throw new RuntimeAuthError(message);
   }
+  return data;
+}
 
+async function postRuntimeAuth(path: string, body: unknown): Promise<RuntimeAuthSession> {
+  const data = await requestRuntimeAuth(path, body);
   if (
     !data ||
     typeof data.worldSocketUrl !== 'string' ||
@@ -109,19 +119,44 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   );
 }
 
-export function runtimeLogin(fields: RuntimeLoginFields): Promise<RuntimeAuthSession> {
+// What proves the account, as the main app's signInSecret decides it: the
+// login key for an account on the login-key scheme, the password only for one
+// still on the old scheme. A login-key answer without its settings never falls
+// back to the password.
+async function accountSecret(username: string, password: string): Promise<{ password: string } | { loginKey: string }> {
+  const pre = await requestRuntimeAuth('prelogin', { username });
+  if (pre?.scheme === 1) {
+    return { password };
+  }
+  if (pre?.scheme !== 2 || typeof pre.kdf_salt !== 'string' || typeof pre.kdf_iterations !== 'number') {
+    throw new RuntimeAuthError('Unexpected response from the server.');
+  }
+  return { loginKey: await deriveLoginKey(password, pre.kdf_salt, pre.kdf_iterations) };
+}
+
+export async function runtimeLogin(fields: RuntimeLoginFields): Promise<RuntimeAuthSession> {
+  const secret = await accountSecret(fields.username, fields.password);
   return postRuntimeAuth('login', {
     username: fields.username,
-    password: fields.password,
+    ...secret,
     currentVenue: fields.currentVenue,
     currentLoadout: fields.currentLoadout,
   });
 }
 
-export function runtimeSignup(fields: RuntimeSignupFields): Promise<RuntimeAuthSession> {
+// A new account signs in with a login key from the start: the server gets the
+// key and its settings, never the password.
+export async function runtimeSignup(fields: RuntimeSignupFields): Promise<RuntimeAuthSession> {
+  if (fields.password.length < MIN_PASSWORD_LENGTH) {
+    throw new RuntimeAuthError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+  }
+  const kdfSalt = newKdfSalt();
+  const loginKey = await deriveLoginKey(fields.password, kdfSalt, DEFAULT_KDF_ITERATIONS);
   return postRuntimeAuth('signup', {
     username: fields.username,
-    password: fields.password,
+    loginKey,
+    kdfSalt,
+    kdfIterations: DEFAULT_KDF_ITERATIONS,
     email: fields.email,
     acceptTerms: fields.acceptTerms,
     acceptPrivacyPolicy: fields.acceptPrivacyPolicy,
