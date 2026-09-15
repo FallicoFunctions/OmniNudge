@@ -87,8 +87,22 @@ func createUser(t *testing.T, repo *models.UserRepository, username string, role
 	return user
 }
 
-// newTestDeps builds all repos, services, handlers, and router
+// newTestDeps builds all repos, services, handlers, and router. The router has
+// no rate limiters, so a test can log in and send as often as it needs.
 func newTestDeps(t *testing.T) *TestDeps {
+	t.Helper()
+	return buildTestDeps(t, false)
+}
+
+// newRateLimitedTestDeps adds the auth and message-send limiters cmd/server
+// puts on those routes, counting in a memory cache of their own, for the
+// tests that exercise the limits.
+func newRateLimitedTestDeps(t *testing.T) *TestDeps {
+	t.Helper()
+	return buildTestDeps(t, true)
+}
+
+func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -163,11 +177,23 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
+	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, modRepo, hubRepo)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
 	userStatusHandler := handlers.NewUserStatusHandler(hub, db.Pool)
 	authorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
+
+	var authLimit, sendLimit []gin.HandlerFunc
+	if rateLimited {
+		limitCache := services.NewMemoryCache()
+		t.Cleanup(limitCache.Stop)
+		authLimit = []gin.HandlerFunc{middleware.AuthRateLimiter(limitCache).Middleware()}
+		sendLimit = []gin.HandlerFunc{middleware.MessageSendRateLimiter(limitCache).Middleware()}
+	}
+	limited := func(limit []gin.HandlerFunc, h gin.HandlerFunc) []gin.HandlerFunc {
+		return append(append([]gin.HandlerFunc{}, limit...), h)
+	}
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -176,8 +202,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 	{
 		auth := api.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", limited(authLimit, authHandler.Register)...)
+			auth.POST("/login", limited(authLimit, authHandler.Login)...)
 			auth.GET("/me", middleware.AuthRequired(authService), authHandler.GetMe)
 		}
 
@@ -234,8 +260,9 @@ func newTestDeps(t *testing.T) *TestDeps {
 				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)
 			}
 
-			protected.POST("/messages", messagesHandler.SendMessage)
-			protected.POST("/messages/forward", messagesHandler.ForwardMessage)
+			protected.POST("/messages", limited(sendLimit, messagesHandler.SendMessage)...)
+			protected.POST("/messages/forward", limited(sendLimit, messagesHandler.ForwardMessage)...)
+			protected.POST("/mod-mail", limited(sendLimit, modMailHandler.CreateModMail)...)
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)

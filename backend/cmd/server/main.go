@@ -921,6 +921,7 @@ func main() {
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
 	passwordResetRateLimiter := middleware.PasswordResetRateLimiter(cache)
+	messageSendRateLimiter := middleware.MessageSendRateLimiter(cache)
 	analyticsRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:analytics").FailClosed()
 	bugReportRateLimiter := middleware.NewRedisRateLimiter(cache, 5, time.Hour, "rate:bug_reports").FailClosed()
 	presenceRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:presence").FailClosed()
@@ -1592,8 +1593,8 @@ func main() {
 			protected.GET("/conversations/:id/folders", foldersHandler.GetConversationFolders)
 
 			// Protected messages routes
-			protected.POST("/messages", messagesHandler.SendMessage)
-			protected.POST("/messages/forward", messagesHandler.ForwardMessage)
+			protected.POST("/messages", messageSendRateLimiter.Middleware(), messagesHandler.SendMessage)
+			protected.POST("/messages/forward", messageSendRateLimiter.Middleware(), messagesHandler.ForwardMessage)
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.GET("/messages/:id/thread", messagesHandler.GetThread)
@@ -1649,7 +1650,7 @@ func main() {
 			protected.GET("/groups/:id/audit-log", groupAdminHandler.GetAuditLog)
 
 			// Mod mail routes
-			protected.POST("/mod-mail", modMailHandler.CreateModMail)
+			protected.POST("/mod-mail", messageSendRateLimiter.Middleware(), modMailHandler.CreateModMail)
 			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
 			protected.GET("/mod-mail/hubs/:hub_name/recipients", modMailHandler.GetModMailRecipients)
 			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)

@@ -135,7 +135,7 @@ func buildExpiredJWT(t *testing.T, secret string, userID int, username, role str
 // REST API triggers rate limiting at approximately 60 msg/min. Sends 70
 // messages rapidly and expects at least one 429 before the 70th.
 func TestWebSocketMessageRateLimit(t *testing.T) {
-	deps := newTestDeps(t)
+	deps := newRateLimitedTestDeps(t)
 	defer deps.DB.Close()
 
 	ts := httptest.NewServer(deps.Router)
@@ -178,10 +178,7 @@ func TestWebSocketMessageRateLimit(t *testing.T) {
 		}
 	}
 
-	if rateLimitedAt == 0 {
-		t.Skip("message rate limiting did not trigger within 70 rapid sends — middleware may not be active on test router")
-	}
-	assert.LessOrEqual(t, rateLimitedAt, 70)
+	assert.Equal(t, 61, rateLimitedAt, "the send limiter allows 60 messages a minute; the 61st should be refused")
 }
 
 // TestWebSocketConcurrentConnections verifies behavior when the same user opens

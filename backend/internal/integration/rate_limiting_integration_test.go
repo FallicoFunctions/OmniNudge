@@ -29,7 +29,7 @@ func loginPayload(username, password string) []byte {
 // TestRateLimitAuthEndpoints verifies that POST /auth/login returns 429 after
 // exceeding the per-IP rate limit window (6+ rapid attempts).
 func TestRateLimitAuthEndpoints(t *testing.T) {
-	deps := newTestDeps(t)
+	deps := newRateLimitedTestDeps(t)
 	defer deps.DB.Close()
 
 	// Create a real user so early requests may legitimately succeed.
@@ -59,21 +59,14 @@ func TestRateLimitAuthEndpoints(t *testing.T) {
 		)
 	}
 
-	// If the server enforces rate limiting, we should have seen 429 within 10 tries.
-	// If the server does NOT yet have rate limiting wired up to this test router,
-	// we skip rather than fail hard, keeping the test green but informative.
-	if firstRateLimited == 0 {
-		t.Skip("rate limiting did not trigger within 10 rapid requests — middleware may not be active on test router")
-	}
-
-	assert.LessOrEqual(t, firstRateLimited, 10,
-		"expected 429 within 10 attempts but first hit at %d", firstRateLimited)
+	// AuthRateLimiter allows 5 attempts per 15 minutes per IP.
+	assert.Equal(t, 6, firstRateLimited, "the sixth login attempt should be the first refused")
 }
 
 // TestRateLimitHeaders checks that rate-limit-related headers are present on
 // login responses (whether or not the server is currently rate-limiting).
 func TestRateLimitHeaders(t *testing.T) {
-	deps := newTestDeps(t)
+	deps := newRateLimitedTestDeps(t)
 	defer deps.DB.Close()
 
 	username := uniqueRLUsername("rlh")
@@ -95,23 +88,9 @@ func TestRateLimitHeaders(t *testing.T) {
 		"unexpected status %d", w.Code,
 	)
 
-	// Rate-limit headers are optional in the test router but log their presence.
-	headerNames := []string{
-		"X-Ratelimit-Limit",
-		"X-Ratelimit-Remaining",
-		"X-Ratelimit-Reset",
-		// Alternate capitalisation used by some middleware.
-		"X-RateLimit-Limit",
-		"X-RateLimit-Remaining",
-		"X-RateLimit-Reset",
-	}
-	found := map[string]string{}
-	for _, h := range headerNames {
-		if v := w.Header().Get(h); v != "" {
-			found[h] = v
-		}
-	}
-	t.Logf("rate-limit headers present: %v", found)
+	assert.Equal(t, "5", w.Header().Get("X-RateLimit-Limit"))
+	assert.Equal(t, "4", w.Header().Get("X-RateLimit-Remaining"))
+	assert.NotEmpty(t, w.Header().Get("X-RateLimit-Reset"))
 
 	// If the server returns 429 it MUST include Retry-After.
 	if w.Code == http.StatusTooManyRequests {
@@ -125,7 +104,7 @@ func TestRateLimitHeaders(t *testing.T) {
 // after a short wait). This test does not sleep for a full window — it just
 // inspects the reset header value.
 func TestRateLimitResetAfterWindow(t *testing.T) {
-	deps := newTestDeps(t)
+	deps := newRateLimitedTestDeps(t)
 	defer deps.DB.Close()
 
 	username := uniqueRLUsername("rlr")
@@ -158,9 +137,7 @@ func TestRateLimitResetAfterWindow(t *testing.T) {
 		}
 	}
 
-	if lastCode != http.StatusTooManyRequests {
-		t.Skip("rate limit was not triggered — skipping reset header assertion")
-	}
+	require.Equal(t, http.StatusTooManyRequests, lastCode, "12 rapid logins should pass the limit of 5")
 
 	// Reset value should be a Unix timestamp or seconds-delta > 0.
 	assert.NotEmpty(t, resetHeader,
@@ -169,29 +146,52 @@ func TestRateLimitResetAfterWindow(t *testing.T) {
 
 // TestRateLimitDifferentIPsIndependent verifies that rate limit counters are
 // scoped per-IP: two distinct IPs should each get their own quota.
+// TestRateLimitModMailCreation: starting a mod mail thread sends a message, so
+// it shares the 60-a-minute send limit. The limiter runs before the handler, so
+// requests the handler would refuse still count against it.
+func TestRateLimitModMailCreation(t *testing.T) {
+	deps := newRateLimitedTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, uniqueRLUsername("rlmm"), "user")
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
+	require.NoError(t, err)
+
+	firstRefused := 0
+	for i := 1; i <= 61; i++ {
+		req, err := http.NewRequest(http.MethodPost, "/api/v1/mod-mail", bytes.NewReader([]byte(`{}`)))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		if doRequest(t, deps.Router, req).Code == http.StatusTooManyRequests {
+			firstRefused = i
+			break
+		}
+	}
+	assert.Equal(t, 61, firstRefused, "the 61st mod mail request should be the first refused")
+}
+
 func TestRateLimitDifferentIPsIndependent(t *testing.T) {
-	deps := newTestDeps(t)
+	deps := newRateLimitedTestDeps(t)
 	defer deps.DB.Close()
 
 	username := uniqueRLUsername("rlip")
 	createUser(t, deps.UserRepo, username, "user")
 
-	ips := []string{"203.0.113.50", "203.0.113.51"}
-
-	for _, ip := range ips {
-		t.Run("ip_"+ip, func(t *testing.T) {
-			// Each IP should be able to make at least 1 request without hitting 429.
-			body := loginPayload(username, "wrongpassword")
-			req, err := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
-			require.NoError(t, err)
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Forwarded-For", ip)
-
-			w := doRequest(t, deps.Router, req)
-
-			// First request from a fresh IP must never be rate-limited.
-			assert.NotEqual(t, http.StatusTooManyRequests, w.Code,
-				"first request from IP %s should not be rate-limited, got %d", ip, w.Code)
-		})
+	login := func(ip string) int {
+		body := loginPayload(username, "wrongpassword")
+		req, err := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		// The client's own address: gin trusts X-Forwarded-For only from a
+		// proxy it knows, and a request with no RemoteAddr has none.
+		req.RemoteAddr = ip + ":40000"
+		return doRequest(t, deps.Router, req).Code
 	}
+
+	for i := 0; i < 5; i++ {
+		login("203.0.113.50")
+	}
+	require.Equal(t, http.StatusTooManyRequests, login("203.0.113.50"), "the first IP should be over its limit")
+	assert.NotEqual(t, http.StatusTooManyRequests, login("203.0.113.51"), "a second IP keeps its own quota")
 }

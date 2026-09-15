@@ -151,6 +151,13 @@ func PasswordResetRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 3, time.Hour, "rate:password_reset").FailClosed()
 }
 
+// MessageSendRateLimiter bounds direct and group message sends: 60 per minute
+// per user, well above anyone typing and far below a script flooding a
+// conversation. It fails open: a cache outage should not stop people talking.
+func MessageSendRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 60, time.Minute, "rate:messages")
+}
+
 // FriendRequestRateLimiterRedis limits relationship-spam across every backend
 // instance. It fails closed because accepting unmetered requests during a cache
 // outage would expose users to a burst of unsolicited requests.
