@@ -555,6 +555,19 @@ export default function OmniChatChatPage() {
   const pendingRegenerationIntentRef = useRef<PendingRegenerationIntent | null>(null);
   const pendingMediaGenerationRef = useRef<OmniChatGenerationRequest | null>(null);
   const pendingMediaCommandRef = useRef<PendingMediaCommand | null>(null);
+  // The Retry button shows while a failed request can be sent again. The
+  // requests stay in refs, which the handlers read; a ref never re-renders, so
+  // every write also sets a flag the screen can read.
+  const [hasPendingGeneration, setHasPendingGeneration] = useState(false);
+  const [hasPendingCommand, setHasPendingCommand] = useState(false);
+  const setPendingGeneration = useCallback((request: OmniChatGenerationRequest | null) => {
+    pendingMediaGenerationRef.current = request;
+    setHasPendingGeneration(request !== null);
+  }, []);
+  const setPendingCommand = useCallback((command: PendingMediaCommand | null) => {
+    pendingMediaCommandRef.current = command;
+    setHasPendingCommand(command !== null);
+  }, []);
 
   const personasQuery = useQuery({
     queryKey: omnichatQueryKeys.personas(),
@@ -576,15 +589,16 @@ export default function OmniChatChatPage() {
   const allowanceExhausted = Boolean(
     allowance && !allowance.unlimited && (allowance.remaining ?? 0) <= 0
   );
+  const allowanceResetAt = allowance?.reset_at;
   const allowanceResetLabel = useMemo(() => {
-    if (!allowance?.reset_at) return '';
+    if (!allowanceResetAt) return '';
     return new Intl.DateTimeFormat(i18n.resolvedLanguage, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-    }).format(new Date(allowance.reset_at));
-  }, [allowance?.reset_at, i18n.resolvedLanguage]);
+    }).format(new Date(allowanceResetAt));
+  }, [allowanceResetAt, i18n.resolvedLanguage]);
 
   useEffect(() => {
     if (!allowance?.reset_at || !allowanceExhausted) return;
@@ -1106,14 +1120,14 @@ export default function OmniChatChatPage() {
         job.status === 'succeeded' &&
         pendingMediaGenerationRef.current?.request_id === request.request_id
       ) {
-        pendingMediaGenerationRef.current = null;
+        setPendingGeneration(null);
       }
       setActiveMediaJob(job);
     },
     onError: (error, request) => {
       const status = (error as Error & { status?: number }).status;
       if (status === 402) {
-        pendingMediaGenerationRef.current = null;
+        setPendingGeneration(null);
         if (request.kind === 'video') setVideoPaywallFeature('scene_video');
         else setShowCommerce(true);
         return;
@@ -1123,7 +1137,7 @@ export default function OmniChatChatPage() {
       // network, and unknown failures can be retried with the same idempotency
       // key so an uncertain request is never duplicated.
       const retryable = status === undefined || status >= 500 || status === 429;
-      pendingMediaGenerationRef.current = retryable ? request : null;
+      setPendingGeneration(retryable ? request : null);
       setMediaGenerationError(mediaGenerationErrorMessage(status));
     },
   });
@@ -1139,7 +1153,7 @@ export default function OmniChatChatPage() {
         job.status === 'succeeded' &&
         pendingMediaCommandRef.current?.request.request_id === request.request.request_id
       ) {
-        pendingMediaCommandRef.current = null;
+        setPendingCommand(null);
       }
       setActiveMediaJob(job);
       queryClient.setQueryData<BotConversationDetail | undefined>(
@@ -1158,13 +1172,13 @@ export default function OmniChatChatPage() {
     onError: (error, request) => {
       const status = (error as Error & { status?: number }).status;
       if (status === 402) {
-        pendingMediaCommandRef.current = null;
+        setPendingCommand(null);
         if (request.request.kind === 'video') setVideoPaywallFeature('scene_video');
         else setShowCommerce(true);
         return;
       }
       const retryable = status === undefined || status >= 500 || status === 429;
-      pendingMediaCommandRef.current = retryable ? request : null;
+      setPendingCommand(retryable ? request : null);
       queryClient.setQueryData<BotConversationDetail | undefined>(
         omnichatQueryKeys.conversation(request.conversationId),
         (previous) =>
@@ -1209,8 +1223,8 @@ export default function OmniChatChatPage() {
     if (!job) return;
     setActiveMediaJob(job);
     if (job.status === 'succeeded' && job.conversation_id) {
-      pendingMediaGenerationRef.current = null;
-      pendingMediaCommandRef.current = null;
+      setPendingGeneration(null);
+      setPendingCommand(null);
       void queryClient.invalidateQueries({
         queryKey: omnichatQueryKeys.conversation(job.conversation_id),
       });
@@ -1219,7 +1233,7 @@ export default function OmniChatChatPage() {
     if (job.status === 'failed') {
       setMediaGenerationError(mediaGenerationErrorMessage(undefined, job.error_code));
     }
-  }, [activeMediaJobQuery.data, queryClient]);
+  }, [activeMediaJobQuery.data, queryClient, setPendingGeneration, setPendingCommand]);
 
   const completeAssistantMessage = useCallback(
     (assistantMessage: BotMessage) => {
@@ -1377,8 +1391,8 @@ export default function OmniChatChatPage() {
     pendingRegenerationIntentRef.current = null;
     pendingMediaIntentRef.current = null;
     setAwaitingReply(false);
-    pendingMediaGenerationRef.current = null;
-    pendingMediaCommandRef.current = null;
+    setPendingGeneration(null);
+    setPendingCommand(null);
     setMediaGenerationError(null);
     setActiveMediaJob(null);
 
@@ -1386,7 +1400,7 @@ export default function OmniChatChatPage() {
       sendMessageAbortRef.current?.abort();
       sendMessageAbortRef.current = null;
     };
-  }, [selectedConversationId]);
+  }, [selectedConversationId, setPendingGeneration, setPendingCommand]);
 
   const regenerateMessageMutation = useMutation({
     mutationFn: ({ messageId, requestId }: { messageId: number; requestId: string }) =>
@@ -1654,8 +1668,8 @@ export default function OmniChatChatPage() {
         return;
       }
       if (!selectedConversationId || !activePersona) return;
-      pendingMediaGenerationRef.current = null;
-      pendingMediaCommandRef.current = null;
+      setPendingGeneration(null);
+      setPendingCommand(null);
       // The scene buttons intentionally start a new generation. Exact replay is exposed separately
       // through Retry, which retains the original request ID after an uncertain failure.
       const request: OmniChatGenerationRequest = {
@@ -1671,10 +1685,18 @@ export default function OmniChatChatPage() {
         aspect_ratio: kind === 'video' ? '16:9' : '4:5',
         duration_seconds: kind === 'video' ? 5 : undefined,
       };
-      pendingMediaGenerationRef.current = request;
+      setPendingGeneration(request);
       mediaGenerationMutation.mutate(request);
     },
-    [activePersona, isAuthenticated, isGuest, mediaGenerationMutation, selectedConversationId]
+    [
+      activePersona,
+      isAuthenticated,
+      isGuest,
+      mediaGenerationMutation,
+      selectedConversationId,
+      setPendingGeneration,
+      setPendingCommand,
+    ]
   );
 
   const retryMediaGeneration = useCallback(() => {
@@ -1795,8 +1817,8 @@ export default function OmniChatChatPage() {
       if (!selectedConversationId || !activePersona) return;
 
       if (directMediaCommand) {
-        pendingMediaGenerationRef.current = null;
-        pendingMediaCommandRef.current = null;
+        setPendingGeneration(null);
+        setPendingCommand(null);
         const request: PendingMediaCommand = {
           conversationId: selectedConversationId,
           content,
@@ -1809,7 +1831,7 @@ export default function OmniChatChatPage() {
             duration_seconds: directMediaCommand.kind === 'video' ? 5 : undefined,
           },
         };
-        pendingMediaCommandRef.current = request;
+        setPendingCommand(request);
         queryClient.setQueryData<BotConversationDetail | undefined>(
           omnichatQueryKeys.conversation(selectedConversationId),
           (previous) =>
@@ -1916,7 +1938,8 @@ export default function OmniChatChatPage() {
       sendMessageMutation,
       mediaCommandMutation,
       activeMediaJobQuery.data,
-      pendingMediaCommandRef,
+      setPendingGeneration,
+      setPendingCommand,
     ]
   );
 
@@ -2762,7 +2785,7 @@ export default function OmniChatChatPage() {
                     {mediaGenerationError && (
                       <div className="flex items-center gap-2 text-xs text-rose-300">
                         <span>{mediaGenerationError}</span>
-                        {(pendingMediaGenerationRef.current || pendingMediaCommandRef.current) && (
+                        {(hasPendingGeneration || hasPendingCommand) && (
                           <button
                             type="button"
                             onClick={retryMediaGeneration}
@@ -2864,7 +2887,7 @@ export default function OmniChatChatPage() {
                           pendingMediaCommandRef.current &&
                           pendingMediaCommandRef.current.content !== nextDraft.trim()
                         ) {
-                          pendingMediaCommandRef.current = null;
+                          setPendingCommand(null);
                         }
                         if (rateLimitError) setRateLimitError(null);
                         if (regenerationError) setRegenerationError(false);

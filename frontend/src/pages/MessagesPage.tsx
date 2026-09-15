@@ -770,6 +770,10 @@ export default function MessagesPage() {
   >('all');
   const [messageSearchDateRange, setMessageSearchDateRange] =
     useState<MessageSearchDateRange>('all');
+  // "Last 7 days" counts back from when the range was picked, not from whichever render last ran.
+  const [messageSearchRangePickedAtMs, setMessageSearchRangePickedAtMs] = useState(() =>
+    Date.now()
+  );
   const [messageSearchHasFiles, setMessageSearchHasFiles] = useState(false);
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
@@ -2178,7 +2182,7 @@ export default function MessagesPage() {
   }, [orderedMessages, debouncedMessageSearch, messageSearchHasLinks, user?.id]);
 
   const messageSearchFilters = useMemo<MessageSearchFilters>(() => {
-    const now = Date.now();
+    const now = messageSearchRangePickedAtMs;
     let startDate: Date | undefined;
     if (messageSearchDateRange === '24h') {
       startDate = new Date(now - 24 * 60 * 60 * 1000);
@@ -2204,6 +2208,7 @@ export default function MessagesPage() {
     };
   }, [
     messageSearchDateRange,
+    messageSearchRangePickedAtMs,
     messageSearchSenderFilter,
     messageSearchHasFiles,
     messageSearchHasLinks,
@@ -3386,11 +3391,10 @@ export default function MessagesPage() {
                         </select>
                         <select
                           value={messageSearchDateRange}
-                          onChange={(e) =>
-                            setMessageSearchDateRange(
-                              e.target.value as 'all' | '24h' | '7d' | '30d'
-                            )
-                          }
+                          onChange={(e) => {
+                            setMessageSearchDateRange(e.target.value as MessageSearchDateRange);
+                            setMessageSearchRangePickedAtMs(Date.now());
+                          }}
                           className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                         >
                           <option value="all">{t('messages.search.filters.dateAll')}</option>
@@ -4797,7 +4801,7 @@ export default function MessagesPage() {
           onSwitchCamera={switchCamera}
           onSetVideoQuality={setVideoQuality}
           peerIsSharing={peerIsSharing}
-          peerConnection={peerConnectionRef.current}
+          peerConnectionRef={peerConnectionRef}
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
           onEndCall={endCall}

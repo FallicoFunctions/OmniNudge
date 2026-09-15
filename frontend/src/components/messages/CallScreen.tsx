@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CallControls } from './CallControls';
 import { CallQualityIndicator } from './CallQualityIndicator';
@@ -26,7 +26,7 @@ interface CallScreenProps {
   onSetVideoQuality: (q: VideoQuality) => void;
   // F14
   peerIsSharing: boolean;
-  peerConnection: RTCPeerConnection | null;
+  peerConnectionRef: RefObject<RTCPeerConnection | null>;
   onToggleMute: () => void;
   onToggleCamera: () => void;
   onEndCall: () => void;
@@ -57,7 +57,7 @@ export function CallScreen({
   onSwitchCamera,
   onSetVideoQuality,
   peerIsSharing,
-  peerConnection,
+  peerConnectionRef,
   onToggleMute,
   onToggleCamera,
   onEndCall,
@@ -68,7 +68,7 @@ export function CallScreen({
 
   const { isSharing, screenStream, startSharing, stopSharing } = useScreenShare(
     call.id,
-    peerConnection
+    peerConnectionRef
   );
 
   // Attach remote stream to video element.

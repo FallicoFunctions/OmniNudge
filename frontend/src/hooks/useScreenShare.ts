@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 import { callsService } from '../services/callsService';
 
 export interface UseScreenShareReturn {
@@ -11,7 +11,7 @@ export interface UseScreenShareReturn {
 
 export function useScreenShare(
   callId: number | null,
-  peerConnection: RTCPeerConnection | null
+  peerConnectionRef: RefObject<RTCPeerConnection | null>
 ): UseScreenShareReturn {
   const [isSharing, setIsSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -21,6 +21,7 @@ export function useScreenShare(
 
   const stopSharing = useCallback(() => {
     // Remove the screen track sender from the peer connection.
+    const peerConnection = peerConnectionRef.current;
     if (peerConnection && screenSenderRef.current) {
       try {
         peerConnection.removeTrack(screenSenderRef.current);
@@ -45,7 +46,7 @@ export function useScreenShare(
         .stopScreenShare(callId)
         .catch((err) => console.error('[useScreenShare] stopScreenShare API error:', err));
     }
-  }, [callId, peerConnection]);
+  }, [callId, peerConnectionRef]);
 
   const startSharing = useCallback(async () => {
     if (!callId) return;
@@ -79,6 +80,7 @@ export function useScreenShare(
       };
 
       // Add screen track to peer connection as an additional track.
+      const peerConnection = peerConnectionRef.current;
       if (peerConnection) {
         const sender = peerConnection.addTrack(videoTrack, stream);
         screenSenderRef.current = sender;
@@ -102,7 +104,7 @@ export function useScreenShare(
         setScreenStream(null);
       }
     }
-  }, [callId, peerConnection, stopSharing]);
+  }, [callId, peerConnectionRef, stopSharing]);
 
   // Stop sharing when page is closed while sharing.
   useEffect(() => {
