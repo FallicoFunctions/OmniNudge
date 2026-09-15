@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { deriveLoginKey } from '../loginKey';
 import { bootstrapSession, runtimeLogin, runtimeLogout, runtimeSignup, saveLoadout, saveReturnPoint, saveRuntimeSettings } from '../session';
 
 function mockFetcher(response: unknown) {
@@ -342,124 +343,111 @@ describe('bootstrapSession', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('posts in-place runtime login with the current venue and session state', async () => {
-    const fetcher = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        playerId: 'user-42',
-        playerName: 'nick',
-        worldSocketUrl: 'ws://localhost:8092/ws',
-        mode: 'account',
-        activeZone: 'underground',
-        lastVenue: 'underground',
-        settings: {
-          uiTheme: 'Luminous Panels',
-          graphicsMode: 'auto',
-          graphicsLevel: 7,
-          displayNames: true,
-          chatCollapsed: false,
-          crouchMode: 'hold',
-          cameraFollow: 'free',
-        },
-      }),
-    }) as Response);
+  const settingsFixture = {
+    uiTheme: 'Luminous Panels',
+    graphicsMode: 'auto',
+    graphicsLevel: 7,
+    displayNames: true,
+    chatCollapsed: false,
+    crouchMode: 'hold',
+    cameraFollow: 'free',
+  } as const;
+  const guestSession = {
+    playerId: 'guest-42',
+    playerName: 'Guest-42',
+    worldSocketUrl: 'ws://localhost:8092/ws',
+    mode: 'guest',
+    activeZone: 'underground',
+    lastVenue: 'main_stage',
+    settings: settingsFixture,
+    loadout: { body: 'guest-default' },
+  } as const;
+  const accountResponse = {
+    playerId: 'user-42',
+    playerName: 'nick',
+    worldSocketUrl: 'ws://localhost:8092/ws',
+    mode: 'account',
+    activeZone: 'underground',
+    lastVenue: 'underground',
+    settings: settingsFixture,
+  };
+  const SALT = btoa('0123456789abcdef');
+  const FEW_ROUNDS = 1000;
+  const PASSWORD = 'correct-horse-battery-staple';
+
+  // Answers the runtime pre-login with the given account, and login or signup
+  // with an account session.
+  function runtimeServer(preLogin: unknown) {
+    return vi.fn(async (url: string) =>
+      (url.endsWith('/prelogin')
+        ? { ok: true, json: async () => preLogin }
+        : { ok: true, json: async () => accountResponse }) as Response,
+    );
+  }
+  const bodySentTo = (fetcher: ReturnType<typeof runtimeServer>, path: string) =>
+    JSON.parse(
+      (fetcher.mock.calls.find(([url]) => url.endsWith(path)) as unknown as [string, RequestInit])[1].body as string,
+    );
+
+  it('logs in with the login key, never the password, for a login-key account', async () => {
+    const fetcher = runtimeServer({ scheme: 2, kdf_salt: SALT, kdf_iterations: FEW_ROUNDS });
 
     const session = await runtimeLogin({
-      session: {
-        playerId: 'guest-42',
-        playerName: 'Guest-42',
-        worldSocketUrl: 'ws://localhost:8092/ws',
-        mode: 'guest',
-        activeZone: 'underground',
-        lastVenue: 'main_stage',
-        settings: {
-          uiTheme: 'Luminous Panels',
-          graphicsMode: 'auto',
-          graphicsLevel: 7,
-          displayNames: true,
-          chatCollapsed: false,
-          crouchMode: 'hold',
-          cameraFollow: 'free',
-        },
-        loadout: { body: 'guest-default' },
-      },
-      credentials: {
-        username: 'nick',
-        password: 'correct-horse-battery-staple',
-      },
+      session: guestSession,
+      credentials: { username: 'nick', password: PASSWORD },
       fetcher,
       apiBaseUrl: 'http://localhost:8091',
     });
 
-    expect(fetcher).toHaveBeenCalledWith(
-      'http://localhost:8091/api/v1/omnigame/runtime/auth/login',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          username: 'nick',
-          password: 'correct-horse-battery-staple',
-          currentVenue: 'underground',
-          currentLoadout: { body: 'guest-default' },
-          currentSettings: {
-            uiTheme: 'Luminous Panels',
-            graphicsMode: 'auto',
-            graphicsLevel: 7,
-            displayNames: true,
-            chatCollapsed: false,
-            crouchMode: 'hold',
-            cameraFollow: 'free',
-          },
-        }),
-      }),
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:8091/api/v1/omnigame/runtime/auth/prelogin',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ username: 'nick' }) }),
     );
+    expect(bodySentTo(fetcher, '/login')).toEqual({
+      username: 'nick',
+      loginKey: await deriveLoginKey(PASSWORD, SALT, FEW_ROUNDS),
+      currentVenue: 'underground',
+      currentLoadout: { body: 'guest-default' },
+      currentSettings: settingsFixture,
+    });
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain(PASSWORD);
     expect(session.mode).toBe('account');
   });
 
-  it('posts in-place runtime signup with consent fields and current guest state', async () => {
-    const fetcher = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        playerId: 'user-42',
-        playerName: 'nick',
-        worldSocketUrl: 'ws://localhost:8092/ws',
-        mode: 'account',
-        activeZone: 'main_stage',
-        lastVenue: 'main_stage',
-        settings: {
-          uiTheme: 'Hybrid Premium',
-          graphicsMode: 'auto',
-          graphicsLevel: 7,
-          displayNames: true,
-          chatCollapsed: false,
-          crouchMode: 'hold',
-          cameraFollow: 'free',
-        },
+  it('logs in with the password only for an account still on the old scheme', async () => {
+    const fetcher = runtimeServer({ scheme: 1 });
+    await runtimeLogin({
+      session: guestSession,
+      credentials: { username: 'nick', password: PASSWORD },
+      fetcher,
+      apiBaseUrl: 'http://localhost:8091',
+    });
+    expect(bodySentTo(fetcher, '/login')).toMatchObject({ username: 'nick', password: PASSWORD });
+  });
+
+  it('never falls back to the password when a login-key answer lacks its settings', async () => {
+    const fetcher = runtimeServer({ scheme: 2 });
+    await expect(
+      runtimeLogin({
+        session: guestSession,
+        credentials: { username: 'nick', password: PASSWORD },
+        fetcher,
+        apiBaseUrl: 'http://localhost:8091',
       }),
-    }) as Response);
+    ).rejects.toThrow('unexpected sign-in settings');
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith('/login'))).toBe(false);
+  });
+
+  it('signs up with a login key, a fresh salt and 600,000 rounds, never the password', async () => {
+    const fetcher = runtimeServer({ scheme: 1 });
 
     await runtimeSignup({
-      session: {
-        playerId: 'guest-42',
-        playerName: 'Guest-42',
-        worldSocketUrl: 'ws://localhost:8092/ws',
-        mode: 'guest',
-        activeZone: 'main_stage',
-        lastVenue: 'main_stage',
-        settings: {
-          uiTheme: 'Hybrid Premium',
-          graphicsMode: 'auto',
-          graphicsLevel: 7,
-          displayNames: true,
-          chatCollapsed: false,
-          crouchMode: 'hold',
-          cameraFollow: 'free',
-        },
-        loadout: { body: 'guest-default' },
-      },
+      session: guestSession,
       signup: {
         username: 'nick',
         email: 'nick@example.com',
-        password: 'correct-horse-battery-staple',
+        password: PASSWORD,
         turnstileToken: 'cf-token-1',
         acceptPrivacyPolicy: true,
         acceptTerms: true,
@@ -470,29 +458,44 @@ describe('bootstrapSession', () => {
 
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8091/api/v1/omnigame/runtime/auth/signup',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const body = bodySentTo(fetcher, '/signup');
+    expect(body).toMatchObject({
+      username: 'nick',
+      email: 'nick@example.com',
+      turnstileToken: 'cf-token-1',
+      acceptPrivacyPolicy: true,
+      acceptTerms: true,
+      kdfIterations: 600000,
+      currentVenue: 'underground',
+      currentLoadout: { body: 'guest-default' },
+      currentSettings: settingsFixture,
+    });
+    expect(body).not.toHaveProperty('password');
+    expect(atob(body.kdfSalt)).toHaveLength(16);
+    expect(body.loginKey).toBe(await deriveLoginKey(PASSWORD, body.kdfSalt, 600000));
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain(PASSWORD);
+  });
+
+  it('refuses a short sign-up password before anything is sent', async () => {
+    const fetcher = runtimeServer({ scheme: 1 });
+    await expect(
+      runtimeSignup({
+        session: guestSession,
+        signup: {
           username: 'nick',
-          email: 'nick@example.com',
-          password: 'correct-horse-battery-staple',
+          email: '',
+          password: 'short',
           turnstileToken: 'cf-token-1',
           acceptPrivacyPolicy: true,
           acceptTerms: true,
-          currentVenue: 'main_stage',
-          currentLoadout: { body: 'guest-default' },
-          currentSettings: {
-            uiTheme: 'Hybrid Premium',
-            graphicsMode: 'auto',
-            graphicsLevel: 7,
-            displayNames: true,
-            chatCollapsed: false,
-            crouchMode: 'hold',
-            cameraFollow: 'free',
-          },
-        }),
+        },
+        fetcher,
+        apiBaseUrl: 'http://localhost:8091',
       }),
-    );
+    ).rejects.toThrow('at least 8');
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('posts runtime logout and returns a fresh guest session', async () => {

@@ -2,7 +2,12 @@ export type RuntimeMode = 'account' | 'guest';
 export type RuntimeZoneID = 'main_stage' | 'underground' | 'plurr_partay';
 export type RuntimeEventPhase = 'none' | 'lead_in' | 'active' | 'recovery';
 
+import { DEFAULT_KDF_ITERATIONS, deriveLoginKey, newKdfSalt } from './loginKey';
 import { normalizeRuntimeSettings, type RuntimeSettings } from './settings';
+
+// The same minimum the main app's sign-up checks; with a login key the server
+// never sees the password, so the client enforces it.
+const MIN_PASSWORD_LENGTH = 8;
 
 export interface RuntimePoint {
   x: number;
@@ -197,7 +202,7 @@ export async function saveRuntimeSettings(input: {
 async function exchangeRuntimeAuth(input: {
   endpoint: 'login' | 'signup' | 'logout';
   session: RuntimeSession;
-  payload: RuntimeLoginRequest | RuntimeSignupRequest | Record<string, never>;
+  payload: Record<string, unknown>;
   fetcher?: typeof fetch;
   apiBaseUrl?: string;
 }): Promise<RuntimeSession> {
@@ -235,31 +240,71 @@ async function exchangeRuntimeAuth(input: {
   } as RuntimeSession;
 }
 
+// What proves the account, as the main app's signInSecret decides it: the
+// login key for an account on the login-key scheme, the password only for one
+// still on the old scheme. A login-key answer without its settings never falls
+// back to the password.
+async function accountSecret(input: {
+  username: string;
+  password: string;
+  fetcher: typeof fetch;
+  apiBaseUrl: string;
+}): Promise<{ password: string } | { loginKey: string }> {
+  const response = await input.fetcher(`${input.apiBaseUrl}/api/v1/omnigame/runtime/auth/prelogin`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: input.username }),
+  });
+  if (!response.ok) {
+    throw new Error(`Runtime login failed with ${response.status}`);
+  }
+  const pre = (await response.json()) as { scheme?: number; kdf_salt?: unknown; kdf_iterations?: unknown };
+  if (pre.scheme === 1) {
+    return { password: input.password };
+  }
+  if (pre.scheme !== 2 || typeof pre.kdf_salt !== 'string' || typeof pre.kdf_iterations !== 'number') {
+    throw new Error('Runtime login failed: unexpected sign-in settings');
+  }
+  return { loginKey: await deriveLoginKey(input.password, pre.kdf_salt, pre.kdf_iterations) };
+}
+
 export async function runtimeLogin(input: {
   session: RuntimeSession;
   credentials: RuntimeLoginRequest;
   fetcher?: typeof fetch;
   apiBaseUrl?: string;
 }): Promise<RuntimeSession> {
+  const fetcher = input.fetcher ?? fetch;
+  const apiBaseUrl = input.apiBaseUrl ?? import.meta.env.VITE_OMNIGAME_API_URL ?? 'http://localhost:8091';
+  const { password, ...credentials } = input.credentials;
+  const secret = await accountSecret({ username: credentials.username, password, fetcher, apiBaseUrl });
   return exchangeRuntimeAuth({
     endpoint: 'login',
     session: input.session,
-    payload: input.credentials,
-    fetcher: input.fetcher,
-    apiBaseUrl: input.apiBaseUrl,
+    payload: { ...credentials, ...secret },
+    fetcher,
+    apiBaseUrl,
   });
 }
 
+// A new account signs in with a login key from the start: the server gets the
+// key and its settings, never the password.
 export async function runtimeSignup(input: {
   session: RuntimeSession;
   signup: RuntimeSignupRequest;
   fetcher?: typeof fetch;
   apiBaseUrl?: string;
 }): Promise<RuntimeSession> {
+  const { password, ...signup } = input.signup;
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+  const kdfSalt = newKdfSalt();
+  const loginKey = await deriveLoginKey(password, kdfSalt, DEFAULT_KDF_ITERATIONS);
   return exchangeRuntimeAuth({
     endpoint: 'signup',
     session: input.session,
-    payload: input.signup,
+    payload: { ...signup, loginKey, kdfSalt, kdfIterations: DEFAULT_KDF_ITERATIONS },
     fetcher: input.fetcher,
     apiBaseUrl: input.apiBaseUrl,
   });
