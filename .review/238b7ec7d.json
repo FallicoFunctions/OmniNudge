@@ -1,0 +1,457 @@
+{
+ "schema_version": 2,
+ "head": "f4563ba25",
+ "base": "238b7ec7d",
+ "scope": {
+  "files": [
+   "frontend/src/pages/ResetPasswordPage.tsx",
+   "frontend/src/pages/__tests__/ResetPasswordPage.test.tsx",
+   "frontend/public/locales/en.json",
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts",
+   "frontend/src/services/accountService.ts",
+   "frontend/src/services/__tests__/accountService.test.ts",
+   "frontend/src/pages/SettingsPage.tsx",
+   "frontend/src/pages/__tests__/SettingsPage.test.tsx"
+  ],
+  "boundaries": [
+   "POST /auth/reset-password",
+   "POST /auth/prelogin",
+   "POST /account/export",
+   "POST /account/delete",
+   "en.json keys"
+  ]
+ },
+ "prior_ledgers_read": [
+  "b4bf42b71",
+  "b2a87c547",
+  "ae248c296"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Reset page sends login_key, kdf_salt, kdf_iterations from prepareSignUp and shows a phrase note; accountProof added; data export and account deletion build their proof in accountService; SettingsPage passes username and password."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "b4bf42b71 (K4d), b2a87c547 (K4c-2), ae248c296 (K4c-1): none on reset or re-authentication."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the mocks: /auth/reset-password {token, login_key, kdf_salt, kdf_iterations} with no password string; /account/export {login_key, data_types, include_deleted} for a login-key account and {password, ...} for an old-scheme one; /account/delete {login_key, confirm}."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The reset success view gains the phrase note; its text was found by the test."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server side read: ResetPassword takes login_key and clears the copy through ResetToLoginKey; data_export and account_deletion bind password and login_key and check them with CheckAccountSecret."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "login_key, kdf_salt, kdf_iterations, password, confirm spelled as the Go tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The fields the server binds are the fields the app sends."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The proof rule lives once, accountProof over signInSecret."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The prelogin fixtures follow the real response shapes."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A matching new password resets; the correct password proves both schemes."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Short and mismatched new passwords are refused before any request (existing tests)."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty export password keeps the button disabled (existing)."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the reset request checked for the same defect: every app request that proves an account."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both accountProof branches reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures reach the existing error boxes."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One proof helper for both actions."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'the app sends a password to a route that checks CheckAccountSecret': grepped every password field the app sends. SettingsPage data export sent password for every account, and the server refuses a password from a login-key account, so export failed for every new account; requestAccountDeletion had the same body with no caller yet (k4e1-export-sends-password). users.go current_password is change-password, which has no screen."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The reset is one request; the derivation happens before it."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The reset clears the old copy server-side; the K4c flow asks for the phrase at the next sign-in."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest 4 files 34 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "E6 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change beyond one paragraph in an existing card."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4e reset page: the password never reaches the server and the phrase restores the key after a reset, as the design memory says."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One caller per action."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4e1-export-sends-password",
+     "summary": "The data export (and the unused account deletion call) sent the plain password, which the server refuses from a login-key account, so export failed for every new account.",
+     "found_by": "E6",
+     "fix_commit": "f4563ba25",
+     "control": {
+      "patch": ".review/controls/k4e1-export-sends-password.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/accountService.test.ts -t 'never the password'",
+       "src/services/__tests__/accountService.test.ts -t 'account deletion'"
+      ],
+      "observed": "FAIL: body carried password instead of login_key"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Reset page sends login_key, kdf_salt, kdf_iterations from prepareSignUp and shows a phrase note; accountProof added; data export and account deletion build their proof in accountService; SettingsPage passes username and password."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "b4bf42b71 (K4d), b2a87c547 (K4c-2), ae248c296 (K4c-1): none on reset or re-authentication."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the mocks: /auth/reset-password {token, login_key, kdf_salt, kdf_iterations} with no password string; /account/export {login_key, data_types, include_deleted} for a login-key account and {password, ...} for an old-scheme one; /account/delete {login_key, confirm}."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The reset success view gains the phrase note; its text was found by the test."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server side read: ResetPassword takes login_key and clears the copy through ResetToLoginKey; data_export and account_deletion bind password and login_key and check them with CheckAccountSecret."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "login_key, kdf_salt, kdf_iterations, password, confirm spelled as the Go tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The fields the server binds are the fields the app sends."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The proof rule lives once, accountProof over signInSecret."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The prelogin fixtures follow the real response shapes."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A matching new password resets; the correct password proves both schemes."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Short and mismatched new passwords are refused before any request (existing tests)."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty export password keeps the button disabled (existing)."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Pass 2: re-checked every CheckAccountSecret route: login, export, deletion, recovery copy, key copies, public key, login-key change; each app caller now sends the login key for a login-key account. The OmniRave runtime login is K5."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both accountProof branches reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures reach the existing error boxes."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One proof helper for both actions."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: re-grepped; no app request sends a password to a login-key account."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The reset is one request; the derivation happens before it."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The reset clears the old copy server-side; the K4c flow asks for the phrase at the next sign-in."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Fix reverted from f4563ba25 (the proof replaced by password): the export and deletion tests fail, body carries password instead of login_key."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest 4 files 34 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change beyond one paragraph in an existing card."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4e reset page: the password never reaches the server and the phrase restores the key after a reset, as the design memory says."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One caller per action."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest 4 files, 34 passed, 0 failed, 0 skipped"
+ }
+}
