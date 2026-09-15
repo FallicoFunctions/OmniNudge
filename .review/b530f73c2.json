@@ -1,0 +1,432 @@
+{
+  "schema_version": 2,
+  "head": "e7ff9c730",
+  "base": "b530f73c2",
+  "scope": {
+    "files": [
+      "backend/internal/handlers/auth.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/api/middleware/redis_rate_limit.go",
+      "backend/internal/services/auth_login_key.go",
+      "backend/internal/integration/test_utils.go",
+      "backend/internal/integration/auth_login_key_integration_test.go",
+      "backend/internal/models/user.go",
+      "backend/internal/models/user_login_keys_test.go"
+    ],
+    "boundaries": [
+      "client -> POST /auth/prelogin, POST /auth/login-key (JSON)",
+      "handler -> AuthService (sentinel errors -> status codes)",
+      "GetByID -> every signed-in password check"
+    ]
+  },
+  "prior_ledgers_read": [
+    "9e4422d83",
+    "85d1ed629"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "e7ff9c730: POST /auth/prelogin and POST /auth/login-key (handlers/auth.go), PreLoginRateLimiter, routes in cmd/server and the test router, sentinel errors ErrInvalidLoginKey and ErrCurrentPasswordIncorrect, four integration tests. 56dfcf9e7: the finding's fix."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "9e4422d83 (K1b-1) fixed the move to replace the password-wrapped copy; b530f73c2 changed only bcrypt cost. No prior finding on GetByID."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read the bodies the client receives through the integration tests: a scheme 2 account's pre-login is exactly {scheme 2, kdf_salt, kdf_iterations 600000}; a scheme 1 account's is exactly {scheme 1}; a missing name's has the same keys as a real scheme 2 answer, a 16-byte salt and 600000 rounds; the sign-up response does not echo the login key; the move returns 200 {scheme 2}, 400, 401 and 409 as specified."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "The finding's SQL change was read back by the models test; no new query otherwise."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The JSON names the handlers bind (username, login_key, kdf_salt, kdf_iterations, current_password, encrypted_private_key) match the service structs; the tests send them by name."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "PreLoginResponse is what the handler returns, unwrapped."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Found the finding: the service tests' mock GetByID returned the stored hash, but the real GetByID never selected password_hash; only the HTTP test through the real repository showed the move refusing the right password."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The move refuses a wrong password (401), 1000 rounds (400) and a second move (409); a moved account refuses its password at sign-in."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The pre-login limit: the 31st request in a minute is refused, the 30th is not."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every signed-in path that checks the current password after GetByID: change-password (users.go) and the move; both compared against an empty hash (finding). The OmniGame runtime login builds its own LoginRequest with only a password, so it cannot sign in a moved account until phase K5, which the plan schedules; no client moves accounts before K4."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Each branch of the move handler's switch is reached by a request in the integration test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The move handler logs unexpected errors with the user ID and returns 500; pre-login logs lookup failures and returns 503."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "In development mode register, login and pre-login run without limiters, as before; the move keeps the sign-in limiter in every mode because it checks a password."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The error-to-status mapping lives once, in the handler, keyed on sentinel errors rather than message text."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other reads that may omit password_hash: GetByUsername (queryUser) and GetByEmail (scanEmailLookupUser) always read it; no code tests an empty hash (grep)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "The pre-login limiter keeps its own key prefix (rate:prelogin), so it cannot spend the sign-in bucket; the test proves sign-in still passes after 30 pre-logins."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted beyond the move, covered in K1b-1."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control replayed as the hook runs it: without password_hash in GetByID, TestUserReadsCarryLoginKeyColumns fails (expected test-hash, actual \"\"); at HEAD, ok."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The routes are registered in cmd/server (both environments) and in the integration router; the tests reach them over HTTP."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; integration login-key and rate-limit tests, services 62, handlers 51 PASS; after the fix models 3, integration 4, handlers password 8 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "C7 already names the technique (a fixture that does not match what the producer emits). No new instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the endpoints over HTTP against real Postgres 16 through the real repository."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The pre-login limiter refuses the 31st request."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's promises for K1b: a pre-login endpoint, a stable fake salt for unknown names, a pre-login rate limit, a move endpoint that takes the current password once and replaces the password copy. Each is exercised over HTTP."
+        }
+      ],
+      "findings": [
+        {
+          "id": "getbyid-no-password-hash",
+          "summary": "GetByID never selected password_hash, so every signed-in action that loaded the user by ID and checked the current password compared against an empty hash: change-password refused every correct password, and the new move endpoint did too. The service tests' mock returned the hash and hid it.",
+          "found_by": "C7",
+          "fix_commit": "56dfcf9e7",
+          "control": {
+            "patch": ".review/controls/getbyid-no-password-hash.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/models/ -run 'TestUserReadsCarryLoginKeyColumns'"
+            ],
+            "observed": "With the patch, TEST_DATABASE_URL unset: FAIL, expected \"test-hash\", actual \"\" (GetByID must carry the hash a password check compares against). Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 covers the fix: password_hash first in GetByID's SELECT and Scan, and the models test asserting the hash from all three reads."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "9e4422d83 (K1b-1) fixed the move to replace the password-wrapped copy; b530f73c2 changed only bcrypt cost. No prior finding on GetByID."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read the bodies the client receives through the integration tests: a scheme 2 account's pre-login is exactly {scheme 2, kdf_salt, kdf_iterations 600000}; a scheme 1 account's is exactly {scheme 1}; a missing name's has the same keys as a real scheme 2 answer, a 16-byte salt and 600000 rounds; the sign-up response does not echo the login key; the move returns 200 {scheme 2}, 400, 401 and 409 as specified."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "The finding's SQL change was read back by the models test; no new query otherwise."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The JSON names the handlers bind (username, login_key, kdf_salt, kdf_iterations, current_password, encrypted_private_key) match the service structs; the tests send them by name."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "PreLoginResponse is what the handler returns, unwrapped."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The mock's GetByID and the real one now agree: both return the hash."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The move refuses a wrong password (401), 1000 rounds (400) and a second move (409); a moved account refuses its password at sign-in."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The pre-login limit: the 31st request in a minute is refused, the 30th is not."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Change-password and the move now compare against the stored hash; both are exercised (handlers password tests, the integration move test)."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Each branch of the move handler's switch is reached by a request in the integration test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The move handler logs unexpected errors with the user ID and returns 500; pre-login logs lookup failures and returns 503."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "In development mode register, login and pre-login run without limiters, as before; the move keeps the sign-in limiter in every mode because it checks a password."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The error-to-status mapping lives once, in the handler, keyed on sentinel errors rather than message text."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other reads that may omit password_hash: GetByUsername (queryUser) and GetByEmail (scanEmailLookupUser) always read it; no code tests an empty hash (grep)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "The pre-login limiter keeps its own key prefix (rate:prelogin), so it cannot spend the sign-in bucket; the test proves sign-in still passes after 30 pre-logins."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted beyond the move, covered in K1b-1."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The control holds at e7ff9c730."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The routes are registered in cmd/server (both environments) and in the integration router; the tests reach them over HTTP."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; integration login-key and rate-limit tests, services 62, handlers 51 PASS; after the fix models 3, integration 4, handlers password 8 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the endpoints over HTTP against real Postgres 16 through the real repository."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The pre-login limiter refuses the 31st request."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's promises for K1b: a pre-login endpoint, a stable fake salt for unknown names, a pre-login rate limit, a move endpoint that takes the current password once and replaces the password copy. Each is exercised over HTTP."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok, and with the integration tag",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "integration login-key 4 and rate-limit tests, services 62, handlers 51, models 3 PASS; 0 FAIL, 0 SKIP"
+  }
+}
