@@ -13,7 +13,7 @@
     "@babylonjs/loaders": "^8.1.0"
   },
   "devDependencies": {
-    "@gltf-transform/cli": "^4.4.1",
+    "@gltf-transform/cli": "^4.5.0",
     "@types/node": "^24.10.1",
     "jsdom": "^27.0.1",
     "typescript": "~5.9.3",
