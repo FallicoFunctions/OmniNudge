@@ -235,6 +235,12 @@
       "name": "Is the layer on top of every layer that can open with it?",
       "trigger": "a component draws a fixed overlay, modal or full-screen step",
       "asks": "List every z-index and portal in the app (grep z-[ and createPortal), put the highest one that can open at the same time behind the new layer in a real browser, and ask elementFromPoint what is on top at the centre. A layer that must never be covered needs to sit above all of them, and outside any root it makes inert."
+    },
+    {
+      "id": "H3",
+      "name": "Run every test that mocks or imports a changed module",
+      "trigger": "a module's exports, signature or behavior changed",
+      "asks": "grep every test file in the package for the module's import path and for vi.mock of it, and run all of them, not only the tests beside the change. A narrow run passes while a distant integration test that mocks the old shape fails in CI; AuthContext's change broke tests/integration/authFlows.test.tsx for five pushes that way."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

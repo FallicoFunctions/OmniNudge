@@ -1,0 +1,456 @@
+{
+ "schema_version": 2,
+ "head": "608615138",
+ "base": "a4d23fcc1",
+ "scope": {
+  "files": [
+   "frontend/tests/integration/authFlows.test.tsx"
+  ],
+  "boundaries": [
+   "AuthContext",
+   "accountKeysService mock",
+   "CI Frontend job"
+  ]
+ },
+ "prior_ledgers_read": [
+  "cdbe1cbe1",
+  "3a35eb5e4",
+  "b2a87c547"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "tests/integration/authFlows.test.tsx rewritten for the account-key AuthContext: it mocks accountKeysService, and checks that login sends the login key and no password, and that register sends the login key and settings and no password."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "cdbe1cbe1, 3a35eb5e4, b2a87c547 (K4c-2, which changed AuthContext); none ran this integration file."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "A test-only change; no payload built."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The mocked module exports are the names AuthContext imports."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The mocked answers have the shapes the real services return (signInSecret, prepareSignUp)."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The user fixture carries public_key, as /auth/login returns it."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling integration tests (messagingFlows, messagesService.editing) that mock key modules pass unchanged."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "All six flows reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Rejected login and register still throw to the caller (asserted)."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One mock of accountKeysService per file, as AuthContext.test does."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a test that mocks the old shape of a changed module': grepped every test for keySyncService, initializeKeys, utils/encryption, /auth/login and /auth/register bodies; the four other hits pass."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b, eslint clean; pre-commit gate 0 failed; CI for b4bf42b71 failed on exactly these three tests (Frontend job), Backend, E2E and migration jobs passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "The technique had no row; H3 added to instruments.json."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in this file; the one skipped test in the H3 run is in a messaging file and was skipped before these changes."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "No plan change: K5 includes restoring the suite after the key phases."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect with two callers."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Every test that mocks or imports a module the key phases changed was listed by grep (45 files) and run: tests/integration/authFlows.test.tsx failed 3 of 6 against the account-key AuthContext, since K4c-2, and CI on main was red from b4bf42b71 on (k5a-auth-flow-tests-follow-old-sign-in). No instrument named running the distant tests of a changed module, so H3 was added."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k5a-auth-flow-tests-follow-old-sign-in",
+     "summary": "The auth flow integration tests still mocked the old key services and expected the password at /auth/login, so three failed in CI after K4c-2 and main stayed red.",
+     "found_by": "H3",
+     "fix_commit": "608615138",
+     "control": {
+      "patch": ".review/controls/k5a-auth-flow-tests-follow-old-sign-in.patch",
+      "runner": "vitest",
+      "tests": [
+       "tests/integration/authFlows.test.tsx"
+      ],
+      "observed": "FAIL: 3 of 6 tests (login, register, logout) against the current AuthContext"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "tests/integration/authFlows.test.tsx rewritten for the account-key AuthContext: it mocks accountKeysService, and checks that login sends the login key and no password, and that register sends the login key and settings and no password."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "cdbe1cbe1, 3a35eb5e4, b2a87c547 (K4c-2, which changed AuthContext); none ran this integration file."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "A test-only change; no payload built."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The mocked module exports are the names AuthContext imports."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The mocked answers have the shapes the real services return (signInSecret, prepareSignUp)."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The user fixture carries public_key, as /auth/login returns it."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling integration tests (messagingFlows, messagesService.editing) that mock key modules pass unchanged."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "All six flows reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Rejected login and register still throw to the caller (asserted)."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One mock of accountKeysService per file, as AuthContext.test does."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: no other test mocks the old key modules in a way that fails."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The old test file restored from a4d23fcc1: 3 of 6 tests fail against the current AuthContext."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b, eslint clean; pre-commit gate 0 failed; CI for b4bf42b71 failed on exactly these three tests (Frontend job), Backend, E2E and migration jobs passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in this file; the one skipped test in the H3 run is in a messaging file and was skipped before these changes."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "No plan change: K5 includes restoring the suite after the key phases."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect with two callers."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Pass 2: the same 45 files, one path per argument: 45 passed, 344 tests passed, 1 skipped."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "H3 set: 45 files, 344 passed, 1 skipped (pre-existing), 0 failed"
+ }
+}
