@@ -239,8 +239,72 @@ func TestKeyBackupReturnsTheSettingsAndBothCopies(t *testing.T) {
 
 	backup, err := GetKeyBackup(ctx, repo, user.ID)
 	require.NoError(t, err)
-	assert.Equal(t, KeyBackup{KDFSalt: testKDFSalt, KDFIterations: MinKDFIterations,
+	assert.Equal(t, KeyBackup{AuthScheme: 2, HasPassword: true, KDFSalt: testKDFSalt, KDFIterations: MinKDFIterations,
 		EncryptedPrivateKey: "copy-under-wrap-key", RecoveryWrappedPrivateKey: "copy-under-phrase"}, *backup)
+
+	oauthOnly := &models.User{Username: "oauthbackup", PasswordHash: ""}
+	require.NoError(t, repo.Create(ctx, oauthOnly))
+	backup, err = GetKeyBackup(ctx, repo, oauthOnly.ID)
+	require.NoError(t, err)
+	assert.Equal(t, KeyBackup{AuthScheme: oauthOnly.AuthScheme, HasPassword: false}, *backup,
+		"an account with no password says so, so the app offers no password step")
+}
+
+func TestStorePrivateKeyCopyNeedsTheAccountsSecret(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithKey(t, auth, repo, "copykeeper")
+	user, _ := repo.GetByUsername(ctx, "copykeeper")
+	registerWithPassword(t, auth, repo, "oldscheme", "correct-horse")
+	oldScheme, _ := repo.GetByUsername(ctx, "oldscheme")
+
+	store := func(userID int, password, key, copy string) error {
+		return StorePrivateKeyCopy(ctx, repo, userID, &PrivateKeyCopyRequest{Password: password, LoginKey: key, EncryptedPrivateKey: copy})
+	}
+	assert.ErrorIs(t, store(user.ID, "", "", "swapped-copy"), ErrCurrentPasswordIncorrect, "a session alone cannot swap the copy")
+	assert.ErrorIs(t, store(user.ID, "", testLoginKey(6), "swapped-copy"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, store(user.ID, "some-password", "", "swapped-copy"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, store(oldScheme.ID, "wrong-horse", "", "swapped-copy"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, store(user.ID, "", testLoginKey(7), ""), ErrInvalidPrivateKeyCopy)
+	assert.ErrorIs(t, store(user.ID, "", testLoginKey(7), strings.Repeat("x", maxWrappedCopyBytes+1)), ErrInvalidPrivateKeyCopy)
+	unchanged, _ := repo.GetByID(ctx, user.ID)
+	assert.Nil(t, unchanged.EncryptedPrivateKey, "no refused request wrote a copy")
+
+	require.NoError(t, store(user.ID, "", testLoginKey(7), "copy-under-wrap-key"))
+	stored, _ := repo.GetByID(ctx, user.ID)
+	require.NotNil(t, stored.EncryptedPrivateKey)
+	assert.Equal(t, "copy-under-wrap-key", *stored.EncryptedPrivateKey)
+	require.NoError(t, store(oldScheme.ID, "correct-horse", "", "copy-under-password"))
+
+	oauthOnly := &models.User{Username: "oauthcopy", PasswordHash: ""}
+	require.NoError(t, repo.Create(ctx, oauthOnly))
+	require.NoError(t, store(oauthOnly.ID, "", "", "copy-under-app-password"), "no password, so the session is the proof")
+}
+
+func TestStorePublicKeyNeedsTheAccountsSecret(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithKey(t, auth, repo, "keypublisher")
+	user, _ := repo.GetByUsername(ctx, "keypublisher")
+
+	publish := func(userID int, key, publicKey string) error {
+		return StorePublicKey(ctx, repo, userID, &PublicKeyRequest{LoginKey: key, PublicKey: publicKey})
+	}
+	assert.ErrorIs(t, publish(user.ID, "", "attackers-public-key"), ErrCurrentPasswordIncorrect, "a session alone cannot swap the key others encrypt to")
+	assert.ErrorIs(t, publish(user.ID, testLoginKey(6), "attackers-public-key"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, publish(user.ID, testLoginKey(7), ""), ErrInvalidPublicKey)
+	assert.ErrorIs(t, publish(user.ID, testLoginKey(7), strings.Repeat("x", maxWrappedCopyBytes+1)), ErrInvalidPublicKey)
+	unchanged, _ := repo.GetByID(ctx, user.ID)
+	assert.Nil(t, unchanged.PublicKey, "no refused request published a key")
+
+	require.NoError(t, publish(user.ID, testLoginKey(7), "own-public-key"))
+	stored, _ := repo.GetByID(ctx, user.ID)
+	require.NotNil(t, stored.PublicKey)
+	assert.Equal(t, "own-public-key", *stored.PublicKey)
+
+	oauthOnly := &models.User{Username: "oauthpublisher", PasswordHash: ""}
+	require.NoError(t, repo.Create(ctx, oauthOnly))
+	require.NoError(t, publish(oauthOnly.ID, "", "own-public-key"), "no password, so the session is the proof")
 }
 
 func TestStoreRecoveryKeyNeedsTheAccountsSecret(t *testing.T) {

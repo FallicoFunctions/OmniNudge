@@ -94,7 +94,7 @@ export async function createAccountKeys(keys: LoginKeys | null): Promise<string>
   // Others encrypt to the public key, so it goes out only once its private key
   // is kept on the device and on the server: a failure part-way leaves no key
   // that messages are sent to and nobody holds.
-  await encryptionService.uploadPublicKey(exported.publicKey);
+  await encryptionService.uploadPublicKey(exported.publicKey, keys?.loginKey);
   return recoveryPhrase;
 }
 

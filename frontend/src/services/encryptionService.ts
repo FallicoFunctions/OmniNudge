@@ -10,10 +10,14 @@ export interface PublicKeysResponse {
 
 export const encryptionService = {
   /**
-   * Upload user's public key to server
+   * Upload user's public key to server. loginKey proves the account, as the
+   * uploads of both private key copies do.
    */
-  async uploadPublicKey(publicKey: string): Promise<void> {
-    await api.put('/auth/public-key', { public_key: publicKey });
+  async uploadPublicKey(publicKey: string, loginKey?: string): Promise<void> {
+    await api.put('/auth/public-key', {
+      public_key: publicKey,
+      ...(loginKey ? { login_key: loginKey } : {}),
+    });
   },
 
   /**

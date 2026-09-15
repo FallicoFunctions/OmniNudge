@@ -265,6 +265,8 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 			protected.POST("/auth/login-key", limited(authLimit, authHandler.MoveToLoginKey)...)
 			protected.GET("/auth/key-backup", authHandler.GetKeyBackup)
 			protected.PUT("/auth/recovery-key", limited(authLimit, authHandler.StoreRecoveryKey)...)
+			protected.PUT("/auth/encrypted-private-key", limited(authLimit, authHandler.UpdateEncryptedPrivateKey)...)
+			protected.PUT("/auth/public-key", limited(authLimit, authHandler.UpdatePublicKey)...)
 			protected.POST("/auth/app-password", limited(authLimit, authHandler.SetAppPassword)...)
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations", conversationsHandler.GetConversations)

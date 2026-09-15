@@ -1347,9 +1347,10 @@ func main() {
 			protected.POST("/auth/ws-token", authHandler.GenerateWSToken)
 			protected.GET("/auth/sessions", authHandler.ListSessions)
 			protected.DELETE("/auth/sessions/:session_id", authHandler.RevokeSession)
-			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
+			// Both check the account's secret, so both share the sign-in limit.
+			protected.PUT("/auth/public-key", authRateLimiter.Middleware(), authHandler.UpdatePublicKey)
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
-			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)
+			protected.PUT("/auth/encrypted-private-key", authRateLimiter.Middleware(), authHandler.UpdateEncryptedPrivateKey)
 			protected.GET("/auth/encrypted-private-key", authHandler.GetEncryptedPrivateKey)
 			// It checks the current password, so it shares the sign-in limit.
 			protected.POST("/auth/login-key", authRateLimiter.Middleware(), authHandler.MoveToLoginKey)

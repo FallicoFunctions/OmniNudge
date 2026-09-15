@@ -392,22 +392,24 @@ func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		PublicKey string `json:"public_key" binding:"required"`
-	}
-
+	var req services.PublicKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	// Update public key in database
-	if err := h.userRepo.UpdatePublicKey(c.Request.Context(), userID, req.PublicKey); err != nil {
+	err := services.StorePublicKey(c.Request.Context(), h.userRepo, userID, &req)
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, gin.H{"message": "Public key updated successfully"})
+	case errors.Is(err, services.ErrInvalidPublicKey):
+		RespondError(c, http.StatusBadRequest, "Invalid public key")
+	case errors.Is(err, services.ErrCurrentPasswordIncorrect):
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
+	default:
+		slog.Error("store public key failed", "error", err, "user_id", userID)
 		RespondError(c, http.StatusInternalServerError, "Failed to update public key")
-		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Public key updated successfully"})
 }
 
 // GetPublicKeys handles fetching public keys for multiple users.
@@ -645,21 +647,24 @@ func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		EncryptedPrivateKey string `json:"encrypted_private_key" binding:"required"`
-	}
-
+	var req services.PrivateKeyCopyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.userRepo.UpdateEncryptedPrivateKey(c.Request.Context(), userID, req.EncryptedPrivateKey); err != nil {
+	err := services.StorePrivateKeyCopy(c.Request.Context(), h.userRepo, userID, &req)
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, gin.H{"message": "Encrypted private key updated successfully"})
+	case errors.Is(err, services.ErrInvalidPrivateKeyCopy):
+		RespondError(c, http.StatusBadRequest, "Invalid private key copy")
+	case errors.Is(err, services.ErrCurrentPasswordIncorrect):
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
+	default:
+		slog.Error("store private key copy failed", "error", err, "user_id", userID)
 		RespondError(c, http.StatusInternalServerError, "Failed to update encrypted private key")
-		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Encrypted private key updated successfully"})
 }
 
 // GetEncryptedPrivateKey handles fetching user's encrypted private key for cross-browser sync.

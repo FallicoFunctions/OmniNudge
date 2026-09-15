@@ -56,7 +56,8 @@ describe('sign-up', () => {
     const phrase = await createAccountKeys(keys);
     expect(isValidRecoveryPhrase(phrase)).toBe(true);
 
-    expect(bodiesSentTo('put', '/auth/public-key')).toHaveLength(1);
+    const [published] = bodiesSentTo('put', '/auth/public-key');
+    expect(published.login_key).toBe(keys.loginKey);
     const [copy] = bodiesSentTo('put', '/auth/encrypted-private-key');
     const [recovery] = bodiesSentTo('put', '/auth/recovery-key');
     expect(copy.login_key).toBe(keys.loginKey);
@@ -97,6 +98,8 @@ describe('sign-up', () => {
     expect(bodiesSentTo('put', '/auth/encrypted-private-key')).toHaveLength(0);
     const [recovery] = bodiesSentTo('put', '/auth/recovery-key');
     expect(recovery).not.toHaveProperty('login_key');
+    const [published] = bodiesSentTo('put', '/auth/public-key');
+    expect(published).not.toHaveProperty('login_key');
   });
 });
 

@@ -151,12 +151,31 @@ func TestRecoveryCopyAndKeyBackupOverHTTP(t *testing.T) {
 		map[string]any{"login_key": itLoginKey(7), "recovery_wrapped_private_key": "copy-under-phrase"}, token)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
+	assert.Equal(t, http.StatusUnauthorized, sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/encrypted-private-key",
+		map[string]any{"encrypted_private_key": "swapped-copy"}, token).Code, "a session alone cannot swap the copy")
+	assert.Equal(t, http.StatusBadRequest, sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/encrypted-private-key",
+		map[string]any{"login_key": itLoginKey(7), "encrypted_private_key": ""}, token).Code)
+	w = sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/encrypted-private-key",
+		map[string]any{"login_key": itLoginKey(7), "encrypted_private_key": "copy-under-wrap-key"}, token)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	assert.Equal(t, http.StatusUnauthorized, sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/public-key",
+		map[string]any{"public_key": "attackers-public-key"}, token).Code, "a session alone cannot swap the public key")
+	w = sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/public-key",
+		map[string]any{"login_key": itLoginKey(7), "public_key": "own-public-key"}, token)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	published, err := deps.UserRepo.GetByID(t.Context(), user.ID)
+	require.NoError(t, err)
+	require.NotNil(t, published.PublicKey)
+	assert.Equal(t, "own-public-key", *published.PublicKey)
+
 	w = sendAuthJSON(t, deps.Router, http.MethodGet, "/api/v1/auth/key-backup", nil, token)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var backup map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &backup))
-	assert.Equal(t, map[string]any{"kdf_salt": itKDFSalt, "kdf_iterations": float64(600000),
-		"recovery_wrapped_private_key": "copy-under-phrase"}, backup)
+	assert.Equal(t, map[string]any{"auth_scheme": float64(2), "has_password": true,
+		"kdf_salt": itKDFSalt, "kdf_iterations": float64(600000),
+		"encrypted_private_key": "copy-under-wrap-key", "recovery_wrapped_private_key": "copy-under-phrase"}, backup)
 }
 
 func TestAppPasswordOverHTTP(t *testing.T) {

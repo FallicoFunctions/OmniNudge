@@ -93,13 +93,22 @@ var (
 	ErrAccountHasPassword = errors.New("account already has a password")
 	// ErrInvalidRecoveryCopy is returned for an empty or oversized recovery copy.
 	ErrInvalidRecoveryCopy = errors.New("invalid recovery copy")
+	// ErrInvalidPrivateKeyCopy is returned for an empty or oversized copy
+	// wrapped by the password's wrap key.
+	ErrInvalidPrivateKeyCopy = errors.New("invalid private key copy")
+	// ErrInvalidPublicKey is returned for an empty or oversized public key.
+	ErrInvalidPublicKey = errors.New("invalid public key")
 )
 
 // KeyBackup is what a device needs to unlock the private key: the derivation
 // settings and both wrapped copies. Neither copy opens without the password
 // or the recovery phrase, so returning them to the account's own session
-// reveals nothing the server itself could read.
+// reveals nothing the server itself could read. AuthScheme and HasPassword
+// tell the app which secret the account proves itself with: its login key,
+// its password on the old scheme, or none (provider sign-in only).
 type KeyBackup struct {
+	AuthScheme                int    `json:"auth_scheme"`
+	HasPassword               bool   `json:"has_password"`
 	KDFSalt                   string `json:"kdf_salt,omitempty"`
 	KDFIterations             int    `json:"kdf_iterations,omitempty"`
 	EncryptedPrivateKey       string `json:"encrypted_private_key,omitempty"`
@@ -115,7 +124,7 @@ func GetKeyBackup(ctx context.Context, userRepo ports.UserRepository, userID int
 	if user == nil {
 		return nil, errors.New("account unavailable")
 	}
-	backup := &KeyBackup{}
+	backup := &KeyBackup{AuthScheme: user.AuthScheme, HasPassword: user.PasswordHash != ""}
 	if user.KDFSalt != nil {
 		backup.KDFSalt = *user.KDFSalt
 	}
@@ -147,6 +156,57 @@ func StoreRecoveryKey(ctx context.Context, userRepo ports.UserRepository, userID
 	if req.RecoveryWrappedPrivateKey == "" || len(req.RecoveryWrappedPrivateKey) > maxWrappedCopyBytes {
 		return ErrInvalidRecoveryCopy
 	}
+	if err := proveAccount(ctx, userRepo, userID, req.Password, req.LoginKey); err != nil {
+		return err
+	}
+	return userRepo.UpdateRecoveryWrappedPrivateKey(ctx, userID, req.RecoveryWrappedPrivateKey)
+}
+
+// PrivateKeyCopyRequest stores the copy of the private key wrapped by the
+// password's wrap key, proved like the recovery copy.
+type PrivateKeyCopyRequest struct {
+	Password            string `json:"password,omitempty"`
+	LoginKey            string `json:"login_key,omitempty"`
+	EncryptedPrivateKey string `json:"encrypted_private_key"`
+}
+
+// StorePrivateKeyCopy replaces the copy a device unlocks at sign-in. Every
+// device trusts whatever copy is stored here, so a session alone must not be
+// able to swap it.
+func StorePrivateKeyCopy(ctx context.Context, userRepo ports.UserRepository, userID int, req *PrivateKeyCopyRequest) error {
+	if req.EncryptedPrivateKey == "" || len(req.EncryptedPrivateKey) > maxWrappedCopyBytes {
+		return ErrInvalidPrivateKeyCopy
+	}
+	if err := proveAccount(ctx, userRepo, userID, req.Password, req.LoginKey); err != nil {
+		return err
+	}
+	return userRepo.UpdateEncryptedPrivateKey(ctx, userID, req.EncryptedPrivateKey)
+}
+
+// PublicKeyRequest publishes the account's public key, proved like the copies.
+type PublicKeyRequest struct {
+	Password  string `json:"password,omitempty"`
+	LoginKey  string `json:"login_key,omitempty"`
+	PublicKey string `json:"public_key"`
+}
+
+// StorePublicKey replaces the key everyone encrypts messages to this account
+// with. A session alone must not be able to swap it, or whoever holds the
+// session reads every new message.
+func StorePublicKey(ctx context.Context, userRepo ports.UserRepository, userID int, req *PublicKeyRequest) error {
+	if req.PublicKey == "" || len(req.PublicKey) > maxWrappedCopyBytes {
+		return ErrInvalidPublicKey
+	}
+	if err := proveAccount(ctx, userRepo, userID, req.Password, req.LoginKey); err != nil {
+		return err
+	}
+	return userRepo.UpdatePublicKey(ctx, userID, req.PublicKey)
+}
+
+// proveAccount checks the secret an account signs in with. An account with no
+// password at all (OAuth, no app password) has only its session to prove
+// itself with.
+func proveAccount(ctx context.Context, userRepo ports.UserRepository, userID int, password, loginKey string) error {
 	user, err := userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -154,10 +214,10 @@ func StoreRecoveryKey(ctx context.Context, userRepo ports.UserRepository, userID
 	if user == nil {
 		return errors.New("account unavailable")
 	}
-	if user.PasswordHash != "" && CheckAccountSecret(user.PasswordHash, user.AuthScheme, req.Password, req.LoginKey) != nil {
+	if user.PasswordHash != "" && CheckAccountSecret(user.PasswordHash, user.AuthScheme, password, loginKey) != nil {
 		return ErrCurrentPasswordIncorrect
 	}
-	return userRepo.UpdateRecoveryWrappedPrivateKey(ctx, userID, req.RecoveryWrappedPrivateKey)
+	return nil
 }
 
 // AppPasswordRequest gives an account without a password (OAuth only) a login
