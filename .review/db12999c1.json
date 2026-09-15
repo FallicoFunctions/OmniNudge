@@ -1,0 +1,224 @@
+{
+  "schema_version": 2,
+  "head": "7b0ad6566",
+  "base": "db12999c1",
+  "scope": {
+    "files": [
+      "backend/internal/models/user.go",
+      "backend/internal/models/user_login_keys_test.go",
+      "backend/internal/ports/user_repository.go",
+      "backend/internal/repository/user_postgres.go",
+      "backend/internal/services/mocks/user_repository.go",
+      "backend/internal/services/auth_login_key.go",
+      "backend/internal/services/auth_login_key_test.go"
+    ],
+    "boundaries": [
+      "services -> UserRepository.SetLoginKey (three implementations)",
+      "users row: password_hash, auth_scheme, kdf_*, encrypted_private_key, token_version"
+    ]
+  },
+  "prior_ledgers_read": [
+    "fc6926b2f",
+    "b530f73c2"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "SetLoginKey in models, ports, the Postgres wrapper and the mock; services.ChangeLoginKey and services.ResetToLoginKey with ErrNotOnLoginKey and ErrPrivateKeyNotRewrapped; tests for both functions (mock) and for SetLoginKey (database)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "fc6926b2f (K2a) found nothing; b530f73c2 found GetByID omitting password_hash, which ChangeLoginKey relies on and which is fixed. No prior finding on password change or reset."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler yet; K2b-2."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the row back after SetLoginKey against Postgres 16: scheme 2, the new hash, the new copy, token_version raised; after a second call with an empty copy, the copy is NULL."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No constant crosses a seam."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No response shape yet."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The rule for proving the current secret is CheckAccountSecret, reused by ChangeLoginKey rather than copied."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "SetLoginKey is carried by all three implementations; go build ./... and go vet ./... pass on the whole backend."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The mock mirrors the SQL (scheme 2, settings, copy replaced or cleared, token_version raised, missing user refused); the database test checks the real SQL does the same."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Test rows are written through the real repository."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing beyond validateLoginKey, covered in K1b."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: a wrong current key, a change without the rewrapped copy when a copy exists, 1000 rounds, a change on a scheme 1 account, a reset with 1000 rounds, SetLoginKey for a missing user."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The rounds boundary is covered by K1b's tests."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Who else writes a login key: UpgradeToLoginKey (the move, scheme 1 only) and Register; SetLoginKey is the one path for a changed or reset key."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "Every branch of both functions is reached by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal is a named error for the handlers of K2b-2 to map; a missing user is an error, not a silent no-op."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Nothing gated on a flag."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that keep a private key copy: the upload endpoint (the app's own) and the move; each replaces it in the same write as the key."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "ChangeLoginKey reads, checks and writes without a lock; two changes with the same current key both pass and the last wins, as today's password change does. Not a new exposure."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Each write is one UPDATE."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Checked against the code: today's reset (UpdatePassword) leaves the copy wrapped by the forgotten password in place, where nothing can open it; ResetToLoginKey clears it, losing nothing usable. The recovery copy is untouched."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The functions have no callers until K2b-2 wires the handlers; the tests call them directly."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; services 65, models 4, handlers 71 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran SetLoginKey against real Postgres 16."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed ChangeLoginKey a change that would drop the only copy: refused with ErrPrivateKeyNotRewrapped."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K2b promises: a change replaces the copy with the rewrapped one and never drops it; a reset clears the copy and leaves the recovery copy for the phrase. Each is a test."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "services 65, models 4, handlers 71 PASS; 0 FAIL, 0 SKIP"
+  }
+}
