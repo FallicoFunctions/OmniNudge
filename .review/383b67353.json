@@ -1,0 +1,407 @@
+{
+  "schema_version": 2,
+  "head": "0e53719a4",
+  "base": "383b67353",
+  "scope": {
+    "files": [
+      "backend/internal/database/test_helpers.go",
+      "backend/internal/database/test_helpers_test.go",
+      "backend/internal/workers/rollout_monitor_db_test.go",
+      ".github/workflows/ci.yml"
+    ],
+    "boundaries": [
+      "test binary -> Postgres (CREATE DATABASE, pg_advisory_lock)",
+      "CI unit step -> four test binaries at once"
+    ]
+  },
+  "prior_ledgers_read": [
+    "c7191c885",
+    "44fcc93e1",
+    "b6cf44ccc"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "backend/internal/database/test_helpers.go (TestDSN, packageDatabaseName, ensurePackageDatabase; NewTest uses TestDSN), test_helpers_test.go (new), internal/workers/rollout_monitor_db_test.go, .github/workflows/ci.yml (-p 4). The integration helper change was taken out of P1: the pre-commit gate lints staged packages without the integration build tag and refuses that package; it is saved for P2, after the gate learns the tag. Boundaries: test binary -> Postgres (CREATE DATABASE, pg_advisory_lock), CI unit step -> four test binaries at once."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger has a finding on the test database helpers, the advisory test lock or the Go test flags in ci.yml; c7191c885 found the CI type check checked nothing, which is the frontend job."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed TestDSN's address from a real run (credentials redacted): postgres://***@localhost:5432/omninudge_test_database?sslmode=disable; and the six addresses a concurrent probe created, omninudge_test_zzprobe_pkg0 to pkg5, each with its query string intact."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Migrated an empty package database with the real Migrate as the local test user, which is not a superuser: 193 migrations recorded, 146 public tables, pg_trgm present, 690 ms; a second Migrate on the same database took 0 s. TestNewTestConnectsToThisPackagesOwnDatabase reads current_database() back."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The same variables in the same order as before (TEST_DATABASE_URL, then DATABASE_URL, then the local default); every derived name contains \"test\", which is what ResetTestData checks before it truncates."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "TestDSN returns the same kind of string database.New and NewTest took before: the base URL with only the path replaced; the query string (sslmode) survives, printed above."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule for every opener: NewTest and the workers helper both go through TestDSN; nothing else in internal/ opens a test database (grep: cmd/ tools read DATABASE_URL but are not tests)."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Postgres's side, run for real: the same advisory key held in pkg0's database could still be taken in pkg1's (acquired=true) and not again in pkg0's (acquired=false); six CREATE DATABASE at once all succeeded; pg_trgm is a trusted extension, so the owner creates it."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added across a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is current_database() on a real NewTest connection, asserted to end in _database; the control shows what a wrong reader produced: omninudge_test_001."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The probe's package directories were shaped the way go test runs a binary, in its package directory under internal/; that shape is what exposed the t.Chdir case."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Naming cases that must work: a flat package, a nested package, upper case, dots and dashes, a directory outside internal/."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A base name without \"test\" gains it (omninudge -> omninudge_test_models), so a DATABASE_URL pointing at a development database never yields a name ResetTestData would refuse, and never touches the development database itself."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Past the 63-byte Postgres limit: two long paths differing only at the end give two distinct names of at most 63 bytes, and the same path gives the same name again."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings that open a test database: the workers helper moved to TestDSN; the integration helper moves in P2 (see A1); no other opener in internal/."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "ensureTestDatabase's name check is still reachable: with TEST_DATABASE_URL unset it now always passes, because every derived name contains test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "CREATE DATABASE: an existing database (42P04, a concurrent run) is success; no permission (42501) returns the one-line ALTER ROLE ... CREATEDB fix; anything else is wrapped with the name. The sync.Once keeps the error, so every NewTest in the binary reports it rather than one."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The new path needs CREATEDB: CI connects as the service superuser; the local user was shown to have it. No migration needs more than owner rights (grep of all 386 files for CREATE ROLE, ALTER SYSTEM, OWNER TO, GRANT to a role, SECURITY DEFINER: none)."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The address fallback chain now exists once, in TestDSN; NewTest no longer repeats it."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every lazily-read input of TestDSN: the working directory (t.Chdir in internal/handlers -- the finding) and the address variables (grep: no test sets TEST_DATABASE_URL or DATABASE_URL; db_pool_test.go sets only the pool sizes, which NewTest reads on every call, outside the Once)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "Packages now run at once, but each in its own database with its own lock; within a package nothing changed. Six concurrent creates: no error."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "A failed CREATE DATABASE leaves nothing half made (Postgres creates a database atomically); the error reaches every NewTest."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration added."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Package databases are kept on purpose, so later runs only check migrations; a renamed package leaves one idle database locally, and CI runners start empty. The probe dropped all seven databases it made."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The one fix is controlled: the patch makes TestPackageDirIsReadBeforeAnyTestMoves fail with a real assertion (actual omninudge_test_001) and it passes at HEAD."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The pre-commit gate ran on the P1 commit and refused it while it staged internal/integration (golangci-lint without the integration tag sees no files there): the gate is wired and blocking. That gap is the separate lint task."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go vet exit 0, golangci-lint 0 issues on database and workers; the database helper tests pass against real Postgres."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "E8 found it and no instrument named lazily-read process state; E8 was added to instruments.json."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran against the real Postgres, not a mock: concurrent creation, per-database advisory locks and a fresh migration, all as recorded above. No model output involved."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision: the database is created only when a test asks for one."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No user interface changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "Found the finding: TestDSN read the working directory on first use; internal/handlers/media_queue_test.go:61 calls t.Chdir(t.TempDir())."
+        }
+      ],
+      "findings": [
+        {
+          "id": "p1-test-dsn-lazy-workdir",
+          "summary": "TestDSN named the package's test database after the working directory read on the first NewTest(); internal/handlers has a test that calls t.Chdir(t.TempDir()), so whenever it ran first the whole handlers binary would have used a database named after a temp directory (omninudge_test_001), possibly shared with another package.",
+          "found_by": "E8",
+          "fix_commit": "0e53719a4",
+          "control": {
+            "patch": ".review/controls/p1-test-dsn-lazy-workdir.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/database/ -run 'TestPackageDirIsReadBeforeAnyTestMoves'"
+            ],
+            "observed": "With the patch (testPackageDir back to a lazy os.Getwd()): FAIL, expected \"omninudge_test_database\", actual \"omninudge_test_001\". Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "backend/internal/database/test_helpers.go (TestDSN, packageDatabaseName, ensurePackageDatabase; NewTest uses TestDSN), test_helpers_test.go (new), internal/workers/rollout_monitor_db_test.go, .github/workflows/ci.yml (-p 4). The integration helper change was taken out of P1: the pre-commit gate lints staged packages without the integration build tag and refuses that package; it is saved for P2, after the gate learns the tag. Boundaries: test binary -> Postgres (CREATE DATABASE, pg_advisory_lock), CI unit step -> four test binaries at once."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger has a finding on the test database helpers, the advisory test lock or the Go test flags in ci.yml; c7191c885 found the CI type check checked nothing, which is the frontend job."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed TestDSN's address from a real run (credentials redacted): postgres://***@localhost:5432/omninudge_test_database?sslmode=disable; and the six addresses a concurrent probe created, omninudge_test_zzprobe_pkg0 to pkg5, each with its query string intact."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Migrated an empty package database with the real Migrate as the local test user, which is not a superuser: 193 migrations recorded, 146 public tables, pg_trgm present, 690 ms; a second Migrate on the same database took 0 s. TestNewTestConnectsToThisPackagesOwnDatabase reads current_database() back."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The same variables in the same order as before (TEST_DATABASE_URL, then DATABASE_URL, then the local default); every derived name contains \"test\", which is what ResetTestData checks before it truncates."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "TestDSN returns the same kind of string database.New and NewTest took before: the base URL with only the path replaced; the query string (sslmode) survives, printed above."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule for every opener: NewTest and the workers helper both go through TestDSN; nothing else in internal/ opens a test database (grep: cmd/ tools read DATABASE_URL but are not tests)."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Postgres's side, run for real: the same advisory key held in pkg0's database could still be taken in pkg1's (acquired=true) and not again in pkg0's (acquired=false); six CREATE DATABASE at once all succeeded; pg_trgm is a trusted extension, so the owner creates it."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added across a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is current_database() on a real NewTest connection, asserted to end in _database; the control shows what a wrong reader produced: omninudge_test_001."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The probe's package directories were shaped the way go test runs a binary, in its package directory under internal/; that shape is what exposed the t.Chdir case."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Naming cases that must work: a flat package, a nested package, upper case, dots and dashes, a directory outside internal/."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A base name without \"test\" gains it (omninudge -> omninudge_test_models), so a DATABASE_URL pointing at a development database never yields a name ResetTestData would refuse, and never touches the development database itself."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Past the 63-byte Postgres limit: two long paths differing only at the end give two distinct names of at most 63 bytes, and the same path gives the same name again."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings that open a test database: the workers helper moved to TestDSN; the integration helper moves in P2 (see A1); no other opener in internal/."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "ensureTestDatabase's name check is still reachable: with TEST_DATABASE_URL unset it now always passes, because every derived name contains test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "CREATE DATABASE: an existing database (42P04, a concurrent run) is success; no permission (42501) returns the one-line ALTER ROLE ... CREATEDB fix; anything else is wrapped with the name. The sync.Once keeps the error, so every NewTest in the binary reports it rather than one."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The new path needs CREATEDB: CI connects as the service superuser; the local user was shown to have it. No migration needs more than owner rights (grep of all 386 files for CREATE ROLE, ALTER SYSTEM, OWNER TO, GRANT to a role, SECURITY DEFINER: none)."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The address fallback chain now exists once, in TestDSN; NewTest no longer repeats it."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every lazily-read input of TestDSN: the working directory (t.Chdir in internal/handlers -- the finding) and the address variables (grep: no test sets TEST_DATABASE_URL or DATABASE_URL; db_pool_test.go sets only the pool sizes, which NewTest reads on every call, outside the Once)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "Packages now run at once, but each in its own database with its own lock; within a package nothing changed. Six concurrent creates: no error."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "A failed CREATE DATABASE leaves nothing half made (Postgres creates a database atomically); the error reaches every NewTest."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration added."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Package databases are kept on purpose, so later runs only check migrations; a renamed package leaves one idle database locally, and CI runners start empty. The probe dropped all seven databases it made."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Replayed by hand after the commit: the control fails with its patch and passes at HEAD 0e53719a4."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The pre-commit gate ran on the P1 commit and refused it while it staged internal/integration (golangci-lint without the integration tag sees no files there): the gate is wired and blocking. That gap is the separate lint task."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Pre-commit gate on 0e53719a4: 0 failed, golangci-lint 0 issues. The four helper tests pass (TestPackageDatabaseName, TestPackageDatabaseNameStaysDistinctPastPostgresLimit, TestPackageDirIsReadBeforeAnyTestMoves, TestNewTestConnectsToThisPackagesOwnDatabase)."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran against the real Postgres, not a mock: concurrent creation, per-database advisory locks and a fresh migration, all as recorded above. No model output involved."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision: the database is created only when a test asks for one."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No user interface changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "Found the finding: TestDSN read the working directory on first use; internal/handlers/media_queue_test.go:61 calls t.Chdir(t.TempDir())."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet exit 0",
+    "lint": "golangci-lint v2.12.2: 0 issues; pre-commit gate 0 failed",
+    "types": "go vet exit 0",
+    "tests": "database helper tests pass against real Postgres; the full suite is run after the review"
+  }
+}

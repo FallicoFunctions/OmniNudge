@@ -1,0 +1,13 @@
+diff --git a/backend/internal/database/test_helpers.go b/backend/internal/database/test_helpers.go
+index 6d71f329b..37a9a9342 100644
+--- a/backend/internal/database/test_helpers.go
++++ b/backend/internal/database/test_helpers.go
+@@ -50,7 +50,7 @@ var (
+ 
+ // testPackageDir is the directory the test binary started in.
+ func testPackageDir() (string, error) {
+-	return startDir, errStartDir
++	return os.Getwd()
+ }
+ 
+ // TestDSN returns the connection string of this test binary's own database,

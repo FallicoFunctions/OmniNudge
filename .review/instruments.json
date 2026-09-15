@@ -205,6 +205,12 @@
       "name": "Measure the rendered layout at the narrowest real widths",
       "trigger": "a component changed what sits in a shared bar, header, toolbar or row",
       "asks": "Open the real page in a real browser at 360, 375 and 390 px and at a desktop width, put the real rendered markup in place for every state the change adds (and the worst realistic content: the longest balance, name, timer and message), and measure: does the row scroll, does any control overlap another, does any text overflow its own box, does anything grow taller than its bar? jsdom has no layout, so every class-level test passes while the header is broken. B2 added call controls to the OmniChat header; every test was green and the row needed 444 px on a 360 px phone -- mute over the logo, the exit off screen. The first fix was measured with the signed-out account button (52 px, not the signed-in 78 px) and still overlapped; a box-overlap check then missed the logo text spilling out of a shrunk box. Measure boxes AND text overflow (scrollWidth > clientWidth), signed in, with the longest content."
+    },
+    {
+      "id": "E8",
+      "name": "What changes the process-wide state that lazy code reads?",
+      "trigger": "code reads process-wide state on first use and caches it: the working directory, environment variables, the clock, a global, a sync.Once",
+      "asks": "Find everything in the same process that can change that state before the first read, and ask what the cached value becomes when it runs first. A lazily-read value is correct only for the order in which the tests happen to run today; -run, -shuffle or one new file changes the order. TestDSN named each package test database after the working directory on the first NewTest() call -- and a handlers test calls t.Chdir(t.TempDir()), so whenever it ran first the whole handlers binary would have been named after a temp directory like 001, possibly one shared with another package, which is exactly the cross-package collision the change existed to remove. Read the state once, before any test can run (a package-level variable), or pass it in."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
