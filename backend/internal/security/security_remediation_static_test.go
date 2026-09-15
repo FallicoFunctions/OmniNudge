@@ -23,15 +23,21 @@ func readRepoFile(t *testing.T, rel string) string {
 
 func TestSecurityRemediationBackendStatic(t *testing.T) {
 	users := readRepoFile(t, "internal/handlers/users.go")
-	for _, forbidden := range []string{`c.GetInt("user_id")`, "bcrypt.DefaultCost"} {
+	// A changed password is hashed where every password is, at the production
+	// cost; a second bcrypt call here could drift to a weaker one.
+	for _, forbidden := range []string{`c.GetInt("user_id")`, "bcrypt.DefaultCost", "bcrypt.GenerateFromPassword"} {
 		if strings.Contains(users, forbidden) {
 			t.Fatalf("users.go still contains %s", forbidden)
 		}
 	}
-	for _, required := range []string{"bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)", "IncrementTokenVersion(c.Request.Context(), userID)"} {
+	for _, required := range []string{"utils.HashPassword(req.NewPassword)", "IncrementTokenVersion(c.Request.Context(), userID)"} {
 		if !strings.Contains(users, required) {
 			t.Fatalf("users.go missing %s", required)
 		}
+	}
+	password := readRepoFile(t, "internal/utils/password.go")
+	if !strings.Contains(password, "productionCost = 12") {
+		t.Fatalf("password.go no longer hashes stored passwords at bcrypt cost 12")
 	}
 
 	designer := readRepoFile(t, "internal/handlers/hub_ai_designer.go")

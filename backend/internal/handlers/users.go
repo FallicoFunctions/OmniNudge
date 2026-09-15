@@ -18,13 +18,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	zlog "github.com/rs/zerolog/log"
-	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // UsersHandler serves public user profile data and profile management
@@ -1149,20 +1149,20 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	}
 
 	// Verify current password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+	if err := utils.CheckPassword(user.PasswordHash, req.CurrentPassword); err != nil {
 		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
 		return
 	}
 
 	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
 
 	// Update password
-	if err := h.userRepo.UpdatePassword(c.Request.Context(), user.ID, string(hashedPassword)); err != nil {
+	if err := h.userRepo.UpdatePassword(c.Request.Context(), user.ID, hashedPassword); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update password")
 		return
 	}
