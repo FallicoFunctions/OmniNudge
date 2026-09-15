@@ -1,0 +1,447 @@
+{
+ "schema_version": 2,
+ "head": "4356a9e19",
+ "base": "3a35eb5e4",
+ "scope": {
+  "files": [
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts"
+  ],
+  "boundaries": [
+   "GET /auth/key-backup",
+   "PUT /auth/recovery-key"
+  ]
+ },
+ "prior_ledgers_read": [
+  "1cc82cad7",
+  "dbb370ff8",
+  "238b7ec7d"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "accountKeysService: replacePhraseWithPassword (the password's wrap key opens the server copy; proof is the login key) and replacePhraseWithPhrase (the current phrase opens the recovery copy; for accounts with no password); both return a PendingPhrase; storeRecoveryCopy now sits on the same prepareRecoveryCopy."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "1cc82cad7 (K4e-2 part 2: one text finding), dbb370ff8, 238b7ec7d; none on replacing the phrase."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The /auth/recovery-key body printed through the mock for both variants: the copy opens with the new phrase to the private key; login_key for a password account, nothing for one with no password; no password string."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; the tab is the next phase."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server StoreRecoveryKey read: checks the secret unless the account has no password; 401 on a wrong secret, 400 on an empty or oversized copy."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "recovery_wrapped_private_key and login_key spelled as the Go tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The copy the server stores is the one a later recoverWithPhrase opens (same openRecoveryCopy)."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Wrapping a recovery copy lives once, prepareRecoveryCopy."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises the plain object."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Copies are made with the real wrapSecret and derive functions."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The right password and the right phrase each produce a new phrase."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password gives Wrong password; an old-scheme account and a wrong phrase are refused; nothing is sent in any of them."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The phrase format is K3's."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: recoverWithPhrase and setAppPassword open the copy the same way; unlockWithPassword maps a copy that does not open to the same message."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached, including a second save."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure throws to the caller, the tab."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One recovery-copy wrapper for all four callers."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'the server copy replaced before the user holds its phrase': sign-up and the move also store before they return, but a retry there makes new keys or proves with the password, as the K4b review recorded; only the two replace functions had no way back."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Half-way failure: both functions sent the new copy before returning the phrase, so a lost response after the server stored it left a copy only an unseen phrase opens; for an account with no password nothing could repair it, because the next attempt needs the old phrase and the old copy was gone (k4e3a-phrase-replaced-before-held)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Until save() runs, the old copy and the old phrase keep working."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest accountKeysService and AuthContext 44 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "F2 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing is sent early: the copy waits for save()."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: Settings 'Make a new recovery phrase' requires the current password; an account with no password proves itself with its current phrase. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "The tab is the only caller; a repeated save sends the same copy."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4e3a-phrase-replaced-before-held",
+     "summary": "Replacing the recovery phrase sent the new copy before the user held the new phrase, so a lost response could leave an account with no password unable to recover.",
+     "found_by": "F2",
+     "fix_commit": "4356a9e19",
+     "control": {
+      "patch": ".review/controls/k4e3a-phrase-replaced-before-held.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/accountKeysService.test.ts -t 'sends nothing until the user holds'",
+       "src/services/__tests__/accountKeysService.test.ts -t 'sends nothing until saved'"
+      ],
+      "observed": "FAIL: api.put called once before save()"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "accountKeysService: replacePhraseWithPassword (the password's wrap key opens the server copy; proof is the login key) and replacePhraseWithPhrase (the current phrase opens the recovery copy; for accounts with no password); both return a PendingPhrase; storeRecoveryCopy now sits on the same prepareRecoveryCopy."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "1cc82cad7 (K4e-2 part 2: one text finding), dbb370ff8, 238b7ec7d; none on replacing the phrase."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The /auth/recovery-key body printed through the mock for both variants: the copy opens with the new phrase to the private key; login_key for a password account, nothing for one with no password; no password string."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; the tab is the next phase."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server StoreRecoveryKey read: checks the secret unless the account has no password; 401 on a wrong secret, 400 on an empty or oversized copy."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "recovery_wrapped_private_key and login_key spelled as the Go tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The copy the server stores is the one a later recoverWithPhrase opens (same openRecoveryCopy)."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Wrapping a recovery copy lives once, prepareRecoveryCopy."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises the plain object."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Copies are made with the real wrapSecret and derive functions."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The right password and the right phrase each produce a new phrase."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password gives Wrong password; an old-scheme account and a wrong phrase are refused; nothing is sent in any of them."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The phrase format is K3's."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: recoverWithPhrase and setAppPassword open the copy the same way; unlockWithPassword maps a copy that does not open to the same message."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached, including a second save."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure throws to the caller, the tab."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One recovery-copy wrapper for all four callers."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: storeRecoveryCopy callers unchanged in behavior; the replace functions are the only ones that return before saving."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Pass 2: nothing is sent until save(); a failed save leaves the old copy, and a repeated save sends the same body (asserted)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Until save() runs, the old copy and the old phrase keep working."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Save moved back into both functions from 4356a9e19: the two 'sends nothing until' tests fail, api.put called once."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest accountKeysService and AuthContext 44 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing is sent early: the copy waits for save()."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: Settings 'Make a new recovery phrase' requires the current password; an account with no password proves itself with its current phrase. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "The tab is the only caller; a repeated save sends the same copy."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest 2 files, 44 passed, 0 failed, 0 skipped"
+ }
+}

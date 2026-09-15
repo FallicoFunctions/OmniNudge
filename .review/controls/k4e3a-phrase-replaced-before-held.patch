@@ -1,0 +1,26 @@
+diff --git a/frontend/src/services/accountKeysService.ts b/frontend/src/services/accountKeysService.ts
+index 61e1998bb..5c9f65642 100644
+--- a/frontend/src/services/accountKeysService.ts
++++ b/frontend/src/services/accountKeysService.ts
+@@ -119,7 +119,9 @@ export async function replacePhraseWithPassword(password: string): Promise<Pendi
+   } catch {
+     throw new Error('Wrong password');
+   }
+-  return prepareRecoveryCopy(privateKey, { login_key: keys.loginKey });
++  const pending = await prepareRecoveryCopy(privateKey, { login_key: keys.loginKey });
++  await pending.save();
++  return pending;
+ }
+ 
+ /**
+@@ -128,7 +130,9 @@ export async function replacePhraseWithPassword(password: string): Promise<Pendi
+  * as proof for such an account; the old phrase proves it here.
+  */
+ export async function replacePhraseWithPhrase(oldPhrase: string): Promise<PendingPhrase> {
+-  return prepareRecoveryCopy(await openRecoveryCopy(oldPhrase), {});
++  const pending = await prepareRecoveryCopy(await openRecoveryCopy(oldPhrase), {});
++  await pending.save();
++  return pending;
+ }
+ 
+ /** A new login key and its settings, for a sign-up or a password reset. */
