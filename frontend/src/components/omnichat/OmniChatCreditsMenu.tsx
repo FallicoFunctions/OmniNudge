@@ -79,7 +79,8 @@ export default function OmniChatCreditsMenu() {
       >
         <Coins size={18} aria-hidden="true" className="text-amber-300" />
         <span className="text-sm font-semibold tabular-nums">{balance}</span>
-        <ChevronDown size={16} aria-hidden="true" className="text-white/50" />
+        {/* A phone's header has no room for it beside the account menu and a call. */}
+        <ChevronDown size={16} aria-hidden="true" className="hidden text-white/50 sm:block" />
       </button>
 
       {open && (

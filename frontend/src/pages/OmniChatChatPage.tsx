@@ -39,6 +39,10 @@ import OmniChatMessageContent from '../components/omnichat/OmniChatMessageConten
 import OmniChatMediaAssetView from '../components/omnichat/OmniChatMediaAssetView';
 import OmniChatSpeakButton from '../components/omnichat/OmniChatSpeakButton';
 import OmniChatCallModal from '../components/omnichat/OmniChatCallModal';
+import {
+  OmniChatCallPaymentRequired,
+  useOmniChatCall,
+} from '../components/omnichat/OmniChatCallProvider';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
 import { OMNICHAT_TAB_ROUTES } from '../components/omnichat/useOmniChatNavigation';
 import OmniChatModelSelectorModal from '../components/omnichat/OmniChatModelSelectorModal';
@@ -493,7 +497,8 @@ export default function OmniChatChatPage() {
     title: string;
     idempotencyKey: string;
   } | null>(null);
-  const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
+  const [videoCallOpen, setVideoCallOpen] = useState(false);
+  const calls = useOmniChatCall();
   const [showCommerce, setShowCommerce] = useState(false);
   const [videoPaywallFeature, setVideoPaywallFeature] = useState<OmniChatPaywallFeature | null>(
     null
@@ -1717,10 +1722,25 @@ export default function OmniChatChatPage() {
         window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
         return;
       }
-      setCallMode(mode);
+      if (mode === 'video') {
+        // One call at a time: a video call replaces a voice call in progress.
+        if (calls?.call) calls.endCall();
+        setVideoCallOpen(true);
+        return;
+      }
+      if (!calls || !selectedConversationId || !activePersona) return;
+      // Inside the press, not after it: Safari opens the microphone only close to a tap.
+      calls
+        .startVoiceCall(selectedConversationId, { id: activePersona.id, name: activePersona.name })
+        .catch((error: unknown) => {
+          if (!(error instanceof OmniChatCallPaymentRequired)) throw error;
+          setVideoPaywallFeature('voice_call');
+        });
     },
-    [isAuthenticated, isGuest]
+    [isAuthenticated, isGuest, calls, selectedConversationId, activePersona]
   );
+  // The header holds this call's controls, so the phone is not offered twice.
+  const inCallHere = calls?.call != null && calls.call.conversationId === selectedConversationId;
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -2377,14 +2397,16 @@ export default function OmniChatChatPage() {
                   // the persona block; without it the extra controls overlap the
                   // avatar and push the name out of the header entirely.
                   <div className="flex flex-shrink-0 items-center gap-0">
-                    <button
-                      type="button"
-                      onClick={() => requestCall('voice')}
-                      aria-label={`Voice call ${activePersona.name}`}
-                      className="rounded-full p-1.5 text-white/70"
-                    >
-                      <Phone size={17} />
-                    </button>
+                    {!inCallHere && (
+                      <button
+                        type="button"
+                        onClick={() => requestCall('voice')}
+                        aria-label={`Voice call ${activePersona.name}`}
+                        className="rounded-full p-1.5 text-white/70"
+                      >
+                        <Phone size={17} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => requestCall('video')}
@@ -2430,15 +2452,17 @@ export default function OmniChatChatPage() {
                   <div className="hidden items-center gap-3 lg:flex">
                     {isAuthenticated && activePersona && selectedConversationId && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => requestCall('voice')}
-                          title={`Call ${activePersona.name}`}
-                          aria-label={`Voice call ${activePersona.name}`}
-                          className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
-                        >
-                          <Phone size={19} />
-                        </button>
+                        {!inCallHere && (
+                          <button
+                            type="button"
+                            onClick={() => requestCall('voice')}
+                            title={`Call ${activePersona.name}`}
+                            aria-label={`Voice call ${activePersona.name}`}
+                            className="rounded-full p-2.5 text-white/75 hover:bg-white/5 hover:text-white"
+                          >
+                            <Phone size={19} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => requestCall('video')}
@@ -3207,22 +3231,19 @@ export default function OmniChatChatPage() {
         </Modal>
       )}
 
-      {callMode && activePersona && selectedConversationId && (
+      {videoCallOpen && activePersona && selectedConversationId && (
         <OmniChatCallModal
           persona={activePersona}
           conversationId={selectedConversationId}
-          mode={callMode}
+          mode="video"
           onClose={() => {
-            setCallMode(null);
-            // A voice call saves its turns on the server as they are spoken and
-            // nothing pushes them here, so this is when the chat catches up.
+            setVideoCallOpen(false);
+            // The call saves its turns on the server; this is when the chat catches up.
             void queryClient.invalidateQueries({
               queryKey: omnichatQueryKeys.conversation(selectedConversationId),
             });
           }}
-          onPaymentRequired={() =>
-            setVideoPaywallFeature(callMode === 'voice' ? 'voice_call' : 'video_call')
-          }
+          onPaymentRequired={() => setVideoPaywallFeature('video_call')}
           onAssistant={(message) => {
             queryClient.setQueryData<BotConversationDetail | undefined>(
               omnichatQueryKeys.conversation(selectedConversationId),

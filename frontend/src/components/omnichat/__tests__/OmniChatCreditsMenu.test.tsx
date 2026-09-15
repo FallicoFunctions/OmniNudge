@@ -53,6 +53,16 @@ describe('OmniChatCreditsMenu', () => {
     expect(await screen.findByRole('button', { name: '55 OmniCredits' })).toBeInTheDocument();
   });
 
+  // Measured at 360 px: signed in with a five-digit balance, the OmniChat header
+  // needed more room than a phone has, before a call took any of it.
+  it('keeps its chevron off a phone', async () => {
+    renderMenu();
+    const button = await screen.findByRole('button', { name: '55 OmniCredits' });
+    const chevron = button.querySelector('.lucide-chevron-down')!;
+    expect(chevron.classList.contains('hidden')).toBe(true);
+    expect(chevron.classList.contains('sm:block')).toBe(true);
+  });
+
   // OmniChat has to work by ear. Until the balance arrives the button says so,
   // rather than reading its visual placeholder aloud.
   it('names the balance as loading until it arrives', () => {

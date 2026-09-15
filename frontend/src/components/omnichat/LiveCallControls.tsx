@@ -45,10 +45,12 @@ export default function LiveCallControls() {
 
   if (!call) {
     if (!failure) return null;
+    // The header's row has no room for a sentence at any width short of a
+    // desktop, so it hangs below the header instead of squeezing the row.
     return (
       <p
         role="alert"
-        className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-xs text-rose-100"
+        className="absolute inset-x-4 top-full mt-2 flex items-center justify-between gap-2 rounded-2xl bg-rose-950/95 px-3 py-2 text-xs text-rose-100 shadow-lg sm:right-auto sm:max-w-md lg:left-6"
       >
         {failure}
         <button

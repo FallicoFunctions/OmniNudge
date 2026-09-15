@@ -6,6 +6,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { ConversationSettings } from '../../types/omnichat';
 import OmniChatDefaultsModal from './OmniChatDefaultsModal';
 import OmniChatCreditsMenu from './OmniChatCreditsMenu';
+import LiveCallControls from './LiveCallControls';
+import { useOmniChatCall } from './OmniChatCallProvider';
 
 export default function OmniChatHeader({
   defaults,
@@ -23,6 +25,11 @@ export default function OmniChatHeader({
   const { user, logout, isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const calls = useOmniChatCall();
+  // A phone is too narrow for a call and the whole header. The call takes the
+  // logo's place, like the call pill on a phone, and the exit waits for the
+  // hang-up: leaving OmniChat would end the call anyway.
+  const inCall = Boolean(calls?.call);
 
   const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : 'OC';
   const signInLabel = t('auth.buttons.signIn');
@@ -33,16 +40,24 @@ export default function OmniChatHeader({
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 h-[var(--omnichat-header-offset)] border-b border-white/[0.08] bg-[#090a0f]/80 pt-[var(--omnichat-safe-top)] backdrop-blur-2xl">
-        <div className="flex h-[var(--omnichat-header-height)] items-center justify-between px-5 lg:px-6">
-          <Link to="/omnichat" className="omnichat-touch-target group flex items-center text-white">
-            <span>
-              <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">
-                OmniChat
+        <div className="flex h-[var(--omnichat-header-height)] items-center justify-between gap-2 px-5 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              to="/omnichat"
+              className={`omnichat-touch-target group shrink-0 items-center text-white ${inCall ? 'hidden sm:flex' : 'flex'}`}
+            >
+              <span>
+                <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">
+                  OmniChat
+                </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+            <LiveCallControls />
+          </div>
 
-          <div className="flex items-center gap-2.5">
+          <div
+            className={`flex shrink-0 items-center ${inCall ? 'gap-1.5 sm:gap-2.5' : 'gap-2.5'}`}
+          >
             {isAuthenticated && <OmniChatCreditsMenu />}
             <div className="relative">
               {isAuthenticated ? (
@@ -57,7 +72,9 @@ export default function OmniChatHeader({
                   <span className="hidden text-sm font-medium text-white/80 sm:inline">
                     {user?.username}
                   </span>
-                  <ChevronDown size={16} className="text-white/50" />
+                  {/* No room on a phone: signed in with a five-digit balance, the
+                      header already needed more than 360 px. */}
+                  <ChevronDown size={16} className="hidden text-white/50 sm:block" />
                 </button>
               ) : (
                 <button
@@ -105,7 +122,7 @@ export default function OmniChatHeader({
 
             <Link
               to="/"
-              className="omnichat-touch-target group flex items-center gap-1.5 rounded-[18px] border border-white/10 bg-white/[0.035] px-3.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              className={`omnichat-touch-target group ${inCall ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 rounded-[18px] border border-white/10 bg-white/[0.035] px-3.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white`}
             >
               <span className="hidden sm:inline">{t('omnichat.exitToSite')}</span>
               <ArrowUpRight

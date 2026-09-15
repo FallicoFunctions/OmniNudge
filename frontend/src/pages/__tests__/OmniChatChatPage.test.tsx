@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OmniChatChatPage from '../OmniChatChatPage';
+import { OmniChatCallPaymentRequired } from '../../components/omnichat/OmniChatCallProvider';
 
 const {
   mockListPersonas,
@@ -67,6 +68,30 @@ vi.mock('../../components/omnichat/ChatSettingsModal', () => ({
 
 vi.mock('../../components/omnichat/OmniChatShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+// The call itself is the provider's, with its own tests; here it is what the
+// page asks of it.
+const liveCall = vi.hoisted(() => ({
+  call: null as null | { conversationId: number },
+  startVoiceCall: vi.fn(),
+  endCall: vi.fn(),
+}));
+vi.mock('../../components/omnichat/OmniChatCallProvider', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useOmniChatCall: () => ({
+    call: liveCall.call,
+    failure: '',
+    startVoiceCall: liveCall.startVoiceCall,
+    endCall: liveCall.endCall,
+    toggleMute: () => undefined,
+    dismissFailure: () => undefined,
+  }),
+}));
+
+// The video call screen has its own tests; here it is only whether it opens.
+vi.mock('../../components/omnichat/OmniChatCallModal', () => ({
+  default: ({ mode }: { mode: string }) => <div role="dialog" aria-label={`${mode} call`} />,
 }));
 
 // importOriginal rather than a bare object: this listed every export it wanted
@@ -490,6 +515,45 @@ describe('OmniChatChatPage', () => {
     expect(mockCreateGeneration.mock.calls[0][0]).toBe(mockCreateGeneration.mock.calls[1][0]);
     expect(mockCreateGeneration.mock.calls[1][0]).toMatchObject({
       request_id: 'provider-failure-request-id',
+    });
+  });
+
+  describe('voice calls', () => {
+    beforeEach(() => {
+      liveCall.call = null;
+      liveCall.startVoiceCall.mockReset().mockResolvedValue(undefined);
+      liveCall.endCall.mockReset();
+    });
+
+    it('starts the call from the phone press, with no call screen', async () => {
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: /^Voice call / }));
+      expect(liveCall.startVoiceCall).toHaveBeenCalledWith(42, expect.objectContaining({ id: 9 }));
+      expect(screen.queryByRole('dialog', { name: /call/i })).not.toBeInTheDocument();
+    });
+
+    it('offers voice-call credits when the first minute cannot be paid for', async () => {
+      liveCall.startVoiceCall.mockRejectedValue(new OmniChatCallPaymentRequired());
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: /^Voice call / }));
+      expect(
+        await screen.findByRole('heading', { name: /unlock voice calls/i })
+      ).toBeInTheDocument();
+    });
+
+    it('does not offer the phone again while this conversation is in a call', async () => {
+      liveCall.call = { conversationId: 42 };
+      renderPage();
+      expect(await screen.findByRole('button', { name: /^Video call / })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Voice call / })).not.toBeInTheDocument();
+    });
+
+    it('hangs up a voice call before a video call opens', async () => {
+      liveCall.call = { conversationId: 42 };
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: /^Video call / }));
+      expect(liveCall.endCall).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('dialog', { name: 'video call' })).toBeInTheDocument();
     });
   });
 
