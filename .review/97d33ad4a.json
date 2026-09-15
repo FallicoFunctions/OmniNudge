@@ -1,0 +1,218 @@
+{
+  "schema_version": 2,
+  "head": "3ade5cdc6",
+  "base": "97d33ad4a",
+  "scope": {
+    "files": [
+      ".github/workflows/ci.yml",
+      "docs/roadmap/01-setup-and-tools.md"
+    ],
+    "boundaries": [
+      "CI job -> postgres service image (Docker Hub digest)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "97d33ad4a",
+    "5e17afbd9"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "ci.yml: the three Postgres services move from postgres:15@sha256:74e110c4... to postgres:16@sha256:f1c3376c...; docs/roadmap/01-setup-and-tools.md: six postgresql@15 commands become postgresql@16. Nothing else changes."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger covers the CI database image."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The same major version everywhere: production postgresql@16-main (RUNBOOK, scripts/deploy-lib.sh), the migration rollback workflow (postgres:16-alpine), the installation guide (postgresql@16), local Postgres 16.15; the pinned image is 16.15."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No shape."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule duplicated."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Read the pinned digest from Docker Hub: an OCI image index that includes linux/amd64 (GitHub's runners), image version 16.15, and the digest the tag 16 points to today."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No validation."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No validation."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every other place that names a Postgres version: none still says 15 (grep of workflows, docs, scripts, RUNBOOK); the 'PostgreSQL 15+' requirement lines stay true."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "No branch."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "No error path."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "The digest appears three times, once per service, as the 15 digest did."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The Debian variant is kept, as for 15: Alpine's musl collation can order text differently and would change sorting tests."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The three services are the ones the backend, E2E and migration jobs start."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "The change is YAML and Markdown; the pre-commit gate passed. The full Go suite already ran on Postgres 16.15 locally today (CI's command, 0 FAIL)."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The real check is CI itself running the suites on the new image; it runs on the push that carries this ledger, and its result is reported to the user."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "na",
+          "why": "No test added; CI's own run follows."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The agreed step: CI's database matches production's major version. It does, at the same patch release."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "no code changed",
+    "vet": "no code changed",
+    "lint": "pre-commit gate 0 failed",
+    "types": "no code changed",
+    "tests": "full Go suite on Postgres 16.15 locally earlier today; CI runs on the push"
+  }
+}
