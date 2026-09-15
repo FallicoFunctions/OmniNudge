@@ -48,6 +48,7 @@ func TestUserReadsCarryLoginKeyColumns(t *testing.T) {
 		got, err := read()
 		require.NoError(t, err, name)
 		require.NotNil(t, got, name)
+		assert.Equal(t, "test-hash", got.PasswordHash, name+" must carry the hash a password check compares against")
 		assert.Equal(t, 2, got.AuthScheme, name)
 		if assert.NotNil(t, got.KDFSalt, name) {
 			assert.Equal(t, "c2FsdC1mb3ItdGVzdA==", *got.KDFSalt, name)

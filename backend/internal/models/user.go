@@ -191,14 +191,17 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
+		SELECT password_hash, id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at,
 		       auth_scheme, kdf_salt, kdf_iterations, recovery_wrapped_private_key
 		FROM users WHERE id = $1
 	`
 
+	// password_hash is read here as by GetByUsername and GetByEmail: a signed-in
+	// action that checks the current password loads the user by ID.
 	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&user.PasswordHash,
 		&user.ID,
 		&user.Username,
 		&user.EncryptedEmail,
