@@ -1,0 +1,224 @@
+{
+  "schema_version": 2,
+  "head": "a61063532",
+  "base": "cc906d5e5",
+  "scope": {
+    "files": [
+      "backend/internal/models/user.go",
+      "backend/internal/models/user_login_keys_test.go",
+      "backend/internal/ports/user_repository.go",
+      "backend/internal/repository/user_postgres.go",
+      "backend/internal/services/mocks/user_repository.go",
+      "backend/internal/services/auth_login_key.go",
+      "backend/internal/services/auth_login_key_test.go"
+    ],
+    "boundaries": [
+      "services -> UserRepository (three implementations)",
+      "users row: recovery_wrapped_private_key, password_hash, auth_scheme"
+    ]
+  },
+  "prior_ledgers_read": [
+    "6febb92fc",
+    "1379ce9db"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "UpdateRecoveryWrappedPrivateKey in models, ports, the Postgres wrapper and the mock; services.GetKeyBackup, StoreRecoveryKey (proof of the account's secret unless it has no password), SetAppPassword (only without a password; reuses SetLoginKey); ErrAccountHasPassword, ErrInvalidRecoveryCopy; tests."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "6febb92fc (K3) and 1379ce9db (K2b-1) found nothing; SetLoginKey, reused here, was reviewed in K2b-1."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler yet; K4a-2."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the row back after UpdateRecoveryWrappedPrivateKey against Postgres 16: the copy stored, then NULL after an empty value; a missing user refused."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "KeyBackup's JSON names (kdf_salt, kdf_iterations, encrypted_private_key, recovery_wrapped_private_key) match the columns and the request structs."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No response shape consumed yet; K4a-2."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The proof rule is CheckAccountSecret, reused; SetAppPassword stores through SetLoginKey, reused."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The new repository method is in all three implementations; go build ./... and go vet ./... pass."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The mock mirrors the SQL (copy stored, empty clears, missing user refused); the database test checks the SQL."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Test rows are written through the repository."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: a session alone, a wrong key, a password for a login-key account, an empty or oversized recovery copy; an app password on an account with a password, with 1000 rounds, or without the wrapped copy."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The size bound: a copy one byte over 16384 is refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The other writers of the same kinds of data: the move and SetLoginKey replace encrypted_private_key in their own writes; the upload endpoint for it is rewritten with the client in K4c. No other writer of recovery_wrapped_private_key."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "Every branch is reached by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal is a named error for K4a-2's handlers; a missing user is an error."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "An account with no password (OAuth without an app password) can store a recovery copy with its session alone: it has nothing else to prove itself with, by the design the user chose."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "na",
+          "why": "No other shape of this kind."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Each write is one UPDATE."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "An empty value clears the recovery copy by design; nothing else persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No callers until K4a-2's handlers; the tests call the functions directly."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; services 68, models 6, handlers 74 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the repository method against real Postgres 16."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed StoreRecoveryKey a session with no secret on an account that has one: refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K4a-1 promises: the server enforces 'password first' for a new phrase; the app password is also a way to sign in and is refused on an account that has a password. Each is a test."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "services 68, models 6, handlers 74 PASS; 0 FAIL, 0 SKIP"
+  }
+}
