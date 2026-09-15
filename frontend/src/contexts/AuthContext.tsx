@@ -141,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign-out and every new key setup move this on, so a step that finishes
   // late cannot write its secret or status over a newer state.
   const generationRef = useRef(0);
+  const sessionSettledRef = useRef<{ accountId: number; generation: number } | null>(null);
   const settlingRef = useRef<{
     accountId: number;
     fromSession: boolean;
@@ -178,6 +179,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (held === null && running?.fromSession && running.accountId === account.id) {
       return running.done;
     }
+    // A callback that answers after the app-open check has finished must not
+    // run again: its account can predate the new public key, and a second run
+    // would replace the phrase the user has not yet seen.
+    const settled = sessionSettledRef.current;
+    if (
+      held === null &&
+      settled?.accountId === account.id &&
+      settled.generation === generationRef.current
+    ) {
+      return Promise.resolve();
+    }
     const generation = ++generationRef.current;
     accountRef.current = account;
     heldRef.current = held;
@@ -185,7 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const done = (running?.done ?? Promise.resolve()).then(async () => {
       if (generation !== generationRef.current) return;
       try {
-        commit(generation, await resolveKeyStatus(account, held));
+        if (commit(generation, await resolveKeyStatus(account, held)) && held === null) {
+          sessionSettledRef.current = { accountId: account.id, generation };
+        }
       } catch (error) {
         console.error('[AuthContext] Could not set up message keys:', error);
         commit(generation, { status: { state: 'failed' }, held });

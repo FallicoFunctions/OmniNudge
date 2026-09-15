@@ -314,6 +314,25 @@ describe('a session that is still open', () => {
     expect(mocks.createAccountKeys).toHaveBeenCalledOnce();
   });
 
+  it('keeps the phrase on screen when the callback page answers after the keys were made', async () => {
+    server({ me: account, backup: { auth_scheme: 1, has_password: false } });
+    deviceHolds(null);
+    mocks.createAccountKeys.mockResolvedValue('provider phrase');
+    const { result } = await renderAuth();
+    await waitFor(() =>
+      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' })
+    );
+
+    // The callback's own /auth/me was sent before the new public key existed.
+    server({
+      me: { ...account, public_key: undefined },
+      backup: { auth_scheme: 1, has_password: false, recovery_wrapped_private_key: 'copy' },
+    });
+    await act(() => result.current.completeOAuthLogin());
+    expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' });
+    expect(mocks.createAccountKeys).toHaveBeenCalledOnce();
+  });
+
   it('asks a provider account on a new device for its phrase', async () => {
     server({
       me: account,
