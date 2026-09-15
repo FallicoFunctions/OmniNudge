@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 )
 
@@ -38,12 +39,14 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	ctx := c.Request.Context()
 
+	// Password proves a scheme 1 account; LoginKey proves a scheme 2 account.
 	var req struct {
-		Password string `json:"password" binding:"required"`
+		Password string `json:"password"`
+		LoginKey string `json:"login_key"`
 		Confirm  string `json:"confirm" binding:"required"` // Must type "DELETE MY ACCOUNT"
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Password == "" && req.LoginKey == "") {
 		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
@@ -58,20 +61,20 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 
 	// Verify password and get user details
 	var storedPasswordHash string
+	var authScheme int
 	var storedEmail *string
 	var emailEncrypted bool
 	var email *string
 	var username string
 	err := h.db.QueryRow(ctx, `
-		SELECT password_hash, email, email_encrypted, username FROM users WHERE id = $1
-	`, userID).Scan(&storedPasswordHash, &storedEmail, &emailEncrypted, &username)
+		SELECT password_hash, auth_scheme, email, email_encrypted, username FROM users WHERE id = $1
+	`, userID).Scan(&storedPasswordHash, &authScheme, &storedEmail, &emailEncrypted, &username)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to verify user")
 		return
 	}
 
-	// Verify password using bcrypt
-	if err := utils.CheckPassword(storedPasswordHash, req.Password); err != nil {
+	if err := services.CheckAccountSecret(storedPasswordHash, authScheme, req.Password, req.LoginKey); err != nil {
 		RespondError(c, http.StatusUnauthorized, "Invalid password")
 		return
 	}

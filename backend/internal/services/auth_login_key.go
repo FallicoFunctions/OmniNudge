@@ -32,7 +32,27 @@ var (
 	ErrInvalidLoginKey = errors.New("invalid login key settings")
 	// ErrCurrentPasswordIncorrect is returned when the move's password proof fails.
 	ErrCurrentPasswordIncorrect = errors.New("current password is incorrect")
+	// ErrWrongSecret is returned when what was sent does not prove the account.
+	ErrWrongSecret = errors.New("invalid credentials")
 )
+
+// CheckAccountSecret checks what a person sent to prove an account. A scheme 2
+// account accepts only its login key, and refuses a password even beside the
+// key, so the password never keeps travelling to the server; any other account
+// accepts only its password. Sign-in and every re-authentication use it.
+func CheckAccountSecret(passwordHash string, authScheme int, password, loginKey string) error {
+	secret := password
+	if authScheme == 2 {
+		if password != "" {
+			return ErrWrongSecret
+		}
+		secret = loginKey
+	}
+	if secret == "" || utils.CheckPassword(passwordHash, secret) != nil {
+		return ErrWrongSecret
+	}
+	return nil
+}
 
 // PreLoginResponse tells the app how to prove a password to the server.
 type PreLoginResponse struct {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/omninudge/backend/internal/services/mocks"
+	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,6 +142,35 @@ func TestPreLoginDoesNotTellMissingAccountsFromLoginKeyAccounts(t *testing.T) {
 	assert.Equal(t, ghost.KDFSalt, again.KDFSalt, "the same missing name always gets the same salt")
 	other, _ := auth.PreLogin(ctx, repo, "someone-else")
 	assert.NotEqual(t, ghost.KDFSalt, other.KDFSalt, "different missing names get different salts")
+}
+
+func TestCheckAccountSecretAcceptsOnlyTheAccountsOwnKind(t *testing.T) {
+	keyHash, err := utils.HashPassword(testLoginKey(5))
+	require.NoError(t, err)
+	passwordHash, err := utils.HashPassword("correct-horse")
+	require.NoError(t, err)
+
+	for name, tc := range map[string]struct {
+		hash               string
+		scheme             int
+		password, loginKey string
+		ok                 bool
+	}{
+		"scheme 2 with its key":            {keyHash, 2, "", testLoginKey(5), true},
+		"scheme 2 with a wrong key":        {keyHash, 2, "", testLoginKey(6), false},
+		"scheme 2 with a password":         {keyHash, 2, "correct-horse", "", false},
+		"scheme 2 with the key and a word": {keyHash, 2, "correct-horse", testLoginKey(5), false},
+		"scheme 1 with its password":       {passwordHash, 1, "correct-horse", "", true},
+		"scheme 1 with a key":              {passwordHash, 1, "", testLoginKey(5), false},
+		"scheme 1 with nothing":            {passwordHash, 1, "", "", false},
+	} {
+		err := CheckAccountSecret(tc.hash, tc.scheme, tc.password, tc.loginKey)
+		if tc.ok {
+			assert.NoError(t, err, name)
+		} else {
+			assert.ErrorIs(t, err, ErrWrongSecret, name)
+		}
+	}
 }
 
 func TestRegisterRefusesBadLoginKeySettings(t *testing.T) {

@@ -510,17 +510,7 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 		return nil, "", errors.New("invalid username or password")
 	}
 
-	// A scheme 2 account signs in only with its login key. Accepting the
-	// password too would keep the password travelling to the server.
-	secret := req.Password
-	if user.AuthScheme == 2 {
-		secret = req.LoginKey
-	}
-	if secret == "" || (user.AuthScheme == 2 && req.Password != "") {
-		log.Printf("Login failed: wrong kind of secret for user_id=%d scheme=%d", user.ID, user.AuthScheme)
-		return nil, "", errors.New("invalid username or password")
-	}
-	if err := utils.CheckPassword(user.PasswordHash, secret); err != nil {
+	if err := CheckAccountSecret(user.PasswordHash, user.AuthScheme, req.Password, req.LoginKey); err != nil {
 		log.Printf("Login failed: password mismatch for user_id=%d username=%q", user.ID, user.Username)
 		return nil, "", errors.New("invalid username or password")
 	}

@@ -79,30 +79,33 @@ var exportDataTypes = []string{
 func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
+	// Password proves a scheme 1 account; LoginKey proves a scheme 2 account.
 	var req struct {
-		Password       string   `json:"password" binding:"required"`
+		Password       string   `json:"password"`
+		LoginKey       string   `json:"login_key"`
 		DataTypes      []string `json:"data_types"`      // e.g., ["messages", "posts", "comments", "profile"]
 		IncludeDeleted bool     `json:"include_deleted"` // Include soft-deleted data
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Password == "" && req.LoginKey == "") {
 		RespondError(c, http.StatusBadRequest, "Invalid request: password is required")
 		return
 	}
 
-	// 1. Re-authenticate user with password
+	// 1. Re-authenticate the user
 	var username, passwordHash string
+	var authScheme int
 	var encryptedPrivateKey *string
 	err := h.db.QueryRow(c.Request.Context(), `
-		SELECT username, password_hash, encrypted_private_key FROM users WHERE id = $1
-	`, userID).Scan(&username, &passwordHash, &encryptedPrivateKey)
+		SELECT username, password_hash, auth_scheme, encrypted_private_key FROM users WHERE id = $1
+	`, userID).Scan(&username, &passwordHash, &authScheme, &encryptedPrivateKey)
 
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch user data")
 		return
 	}
 
-	if err := utils.CheckPassword(passwordHash, req.Password); err != nil {
+	if err := services.CheckAccountSecret(passwordHash, authScheme, req.Password, req.LoginKey); err != nil {
 		RespondError(c, http.StatusUnauthorized, "Invalid password")
 		return
 	}

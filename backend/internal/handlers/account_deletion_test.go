@@ -58,6 +58,47 @@ func setupAccountDeletionTest(t *testing.T) (*AccountDeletionHandler, *database.
 	return handler, db, user.ID, cleanup
 }
 
+// moveTestUserToLoginKey turns a test user into a scheme 2 account whose login
+// key is loginKey, as the move endpoint would.
+func moveTestUserToLoginKey(t *testing.T, db *database.Database, userID int, loginKey string) {
+	t.Helper()
+	hash, err := utils.HashPassword(loginKey)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(context.Background(), `
+		UPDATE users SET password_hash = $1, auth_scheme = 2, kdf_salt = 'MDEyMzQ1Njc4OWFiY2RlZg==', kdf_iterations = 600000
+		WHERE id = $2`, hash, userID)
+	require.NoError(t, err)
+}
+
+const handlerTestLoginKey = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+
+func TestRequestAccountDeletion_LoginKeyAccount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for name, tc := range map[string]struct {
+		body map[string]interface{}
+		want int
+	}{
+		"its login key deletes":         {map[string]interface{}{"login_key": handlerTestLoginKey, "confirm": "DELETE MY ACCOUNT"}, http.StatusOK},
+		"its old password is refused":   {map[string]interface{}{"password": "correct-password", "confirm": "DELETE MY ACCOUNT"}, http.StatusUnauthorized},
+		"a password beside the key too": {map[string]interface{}{"password": "correct-password", "login_key": handlerTestLoginKey, "confirm": "DELETE MY ACCOUNT"}, http.StatusUnauthorized},
+	} {
+		t.Run(name, func(t *testing.T) {
+			handler, db, userID, cleanup := setupAccountDeletionTest(t)
+			defer cleanup()
+			moveTestUserToLoginKey(t, db, userID, handlerTestLoginKey)
+
+			body, _ := json.Marshal(tc.body)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/account/delete", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("user_id", userID)
+			handler.RequestAccountDeletion(c)
+			assert.Equal(t, tc.want, w.Code, w.Body.String())
+		})
+	}
+}
+
 func TestRequestAccountDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -157,6 +157,31 @@ func TestRequestDataExport_WrongPassword(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
+func TestRequestDataExport_LoginKeyAccount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for name, tc := range map[string]struct {
+		body map[string]interface{}
+		want int
+	}{
+		"its login key exports":       {map[string]interface{}{"login_key": handlerTestLoginKey, "data_types": []string{"profile"}}, http.StatusAccepted},
+		"its old password is refused": {map[string]interface{}{"password": "TestPassword123!", "data_types": []string{"profile"}}, http.StatusUnauthorized},
+	} {
+		t.Run(name, func(t *testing.T) {
+			handler, db, userID, _ := setupDataExportHandlerTest(t)
+			moveTestUserToLoginKey(t, db, userID, handlerTestLoginKey)
+
+			body, _ := json.Marshal(tc.body)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/account/export", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("user_id", userID)
+			handler.RequestDataExport(c)
+			assert.Equal(t, tc.want, w.Code, w.Body.String())
+		})
+	}
+}
+
 func TestRequestDataExport_MissingPassword(t *testing.T) {
 	handler, _, userID, _ := setupDataExportHandlerTest(t)
 
