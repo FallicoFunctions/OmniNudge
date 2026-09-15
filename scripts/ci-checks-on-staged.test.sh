@@ -28,6 +28,13 @@ expect() { # name, want (pass|fail), command...
 # A guard nobody runs is no guard: the hook must call it.
 expect "the pre-commit hook runs the gate" pass grep -q "bash $gate" frontend/.husky/pre-commit
 
+# The gate and CI must lint the same files. Dropping --build-tags=integration
+# from CI alone would pass every commit here while CI saw none of
+# internal/integration again.
+ci_lint_args=$(sed -n '/golangci-lint-action/,/args:/s/^ *args: *//p' .github/workflows/ci.yml)
+expect "the gate lints with CI's golangci-lint arguments" pass \
+  bash -c '[ -n "$1" ] && grep -qF -- "golangci-lint run $1 " "$2"' _ "$ci_lint_args" "$gate"
+
 # Formatting, the check that blocked every frontend pull request.
 printf 'export const   fixture = {a:1}\n' >"$ts_fixture"
 expect "unformatted TypeScript is refused" fail env CI_CHECKS_FILES="$ts_fixture" bash "$gate"
@@ -59,6 +66,35 @@ func Leak() {
 }
 EOF
 expect "an unchecked Close is refused by golangci-lint" fail env CI_CHECKS_FILES="$go_dir/fixture.go" bash "$gate"
+
+# internal/integration's files all carry //go:build integration, and a linter
+# run without that tag saw none of them. The clean untagged file keeps the
+# package lintable without the tag, so only a linter that reads tagged files
+# can refuse this.
+cat >"$go_dir/fixture.go" <<'EOF'
+package cichecksfixture
+
+// Fine is formatted and lint-clean.
+func Fine() int { return 1 }
+EOF
+cat >"$go_dir/fixture_integration.go" <<'EOF'
+//go:build integration
+
+package cichecksfixture
+
+import "os"
+
+// LeakTagged drops the error from Close, behind the integration tag.
+func LeakTagged() {
+	f, err := os.Open("missing")
+	if err != nil {
+		return
+	}
+	f.Close()
+}
+EOF
+expect "an unchecked Close behind the integration tag is refused" fail env CI_CHECKS_FILES="$go_dir/fixture_integration.go" bash "$gate"
+rm -f "$go_dir/fixture_integration.go"
 
 cat >"$go_dir/fixture.go" <<'EOF'
 package cichecksfixture

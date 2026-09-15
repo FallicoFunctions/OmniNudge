@@ -38,7 +38,7 @@ if [ -n "$go_files" ]; then
     failed=$((failed+1))
   else
     packages=$(printf '%s\n' $go_files | xargs -n1 dirname | sort -u | sed 's#^#./#')
-    if ! (cd backend && golangci-lint run --timeout=10m $packages); then
+    if ! (cd backend && golangci-lint run --timeout=10m --build-tags=integration $packages); then
       echo "FAIL: golangci-lint (CI's required 'Backend (Go)' check)"
       failed=$((failed+1))
     fi

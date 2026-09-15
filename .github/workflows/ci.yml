@@ -103,7 +103,9 @@ jobs:
           version: v2.12.2
           install-mode: goinstall
           working-directory: backend
-          args: --timeout=10m
+          # Every file in internal/integration needs the integration tag; without it
+          # the linter sees none of them.
+          args: --timeout=10m --build-tags=integration
           skip-cache: false
 
       - name: Run unit tests

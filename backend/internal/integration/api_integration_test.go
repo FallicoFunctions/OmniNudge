@@ -243,7 +243,7 @@ func TestAdminPromotionAndAddModerator(t *testing.T) {
 }
 
 func TestMediaUploadValidation(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -254,7 +254,7 @@ func TestMediaUploadValidation(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "bad.exe")
 	part.Write([]byte("MZ executable payload")) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -266,7 +266,7 @@ func TestMediaUploadValidation(t *testing.T) {
 }
 
 func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -278,7 +278,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "image.png")
 	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'}) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -294,7 +294,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'}
 	p2.Write(pngHeader)                               //nolint:errcheck // test helper; write error non-fatal
 	p2.Write(bytes.Repeat([]byte("A"), 26*1024*1024)) //nolint:errcheck // test helper; write error non-fatal — >25MB
-	bw.Close()
+	require.NoError(t, bw.Close())
 	req, _ = http.NewRequest("POST", "/api/v1/media/upload", &big)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", bw.FormDataContentType())
@@ -304,7 +304,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 }
 
 func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -315,7 +315,7 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "doc.pdf")
 	part.Write([]byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n")) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -325,7 +325,7 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 }
 
 func TestMediaUpload_AllowsExpandedDocumentAndArchiveTypes(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -382,7 +382,7 @@ func TestMediaUpload_AllowsExpandedDocumentAndArchiveTypes(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsRenamedZipAsDocx(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1851,7 +1851,7 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 }
 
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1877,7 +1877,7 @@ func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1889,7 +1889,7 @@ func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
 	part, _ := writer.CreateFormFile("file", "photo.exe")
 	// PNG magic bytes with forbidden extension should still be rejected.
 	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'}) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -1900,7 +1900,7 @@ func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsEmptyFile(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1910,7 +1910,7 @@ func TestMediaUpload_RejectsEmptyFile(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	_, _ = writer.CreateFormFile("file", "empty.png")
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -1921,7 +1921,7 @@ func TestMediaUpload_RejectsEmptyFile(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1933,7 +1933,7 @@ func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
 	part, _ := writer.CreateFormFile("file", "image.jpg")
 	// PDF magic bytes with jpg extension.
 	part.Write([]byte("%PDF-1.4\n1 0 obj\n")) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -1944,7 +1944,7 @@ func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -1962,7 +1962,7 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "clip.pdf")
 	part.Write([]byte("%PDF-1.4\nquota-test\n")) //nolint:errcheck // test helper; write error non-fatal
-	writer.Close()
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -2100,7 +2100,7 @@ func TestFilesThumbnailRedirect_BlocksPendingScan(t *testing.T) {
 }
 
 func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
-	defer os.RemoveAll("uploads")
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -2112,8 +2112,9 @@ func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
 	part, _ := writer.CreateFormFile("file", "photo.png")
 	// Valid PNG signature + embedded ZIP local file header marker.
 	payload := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A', 'P', 'K', 0x03, 0x04}
-	part.Write(payload)
-	writer.Close()
+	_, writeErr := part.Write(payload)
+	require.NoError(t, writeErr)
+	require.NoError(t, writer.Close())
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
 	req.Header.Set("Authorization", "Bearer "+token)

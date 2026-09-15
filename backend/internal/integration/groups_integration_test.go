@@ -136,15 +136,10 @@ func TestGroupMemberAdd(t *testing.T) {
 	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	newMemberToken, _ := deps.AuthService.GenerateJWT(newMember.ID, newMember.Username, newMember.Role)
 
-	// Create group with 2 initial members (owner + member1)
-	body := createGroupBody("Test Group Beta", []int{member1.ID})
-	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken, body)
-
-	// owner + 1 other = 2 total, but CreateGroup requires at least 2 others (3 total).
-	// Add a placeholder second member.
+	// CreateGroup needs at least two members besides the owner.
 	placeholder := createUser(t, deps.UserRepo, uniqueGrpUsername("ph"), "user")
-	body = createGroupBody("Test Group Beta", []int{member1.ID, placeholder.ID})
-	w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken, body)
+	body := createGroupBody("Test Group Beta", []int{member1.ID, placeholder.ID})
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken, body)
 	require.Equal(t, http.StatusCreated, w.Code, "group creation: %s", w.Body.String())
 
 	var group struct {

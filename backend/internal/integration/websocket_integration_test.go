@@ -70,9 +70,9 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	}
 
 	aliceConn := dial(aliceWSToken)
-	defer aliceConn.Close()
+	defer func() { _ = aliceConn.Close() }()
 	bobConn := dial(bobWSToken)
-	defer bobConn.Close()
+	defer func() { _ = bobConn.Close() }()
 
 	consumeInitialState := func(conn *websocket.Conn) {
 		conn.SetReadDeadline(time.Now().Add(2 * time.Second)) //nolint:errcheck // test helper; deadline error non-fatal

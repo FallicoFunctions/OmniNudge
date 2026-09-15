@@ -54,7 +54,7 @@ func TestWebSocketReconnectsAfterDrop(t *testing.T) {
 	require.NoError(t, err, "first WebSocket connection should succeed")
 
 	// Force-close without a proper close handshake
-	conn1.Close()
+	_ = conn1.Close()
 
 	// Allow the server a moment to detect the drop
 	time.Sleep(50 * time.Millisecond)
@@ -62,7 +62,7 @@ func TestWebSocketReconnectsAfterDrop(t *testing.T) {
 	// Reconnect — must succeed
 	conn2, _, err := dialWS(ts, token)
 	require.NoError(t, err, "reconnection after forced drop should succeed")
-	defer conn2.Close()
+	defer func() { _ = conn2.Close() }()
 
 	t.Log("reconnection successful")
 }
@@ -202,7 +202,7 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 	conn1, resp1, err1 := dialWS(ts, token)
 	require.NoError(t, err1, "first connection must succeed")
 	require.Equal(t, http.StatusSwitchingProtocols, resp1.StatusCode)
-	defer conn1.Close()
+	defer func() { _ = conn1.Close() }()
 
 	// Second connection — same user
 	conn2, resp2, err2 := dialWS(ts, token)
@@ -215,13 +215,13 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 		}
 		return
 	}
-	defer conn2.Close()
+	defer func() { _ = conn2.Close() }()
 
 	t.Log("server allows concurrent connections for the same user")
 
 	// Give the server a window to send a close frame to one connection.
-	conn1.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
-	conn2.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	_ = conn1.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	_ = conn2.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
 
 	alive := 0
 	for _, conn := range []*websocket.Conn{conn1, conn2} {
