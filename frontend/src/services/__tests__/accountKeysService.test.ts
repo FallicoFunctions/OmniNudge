@@ -11,6 +11,7 @@ import {
 import {
   createAccountKeys,
   moveAccount,
+  moveWithoutKey,
   prepareSignUp,
   recoverWithPhrase,
   signInSecret,
@@ -211,6 +212,23 @@ describe('the move from the old scheme', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it('moves an account with no old copy to a login key with no copy, for a fresh start', async () => {
+    const keys = await moveWithoutKey('old-password');
+    const [move] = bodiesSentTo('post', '/auth/login-key');
+    expect(move).toMatchObject({
+      current_password: 'old-password',
+      login_key: keys.loginKey,
+      kdf_iterations: 600000,
+    });
+    expect(move).not.toHaveProperty('encrypted_private_key');
+    const again = await deriveLoginKeys(
+      'old-password',
+      move.kdf_salt as string,
+      move.kdf_iterations as number
+    );
+    expect(again.loginKey).toBe(keys.loginKey);
+  });
+
   it('reports an account with no old copy instead of moving it', async () => {
     serverAnswers({ '/auth/encrypted-private-key': { encrypted_private_key: null } });
     expect(await moveAccount('old-password', 'the-public-key')).toEqual({
@@ -252,6 +270,21 @@ describe('recovery with the phrase', () => {
     await expect(unwrapSecret(copy.encrypted_private_key as string, keys.wrapKey)).resolves.toBe(
       'the-private-key'
     );
+    expect(storeNonExtractablePrivateKey).toHaveBeenCalledWith('the-private-key', 'the-public-key');
+  });
+
+  it('keeps the key on the device, and uploads no copy, for an account with no password', async () => {
+    const phrase = newRecoveryPhrase();
+    serverAnswers({
+      '/auth/key-backup': {
+        recovery_wrapped_private_key: await wrapSecret(
+          'the-private-key',
+          await deriveRecoveryKey(phrase)
+        ),
+      },
+    });
+    await recoverWithPhrase(phrase, null, 'the-public-key');
+    expect(api.put).not.toHaveBeenCalled();
     expect(storeNonExtractablePrivateKey).toHaveBeenCalledWith('the-private-key', 'the-public-key');
   });
 

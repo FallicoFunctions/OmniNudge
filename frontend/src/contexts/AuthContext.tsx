@@ -1,40 +1,151 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../lib/api';
-import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
+import type { User, LoginRequest, RegisterRequest, AuthResponse, KeyBackup } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
+import { getOwnKeys, getOwnPublicKeyBase64 } from '../services/keyManagementService';
 import {
-  initializeKeys,
-  getOwnPublicKeyBase64,
-  getOwnKeys,
-  storeNonExtractablePrivateKey,
-} from '../services/keyManagementService';
-import { encryptionService } from '../services/encryptionService';
-import {
-  encryptPrivateKeyWithPassword,
-  decryptPrivateKeyWithPassword,
-} from '../services/keySyncService';
-import { exportKeyPair } from '../utils/encryption';
+  createAccountKeys,
+  moveAccount,
+  moveWithoutKey,
+  prepareSignUp,
+  recoverWithPhrase,
+  signInSecret,
+  unlockAfterSignIn,
+} from '../services/accountKeysService';
+import { deriveLoginKeys, type LoginKeys } from '../utils/loginKeys';
 import { analyticsService } from '../services/analyticsService';
 import { clearOmniChatDefaults } from '../utils/omnichatDefaults';
 import { clearAllGuestMessages } from '../utils/omnichatGuestStorage';
 
+const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * Where this device stands with the account's private key. The key screens
+ * read it: a new phrase to show once, a password to ask for, a phrase to ask
+ * for (or, with no recovery copy, only a fresh start), or a retry.
+ */
+export type KeyStatus =
+  | { state: 'signed-out' }
+  | { state: 'checking' }
+  | { state: 'ready' }
+  | { state: 'show-phrase'; phrase: string }
+  | { state: 'needs-password' }
+  | { state: 'needs-recovery'; hasRecoveryCopy: boolean }
+  | { state: 'failed' };
+
+/**
+ * The secret this session can prove the account with, held in memory only
+ * between the key steps. The old password is held only for an old-scheme
+ * account that must start fresh, and is dropped once it has.
+ */
+type HeldSecret =
+  | { kind: 'new-account'; keys: LoginKeys }
+  | { kind: 'login-key'; keys: LoginKeys }
+  | { kind: 'old-password'; password: string }
+  | { kind: 'no-password' };
+
+interface KeyOutcome {
+  status: KeyStatus;
+  held: HeldSecret | null;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  keyStatus: KeyStatus;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   completeOAuthLogin: () => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
+  unlockWithPassword: (password: string) => Promise<void>;
+  recoverKeys: (phrase: string) => Promise<void>;
+  startFresh: () => Promise<void>;
+  acknowledgePhrase: () => void;
+  retryKeys: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const phraseShown = (phrase: string): KeyStatus => ({ state: 'show-phrase', phrase });
+
+// A key on this device counts only if it is the account's current key: after a
+// fresh start elsewhere, the old one cannot read new messages.
+async function deviceHoldsAccountKey(account: User): Promise<boolean> {
+  return (
+    !!account.public_key && !!(await getOwnKeys()) && getOwnPublicKeyBase64() === account.public_key
+  );
+}
+
+// Decides the key step after sign-in, sign-up, provider sign-in, or an app
+// open with a session still live. It never makes keys unless the account has
+// none to recover: a new account, or a provider account with no recovery copy.
+async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise<KeyOutcome> {
+  if (held?.kind === 'new-account') {
+    const phrase = await createAccountKeys(held.keys);
+    return { status: phraseShown(phrase), held: { kind: 'login-key', keys: held.keys } };
+  }
+  if (held?.kind === 'login-key') {
+    if (
+      account.public_key &&
+      (await unlockAfterSignIn(held.keys, account.public_key)) === 'unlocked'
+    ) {
+      return { status: { state: 'ready' }, held };
+    }
+    const backup = await api.get<KeyBackup>('/auth/key-backup');
+    return {
+      status: { state: 'needs-recovery', hasRecoveryCopy: !!backup.recovery_wrapped_private_key },
+      held,
+    };
+  }
+  if (held?.kind === 'old-password') {
+    if (account.public_key) {
+      const moved = await moveAccount(held.password, account.public_key);
+      if (moved.status === 'moved') {
+        return {
+          status: phraseShown(moved.recoveryPhrase),
+          held: { kind: 'login-key', keys: moved.keys },
+        };
+      }
+    }
+    // No key the browser can export: the only way on is a fresh start.
+    return { status: { state: 'needs-recovery', hasRecoveryCopy: false }, held };
+  }
+
+  const backup = await api.get<KeyBackup>('/auth/key-backup');
+  const onDevice = await deviceHoldsAccountKey(account);
+  if (!backup.has_password) {
+    const noPassword: HeldSecret = { kind: 'no-password' };
+    if (!backup.recovery_wrapped_private_key) {
+      return { status: phraseShown(await createAccountKeys(null)), held: noPassword };
+    }
+    return {
+      status: onDevice ? { state: 'ready' } : { state: 'needs-recovery', hasRecoveryCopy: true },
+      held: noPassword,
+    };
+  }
+  if (backup.auth_scheme === 2 && onDevice) {
+    return { status: { state: 'ready' }, held: null };
+  }
+  return { status: { state: 'needs-password' }, held: null };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>({ state: 'signed-out' });
+  const accountRef = useRef<User | null>(null);
+  const heldRef = useRef<HeldSecret | null>(null);
+  // Sign-out and every new key setup move this on, so a step that finishes
+  // late cannot write its secret or status over a newer state.
+  const generationRef = useRef(0);
+  const settlingRef = useRef<{
+    accountId: number;
+    fromSession: boolean;
+    done: Promise<void>;
+  } | null>(null);
 
   const clearAuthState = () => {
     // Remove credentials left by versions that predate HttpOnly cookie auth.
@@ -43,63 +154,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     clearOmniChatDefaults('authenticated');
     clearAllGuestMessages();
+    generationRef.current += 1;
+    accountRef.current = null;
+    heldRef.current = null;
+    setKeyStatus({ state: 'signed-out' });
     setUser(null);
   };
 
-  const initializeEncryptionKeys = async (password?: string, publicKey?: string) => {
-    try {
-      // If password is provided, try to sync keys from server first
-      if (password) {
-        const encryptedPrivateKey = await encryptionService.getEncryptedPrivateKey();
-        if (encryptedPrivateKey) {
-          try {
-            const privateKeyBase64 = await decryptPrivateKeyWithPassword(
-              encryptedPrivateKey,
-              password
-            );
-            // Use provided public key or get from local storage
-            const publicKeyBase64 = publicKey || getOwnPublicKeyBase64();
-
-            if (publicKeyBase64) {
-              await storeNonExtractablePrivateKey(privateKeyBase64, publicKeyBase64);
-              return;
-            }
-          } catch (error) {
-            console.error('[AuthContext] Failed to decrypt keys from server:', error);
-            // Fall through to generate new keys
-          }
-        }
-      }
-
-      // Generate or retrieve encryption keys locally
-      await initializeKeys();
-
-      // Get public key and upload to server
-      const publicKeyBase64 = getOwnPublicKeyBase64();
-      if (publicKeyBase64) {
-        await encryptionService.uploadPublicKey(publicKeyBase64);
-
-        // If password is provided, encrypt and upload private key to server
-        if (password) {
-          const keyPair = await getOwnKeys();
-          if (keyPair) {
-            const exported = await exportKeyPair(keyPair);
-            const encryptedPrivateKey = await encryptPrivateKeyWithPassword(
-              exported.privateKey,
-              password
-            );
-            await encryptionService.uploadEncryptedPrivateKey(encryptedPrivateKey);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to initialize encryption keys:', error);
-      // Don't block auth flow if encryption fails
+  const commit = (generation: number, outcome: KeyOutcome): boolean => {
+    if (generation !== generationRef.current) {
+      return false;
     }
+    heldRef.current = outcome.held;
+    setKeyStatus(outcome.status);
+    return true;
+  };
+
+  // Key setups run one at a time, so two can never make or upload keys at
+  // once. The app-open check and the provider callback both ask on the same
+  // page load; the second shares the first's run.
+  const settleKeys = (account: User, held: HeldSecret | null): Promise<void> => {
+    const running = settlingRef.current;
+    if (held === null && running?.fromSession && running.accountId === account.id) {
+      return running.done;
+    }
+    const generation = ++generationRef.current;
+    accountRef.current = account;
+    heldRef.current = held;
+    setKeyStatus({ state: 'checking' });
+    const done = (running?.done ?? Promise.resolve()).then(async () => {
+      if (generation !== generationRef.current) return;
+      try {
+        commit(generation, await resolveKeyStatus(account, held));
+      } catch (error) {
+        console.error('[AuthContext] Could not set up message keys:', error);
+        commit(generation, { status: { state: 'failed' }, held });
+      }
+    });
+    const entry = { accountId: account.id, fromSession: held === null, done };
+    settlingRef.current = entry;
+    void done.finally(() => {
+      if (settlingRef.current === entry) settlingRef.current = null;
+    });
+    return done;
   };
 
   // Check if user is already authenticated on mount — cookie is sent automatically
   useEffect(() => {
+    let cancelled = false;
     // Remove credentials created by older builds. Browser authentication is now
     // entirely cookie-backed and no bearer token belongs in web storage.
     localStorage.removeItem('auth_token');
@@ -107,21 +209,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get<User>('/auth/me')
       .then((userData) => {
+        if (cancelled) return;
         setUser(userData);
-        initializeEncryptionKeys().catch((err) => {
-          console.error('Background encryption key init failed:', err);
-        });
+        void settleKeys(userData, null);
       })
       .catch(() => {
         // Not authenticated — cookie absent or expired
       })
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+    // settleKeys reads refs only; the check runs once per app open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (credentials: LoginRequest) => {
-    const response = await api.post<AuthResponse>('/auth/login', credentials);
+    const secret = await signInSecret(credentials.username, credentials.password ?? '');
+    const response = await api.post<AuthResponse>('/auth/login', {
+      username: credentials.username,
+      keep_logged_in: credentials.keep_logged_in,
+      ...(secret.scheme === 2 ? { login_key: secret.login_key } : { password: secret.password }),
+    });
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -133,19 +244,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       keep_logged_in: credentials.keep_logged_in ?? false,
     });
 
-    // Initialize encryption keys with password for cross-browser sync (non-blocking)
-    // Run after React has committed the authenticated user state.
-    setTimeout(() => {
-      initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch(
-        (err) => {
-          console.error('Background encryption key init failed:', err);
-        }
-      );
-    }, 100);
+    void settleKeys(
+      response.user,
+      secret.scheme === 2
+        ? { kind: 'login-key', keys: secret.keys }
+        : { kind: 'old-password', password: secret.password }
+    );
   };
 
   const register = async (data: RegisterRequest) => {
-    const response = await api.post<AuthResponse>('/auth/register', data);
+    const password = data.password ?? '';
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+    // The server gets the login key and its settings, never the password.
+    const { keys, kdf_salt, kdf_iterations } = await prepareSignUp(password);
+    const response = await api.post<AuthResponse>('/auth/register', {
+      ...data,
+      password: undefined,
+      login_key: keys.loginKey,
+      kdf_salt,
+      kdf_iterations,
+    });
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -157,10 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       has_email: !!data.email,
     });
 
-    // Initialize encryption keys with password for cross-browser sync (non-blocking)
-    initializeEncryptionKeys(data.password, response.user.public_key || undefined).catch((err) => {
-      console.error('Background encryption key init failed:', err);
-    });
+    void settleKeys(response.user, { kind: 'new-account', keys });
   };
 
   const logout = () => {
@@ -187,15 +304,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistOmniFeedStateForUser(userData.id, resolveDefaultOmniFeedState());
     analyticsService.identify(userData.id.toString(), { username: userData.username });
     analyticsService.track('user_login', { method: 'oauth' });
+    void settleKeys(userData, null);
   };
 
   const refreshUser = async () => {
     try {
       const userData = await api.get<User>('/auth/me');
+      accountRef.current = userData;
       setUser(userData);
     } catch (error) {
       console.error('Failed to refresh user:', error);
     }
+  };
+
+  const signedInAccount = (): User => {
+    if (!accountRef.current) {
+      throw new Error('Not signed in');
+    }
+    return accountRef.current;
+  };
+
+  // For a session that was already open: the password unlocks the key on this
+  // device, or moves an old-scheme account. A wrong password throws and the
+  // step stays where it was.
+  const unlockWithPassword = async (password: string) => {
+    const generation = generationRef.current;
+    const account = signedInAccount();
+    const backup = await api.get<KeyBackup>('/auth/key-backup');
+    if (backup.auth_scheme !== 2 || !backup.kdf_salt || !backup.kdf_iterations) {
+      commit(generation, await resolveKeyStatus(account, { kind: 'old-password', password }));
+      return;
+    }
+    const keys = await deriveLoginKeys(password, backup.kdf_salt, backup.kdf_iterations);
+    const held: HeldSecret = { kind: 'login-key', keys };
+    if (backup.encrypted_private_key) {
+      const unlocked =
+        !!account.public_key && (await unlockAfterSignIn(keys, account.public_key)) === 'unlocked';
+      if (!unlocked) {
+        throw new Error('Wrong password');
+      }
+      commit(generation, { status: { state: 'ready' }, held });
+      return;
+    }
+    commit(generation, {
+      status: { state: 'needs-recovery', hasRecoveryCopy: !!backup.recovery_wrapped_private_key },
+      held,
+    });
+  };
+
+  const recoverKeys = async (phrase: string) => {
+    const generation = generationRef.current;
+    const account = signedInAccount();
+    const held = heldRef.current;
+    if (!account.public_key || (held?.kind !== 'login-key' && held?.kind !== 'no-password')) {
+      throw new Error('Sign in again to use the recovery phrase');
+    }
+    await recoverWithPhrase(
+      phrase,
+      held.kind === 'login-key' ? held.keys : null,
+      account.public_key
+    );
+    commit(generation, { status: { state: 'ready' }, held });
+  };
+
+  // New keys and a new phrase. Messages encrypted to the old key can no longer
+  // be read; the screen warns and asks for a typed confirmation first.
+  const startFresh = async () => {
+    const generation = generationRef.current;
+    signedInAccount();
+    const held = heldRef.current;
+    let keys: LoginKeys | null;
+    if (held?.kind === 'login-key') {
+      keys = held.keys;
+    } else if (held?.kind === 'old-password') {
+      keys = await moveWithoutKey(held.password);
+    } else if (held?.kind === 'no-password') {
+      keys = null;
+    } else {
+      throw new Error('Sign in again to start fresh');
+    }
+    const phrase = await createAccountKeys(keys);
+    const next: HeldSecret = keys ? { kind: 'login-key', keys } : held;
+    if (commit(generation, { status: phraseShown(phrase), held: next })) {
+      await refreshUser();
+    }
+  };
+
+  const acknowledgePhrase = () => {
+    setKeyStatus((current) => (current.state === 'show-phrase' ? { state: 'ready' } : current));
+  };
+
+  const retryKeys = async () => {
+    await settleKeys(signedInAccount(), heldRef.current);
   };
 
   return (
@@ -203,12 +403,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
+        keyStatus,
         login,
         register,
         completeOAuthLogin,
         logout,
         isAuthenticated: !!user,
         refreshUser,
+        unlockWithPassword,
+        recoverKeys,
+        startFresh,
+        acknowledgePhrase,
+        retryKeys,
       }}
     >
       {children}

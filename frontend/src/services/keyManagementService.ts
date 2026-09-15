@@ -5,7 +5,7 @@
  * to prevent XSS exfiltration. Public keys remain in localStorage (not secret).
  */
 
-import { generateKeyPair, exportKeyPair, importPublicKey, type KeyPair } from '../utils/encryption';
+import { exportKeyPair, importPublicKey, type KeyPair } from '../utils/encryption';
 
 const PRIVATE_KEY_STORAGE_KEY = 'omninudge_private_key';
 const PUBLIC_KEY_STORAGE_KEY = 'omninudge_public_key';
@@ -43,22 +43,6 @@ async function loadPrivateKeyFromIDB(): Promise<CryptoKey | null> {
     req.onsuccess = () => resolve((req.result as CryptoKey) ?? null);
     req.onerror = () => reject(req.error);
   });
-}
-
-/**
- * Initialize encryption keys for current user.
- * Generates new keys if they don't exist.
- */
-export async function initializeKeys(): Promise<KeyPair> {
-  const existingKeys = await getOwnKeys();
-  if (existingKeys) {
-    return existingKeys;
-  }
-
-  const keyPair = await generateKeyPair();
-  await saveKeys(keyPair);
-
-  return keyPair;
 }
 
 /**

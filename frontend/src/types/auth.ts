@@ -41,8 +41,14 @@ export interface PreLoginResponse {
   kdf_iterations?: number;
 }
 
-/** What a device needs to unlock the private key. */
+/**
+ * What a device needs to unlock the private key. auth_scheme and has_password
+ * say which secret the account proves itself with; an account with no
+ * password signed up through a provider.
+ */
 export interface KeyBackup {
+  auth_scheme: number;
+  has_password: boolean;
   kdf_salt?: string;
   kdf_iterations?: number;
   encrypted_private_key?: string;

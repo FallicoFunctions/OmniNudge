@@ -155,13 +155,29 @@ export async function moveAccount(password: string, publicKey: string): Promise<
 }
 
 /**
- * Opens the recovery copy with the phrase, keeps the private key on the
- * device, and wraps it again under the current password's wrap key, which a
- * reset left without a copy. Throws on a wrong phrase or no recovery copy.
+ * Moves a scheme 1 account with no old copy to a login key, with no private
+ * key copy yet: the caller starts fresh with the returned keys.
+ */
+export async function moveWithoutKey(password: string): Promise<LoginKeys> {
+  const settings: KdfSettings = { kdf_salt: newKdfSalt(), kdf_iterations: DEFAULT_KDF_ITERATIONS };
+  const keys = await deriveLoginKeys(password, settings.kdf_salt, settings.kdf_iterations);
+  await api.post('/auth/login-key', {
+    current_password: password,
+    login_key: keys.loginKey,
+    ...settings,
+  });
+  return keys;
+}
+
+/**
+ * Opens the recovery copy with the phrase and keeps the private key on the
+ * device. An account with a password also gets the key wrapped again under
+ * the current wrap key, which a reset left without a copy; keys is null for
+ * an account with no password. Throws on a wrong phrase or no recovery copy.
  */
 export async function recoverWithPhrase(
   phrase: string,
-  keys: LoginKeys,
+  keys: LoginKeys | null,
   publicKey: string
 ): Promise<void> {
   const backup = await api.get<KeyBackup>('/auth/key-backup');
@@ -172,9 +188,11 @@ export async function recoverWithPhrase(
     backup.recovery_wrapped_private_key,
     await deriveRecoveryKey(phrase)
   );
-  await encryptionService.uploadEncryptedPrivateKey(
-    await wrapSecret(privateKey, keys.wrapKey),
-    keys.loginKey
-  );
+  if (keys) {
+    await encryptionService.uploadEncryptedPrivateKey(
+      await wrapSecret(privateKey, keys.wrapKey),
+      keys.loginKey
+    );
+  }
   await storeNonExtractablePrivateKey(privateKey, publicKey);
 }
