@@ -1,0 +1,206 @@
+{
+  "schema_version": 2,
+  "head": "6855f76dc",
+  "base": "7c62d192b",
+  "scope": {
+    "files": [
+      "frontend/src/pages/OmniChatChatPage.tsx",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/messages/CallScreen.tsx",
+      "frontend/src/hooks/useScreenShare.ts"
+    ],
+    "boundaries": [
+      "MessagesPage -> CallScreen props (peerConnectionRef)",
+      "CallScreen -> useScreenShare argument",
+      "useCallManager -> MessagesPage (peerConnectionRef)",
+      "MessagesPage search filters -> searchMessages()"
+    ]
+  },
+  "prior_ledgers_read": [
+    "b6cf44ccc",
+    "121713a04",
+    "19353074d",
+    "6a2482b9f",
+    "c4b3d25e3",
+    "da6885d45"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Four frontend files: OmniChatChatPage.tsx, MessagesPage.tsx, CallScreen.tsx, useScreenShare.ts. Boundaries: MessagesPage -> CallScreen prop (peerConnection value became peerConnectionRef), CallScreen -> useScreenShare argument, useCallManager ref -> page; message search filters -> searchMessages()."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read b6cf44ccc (L1, no findings) and searched the five ledgers naming these files (121713a04, 19353074d, 6a2482b9f, c4b3d25e3, da6885d45). Only related rows: stream-R2 (a URL retry suffix) and credits-end-call-ambiguous (a test selector); neither touches Retry state, the search date filter or screen share."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the MessageSearchFilters artifact through the real page: two messages 3 and 10 days old; Any time -> both shown, Last 7 days -> \"1 match\", Last 30 days -> \"2 matches\", Last 24h -> \"0 matches\"."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Throwaway probe inside the OmniChatChatPage harness printed the error row: status 500 -> \"<span>Media generation is temporarily unavailable...</span><button>Retry</button>\"; status 400 -> the span only, 0 Retry buttons; after Retry on the 500 case the error row is gone. Screen share probe: ref empty at render and filled later -> addTrack 1, stopSharing -> removeTrack 1 with the same sender. Probes deleted."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "CallScreen prop renamed peerConnection -> peerConnectionRef; grep finds one CallScreen caller (MessagesPage:4804) and one useScreenShare caller (CallScreen:69); tsc -b passes, so no caller still passes the old name."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "useCallManager returns peerConnectionRef as MutableRefObject<RTCPeerConnection | null>; it is passed unchanged into RefObject<RTCPeerConnection | null>, and the hook reads .current, the field useCallManager writes (lines 124, 191)."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule in two places checked: the date range also drives the page-reset effect at MessagesPage:2100, which reads no clock. The Retry decision (retryable = status undefined, >=500 or 429) is unchanged and lives once per mutation, as before."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external contract changed."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added across a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is useScreenShare reading peerConnectionRef.current; probe A filled the ref only after render and the reader still found the connection."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Probes used the real harnesses: the existing OmniChatChatPage mocks with a real error status, and MessagesPage getMessagesPage returning sent_at ISO strings as the API does."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Date ranges probed with realistic message ages (3 and 10 days) across all four options."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No validation or parsing added; the select value is cast to MessageSearchDateRange from a closed option list, as before (the literal union was replaced by the named type)."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundary input: Last 24h with no message inside it -> \"0 matches\"; Any time -> no count shown and both messages listed."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every pending-request write in OmniChatChatPage (17) goes through setPendingGeneration / setPendingCommand; grep finds no other direct write. Every other ref read (lines 1121, 1154, 1703, 1709, 2887) is inside a callback or event handler. grep for Ref.current in JSX across src finds none left."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Probe B (no connection at all): startSharing sets isSharing true with no error and adds no track, so the peer sees nothing. Same behaviour before this change (the old code skipped addTrack when the prop was null); not introduced here and reported to the user, not fixed in a lint phase."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "No error path changed; the 402 and non-retryable paths still clear the pending request and set the error message, shown in the probe for 400."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No new flag or conditional gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The date range literal union at the select was replaced by the existing MessageSearchDateRange type, removing a duplicate."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched for the same shape (ref.current read during render, passed as a prop, or Date.now() in a memo) across src with grep and with eslint-plugin-react-hooks 7.1.1 over the whole frontend: only OmniChatCallModal.tsx remains (9 errors), which is the planned call-screen phase."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or Go shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no fix to control."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "eslint with plugin 7.1.1 on the eight L1+L2 files: exit 0; whole-frontend eslint --quiet with the committed 7.0.1: exit 0; tsc -b: exit 0; prettier --check clean; vitest OmniChatChatPage.test.tsx + MessagesPage.test.tsx: 57 passed, 1 skipped (pre-existing skip); pre-commit gate: 0 failed."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "No model or provider output changed; the change is client state and a WebRTC track path, exercised by the probes above."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "startSharing opens the screen picker before it knows whether a peer connection exists; with none it still marks sharing (see E2). Pre-existing, not changed by this diff, reported to the user."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added or changed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint 7.0.1 whole frontend exit 0; 7.1.1 on L1+L2 files exit 0",
+    "types": "tsc -b exit 0",
+    "tests": "OmniChatChatPage.test.tsx + MessagesPage.test.tsx: 57 passed, 1 skipped"
+  }
+}
