@@ -83,6 +83,120 @@ func ChangeLoginKey(ctx context.Context, userRepo ports.UserRepository, userID i
 	return userRepo.SetLoginKey(ctx, userID, hash, req.KDFSalt, req.KDFIterations, req.EncryptedPrivateKey)
 }
 
+// maxWrappedCopyBytes bounds a stored copy of the private key. A copy of an
+// RSA-2048 key wrapped as {v, iv, data} is about 2.3 KB.
+const maxWrappedCopyBytes = 16384
+
+var (
+	// ErrAccountHasPassword is returned when an app password is set on an
+	// account that already has a password; change-password applies there.
+	ErrAccountHasPassword = errors.New("account already has a password")
+	// ErrInvalidRecoveryCopy is returned for an empty or oversized recovery copy.
+	ErrInvalidRecoveryCopy = errors.New("invalid recovery copy")
+)
+
+// KeyBackup is what a device needs to unlock the private key: the derivation
+// settings and both wrapped copies. Neither copy opens without the password
+// or the recovery phrase, so returning them to the account's own session
+// reveals nothing the server itself could read.
+type KeyBackup struct {
+	KDFSalt                   string `json:"kdf_salt,omitempty"`
+	KDFIterations             int    `json:"kdf_iterations,omitempty"`
+	EncryptedPrivateKey       string `json:"encrypted_private_key,omitempty"`
+	RecoveryWrappedPrivateKey string `json:"recovery_wrapped_private_key,omitempty"`
+}
+
+// GetKeyBackup returns the signed-in account's key backup.
+func GetKeyBackup(ctx context.Context, userRepo ports.UserRepository, userID int) (*KeyBackup, error) {
+	user, err := userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("account unavailable")
+	}
+	backup := &KeyBackup{}
+	if user.KDFSalt != nil {
+		backup.KDFSalt = *user.KDFSalt
+	}
+	if user.KDFIterations != nil {
+		backup.KDFIterations = *user.KDFIterations
+	}
+	if user.EncryptedPrivateKey != nil {
+		backup.EncryptedPrivateKey = *user.EncryptedPrivateKey
+	}
+	if user.RecoveryWrappedPrivateKey != nil {
+		backup.RecoveryWrappedPrivateKey = *user.RecoveryWrappedPrivateKey
+	}
+	return backup, nil
+}
+
+// RecoveryKeyRequest stores a new recovery copy. An account with a password
+// proves it again with the same secret it signs in with, so a session alone,
+// for example on a borrowed or stolen device, cannot replace the phrase.
+type RecoveryKeyRequest struct {
+	Password                  string `json:"password,omitempty"`
+	LoginKey                  string `json:"login_key,omitempty"`
+	RecoveryWrappedPrivateKey string `json:"recovery_wrapped_private_key"`
+}
+
+// StoreRecoveryKey stores the copy of the private key wrapped by the recovery
+// phrase. An account with no password at all (OAuth, no app password) has
+// only its session to prove itself with.
+func StoreRecoveryKey(ctx context.Context, userRepo ports.UserRepository, userID int, req *RecoveryKeyRequest) error {
+	if req.RecoveryWrappedPrivateKey == "" || len(req.RecoveryWrappedPrivateKey) > maxWrappedCopyBytes {
+		return ErrInvalidRecoveryCopy
+	}
+	user, err := userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("account unavailable")
+	}
+	if user.PasswordHash != "" && CheckAccountSecret(user.PasswordHash, user.AuthScheme, req.Password, req.LoginKey) != nil {
+		return ErrCurrentPasswordIncorrect
+	}
+	return userRepo.UpdateRecoveryWrappedPrivateKey(ctx, userID, req.RecoveryWrappedPrivateKey)
+}
+
+// AppPasswordRequest gives an account without a password (OAuth only) a login
+// key derived from a new app password, and the private key wrapped by it.
+type AppPasswordRequest struct {
+	LoginKey            string `json:"login_key"`
+	KDFSalt             string `json:"kdf_salt"`
+	KDFIterations       int    `json:"kdf_iterations"`
+	EncryptedPrivateKey string `json:"encrypted_private_key"`
+}
+
+// SetAppPassword sets the first password of an account that has none. It is
+// a real login key: the account can then sign in with username and app
+// password as well as through its provider. An account that already has a
+// password changes it through change-password, which proves the current one.
+func SetAppPassword(ctx context.Context, userRepo ports.UserRepository, userID int, req *AppPasswordRequest) error {
+	if err := validateLoginKey(req.LoginKey, req.KDFSalt, req.KDFIterations); err != nil {
+		return err
+	}
+	if req.EncryptedPrivateKey == "" || len(req.EncryptedPrivateKey) > maxWrappedCopyBytes {
+		return ErrPrivateKeyNotRewrapped
+	}
+	user, err := userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("account unavailable")
+	}
+	if user.PasswordHash != "" {
+		return ErrAccountHasPassword
+	}
+	hash, err := utils.HashPassword(req.LoginKey)
+	if err != nil {
+		return fmt.Errorf("hash login key: %w", err)
+	}
+	return userRepo.SetLoginKey(ctx, userID, hash, req.KDFSalt, req.KDFIterations, req.EncryptedPrivateKey)
+}
+
 // ResetToLoginKey stores the login key derived from a password chosen through a
 // reset link, on any account. The private key copy is cleared: the key that
 // wrapped it came from the forgotten password, so the app unlocks the private

@@ -698,6 +698,19 @@ func (r *UserRepository) UpgradeToLoginKey(ctx context.Context, userID int, logi
 	return nil
 }
 
+// UpdateRecoveryWrappedPrivateKey stores the copy of the private key wrapped
+// by the recovery phrase; empty clears it.
+func (r *UserRepository) UpdateRecoveryWrappedPrivateKey(ctx context.Context, userID int, wrapped string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET recovery_wrapped_private_key = NULLIF($1, '') WHERE id = $2`, wrapped, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errors.New("user not found")
+	}
+	return nil
+}
+
 // SetLoginKey stores a new login key for an account whose password changed or
 // was reset, and puts it on scheme 2. The private key copy is replaced in the
 // same statement: rewrapped with the new key on a change, cleared (empty) on a

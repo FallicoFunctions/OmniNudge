@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"strings"
 	"testing"
 
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services/mocks"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -225,6 +227,78 @@ func TestResetToLoginKeyClearsTheCopyItCanNoLongerOpen(t *testing.T) {
 	assert.Error(t, err)
 	_, _, err = auth.Login(ctx, repo, &LoginRequest{Username: "forgetful", LoginKey: testLoginKey(4)})
 	assert.NoError(t, err)
+}
+
+func TestKeyBackupReturnsTheSettingsAndBothCopies(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithKey(t, auth, repo, "backedup")
+	user, _ := repo.GetByUsername(ctx, "backedup")
+	require.NoError(t, repo.UpdateEncryptedPrivateKey(ctx, user.ID, "copy-under-wrap-key"))
+	require.NoError(t, repo.UpdateRecoveryWrappedPrivateKey(ctx, user.ID, "copy-under-phrase"))
+
+	backup, err := GetKeyBackup(ctx, repo, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, KeyBackup{KDFSalt: testKDFSalt, KDFIterations: MinKDFIterations,
+		EncryptedPrivateKey: "copy-under-wrap-key", RecoveryWrappedPrivateKey: "copy-under-phrase"}, *backup)
+}
+
+func TestStoreRecoveryKeyNeedsTheAccountsSecret(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithKey(t, auth, repo, "phrasekeeper")
+	user, _ := repo.GetByUsername(ctx, "phrasekeeper")
+
+	store := func(password, key, copy string) error {
+		return StoreRecoveryKey(ctx, repo, user.ID, &RecoveryKeyRequest{Password: password, LoginKey: key, RecoveryWrappedPrivateKey: copy})
+	}
+	assert.ErrorIs(t, store("", "", "copy-under-phrase"), ErrCurrentPasswordIncorrect, "a session alone cannot replace the phrase")
+	assert.ErrorIs(t, store("", testLoginKey(6), "copy-under-phrase"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, store("some-password", "", "copy-under-phrase"), ErrCurrentPasswordIncorrect, "a login key account never proves itself with a password")
+	assert.ErrorIs(t, store("", testLoginKey(7), ""), ErrInvalidRecoveryCopy)
+	assert.ErrorIs(t, store("", testLoginKey(7), strings.Repeat("x", maxWrappedCopyBytes+1)), ErrInvalidRecoveryCopy)
+
+	require.NoError(t, store("", testLoginKey(7), "copy-under-phrase"))
+	stored, _ := repo.GetByID(ctx, user.ID)
+	require.NotNil(t, stored.RecoveryWrappedPrivateKey)
+	assert.Equal(t, "copy-under-phrase", *stored.RecoveryWrappedPrivateKey)
+}
+
+func TestStoreRecoveryKeyForAnAccountWithNoPasswordNeedsOnlyTheSession(t *testing.T) {
+	ctx := context.Background()
+	repo := mocks.NewUserRepository()
+	oauthOnly := &models.User{Username: "oauthonly", PasswordHash: ""}
+	require.NoError(t, repo.Create(ctx, oauthOnly))
+
+	require.NoError(t, StoreRecoveryKey(ctx, repo, oauthOnly.ID, &RecoveryKeyRequest{RecoveryWrappedPrivateKey: "copy-under-phrase"}))
+	stored, _ := repo.GetByID(ctx, oauthOnly.ID)
+	require.NotNil(t, stored.RecoveryWrappedPrivateKey)
+}
+
+func TestSetAppPasswordOnlyOnAnAccountWithoutOne(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	oauthOnly := &models.User{Username: "googleuser", PasswordHash: ""}
+	require.NoError(t, repo.Create(ctx, oauthOnly))
+
+	set := func(userID int, rounds int, copy string) error {
+		return SetAppPassword(ctx, repo, userID, &AppPasswordRequest{LoginKey: testLoginKey(3), KDFSalt: testKDFSalt, KDFIterations: rounds, EncryptedPrivateKey: copy})
+	}
+	assert.ErrorIs(t, set(oauthOnly.ID, 1000, "copy-under-app-password"), ErrInvalidLoginKey)
+	assert.ErrorIs(t, set(oauthOnly.ID, MinKDFIterations, ""), ErrPrivateKeyNotRewrapped)
+
+	require.NoError(t, set(oauthOnly.ID, MinKDFIterations, "copy-under-app-password"))
+	stored, _ := repo.GetByID(ctx, oauthOnly.ID)
+	assert.Equal(t, 2, stored.AuthScheme)
+	require.NotNil(t, stored.EncryptedPrivateKey)
+	assert.Equal(t, "copy-under-app-password", *stored.EncryptedPrivateKey)
+	_, _, err := auth.Login(ctx, repo, &LoginRequest{Username: "googleuser", LoginKey: testLoginKey(3)})
+	assert.NoError(t, err, "the app password is also a way to sign in")
+
+	assert.ErrorIs(t, set(oauthOnly.ID, MinKDFIterations, "another-copy"), ErrAccountHasPassword, "once set, change-password applies")
+	registerWithPassword(t, auth, repo, "haspassword", "correct-horse")
+	withPassword, _ := repo.GetByUsername(ctx, "haspassword")
+	assert.ErrorIs(t, set(withPassword.ID, MinKDFIterations, "copy"), ErrAccountHasPassword)
 }
 
 func TestRegisterRefusesBadLoginKeySettings(t *testing.T) {

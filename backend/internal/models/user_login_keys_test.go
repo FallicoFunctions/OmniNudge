@@ -130,6 +130,33 @@ func TestSetLoginKeyReplacesOrClearsTheCopyAndEndsSessions(t *testing.T) {
 	assert.Error(t, repo.SetLoginKey(ctx, 999999, "x", "c2FsdC1mb3ItdGVzdA==", 600000, ""), "a missing user is an error")
 }
 
+func TestUpdateRecoveryWrappedPrivateKeyStoresAndClears(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+	repo := NewUserRepository(db.Pool)
+
+	user := &User{Username: "recovery_keeper", PasswordHash: "password-hash"}
+	require.NoError(t, repo.Create(ctx, user))
+
+	require.NoError(t, repo.UpdateRecoveryWrappedPrivateKey(ctx, user.ID, "copy-under-phrase"))
+	stored, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	if assert.NotNil(t, stored.RecoveryWrappedPrivateKey) {
+		assert.Equal(t, "copy-under-phrase", *stored.RecoveryWrappedPrivateKey)
+	}
+
+	require.NoError(t, repo.UpdateRecoveryWrappedPrivateKey(ctx, user.ID, ""))
+	cleared, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Nil(t, cleared.RecoveryWrappedPrivateKey)
+
+	assert.Error(t, repo.UpdateRecoveryWrappedPrivateKey(ctx, 999999, "copy"), "a missing user is an error")
+}
+
 func TestLoginKeySchemeNeedsSaltAndEnoughRounds(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

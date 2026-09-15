@@ -84,6 +84,10 @@ func (r *PostgresUserRepository) SetLoginKey(ctx context.Context, userID int, lo
 	return r.inner.SetLoginKey(ctx, userID, loginKeyHash, kdfSalt, kdfIterations, encryptedPrivateKey)
 }
 
+func (r *PostgresUserRepository) UpdateRecoveryWrappedPrivateKey(ctx context.Context, userID int, wrapped string) error {
+	return r.inner.UpdateRecoveryWrappedPrivateKey(ctx, userID, wrapped)
+}
+
 func (r *PostgresUserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {
 	return r.inner.IncrementTokenVersion(ctx, userID)
 }

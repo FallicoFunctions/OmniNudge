@@ -189,6 +189,19 @@ func (m *UserRepository) SetLoginKey(_ context.Context, userID int, loginKeyHash
 	return nil
 }
 
+// UpdateRecoveryWrappedPrivateKey mirrors the query: empty clears the copy.
+func (m *UserRepository) UpdateRecoveryWrappedPrivateKey(_ context.Context, userID int, wrapped string) error {
+	u, ok := m.users[userID]
+	if !ok {
+		return errors.New("user not found")
+	}
+	u.RecoveryWrappedPrivateKey = nil
+	if wrapped != "" {
+		u.RecoveryWrappedPrivateKey = &wrapped
+	}
+	return nil
+}
+
 func (m *UserRepository) UpdatePassword(_ context.Context, userID int, passwordHash string) error {
 	if u, ok := m.users[userID]; ok {
 		u.PasswordHash = passwordHash
