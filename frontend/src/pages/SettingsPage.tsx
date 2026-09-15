@@ -1973,30 +1973,36 @@ export default function SettingsPage() {
                     setExportSuccess(null);
 
                     try {
-                      const response = await accountService.requestDataExport({
-                        password: exportPassword,
-                        // Omitting data_types would let the server pick the full
-                        // set, but sending it explicitly keeps the request
-                        // self-describing. Any value here must exist in
-                        // exportDataTypes in backend/internal/handlers/data_export.go,
-                        // which rejects an unknown type outright.
-                        data_types: [
-                          'profile',
-                          'messages',
-                          'posts',
-                          'comments',
-                          'votes',
-                          'saved',
-                          'hubs',
-                          'settings',
-                          'encryption_keys',
-                          'omnichat_conversations',
-                          'omnichat_personas',
-                          'omnichat_memory',
-                          'omnichat_media',
-                        ],
-                        include_deleted: false,
-                      });
+                      if (!user) {
+                        throw new Error(t('settings.dataExport.requestButton'));
+                      }
+                      const response = await accountService.requestDataExport(
+                        user.username,
+                        exportPassword,
+                        {
+                          // Omitting data_types would let the server pick the full
+                          // set, but sending it explicitly keeps the request
+                          // self-describing. Any value here must exist in
+                          // exportDataTypes in backend/internal/handlers/data_export.go,
+                          // which rejects an unknown type outright.
+                          data_types: [
+                            'profile',
+                            'messages',
+                            'posts',
+                            'comments',
+                            'votes',
+                            'saved',
+                            'hubs',
+                            'settings',
+                            'encryption_keys',
+                            'omnichat_conversations',
+                            'omnichat_personas',
+                            'omnichat_memory',
+                            'omnichat_media',
+                          ],
+                          include_deleted: false,
+                        }
+                      );
 
                       setExportSuccess(
                         t('settings.dataExport.successMessage', { exportId: response.export_id })

@@ -2577,7 +2577,8 @@
       },
       "success": {
         "title": "Password Reset Successful",
-        "description": "Your password has been successfully reset. You can now log in with your new password."
+        "description": "Your password has been successfully reset. You can now log in with your new password.",
+        "phraseNote": "To read your encrypted messages again, have your 12-word recovery phrase ready: the app asks for it the next time you sign in."
       }
     },
     "verifyEmailPage": {

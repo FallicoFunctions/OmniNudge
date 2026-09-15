@@ -114,7 +114,7 @@ vi.mock('../../hooks/usePushNotifications', () => ({
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { email: 'test@example.com', email_verified: true },
+    user: { username: 'keyholder', email: 'test@example.com', email_verified: true },
     refreshUser: vi.fn(),
   }),
 }));
@@ -268,7 +268,7 @@ describe('SettingsPage data export', () => {
     vi.clearAllMocks();
   });
 
-  it('submits export password with the request', async () => {
+  it('hands the username and password to the service, which proves the account', async () => {
     requestDataExport.mockResolvedValue({
       export_id: 'export_123',
       status: 'pending',
@@ -287,9 +287,9 @@ describe('SettingsPage data export', () => {
 
     await waitFor(() => {
       expect(requestDataExport).toHaveBeenCalledWith(
-        expect.objectContaining({
-          password: 'ValidPass123!',
-        })
+        'keyholder',
+        'ValidPass123!',
+        expect.objectContaining({ include_deleted: false })
       );
     });
   });

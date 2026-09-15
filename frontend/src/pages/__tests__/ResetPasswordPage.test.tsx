@@ -10,7 +10,16 @@ vi.mock('../../lib/api', () => ({
   },
 }));
 
+vi.mock('../../services/accountKeysService', () => ({
+  prepareSignUp: vi.fn(async () => ({
+    keys: { loginKey: 'the-login-key', wrapKey: {} },
+    kdf_salt: 'the-salt',
+    kdf_iterations: 600000,
+  })),
+}));
+
 import { api } from '../../lib/api';
+import { prepareSignUp } from '../../services/accountKeysService';
 import ResetPasswordPage from '../ResetPasswordPage';
 
 const renderPage = (search = '') =>
@@ -98,5 +107,35 @@ describe('ResetPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/do not match|passwords.*match/i)).toBeInTheDocument();
     });
+  });
+
+  it('sends a login key derived from the new password, never the password', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ valid: true, username: 'alice' });
+    vi.mocked(api.post).mockResolvedValueOnce({});
+
+    renderPage('?token=good-token');
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/enter new password/i)).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/enter new password/i), {
+      target: { value: 'correct horse' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/confirm new password/i), {
+      target: { value: 'correct horse' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: /reset|save|submit|change/i }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    expect(prepareSignUp).toHaveBeenCalledWith('correct horse');
+    const [path, body] = vi.mocked(api.post).mock.calls[0];
+    expect(path).toBe('/auth/reset-password');
+    expect(body).toEqual({
+      token: 'good-token',
+      login_key: 'the-login-key',
+      kdf_salt: 'the-salt',
+      kdf_iterations: 600000,
+    });
+    expect(JSON.stringify(body)).not.toContain('correct horse');
+    expect(await screen.findByText(/recovery phrase/i)).toBeInTheDocument();
   });
 });

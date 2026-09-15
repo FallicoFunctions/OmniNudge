@@ -56,7 +56,20 @@ export async function signInSecret(username: string, password: string): Promise<
   return { scheme: 2, login_key: keys.loginKey, keys };
 }
 
-/** The login key and settings for a new account's sign-up request. */
+/**
+ * What proves the signed-in account again before a sensitive action: its login
+ * key, or its password while it is still on the old scheme. Never the password
+ * for a login-key account, which the server refuses and must never receive.
+ */
+export async function accountProof(
+  username: string,
+  password: string
+): Promise<{ login_key: string } | { password: string }> {
+  const secret = await signInSecret(username, password);
+  return secret.scheme === 2 ? { login_key: secret.login_key } : { password: secret.password };
+}
+
+/** A new login key and its settings, for a sign-up or a password reset. */
 export async function prepareSignUp(password: string): Promise<{ keys: LoginKeys } & KdfSettings> {
   const settings: KdfSettings = { kdf_salt: newKdfSalt(), kdf_iterations: DEFAULT_KDF_ITERATIONS };
   const keys = await deriveLoginKeys(password, settings.kdf_salt, settings.kdf_iterations);

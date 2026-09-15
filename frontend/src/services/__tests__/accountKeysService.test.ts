@@ -9,6 +9,7 @@ import {
   newRecoveryPhrase,
 } from '../../utils/recoveryPhrase';
 import {
+  accountProof,
   createAccountKeys,
   moveAccount,
   moveWithoutKey,
@@ -124,6 +125,24 @@ describe('sign-in', () => {
         'Sign-in settings are missing'
       );
     }
+  });
+
+  it('proves a login-key account again with its login key, never its password', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({
+      scheme: 2,
+      kdf_salt: salt,
+      kdf_iterations: FEW_ROUNDS,
+    });
+    const proof = await accountProof('keyholder', 'correct horse');
+    const expected = await deriveLoginKeys('correct horse', salt, FEW_ROUNDS);
+    expect(proof).toEqual({ login_key: expected.loginKey });
+  });
+
+  it('proves an old-scheme account again with its password', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ scheme: 1 });
+    expect(await accountProof('oldschool', 'correct horse')).toEqual({
+      password: 'correct horse',
+    });
   });
 
   it('sends the password on scheme 1', async () => {

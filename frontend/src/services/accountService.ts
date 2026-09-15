@@ -1,7 +1,7 @@
 import api from './api';
+import { accountProof } from './accountKeysService';
 
-interface DataExportRequest {
-  password: string;
+interface DataExportOptions {
   data_types: string[];
   include_deleted: boolean;
 }
@@ -35,8 +35,15 @@ class AccountService {
    * Request a GDPR data export
    * P0-016: GDPR Right to Data Portability
    */
-  async requestDataExport(request: DataExportRequest): Promise<DataExportResponse> {
-    const response = await api.post('/account/export', request);
+  async requestDataExport(
+    username: string,
+    password: string,
+    options: DataExportOptions
+  ): Promise<DataExportResponse> {
+    const response = await api.post('/account/export', {
+      ...(await accountProof(username, password)),
+      ...options,
+    });
     return response.data;
   }
 
@@ -63,9 +70,9 @@ class AccountService {
   /**
    * Request account deletion (P0-017)
    */
-  async requestAccountDeletion(password: string, confirm: string) {
+  async requestAccountDeletion(username: string, password: string, confirm: string) {
     const response = await api.post('/account/delete', {
-      password,
+      ...(await accountProof(username, password)),
       confirm,
     });
     return response.data;

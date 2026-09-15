@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
+import { prepareSignUp } from '../services/accountKeysService';
 import { FormField } from '../components/forms/FormField';
 import { Button } from '../components/ui/Button';
 
@@ -74,9 +75,15 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
 
     try {
+      // The server gets the login key and its settings, never the password.
+      // The reset clears the copy of the private key the forgotten password
+      // wrapped, so the next sign-in asks for the recovery phrase.
+      const { keys, kdf_salt, kdf_iterations } = await prepareSignUp(password);
       await api.post('/auth/reset-password', {
         token,
-        new_password: password,
+        login_key: keys.loginKey,
+        kdf_salt,
+        kdf_iterations,
       });
 
       setSuccess(true);
@@ -155,6 +162,9 @@ export default function ResetPasswordPage() {
           </h1>
           <p className="mb-6 text-center text-[var(--color-text-secondary)]">
             {t('auth.resetPasswordPage.success.description')}
+          </p>
+          <p className="mb-6 text-center text-sm text-[var(--color-text-secondary)]">
+            {t('auth.resetPasswordPage.success.phraseNote')}
           </p>
           <p className="text-center text-sm text-[var(--color-text-muted)]">
             {t('auth.resetPasswordPage.status.redirectingHome')}
