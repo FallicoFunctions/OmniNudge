@@ -1,0 +1,684 @@
+{
+ "schema_version": 2,
+ "head": "4bc091c96",
+ "base": "b2a87c547",
+ "scope": {
+  "files": [
+   "frontend/src/contexts/AuthContext.tsx",
+   "frontend/src/contexts/__tests__/AuthContext.test.tsx",
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts",
+   "frontend/src/services/keyManagementService.ts",
+   "frontend/src/types/auth.ts"
+  ],
+  "boundaries": [
+   "/auth/prelogin",
+   "/auth/login",
+   "/auth/register",
+   "/auth/me",
+   "/auth/key-backup",
+   "/auth/login-key",
+   "IndexedDB and localStorage keys",
+   "OAuthCallbackPage -> completeOAuthLogin"
+  ]
+ },
+ "prior_ledgers_read": [
+  "ae248c296",
+  "a20fb1d51"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "AuthContext rewritten around resolveKeyStatus (sign-in, sign-up, old-scheme move, app open, provider sign-in) and five key actions; initializeKeys removed; moveWithoutKey and recoverWithPhrase(null keys) added; KeyBackup gains auth_scheme and has_password. Boundaries: /auth/prelogin, /auth/login, /auth/register, /auth/me, /auth/key-backup, /auth/login-key, IndexedDB and localStorage keys, OAuthCallbackPage."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "ae248c296 (K4c-1: public-key proof), a20fb1d51 (K4b: two client findings); none on AuthContext."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the api mock: /auth/login carries login_key and no password for scheme 2, password for scheme 1; /auth/register carries login_key, kdf_salt, kdf_iterations and no password (the password string appears nowhere in it); /auth/login-key from moveWithoutKey carries no encrypted_private_key."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; screens are K4d."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "auth_scheme, has_password, recovery_wrapped_private_key, kdf_salt, kdf_iterations spelled as the Go JSON tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "KeyBackup fields match the K4c-1 server struct; the fields AuthContext reads are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The needs-recovery and ready rules live once, in resolveKeyStatus; unlockWithPassword reuses it for the old scheme."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises plain objects; password: undefined is dropped by JSON, asserted."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The account and backup fixtures follow the real server shapes (omitempty fields left out, has_password always sent)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Correct secrets on every path: scheme 2, scheme 1, provider, the phrase."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password on the signed-in unlock throws and the step stays; a short password is refused before any request; key actions after sign-out refuse."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "No public key on the account, no copy, no recovery copy, no key on the device: each has a defined step."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling flows compared: every path that makes keys now needs a new account, a provider account with no copy, or startFresh; no path uploads without the proof."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every KeyStatus state is reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Setup errors log and give the failed state with retryKeys; action errors throw to the screen."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "KDF settings still come from the K3 constants; one proof shape."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'result written after the state it belongs to is gone': every await in AuthContext now commits through commit(generation); shape 'two callers, one effect': settleKeys is the only key setup entry."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Shared state is the refs; ordering exercised by the deferred tests."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A failed setup leaves the failed state; createAccountKeys publishes the public key last (K4b)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Sign-out during a setup: the late step wrote the held secret and status after sign-out (k4c2-settle-after-signout). Re-do elsewhere: a fresh start on another device left this device's old key counted as ready (k4c2-stale-device-key-ready)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Controls built after the fixes; see pass 3."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Nothing new guards; the old silent key creation (initializeKeys) has no caller and is deleted."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest AuthContext 18 + accountKeysService 17 = 35 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "F4 already named; the two-entry-point technique had no row, so F5 was added to instruments.json."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts before sign-in decides it; key setup starts after the session exists."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest reports 0 skipped; no test has a skip condition."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4c plan: AuthContext uses the flows, no silent key creation, the proof on uploads (K4c-1). Design memory kept: login shows messages with no phrase, old accounts move at sign-in or ask the password once on app open, provider accounts with no exportable key start fresh, a lost phrase starts fresh only when asked."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "The app-open check and OAuthCallbackPage both start key setup on one page load; two createAccountKeys runs could interleave and leave a phrase copy of another key pair (k4c2-oauth-double-settle)."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4c2-oauth-double-settle",
+     "summary": "The app-open check and the OAuth callback both set up keys on one page load, so two createAccountKeys runs could interleave.",
+     "found_by": "F5",
+     "fix_commit": "4f8f665c9",
+     "control": {
+      "patch": ".review/controls/k4c2-oauth-double-settle.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/AuthContext.test.tsx -t 'makes a provider account one key pair'"
+      ],
+      "observed": "FAIL: createAccountKeys called 2 times"
+     }
+    },
+    {
+     "id": "k4c2-settle-after-signout",
+     "summary": "A key setup that finished after sign-out wrote its held secret and status back.",
+     "found_by": "F4",
+     "fix_commit": "4f8f665c9",
+     "control": {
+      "patch": ".review/controls/k4c2-settle-after-signout.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/AuthContext.test.tsx -t 'finishes after sign-out'"
+      ],
+      "observed": "FAIL: needs-recovery instead of signed-out"
+     }
+    },
+    {
+     "id": "k4c2-stale-device-key-ready",
+     "summary": "The app-open check counted any key on the device as ready, even one replaced by a fresh start elsewhere.",
+     "found_by": "F4",
+     "fix_commit": "4f8f665c9",
+     "control": {
+      "patch": ".review/controls/k4c2-stale-device-key-ready.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/AuthContext.test.tsx -t 'does not count an older key'"
+      ],
+      "observed": "FAIL: ready instead of needs-password and needs-recovery"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "AuthContext rewritten around resolveKeyStatus (sign-in, sign-up, old-scheme move, app open, provider sign-in) and five key actions; initializeKeys removed; moveWithoutKey and recoverWithPhrase(null keys) added; KeyBackup gains auth_scheme and has_password. Boundaries: /auth/prelogin, /auth/login, /auth/register, /auth/me, /auth/key-backup, /auth/login-key, IndexedDB and localStorage keys, OAuthCallbackPage."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "ae248c296 (K4c-1: public-key proof), a20fb1d51 (K4b: two client findings); none on AuthContext."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the api mock: /auth/login carries login_key and no password for scheme 2, password for scheme 1; /auth/register carries login_key, kdf_salt, kdf_iterations and no password (the password string appears nowhere in it); /auth/login-key from moveWithoutKey carries no encrypted_private_key."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; screens are K4d."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "auth_scheme, has_password, recovery_wrapped_private_key, kdf_salt, kdf_iterations spelled as the Go JSON tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "KeyBackup fields match the K4c-1 server struct; the fields AuthContext reads are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The needs-recovery and ready rules live once, in resolveKeyStatus; unlockWithPassword reuses it for the old scheme."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises plain objects; password: undefined is dropped by JSON, asserted."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The account and backup fixtures follow the real server shapes (omitempty fields left out, has_password always sent)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Correct secrets on every path: scheme 2, scheme 1, provider, the phrase."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password on the signed-in unlock throws and the step stays; a short password is refused before any request; key actions after sign-out refuse."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "No public key on the account, no copy, no recovery copy, no key on the device: each has a defined step."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Pass 2: re-compared the fix's callers: completeOAuthLogin, mount, retryKeys."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every KeyStatus state is reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Setup errors log and give the failed state with retryKeys; action errors throw to the screen."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "KDF settings still come from the K3 constants; one proof shape."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: re-grepped every settleKeys caller."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Pass 2: the dedupe covers only a running setup."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Pass 2: unchanged."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Pass 2: sign-out bumps the generation, so the new skip never crosses a sign-out."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Controls built after the fix; see pass 3."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Nothing new guards; the old silent key creation (initializeKeys) has no caller and is deleted."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest AuthContext 18 + accountKeysService 17 = 35 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "F5 found it; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Pass 2: unchanged."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest reports 0 skipped; no test has a skip condition."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4c plan: AuthContext uses the flows, no silent key creation, the proof on uploads (K4c-1). Design memory kept: login shows messages with no phrase, old accounts move at sign-in or ask the password once on app open, provider accounts with no exportable key start fresh, a lost phrase starts fresh only when asked."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "F5 applied to the fix: a callback whose /auth/me answers after the first setup has ended ran again with an account from before the public key, and replaced the phrase the user had not seen (k4c2-late-callback-hides-phrase)."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4c2-late-callback-hides-phrase",
+     "summary": "A callback answering after the first setup ended ran again with an account from before the public key and replaced the phrase.",
+     "found_by": "F5",
+     "fix_commit": "4bc091c96",
+     "control": {
+      "patch": ".review/controls/k4c2-late-callback-hides-phrase.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/AuthContext.test.tsx -t 'keeps the phrase on screen'"
+      ],
+      "observed": "FAIL: needs-recovery instead of show-phrase"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "AuthContext rewritten around resolveKeyStatus (sign-in, sign-up, old-scheme move, app open, provider sign-in) and five key actions; initializeKeys removed; moveWithoutKey and recoverWithPhrase(null keys) added; KeyBackup gains auth_scheme and has_password. Boundaries: /auth/prelogin, /auth/login, /auth/register, /auth/me, /auth/key-backup, /auth/login-key, IndexedDB and localStorage keys, OAuthCallbackPage."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "ae248c296 (K4c-1: public-key proof), a20fb1d51 (K4b: two client findings); none on AuthContext."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the api mock: /auth/login carries login_key and no password for scheme 2, password for scheme 1; /auth/register carries login_key, kdf_salt, kdf_iterations and no password (the password string appears nowhere in it); /auth/login-key from moveWithoutKey carries no encrypted_private_key."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; screens are K4d."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "auth_scheme, has_password, recovery_wrapped_private_key, kdf_salt, kdf_iterations spelled as the Go JSON tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "KeyBackup fields match the K4c-1 server struct; the fields AuthContext reads are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The needs-recovery and ready rules live once, in resolveKeyStatus; unlockWithPassword reuses it for the old scheme."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises plain objects; password: undefined is dropped by JSON, asserted."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The account and backup fixtures follow the real server shapes (omitempty fields left out, has_password always sent)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Correct secrets on every path: scheme 2, scheme 1, provider, the phrase."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong password on the signed-in unlock throws and the step stays; a short password is refused before any request; key actions after sign-out refuse."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "No public key on the account, no copy, no recovery copy, no key on the device: each has a defined step."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Pass 3: retryKeys after failed is not skipped (failed is never recorded as settled); unlock, recover and start fresh do not move the generation, so a later check for the same account correctly stays skipped."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every KeyStatus state is reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Setup errors log and give the failed state with retryKeys; action errors throw to the screen."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "KDF settings still come from the K3 constants; one proof shape."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 3: grepped every read of public_key: only AuthContext, from accountRef, which a skipped check leaves at the newer account."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Pass 3: unchanged."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Pass 3: unchanged."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Pass 3: unchanged."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Each fix reverted from HEAD 4bc091c96: all four named tests fail with assertion errors (called 2 times; needs-recovery instead of signed-out; ready instead of needs-password and needs-recovery; needs-recovery instead of show-phrase)."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Nothing new guards; the old silent key creation (initializeKeys) has no caller and is deleted."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest AuthContext 18 + accountKeysService 17 = 35 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 3 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Pass 3: unchanged."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest reports 0 skipped; no test has a skip condition."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4c plan: AuthContext uses the flows, no silent key creation, the proof on uploads (K4c-1). Design memory kept: login shows messages with no phrase, old accounts move at sign-in or ask the password once on app open, provider accounts with no exportable key start fresh, a lost phrase starts fresh only when asked."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "Pass 3: every entry point listed again (mount, OAuthCallbackPage, login, register, retryKeys, the three actions); each concurrent pair is serialized, shared, or skipped."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest AuthContext 18, accountKeysService 17: 35 passed, 0 failed, 0 skipped"
+ }
+}

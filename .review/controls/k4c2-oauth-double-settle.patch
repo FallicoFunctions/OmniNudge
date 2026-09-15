@@ -1,0 +1,23 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index 5dcc5313f..fe32ec389 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -176,9 +176,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+   // page load; the second shares the first's run.
+   const settleKeys = (account: User, held: HeldSecret | null): Promise<void> => {
+     const running = settlingRef.current;
+-    if (held === null && running?.fromSession && running.accountId === account.id) {
+-      return running.done;
+-    }
+     // A callback that answers after the app-open check has finished must not
+     // run again: its account can predate the new public key, and a second run
+     // would replace the phrase the user has not yet seen.
+@@ -194,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+     accountRef.current = account;
+     heldRef.current = held;
+     setKeyStatus({ state: 'checking' });
+-    const done = (running?.done ?? Promise.resolve()).then(async () => {
++    const done = Promise.resolve().then(async () => {
+       if (generation !== generationRef.current) return;
+       try {
+         if (commit(generation, await resolveKeyStatus(account, held)) && held === null) {

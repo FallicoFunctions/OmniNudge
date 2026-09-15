@@ -1,0 +1,13 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index 5dcc5313f..0228317b6 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -75,7 +75,7 @@ const phraseShown = (phrase: string): KeyStatus => ({ state: 'show-phrase', phra
+ // fresh start elsewhere, the old one cannot read new messages.
+ async function deviceHoldsAccountKey(account: User): Promise<boolean> {
+   return (
+-    !!account.public_key && !!(await getOwnKeys()) && getOwnPublicKeyBase64() === account.public_key
++    !!account.public_key && !!(await getOwnKeys()) && getOwnPublicKeyBase64() !== null
+   );
+ }
+ 

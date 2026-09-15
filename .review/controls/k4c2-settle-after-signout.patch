@@ -1,0 +1,12 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index 5dcc5313f..6e3d3fe9c 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -155,7 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
+     clearOmniChatDefaults('authenticated');
+     clearAllGuestMessages();
+-    generationRef.current += 1;
+     accountRef.current = null;
+     heldRef.current = null;
+     setKeyStatus({ state: 'signed-out' });

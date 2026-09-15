@@ -223,6 +223,12 @@
       "name": "Does the change keep every promise of the approved plan?",
       "trigger": "the change is one phase of a plan the user approved",
       "asks": "Reread the plan's own sentences for this phase and check each against the code: every 'deletes', 'never', 'only' and 'at once' is a guarantee someone will rely on without looking. The login-key plan said the move to the new scheme 'deletes the password copy'; the first cut of the move changed only the login columns, so the private key copy wrapped with a password the server had seen would have stayed on the server for good. Nothing in the diff was wrong on its own terms, and no test asked, because the test was written from the code rather than from the plan."
+    },
+    {
+      "id": "F5",
+      "name": "Can two entry points run the same side effect at once?",
+      "trigger": "a side effect (making keys, a payment, an upload) is started from more than one place: an app-open check, a callback page, a retry, a second tab",
+      "asks": "List every caller that can start it, and find a real page load or user path where two of them fire together. Run them together in a test with the first held open, and require the effect to happen once and the result to stay consistent. A guard on each caller alone does not see the other caller."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

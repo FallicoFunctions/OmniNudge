@@ -1,0 +1,22 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index 5dcc5313f..3b0524b75 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -179,17 +179,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+     if (held === null && running?.fromSession && running.accountId === account.id) {
+       return running.done;
+     }
+-    // A callback that answers after the app-open check has finished must not
+-    // run again: its account can predate the new public key, and a second run
+-    // would replace the phrase the user has not yet seen.
+-    const settled = sessionSettledRef.current;
+-    if (
+-      held === null &&
+-      settled?.accountId === account.id &&
+-      settled.generation === generationRef.current
+-    ) {
+-      return Promise.resolve();
+-    }
+     const generation = ++generationRef.current;
+     accountRef.current = account;
+     heldRef.current = held;
