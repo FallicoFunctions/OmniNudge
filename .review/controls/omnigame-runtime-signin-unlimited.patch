@@ -1,0 +1,18 @@
+diff --git a/backend/internal/omnigame/api/router.go b/backend/internal/omnigame/api/router.go
+index 3d08b0b07..7cabe818b 100644
+--- a/backend/internal/omnigame/api/router.go
++++ b/backend/internal/omnigame/api/router.go
+@@ -89,11 +89,10 @@ func NewRouter(
+ 	// The runtime signs in against the same accounts as the main API, so it
+ 	// carries the same limits under the same keys; with a shared Redis the two
+ 	// servers share one count, and switching servers does not reset it.
+-	authLimit := middleware.AuthRateLimiter(rateLimitCache).Middleware()
+ 	preLoginLimit := middleware.PreLoginRateLimiter(rateLimitCache).Middleware()
+ 	v1.POST("/omnigame/runtime/auth/prelogin", preLoginLimit, runtimeAuthHandler.PreLogin)
+-	v1.POST("/omnigame/runtime/auth/login", authLimit, runtimeAuthHandler.Login)
+-	v1.POST("/omnigame/runtime/auth/signup", authLimit, runtimeAuthHandler.Signup)
++	v1.POST("/omnigame/runtime/auth/login", runtimeAuthHandler.Login)
++	v1.POST("/omnigame/runtime/auth/signup", runtimeAuthHandler.Signup)
+ 	v1.POST("/omnigame/runtime/auth/logout", runtimeAuthHandler.Logout)
+ 
+ 	protected := v1.Group("/omnigame/profile")

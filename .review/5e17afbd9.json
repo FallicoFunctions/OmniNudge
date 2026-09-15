@@ -1,0 +1,433 @@
+{
+  "schema_version": 2,
+  "head": "fd61f673b",
+  "base": "5e17afbd9",
+  "scope": {
+    "files": [
+      "backend/internal/omnigame/model/types.go",
+      "backend/internal/omnigame/api/handlers/runtime_auth_handler.go",
+      "backend/internal/omnigame/api/router.go",
+      "backend/cmd/omnigame-api/main.go",
+      "backend/internal/omnigame/api/handlers/runtime_auth_handler_test.go",
+      "backend/internal/omnigame/api/router_test.go",
+      "backend/internal/omnigame/api/router_rate_limit_test.go",
+      "backend/internal/omnigame/api/persona_admission_route_test.go",
+      "backend/internal/omnigame/api/world_event_route_test.go"
+    ],
+    "boundaries": [
+      "OmniRave client -> /omnigame/runtime/auth/{prelogin,login,signup}",
+      "OmniGame server -> Redis (shared limits with the main API)",
+      "runtime adapter -> services.AuthService"
+    ]
+  },
+  "prior_ledgers_read": [
+    "1379ce9db",
+    "b530f73c2"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "fd61f673b: RuntimeAuthRequest gains loginKey, kdfSalt, kdfIterations; the runtime adapter passes them to Login and Register; PreLogin on the runtime interface, adapter, handler and route; NewRouter takes a cache and puts the sign-in and pre-login limiters on the runtime routes; cmd/omnigame-api builds the cache from REDIS_ADDR or memory; tests."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "1379ce9db (K2b-2) and fc6926b2f (K2a) found nothing; b530f73c2 added the main API's pre-login limiter this phase reuses. No prior finding on the OmniGame API's limits."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read what the runtime client receives: pre-login returns exactly {scheme, kdf_salt, kdf_iterations}; six wrong sign-ins from one address return 401 five times, then 429; pre-login still answers 200 after that."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The runtime JSON names follow the runtime's camelCase (loginKey, kdfSalt, kdfIterations); the limiters use the main API's key prefixes (rate:auth, rate:prelogin), so a shared Redis gives one count for both servers."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The pre-login response is the main API's PreLoginResponse, so both servers answer in the same shape."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The sign-in rule stays in services.Login and CheckAccountSecret; the runtime passes the fields through rather than checking anything itself."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The OmniGame server reads the same REDIS_ADDR and REDIS_PASSWORD as the main API and pings Redis the same way before trusting it."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "The three new request fields are read by the adapter, which is the only decoder."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Login keys in the tests are 32 bytes base64, as the app sends."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing beyond validateLoginKey."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: the sixth sign-in from one address (429); a login-key account's password on the runtime (401)."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The limit boundary is D2's; the rounds boundary is K1b's."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Found the finding by comparing the runtime routes with their siblings on the main API: /auth/login and /auth/register carry AuthRateLimiter; /omnigame/runtime/auth/login and /signup check the same accounts and carried nothing."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The pre-login handler's success path and the adapter's key paths are reached by tests."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A missing user repository makes pre-login answer 503 rather than a false scheme."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The main API drops its sign-in limit in development; the OmniGame server has no environment switch, so its limit applies locally too (noted to the user)."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The Redis setup is written again in cmd/omnigame-api, shorter than the main server's; both read the same variables. Left as two small copies rather than a shared package for one call."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every other route that checks a password on the OmniGame server: none besides login and signup (grep of the router)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "The limit keys on the user when AuthOptional sets one, otherwise on ClientIP. The server trusts only 127.0.0.1 and ::1 (OMNIGAME_TRUSTED_PROXIES, and the RUNBOOK) and sits behind nginx on the same host, so the address comes from nginx's forwarded header. The nginx site config is not in this repository, so the header was not verified here; the main API's limit depends on it in the same way."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The memory cache is stopped at shutdown; the Redis client is closed."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control replayed as the hook runs it: without the sign-in limiter the six attempts return 401 six times (expected the sixth to be 429), FAIL; at HEAD, ok."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The limiters sit on the routes cmd/omnigame-api serves; the test reaches them through the real NewRouter."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues on internal/omnigame and cmd/omnigame-api; every OmniGame package passes: 129 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "E1 already names the technique (what defence do siblings carry that this path lacks). No new instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real router and the real AuthService with the mock repository; the rate limit test drives HTTP through NewRouter."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the runtime six wrong sign-ins from one address: the sixth was refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "-v across internal/omnigame/...: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K2c promise: the OmniGame runtime sign-in and sign-up accept a login key. Both do, and a login-key account's password is refused there, as on the main API."
+        }
+      ],
+      "findings": [
+        {
+          "id": "omnigame-runtime-signin-unlimited",
+          "summary": "The OmniGame runtime sign-in and sign-up checked the same accounts as the main API but carried no rate limit; the main API allows five attempts per 15 minutes.",
+          "found_by": "E1",
+          "fix_commit": "fd61f673b",
+          "control": {
+            "patch": ".review/controls/omnigame-runtime-signin-unlimited.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/omnigame/api/ -run 'TestRuntimeSignInIsRateLimited'"
+            ],
+            "observed": "With the patch, TEST_DATABASE_URL unset: FAIL, expected [401 401 401 401 401 429], actual [401 401 401 401 401 401]. Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 covers the fix as committed in fd61f673b: the limiters on the runtime routes, the cache parameter, and the four older router tests updated to pass a cache."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "1379ce9db (K2b-2) and fc6926b2f (K2a) found nothing; b530f73c2 added the main API's pre-login limiter this phase reuses. No prior finding on the OmniGame API's limits."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read what the runtime client receives: pre-login returns exactly {scheme, kdf_salt, kdf_iterations}; six wrong sign-ins from one address return 401 five times, then 429; pre-login still answers 200 after that."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The runtime JSON names follow the runtime's camelCase (loginKey, kdfSalt, kdfIterations); the limiters use the main API's key prefixes (rate:auth, rate:prelogin), so a shared Redis gives one count for both servers."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The pre-login response is the main API's PreLoginResponse, so both servers answer in the same shape."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The sign-in rule stays in services.Login and CheckAccountSecret; the runtime passes the fields through rather than checking anything itself."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The OmniGame server reads the same REDIS_ADDR and REDIS_PASSWORD as the main API and pings Redis the same way before trusting it."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "The three new request fields are read by the adapter, which is the only decoder."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Login keys in the tests are 32 bytes base64, as the app sends."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing beyond validateLoginKey."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: the sixth sign-in from one address (429); a login-key account's password on the runtime (401)."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The limit boundary is D2's; the rounds boundary is K1b's."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "No runtime route that checks a password is left without a limit."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The pre-login handler's success path and the adapter's key paths are reached by tests."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A missing user repository makes pre-login answer 503 rather than a false scheme."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The main API drops its sign-in limit in development; the OmniGame server has no environment switch, so its limit applies locally too (noted to the user)."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The Redis setup is written again in cmd/omnigame-api, shorter than the main server's; both read the same variables. Left as two small copies rather than a shared package for one call."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every other route that checks a password on the OmniGame server: none besides login and signup (grep of the router)."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "The limit keys on the user when AuthOptional sets one, otherwise on ClientIP. The server trusts only 127.0.0.1 and ::1 (OMNIGAME_TRUSTED_PROXIES, and the RUNBOOK) and sits behind nginx on the same host, so the address comes from nginx's forwarded header. The nginx site config is not in this repository, so the header was not verified here; the main API's limit depends on it in the same way."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The memory cache is stopped at shutdown; the Redis client is closed."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The control holds at fd61f673b."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The limiters sit on the routes cmd/omnigame-api serves; the test reaches them through the real NewRouter."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues on internal/omnigame and cmd/omnigame-api; every OmniGame package passes: 129 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real router and the real AuthService with the mock repository; the rate limit test drives HTTP through NewRouter."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the runtime six wrong sign-ins from one address: the sixth was refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "-v across internal/omnigame/...: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K2c promise: the OmniGame runtime sign-in and sign-up accept a login key. Both do, and a login-key account's password is refused there, as on the main API."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok, and with the integration tag",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "internal/omnigame/... 129 PASS, 0 FAIL, 0 SKIP"
+  }
+}
