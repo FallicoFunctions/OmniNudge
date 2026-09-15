@@ -1,0 +1,22 @@
+diff --git a/backend/internal/integration/test_utils.go b/backend/internal/integration/test_utils.go
+index 73b82e6a5..e32b3ded5 100644
+--- a/backend/internal/integration/test_utils.go
++++ b/backend/internal/integration/test_utils.go
+@@ -7,6 +7,7 @@ import (
+ 	"fmt"
+ 	"net/http"
+ 	"net/http/httptest"
++	"os"
+ 	"testing"
+ 
+ 	"github.com/gin-gonic/gin"
+@@ -47,6 +48,9 @@ func directConversationRequestBody(otherUserID int) []byte {
+ // suite that skips without a database prints ok while checking nothing.
+ func getTestDB(t *testing.T) *database.DB {
+ 	t.Helper()
++	if os.Getenv("TEST_DATABASE_URL") == "" {
++		t.Skip("TEST_DATABASE_URL not set; skipping integration tests")
++	}
+ 	dsn, err := database.TestDSN()
+ 	require.NoError(t, err)
+ 	db, err := database.New(dsn)
