@@ -1,0 +1,436 @@
+{
+ "schema_version": 2,
+ "head": "bee17edf1",
+ "base": "ae248c296",
+ "scope": {
+  "files": [
+   "backend/internal/services/auth_login_key.go",
+   "backend/internal/services/auth_login_key_test.go",
+   "backend/internal/handlers/auth.go",
+   "backend/cmd/server/main.go",
+   "backend/internal/integration/test_utils.go",
+   "backend/internal/integration/auth_login_key_integration_test.go",
+   "frontend/src/services/encryptionService.ts",
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts"
+  ],
+  "boundaries": [
+   "PUT /auth/encrypted-private-key",
+   "PUT /auth/public-key",
+   "GET /auth/key-backup",
+   "users row: public_key, encrypted_private_key",
+   "sign-in rate limiter",
+   "app encryptionService -> server"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a20fb1d51",
+  "0e793f7ff"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "StorePrivateKeyCopy and StorePublicKey behind one proveAccount check (shared with StoreRecoveryKey); KeyBackup gains auth_scheme and has_password; handlers map the errors; both PUT routes get the sign-in limit in the server and the test router; the app sends login_key with the public key."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a20fb1d51 (K4b: two client findings, fixed) and 0e793f7ff (K4a-1, none); neither touches these routes."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Request bodies from the app printed through the api mock: sign-up with a password sends login_key with the public key; an account with no password sends public_key alone."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "HTTP over the real router and Postgres: PUT encrypted-private-key and PUT public-key without a secret give 401, an empty copy 400, with the login key 200 and the row holds the value; GET key-backup body compared whole: auth_scheme 2, has_password true, salt, rounds, both copies. The account with no password: {auth_scheme, has_password:false} only (service test)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Rows read back after each accepted and refused write: refused requests leave encrypted_private_key and public_key NULL."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "JSON names match on both sides: password, login_key, encrypted_private_key, public_key, auth_scheme, has_password."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The app's uploads send exactly the fields PrivateKeyCopyRequest and PublicKeyRequest bind; the frontend KeyBackup type gains the two new fields in K4c-2, and nothing reads them before then."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One proof rule, proveAccount, now used by all three key writes; CheckAccountSecret stays the one secret check."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "gin binds the structs; the new KeyBackup fields have no omitempty, so false and 0 still reach the app (asserted for has_password false)."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Integration accounts are made by the real register route; login keys are 32 real bytes, base64."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The correct login key, the correct old-scheme password, and a session with no password all store."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "No secret, a wrong login key, a password sent to a login-key account, a wrong old password: all refused, nothing written."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty copy, empty public key, and 16384+1 bytes refused."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling key writes compared: the recovery copy and now the private key copy need a secret, but PUT /auth/public-key still took a session alone (finding k4c1-public-key-session-only)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: invalid, wrong secret, no-password session, accepted, for both routes."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Unexpected errors log with user_id and give 500; the app's old AuthContext upload now gets 401, which its catch logs; K4c-2 removes that code."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The copy-was-proved check existed once in StoreRecoveryKey and is now one function, not three copies."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'key material written on a session alone': grepped every UpdatePublicKey/UpdateEncryptedPrivateKey/UpdateRecoveryWrappedPrivateKey caller; only the three proved services and SetLoginKey paths that check a secret or a reset token remain."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "Each route is one row write after the check; nothing to leave half done."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing new is deleted or orphaned; a replaced copy is the intended replacement."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "Controls built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The checks sit in the service each handler calls, and both routes are registered in the server and the test router, where the HTTP test reaches them."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt, go build, go vet (with and without the integration tag), prettier, tsc -b, eslint clean; pre-commit gate 0 failed, golangci-lint 0 issues; services 6, integration 3, vitest 15 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "E1 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each check the thing it refuses: session-only, wrong key, oversized; each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with TEST_DATABASE_URL and -v: 0 SKIP in either package; vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Plan for K4c: the proof on PUT /auth/encrypted-private-key, as the design memory required; the phrase and app-password rules unchanged. The public-key proof goes beyond the plan's words and serves its aim."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4c1-public-key-session-only",
+     "summary": "PUT /auth/public-key replaced the key others encrypt to with only a session, while the two private key copies needed the account's secret.",
+     "found_by": "E1",
+     "fix_commit": "bee17edf1",
+     "control": {
+      "patch": ".review/controls/k4c1-public-key-session-only.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestStorePublicKeyNeedsTheAccountsSecret"
+      ],
+      "observed": "FAIL: expected ErrCurrentPasswordIncorrect, got nil; the refused request published a key"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "StorePrivateKeyCopy and StorePublicKey behind one proveAccount check (shared with StoreRecoveryKey); KeyBackup gains auth_scheme and has_password; handlers map the errors; both PUT routes get the sign-in limit in the server and the test router; the app sends login_key with the public key."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a20fb1d51 (K4b: two client findings, fixed) and 0e793f7ff (K4a-1, none); neither touches these routes."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Request bodies from the app printed through the api mock: sign-up with a password sends login_key with the public key; an account with no password sends public_key alone."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "HTTP over the real router and Postgres: PUT encrypted-private-key and PUT public-key without a secret give 401, an empty copy 400, with the login key 200 and the row holds the value; GET key-backup body compared whole: auth_scheme 2, has_password true, salt, rounds, both copies. The account with no password: {auth_scheme, has_password:false} only (service test)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Rows read back after each accepted and refused write: refused requests leave encrypted_private_key and public_key NULL."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "JSON names match on both sides: password, login_key, encrypted_private_key, public_key, auth_scheme, has_password."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The app's uploads send exactly the fields PrivateKeyCopyRequest and PublicKeyRequest bind; the frontend KeyBackup type gains the two new fields in K4c-2, and nothing reads them before then."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One proof rule, proveAccount, now used by all three key writes; CheckAccountSecret stays the one secret check."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "gin binds the structs; the new KeyBackup fields have no omitempty, so false and 0 still reach the app (asserted for has_password false)."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Integration accounts are made by the real register route; login keys are 32 real bytes, base64."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The correct login key, the correct old-scheme password, and a session with no password all store."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "No secret, a wrong login key, a password sent to a login-key account, a wrong old password: all refused, nothing written."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty copy, empty public key, and 16384+1 bytes refused."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Pass 2: all three key writes (recovery copy, private key copy, public key) go through proveAccount; /auth/login-key checks current_password; app-password only while no password exists, by design."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: invalid, wrong secret, no-password session, accepted, for both routes."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Unexpected errors log with user_id and give 500; the app's old AuthContext upload now gets 401, which its catch logs; K4c-2 removes that code."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The copy-was-proved check existed once in StoreRecoveryKey and is now one function, not three copies."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2 re-grep: no other caller writes a key; no other client (OmniRave, scripts) calls /auth/public-key."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "Each route is one row write after the check; nothing to leave half done."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing new is deleted or orphaned; a replaced copy is the intended replacement."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Proof removed from StorePublicKey: the service test fails (expected ErrCurrentPasswordIncorrect, got nil) and the HTTP test fails (a session alone cannot swap the public key). The app side reverted by hand: the sign-up test fails, login_key undefined. Patch .review/controls/k4c1-public-key-session-only.patch."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The checks sit in the service each handler calls, and both routes are registered in the server and the test router, where the HTTP test reaches them."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt, go build, go vet (with and without the integration tag), prettier, tsc -b, eslint clean; pre-commit gate 0 failed, golangci-lint 0 issues; services 6, integration 3, vitest 15 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each check the thing it refuses: session-only, wrong key, oversized; each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with TEST_DATABASE_URL and -v: 0 SKIP in either package; vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Plan for K4c: the proof on PUT /auth/encrypted-private-key, as the design memory required; the phrase and app-password rules unchanged. The public-key proof goes beyond the plan's words and serves its aim."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok; tsc -b ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues; eslint clean; pre-commit gate 0 failed",
+  "types": "go build and tsc -b",
+  "tests": "services 6, integration 3, vitest 15 passed; 0 failed, 0 skipped"
+ }
+}

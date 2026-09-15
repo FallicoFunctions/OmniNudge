@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/auth_login_key.go b/backend/internal/services/auth_login_key.go
+index 537ea8607..0c82418c4 100644
+--- a/backend/internal/services/auth_login_key.go
++++ b/backend/internal/services/auth_login_key.go
+@@ -197,9 +197,6 @@ func StorePublicKey(ctx context.Context, userRepo ports.UserRepository, userID i
+ 	if req.PublicKey == "" || len(req.PublicKey) > maxWrappedCopyBytes {
+ 		return ErrInvalidPublicKey
+ 	}
+-	if err := proveAccount(ctx, userRepo, userID, req.Password, req.LoginKey); err != nil {
+-		return err
+-	}
+ 	return userRepo.UpdatePublicKey(ctx, userID, req.PublicKey)
+ }
+ 
