@@ -1,0 +1,224 @@
+{
+  "schema_version": 2,
+  "head": "284a56e0a",
+  "base": "fc6926b2f",
+  "scope": {
+    "files": [
+      "backend/internal/services/auth_login_key.go",
+      "backend/internal/services/auth.go",
+      "backend/internal/handlers/account_deletion.go",
+      "backend/internal/handlers/data_export.go",
+      "backend/internal/services/auth_login_key_test.go",
+      "backend/internal/handlers/account_deletion_test.go",
+      "backend/internal/handlers/data_export_test.go"
+    ],
+    "boundaries": [
+      "client -> /account/delete, /account/export (password or login_key)",
+      "handlers -> services.CheckAccountSecret"
+    ]
+  },
+  "prior_ledgers_read": [
+    "b530f73c2",
+    "9e4422d83"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "services.CheckAccountSecret (one rule for proving an account) used by Login, account deletion and data export; the two handlers read auth_scheme and accept login_key beside password; tests for the rule and for both handlers with a scheme 2 account."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "b530f73c2 (K1b-2) found GetByID omitting password_hash; these handlers read the hash with their own queries, which do select it. No prior finding on deletion or export."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read the statuses the client receives: a scheme 2 account's login key deletes (200) and exports (202); its old password is refused (401), alone or beside the key; a request with neither secret still gets 400, with the same messages as before."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "The handlers' queries only add auth_scheme to what they read; read back by the tests."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The JSON names are password and login_key in both handlers, the same names sign-in uses."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No new response shape."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The rule lives once, in CheckAccountSecret; Login calls it instead of its own copy."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The test rows are written as the move endpoint writes them."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The rule refuses: a wrong key, a password to scheme 2, a password beside the key, a key to scheme 1, nothing at all."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No boundary input."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every remaining direct password check: change-password (users.go, phase K2b) and MoveToLoginKey (scheme 1 only, where the password is the right secret). The OmniGame runtime sign-in calls Login, so it follows the rule; its request gains login_key in phase K2c."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Each branch of CheckAccountSecret is reached by a row of its table test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Both handlers keep their 401 and 400 answers; nothing new is swallowed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Nothing gated on a flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The scheme rule is no longer duplicated between Login and the handlers."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other endpoints that ask for the password again: none besides these, change-password and the move (grep of CheckPassword and bcrypt compare)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Deletion keeps its transaction unchanged."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing new persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The handlers are the ones cmd/server routes for /account/delete and /account/export."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; services 63, handlers 67, integration 4 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the handlers against real Postgres 16 with a scheme 2 row."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the handlers the password of a scheme 2 account: refused (401)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K2a promise: account deletion and data export work for a scheme 2 account with its login key and never with its password. Both proven over the handlers."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "services 63, handlers 67, integration 4 PASS; 0 FAIL, 0 SKIP"
+  }
+}
