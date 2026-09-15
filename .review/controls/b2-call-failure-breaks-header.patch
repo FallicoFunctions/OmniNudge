@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/LiveCallControls.tsx b/frontend/src/components/omnichat/LiveCallControls.tsx
+index 6f3d04e58..f428521cd 100644
+--- a/frontend/src/components/omnichat/LiveCallControls.tsx
++++ b/frontend/src/components/omnichat/LiveCallControls.tsx
+@@ -50,7 +50,7 @@ export default function LiveCallControls() {
+     return (
+       <p
+         role="alert"
+-        className="absolute inset-x-4 top-full mt-2 flex items-center justify-between gap-2 rounded-2xl bg-rose-950/95 px-3 py-2 text-xs text-rose-100 shadow-lg sm:right-auto sm:max-w-md lg:left-6"
++        className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-xs text-rose-100"
+       >
+         {failure}
+         <button

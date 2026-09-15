@@ -1,0 +1,35 @@
+diff --git a/frontend/src/components/omnichat/OmniChatCreditsMenu.tsx b/frontend/src/components/omnichat/OmniChatCreditsMenu.tsx
+index bf1acdf78..40ff4da3a 100644
+--- a/frontend/src/components/omnichat/OmniChatCreditsMenu.tsx
++++ b/frontend/src/components/omnichat/OmniChatCreditsMenu.tsx
+@@ -80,7 +80,7 @@ export default function OmniChatCreditsMenu() {
+         <Coins size={18} aria-hidden="true" className="text-amber-300" />
+         <span className="text-sm font-semibold tabular-nums">{balance}</span>
+         {/* A phone's header has no room for it beside the account menu and a call. */}
+-        <ChevronDown size={16} aria-hidden="true" className="hidden text-white/50 sm:block" />
++        <ChevronDown size={16} aria-hidden="true" className="text-white/50" />
+       </button>
+ 
+       {open && (
+diff --git a/frontend/src/components/omnichat/OmniChatHeader.tsx b/frontend/src/components/omnichat/OmniChatHeader.tsx
+index 91264e371..da5fda534 100644
+--- a/frontend/src/components/omnichat/OmniChatHeader.tsx
++++ b/frontend/src/components/omnichat/OmniChatHeader.tsx
+@@ -44,7 +44,7 @@ export default function OmniChatHeader({
+           <div className="flex min-w-0 items-center gap-3">
+             <Link
+               to="/omnichat"
+-              className={`omnichat-touch-target group shrink-0 items-center text-white ${inCall ? 'hidden sm:flex' : 'flex'}`}
++              className={`omnichat-touch-target group items-center text-white ${inCall ? 'hidden sm:flex' : 'flex'}`}
+             >
+               <span>
+                 <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">
+@@ -74,7 +74,7 @@ export default function OmniChatHeader({
+                   </span>
+                   {/* No room on a phone: signed in with a five-digit balance, the
+                       header already needed more than 360 px. */}
+-                  <ChevronDown size={16} className="hidden text-white/50 sm:block" />
++                  <ChevronDown size={16} className="text-white/50" />
+                 </button>
+               ) : (
+                 <button

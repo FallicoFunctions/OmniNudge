@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/omnichat/OmniChatHeader.tsx b/frontend/src/components/omnichat/OmniChatHeader.tsx
+index 91264e371..12770a44e 100644
+--- a/frontend/src/components/omnichat/OmniChatHeader.tsx
++++ b/frontend/src/components/omnichat/OmniChatHeader.tsx
+@@ -44,7 +44,7 @@ export default function OmniChatHeader({
+           <div className="flex min-w-0 items-center gap-3">
+             <Link
+               to="/omnichat"
+-              className={`omnichat-touch-target group shrink-0 items-center text-white ${inCall ? 'hidden sm:flex' : 'flex'}`}
++              className={`omnichat-touch-target group shrink-0 items-center text-white flex`}
+             >
+               <span>
+                 <span className="block text-[1.2rem] font-bold leading-none tracking-[-0.035em] sm:text-[1.28rem]">

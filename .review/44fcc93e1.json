@@ -1,0 +1,445 @@
+{
+  "schema_version": 2,
+  "head": "15960a50d",
+  "base": "44fcc93e1",
+  "scope": {
+    "files": [
+      "frontend/src/App.tsx",
+      "frontend/src/components/omnichat/OmniChatCallLayout.tsx",
+      "frontend/src/components/omnichat/OmniChatHeader.tsx",
+      "frontend/src/components/omnichat/OmniChatCreditsMenu.tsx",
+      "frontend/src/components/omnichat/LiveCallControls.tsx",
+      "frontend/src/pages/OmniChatChatPage.tsx",
+      "frontend/src/pages/__tests__/OmniChatChatPage.test.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatHeader.test.tsx",
+      "frontend/src/components/omnichat/__tests__/OmniChatCreditsMenu.test.tsx"
+    ],
+    "boundaries": [
+      "router -> OmniChatCallLayout -> OmniChatCallProvider context",
+      "OmniChatChatPage -> startVoiceCall / endCall",
+      "OmniChatHeader -> LiveCallControls and OmniChatCreditsMenu"
+    ]
+  },
+  "prior_ledgers_read": [
+    "f6fa4f256",
+    "c7191c885"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "App.tsx (a pathless lazy layout route around the nine /omnichat routes), OmniChatCallLayout.tsx (new), OmniChatHeader.tsx, OmniChatCreditsMenu.tsx, LiveCallControls.tsx, OmniChatChatPage.tsx, and tests. Boundaries: router -> layout -> call provider context -> header and chat page; chat page -> startVoiceCall; header -> credits menu and live controls."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read f6fa4f256 (credits label read aloud, credits zero while loading, video usage field) and c7191c885 (hang-up button name changed every second). The hang-up label is still static and the timer a separate role=timer span in the printed markup (\"End the call with Sadie\", \"Call time 12:34\"); the credits button still names loading as loading."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt, request or message is assembled differently: startCall(conversationId, 'voice') is the B1 provider's, unchanged; the chat page passes (conversation 42, {id, name}), asserted by the chat page test."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the real LiveCallControls (mute, \"End the call with Sadie\", 12:34, role=timer \"Call time 12:34\"), the real credits button (\"1,250 OmniCredits\"), and the real header for three states: in a call, a failed call, no call."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The voice paywall key 'voice_call' is a member of OmniChatPaywallFeature and renders 'Unlock voice calls' (asserted). The nine route paths inside the layout route are the same strings as before (read back from App.tsx)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The chat page passes { id: activePersona.id, name: activePersona.name }, the OmniChatCallPersona shape; the header reads calls.call and calls.failure, the fields the provider sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One call at a time lives in two places: the provider hangs up before a new voice call, and the chat page hangs up a voice call before a video call opens (asserted: endCall once, then the video dialog)."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external contract changed."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to a struct that crosses a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is useOmniChatCall through the real layout route: a probe with the real OmniChatCallLayout under MemoryRouter showed the provider present on two OmniChat pages with the same call, and absent outside, where endCall ran once with the session id."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The header markup the browser measured was rendered by the real components in jsdom, signed in, with the real credits menu and live controls. The first measurement used the signed-out account button (52 px) and was wrong; every later one used the signed-in button (78 px) and the worst content: a 12,500 balance and a 1:02:34 timer."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every place that starts an OmniChat call: grep finds only the chat page (two phone buttons, two video buttons); the header is the only other surface and carries the controls on every page through OmniChatShell."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "OmniChatCallModal's voice branch (the voice start, liveCallId, useLiveVoiceCall for voice) is now unreachable: the page opens it only with mode=\"video\". Deliberate and told to the user: it is removed with the call-screen lint phase, which edits the same file, to keep B2 within five files."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "startVoiceCall rejects only with OmniChatCallPaymentRequired, which opens the voice paywall (asserted); anything else is rethrown rather than swallowed. The provider reports the other start failures itself (the failure banner)."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Guests are stopped before the provider: requestCall opens the sign-in modal first. The header shows the controls whatever the auth state, since only a signed-in user can have a call."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The compact prop added in the first fix was removed again: the chevron rule is now one class in each component, not a flag passed down."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Having found the phone overflow, the same shape was measured at every width and state: 640-750 px during a call (found b2-exit-overlaps-at-tablet) and the no-call signed-in header at 360-375 px (found the logo squeeze in b2-header-chevrons-crowd-phone)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or Go shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Leaving OmniChat unmounts the layout and ends the call: the navigation probe showed endCall called once with the session after leaving, none while moving between OmniChat pages."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Four controls, each reverting one fix: each named test fails with a real AssertionError with its patch applied and passes at HEAD."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "eslint and tsc -b exit 0; vitest on the header, credits menu, live controls, provider and chat page tests: 80 passed."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "B6 found all four and no instrument named measuring layout in a real browser; B6 was added to instruments.json."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "UNVERIFIED, told to the user: no real Gemini Live voice call has been placed through the provider. B1 built the provider without mounting it, and B2 is the first time it is reachable; the relay and model inputs are unchanged. The real-browser output of this change -- the header layout -- was measured under B6."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision: the voice press calls startVoiceCall directly, and the video press ends a voice call before it opens the video screen."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Opened /omnichat in the browser pane at 360, 375, 390, 640, 768 and 1280 px and put the real header markup in place. Found all four findings: the 444 px row at phone widths, the 172 px failure, the pill over the credits and the covered logo with a signed-in five-digit balance, and the logo on the hang-up button at 640 px."
+        }
+      ],
+      "findings": [
+        {
+          "id": "b2-call-header-overflows-phone",
+          "summary": "B2 put mute and the live icon into the OmniChat header row as-is; at 360-390 px the row needed 444 px, so mute sat on the logo, the account button was cut in half and the exit fell off the screen.",
+          "found_by": "B6",
+          "fix_commit": "15960a50d",
+          "control": {
+            "patch": ".review/controls/b2-call-header-overflows-phone.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatHeader.test.tsx -t 'gives the logo and the exit to a call in progress'"
+            ],
+            "observed": "With the patch (the logo no longer hidden on a phone during a call): AssertionError, expected false to be true. Without: passes."
+          }
+        },
+        {
+          "id": "b2-call-failure-breaks-header",
+          "summary": "A failed call's reason sat inline in the header row and, measured, wrapped into a 98 px column 172 px tall inside a 72 px header.",
+          "found_by": "B6",
+          "fix_commit": "15960a50d",
+          "control": {
+            "patch": ".review/controls/b2-call-failure-breaks-header.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatHeader.test.tsx -t 'hangs a failed call below the header'"
+            ],
+            "observed": "With the patch (the reason back inline): AssertionError, expected false to be true. Without: passes."
+          }
+        },
+        {
+          "id": "b2-header-chevrons-crowd-phone",
+          "summary": "Signed in with a five-digit balance, the header at 360-375 px had no room for its two chevrons: during a call the live pill overlapped the credits button, and with no call the logo box shrank to 44 px under the credits button. The first fix was measured with the signed-out account button (52 px, not 78) and missed this.",
+          "found_by": "B6",
+          "fix_commit": "15960a50d",
+          "control": {
+            "patch": ".review/controls/b2-header-chevrons-crowd-phone.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatHeader.test.tsx -t 'shows the whole header when there is no call'",
+              "src/components/omnichat/__tests__/OmniChatCreditsMenu.test.tsx -t 'keeps its chevron off a phone'"
+            ],
+            "observed": "With the patch (both chevrons shown on a phone, the logo shrinkable): both tests fail with AssertionError, expected false to be true. Without: both pass."
+          }
+        },
+        {
+          "id": "b2-exit-overlaps-at-tablet",
+          "summary": "From 640 to about 750 px during a call, the logo, the username and the exit's full label all return, and the logo was pushed onto the hang-up button.",
+          "found_by": "B6",
+          "fix_commit": "15960a50d",
+          "control": {
+            "patch": ".review/controls/b2-exit-overlaps-at-tablet.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatHeader.test.tsx -t 'gives the logo and the exit to a call in progress'"
+            ],
+            "observed": "With the patch (the exit back from 640 px during a call): AssertionError, expected false to be true. Without: passes."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "App.tsx (a pathless lazy layout route around the nine /omnichat routes), OmniChatCallLayout.tsx (new), OmniChatHeader.tsx, OmniChatCreditsMenu.tsx, LiveCallControls.tsx, OmniChatChatPage.tsx, and tests. Boundaries: router -> layout -> call provider context -> header and chat page; chat page -> startVoiceCall; header -> credits menu and live controls."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read f6fa4f256 (credits label read aloud, credits zero while loading, video usage field) and c7191c885 (hang-up button name changed every second). The hang-up label is still static and the timer a separate role=timer span in the printed markup (\"End the call with Sadie\", \"Call time 12:34\"); the credits button still names loading as loading."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt, request or message is assembled differently: startCall(conversationId, 'voice') is the B1 provider's, unchanged; the chat page passes (conversation 42, {id, name}), asserted by the chat page test."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the real header again after every fix, for the three states, with a 12,500 balance and a 1:02:34 timer; the in-call markup carries hidden sm:flex on the logo, hidden lg:flex on the exit and hidden sm:block on both chevrons; the failure is absolute, top-full."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The voice paywall key 'voice_call' is a member of OmniChatPaywallFeature and renders 'Unlock voice calls' (asserted). The nine route paths inside the layout route are the same strings as before (read back from App.tsx)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The chat page passes { id: activePersona.id, name: activePersona.name }, the OmniChatCallPersona shape; the header reads calls.call and calls.failure, the fields the provider sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One call at a time lives in two places: the provider hangs up before a new voice call, and the chat page hangs up a voice call before a video call opens (asserted: endCall once, then the video dialog)."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external contract changed."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to a struct that crosses a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is useOmniChatCall through the real layout route: a probe with the real OmniChatCallLayout under MemoryRouter showed the provider present on two OmniChat pages with the same call, and absent outside, where endCall ran once with the session id."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The header markup the browser measured was rendered by the real components in jsdom, signed in, with the real credits menu and live controls. The first measurement used the signed-out account button (52 px) and was wrong; every later one used the signed-in button (78 px) and the worst content: a 12,500 balance and a 1:02:34 timer."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No validation or parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every place that starts an OmniChat call: grep finds only the chat page (two phone buttons, two video buttons); the header is the only other surface and carries the controls on every page through OmniChatShell."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "OmniChatCallModal's voice branch (the voice start, liveCallId, useLiveVoiceCall for voice) is now unreachable: the page opens it only with mode=\"video\". Deliberate and told to the user: it is removed with the call-screen lint phase, which edits the same file, to keep B2 within five files."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "startVoiceCall rejects only with OmniChatCallPaymentRequired, which opens the voice paywall (asserted); anything else is rethrown rather than swallowed. The provider reports the other start failures itself (the failure banner)."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Guests are stopped before the provider: requestCall opens the sign-in modal first. The header shows the controls whatever the auth state, since only a signed-in user can have a call."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The compact prop added in the first fix was removed again: the chevron rule is now one class in each component, not a flag passed down."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Having found the phone overflow, the same shape was measured at every width and state: 640-750 px during a call (found b2-exit-overlaps-at-tablet) and the no-call signed-in header at 360-375 px (found the logo squeeze in b2-header-chevrons-crowd-phone)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or Go shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Leaving OmniChat unmounts the layout and ends the call: the navigation probe showed endCall called once with the session after leaving, none while moving between OmniChat pages."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All four controls replayed by hand: each fails with its patch and passes at HEAD 15960a50d."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Pre-commit gate on 15960a50d: 0 failed. eslint and tsc -b exit 0; the five related test files: 80 passed."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "UNVERIFIED, told to the user: no real Gemini Live voice call has been placed through the provider. B1 built the provider without mounting it, and B2 is the first time it is reachable; the relay and model inputs are unchanged. The real-browser output of this change -- the header layout -- was measured under B6."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision: the voice press calls startVoiceCall directly, and the video press ends a voice call before it opens the video screen."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added or changed."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "After the last fix, measured the three real headers at 360, 640, 700, 768 and 1024 px (and before it, unaffected by it, at 375, 390 and 1280): no row overflow, no overlapping controls, no text overflowing its box (the only hit was the 1 px sr-only timer, by design), and the failure banner at y 79-127 below a header ending at 72, inside the screen. At 1024 px during a call the exit returns and fits (823-1000)."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0 on every changed file; pre-commit gate 0 failed",
+    "types": "tsc -b exit 0",
+    "tests": "header, credits menu, live controls, provider and chat page tests: 80 passed"
+  }
+}
