@@ -1,0 +1,26 @@
+diff --git a/backend/cmd/server/main.go b/backend/cmd/server/main.go
+index 7e4b74aa4..34a51cd72 100644
+--- a/backend/cmd/server/main.go
++++ b/backend/cmd/server/main.go
+@@ -1650,7 +1650,7 @@ func main() {
+ 			protected.GET("/groups/:id/audit-log", groupAdminHandler.GetAuditLog)
+ 
+ 			// Mod mail routes
+-			protected.POST("/mod-mail", messageSendRateLimiter.Middleware(), modMailHandler.CreateModMail)
++			protected.POST("/mod-mail", modMailHandler.CreateModMail)
+ 			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
+ 			protected.GET("/mod-mail/hubs/:hub_name/recipients", modMailHandler.GetModMailRecipients)
+ 			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)
+diff --git a/backend/internal/integration/test_utils.go b/backend/internal/integration/test_utils.go
+index dcbe8ac4f..9f5b9d78d 100644
+--- a/backend/internal/integration/test_utils.go
++++ b/backend/internal/integration/test_utils.go
+@@ -262,7 +262,7 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
+ 
+ 			protected.POST("/messages", limited(sendLimit, messagesHandler.SendMessage)...)
+ 			protected.POST("/messages/forward", limited(sendLimit, messagesHandler.ForwardMessage)...)
+-			protected.POST("/mod-mail", limited(sendLimit, modMailHandler.CreateModMail)...)
++			protected.POST("/mod-mail", modMailHandler.CreateModMail)
+ 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
+ 			protected.GET("/conversations", conversationsHandler.GetConversations)
+ 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)

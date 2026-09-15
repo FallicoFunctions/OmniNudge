@@ -1,0 +1,11 @@
+diff --git a/frontend/src/utils/messageSendErrors.ts b/frontend/src/utils/messageSendErrors.ts
+index 3f49fd306..5a17f31b3 100644
+--- a/frontend/src/utils/messageSendErrors.ts
++++ b/frontend/src/utils/messageSendErrors.ts
+@@ -6,6 +6,5 @@ export function messageSendErrorKey(status?: number): string | undefined {
+   // 404 and 403 mean the recipient cannot be messaged (a block exists); the copy
+   // must not reveal that a block is in place.
+   if (status === 404 || status === 403) return 'messages.errors.userUnavailable';
+-  if (status === 429) return 'messages.errors.sendingTooFast';
+   return undefined;
+ }

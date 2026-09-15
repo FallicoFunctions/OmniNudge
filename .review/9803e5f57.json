@@ -1,0 +1,152 @@
+{
+  "schema_version": 2,
+  "head": "8bcadfd93",
+  "base": "9803e5f57",
+  "scope": {
+    "files": [
+      "frontend/package.json",
+      "frontend/package-lock.json",
+      "backend/internal/api/middleware/redis_rate_limit.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/integration/test_utils.go",
+      "backend/internal/integration/rate_limiting_integration_test.go",
+      "backend/internal/integration/websocket_resilience_integration_test.go",
+      "frontend/src/utils/messageSendErrors.ts",
+      "frontend/src/utils/__tests__/messageSendErrors.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/public/locales/en.json"
+    ],
+    "boundaries": [
+      "npm registry -> package-lock.json (audit fix, vitest 4.1.11)",
+      "client -> POST /messages, /messages/forward, /mod-mail (new 429)",
+      "429 response -> MessagesPage send error handler -> the user",
+      "RedisRateLimiter -> the cache (Redis in production, memory in tests)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "703a8506a",
+    "b45730e97"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "e07521e84 (audit: lockfile, vitest ^4.1.11), and the send limiter: MessageSendRateLimiter, its wiring in cmd/server, a rate-limited integration router, and five tests that skipped turned into checks."},
+        {"id": "A2", "status": "applied", "evidence": "703a8506a added H2 after tests that skipped; the rate-limit tests are more of the same shape. No prior finding on send limits."},
+        {"id": "B1", "status": "applied", "evidence": "Printed the limiter keys the middleware builds: rate:messages:user:<id> for a signed-in sender (JWTClaims.UserID is an int, so the per-user branch is taken), rate:auth:ip:<addr> for logins."},
+        {"id": "B2", "status": "na", "why": "No component markup changed; the page only chooses which alert text to show."},
+        {"id": "B3", "status": "applied", "evidence": "Read what the client gets past the limit: 429 with code RATE_LIMIT_EXCEEDED, X-RateLimit-* headers and Retry-After 60; and what the page did with it: onError handled only 403 and 404, so a refused send vanished with nothing on screen (finding fe-silent-429)."},
+        {"id": "B4", "status": "na", "why": "No query or migration."},
+        {"id": "C1", "status": "applied", "evidence": "The key prefix rate:messages is used by nothing else (grep); the locale key messages.errors.sendingTooFast exists in en.json and the i18n check passes."},
+        {"id": "C2", "status": "applied", "evidence": "axios 1.18 sets error.status from response.status (AxiosError.js:136), and api.ts rejects the axios error unchanged apart from the 401 refresh, so the helper reads a real status."},
+        {"id": "C3", "status": "applied", "evidence": "The test router copies the limiter wiring from cmd/server by hand; main() builds its routes inline and routes_test.go cannot reach them, so no test can see cmd/server drop a limiter. Recorded as a known limit of the guard."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "applied", "evidence": "The limiter's per-user read (userID.(int)) falls back to the IP bucket on any other type; the claims type is int, checked."},
+        {"id": "C7", "status": "applied", "evidence": "The per-IP test first used X-Forwarded-For on a request with no RemoteAddr, which gin ignores, so both IPs shared one bucket and the test failed; it now sets RemoteAddr, the address gin really reads from an unknown client."},
+        {"id": "D1", "status": "applied", "evidence": "60 sends a minute pass: the websocket flood test's first 429 is message 61."},
+        {"id": "D2", "status": "applied", "evidence": "The 61st send and the 6th login are refused."},
+        {"id": "D3", "status": "applied", "evidence": "The boundary exactly: 60 allowed, 61 refused; 5 logins allowed, 6 refused; X-RateLimit-Remaining 4 after the first login."},
+        {"id": "E1", "status": "applied", "evidence": "Listed every route that creates a message: /messages and /messages/forward were limited; /mod-mail was not (finding rl-mod-mail-unlimited); /messages/:id/voice uploads to a message already sent through /messages."},
+        {"id": "E2", "status": "applied", "evidence": "The skip branches in the five rate tests are gone; each branch now asserts."},
+        {"id": "E3", "status": "applied", "evidence": "The refused send was the swallowed error (fe-silent-429). The limiter's own cache error fails open by design and is logged by the cache layer."},
+        {"id": "E4", "status": "applied", "evidence": "Development mode registers /login and /register without the auth limiter (main.go 1137); outside development they are limited. The send limiter is not gated on the environment."},
+        {"id": "E5", "status": "applied", "evidence": "The limiter wiring exists twice, in cmd/server and the test router (see C3)."},
+        {"id": "E6", "status": "applied", "evidence": "Other tests that skip when a middleware is absent: grep for 'may not be active' finds none left."},
+        {"id": "F1", "status": "applied", "evidence": "MemoryCache counts atomically (IncrementWithTTL), so the limiter holds under concurrent sends."},
+        {"id": "F2", "status": "na", "why": "No transaction."},
+        {"id": "F4", "status": "applied", "evidence": "NewMemoryCache starts a cleanup goroutine; each rate-limited test leaked one. Fixed before commit with t.Cleanup(limitCache.Stop); no behaviour a test can observe, so it has no control."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "G1", "status": "applied", "evidence": "Both controls replayed by hand: without the mod mail limiter TestRateLimitModMailCreation fails (expected 61, actual 0); without the 429 branch the helper test fails on the 429 case. Both pass at HEAD."},
+        {"id": "G2", "status": "applied", "evidence": "The limiter is reached by requests in cmd/server (wired on three routes) and in the rate-limited test router."},
+        {"id": "G3", "status": "applied", "evidence": "Fed the limiter the thing it refuses: the 61st send, the 61st mod mail request and the 6th login each got 429."},
+        {"id": "H1", "status": "applied", "evidence": "Backend: gofmt clean, go vet ok, golangci-lint 0 issues, six rate tests pass. Frontend: tsc -b, eslint, prettier, the helper test (5 of 5) and the i18n check pass. Audit commit: npm audit 0 vulnerabilities, the full vitest suite 169 files, 1008 passed, Security Scan green on CI."},
+        {"id": "Z1", "status": "applied", "evidence": "Both findings came from rows already here (E1, B3). No new instrument."},
+        {"id": "B5", "status": "applied", "evidence": "Ran the real limiter against real requests through the real handlers and Postgres 16, not a mock of the middleware."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No layout changed."},
+        {"id": "E8", "status": "na", "why": "No lazily cached process state."},
+        {"id": "H2", "status": "applied", "evidence": "The six rate tests with -v: six PASS, zero SKIP (they skipped on every run before)."}
+      ],
+      "findings": [
+        {
+          "id": "rl-mod-mail-unlimited",
+          "summary": "POST /mod-mail starts a conversation with a first message but carried no send limit, beside the newly limited /messages routes.",
+          "found_by": "E1",
+          "fix_commit": "85653aae1",
+          "control": {
+            "patch": ".review/controls/rl-mod-mail-unlimited.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/integration/ -tags=integration -run 'TestRateLimitModMailCreation'"
+            ],
+            "observed": "With the patch (the limiter off /mod-mail in cmd/server and the test router): FAIL, expected 61, actual 0. Without: ok. The test sees the test router's copy of the wiring, not cmd/server's (C3)."
+          }
+        },
+        {
+          "id": "fe-silent-429",
+          "summary": "A send refused by the new limit (429) left the message unsent with nothing on screen: the send error handler handled only 403 and 404.",
+          "found_by": "B3",
+          "fix_commit": "8bcadfd93",
+          "control": {
+            "patch": ".review/controls/fe-silent-429.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/utils/__tests__/messageSendErrors.test.ts -t 'maps 429'"
+            ],
+            "observed": "With the patch: FAIL, maps 429 to messages.errors.sendingTooFast received undefined. Without: 5 passed."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the review fixes: the /mod-mail limiter and its test, the memory cache cleanup, and messageSendErrorKey with its wiring and locale key."},
+        {"id": "A2", "status": "applied", "evidence": "Pass 1 of this ledger."},
+        {"id": "B1", "status": "applied", "evidence": "The mod mail request counts against the same rate:messages:user:<id> bucket as /messages."},
+        {"id": "B2", "status": "na", "why": "No component markup changed."},
+        {"id": "B3", "status": "applied", "evidence": "What the user now sees on each send error: 403 and 404 'This user is not available.', 429 'You are sending messages too fast. Wait a minute and try again.', others nothing new."},
+        {"id": "B4", "status": "na", "why": "No query."},
+        {"id": "C1", "status": "applied", "evidence": "The helper returns keys that exist in en.json (userUnavailable, sendingTooFast); the i18n check passes."},
+        {"id": "C2", "status": "applied", "evidence": "onError passes error.status to the helper, the field axios sets."},
+        {"id": "C3", "status": "applied", "evidence": "Unchanged limit of the guard, see pass 1."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "na", "why": "No new accessor."},
+        {"id": "C7", "status": "applied", "evidence": "The mod mail test sends an empty body on purpose: the limiter runs before the handler, and the first 60 get 400, which is what production would count too."},
+        {"id": "D1", "status": "applied", "evidence": "The helper's table covers 403, 404, 429, 500 and no status."},
+        {"id": "D2", "status": "applied", "evidence": "The 61st mod mail request is refused."},
+        {"id": "D3", "status": "applied", "evidence": "An undefined status (a network error) gives no key, so the page adds nothing wrong."},
+        {"id": "E1", "status": "applied", "evidence": "No other message-creating route left without the limit."},
+        {"id": "E2", "status": "applied", "evidence": "The helper's undefined branch is reached by 500 and by no status."},
+        {"id": "E3", "status": "applied", "evidence": "A 429 now reaches the user."},
+        {"id": "E4", "status": "na", "why": "Nothing new gated on a flag."},
+        {"id": "E5", "status": "applied", "evidence": "The send-error copy lives in one helper; the page no longer tests statuses itself."},
+        {"id": "E6", "status": "applied", "evidence": "Other send paths that could see 429: forwards and mod mail show their own errors through their own dialogs; the chat send path is the one a person types into and now says so."},
+        {"id": "F1", "status": "na", "why": "No new shared state."},
+        {"id": "F2", "status": "na", "why": "No transaction."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "applied", "evidence": "The limit cache stops with each test (t.Cleanup)."},
+        {"id": "G1", "status": "applied", "evidence": "Both controls hold at 8bcadfd93."},
+        {"id": "G2", "status": "applied", "evidence": "The helper is imported and called by MessagesPage's send mutation."},
+        {"id": "G3", "status": "applied", "evidence": "The limiter refuses the 61st mod mail request."},
+        {"id": "H1", "status": "applied", "evidence": "The pre-commit gate passed both commits; the rate tests and the helper test pass."},
+        {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+        {"id": "B5", "status": "applied", "evidence": "Ran against the real limiter and real Postgres, as in pass 1."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No layout changed."},
+        {"id": "E8", "status": "na", "why": "No lazily cached process state."},
+        {"id": "H2", "status": "applied", "evidence": "Six PASS and zero SKIP in the rate tests; the helper test 5 of 5, none skipped."}
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet ok; tsc -b ok",
+    "vet": "go vet ok",
+    "lint": "golangci-lint 0 issues; eslint and prettier clean; pre-commit gate 0 failed on all three commits",
+    "types": "tsc -b ok",
+    "tests": "six rate-limit integration tests pass against Postgres 16; messageSendErrors 5 of 5; full vitest suite on 4.1.11: 169 files, 1008 passed"
+  }
+}
