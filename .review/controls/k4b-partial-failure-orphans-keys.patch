@@ -1,0 +1,39 @@
+diff --git a/frontend/src/services/accountKeysService.ts b/frontend/src/services/accountKeysService.ts
+index 385f47f2b..81896e750 100644
+--- a/frontend/src/services/accountKeysService.ts
++++ b/frontend/src/services/accountKeysService.ts
+@@ -80,6 +80,7 @@ export type AccountProof = { login_key: string } | { password: string } | Record
+ export async function createAccountKeys(keys: LoginKeys | null): Promise<string> {
+   const keyPair = await generateKeyPair();
+   const exported = await exportKeyPair(keyPair);
++  await encryptionService.uploadPublicKey(exported.publicKey);
+   if (keys) {
+     await encryptionService.uploadEncryptedPrivateKey(
+       await wrapSecret(exported.privateKey, keys.wrapKey),
+@@ -91,10 +92,6 @@ export async function createAccountKeys(keys: LoginKeys | null): Promise<string>
+     keys ? { login_key: keys.loginKey } : {}
+   );
+   await saveKeys(keyPair);
+-  // Others encrypt to the public key, so it goes out only once its private key
+-  // is kept on the device and on the server: a failure part-way leaves no key
+-  // that messages are sent to and nobody holds.
+-  await encryptionService.uploadPublicKey(exported.publicKey);
+   return recoveryPhrase;
+ }
+ 
+@@ -141,7 +138,6 @@ export async function moveAccount(password: string, publicKey: string): Promise<
+   // The phrase copy goes first, proved with the password the account still
+   // signs in with: if the move then fails the account is unchanged, and it is
+   // never moved without a phrase.
+-  const recoveryPhrase = await storeRecoveryCopy(privateKey, { password });
+   const settings: KdfSettings = { kdf_salt: newKdfSalt(), kdf_iterations: DEFAULT_KDF_ITERATIONS };
+   const keys = await deriveLoginKeys(password, settings.kdf_salt, settings.kdf_iterations);
+   await api.post('/auth/login-key', {
+@@ -150,6 +146,7 @@ export async function moveAccount(password: string, publicKey: string): Promise<
+     ...settings,
+     encrypted_private_key: await wrapSecret(privateKey, keys.wrapKey),
+   });
++  const recoveryPhrase = await storeRecoveryCopy(privateKey, { password });
+   await storeNonExtractablePrivateKey(privateKey, publicKey);
+   return { status: 'moved', recoveryPhrase, keys };
+ }

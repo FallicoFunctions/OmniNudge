@@ -1,0 +1,448 @@
+{
+ "schema_version": 2,
+ "head": "b57a924e8",
+ "base": "a20fb1d51",
+ "scope": {
+  "files": [
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts",
+   "frontend/src/services/encryptionService.ts",
+   "frontend/src/types/auth.ts"
+  ],
+  "boundaries": [
+   "/auth/prelogin",
+   "/auth/key-backup",
+   "/auth/recovery-key (RecoveryKeyRequest)",
+   "/auth/login-key",
+   "/auth/encrypted-private-key",
+   "/auth/public-key",
+   "keyManagementService (IndexedDB)"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a20fb1d51",
+  "0e793f7ff",
+  "cc906d5e5"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "New accountKeysService (signInSecret, prepareSignUp, createAccountKeys, storeRecoveryCopy, unlockAfterSignIn, moveAccount, recoverWithPhrase); login_key on the encrypted-copy upload; optional password and the new pre-login and key-backup types. Boundaries: /auth/prelogin, /auth/key-backup, /auth/recovery-key, /auth/login-key, /auth/encrypted-private-key, /auth/public-key, IndexedDB via keyManagementService."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "0e793f7ff and a20fb1d51 (K4a) and cc906d5e5 (K3) found nothing; K4a's RecoveryKeyRequest already takes password or login_key as proof."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Request bodies printed through the api mock for three inputs: sign-up with a password sends login_key with both copies; no password sends the recovery copy alone; the move sends password with the recovery copy and current_password with /auth/login-key. The plain private key appears in no body."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component in this phase; screens are K4d."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed; client only. Server bodies checked under C2."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Paths and field names match the K4a routes and structs: login_key, kdf_salt, kdf_iterations, encrypted_private_key, recovery_wrapped_private_key, password, current_password. HKDF labels come from the committed K3 vectors."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "PreLoginResponse and KeyBackup mirror the Go JSON tags (omitempty fields optional). RecoveryKeyRequest has json:\"password,omitempty\" and json:\"login_key,omitempty\", so the AccountProof spread lands on real fields."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Key derivation has one client implementation (K3), checked against the Node vectors; this phase adds no second one."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or external provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises the plain objects; no hand-written encoder. The spread proof is asserted present or absent per flow."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor; typed responses."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Old-scheme fixtures are made by the real encryptPrivateKeyWithPassword, and wrapped copies by the real wrapSecret, not by hand."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Scheme 1 answer and a full scheme 2 answer both sign in."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile pre-login answers: {scheme:2} without salt or rounds made signInSecret return the password (finding k4b-scheme2-without-settings-sends-password). A wrong password, a wrong phrase and a copy under another wrap key are refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty backup, null old copy, missing recovery copy each tested; the phrase length is K3's rule."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling uploads prove the account: the encrypted-copy upload now carries login_key like the recovery copy."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached by a test: scheme 1, scheme 2, malformed answer, unlocked, needs-recovery (missing and wrong), moved, no-exportable-key, recovery ok and refused."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures throw to the caller (AuthContext in K4c); unlockAfterSignIn maps an unwrap failure to needs-recovery on purpose, and makes no keys."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No feature flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "KDF settings built in prepareSignUp and moveAccount from the same two K3 constants; the proof shape is one type, AccountProof."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'secret sent on a fallback path': grepped password in the service; only scheme 1 returns it. Shape 'publish before the private key is held': only createAccountKeys uploads a public key in this phase; AuthContext's old path is replaced in K4c."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine; JS awaits run in order."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Half-way failure: createAccountKeys uploaded the public key first and saved the device key last, and moveAccount moved the account before its phrase copy existed (finding k4b-partial-failure-orphans-keys)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A failed sign-up leaves only wrapped copies that nobody encrypts to; a failed move leaves the account on scheme 1 with a phrase copy of its own key, and the next attempt replaces it."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Controls built after the fixes; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b and eslint clean; vitest accountKeysService + utils: 21 files, 194 tests passed; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "D2 and F2 already name both techniques; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output; the crypto is checked against Node's own implementation in K3."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early; each request awaits the one before, and the public key now goes last."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest reported 194 passed and 0 skipped; the file has no skip conditions."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Plan for K4b: client flows only, AuthContext untouched until K4c, nothing makes keys on its own, the move deletes the old copy (server side, K2b), the phrase copy is proved. All kept."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4b-scheme2-without-settings-sends-password",
+     "summary": "signInSecret sent the password when pre-login said scheme 2 but left out the salt or rounds.",
+     "found_by": "D2",
+     "fix_commit": "b57a924e8",
+     "control": {
+      "patch": ".review/controls/k4b-scheme2-without-settings-sends-password.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/accountKeysService.test.ts -t 'never falls back to the password'"
+      ],
+      "observed": "FAIL: promise resolved { scheme: 1, password } instead of rejecting"
+     }
+    },
+    {
+     "id": "k4b-partial-failure-orphans-keys",
+     "summary": "Sign-up published the public key before the private key was kept, and the move changed the account before its phrase copy existed.",
+     "found_by": "F2",
+     "fix_commit": "b57a924e8",
+     "control": {
+      "patch": ".review/controls/k4b-partial-failure-orphans-keys.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/accountKeysService.test.ts -t 'publishes no public key when a copy fails'",
+       "src/services/__tests__/accountKeysService.test.ts -t 'does not move the account when the phrase copy fails'"
+      ],
+      "observed": "FAIL: public key uploaded after the recovery upload failed; /auth/login-key posted before the phrase copy"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "New accountKeysService (signInSecret, prepareSignUp, createAccountKeys, storeRecoveryCopy, unlockAfterSignIn, moveAccount, recoverWithPhrase); login_key on the encrypted-copy upload; optional password and the new pre-login and key-backup types. Boundaries: /auth/prelogin, /auth/key-backup, /auth/recovery-key, /auth/login-key, /auth/encrypted-private-key, /auth/public-key, IndexedDB via keyManagementService."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "0e793f7ff and a20fb1d51 (K4a) and cc906d5e5 (K3) found nothing; K4a's RecoveryKeyRequest already takes password or login_key as proof."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Request bodies printed through the api mock for three inputs: sign-up with a password sends login_key with both copies; no password sends the recovery copy alone; the move sends password with the recovery copy and current_password with /auth/login-key. The plain private key appears in no body. Pass 2: the move's recovery body now carries password and no login_key, asserted."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component in this phase; screens are K4d."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed; client only. Server bodies checked under C2."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Paths and field names match the K4a routes and structs: login_key, kdf_salt, kdf_iterations, encrypted_private_key, recovery_wrapped_private_key, password, current_password. HKDF labels come from the committed K3 vectors."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "PreLoginResponse and KeyBackup mirror the Go JSON tags (omitempty fields optional). RecoveryKeyRequest has json:\"password,omitempty\" and json:\"login_key,omitempty\", so the AccountProof spread lands on real fields."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Key derivation has one client implementation (K3), checked against the Node vectors; this phase adds no second one."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or external provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises the plain objects; no hand-written encoder. The spread proof is asserted present or absent per flow."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor; typed responses."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Old-scheme fixtures are made by the real encryptPrivateKeyWithPassword, and wrapped copies by the real wrapSecret, not by hand."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Scheme 1 answer and a full scheme 2 answer both sign in."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile pre-login answers: {scheme:2} without salt or rounds made signInSecret return the password (finding k4b-scheme2-without-settings-sends-password). A wrong password, a wrong phrase and a copy under another wrap key are refused. Pass 2: {scheme:2}, salt without rounds and {scheme:3} all reject; nothing returns the password."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty backup, null old copy, missing recovery copy each tested; the phrase length is K3's rule."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling uploads prove the account: the encrypted-copy upload now carries login_key like the recovery copy."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached by a test: scheme 1, scheme 2, malformed answer, unlocked, needs-recovery (missing and wrong), moved, no-exportable-key, recovery ok and refused."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures throw to the caller (AuthContext in K4c); unlockAfterSignIn maps an unwrap failure to needs-recovery on purpose, and makes no keys."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No feature flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "KDF settings built in prepareSignUp and moveAccount from the same two K3 constants; the proof shape is one type, AccountProof."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2 re-grep: no other fallback returns the password; uploadPublicKey is called once, last."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine; JS awaits run in order."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Half-way failure: createAccountKeys uploaded the public key first and saved the device key last, and moveAccount moved the account before its phrase copy existed (finding k4b-partial-failure-orphans-keys). Pass 2: a failed recovery upload publishes no public key and posts no move, asserted."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A failed sign-up leaves only wrapped copies that nobody encrypts to; a failed move leaves the account on scheme 1 with a phrase copy of its own key, and the next attempt replaces it."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Each fix reverted and its tests fail with assertion errors; patches under .review/controls/k4b-*."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b and eslint clean; vitest accountKeysService + utils: 21 files, 194 tests passed; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output; the crypto is checked against Node's own implementation in K3."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early; each request awaits the one before, and the public key now goes last."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest reported 194 passed and 0 skipped; the file has no skip conditions."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Plan for K4b: client flows only, AuthContext untouched until K4c, nothing makes keys on its own, the move deletes the old copy (server side, K2b), the phrase copy is proved. All kept."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint 0 issues; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest 21 files, 194 passed, 0 failed, 0 skipped"
+ }
+}
