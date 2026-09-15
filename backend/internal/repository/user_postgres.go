@@ -80,6 +80,10 @@ func (r *PostgresUserRepository) UpgradeToLoginKey(ctx context.Context, userID i
 	return r.inner.UpgradeToLoginKey(ctx, userID, loginKeyHash, kdfSalt, kdfIterations, encryptedPrivateKey)
 }
 
+func (r *PostgresUserRepository) SetLoginKey(ctx context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error {
+	return r.inner.SetLoginKey(ctx, userID, loginKeyHash, kdfSalt, kdfIterations, encryptedPrivateKey)
+}
+
 func (r *PostgresUserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {
 	return r.inner.IncrementTokenVersion(ctx, userID)
 }

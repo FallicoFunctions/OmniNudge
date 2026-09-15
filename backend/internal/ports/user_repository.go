@@ -22,6 +22,7 @@ type UserRepository interface {
 	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error
 	UpdatePassword(ctx context.Context, userID int, passwordHash string) error
 	UpgradeToLoginKey(ctx context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error
+	SetLoginKey(ctx context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error
 	IncrementTokenVersion(ctx context.Context, userID int) error
 	UpdateLastAgentPostAt(ctx context.Context, userID int, timestamp time.Time) error
 	UpdateLastAgentBrowseAt(ctx context.Context, userID int, timestamp time.Time) error

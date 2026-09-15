@@ -34,7 +34,69 @@ var (
 	ErrCurrentPasswordIncorrect = errors.New("current password is incorrect")
 	// ErrWrongSecret is returned when what was sent does not prove the account.
 	ErrWrongSecret = errors.New("invalid credentials")
+	// ErrNotOnLoginKey is returned when a login-key change reaches an account
+	// that still signs in with its password.
+	ErrNotOnLoginKey = errors.New("account does not sign in with a login key")
+	// ErrPrivateKeyNotRewrapped is returned when a change would drop the only
+	// copy of the private key the account can open.
+	ErrPrivateKeyNotRewrapped = errors.New("the private key must be rewrapped with the new key")
 )
+
+// LoginKeyChangeRequest changes a scheme 2 account's password. The app proves
+// the current password with its login key and sends the new login key, its KDF
+// settings, and the private key rewrapped with the new wrap key.
+type LoginKeyChangeRequest struct {
+	CurrentLoginKey     string `json:"current_login_key"`
+	NewLoginKey         string `json:"new_login_key"`
+	KDFSalt             string `json:"kdf_salt"`
+	KDFIterations       int    `json:"kdf_iterations"`
+	EncryptedPrivateKey string `json:"encrypted_private_key"`
+}
+
+// ChangeLoginKey changes the login key of a signed-in scheme 2 account. When the
+// account has a private key copy, the rewrapped copy is required: the old one
+// opens only with the old wrap key, so dropping it would lose the key.
+func ChangeLoginKey(ctx context.Context, userRepo ports.UserRepository, userID int, req *LoginKeyChangeRequest) error {
+	if err := validateLoginKey(req.NewLoginKey, req.KDFSalt, req.KDFIterations); err != nil {
+		return err
+	}
+	user, err := userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("account unavailable")
+	}
+	if user.AuthScheme != 2 {
+		return ErrNotOnLoginKey
+	}
+	if CheckAccountSecret(user.PasswordHash, user.AuthScheme, "", req.CurrentLoginKey) != nil {
+		return ErrCurrentPasswordIncorrect
+	}
+	if user.EncryptedPrivateKey != nil && req.EncryptedPrivateKey == "" {
+		return ErrPrivateKeyNotRewrapped
+	}
+	hash, err := utils.HashPassword(req.NewLoginKey)
+	if err != nil {
+		return fmt.Errorf("hash login key: %w", err)
+	}
+	return userRepo.SetLoginKey(ctx, userID, hash, req.KDFSalt, req.KDFIterations, req.EncryptedPrivateKey)
+}
+
+// ResetToLoginKey stores the login key derived from a password chosen through a
+// reset link, on any account. The private key copy is cleared: the key that
+// wrapped it came from the forgotten password, so the app unlocks the private
+// key with the recovery phrase and uploads a new copy.
+func ResetToLoginKey(ctx context.Context, userRepo ports.UserRepository, userID int, loginKey, kdfSalt string, kdfIterations int) error {
+	if err := validateLoginKey(loginKey, kdfSalt, kdfIterations); err != nil {
+		return err
+	}
+	hash, err := utils.HashPassword(loginKey)
+	if err != nil {
+		return fmt.Errorf("hash login key: %w", err)
+	}
+	return userRepo.SetLoginKey(ctx, userID, hash, kdfSalt, kdfIterations, "")
+}
 
 // CheckAccountSecret checks what a person sent to prove an account. A scheme 2
 // account accepts only its login key, and refuses a password even beside the

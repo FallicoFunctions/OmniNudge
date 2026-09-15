@@ -173,6 +173,60 @@ func TestCheckAccountSecretAcceptsOnlyTheAccountsOwnKind(t *testing.T) {
 	}
 }
 
+func TestChangeLoginKeyNeedsTheCurrentKeyAndTheRewrappedCopy(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithKey(t, auth, repo, "changer")
+	user, _ := repo.GetByUsername(ctx, "changer")
+	require.NoError(t, repo.UpdateEncryptedPrivateKey(ctx, user.ID, "copy-under-old-key"))
+	versionBefore := user.TokenVersion
+
+	change := func(current string, rounds int, copy string) error {
+		return ChangeLoginKey(ctx, repo, user.ID, &LoginKeyChangeRequest{
+			CurrentLoginKey: current, NewLoginKey: testLoginKey(8), KDFSalt: testKDFSalt, KDFIterations: rounds, EncryptedPrivateKey: copy,
+		})
+	}
+	assert.ErrorIs(t, change(testLoginKey(6), MinKDFIterations, "copy-under-new-key"), ErrCurrentPasswordIncorrect)
+	assert.ErrorIs(t, change(testLoginKey(7), MinKDFIterations, ""), ErrPrivateKeyNotRewrapped, "a change must not drop the key")
+	assert.ErrorIs(t, change(testLoginKey(7), 1000, "copy-under-new-key"), ErrInvalidLoginKey)
+
+	require.NoError(t, change(testLoginKey(7), MinKDFIterations, "copy-under-new-key"))
+	changed, _ := repo.GetByID(ctx, user.ID)
+	require.NotNil(t, changed.EncryptedPrivateKey)
+	assert.Equal(t, "copy-under-new-key", *changed.EncryptedPrivateKey)
+	assert.Greater(t, changed.TokenVersion, versionBefore, "other sessions end")
+
+	_, _, err := auth.Login(ctx, repo, &LoginRequest{Username: "changer", LoginKey: testLoginKey(7)})
+	assert.Error(t, err, "the old login key no longer signs in")
+	_, _, err = auth.Login(ctx, repo, &LoginRequest{Username: "changer", LoginKey: testLoginKey(8)})
+	assert.NoError(t, err)
+
+	registerWithPassword(t, auth, repo, "stillpassword", "correct-horse")
+	old, _ := repo.GetByUsername(ctx, "stillpassword")
+	assert.ErrorIs(t, ChangeLoginKey(ctx, repo, old.ID, &LoginKeyChangeRequest{
+		CurrentLoginKey: testLoginKey(1), NewLoginKey: testLoginKey(2), KDFSalt: testKDFSalt, KDFIterations: MinKDFIterations,
+	}), ErrNotOnLoginKey)
+}
+
+func TestResetToLoginKeyClearsTheCopyItCanNoLongerOpen(t *testing.T) {
+	ctx := context.Background()
+	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
+	registerWithPassword(t, auth, repo, "forgetful", "correct-horse")
+	user, _ := repo.GetByUsername(ctx, "forgetful")
+	require.NoError(t, repo.UpdateEncryptedPrivateKey(ctx, user.ID, "copy-under-forgotten-password"))
+
+	assert.ErrorIs(t, ResetToLoginKey(ctx, repo, user.ID, testLoginKey(4), testKDFSalt, 1000), ErrInvalidLoginKey)
+	require.NoError(t, ResetToLoginKey(ctx, repo, user.ID, testLoginKey(4), testKDFSalt, MinKDFIterations))
+
+	reset, _ := repo.GetByID(ctx, user.ID)
+	assert.Equal(t, 2, reset.AuthScheme)
+	assert.Nil(t, reset.EncryptedPrivateKey, "the copy wrapped by the forgotten password is cleared")
+	_, _, err := auth.Login(ctx, repo, &LoginRequest{Username: "forgetful", Password: "correct-horse"})
+	assert.Error(t, err)
+	_, _, err = auth.Login(ctx, repo, &LoginRequest{Username: "forgetful", LoginKey: testLoginKey(4)})
+	assert.NoError(t, err)
+}
+
 func TestRegisterRefusesBadLoginKeySettings(t *testing.T) {
 	auth, repo := newLoginKeyAuth(), mocks.NewUserRepository()
 	short := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, loginKeyBytes-1))

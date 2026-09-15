@@ -698,6 +698,25 @@ func (r *UserRepository) UpgradeToLoginKey(ctx context.Context, userID int, logi
 	return nil
 }
 
+// SetLoginKey stores a new login key for an account whose password changed or
+// was reset, and puts it on scheme 2. The private key copy is replaced in the
+// same statement: rewrapped with the new key on a change, cleared (empty) on a
+// reset, where the key that wrapped it came from the forgotten password. Every
+// session ends, as with UpdatePassword.
+func (r *UserRepository) SetLoginKey(ctx context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET password_hash = $1, auth_scheme = 2, kdf_salt = $2, kdf_iterations = $3,
+		       encrypted_private_key = NULLIF($5, ''), token_version = token_version + 1
+		WHERE id = $4`, loginKeyHash, kdfSalt, kdfIterations, userID, encryptedPrivateKey)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errors.New("user not found")
+	}
+	return nil
+}
+
 func (r *UserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {
 	_, err := r.pool.Exec(ctx, `UPDATE users SET token_version = token_version + 1 WHERE id = $1`, userID)
 	return err

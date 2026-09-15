@@ -95,6 +95,41 @@ func TestLoginKeyMoveAndPasswordWritesKeepTheSchemeTrue(t *testing.T) {
 	assert.Nil(t, reset.KDFIterations)
 }
 
+// SetLoginKey serves a changed password (new copy) and a reset one (copy
+// cleared, since the key that wrapped it is lost); both end every session.
+func TestSetLoginKeyReplacesOrClearsTheCopyAndEndsSessions(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+	repo := NewUserRepository(db.Pool)
+
+	user := &User{Username: "key_setter", PasswordHash: "password-hash"}
+	require.NoError(t, repo.Create(ctx, user))
+	require.NoError(t, repo.UpdateEncryptedPrivateKey(ctx, user.ID, "old-copy"))
+	before, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.SetLoginKey(ctx, user.ID, "new-key-hash", "c2FsdC1mb3ItdGVzdA==", 600000, "new-copy"))
+	changed, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, changed.AuthScheme)
+	assert.Equal(t, "new-key-hash", changed.PasswordHash)
+	if assert.NotNil(t, changed.EncryptedPrivateKey) {
+		assert.Equal(t, "new-copy", *changed.EncryptedPrivateKey)
+	}
+	assert.Greater(t, changed.TokenVersion, before.TokenVersion)
+
+	require.NoError(t, repo.SetLoginKey(ctx, user.ID, "reset-key-hash", "c2FsdC1mb3ItdGVzdA==", 600000, ""))
+	reset, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Nil(t, reset.EncryptedPrivateKey, "a reset clears the copy it can no longer open")
+
+	assert.Error(t, repo.SetLoginKey(ctx, 999999, "x", "c2FsdC1mb3ItdGVzdA==", 600000, ""), "a missing user is an error")
+}
+
 func TestLoginKeySchemeNeedsSaltAndEnoughRounds(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

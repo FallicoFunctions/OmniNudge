@@ -11,6 +11,7 @@ package mocks
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/omninudge/backend/internal/domain"
@@ -166,6 +167,25 @@ func (m *UserRepository) UpgradeToLoginKey(_ context.Context, userID int, loginK
 	if encryptedPrivateKey != "" {
 		u.EncryptedPrivateKey = &encryptedPrivateKey
 	}
+	return nil
+}
+
+// SetLoginKey mirrors the query: scheme 2, the new key settings, the copy
+// replaced (or cleared when empty), and every session ended.
+func (m *UserRepository) SetLoginKey(_ context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error {
+	u, ok := m.users[userID]
+	if !ok {
+		return errors.New("user not found")
+	}
+	u.PasswordHash = loginKeyHash
+	u.AuthScheme = 2
+	u.KDFSalt = &kdfSalt
+	u.KDFIterations = &kdfIterations
+	u.EncryptedPrivateKey = nil
+	if encryptedPrivateKey != "" {
+		u.EncryptedPrivateKey = &encryptedPrivateKey
+	}
+	u.TokenVersion++
 	return nil
 }
 
