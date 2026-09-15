@@ -32,8 +32,9 @@ expect "the pre-commit hook runs the gate" pass grep -q "bash $gate" frontend/.h
 # from CI alone would pass every commit here while CI saw none of
 # internal/integration again.
 ci_lint_args=$(sed -n '/golangci-lint-action/,/args:/s/^ *args: *//p' .github/workflows/ci.yml)
+gate_lint_args=$(sed -n 's/.*golangci-lint run \(.*\) \$packages.*/\1/p' "$gate")
 expect "the gate lints with CI's golangci-lint arguments" pass \
-  bash -c '[ -n "$1" ] && grep -qF -- "golangci-lint run $1 " "$2"' _ "$ci_lint_args" "$gate"
+  test -n "$ci_lint_args" -a "$ci_lint_args" = "$gate_lint_args"
 
 # Formatting, the check that blocked every frontend pull request.
 printf 'export const   fixture = {a:1}\n' >"$ts_fixture"
