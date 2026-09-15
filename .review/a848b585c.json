@@ -1,0 +1,475 @@
+{
+ "schema_version": 2,
+ "head": "254554f51",
+ "base": "a848b585c",
+ "scope": {
+  "files": [
+   "backend/internal/database/migrations/212_group_key_versions.up.sql",
+   "backend/internal/database/migrations/212_group_key_versions.down.sql",
+   "backend/internal/services/group_keys.go",
+   "backend/internal/services/group_keys_test.go",
+   "backend/internal/services/group_encryption.go (removed)",
+   "backend/internal/services/group_encryption_test.go (removed)",
+   "backend/internal/database/omnichat_expansion_migration_test.go"
+  ],
+  "boundaries": [
+   "group_encryption_keys",
+   "group_key_members",
+   "conversation_participants",
+   "group_settings.message_history_visible",
+   "conversations.current_encryption_version",
+   "the data export's reads of the key tables"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a848b585c",
+  "5ba782a38",
+  "8bc3efc78"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Migration 212 (the unused server copy column and created_by become nullable), services/group_keys.go (State, Rotate, MarkGroupKeyStale) with tests, the dead server-side group encryption service removed, and both migration rollback lists updated. Boundaries: group_encryption_keys, group_key_members, conversation_participants, group_settings, conversations."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a848b585c (K5e), 5ba782a38 (K5d), 8bc3efc78 (K5b): none touched group keys."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The stored rows printed back through State for each member: each sees its own wrapped copy per version and no other member's copy."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; G1a is server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "No handler yet; G1b adds the routes."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows written were read back after every accepted and refused call: a refused rotation leaves no version and no copy."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Column names match the tables the data export reads (encrypted_key_for_user, group_key_id); export_session_keys keeps its plain integer reference."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "State returns what a sender needs (members, missing history) and what Rotate then checks."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One place decides who gets a copy: Rotate. MarkGroupKeyStale is the single way a membership change ends a version."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "pgx binds the values; no hand-written encoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group is built exactly as CreateGroup builds one: conversation_type 'group', is_group, created_by, participants with roles."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A first version, a version after a leave, a version after a join with history: each stored."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Refused: a non-member, copies missing a member, copies for an outsider, an empty copy, a version that is not the next one, a new version while the current one still fits, older copies while history is hidden, and older copies for a version the sender never held."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty copy and a copy over the size limit are refused; a group with no settings row keeps history visible."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling rule compared with the key backup endpoints: the server never holds a key, only wrapped copies, and checks who may have one."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure returns a named error the handlers in G1b can map."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The rotation rules live once; the state query is shared by State and Rotate."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'the server can read a group key': grepped every user of the two tables. The data export still decrypts copies with a password-wrapped private key, which no longer exists for a login-key account; that path is outside G1a and reported."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Rotate locks the conversation row for its whole check, so two senders cannot both make the same version; the unique key (conversation_id, key_version) is the second line."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Rotate is one transaction: a refused or failed rotation stores no version and no copies."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "Migration 212 has a down file, and the rollback test rolled it back and re-applied it twice in this run."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A member who leaves keeps no place in a new version; State refuses them."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok, golangci-lint 0 issues in the commit gate; group key tests 7 passed, migration tests 2 passed, data export tests 8 and export worker tests 8 passed; 0 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "H3 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each rule the thing it refuses (see D2); each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run used the real database (TEST_DATABASE_URL) and reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: one shared key per group in versions, one wrapped copy per member, a join or leave ends the version, the next sender makes the next one, history on means every older version reaches a newcomer. G1a is the server store for exactly that."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One entry point per action; concurrent senders are serialised by the row lock."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Every test that touches the changed area was run, not only the new ones: the database migration tests, the data export handler tests and the export worker tests. Both migration rollback tests failed, because each walks a list whose head must be the newest migration and 212 was missing from both (g1a-migration-not-in-rollback-lists)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": [
+    {
+     "id": "g1a-migration-not-in-rollback-lists",
+     "summary": "The new migration was missing from the two rollback lists whose head must be the newest migration, so both migration tests failed on their first step.",
+     "found_by": "H3",
+     "fix_commit": "254554f51",
+     "control": {
+      "patch": ".review/controls/g1a-migration-not-in-rollback-lists.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/database/ -run TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly"
+      ],
+      "observed": "FAIL: expected 211_e2e_login_keys, actual 212_group_key_versions"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Migration 212 (the unused server copy column and created_by become nullable), services/group_keys.go (State, Rotate, MarkGroupKeyStale) with tests, the dead server-side group encryption service removed, and both migration rollback lists updated. Boundaries: group_encryption_keys, group_key_members, conversation_participants, group_settings, conversations."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a848b585c (K5e), 5ba782a38 (K5d), 8bc3efc78 (K5b): none touched group keys."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The stored rows printed back through State for each member: each sees its own wrapped copy per version and no other member's copy."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; G1a is server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "No handler yet; G1b adds the routes."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows written were read back after every accepted and refused call: a refused rotation leaves no version and no copy."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Column names match the tables the data export reads (encrypted_key_for_user, group_key_id); export_session_keys keeps its plain integer reference."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "State returns what a sender needs (members, missing history) and what Rotate then checks."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One place decides who gets a copy: Rotate. MarkGroupKeyStale is the single way a membership change ends a version."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "pgx binds the values; no hand-written encoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group is built exactly as CreateGroup builds one: conversation_type 'group', is_group, created_by, participants with roles."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A first version, a version after a leave, a version after a join with history: each stored."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Refused: a non-member, copies missing a member, copies for an outsider, an empty copy, a version that is not the next one, a new version while the current one still fits, older copies while history is hidden, and older copies for a version the sender never held."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty copy and a copy over the size limit are refused; a group with no settings row keeps history visible."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling rule compared with the key backup endpoints: the server never holds a key, only wrapped copies, and checks who may have one."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure returns a named error the handlers in G1b can map."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The rotation rules live once; the state query is shared by State and Rotate."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'the server can read a group key': grepped every user of the two tables. The data export still decrypts copies with a password-wrapped private key, which no longer exists for a login-key account; that path is outside G1a and reported."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Rotate locks the conversation row for its whole check, so two senders cannot both make the same version; the unique key (conversation_id, key_version) is the second line."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Rotate is one transaction: a refused or failed rotation stores no version and no copies."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "Migration 212 has a down file, and the rollback test rolled it back and re-applied it twice in this run."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A member who leaves keeps no place in a new version; State refuses them."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The new migration removed from both lists at 254554f51: the rollback test fails with actual \"212_group_key_versions\"; at the commit the same selector passes."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok, golangci-lint 0 issues in the commit gate; group key tests 7 passed, migration tests 2 passed, data export tests 8 and export worker tests 8 passed; 0 skipped."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each rule the thing it refuses (see D2); each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run used the real database (TEST_DATABASE_URL) and reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: one shared key per group in versions, one wrapped copy per member, a join or leave ends the version, the next sender makes the next one, history on means every older version reaches a newcomer. G1a is the server store for exactly that."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One entry point per action; concurrent senders are serialised by the row lock."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Pass 2: the same set again after the fix: migration tests 2 passed (the down migration rolled back twice in the run), data export 8, export worker 8, group keys 7; 0 skipped."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ./internal/services/ ok",
+  "lint": "golangci-lint 0 issues (commit gate)",
+  "types": "go build",
+  "tests": "group keys 7, migrations 2, data export 8, export worker 8; 0 failed, 0 skipped"
+ }
+}
