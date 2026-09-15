@@ -1,0 +1,36 @@
+{
+  "info": {
+    "login": "omninudge/login-key/v1",
+    "wrap": "omninudge/wrap-key/v1",
+    "recovery": "omninudge/recovery-key/v1"
+  },
+  "plaintext": "private-key-under-test",
+  "passwords": [
+    {
+      "password": "correct horse battery staple",
+      "salt": "MDEyMzQ1Njc4OWFiY2RlZg==",
+      "iterations": 600000,
+      "loginKey": "pczxCQYs8e6livW56QJ3QpKXNlgSXxaPGvtOam5sWmo=",
+      "wrapped": "{\"v\":1,\"iv\":\"AAECAwQFBgcICQoL\",\"data\":\"QpRMrKquJAa6iOxENaROReGkEyJp+PMxKWQXAgVRM9bORPcvCMA=\"}"
+    },
+    {
+      "password": "Pässwörd ✓",
+      "salt": "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4",
+      "iterations": 600000,
+      "loginKey": "c3uI/y6dgjlMpIgGtyitbw2XSMMIZXqBB0+K9v0LkvQ=",
+      "wrapped": "{\"v\":1,\"iv\":\"AAECAwQFBgcICQoL\",\"data\":\"siYS8uAPGIe19pEwVkZkAh2L328Iieeb39aisL+tTc5ZysGDEKo=\"}"
+    }
+  ],
+  "phrases": [
+    {
+      "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "entropy": "00000000000000000000000000000000",
+      "wrapped": "{\"v\":1,\"iv\":\"AAECAwQFBgcICQoL\",\"data\":\"fvs/T75DXlJoCWWkMwXHFmx1U2YWSAXCXFM0Az48glzivEL8O6o=\"}"
+    },
+    {
+      "phrase": "legal winner thank year wave sausage worth useful legal winner thank yellow",
+      "entropy": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+      "wrapped": "{\"v\":1,\"iv\":\"AAECAwQFBgcICQoL\",\"data\":\"rOrAozAAgcMc4BPLnnGT6BDHHOicWzH28+ebYLk49LT1Q3cRbhQ=\"}"
+    }
+  ]
+}
