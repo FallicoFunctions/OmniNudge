@@ -1,0 +1,234 @@
+{
+ "schema_version": 2,
+ "head": "fd2646f08",
+ "base": "dbb370ff8",
+ "scope": {
+  "files": [
+   "frontend/src/services/accountKeysService.ts",
+   "frontend/src/services/__tests__/accountKeysService.test.ts",
+   "frontend/src/contexts/AuthContext.tsx",
+   "frontend/src/contexts/__tests__/AuthContext.test.tsx",
+   "frontend/src/components/keys/__tests__/KeySetupScreen.test.tsx"
+  ],
+  "boundaries": [
+   "GET /auth/key-backup",
+   "POST /auth/app-password",
+   "AuthContext keyStatus"
+  ]
+ },
+ "prior_ledgers_read": [
+  "238b7ec7d",
+  "b4bf42b71",
+  "b2a87c547"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "accountKeysService.setAppPassword (phrase opens the recovery copy, key rewrapped under the app password's wrap key, POST /auth/app-password) and openRecoveryCopy, shared with recoverWithPhrase; AuthContext show-phrase gains offerAppPassword (true only for an account with no password: provider sign-in with no copy, or a fresh start with no keys) and a setAppPassword action; tests."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "238b7ec7d (K4e-1: export sent the password, fixed), b4bf42b71, b2a87c547; nothing on the app password."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The /auth/app-password body printed through the api mock: login_key, kdf_salt, kdf_iterations 600000, encrypted_private_key that opens with the returned wrap key to the private key; the app password string appears nowhere in it."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed; the offer screen is the next phase."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server handler read: 200 {scheme: 2}; 400 for bad login key settings or a missing wrapped copy; 409 when the account already has a password; the route shares the sign-in limit."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Field names match services.AppPasswordRequest json tags."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The server stores the login key and the copy; the account then signs in with scheme 2, which signInSecret reads from pre-login."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Opening the recovery copy existed twice after the build (recoverWithPhrase and setAppPassword); moved into openRecoveryCopy before the commit."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Axios serialises the plain object."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The recovery copy fixture is made with the real wrapSecret and deriveRecoveryKey."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A correct phrase and an 8+ character password set it."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A wrong phrase and a missing copy send nothing; a short password and an account that has a password are refused before any request."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The password minimum is the one sign-up uses; the phrase format is K3's."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: recoverWithPhrase and moveWithoutKey prove or derive the same way; setAppPassword relies on the server's empty-password rule, as the design says."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "offerAppPassword true and false both reached; setAppPassword's three refusals reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures throw to the caller, the offer screen."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One recovery-copy opener, one KDF settings source (prepareSignUp)."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every phraseShown caller checked: only the no-password provider branch and a fresh start with no keys offer."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Shared state is the refs; commit(generation) guards the write."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "One request after the local work; a failure leaves the account without a password, as before."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A sign-out during the request writes nothing (commit generation)."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "No finding, so no control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; pre-commit gate 0 failed; vitest 3 files, 60 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "The pass found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: the OAuth app password is also a way to sign in (a real login key), may be set only while the account has no password, and is offered after the phrase. Kept; the screen that offers it is the next phase."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller, the offer screen; a double submit reaches the server's 409 after the first succeeds."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest 3 files, 60 passed, 0 failed, 0 skipped"
+ }
+}
