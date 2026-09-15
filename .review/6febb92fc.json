@@ -1,0 +1,224 @@
+{
+  "schema_version": 2,
+  "head": "6759a452b",
+  "base": "6febb92fc",
+  "scope": {
+    "files": [
+      "frontend/src/utils/loginKeys.ts",
+      "frontend/src/utils/recoveryPhrase.ts",
+      "frontend/src/utils/loginKeys.test.ts",
+      "shared/crypto-vectors/generate.mjs",
+      "shared/crypto-vectors/login-keys.json",
+      "frontend/package.json",
+      "frontend/package-lock.json"
+    ],
+    "boundaries": [
+      "device -> server: the login key (base64, 32 bytes)",
+      "client -> client: shared test vectors (WebCrypto vs Node crypto, OmniRave in K5)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "97d33ad4a",
+    "5e17afbd9"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "frontend/src/utils/loginKeys.ts (deriveLoginKeys, newKdfSalt, wrapSecret, unwrapSecret), recoveryPhrase.ts (newRecoveryPhrase, normalize, validate, deriveRecoveryKey, pickConfirmationPositions), loginKeys.test.ts; shared/crypto-vectors/generate.mjs and login-keys.json; @scure/bip39 2.4.0."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger covers client-side key derivation; K1a-K2c fixed what the server accepts (32-byte key, 16-64 byte salt, 600000-10000000 rounds)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the artifacts the server and other clients receive: the login keys for two materially different passwords (ASCII, and decomposed Unicode normalized by NFKC) match the values Node computed; the wrapped copies Node sealed open under the derived wrap key and under the keys from two official BIP-39 phrases."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The login key is 32 bytes base64, the salt 16 bytes, the rounds 600000: inside every bound the server enforces."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No response shape consumed yet; K4 wires the calls."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The derivation is one implementation per client, checked against vectors computed by a second one (Node's crypto); OmniRave in K5 is checked against the same file."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "CI's frontend test step runs from frontend/ (working-directory), where the test resolves ../shared/crypto-vectors/login-keys.json, as it does locally."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Accepted: both vector passwords, a phrase typed in capitals with extra spaces and a trailing newline."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: a phrase with a wrong checksum, an 11-word phrase, a word off the list; a copy under another wrap key."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Unicode forms: composed and decomposed forms of one password give one key."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "No sibling path to compare yet; the screens arrive in K4."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "Every branch is reached by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "unwrapSecret throws on a wrong key, a damaged copy or an unknown version; deriveRecoveryKey throws on an invalid phrase."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Nothing gated on a flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The AES key derivation is one function (deriveAesKey), used for the wrap key and the recovery key."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that derive keys from a password: keySyncService's PBKDF2 backup (the old scheme, replaced in K4); nothing else."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No shared state; every call derives fresh."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control; the tests were probed under G3."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No callers until K4 wires the screens; the tests call the functions directly."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b and eslint pass; prettier formatted; vitest: loginKeys.test.ts and encryption.test.ts, 38 PASS; npm audit 0 vulnerabilities."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real WebCrypto derivation against values from a separate implementation (Node's crypto), not a restatement of its own output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Probed the tests with two deliberate faults: a wrong HKDF label made both vector tests fail; removing NFKC made the decomposed-Unicode vector and the composed-versus-decomposed test fail while the ASCII vector passed. loginKeys.ts restored byte for byte."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "The vitest run: 38 passed, 0 skipped."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K3 promises: the password never leaves the device in usable form (only the HKDF login key does), the wrap key cannot be exported, the phrase is 12 words from @scure/bip39, and shared vectors prove every client derives the same keys."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b ok",
+    "vet": "n/a (TypeScript)",
+    "lint": "eslint ok; prettier formatted; pre-commit gate 0 failed",
+    "types": "tsc -b ok",
+    "tests": "vitest loginKeys + encryption: 38 PASS, 0 FAIL, 0 SKIP; two deliberate faults each caught"
+  }
+}
