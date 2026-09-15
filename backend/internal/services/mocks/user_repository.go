@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/omninudge/backend/internal/domain"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/ports"
 )
 
@@ -45,6 +46,9 @@ func (m *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	m.nextID++
 	now := time.Now()
 	user.CreatedAt = now
+	if user.AuthScheme == 0 {
+		user.AuthScheme = 1 // the column's default, read back by Create
+	}
 	copy := *user
 	m.users[copy.ID] = &copy
 	return nil
@@ -147,9 +151,30 @@ func (m *UserRepository) UpdateProfile(_ context.Context, userID int, bio *strin
 	return nil
 }
 
+// UpgradeToLoginKey mirrors the query's WHERE auth_scheme = 1: an account
+// moves once, and a missing or moved account is refused.
+func (m *UserRepository) UpgradeToLoginKey(_ context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error {
+	u, ok := m.users[userID]
+	if !ok || u.AuthScheme == 2 {
+		return models.ErrLoginKeyAlreadySet
+	}
+	u.PasswordHash = loginKeyHash
+	u.AuthScheme = 2
+	u.KDFSalt = &kdfSalt
+	u.KDFIterations = &kdfIterations
+	u.EncryptedPrivateKey = nil
+	if encryptedPrivateKey != "" {
+		u.EncryptedPrivateKey = &encryptedPrivateKey
+	}
+	return nil
+}
+
 func (m *UserRepository) UpdatePassword(_ context.Context, userID int, passwordHash string) error {
 	if u, ok := m.users[userID]; ok {
 		u.PasswordHash = passwordHash
+		u.AuthScheme = 1 // a password hash means the password scheme, as in models
+		u.KDFSalt = nil
+		u.KDFIterations = nil
 		u.TokenVersion++
 	}
 	return nil

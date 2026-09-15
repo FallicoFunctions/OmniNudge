@@ -61,6 +61,39 @@ func TestUserReadsCarryLoginKeyColumns(t *testing.T) {
 	}
 }
 
+// The move replaces the private key copy wrapped with the password, which the
+// server has seen; a later password write (reset, change) returns the account
+// to scheme 1, or sign-in would ask for a login key the new hash cannot match.
+func TestLoginKeyMoveAndPasswordWritesKeepTheSchemeTrue(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+	repo := NewUserRepository(db.Pool)
+
+	user := &User{Username: "scheme_mover", PasswordHash: "password-hash"}
+	require.NoError(t, repo.Create(ctx, user))
+	require.NoError(t, repo.UpdateEncryptedPrivateKey(ctx, user.ID, "wrapped-by-password"))
+
+	require.NoError(t, repo.UpgradeToLoginKey(ctx, user.ID, "login-key-hash", "c2FsdC1mb3ItdGVzdA==", 600000, "wrapped-by-wrap-key"))
+	moved, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, moved.AuthScheme)
+	if assert.NotNil(t, moved.EncryptedPrivateKey) {
+		assert.Equal(t, "wrapped-by-wrap-key", *moved.EncryptedPrivateKey)
+	}
+	assert.ErrorIs(t, repo.UpgradeToLoginKey(ctx, user.ID, "again", "c2FsdC1mb3ItdGVzdA==", 600000, ""), ErrLoginKeyAlreadySet)
+
+	require.NoError(t, repo.UpdatePassword(ctx, user.ID, "new-password-hash"))
+	reset, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, reset.AuthScheme, "a password hash means the password scheme")
+	assert.Nil(t, reset.KDFSalt)
+	assert.Nil(t, reset.KDFIterations)
+}
+
 func TestLoginKeySchemeNeedsSaltAndEnoughRounds(t *testing.T) {
 	ctx := context.Background()
 	db, err := database.NewTest()

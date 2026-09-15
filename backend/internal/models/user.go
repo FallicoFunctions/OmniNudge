@@ -158,9 +158,15 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.Email = &normalizedEmail
 	}
 
+	scheme := user.AuthScheme
+	if scheme == 0 {
+		scheme = 1
+	}
+
 	query := `
-		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw,
+		                   auth_scheme, kdf_salt, kdf_iterations)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at, auth_scheme
 	`
 
@@ -174,6 +180,9 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.AvatarURL,
 		user.Bio,
 		user.NSFW,
+		scheme,
+		user.KDFSalt,
+		user.KDFIterations,
 	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt, &user.AuthScheme)
 }
 
@@ -649,10 +658,41 @@ func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *str
 }
 
 // UpdatePassword updates a user's password hash
+// UpdatePassword stores a hash of the password itself, so the account signs in
+// with the password again (scheme 1). Left on scheme 2, sign-in would ask for a
+// login key that this hash can never match.
 func (r *UserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {
-	query := `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`
+	query := `
+		UPDATE users SET password_hash = $1, auth_scheme = 1, kdf_salt = NULL, kdf_iterations = NULL,
+		       token_version = token_version + 1
+		WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, passwordHash, userID)
 	return err
+}
+
+// ErrLoginKeyAlreadySet is returned when an account that already signs in with
+// a login key (or does not exist) is asked to move to one.
+var ErrLoginKeyAlreadySet = errors.New("account already signs in with a login key")
+
+// UpgradeToLoginKey moves an account from sending its password (scheme 1) to
+// sending a login key the app derives (scheme 2). An account moves once. The
+// session is kept: the user proved the same password to get here.
+//
+// The private key copy is replaced in the same statement: the old copy is
+// wrapped with the password, which the server has seen, so it must not outlive
+// the move. An empty copy (no key set up yet) clears it.
+func (r *UserRepository) UpgradeToLoginKey(ctx context.Context, userID int, loginKeyHash, kdfSalt string, kdfIterations int, encryptedPrivateKey string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET password_hash = $1, auth_scheme = 2, kdf_salt = $2, kdf_iterations = $3,
+		       encrypted_private_key = NULLIF($5, '')
+		WHERE id = $4 AND auth_scheme = 1`, loginKeyHash, kdfSalt, kdfIterations, userID, encryptedPrivateKey)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrLoginKeyAlreadySet
+	}
+	return nil
 }
 
 func (r *UserRepository) IncrementTokenVersion(ctx context.Context, userID int) error {

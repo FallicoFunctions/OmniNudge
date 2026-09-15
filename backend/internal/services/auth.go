@@ -363,8 +363,13 @@ func (s *AuthService) validateLiveUserState(ctx context.Context, userID int, tok
 
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
-	Username            string  `json:"username"`
+	Username string `json:"username"`
+	// Password is the old scheme. The app sends LoginKey, KDFSalt and
+	// KDFIterations instead, and the password never leaves the device.
 	Password            string  `json:"password"`
+	LoginKey            string  `json:"login_key,omitempty"`
+	KDFSalt             string  `json:"kdf_salt,omitempty"`
+	KDFIterations       int     `json:"kdf_iterations,omitempty"`
 	Email               *string `json:"email,omitempty"`
 	TurnstileToken      string  `json:"turnstile_token"`
 	AcceptPrivacyPolicy bool    `json:"accept_privacy_policy"` // GDPR requirement
@@ -375,6 +380,7 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Username     string `json:"username"`
 	Password     string `json:"password"`
+	LoginKey     string `json:"login_key,omitempty"`
 	KeepLoggedIn bool   `json:"keep_logged_in"`
 }
 
@@ -417,8 +423,9 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 		return nil, "", errors.New("username must be between 3 and 50 characters")
 	}
 
-	if len(req.Password) < 8 {
-		return nil, "", errors.New("password must be at least 8 characters")
+	credentials, err := registrationCredentials(req)
+	if err != nil {
+		return nil, "", err
 	}
 
 	// Validate email format if provided
@@ -448,8 +455,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 		return nil, "", errors.New("username already taken")
 	}
 
-	// Hash password
-	hashedPassword, err := utils.HashPassword(req.Password)
+	hashedPassword, err := utils.HashPassword(credentials.secret)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -463,6 +469,9 @@ func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepositor
 		Username:              username,
 		Email:                 req.Email,
 		PasswordHash:          hashedPassword,
+		AuthScheme:            credentials.scheme,
+		KDFSalt:               credentials.kdfSalt,
+		KDFIterations:         credentials.kdfIterations,
 		PrivacyPolicyVersion:  &privacyVersion,
 		TermsOfServiceVersion: &termsVersion,
 		PrivacyAcceptedAt:     &currentTime,
@@ -501,8 +510,17 @@ func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, 
 		return nil, "", errors.New("invalid username or password")
 	}
 
-	// Check password
-	if err := utils.CheckPassword(user.PasswordHash, req.Password); err != nil {
+	// A scheme 2 account signs in only with its login key. Accepting the
+	// password too would keep the password travelling to the server.
+	secret := req.Password
+	if user.AuthScheme == 2 {
+		secret = req.LoginKey
+	}
+	if secret == "" || (user.AuthScheme == 2 && req.Password != "") {
+		log.Printf("Login failed: wrong kind of secret for user_id=%d scheme=%d", user.ID, user.AuthScheme)
+		return nil, "", errors.New("invalid username or password")
+	}
+	if err := utils.CheckPassword(user.PasswordHash, secret); err != nil {
 		log.Printf("Login failed: password mismatch for user_id=%d username=%q", user.ID, user.Username)
 		return nil, "", errors.New("invalid username or password")
 	}
