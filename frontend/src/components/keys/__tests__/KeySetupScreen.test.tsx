@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KeyStatus } from '../../../contexts/AuthContext';
 import KeySetupScreen, { FRESH_START_TEXT } from '../KeySetupScreen';
+import en from '../../../../public/locales/en.json';
 
 const auth = vi.hoisted(() => ({
   keyStatus: { state: 'ready' } as KeyStatus,
@@ -11,6 +12,7 @@ const auth = vi.hoisted(() => ({
   startFresh: vi.fn(),
   retryKeys: vi.fn(),
   logout: vi.fn(),
+  setAppPassword: vi.fn(),
 }));
 
 vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => auth }));
@@ -126,6 +128,82 @@ describe('the recovery phrase', () => {
     const after = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(after);
     expect(after.defaultPrevented).toBe(false);
+  });
+});
+
+// Types back the three words the confirm step asks for.
+function confirmWords() {
+  fireEvent.click(button('keys.phrase.saved'));
+  const inputs = screen.getAllByRole('textbox') as HTMLInputElement[];
+  inputs.forEach((input) => {
+    const { number } = JSON.parse(input.labels![0].textContent!.split(':').slice(1).join(':'));
+    fireEvent.change(input, { target: { value: WORDS[Number(number) - 1] } });
+  });
+  fireEvent.click(button('keys.phrase.confirm'));
+}
+
+describe('the app password offer', () => {
+  // The offer reaches every account with no password, whichever provider it
+  // signs in through, so the English text must not name only one of them.
+  it('names every provider the sign-in screen offers', () => {
+    const intro = en.keys.app.intro;
+    for (const provider of ['Google', 'Discord', 'GitHub', 'Steam']) {
+      expect(intro).toContain(provider);
+    }
+  });
+
+  const offered = () => showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: true });
+
+  function fill(password: string, confirmation: string) {
+    fireEvent.change(screen.getByLabelText('keys.app.label'), { target: { value: password } });
+    fireEvent.change(screen.getByLabelText('keys.app.confirmLabel'), {
+      target: { value: confirmation },
+    });
+    fireEvent.click(button('keys.app.submit'));
+  }
+
+  it('comes after the phrase for an account with no password, and can be skipped', () => {
+    offered();
+    confirmWords();
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('keys.app.title');
+    expect(auth.acknowledgePhrase).not.toHaveBeenCalled();
+    fireEvent.click(button('keys.app.skip'));
+    expect(auth.acknowledgePhrase).toHaveBeenCalledOnce();
+  });
+
+  it('is not offered to an account that has a password', () => {
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
+    confirmWords();
+    expect(screen.queryByLabelText('keys.app.label')).toBeNull();
+    expect(auth.acknowledgePhrase).toHaveBeenCalledOnce();
+  });
+
+  it('sets the app password with the phrase still in hand', async () => {
+    auth.setAppPassword.mockResolvedValue(undefined);
+    offered();
+    confirmWords();
+    fill('app password', 'app password');
+    await waitFor(() => expect(auth.setAppPassword).toHaveBeenCalledWith(PHRASE, 'app password'));
+  });
+
+  it('refuses a short or mismatched password before sending anything', () => {
+    offered();
+    confirmWords();
+    fill('short', 'short');
+    expect(screen.getByRole('alert')).toHaveTextContent('keys.app.short');
+    fill('app password', 'another one');
+    expect(screen.getByRole('alert')).toHaveTextContent('keys.app.mismatch');
+    expect(auth.setAppPassword).not.toHaveBeenCalled();
+  });
+
+  it('says when the app password could not be added, and still allows a skip', async () => {
+    auth.setAppPassword.mockRejectedValueOnce(new Error('offline'));
+    offered();
+    confirmWords();
+    fill('app password', 'app password');
+    expect(await screen.findByRole('alert')).toHaveTextContent('keys.app.failed');
+    fireEvent.click(button('keys.app.skip'));
+    expect(auth.acknowledgePhrase).toHaveBeenCalledOnce();
   });
 });
 

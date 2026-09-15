@@ -2425,6 +2425,17 @@
     "buttonTitle": "Send feedback"
   },
   "keys": {
+    "app": {
+      "title": "Add an app password (optional)",
+      "intro": "Your account signs in through Google, Discord, GitHub or Steam, so it has no password. With an app password, a new device unlocks your messages when you sign in, with no need to find your recovery phrase and type all 12 words. You can also sign in with your username and this password.",
+      "label": "App password",
+      "confirmLabel": "Confirm app password",
+      "submit": "Add app password",
+      "skip": "Skip for now",
+      "short": "Use at least {{count}} characters.",
+      "mismatch": "The two passwords do not match.",
+      "failed": "Could not add the app password. Try again, or skip for now."
+    },
     "signOut": "Sign out",
     "working": "Working…",
     "phrase": {

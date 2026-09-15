@@ -14,6 +14,9 @@ export const FRESH_START_TEXT = 'START FRESH';
 // AuthContext throws this message when a password does not open the copy.
 const WRONG_PASSWORD = 'Wrong password';
 
+// The same minimum sign-up uses; AuthContext checks it again.
+const MIN_APP_PASSWORD_LENGTH = 8;
+
 const inputClass =
   'mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]';
 const primaryButtonClass =
@@ -31,7 +34,11 @@ export default function KeySetupScreen() {
     case 'show-phrase':
       return (
         <KeyScreen>
-          <RecoveryPhraseStep phrase={keyStatus.phrase} onDone={acknowledgePhrase} />
+          <PhraseStep
+            phrase={keyStatus.phrase}
+            offerAppPassword={keyStatus.offerAppPassword}
+            onDone={acknowledgePhrase}
+          />
         </KeyScreen>
       );
     case 'needs-password':
@@ -316,6 +323,104 @@ function FreshStartStep({ onBack }: { onBack?: () => void }) {
         </button>
       )}
       <SignOutButton />
+    </form>
+  );
+}
+
+// The phrase first; then, for an account with no password, the optional app
+// password, offered while the phrase can still open the recovery copy.
+function PhraseStep({
+  phrase,
+  offerAppPassword,
+  onDone,
+}: {
+  phrase: string;
+  offerAppPassword: boolean;
+  onDone: () => void;
+}) {
+  const [offering, setOffering] = useState(false);
+  if (offering) {
+    return <AppPasswordOffer phrase={phrase} onSkip={onDone} />;
+  }
+  return (
+    <RecoveryPhraseStep
+      phrase={phrase}
+      onDone={offerAppPassword ? () => setOffering(true) : onDone}
+    />
+  );
+}
+
+function AppPasswordOffer({ phrase, onSkip }: { phrase: string; onSkip: () => void }) {
+  const { t } = useTranslation();
+  const { setAppPassword } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
+    if (password.length < MIN_APP_PASSWORD_LENGTH) {
+      setError(t('keys.app.short', { count: MIN_APP_PASSWORD_LENGTH }));
+      return;
+    }
+    if (password !== confirmation) {
+      setError(t('keys.app.mismatch'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await setAppPassword(phrase, password);
+    } catch {
+      setError(t('keys.app.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <StepHeader title={t('keys.app.title')} intro={t('keys.app.intro')} />
+      <ErrorMessage message={error} />
+      <div>
+        <label
+          htmlFor="key-app-password"
+          className="block text-sm font-semibold text-[var(--color-text-primary)]"
+        >
+          {t('keys.app.label')}
+        </label>
+        <input
+          id="key-app-password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className={inputClass}
+          autoComplete="new-password"
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="key-app-password-confirm"
+          className="block text-sm font-semibold text-[var(--color-text-primary)]"
+        >
+          {t('keys.app.confirmLabel')}
+        </label>
+        <input
+          id="key-app-password-confirm"
+          type="password"
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          className={inputClass}
+          autoComplete="new-password"
+        />
+      </div>
+      <button type="submit" disabled={busy} className={primaryButtonClass}>
+        {busy ? t('keys.working') : t('keys.app.submit')}
+      </button>
+      <button type="button" disabled={busy} onClick={onSkip} className={textButtonClass}>
+        {t('keys.app.skip')}
+      </button>
     </form>
   );
 }
