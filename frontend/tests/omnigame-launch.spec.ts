@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { LOGIN_KEY_ACCOUNT_BACKUP, seedDeviceMessageKey } from './e2e/helpers/deviceKeys';
 
 test('launches OmniRave from OmniGame discovery into the dedicated runtime', async ({ page }) => {
   let requestBody: unknown = null;
@@ -51,6 +52,7 @@ test('launches OmniRave from OmniGame discovery into the dedicated runtime', asy
 
 test('uses the OmniNudge account automatically when the player is signed in', async ({ page }) => {
   let requestBody: unknown = null;
+  const publicKey = await seedDeviceMessageKey(page);
 
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
@@ -60,7 +62,15 @@ test('uses the OmniNudge account automatically when the player is signed in', as
         username: 'signed-in-raver',
         role: 'user',
         created_at: '2026-08-09T00:00:00Z',
+        public_key: publicKey,
       }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/key-backup', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(LOGIN_KEY_ACCOUNT_BACKUP),
     });
   });
 
@@ -87,7 +97,9 @@ test('uses the OmniNudge account automatically when the player is signed in', as
   });
 
   await page.goto('/games/omnirave');
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('auth_token'))).toBe('signed-in-test-token');
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('auth_token')))
+    .toBe('signed-in-test-token');
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
 
   await page.getByRole('button', { name: 'Play', exact: true }).click();

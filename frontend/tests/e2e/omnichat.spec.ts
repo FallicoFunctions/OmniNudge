@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route, type WebSocketRoute } from '@playwright/test';
+import { LOGIN_KEY_ACCOUNT_BACKUP, seedDeviceMessageKey } from './helpers/deviceKeys';
 
 type MockPersona = {
   id: number;
@@ -92,7 +93,8 @@ async function installOmniChatApi(page: Page) {
     username: 'launch-owner',
     email: 'launch-owner@example.com',
     role: 'user',
-    public_key: null,
+    // This browser is a device that already holds the account's message key.
+    public_key: await seedDeviceMessageKey(page),
   };
 
   const publicPersona: MockPersona = {
@@ -167,6 +169,11 @@ async function installOmniChatApi(page: Page) {
         return;
       }
       await fulfillJson(route, authUser);
+      return;
+    }
+
+    if (path === '/auth/key-backup' && request.method() === 'GET') {
+      await fulfillJson(route, LOGIN_KEY_ACCOUNT_BACKUP);
       return;
     }
 
