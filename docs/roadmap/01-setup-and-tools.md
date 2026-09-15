@@ -247,14 +247,14 @@ yarn --version
 
 ```bash
 # Install PostgreSQL
-brew install postgresql@15
+brew install postgresql@16
 
 # Start PostgreSQL service
-brew services start postgresql@15
+brew services start postgresql@16
 
 # Verify it's running
 brew services list
-# Should show postgresql@15 as "started"
+# Should show postgresql@16 as "started"
 
 # Access PostgreSQL
 psql postgres
@@ -1086,7 +1086,7 @@ Add to `~/.bashrc` or `~/.zshrc` to make permanent.
 Solution:
 - Verify PostgreSQL is installed
 - Add to PATH:
-  - macOS Homebrew: `export PATH=$PATH:/opt/homebrew/opt/postgresql@15/bin`
+  - macOS Homebrew: `export PATH=$PATH:/opt/homebrew/opt/postgresql@16/bin`
   - Postgres.app: `export PATH=$PATH:/Applications/Postgres.app/Contents/Versions/latest/bin`
 
 **Problem: "connection refused"**
@@ -1094,7 +1094,7 @@ Solution:
 Solution:
 ```bash
 # macOS
-brew services restart postgresql@15
+brew services restart postgresql@16
 
 # Linux
 sudo systemctl restart postgresql
@@ -1239,7 +1239,7 @@ redis-cli --version
 git --version
 
 # Start services (macOS)
-brew services start postgresql@15
+brew services start postgresql@16
 brew services start redis
 
 # Start services (Linux)
