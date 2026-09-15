@@ -115,7 +115,9 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
           REDIS_ADDR: localhost:6379
-        run: go test -v -race -count=1 -timeout=20m -p 4 -tags=integration -coverprofile=coverage.out ./internal/...
+        # -timeout is per package: integration alone took ~18 minutes locally
+        # beside three other packages.
+        run: go test -v -race -count=1 -timeout=30m -p 4 -tags=integration -coverprofile=coverage.out ./internal/...
 
       - name: Show coverage summary
         working-directory: backend
