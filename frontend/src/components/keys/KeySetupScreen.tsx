@@ -198,7 +198,8 @@ function PasswordStep() {
 }
 
 // The words as the phrase was made: lower case, one space between.
-const normalizePhrase = (phrase: string) => phrase.trim().toLowerCase().split(/\s+/).join(' ');
+export const normalizePhrase = (phrase: string) =>
+  phrase.trim().toLowerCase().split(/\s+/).join(' ');
 
 function RecoveryStep({ hasRecoveryCopy }: { hasRecoveryCopy: boolean }) {
   const { t } = useTranslation();

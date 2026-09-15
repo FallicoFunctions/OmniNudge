@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
 import { LanguageSelector } from '../components/settings/LanguageSelector';
+import EncryptionSettings from '../components/settings/EncryptionSettings';
 import { Panel } from '../components/common/Panel';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -105,7 +106,13 @@ export default function SettingsPage() {
     setDailyDigest,
   } = useSettings();
 
-  type SettingsTab = 'general' | 'notifications' | 'privacy' | 'appearance' | 'audio_video';
+  type SettingsTab =
+    | 'general'
+    | 'notifications'
+    | 'privacy'
+    | 'encryption'
+    | 'appearance'
+    | 'audio_video';
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   const tabItems = useMemo(
@@ -114,6 +121,7 @@ export default function SettingsPage() {
         { key: 'general' as const, label: t('settings.tabs.general') },
         { key: 'notifications' as const, label: t('settings.tabs.notifications') },
         { key: 'privacy' as const, label: t('settings.tabs.privacy') },
+        { key: 'encryption' as const, label: t('settings.tabs.encryption') },
         { key: 'appearance' as const, label: t('settings.tabs.appearance') },
         { key: 'audio_video' as const, label: t('settings.tabs.audioVideo') },
       ] satisfies Array<{ key: SettingsTab; label: string }>,
@@ -1736,6 +1744,10 @@ export default function SettingsPage() {
             </div>
           </Panel>
         </div>
+
+        {/* Mounted only while open: leaving the tab drops a phrase that was never
+            saved, and the old phrase keeps working. */}
+        {activeTab === 'encryption' && <EncryptionSettings />}
 
         <div hidden={activeTab !== 'audio_video'}>
           <Panel as="section">

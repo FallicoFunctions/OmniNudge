@@ -2085,6 +2085,7 @@
       "general": "General",
       "notifications": "Notifications",
       "privacy": "Privacy",
+      "encryption": "Encryption",
       "appearance": "Appearance",
       "audioVideo": "Audio & Video"
     },
@@ -2425,6 +2426,28 @@
     "buttonTitle": "Send feedback"
   },
   "keys": {
+    "settings": {
+      "title": "Message encryption",
+      "intro": "Your messages are end-to-end encrypted. Your recovery phrase unlocks them if you forget your password or lose your devices.",
+      "phraseTitle": "Recovery phrase",
+      "phraseIntroPassword": "Make a new recovery phrase if you lost the old one or think someone else has seen it. Enter your password to confirm. The old phrase stops working once the new one is saved.",
+      "phraseIntroPhrase": "Make a new recovery phrase if you think someone else has seen yours. Enter your current phrase to confirm. The old phrase stops working once the new one is saved.",
+      "passwordLabel": "Current password",
+      "phraseLabel": "Current recovery phrase",
+      "start": "Make a new recovery phrase",
+      "wrongPassword": "That password is not correct.",
+      "wrongPhrase": "That phrase does not match your account. Check the words and try again.",
+      "failed": "Could not make a new recovery phrase. Try again.",
+      "unavailable": "Sign out and sign in again, then come back here to make a new recovery phrase.",
+      "cancel": "Cancel",
+      "saveFailed": "The new phrase may not have been saved. Keep both your old and your new phrase, and save again.",
+      "retry": "Save again",
+      "saved": "Your new recovery phrase is saved. The old one no longer works.",
+      "appTitle": "App password",
+      "appFailed": "Could not add the app password. Check your recovery phrase and try again.",
+      "appAdded": "Your app password is set. You can now sign in with your username and this password.",
+      "loadFailed": "Could not load your encryption settings. Reload the page to try again."
+    },
     "app": {
       "title": "Add an app password (optional)",
       "intro": "Your account signs in through Google, Discord, GitHub or Steam, so it has no password. With an app password, a new device unlocks your messages when you sign in, with no need to find your recovery phrase and type all 12 words. You can also sign in with your username and this password.",
