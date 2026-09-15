@@ -1,0 +1,469 @@
+{
+ "schema_version": 2,
+ "head": "0109dfa0b",
+ "base": "5ba782a38",
+ "scope": {
+  "files": [
+   "frontend/tests/e2e/helpers/deviceKeys.ts",
+   "frontend/tests/e2e/omnichat.spec.ts",
+   "frontend/tests/omnigame-launch.spec.ts"
+  ],
+  "boundaries": [
+   "KeySetupScreen gate",
+   "AuthContext key check",
+   "keyManagementService storage",
+   "mocked /auth/me and /auth/key-backup"
+  ]
+ },
+ "prior_ledgers_read": [
+  "fb30bad62",
+  "b4bf42b71",
+  "a4d23fcc1"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "tests/e2e/helpers/deviceKeys.ts (seedDeviceMessageKey: an RSA-OAEP 2048 pair from Node, the public key and the legacy private key slot set before the app loads; LOGIN_KEY_ACCOUNT_BACKUP); tests/e2e/omnichat.spec.ts and tests/omnigame-launch.spec.ts return that public key from /auth/me and answer /auth/key-backup."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "fb30bad62 (K5d), b4bf42b71 (K4d, which added the gate), a4d23fcc1 (K5a, the other stale test)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "A test change; no payload built beyond the mocked responses read under C2."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The signed-in page printed through Playwright: with no device key the key step covers the page and the Play and Create Character clicks time out; with the seeded key the page is usable."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "omninudge_public_key and omninudge_private_key are keyManagementService's storage keys; auth_scheme, has_password, kdf_salt, kdf_iterations as the key backup returns them."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The mocked account's public_key is exactly the seeded key, which deviceHoldsAccountKey compares."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Formats match what the app makes: base64 SPKI and PKCS#8 for RSA-OAEP 2048 SHA-256 (utils/encryption exportKeyPair, importPublicKey)."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The other signed-in specs (auth, messaging) passed in CI with the gate; only these two sign in by mock and then act on the page."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both the unauthenticated half and the signed-in half of the OmniChat smoke test run."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A seeding that did not take would show as the same click timeout, visible in the report."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One helper for both specs."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a signed-in test with no device key': grepped every spec for auth/me; auth.spec and messaging.spec passed in CI and do not act behind the gate."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean (the helper was renamed from use... to satisfy react-hooks/rules-of-hooks); pre-commit gate 0 failed; local Playwright: both specs 3 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "The technique had no row; H4 added to instruments.json."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout changed."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Playwright reported no skipped tests."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "No plan change: K5 restores the suites after the key phases."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One seeding per test."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "The gate sits above every app layer by design (K4d); the tests now give it no reason to open, as on a device that is set up."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The helper is imported by the two specs, both run."
+    },
+    {
+     "id": "H4",
+     "status": "applied",
+     "evidence": "CI's E2E job for d67e47c15 failed: omnichat.spec.ts:422 and omnigame-launch.spec.ts:52 timed out clicking buttons that the K4d key step covered, since a mocked signed-in browser holds no message key and the key check ends in a key step or failed (k5e-signed-in-e2e-covered-by-key-step). No instrument named running the E2E specs for a screen-wide change, so H4 was added."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k5e-signed-in-e2e-covered-by-key-step",
+     "summary": "Two signed-in E2E specs mocked an account with no device key, so the K4d key step covered the app and their clicks timed out; CI's E2E job failed from the K4d push on.",
+     "found_by": "H4",
+     "fix_commit": "0109dfa0b",
+     "control": {
+      "patch": ".review/controls/k5e-signed-in-e2e-covered-by-key-step.patch",
+      "runner": "bash",
+      "tests": [
+       "cd frontend && CI=1 npx playwright test tests/omnigame-launch.spec.ts --reporter=line --project=chromium"
+      ],
+      "observed": "FAIL: 1 failed, the signed-in test times out behind the key step"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "tests/e2e/helpers/deviceKeys.ts (seedDeviceMessageKey: an RSA-OAEP 2048 pair from Node, the public key and the legacy private key slot set before the app loads; LOGIN_KEY_ACCOUNT_BACKUP); tests/e2e/omnichat.spec.ts and tests/omnigame-launch.spec.ts return that public key from /auth/me and answer /auth/key-backup."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "fb30bad62 (K5d), b4bf42b71 (K4d, which added the gate), a4d23fcc1 (K5a, the other stale test)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "A test change; no payload built beyond the mocked responses read under C2."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The signed-in page printed through Playwright: with no device key the key step covers the page and the Play and Create Character clicks time out; with the seeded key the page is usable."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "omninudge_public_key and omninudge_private_key are keyManagementService's storage keys; auth_scheme, has_password, kdf_salt, kdf_iterations as the key backup returns them."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The mocked account's public_key is exactly the seeded key, which deviceHoldsAccountKey compares."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Formats match what the app makes: base64 SPKI and PKCS#8 for RSA-OAEP 2048 SHA-256 (utils/encryption exportKeyPair, importPublicKey)."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation changed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The other signed-in specs (auth, messaging) passed in CI with the gate; only these two sign in by mock and then act on the page."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both the unauthenticated half and the signed-in half of the OmniChat smoke test run."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A seeding that did not take would show as the same click timeout, visible in the report."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One helper for both specs."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: no other spec mocks a signed-in user and then clicks."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Seeding and the key-backup route removed from the signed-in launch test at 0109dfa0b: the hook's selector reports 1 failed (click timeout); at the commit 2 passed."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean (the helper was renamed from use... to satisfy react-hooks/rules-of-hooks); pre-commit gate 0 failed; local Playwright: both specs 3 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout changed."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Playwright reported no skipped tests."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "No plan change: K5 restores the suites after the key phases."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One seeding per test."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "The gate sits above every app layer by design (K4d); the tests now give it no reason to open, as on a device that is set up."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The helper is imported by the two specs, both run."
+    },
+    {
+     "id": "H4",
+     "status": "applied",
+     "evidence": "Pass 2: every spec that signs in by mock was run locally after the fix: 3 passed."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "local Playwright: omnichat and omnigame-launch specs 3 passed"
+ }
+}

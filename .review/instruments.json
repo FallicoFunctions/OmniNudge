@@ -241,6 +241,12 @@
       "name": "Run every test that mocks or imports a changed module",
       "trigger": "a module's exports, signature or behavior changed",
       "asks": "grep every test file in the package for the module's import path and for vi.mock of it, and run all of them, not only the tests beside the change. A narrow run passes while a distant integration test that mocks the old shape fails in CI; AuthContext's change broke tests/integration/authFlows.test.tsx for five pushes that way."
+    },
+    {
+      "id": "H4",
+      "name": "Run the signed-in E2E specs when a change can take over the screen",
+      "trigger": "a change adds or alters something that can cover, block or redirect the whole app: a gate, a full-screen step, a modal on sign-in, a redirect, an inert root",
+      "asks": "Unit tests and H3 import modules; Playwright specs load the app in a browser and import nothing, so neither sees a screen-wide overlay. Run every spec that signs in (grep auth/me and login in tests/**/*.spec.ts) with the local Playwright before pushing. The K4d key gate covered the app in two signed-in specs for six pushes because only CI ran them."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

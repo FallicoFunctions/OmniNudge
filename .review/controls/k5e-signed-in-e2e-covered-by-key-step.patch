@@ -1,0 +1,30 @@
+diff --git a/frontend/tests/omnigame-launch.spec.ts b/frontend/tests/omnigame-launch.spec.ts
+index a1207964d..a2816f8a2 100644
+--- a/frontend/tests/omnigame-launch.spec.ts
++++ b/frontend/tests/omnigame-launch.spec.ts
+@@ -52,7 +52,6 @@ test('launches OmniRave from OmniGame discovery into the dedicated runtime', asy
+ 
+ test('uses the OmniNudge account automatically when the player is signed in', async ({ page }) => {
+   let requestBody: unknown = null;
+-  const publicKey = await seedDeviceMessageKey(page);
+ 
+   await page.route('**/api/v1/auth/me', async (route) => {
+     await route.fulfill({
+@@ -62,17 +61,10 @@ test('uses the OmniNudge account automatically when the player is signed in', as
+         username: 'signed-in-raver',
+         role: 'user',
+         created_at: '2026-08-09T00:00:00Z',
+-        public_key: publicKey,
+       }),
+     });
+   });
+ 
+-  await page.route('**/api/v1/auth/key-backup', async (route) => {
+-    await route.fulfill({
+-      contentType: 'application/json',
+-      body: JSON.stringify(LOGIN_KEY_ACCOUNT_BACKUP),
+-    });
+-  });
+ 
+   await page.route('http://localhost:8091/api/v1/omnigame/launch/omnirave', async (route) => {
+     requestBody = route.request().postDataJSON();
