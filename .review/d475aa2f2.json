@@ -1,0 +1,419 @@
+{
+  "schema_version": 2,
+  "head": "a31cb77ab",
+  "base": "d475aa2f2",
+  "scope": {
+    "files": [
+      "backend/internal/database/migrations/211_e2e_login_keys.up.sql",
+      "backend/internal/database/migrations/211_e2e_login_keys.down.sql",
+      "backend/internal/models/user.go",
+      "backend/internal/models/user_login_keys_test.go",
+      "backend/internal/database/omnichat_expansion_migration_test.go",
+      "backend/internal/database/omnichat_omniai_appearance_migration_test.go"
+    ],
+    "boundaries": [
+      "migration -> users table (columns, default, check)",
+      "users row -> models.User (three SELECT lists, three scans, Create RETURNING)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "9803e5f57",
+    "703a8506a"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "a31cb77ab: migration 211 (auth_scheme, kdf_salt, kdf_iterations, recovery_wrapped_private_key, users_auth_scheme_check), the four User fields in every whole-user read, the migration ladder tests, user_login_keys_test.go."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "9803e5f57 (send limit) found nothing on user columns; 703a8506a and earlier have no finding on the users table. This is phase K1a of the agreed key plan."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or request payload is built."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed; K1b adds the endpoints."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Printed the migrated table from omninudge_test_models: auth_scheme smallint NOT NULL default 1; kdf_salt text, kdf_iterations integer, recovery_wrapped_private_key text, all nullable with no default; CHECK ((auth_scheme = 1) OR (auth_scheme = 2 AND kdf_salt IS NOT NULL AND kdf_iterations >= 600000))."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The Go field and column names match across the migration, the three SELECT lists and the three scans; the test reads each value back."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No field crosses an API boundary yet: all four are json:\"-\"."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The production PostgresUserRepository forwards to models.UserRepository, so the column lists live once; domain.User is an alias of models.User."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Found the finding: the fields were added to every read, but Create's RETURNING, the sibling path that already reads token_version and plan back, did not read auth_scheme, so a new user's struct held 0."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is each real repository method; the test asserts the value from GetByID, GetByUsername and GetByEmail, and from the struct Create fills."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The test values are written through SQL exactly as a later endpoint will store them."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No validation code; the database check is covered under D2."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The database refuses scheme 2 without a salt and with 1000 rounds (TestLoginKeySchemeNeedsSaltAndEnoughRounds)."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary: 600000 rounds is accepted (the read test stores exactly that), fewer is refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every function that returns a whole User was checked: GetByID, queryUser (GetByUsername), GetByEmail (scanEmailLookupUser) and Create. The other scans in user.go return other types."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch uses the scheme yet; K1b will. Anything other than 2 must be treated as the old flow."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "No error path changed."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The CHECK allows scheme 2 only with its derivation settings."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The new column list appears in three SELECTs because each had its own list already; unchanged shape."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that read a user back after writing: UpdatePassword and UpdateEncryptedPrivateKey return only errors; nothing else caches a User."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Single-statement migration steps; no transaction logic."
+        },
+        {
+          "id": "F3",
+          "status": "applied",
+          "evidence": "The ladder: 211 heads both rollback lists and ends the replay list. The ladder tests applied, rolled back and re-applied 211 twice, and replaying the up file on its own result passes."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The down migration drops the constraint first, then the four columns; the ladder test ran it."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control replayed as the hook runs it (TEST_DATABASE_URL unset): with the patch, FAIL expected 1, actual 0; at HEAD, ok."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The migration runs through db.Migrate in every package test and in cmd/migrate; the reads are the ones sign-in uses."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go vet ok, golangci-lint 0 issues; models tests and the 12 ladder tests pass against Postgres 16; the pre-commit gate passed a31cb77ab."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "C5 already names the technique. No new instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the migration against a real Postgres 16, up, down and up again, and read the catalog back."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The CHECK refuses the two known-bad rows."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "-v: both new tests PASS and all 12 ladder tests PASS, no SKIP."
+        }
+      ],
+      "findings": [
+        {
+          "id": "k1a-create-scheme-zero",
+          "summary": "Create read id, token_version, plan and other defaults back with RETURNING but not auth_scheme, so a newly created user's struct held AuthScheme 0 while its row held 1; sign-up returns that struct.",
+          "found_by": "C5",
+          "fix_commit": "a31cb77ab",
+          "control": {
+            "patch": ".review/controls/k1a-create-scheme-zero.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/models/ -run 'TestUserReadsCarryLoginKeyColumns'"
+            ],
+            "observed": "With the patch, TEST_DATABASE_URL unset: FAIL, expected 1, actual 0 (Create must read the scheme back). Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 covers the fix: auth_scheme in Create's RETURNING and Scan, and the test's check on the struct Create fills."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "9803e5f57 (send limit) found nothing on user columns; 703a8506a and earlier have no finding on the users table. This is phase K1a of the agreed key plan."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or request payload is built."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed; K1b adds the endpoints."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Printed the migrated table from omninudge_test_models: auth_scheme smallint NOT NULL default 1; kdf_salt text, kdf_iterations integer, recovery_wrapped_private_key text, all nullable with no default; CHECK ((auth_scheme = 1) OR (auth_scheme = 2 AND kdf_salt IS NOT NULL AND kdf_iterations >= 600000))."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The Go field and column names match across the migration, the three SELECT lists and the three scans; the test reads each value back."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No field crosses an API boundary yet: all four are json:\"-\"."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The production PostgresUserRepository forwards to models.UserRepository, so the column lists live once; domain.User is an alias of models.User."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Every path that fills a User now carries auth_scheme: the three reads and Create."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader is each real repository method; the test asserts the value from GetByID, GetByUsername and GetByEmail, and from the struct Create fills."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The test values are written through SQL exactly as a later endpoint will store them."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No validation code; the database check is covered under D2."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The database refuses scheme 2 without a salt and with 1000 rounds (TestLoginKeySchemeNeedsSaltAndEnoughRounds)."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary: 600000 rounds is accepted (the read test stores exactly that), fewer is refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every function that returns a whole User was checked: GetByID, queryUser (GetByUsername), GetByEmail (scanEmailLookupUser) and Create. The other scans in user.go return other types."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch uses the scheme yet; K1b will. Anything other than 2 must be treated as the old flow."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "No error path changed."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The CHECK allows scheme 2 only with its derivation settings."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The new column list appears in three SELECTs because each had its own list already; unchanged shape."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that read a user back after writing: UpdatePassword and UpdateEncryptedPrivateKey return only errors; nothing else caches a User."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Single-statement migration steps; no transaction logic."
+        },
+        {
+          "id": "F3",
+          "status": "applied",
+          "evidence": "The ladder: 211 heads both rollback lists and ends the replay list. The ladder tests applied, rolled back and re-applied 211 twice, and replaying the up file on its own result passes."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The down migration drops the constraint first, then the four columns; the ladder test ran it."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The control holds at a31cb77ab."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The migration runs through db.Migrate in every package test and in cmd/migrate; the reads are the ones sign-in uses."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go vet ok, golangci-lint 0 issues; models tests and the 12 ladder tests pass against Postgres 16; the pre-commit gate passed a31cb77ab."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the migration against a real Postgres 16, up, down and up again, and read the catalog back."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The CHECK refuses the two known-bad rows."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "-v: both new tests PASS and all 12 ladder tests PASS, no SKIP."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet ok",
+    "vet": "go vet ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go vet type-checks the package",
+    "tests": "TestUserReadsCarryLoginKeyColumns, TestLoginKeySchemeNeedsSaltAndEnoughRounds and the 12 migration ladder tests pass against Postgres 16"
+  }
+}
