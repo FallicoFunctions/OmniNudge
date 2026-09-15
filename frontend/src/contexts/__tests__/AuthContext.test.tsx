@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   moveWithoutKey: vi.fn(),
   prepareSignUp: vi.fn(),
   recoverWithPhrase: vi.fn(),
+  setAppPassword: vi.fn(),
   signInSecret: vi.fn(),
   unlockAfterSignIn: vi.fn(),
   deriveLoginKeys: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('../../services/accountKeysService', () => ({
   moveWithoutKey: mocks.moveWithoutKey,
   prepareSignUp: mocks.prepareSignUp,
   recoverWithPhrase: mocks.recoverWithPhrase,
+  setAppPassword: mocks.setAppPassword,
   signInSecret: mocks.signInSecret,
   unlockAfterSignIn: mocks.unlockAfterSignIn,
 }));
@@ -140,7 +142,11 @@ describe('sign-in', () => {
 
     await act(() => result.current.login({ username: 'oldschool', password: 'correct horse' }));
     await waitFor(() =>
-      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'the phrase' })
+      expect(result.current.keyStatus).toEqual({
+        state: 'show-phrase',
+        phrase: 'the phrase',
+        offerAppPassword: false,
+      })
     );
     expect(postBody('/auth/login')).toMatchObject({ password: 'correct horse' });
     expect(mocks.moveAccount).toHaveBeenCalledWith('correct horse', 'pk');
@@ -167,7 +173,11 @@ describe('sign-in', () => {
     await act(() => result.current.startFresh());
     expect(mocks.moveWithoutKey).toHaveBeenCalledWith('correct horse');
     expect(mocks.createAccountKeys).toHaveBeenCalledWith(keys);
-    expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'fresh phrase' });
+    expect(result.current.keyStatus).toEqual({
+      state: 'show-phrase',
+      phrase: 'fresh phrase',
+      offerAppPassword: false,
+    });
   });
 });
 
@@ -188,7 +198,11 @@ describe('sign-up', () => {
       })
     );
     await waitFor(() =>
-      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'new phrase' })
+      expect(result.current.keyStatus).toEqual({
+        state: 'show-phrase',
+        phrase: 'new phrase',
+        offerAppPassword: false,
+      })
     );
     const body = postBody('/auth/register');
     expect(body).toMatchObject({
@@ -278,7 +292,11 @@ describe('a session that is still open', () => {
     mocks.moveAccount.mockResolvedValue({ status: 'moved', recoveryPhrase: 'the phrase', keys });
     await act(() => result.current.unlockWithPassword('correct horse'));
     expect(mocks.moveAccount).toHaveBeenCalledWith('correct horse', 'pk');
-    expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'the phrase' });
+    expect(result.current.keyStatus).toEqual({
+      state: 'show-phrase',
+      phrase: 'the phrase',
+      offerAppPassword: false,
+    });
   });
 
   it('gives a provider account with no recovery copy its keys and phrase', async () => {
@@ -287,7 +305,11 @@ describe('a session that is still open', () => {
     mocks.createAccountKeys.mockResolvedValue('provider phrase');
     const { result } = await renderAuth();
     await waitFor(() =>
-      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' })
+      expect(result.current.keyStatus).toEqual({
+        state: 'show-phrase',
+        phrase: 'provider phrase',
+        offerAppPassword: true,
+      })
     );
     expect(mocks.createAccountKeys).toHaveBeenCalledExactlyOnceWith(null);
   });
@@ -309,7 +331,11 @@ describe('a session that is still open', () => {
       await callback;
     });
     await waitFor(() =>
-      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' })
+      expect(result.current.keyStatus).toEqual({
+        state: 'show-phrase',
+        phrase: 'provider phrase',
+        offerAppPassword: true,
+      })
     );
     expect(mocks.createAccountKeys).toHaveBeenCalledOnce();
   });
@@ -320,7 +346,11 @@ describe('a session that is still open', () => {
     mocks.createAccountKeys.mockResolvedValue('provider phrase');
     const { result } = await renderAuth();
     await waitFor(() =>
-      expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' })
+      expect(result.current.keyStatus).toEqual({
+        state: 'show-phrase',
+        phrase: 'provider phrase',
+        offerAppPassword: true,
+      })
     );
 
     // The callback's own /auth/me was sent before the new public key existed.
@@ -329,8 +359,52 @@ describe('a session that is still open', () => {
       backup: { auth_scheme: 1, has_password: false, recovery_wrapped_private_key: 'copy' },
     });
     await act(() => result.current.completeOAuthLogin());
-    expect(result.current.keyStatus).toEqual({ state: 'show-phrase', phrase: 'provider phrase' });
+    expect(result.current.keyStatus).toEqual({
+      state: 'show-phrase',
+      phrase: 'provider phrase',
+      offerAppPassword: true,
+    });
     expect(mocks.createAccountKeys).toHaveBeenCalledOnce();
+  });
+
+  it('offers a provider account an app password with its phrase, and ends the step when set', async () => {
+    server({ me: account, backup: { auth_scheme: 1, has_password: false } });
+    deviceHolds(null);
+    mocks.createAccountKeys.mockResolvedValue('provider phrase');
+    const { result } = await renderAuth();
+    await waitFor(() => expect(result.current.keyStatus.state).toBe('show-phrase'));
+
+    await expect(result.current.setAppPassword('provider phrase', 'short')).rejects.toThrow(
+      'at least 8'
+    );
+    expect(mocks.setAppPassword).not.toHaveBeenCalled();
+
+    mocks.setAppPassword.mockResolvedValue(keys);
+    await act(() => result.current.setAppPassword('provider phrase', 'app password'));
+    expect(mocks.setAppPassword).toHaveBeenCalledWith('provider phrase', 'app password');
+    expect(result.current.keyStatus).toEqual({ state: 'ready' });
+  });
+
+  it('does not offer, or set, an app password on an account that has a password', async () => {
+    server({});
+    mocks.prepareSignUp.mockResolvedValue({ keys, kdf_salt: 'salt', kdf_iterations: 600000 });
+    mocks.createAccountKeys.mockResolvedValue('new phrase');
+    const { result } = await renderAuth();
+    await act(() =>
+      result.current.register({
+        username: 'newcomer',
+        password: 'correct horse',
+        turnstile_token: 't',
+        accept_privacy_policy: true,
+        accept_terms: true,
+      })
+    );
+    await waitFor(() => expect(result.current.keyStatus.state).toBe('show-phrase'));
+    expect(result.current.keyStatus).toMatchObject({ offerAppPassword: false });
+    await expect(result.current.setAppPassword('new phrase', 'app password')).rejects.toThrow(
+      'already has a password'
+    );
+    expect(mocks.setAppPassword).not.toHaveBeenCalled();
   });
 
   it('asks a provider account on a new device for its phrase', async () => {

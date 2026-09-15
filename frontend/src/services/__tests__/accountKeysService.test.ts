@@ -15,6 +15,7 @@ import {
   moveWithoutKey,
   prepareSignUp,
   recoverWithPhrase,
+  setAppPassword,
   signInSecret,
   unlockAfterSignIn,
 } from '../accountKeysService';
@@ -266,6 +267,51 @@ describe('the move from the old scheme', () => {
       },
     });
     await expect(moveAccount('wrong-password', 'the-public-key')).rejects.toThrow();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('the app password', () => {
+  it('wraps the key the phrase opens under the app password, and sends no password', async () => {
+    const phrase = newRecoveryPhrase();
+    serverAnswers({
+      '/auth/key-backup': {
+        recovery_wrapped_private_key: await wrapSecret(
+          'the-private-key',
+          await deriveRecoveryKey(phrase)
+        ),
+      },
+    });
+    const keys = await setAppPassword(phrase, 'app password');
+
+    const [body] = bodiesSentTo('post', '/auth/app-password');
+    expect(body).toMatchObject({ login_key: keys.loginKey, kdf_iterations: 600000 });
+    await expect(unwrapSecret(body.encrypted_private_key as string, keys.wrapKey)).resolves.toBe(
+      'the-private-key'
+    );
+    const again = await deriveLoginKeys(
+      'app password',
+      body.kdf_salt as string,
+      body.kdf_iterations as number
+    );
+    expect(again.loginKey).toBe(keys.loginKey);
+    expect(JSON.stringify(body)).not.toContain('app password');
+  });
+
+  it('sends nothing when the phrase does not open the copy, or there is no copy', async () => {
+    serverAnswers({
+      '/auth/key-backup': {
+        recovery_wrapped_private_key: await wrapSecret(
+          'the-private-key',
+          await deriveRecoveryKey(newRecoveryPhrase())
+        ),
+      },
+    });
+    await expect(setAppPassword(newRecoveryPhrase(), 'app password')).rejects.toThrow();
+    serverAnswers({ '/auth/key-backup': {} });
+    await expect(setAppPassword(newRecoveryPhrase(), 'app password')).rejects.toThrow(
+      'This account has no recovery copy'
+    );
     expect(api.post).not.toHaveBeenCalled();
   });
 });

@@ -51,7 +51,7 @@ describe('when nothing is needed', () => {
 
 describe('the recovery phrase', () => {
   it('shows all twelve words in order, with no way to close or sign out', () => {
-    showing({ state: 'show-phrase', phrase: PHRASE });
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toEqual(WORDS.map((word, i) => `${i + 1}${word}`));
     expect(screen.queryByRole('button', { name: 'keys.signOut' })).toBeNull();
@@ -59,7 +59,7 @@ describe('the recovery phrase', () => {
   });
 
   it('goes on only when three of the words are typed back', () => {
-    showing({ state: 'show-phrase', phrase: PHRASE });
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     fireEvent.click(button('keys.phrase.saved'));
     const inputs = screen.getAllByRole('textbox') as HTMLInputElement[];
     expect(inputs).toHaveLength(3);
@@ -83,7 +83,7 @@ describe('the recovery phrase', () => {
   it('copies the phrase', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
-    showing({ state: 'show-phrase', phrase: PHRASE });
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     fireEvent.click(button('keys.phrase.copy'));
     await waitFor(() => expect(button('keys.phrase.copied')).toBeInTheDocument());
     expect(writeText).toHaveBeenCalledWith(PHRASE);
@@ -100,7 +100,7 @@ describe('the recovery phrase', () => {
       revokeObjectURL: vi.fn(),
     });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    showing({ state: 'show-phrase', phrase: PHRASE });
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     fireEvent.click(button('keys.phrase.download'));
     expect(click).toHaveBeenCalledOnce();
     expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(
@@ -117,7 +117,7 @@ describe('the recovery phrase', () => {
   });
 
   it('warns before the page is left while the phrase is on screen', () => {
-    const { unmount } = showing({ state: 'show-phrase', phrase: PHRASE });
+    const { unmount } = showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
@@ -239,7 +239,7 @@ describe('the gate frame', () => {
   });
 
   it('scrolls a tall step instead of centring it off the top of the screen', () => {
-    showing({ state: 'show-phrase', phrase: PHRASE });
+    showing({ state: 'show-phrase', phrase: PHRASE, offerAppPassword: false });
     const dialog = screen.getByRole('dialog');
     expect(dialog).not.toHaveClass('items-center');
     expect(dialog.firstElementChild).toHaveClass('m-auto');

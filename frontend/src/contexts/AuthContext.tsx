@@ -10,6 +10,7 @@ import {
   moveWithoutKey,
   prepareSignUp,
   recoverWithPhrase,
+  setAppPassword as setAppPasswordWithPhrase,
   signInSecret,
   unlockAfterSignIn,
 } from '../services/accountKeysService';
@@ -29,7 +30,7 @@ export type KeyStatus =
   | { state: 'signed-out' }
   | { state: 'checking' }
   | { state: 'ready' }
-  | { state: 'show-phrase'; phrase: string }
+  | { state: 'show-phrase'; phrase: string; offerAppPassword: boolean }
   | { state: 'needs-password' }
   | { state: 'needs-recovery'; hasRecoveryCopy: boolean }
   | { state: 'failed' };
@@ -64,12 +65,19 @@ interface AuthContextType {
   recoverKeys: (phrase: string) => Promise<void>;
   startFresh: () => Promise<void>;
   acknowledgePhrase: () => void;
+  setAppPassword: (phrase: string, password: string) => Promise<void>;
   retryKeys: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const phraseShown = (phrase: string): KeyStatus => ({ state: 'show-phrase', phrase });
+// offerAppPassword is true only for an account with no password: the offer comes
+// after the phrase, while the phrase can still open the recovery copy.
+const phraseShown = (phrase: string, offerAppPassword = false): KeyStatus => ({
+  state: 'show-phrase',
+  phrase,
+  offerAppPassword,
+});
 
 // A key on this device counts only if it is the account's current key: after a
 // fresh start elsewhere, the old one cannot read new messages.
@@ -119,7 +127,7 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
   if (!backup.has_password) {
     const noPassword: HeldSecret = { kind: 'no-password' };
     if (!backup.recovery_wrapped_private_key) {
-      return { status: phraseShown(await createAccountKeys(null)), held: noPassword };
+      return { status: phraseShown(await createAccountKeys(null), true), held: noPassword };
     }
     return {
       status: onDevice ? { state: 'ready' } : { state: 'needs-recovery', hasRecoveryCopy: true },
@@ -399,9 +407,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const phrase = await createAccountKeys(keys);
     const next: HeldSecret = keys ? { kind: 'login-key', keys } : held;
-    if (commit(generation, { status: phraseShown(phrase), held: next })) {
+    if (commit(generation, { status: phraseShown(phrase, !keys), held: next })) {
       await refreshUser();
     }
+  };
+
+  // The optional app password for an account with no password, offered on the
+  // phrase step. On success the account signs in with it too, and the step ends.
+  const setAppPassword = async (phrase: string, password: string) => {
+    const generation = generationRef.current;
+    signedInAccount();
+    if (heldRef.current?.kind !== 'no-password') {
+      throw new Error('This account already has a password');
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+    const keys = await setAppPasswordWithPhrase(phrase, password);
+    commit(generation, { status: { state: 'ready' }, held: { kind: 'login-key', keys } });
   };
 
   const acknowledgePhrase = () => {
@@ -428,6 +451,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         recoverKeys,
         startFresh,
         acknowledgePhrase,
+        setAppPassword,
         retryKeys,
       }}
     >

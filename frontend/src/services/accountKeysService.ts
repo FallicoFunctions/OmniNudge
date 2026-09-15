@@ -69,6 +69,33 @@ export async function accountProof(
   return secret.scheme === 2 ? { login_key: secret.login_key } : { password: secret.password };
 }
 
+/** The private key from the recovery copy. Throws on a wrong phrase or no copy. */
+async function openRecoveryCopy(phrase: string): Promise<string> {
+  const backup = await api.get<KeyBackup>('/auth/key-backup');
+  if (!backup.recovery_wrapped_private_key) {
+    throw new Error('This account has no recovery copy');
+  }
+  return unwrapSecret(backup.recovery_wrapped_private_key, await deriveRecoveryKey(phrase));
+}
+
+/**
+ * Gives an account with no password (provider sign-in) an app password while
+ * its new recovery phrase is still on screen: the phrase opens the recovery
+ * copy, and the private key is wrapped again under the app password's wrap key.
+ * The app password is a real login key, so it also signs the account in.
+ */
+export async function setAppPassword(phrase: string, password: string): Promise<LoginKeys> {
+  const privateKey = await openRecoveryCopy(phrase);
+  const { keys, kdf_salt, kdf_iterations } = await prepareSignUp(password);
+  await api.post('/auth/app-password', {
+    login_key: keys.loginKey,
+    kdf_salt,
+    kdf_iterations,
+    encrypted_private_key: await wrapSecret(privateKey, keys.wrapKey),
+  });
+  return keys;
+}
+
 /** A new login key and its settings, for a sign-up or a password reset. */
 export async function prepareSignUp(password: string): Promise<{ keys: LoginKeys } & KdfSettings> {
   const settings: KdfSettings = { kdf_salt: newKdfSalt(), kdf_iterations: DEFAULT_KDF_ITERATIONS };
@@ -193,14 +220,7 @@ export async function recoverWithPhrase(
   keys: LoginKeys | null,
   publicKey: string
 ): Promise<void> {
-  const backup = await api.get<KeyBackup>('/auth/key-backup');
-  if (!backup.recovery_wrapped_private_key) {
-    throw new Error('This account has no recovery copy');
-  }
-  const privateKey = await unwrapSecret(
-    backup.recovery_wrapped_private_key,
-    await deriveRecoveryKey(phrase)
-  );
+  const privateKey = await openRecoveryCopy(phrase);
   if (keys) {
     await encryptionService.uploadEncryptedPrivateKey(
       await wrapSecret(privateKey, keys.wrapKey),
