@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -43,13 +42,11 @@ func directConversationRequestBody(otherUserID int) []byte {
 	return []byte(fmt.Sprintf(`{"other_user_id":%d}`, otherUserID))
 }
 
-// getTestDB connects to this package's own test database, or skips the tests
-// when TEST_DATABASE_URL is not set.
+// getTestDB connects to this package's own test database. It does not skip when
+// TEST_DATABASE_URL is unset: TestDSN falls back to the local default, and a
+// suite that skips without a database prints ok while checking nothing.
 func getTestDB(t *testing.T) *database.DB {
 	t.Helper()
-	if os.Getenv("TEST_DATABASE_URL") == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping integration tests")
-	}
 	dsn, err := database.TestDSN()
 	require.NoError(t, err)
 	db, err := database.New(dsn)

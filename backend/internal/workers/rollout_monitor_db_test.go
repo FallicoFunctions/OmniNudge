@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -17,9 +16,6 @@ import (
 
 func getRolloutTestDB(t *testing.T) *database.DB {
 	t.Helper()
-	if os.Getenv("TEST_DATABASE_URL") == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping rollout DB integration test")
-	}
 	dsn, err := database.TestDSN()
 	require.NoError(t, err)
 
