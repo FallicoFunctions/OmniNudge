@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/keys/KeySetupScreen.tsx b/frontend/src/components/keys/KeySetupScreen.tsx
+index 20b34404b..5608138f3 100644
+--- a/frontend/src/components/keys/KeySetupScreen.tsx
++++ b/frontend/src/components/keys/KeySetupScreen.tsx
+@@ -67,8 +67,6 @@ function KeyScreen({ children }: { children: ReactNode }) {
+     lockScroll();
+     // The app behind cannot be reached by keyboard or screen reader.
+     const root = document.getElementById('root');
+-    root?.setAttribute('inert', '');
+-    dialogRef.current?.focus();
+     return () => {
+       root?.removeAttribute('inert');
+       unlockScroll();

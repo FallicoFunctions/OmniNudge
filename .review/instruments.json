@@ -229,6 +229,12 @@
       "name": "Can two entry points run the same side effect at once?",
       "trigger": "a side effect (making keys, a payment, an upload) is started from more than one place: an app-open check, a callback page, a retry, a second tab",
       "asks": "List every caller that can start it, and find a real page load or user path where two of them fire together. Run them together in a test with the first held open, and require the effect to happen once and the result to stay consistent. A guard on each caller alone does not see the other caller."
+    },
+    {
+      "id": "B7",
+      "name": "Is the layer on top of every layer that can open with it?",
+      "trigger": "a component draws a fixed overlay, modal or full-screen step",
+      "asks": "List every z-index and portal in the app (grep z-[ and createPortal), put the highest one that can open at the same time behind the new layer in a real browser, and ask elementFromPoint what is on top at the centre. A layer that must never be covered needs to sit above all of them, and outside any root it makes inert."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

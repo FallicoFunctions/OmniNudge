@@ -1,0 +1,16 @@
+diff --git a/frontend/src/components/keys/KeySetupScreen.tsx b/frontend/src/components/keys/KeySetupScreen.tsx
+index 20b34404b..ed8fcc7ce 100644
+--- a/frontend/src/components/keys/KeySetupScreen.tsx
++++ b/frontend/src/components/keys/KeySetupScreen.tsx
+@@ -81,9 +81,9 @@ function KeyScreen({ children }: { children: ReactNode }) {
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="key-step-title"
+-      className="fixed inset-0 z-[120] flex overflow-y-auto bg-[var(--color-background)] p-4 outline-none"
++      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-[var(--color-background)] p-4 outline-none"
+     >
+-      <div className="m-auto w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
++      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
+         {children}
+       </div>
+     </div>,

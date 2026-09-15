@@ -1,0 +1,480 @@
+{
+ "schema_version": 2,
+ "head": "cabb842cd",
+ "base": "b4bf42b71",
+ "scope": {
+  "files": [
+   "frontend/src/components/keys/KeySetupScreen.tsx",
+   "frontend/src/components/keys/RecoveryPhraseStep.tsx",
+   "frontend/src/components/keys/__tests__/KeySetupScreen.test.tsx",
+   "frontend/src/App.tsx",
+   "frontend/public/locales/en.json"
+  ],
+  "boundaries": [
+   "AuthContext keyStatus and actions",
+   "other app layers and body portals",
+   "#root",
+   "clipboard and file download",
+   "en.json keys"
+  ]
+ },
+ "prior_ledgers_read": [
+  "b2a87c547",
+  "ae248c296",
+  "a20fb1d51"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "KeySetupScreen (gate and the password, recovery, fresh-start and failed steps), RecoveryPhraseStep (words, Copy, Download, three words typed back, leave warning), mounted in App inside AuthProvider; keys.* strings in en.json. Boundaries: AuthContext keyStatus and actions, the app's other layers and portals, clipboard, file download, #root."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "b2a87c547 (K4c-2: four AuthContext findings, fixed), ae248c296, a20fb1d51; none on screens."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The download file printed through a stubbed createObjectURL: heading line and the 12 words; the recoverKeys argument printed for mixed-case, multi-space, multi-line input: the lower-case single-spaced phrase."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered the real KeySetupScreen in a throwaway Vite page with a fake useAuth: pressing Tab from the open gate moved focus to a link in the app behind, and focus started on BODY (k4d-focus-escapes-gate)."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.* key used by the two components exists in en.json; i18n:check and i18n:guard pass."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The screens read keyStatus.phrase and hasRecoveryCopy, which AuthContext sets; the WRONG_PASSWORD message matches the Error AuthContext throws."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser; JSON validated after the en.json edit."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Test statuses use the KeyStatus type AuthContext exports; the phrase fixture is 12 words as K3 makes."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Words typed back with spaces and capitals are accepted; a phrase pasted over lines is accepted."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Wrong words refuse to go on; a partial or wrong START FRESH keeps the button disabled and a forced submit does nothing."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The phrase length and word list are K3's; the screens pass input through."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling modals compared: AuthModal and Modal.tsx at z-50, the About, upgrade and image-crop modals at z-[60], the call screen z-[100], commerce z-[110]."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every KeyStatus branch renders a step or nothing, each reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Each action's failure shows an alert; retry and sign-out stay available except on the phrase step, by design."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Input and button classes defined once per file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'fixed overlay under another layer': grepped every z-[ and createPortal in the app."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state beyond React state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A failed action leaves the step open with its error."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Unmounting the gate removes inert and restores scroll (asserted)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Controls built after the fixes; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n:check and i18n:guard OK; pre-commit gate 0 failed; vitest keys 19 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "B2 and B6 named; the stacking check had no row, so B7 was added to instruments.json."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts before the step is shown."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "Measured at 360x480 and 360x640: at 480 the 604 px phrase card's top sat at -62 px at scroll 0, unreachable because of flex centring (k4d-tall-step-top-clipped)."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4 decisions kept: phrase is the unskippable last step confirmed by 3 words; full-screen step for existing users and the password asked once on app open; Copy and Download; lost phrase warns and needs a typed confirmation."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One gate, mounted once in App."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "elementFromPoint at the centre returned a z-[60] stand-in for the About modal, not the gate; the app also has z-[100] and z-[110] layers (k4d-gate-under-higher-layers). No row named the technique, so B7 was added."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4d-gate-under-higher-layers",
+     "summary": "The key gate sat at z-50, under the About, upgrade and image-crop modals (z-[60]) and the call screen (z-[100]).",
+     "found_by": "B7",
+     "fix_commit": "cabb842cd",
+     "control": {
+      "patch": ".review/controls/k4d-gate-under-higher-layers.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/keys/__tests__/KeySetupScreen.test.tsx -t 'sits above every other app layer'"
+      ],
+      "observed": "FAIL: dialog lacks z-[120]; in the browser a z-[60] layer was on top"
+     }
+    },
+    {
+     "id": "k4d-tall-step-top-clipped",
+     "summary": "A step taller than the screen lost its top: flex centring put the phrase card at -62 px at 360x480, out of scroll reach.",
+     "found_by": "B6",
+     "fix_commit": "cabb842cd",
+     "control": {
+      "patch": ".review/controls/k4d-tall-step-top-clipped.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/keys/__tests__/KeySetupScreen.test.tsx -t 'scrolls a tall step'"
+      ],
+      "observed": "FAIL: dialog has items-center and the card lacks m-auto; in the browser the card top was -62 px"
+     }
+    },
+    {
+     "id": "k4d-focus-escapes-gate",
+     "summary": "Focus stayed on the page and Tab reached the app behind the gate.",
+     "found_by": "B2",
+     "fix_commit": "cabb842cd",
+     "control": {
+      "patch": ".review/controls/k4d-focus-escapes-gate.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/keys/__tests__/KeySetupScreen.test.tsx -t 'makes the app behind inert'"
+      ],
+      "observed": "FAIL: #root not inert and focus not in the dialog; in the browser Tab reached the link behind"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "KeySetupScreen (gate and the password, recovery, fresh-start and failed steps), RecoveryPhraseStep (words, Copy, Download, three words typed back, leave warning), mounted in App inside AuthProvider; keys.* strings in en.json. Boundaries: AuthContext keyStatus and actions, the app's other layers and portals, clipboard, file download, #root."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "b2a87c547 (K4c-2: four AuthContext findings, fixed), ae248c296, a20fb1d51; none on screens."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The download file printed through a stubbed createObjectURL: heading line and the 12 words; the recoverKeys argument printed for mixed-case, multi-space, multi-line input: the lower-case single-spaced phrase."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Pass 2, served source confirmed to hold the fix after a server restart: the dialog takes focus on open, Tab goes to Copy inside it, #root is inert and the gate is outside it. Screenshots of the phrase (dark), fresh start with no copy (dark) and password (light) steps at 360x640 read correctly. Known limit: modals another component portals into document.body before the gate opens are not made inert; they draw under z-[120]."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.* key used by the two components exists in en.json; i18n:check and i18n:guard pass."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The screens read keyStatus.phrase and hasRecoveryCopy, which AuthContext sets; the WRONG_PASSWORD message matches the Error AuthContext throws."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No rule in two places."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser; JSON validated after the en.json edit."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Test statuses use the KeyStatus type AuthContext exports; the phrase fixture is 12 words as K3 makes."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Words typed back with spaces and capitals are accepted; a phrase pasted over lines is accepted."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Wrong words refuse to go on; a partial or wrong START FRESH keeps the button disabled and a forced submit does nothing."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The phrase length and word list are K3's; the screens pass input through."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling modals compared: AuthModal and Modal.tsx at z-50, the About, upgrade and image-crop modals at z-[60], the call screen z-[100], commerce z-[110]."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every KeyStatus branch renders a step or nothing, each reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Each action's failure shows an alert; retry and sign-out stay available except on the phrase step, by design."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Input and button classes defined once per file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'fixed overlay under another layer': grepped every z-[ and createPortal in the app."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state beyond React state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A failed action leaves the step open with its error."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Unmounting the gate removes inert and restores scroll (asserted)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Each fix reverted from cabb842cd: its named test fails (z-[120] class, m-auto and no items-center, inert and focus)."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n:check and i18n:guard OK; pre-commit gate 0 failed; vitest keys 19 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts before the step is shown."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "Pass 2: at 360x480 the card top is 16 px at scroll 0 and its bottom (464 px) is reachable; at 360x640 it spans 18 to 622."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K4 decisions kept: phrase is the unskippable last step confirmed by 3 words; full-screen step for existing users and the password asked once on app open; Copy and Download; lost phrase warns and needs a typed confirmation."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One gate, mounted once in App."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "Pass 2: elementFromPoint at the centre returns the gate over the z-[60] layer at both sizes; z-[120] is above the highest app layer, z-[110]."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest keys 19 passed, 0 failed, 0 skipped"
+ }
+}
