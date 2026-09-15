@@ -28,6 +28,14 @@ type User struct {
 	PublicKey           *string `json:"public_key,omitempty"`
 	EncryptedPrivateKey *string `json:"encrypted_private_key,omitempty"` // For cross-browser sync
 
+	// AuthScheme 1: the server receives the password itself. AuthScheme 2: it
+	// receives a login key the app derives with KDFSalt and KDFIterations, and
+	// the password never leaves the device.
+	AuthScheme                int     `json:"-"`
+	KDFSalt                   *string `json:"-"`
+	KDFIterations             *int    `json:"-"`
+	RecoveryWrappedPrivateKey *string `json:"-"`
+
 	// Profile
 	AvatarURL    *string `json:"avatar_url,omitempty"`
 	Bio          *string `json:"bio,omitempty"`
@@ -153,7 +161,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at
+		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at, auth_scheme
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -166,7 +174,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.AvatarURL,
 		user.Bio,
 		user.NSFW,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt, &user.AuthScheme)
 }
 
 // GetByID retrieves a user by their internal ID
@@ -176,7 +184,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	query := `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at,
+		       auth_scheme, kdf_salt, kdf_iterations, recovery_wrapped_private_key
 		FROM users WHERE id = $1
 	`
 
@@ -208,6 +217,10 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.LastAgentBrowseAt,
 		&user.Plan,
 		&user.PlanExpiresAt,
+		&user.AuthScheme,
+		&user.KDFSalt,
+		&user.KDFIterations,
+		&user.RecoveryWrappedPrivateKey,
 	)
 
 	if err != nil {
@@ -353,7 +366,8 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, email_verified, password_hash, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, deleted_at, permanent_deletion_at, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at
+		       last_agent_post_at, last_agent_browse_at, plan, plan_expires_at,
+		       auth_scheme, kdf_salt, kdf_iterations, recovery_wrapped_private_key
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
 }
@@ -390,6 +404,10 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.LastAgentBrowseAt,
 		&user.Plan,
 		&user.PlanExpiresAt,
+		&user.AuthScheme,
+		&user.KDFSalt,
+		&user.KDFIterations,
+		&user.RecoveryWrappedPrivateKey,
 	)
 
 	if err != nil {
@@ -451,6 +469,10 @@ func scanEmailLookupUser(row userRowScanner, user *User) error {
 		&user.PasswordHash,
 		&user.Plan,
 		&user.PlanExpiresAt,
+		&user.AuthScheme,
+		&user.KDFSalt,
+		&user.KDFIterations,
+		&user.RecoveryWrappedPrivateKey,
 	)
 }
 
@@ -476,7 +498,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	const columns = `
 		SELECT id, username, email, email_encrypted, email_verified, public_key, encrypted_private_key, avatar_url, bio, karma, role, token_version,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
-		       last_agent_post_at, last_agent_browse_at, password_hash, plan, plan_expires_at
+		       last_agent_post_at, last_agent_browse_at, password_hash, plan, plan_expires_at,
+		       auth_scheme, kdf_salt, kdf_iterations, recovery_wrapped_private_key
 	`
 	user := &User{}
 	err = scanEmailLookupUser(r.pool.QueryRow(ctx, columns+`
