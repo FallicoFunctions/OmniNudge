@@ -1604,6 +1604,7 @@
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
       "userUnavailable": "This user is not available.",
+      "sendingTooFast": "You are sending messages too fast. Wait a minute and try again.",
       "forwardConversationMissing": "Forward target conversation not found.",
       "forwardLoadParticipantsFailed": "Unable to load conversation participants for forwarding.",
       "forwardNoParticipants": "No participants found for selected conversation.",

@@ -92,6 +92,7 @@ import {
   formatRedditSlideshowInput,
   parseRedditSlideshowInput,
 } from '../utils/redditSlideshowInput';
+import { messageSendErrorKey } from '../utils/messageSendErrors';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 const SEARCH_PAGE_SIZE = 50;
@@ -1249,13 +1250,8 @@ export default function MessagesPage() {
       }
     },
     onError: (error: unknown) => {
-      // Point 11 / 12: a 404 from the message endpoint means the recipient
-      // cannot be messaged (block relationship exists). Show a clear message
-      // without revealing that a block is in place.
-      const status = (error as Error & { status?: number }).status;
-      if (status === 404 || status === 403) {
-        alert(t('messages.errors.userUnavailable'));
-      }
+      const key = messageSendErrorKey((error as Error & { status?: number }).status);
+      if (key) alert(t(key));
     },
   });
 
