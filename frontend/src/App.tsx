@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import i18n from './i18n/config';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
+import KeySetupScreen from './components/keys/KeySetupScreen';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
@@ -361,6 +362,8 @@ function App() {
               </FeatureFlagProvider>
             </WebSocketProvider>
           </SettingsProvider>
+          {/* After the app, so it covers every page and modal while a key step is open. */}
+          <KeySetupScreen />
         </AuthProvider>
       </AnalyticsWrapper>
     </BrowserRouter>

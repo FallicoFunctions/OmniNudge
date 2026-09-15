@@ -2424,6 +2424,56 @@
     "buttonAriaLabel": "Send feedback",
     "buttonTitle": "Send feedback"
   },
+  "keys": {
+    "signOut": "Sign out",
+    "working": "Working…",
+    "phrase": {
+      "title": "Save your recovery phrase",
+      "intro": "These 12 words unlock your messages if you forget your password or lose this device. Write them down or save them somewhere safe. OmniNudge cannot show them again or find them for you.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "download": "Download",
+      "saved": "I have saved it",
+      "confirmTitle": "Confirm your recovery phrase",
+      "confirmIntro": "Type these words from your phrase.",
+      "confirmLabel": "Word {{number}}",
+      "confirm": "Confirm",
+      "back": "Show the words again",
+      "mismatch": "Those words do not match your phrase. Check them and try again.",
+      "fileHeading": "OmniNudge recovery phrase. Keep it private: anyone with these words can read your messages."
+    },
+    "password": {
+      "title": "Unlock your messages",
+      "intro": "Enter your password to read your encrypted messages on this device.",
+      "label": "Password",
+      "submit": "Unlock",
+      "wrong": "That password is not correct.",
+      "failed": "Your messages could not be unlocked. Check your password and try again."
+    },
+    "recovery": {
+      "title": "Enter your recovery phrase",
+      "intro": "Your messages are locked on this device. Enter the 12 words you saved to unlock them.",
+      "label": "Recovery phrase",
+      "submit": "Unlock",
+      "wrong": "That phrase does not unlock your messages. Check the words and try again.",
+      "lost": "I lost my recovery phrase"
+    },
+    "fresh": {
+      "title": "Start fresh",
+      "lostIntro": "Without your recovery phrase, this device cannot unlock your messages.",
+      "noCopyIntro": "This account has no saved key that this device can unlock, so it needs new keys.",
+      "warning": "Your old encrypted messages will be gone for good: nobody, including OmniNudge, can open them again. You keep your account, your friends and every new message.",
+      "confirmLabel": "Type {{text}} to confirm",
+      "submit": "Start fresh",
+      "back": "Back",
+      "failed": "Could not start fresh. Try again."
+    },
+    "failed": {
+      "title": "Your messages could not be unlocked",
+      "intro": "Something went wrong while this device set up your message keys.",
+      "retry": "Try again"
+    }
+  },
   "auth": {
     "title": "OmniNudge",
     "loginTitle": "Log In",
