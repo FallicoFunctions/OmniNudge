@@ -1,0 +1,447 @@
+{
+ "schema_version": 2,
+ "head": "3503d45d6",
+ "base": "1cc82cad7",
+ "scope": {
+  "files": [
+   "frontend/src/components/keys/KeySetupScreen.tsx",
+   "frontend/src/components/keys/__tests__/KeySetupScreen.test.tsx",
+   "frontend/public/locales/en.json"
+  ],
+  "boundaries": [
+   "AuthContext keyStatus and setAppPassword",
+   "en.json keys"
+  ]
+ },
+ "prior_ledgers_read": [
+  "dbb370ff8",
+  "238b7ec7d",
+  "b4bf42b71"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "KeySetupScreen: PhraseStep shows the phrase, then for offerAppPassword the AppPasswordOffer (password, confirmation, Add, Skip); keys.app strings in en.json; tests."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "dbb370ff8 (K4e-2 part 1, nothing found), 238b7ec7d, b4bf42b71."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "setAppPassword is called with the confirmed phrase and the typed password (asserted); nothing else leaves the screen."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The offer text printed for the other kind of account it reaches: the app has Google, Discord, GitHub and Steam sign-in (AuthModal links, auth_oauth.go), and the offer shows for every account with no password, but the text said the account signs in with Google (k4e2-offer-names-one-provider)."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.app key used exists in en.json; i18n check passes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The screen reads keyStatus.offerAppPassword and phrase, which AuthContext sets; it calls setAppPassword(phrase, password) as AuthContext declares."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The minimum length is checked here and again in AuthContext; both 8, commented."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Statuses use the exported KeyStatus type."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A matching 8+ character password is sent."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Short and mismatched passwords are refused before anything is sent."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Exactly the minimum length passes the same check sign-up uses."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling steps compared: like the password and fresh-start steps it disables its buttons while busy and shows an alert on failure."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Offer shown, not shown, skipped, set, refused, failed: each reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failure shows keys.app.failed and leaves Skip available."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Input and button classes reused from the file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'text that names one provider for every provider': walked every keys.* string; only keys.app.intro names a provider."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state beyond component state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A failed set leaves the account without a password and the step open; Skip still ends it."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Skip ends the phrase step exactly as before the offer existed."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest keys 25 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "B2's two-inputs rule found it; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts before the user submits."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "The offer is a short form inside the gate frame measured in the K4d review at 360x480 and 360x640; no new layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the full keys run."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: after the phrase, optional, with Skip, and explaining that it is easier than finding and typing the phrase on a new device; also a way to sign in. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One offer per phrase step; busy disables a second submit."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer; it renders inside the existing gate."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k4e2-offer-names-one-provider",
+     "summary": "The app password offer told every account with no password that it signs in with Google, though Discord, GitHub and Steam accounts see it too.",
+     "found_by": "B2",
+     "fix_commit": "3503d45d6",
+     "control": {
+      "patch": ".review/controls/k4e2-offer-names-one-provider.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/keys/__tests__/KeySetupScreen.test.tsx -t 'names every provider'"
+      ],
+      "observed": "FAIL: the intro does not contain Discord"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "KeySetupScreen: PhraseStep shows the phrase, then for offerAppPassword the AppPasswordOffer (password, confirmation, Add, Skip); keys.app strings in en.json; tests."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "dbb370ff8 (K4e-2 part 1, nothing found), 238b7ec7d, b4bf42b71."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "setAppPassword is called with the confirmed phrase and the typed password (asserted); nothing else leaves the screen."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Pass 2: the intro names all four providers; the step's labels and buttons name none."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Every keys.app key used exists in en.json; i18n check passes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The screen reads keyStatus.offerAppPassword and phrase, which AuthContext sets; it calls setAppPassword(phrase, password) as AuthContext declares."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The minimum length is checked here and again in AuthContext; both 8, commented."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Statuses use the exported KeyStatus type."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A matching 8+ character password is sent."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Short and mismatched passwords are refused before anything is sent."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Exactly the minimum length passes the same check sign-up uses."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling steps compared: like the password and fresh-start steps it disables its buttons while busy and shows an alert on failure."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Offer shown, not shown, skipped, set, refused, failed: each reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failure shows keys.app.failed and leaves Skip available."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Input and button classes reused from the file."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: re-walked keys.*; only keys.app.intro names providers, and it names all four."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state beyond component state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A failed set leaves the account without a password and the step open; Skip still ends it."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Skip ends the phrase step exactly as before the offer existed."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Text reverted from 3503d45d6: the provider test fails, the intro does not contain Discord."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "prettier, tsc -b, eslint clean; i18n OK; pre-commit gate 0 failed; vitest keys 25 passed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts before the user submits."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "The offer is a short form inside the gate frame measured in the K4d review at 360x480 and 360x640; no new layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the full keys run."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Design: after the phrase, optional, with Skip, and explaining that it is easier than finding and typing the phrase on a new device; also a way to sign in. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One offer per phrase step; busy disables a second submit."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No new layer; it renders inside the existing gate."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "tsc -b ok",
+  "vet": "n/a (frontend)",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "tsc -b ok",
+  "tests": "vitest keys 25 passed, 0 failed, 0 skipped"
+ }
+}

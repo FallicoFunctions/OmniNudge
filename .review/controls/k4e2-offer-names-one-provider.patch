@@ -1,0 +1,13 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 499df7008..5491257c7 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -2427,7 +2427,7 @@
+   "keys": {
+     "app": {
+       "title": "Add an app password (optional)",
+-      "intro": "Your account signs in through Google, Discord, GitHub or Steam, so it has no password. With an app password, a new device unlocks your messages when you sign in, with no need to find your recovery phrase and type all 12 words. You can also sign in with your username and this password.",
++      "intro": "Your account signs in with Google, so it has no password. With an app password, a new device unlocks your messages when you sign in, with no need to find your recovery phrase and type all 12 words. You can also sign in with your username and this password.",
+       "label": "App password",
+       "confirmLabel": "Confirm app password",
+       "submit": "Add app password",
