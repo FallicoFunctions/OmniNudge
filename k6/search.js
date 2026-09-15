@@ -2,7 +2,7 @@
 // Run: k6 run k6/search.js
 // Override base URL: BASE_URL=https://api.example.com k6 run k6/search.js
 //
-// Optional auth: set TOKEN env var (or USERNAME + PASSWORD for auto-login).
+// Optional auth: set TOKEN env var (or USERNAME + LOGIN_KEY, or USERNAME + PASSWORD on the old scheme, for auto-login).
 //
 // CACHE HIT RATE NOTE: With a small QUERIES array the cache hit rate will be
 // artificially high after warmup (few distinct keys). To simulate production
@@ -12,6 +12,7 @@
 // VUs / (avg_response_time + 1s). For deterministic RPS use arrival-rate scenario.
 
 import http from 'k6/http';
+import { accessTokenFrom, loginBody } from './lib/auth.js';
 import { check, sleep } from 'k6';
 
 export const options = {
@@ -42,20 +43,25 @@ const RANDOM_SUFFIX = __ENV.RANDOM_SUFFIX === '1';
 // setup() runs once before all VUs start. Obtains an auth token via login if
 // USERNAME and PASSWORD env vars are set, otherwise uses TOKEN env var.
 export function setup() {
+  // An account on the login-key scheme refuses its password: sign in with
+  // LOGIN_KEY, printed by: PASSWORD=... node scripts/derive-login-key.mjs <username>
+  // PASSWORD alone works only for an account still on the old scheme.
   const username = __ENV.USERNAME || '';
+  const loginKey = __ENV.LOGIN_KEY || '';
   const password = __ENV.PASSWORD || '';
-  if (username && password) {
+  if (username && (loginKey || password)) {
     const res = http.post(
       `${BASE_URL}/api/v1/auth/login`,
-      JSON.stringify({ username, password }),
+      JSON.stringify(loginBody(username, loginKey, password)),
       { headers: { 'Content-Type': 'application/json' } }
     );
     if (res.status !== 200) {
-      throw new Error(`Login failed (status ${res.status}): credentials were provided but authentication rejected. Fix the test account or unset USERNAME/PASSWORD to run unauthenticated.`);
+      throw new Error(`Login failed (status ${res.status}): credentials were provided but authentication rejected. Fix the test account, or unset USERNAME, LOGIN_KEY and PASSWORD to run unauthenticated.`);
     }
-    const token = res.json('token');
+    // The session comes back as cookies, not a token in the body.
+    const token = accessTokenFrom(res);
     if (!token) {
-      throw new Error('Login response did not include a token field. Check the API response format.');
+      throw new Error('Login response did not set the omni_access cookie. Check the API response format.');
     }
     return { token };
   }

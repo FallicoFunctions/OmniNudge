@@ -2,17 +2,18 @@
 // Run: k6 run k6/feed.js
 // Override base URL: BASE_URL=https://api.example.com k6 run k6/feed.js
 //
-// Optional auth: set TOKEN env var (or USERNAME + PASSWORD for auto-login).
+// Optional auth: set TOKEN env var (or USERNAME + LOGIN_KEY, or USERNAME + PASSWORD on the old scheme, for auto-login).
 // Without auth the feed endpoint returns 200 (unauthenticated home feed) or
 // 401 if the server requires authentication — both are accepted by the check.
 // NOTE: For meaningful performance testing of the authenticated feed path,
-// set the TOKEN env var (or USERNAME + PASSWORD) so requests use real user context.
+// set the TOKEN env var (or USERNAME + LOGIN_KEY, or USERNAME + PASSWORD on the old scheme) so requests use real user context.
 //
 // THROUGHPUT NOTE: With sleep(1) this is a closed-loop test. Actual RPS ≈
 // VUs / (avg_response_time + 1s). At p50=50ms with 100 VUs ≈ 95 RPS.
 // For deterministic RPS use an open-loop scenario with arrival-rate instead.
 
 import http from 'k6/http';
+import { accessTokenFrom, loginBody } from './lib/auth.js';
 import { check, sleep } from 'k6';
 
 export const options = {
@@ -33,20 +34,25 @@ const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 // login if USERNAME and PASSWORD env vars are provided, otherwise falls back
 // to the TOKEN env var (which may be empty for unauthenticated tests).
 export function setup() {
+  // An account on the login-key scheme refuses its password: sign in with
+  // LOGIN_KEY, printed by: PASSWORD=... node scripts/derive-login-key.mjs <username>
+  // PASSWORD alone works only for an account still on the old scheme.
   const username = __ENV.USERNAME || '';
+  const loginKey = __ENV.LOGIN_KEY || '';
   const password = __ENV.PASSWORD || '';
-  if (username && password) {
+  if (username && (loginKey || password)) {
     const res = http.post(
       `${BASE_URL}/api/v1/auth/login`,
-      JSON.stringify({ username, password }),
+      JSON.stringify(loginBody(username, loginKey, password)),
       { headers: { 'Content-Type': 'application/json' } }
     );
     if (res.status !== 200) {
-      throw new Error(`Login failed (status ${res.status}): credentials were provided but authentication rejected. Fix the test account or unset USERNAME/PASSWORD to run unauthenticated.`);
+      throw new Error(`Login failed (status ${res.status}): credentials were provided but authentication rejected. Fix the test account, or unset USERNAME, LOGIN_KEY and PASSWORD to run unauthenticated.`);
     }
-    const token = res.json('token');
+    // The session comes back as cookies, not a token in the body.
+    const token = accessTokenFrom(res);
     if (!token) {
-      throw new Error('Login response did not include a token field. Check the API response format.');
+      throw new Error('Login response did not set the omni_access cookie. Check the API response format.');
     }
     return { token };
   }
