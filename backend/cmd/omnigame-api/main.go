@@ -16,7 +16,31 @@ import (
 	omniraveplaylist "github.com/omninudge/backend/internal/omniraveworld/repository"
 	omniraveworld "github.com/omninudge/backend/internal/omniraveworld/world"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/redis/go-redis/v9"
 )
+
+// rateLimitCache counts sign-in attempts. With REDIS_ADDR, the variable the
+// main API reads, the counts are shared with it; without Redis each process
+// keeps its own, which still bounds guessing.
+func rateLimitCache() (services.Cache, func()) {
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		client := redis.NewClient(&redis.Options{
+			Addr:        addr,
+			Password:    os.Getenv("REDIS_PASSWORD"),
+			DialTimeout: 500 * time.Millisecond,
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+		err := client.Ping(ctx).Err()
+		cancel()
+		if err == nil {
+			return services.NewResilientRedisCacheWithClient(client), func() { _ = client.Close() }
+		}
+		log.Printf("omnigame-api: Redis at %s unavailable, sign-in limits count per process: %v", addr, err)
+		_ = client.Close()
+	}
+	memory := services.NewMemoryCache()
+	return memory, memory.Stop
+}
 
 func main() {
 	port := envOrDefault("OMNIGAME_API_PORT", "8091")
@@ -125,6 +149,9 @@ func main() {
 		log.Println("omnigame-api: WORLD_EVENT_SECRET unset, world events are disabled")
 	}
 
+	limitCache, closeLimitCache := rateLimitCache()
+	defer closeLimitCache()
+
 	router := omnigameapi.NewRouter(
 		sessionService,
 		authService,
@@ -133,6 +160,7 @@ func main() {
 		worldEvents,
 		characterMemory,
 		trustedProxiesFromEnv(),
+		limitCache,
 	)
 	addr := ":" + port
 

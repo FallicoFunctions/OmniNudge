@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,13 +20,75 @@ import (
 )
 
 type fakeRuntimeAuthService struct {
-	loginResponse  *model.RuntimeAuthResponse
-	signupResponse *model.RuntimeAuthResponse
-	logoutResponse *model.RuntimeAuthResponse
-	loginErr       error
-	signupErr      error
-	logoutErr      error
-	lastInput      model.RuntimeAuthRequest
+	preLoginResponse *services.PreLoginResponse
+	lastUsername     string
+	loginResponse    *model.RuntimeAuthResponse
+	signupResponse   *model.RuntimeAuthResponse
+	logoutResponse   *model.RuntimeAuthResponse
+	loginErr         error
+	signupErr        error
+	logoutErr        error
+	lastInput        model.RuntimeAuthRequest
+}
+
+func (f *fakeRuntimeAuthService) PreLogin(_ context.Context, username string) (*services.PreLoginResponse, error) {
+	f.lastUsername = username
+	return f.preLoginResponse, nil
+}
+
+func TestRuntimeAuthHandler_PreLoginReturnsTheScheme(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fake := &fakeRuntimeAuthService{preLoginResponse: &services.PreLoginResponse{Scheme: 2, KDFSalt: "c2FsdA==", KDFIterations: 600000}}
+	router := gin.New()
+	router.POST("/api/v1/omnigame/runtime/auth/prelogin", NewRuntimeAuthHandler(fake).PreLogin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/omnigame/runtime/auth/prelogin", strings.NewReader(`{"username":"nick"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.JSONEq(t, `{"scheme":2,"kdf_salt":"c2FsdA==","kdf_iterations":600000}`, rec.Body.String())
+	require.Equal(t, "nick", fake.lastUsername)
+}
+
+// The runtime signs in against the same accounts, so a login key account must
+// be able to sign up, sign in and look itself up here too.
+func TestRuntimeAuthAdapter_CarriesTheLoginKey(t *testing.T) {
+	ctx := context.Background()
+	authService := services.NewAuthService("dev-secret", "OmniGame/1.0", "")
+	userRepo := servicemocks.NewUserRepository()
+	authService.SetUserRepository(userRepo)
+	sessionService := omnigameservice.NewSessionServiceWithDependencies(
+		"http://localhost:4173/omnirave",
+		"ws://localhost:8092/ws",
+		repository.NewInMemoryProfileRepository(),
+		repository.NewInMemorySanctionRepository(),
+		authService,
+	)
+	adapter := NewRuntimeAuthService(sessionService, authService)
+	key := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32))
+	salt := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+
+	_, err := adapter.Signup(ctx, model.RuntimeAuthRequest{
+		Username: "keyrunner", LoginKey: key, KDFSalt: salt, KDFIterations: 600000,
+		AcceptPrivacyPolicy: true, AcceptTerms: true, CurrentVenue: "underground",
+	})
+	require.NoError(t, err)
+	stored, err := userRepo.GetByUsername(ctx, "keyrunner")
+	require.NoError(t, err)
+	require.Equal(t, 2, stored.AuthScheme)
+
+	_, err = adapter.Login(ctx, model.RuntimeAuthRequest{Username: "keyrunner", LoginKey: key, CurrentVenue: "underground"})
+	require.NoError(t, err)
+	_, err = adapter.Login(ctx, model.RuntimeAuthRequest{Username: "keyrunner", Password: "correct-horse-battery-staple", CurrentVenue: "underground"})
+	var runtimeErr *runtimeAuthFailure
+	require.ErrorAs(t, err, &runtimeErr, "a login key account refuses a password here too")
+	require.Equal(t, http.StatusUnauthorized, runtimeErr.statusCode)
+
+	pre, err := adapter.PreLogin(ctx, "keyrunner")
+	require.NoError(t, err)
+	require.Equal(t, services.PreLoginResponse{Scheme: 2, KDFSalt: salt, KDFIterations: 600000}, *pre)
 }
 
 func (f *fakeRuntimeAuthService) Login(_ context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error) {

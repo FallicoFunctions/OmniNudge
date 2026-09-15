@@ -16,6 +16,7 @@ import (
 )
 
 type runtimeAuthService interface {
+	PreLogin(ctx context.Context, username string) (*services.PreLoginResponse, error)
 	Login(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error)
 	Signup(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error)
 	Logout(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error)
@@ -51,6 +52,27 @@ func NewRuntimeAuthService(sessionService *service.SessionService, authService *
 		sessionService: sessionService,
 		authService:    authService,
 	}
+}
+
+// PreLogin tells the runtime how an account proves its password, as the main
+// API's /auth/prelogin does: scheme 1 sends the password, scheme 2 derives a
+// login key with the returned salt and rounds.
+func (h *RuntimeAuthHandler) PreLogin(c *gin.Context) {
+	var input struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apiresponse.WriteError(c, http.StatusBadRequest, "invalid runtime auth request")
+		return
+	}
+
+	response, err := h.runtimeAuth.PreLogin(c.Request.Context(), input.Username)
+	if err != nil {
+		apiresponse.WriteError(c, http.StatusServiceUnavailable, "sign-in is temporarily unavailable")
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *RuntimeAuthHandler) Login(c *gin.Context) {
@@ -123,6 +145,14 @@ type runtimeAuthAdapter struct {
 	authService    *services.AuthService
 }
 
+func (a runtimeAuthAdapter) PreLogin(ctx context.Context, username string) (*services.PreLoginResponse, error) {
+	userRepo := a.authService.UserRepository()
+	if userRepo == nil {
+		return nil, fmt.Errorf("runtime auth user repository not configured")
+	}
+	return a.authService.PreLogin(ctx, userRepo, username)
+}
+
 func (a runtimeAuthAdapter) Login(ctx context.Context, input model.RuntimeAuthRequest) (*model.RuntimeAuthResponse, error) {
 	userRepo := a.authService.UserRepository()
 	if userRepo == nil {
@@ -132,6 +162,7 @@ func (a runtimeAuthAdapter) Login(ctx context.Context, input model.RuntimeAuthRe
 	user, _, err := a.authService.Login(ctx, userRepo, &services.LoginRequest{
 		Username: input.Username,
 		Password: input.Password,
+		LoginKey: input.LoginKey,
 	})
 	if err != nil {
 		return nil, newRuntimeAuthFailure(http.StatusUnauthorized, "invalid username or password", err)
@@ -158,6 +189,9 @@ func (a runtimeAuthAdapter) Signup(ctx context.Context, input model.RuntimeAuthR
 	user, _, err := a.authService.Register(ctx, userRepo, &services.RegisterRequest{
 		Username:            input.Username,
 		Password:            input.Password,
+		LoginKey:            input.LoginKey,
+		KDFSalt:             input.KDFSalt,
+		KDFIterations:       input.KDFIterations,
 		Email:               email,
 		TurnstileToken:      input.TurnstileToken,
 		AcceptPrivacyPolicy: input.AcceptPrivacyPolicy,

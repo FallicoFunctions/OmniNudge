@@ -132,6 +132,7 @@ func newAdmissionRouter(t *testing.T) (*gin.Engine, *services.AuthService) {
 		nil,
 		nil,
 		[]string{"127.0.0.1/32", "::1/128"},
+		newTestLimitCache(t),
 	)
 
 	return router, authService

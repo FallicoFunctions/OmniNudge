@@ -18,6 +18,7 @@ func NewRouter(
 	worldEvents *services.WorldEventAuth,
 	characterMemory *services.OmniChatMemoryService,
 	trustedProxies []string,
+	rateLimitCache services.Cache,
 ) *gin.Engine {
 	router := gin.New()
 	if err := router.SetTrustedProxies(trustedProxies); err != nil {
@@ -85,8 +86,14 @@ func NewRouter(
 	runtimeAuthHandler := handlers.NewRuntimeAuthHandler(handlers.NewRuntimeAuthService(sessionService, authService))
 	v1.POST("/omnigame/launch/omnirave", launchHandler.CreateOmniRaveLaunch)
 	v1.POST("/omnigame/session/exchange", launchHandler.ExchangeSession)
-	v1.POST("/omnigame/runtime/auth/login", runtimeAuthHandler.Login)
-	v1.POST("/omnigame/runtime/auth/signup", runtimeAuthHandler.Signup)
+	// The runtime signs in against the same accounts as the main API, so it
+	// carries the same limits under the same keys; with a shared Redis the two
+	// servers share one count, and switching servers does not reset it.
+	authLimit := middleware.AuthRateLimiter(rateLimitCache).Middleware()
+	preLoginLimit := middleware.PreLoginRateLimiter(rateLimitCache).Middleware()
+	v1.POST("/omnigame/runtime/auth/prelogin", preLoginLimit, runtimeAuthHandler.PreLogin)
+	v1.POST("/omnigame/runtime/auth/login", authLimit, runtimeAuthHandler.Login)
+	v1.POST("/omnigame/runtime/auth/signup", authLimit, runtimeAuthHandler.Signup)
 	v1.POST("/omnigame/runtime/auth/logout", runtimeAuthHandler.Logout)
 
 	protected := v1.Group("/omnigame/profile")

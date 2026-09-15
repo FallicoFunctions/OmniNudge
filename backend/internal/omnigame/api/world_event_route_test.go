@@ -60,6 +60,7 @@ func newWorldEventRouter(t *testing.T) (*gin.Engine, *pgxpool.Pool, *services.Au
 		worldEvents,
 		characterMemory,
 		[]string{"127.0.0.1/32", "::1/128"},
+		newTestLimitCache(t),
 	)
 
 	return router, db.Pool, authService
@@ -373,7 +374,7 @@ func TestRouter_WorldEventRefusesWhenSecretIsUnconfigured(t *testing.T) {
 		repository.NewInMemorySanctionRepository(),
 		authService,
 	)
-	router := NewRouter(sessionService, authService, nil, nil, nil, nil, []string{"127.0.0.1/32", "::1/128"})
+	router := NewRouter(sessionService, authService, nil, nil, nil, nil, []string{"127.0.0.1/32", "::1/128"}, newTestLimitCache(t))
 
 	rec := postWorldEvent(t, router, `{"title":"x","summary":"y"}`, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer anything")
@@ -397,7 +398,7 @@ func TestRouter_WorldEventRefusesWithoutADatabase(t *testing.T) {
 	worldEvents, err := services.NewWorldEventAuth(testWorldEventSecret, "dev-secret")
 	require.NoError(t, err)
 
-	router := NewRouter(sessionService, authService, nil, nil, worldEvents, nil, []string{"127.0.0.1/32", "::1/128"})
+	router := NewRouter(sessionService, authService, nil, nil, worldEvents, nil, []string{"127.0.0.1/32", "::1/128"}, newTestLimitCache(t))
 
 	rec := postWorldEvent(t, router, `{"title":"x","summary":"y"}`, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+worldEventCredential(t, 7))

@@ -210,9 +210,14 @@ type PersonaAdmission struct {
 }
 
 type RuntimeAuthRequest struct {
-	Username            string            `json:"username,omitempty"`
-	Email               string            `json:"email,omitempty"`
-	Password            string            `json:"password,omitempty"`
+	Username string `json:"username,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+	// LoginKey, KDFSalt and KDFIterations replace Password for an account that
+	// signs in with a login key; the app derives them from the password.
+	LoginKey            string            `json:"loginKey,omitempty"`
+	KDFSalt             string            `json:"kdfSalt,omitempty"`
+	KDFIterations       int               `json:"kdfIterations,omitempty"`
 	TurnstileToken      string            `json:"turnstileToken,omitempty"`
 	AcceptPrivacyPolicy bool              `json:"acceptPrivacyPolicy"`
 	AcceptTerms         bool              `json:"acceptTerms"`
