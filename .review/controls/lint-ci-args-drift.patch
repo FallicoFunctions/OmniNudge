@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index c71737a25..9b0be3fc8 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -105,7 +105,7 @@ jobs:
+           working-directory: backend
+           # Every file in internal/integration needs the integration tag; without it
+           # the linter sees none of them.
+-          args: --timeout=10m --build-tags=integration
++          args: --timeout=10m
+           skip-cache: false
+ 
+       - name: Run unit tests

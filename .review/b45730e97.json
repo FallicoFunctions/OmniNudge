@@ -1,0 +1,128 @@
+{
+  "schema_version": 2,
+  "head": "415a8a185",
+  "base": "b45730e97",
+  "scope": {
+    "files": [
+      ".github/workflows/ci.yml",
+      "scripts/ci-checks-on-staged.sh",
+      "scripts/ci-checks-on-staged.test.sh",
+      "backend/internal/integration/api_integration_test.go",
+      "backend/internal/integration/groups_integration_test.go",
+      "backend/internal/integration/websocket_integration_test.go",
+      "backend/internal/integration/websocket_resilience_integration_test.go"
+    ],
+    "boundaries": [
+      "CI lint step -> golangci-lint (build tags decide which files it reads)",
+      "pre-commit gate -> golangci-lint (the same arguments as CI)",
+      "integration tests -> Postgres (skipped unless TEST_DATABASE_URL is set)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "383b67353"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Seven files: the lint tag in ci.yml and in the gate, a tagged known-bad case in the gate's tests, and 30 lint fixes in four integration test files. Boundaries listed in scope."},
+        {"id": "A2", "status": "applied", "evidence": "383b67353 (P1) moved internal/integration's TestDSN change out of P1 because the gate linted the package without the tag; this change is the fix that was deferred. No prior finding on errcheck in the integration tests."},
+        {"id": "B1", "status": "applied", "evidence": "Printed the argument strings the new case compares, extracted from ci.yml and from the gate: both '--timeout=10m --build-tags=integration'; and, with the control applied, CI's became '--timeout=10m' while the gate's did not."},
+        {"id": "B2", "status": "na", "why": "No component changed."},
+        {"id": "B3", "status": "na", "why": "No handler changed; the tests that post multipart uploads still get the same statuses (all 11 upload tests pass against Postgres)."},
+        {"id": "B4", "status": "na", "why": "No query or migration changed."},
+        {"id": "C1", "status": "applied", "evidence": "The new group comment states the rule in internal/handlers/groups.go:269 ('at least 2 other participants (3 total)'); the request the test keeps sends two others."},
+        {"id": "C2", "status": "na", "why": "No field crosses a boundary."},
+        {"id": "C3", "status": "applied", "evidence": "One command lives in two places: CI's golangci-lint args and the gate's golangci-lint run. Asked what stops them drifting: nothing did (finding lint-ci-args-unguarded)."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor involved."},
+        {"id": "C7", "status": "applied", "evidence": "The tagged fixture carries the same '//go:build integration' line as every file in internal/integration, and sits beside a clean untagged file so the package is lintable without the tag, as internal/integration is not."},
+        {"id": "D1", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D2", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D3", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "E1", "status": "applied", "evidence": "Sibling tools that also run without the tag: CI's go vet ./..., staticcheck ./... and deadcode -test ./... in security.yml. With the tag: go vet exit 0, staticcheck exit 0, deadcode output identical to the untagged run. golangci-lint already runs govet and staticcheck with the tag, so nothing is missed today; left unchanged."},
+        {"id": "E2", "status": "applied", "evidence": "TestGroupMemberAdd sent a first create-group request with one other member that the handler always refuses, and never read the response; removed. Every remaining branch in the changed tests is reached (15 tests pass)."},
+        {"id": "E3", "status": "applied", "evidence": "The errors that decide a test (multipart writer.Close, part.Write) now fail it with require.NoError; the ones that do not (Close on a finished websocket, RemoveAll of the uploads folder, SetReadDeadline before a read the test tolerates failing) are dropped on purpose with _ =."},
+        {"id": "E4", "status": "applied", "evidence": "The integration tests skip unless TEST_DATABASE_URL is set; a first local run skipped all 16 and printed ok. Re-ran with the variable set to the code's default address: 15 run and pass. CI sets it."},
+        {"id": "E5", "status": "applied", "evidence": "The lint arguments exist twice (ci.yml, the gate); the new case pins them equal."},
+        {"id": "E6", "status": "applied", "evidence": "Searched for other '//go:build integration' files: only internal/integration. Searched the workflows for Go tools without tags: see E1."},
+        {"id": "F1", "status": "na", "why": "No goroutine or shared state changed."},
+        {"id": "F2", "status": "na", "why": "No transaction or queue work."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "applied", "evidence": "The uploads folder is still removed after each upload test (t.Cleanup instead of defer; it runs after the deferred DB close, as before)."},
+        {"id": "G1", "status": "applied", "evidence": "The first version of the new case matched CI's arguments as a substring of the gate's command, and its control passed: '--timeout=10m' is a substring of '--timeout=10m --build-tags=integration'. Replaced by an exact comparison in 415a8a185; the control now fails that case alone (11 passed, 1 failed)."},
+        {"id": "G2", "status": "applied", "evidence": "The gate is wired: the test's first case asserts frontend/.husky/pre-commit runs it, and it ran on both commits of this change."},
+        {"id": "G3", "status": "applied", "evidence": "Fed the gate a tagged unchecked Close with the tag removed from its command: the new case failed alone (10 passed, 1 failed), then passed with the tag restored. Asked the same of CI's lint step: nothing would notice its tag removed (finding lint-ci-args-unguarded)."},
+        {"id": "H1", "status": "applied", "evidence": "golangci-lint --build-tags=integration on the whole backend: 0 issues. go vet -tags=integration and staticcheck -tags integration: exit 0. gofmt: clean. Gate tests: 12 passed. The 15 changed integration tests and the workers DB test pass against Postgres 16."},
+        {"id": "Z1", "status": "applied", "evidence": "Both techniques are rows already: C3/G3 found the unguarded CI argument, G1's control found the blind first check. No new instrument."},
+        {"id": "B5", "status": "applied", "evidence": "Ran the real tools, not a reading of the YAML: golangci-lint against the tagged package, and the gate against a known-bad tagged file. No model output involved."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No user interface changed."},
+        {"id": "E8", "status": "na", "why": "No lazily cached process-wide state changed."}
+      ],
+      "findings": [
+        {
+          "id": "lint-ci-args-unguarded",
+          "summary": "Nothing checked that CI's lint step keeps --build-tags=integration: removing it from ci.yml passed every test and the gate, and CI would again lint none of internal/integration. The first check added for it compared by substring and was blind to exactly that removal.",
+          "found_by": "G3",
+          "fix_commit": "415a8a185",
+          "control": {
+            "patch": ".review/controls/lint-ci-args-drift.patch",
+            "runner": "bash",
+            "tests": ["scripts/ci-checks-on-staged.test.sh"],
+            "observed": "With the tag removed from ci.yml: 'the gate lints with CI's golangci-lint arguments' fails, 11 passed, 1 failed. Against the substring version (76b4daffe) the same patch passed 12 of 12."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the same seven files plus the exact-comparison rewrite of the new case in 415a8a185."},
+        {"id": "A2", "status": "applied", "evidence": "Pass 1 of this ledger; 383b67353 has nothing on the gate's argument parity."},
+        {"id": "B1", "status": "applied", "evidence": "Printed both extracted strings again after the rewrite: equal at HEAD; with the control, CI's is '--timeout=10m' and the gate's '--timeout=10m --build-tags=integration'. An empty CI extraction fails the case (test -n)."},
+        {"id": "B2", "status": "na", "why": "No component changed."},
+        {"id": "B3", "status": "na", "why": "No handler changed."},
+        {"id": "B4", "status": "na", "why": "No query or migration changed."},
+        {"id": "C1", "status": "applied", "evidence": "The gate extraction reads the text between 'golangci-lint run ' and ' $packages'; the gate's line has exactly that shape, and the CI extraction reads the args key of the golangci-lint-action step only."},
+        {"id": "C2", "status": "na", "why": "No field crosses a boundary."},
+        {"id": "C3", "status": "applied", "evidence": "The two copies of the lint arguments are now compared for equality on every gate test run."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor involved."},
+        {"id": "C7", "status": "applied", "evidence": "The comparison reads the real ci.yml and the real gate, not copies."},
+        {"id": "D1", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D2", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D3", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "E1", "status": "applied", "evidence": "No other gate step mirrors a CI argument list; gofmt takes no tags."},
+        {"id": "E2", "status": "applied", "evidence": "Both outcomes of the new case are reached: pass at HEAD, fail with the control."},
+        {"id": "E3", "status": "applied", "evidence": "A failing case prints its name and the gate output, as the other cases do."},
+        {"id": "E4", "status": "applied", "evidence": "Nothing new is gated on an environment variable."},
+        {"id": "E5", "status": "applied", "evidence": "Nothing duplicated beyond the two argument lists the case pins together."},
+        {"id": "E6", "status": "applied", "evidence": "Other substring matches in the script: the hook-wiring case greps for 'bash $gate' in the pre-commit file, where a substring is the right test (the line holds more than the call)."},
+        {"id": "F1", "status": "na", "why": "No goroutine or shared state changed."},
+        {"id": "F2", "status": "na", "why": "No transaction or queue work."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "na", "why": "Nothing persisted."},
+        {"id": "G1", "status": "applied", "evidence": "Control replayed by hand at 415a8a185: fails with the patch (11 passed, 1 failed), passes without (12 passed)."},
+        {"id": "G2", "status": "applied", "evidence": "The new case lives in the gate's own test script, beside the wiring case."},
+        {"id": "G3", "status": "applied", "evidence": "Known-bad inputs refused: a tagged unchecked Close (gate), and a CI lint step without the tag (the new case)."},
+        {"id": "H1", "status": "applied", "evidence": "Gate tests 12 passed; the pre-commit gate ran on 415a8a185."},
+        {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+        {"id": "B5", "status": "applied", "evidence": "Ran the real script against the real files, with and without the control."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No user interface changed."},
+        {"id": "E8", "status": "na", "why": "No lazily cached process-wide state changed."}
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet -tags=integration ./... exit 0",
+    "vet": "go vet -tags=integration ./... exit 0; staticcheck -tags integration ./... exit 0",
+    "lint": "golangci-lint v2.12.2 --build-tags=integration: 0 issues on the whole backend",
+    "types": "the tagged package compiles (vet and lint type-check it)",
+    "tests": "scripts/ci-checks-on-staged.test.sh 12 passed; 15 changed integration tests and the workers DB test pass against Postgres 16"
+  }
+}
