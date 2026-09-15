@@ -1,0 +1,130 @@
+{
+  "schema_version": 2,
+  "head": "6f093dded",
+  "base": "703a8506a",
+  "scope": {
+    "files": [
+      "backend/internal/integration/test_utils.go",
+      ".github/workflows/ci.yml",
+      "backend/internal/security/sql_injection_test.go",
+      "backend/internal/database/test_address_test.go"
+    ],
+    "boundaries": [
+      "CI test step -> every test binary, integration included, four at once",
+      "test binary -> Postgres (one database per package through TestDSN)",
+      "test binary -> Redis (REDIS_ADDR, now shared by packages running at once)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "383b67353",
+    "b45730e97"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "test_utils.go: getTestDB opens this package's database through TestDSN. ci.yml: one 'Run tests' step, go test -p 4 -tags=integration -timeout=20m over ./internal/..., the separate integration step removed."},
+        {"id": "A2", "status": "applied", "evidence": "383b67353 (P1) E1/C3 said no other test database opener existed in internal/ besides workers and integration; that was wrong (the finding). b45730e97 covered the integration lint tag; nothing on openers."},
+        {"id": "B1", "status": "applied", "evidence": "Printed the database each opener reaches, from the real database: the security test now migrates omninudge_test_security (its table list read back with psql: platform_posts, post_comments, ...); integration reaches omninudge_test_integration."},
+        {"id": "B2", "status": "na", "why": "No component changed."},
+        {"id": "B3", "status": "na", "why": "No handler changed."},
+        {"id": "B4", "status": "applied", "evidence": "getTestDB migrates its new package database (test_utils.go:58); the security test migrates and then ResetTestData truncates, so its whole-table assertions (no admin users) read a clean database."},
+        {"id": "C1", "status": "applied", "evidence": "The CI test step keeps TEST_DATABASE_URL and REDIS_ADDR exactly as both old steps had them."},
+        {"id": "C2", "status": "na", "why": "No field crosses a boundary."},
+        {"id": "C3", "status": "applied", "evidence": "One rule, one place: every test database now comes from TestDSN; the guard test enforces it for internal/."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor involved."},
+        {"id": "C7", "status": "na", "why": "No fixture of a produced value."},
+        {"id": "D1", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D2", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D3", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "E1", "status": "applied", "evidence": "Grepped every database.New( and TEST_DATABASE_URL in backend: cmd/ tools read the configured address (not tests); internal/security/sql_injection_test.go:16 dialled a fixed address as omnin_test (the finding)."},
+        {"id": "E2", "status": "applied", "evidence": "The security test's skip branch was the only branch ever taken; now removed. The integration skip on an empty TEST_DATABASE_URL stays, and CI sets it."},
+        {"id": "E3", "status": "applied", "evidence": "A security test that cannot reach its database now fails (require.NoError) instead of skipping."},
+        {"id": "E4", "status": "applied", "evidence": "The integration tests and the workers DB test run only with TEST_DATABASE_URL; the CI step sets it."},
+        {"id": "E5", "status": "applied", "evidence": "The two test steps' identical env blocks are now one."},
+        {"id": "E6", "status": "applied", "evidence": "Searched every Go file for a fixed postgres:// literal: only database/test_helpers.go (the default) and the security test. The guard now checks all of internal/ on every run."},
+        {"id": "F1", "status": "applied", "evidence": "Integration now runs beside the other packages: its own database, so no shared rows or advisory lock. Redis: the only test client is miniredis in services, and no integration file reads REDIS_ADDR."},
+        {"id": "F2", "status": "na", "why": "No transaction or queue work changed."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "applied", "evidence": "Package databases are kept between runs; the security test resets its database before use, so its fixed testuser and whole-table counts cannot trip on a previous run (ran -count=2: both pass)."},
+        {"id": "G1", "status": "applied", "evidence": "Control replayed by hand: the guard fails naming security/sql_injection_test.go with the patch, passes at HEAD; the security package compiles with the patch."},
+        {"id": "G2", "status": "applied", "evidence": "The guard is a Go test in internal/database, so the CI test step runs it every push."},
+        {"id": "G3", "status": "applied", "evidence": "Fed the guard the thing it refuses (the old fixed address, through the control): it failed."},
+        {"id": "H1", "status": "applied", "evidence": "gofmt clean; go vet ok; golangci-lint --build-tags=integration 0 issues on database, security and integration; the pre-commit gate passed both commits; the security test passes twice in a row against Postgres 16."},
+        {"id": "Z1", "status": "applied", "evidence": "Added H2 (did the tests run, or skip?): 'ok' came from skipped tests three times this session, and this finding was a test that had skipped since it was written."},
+        {"id": "B5", "status": "applied", "evidence": "Ran the security test against real Postgres for the first time: four subtests failed on stale assumptions ((nil, nil) for not found, an empty comment list, a table renamed to platform_posts), not on an injection; the user and hub values stayed nil. Fixed the assertions."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No user interface changed."},
+        {"id": "E8", "status": "applied", "evidence": "The guard reads startDir, captured at binary start before any test can t.Chdir."},
+        {"id": "H2", "status": "applied", "evidence": "Ran the changed tests with -v: security 8 of 8 subtests PASS, none SKIP; the guard PASS."}
+      ],
+      "findings": [
+        {
+          "id": "p2-security-fixed-address",
+          "summary": "internal/security's SQL injection test dialled a fixed address as a user CI does not have, so it skipped on every run; had it connected, it would have shared omninudge_test with the packages running beside it.",
+          "found_by": "E1",
+          "fix_commit": "6f093dded",
+          "control": {
+            "patch": ".review/controls/p2-security-fixed-address.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/database/ -run 'TestNoTestDialsAFixedDatabaseAddress'"
+            ],
+            "observed": "With the patch (the fixed address back): FAIL, Should be empty, but was [security/sql_injection_test.go]. Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {"id": "A1", "status": "applied", "evidence": "Pass 2 covers the security test rewrite and the guard test from 6f093dded, with P2's two files."},
+        {"id": "A2", "status": "applied", "evidence": "Pass 1 of this ledger."},
+        {"id": "B1", "status": "applied", "evidence": "Printed what the guard sees: with the control, the offender list [security/sql_injection_test.go]; at HEAD, empty. The guard skips database/test_helpers.go only, by file and folder name."},
+        {"id": "B2", "status": "na", "why": "No component changed."},
+        {"id": "B3", "status": "na", "why": "No handler changed."},
+        {"id": "B4", "status": "applied", "evidence": "The Second Order subtest now checks platform_posts, a table that exists in the migrated database (psql)."},
+        {"id": "C1", "status": "applied", "evidence": "The rewritten assertions match the repositories: GetByUsername (user.go:347) and HubRepository.GetByName (hub.go:72, :87) return (nil, nil) for not found."},
+        {"id": "C2", "status": "na", "why": "No field crosses a boundary."},
+        {"id": "C3", "status": "applied", "evidence": "No test opener left outside TestDSN."},
+        {"id": "C4", "status": "na", "why": "No worker or provider contract changed."},
+        {"id": "C5", "status": "na", "why": "No struct field added."},
+        {"id": "C6", "status": "na", "why": "No untyped accessor involved."},
+        {"id": "C7", "status": "na", "why": "No fixture of a produced value."},
+        {"id": "D1", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "D2", "status": "applied", "evidence": "The injection subtests still refuse what they exist to refuse: an injected OR must return no user, no hub; the users and platform_posts tables must survive."},
+        {"id": "D3", "status": "na", "why": "No validation or parsing changed."},
+        {"id": "E1", "status": "applied", "evidence": "The security test now opens exactly as the database package's own tests do (NewTest, Cleanup, Migrate, ResetTestData)."},
+        {"id": "E2", "status": "applied", "evidence": "The guard's own file does not match itself: the needle is built from two literals."},
+        {"id": "E3", "status": "applied", "evidence": "The guard returns walk and read errors through require.NoError instead of dropping them."},
+        {"id": "E4", "status": "applied", "evidence": "The guard needs no database and no variable, so it runs everywhere."},
+        {"id": "E5", "status": "na", "why": "Nothing duplicated."},
+        {"id": "E6", "status": "applied", "evidence": "Other tests asserting a not-found error from these repositories: none in internal/security; the handlers and models tests already expect (nil, nil)."},
+        {"id": "F1", "status": "applied", "evidence": "The security test holds the package's advisory lock through NewTest, like the other database tests."},
+        {"id": "F2", "status": "na", "why": "No transaction or queue work changed."},
+        {"id": "F3", "status": "na", "why": "No migration."},
+        {"id": "F4", "status": "applied", "evidence": "The Second Order subtest deletes its user, and ResetTestData clears anything a failed run leaves."},
+        {"id": "G1", "status": "applied", "evidence": "The control holds at 6f093dded (fails with the patch, passes without)."},
+        {"id": "G2", "status": "applied", "evidence": "The guard runs in CI's test step."},
+        {"id": "G3", "status": "applied", "evidence": "The guard refuses the known-bad address."},
+        {"id": "H1", "status": "applied", "evidence": "go vet and golangci-lint clean after the subtest edits; the security test passes twice."},
+        {"id": "Z1", "status": "na", "why": "This pass found nothing."},
+        {"id": "B5", "status": "applied", "evidence": "Ran against real Postgres 16, as in pass 1."},
+        {"id": "E7", "status": "na", "why": "Nothing starts early."},
+        {"id": "B6", "status": "na", "why": "No user interface changed."},
+        {"id": "E8", "status": "applied", "evidence": "No new lazily read state."},
+        {"id": "H2", "status": "applied", "evidence": "Security: 16 subtest PASS lines over two runs, no SKIP."}
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go vet ./internal/database/ ./internal/security/ ./internal/integration/ (tagged) ok",
+    "vet": "go vet ok",
+    "lint": "golangci-lint v2.12.2 --build-tags=integration: 0 issues; pre-commit gate 0 failed on both commits",
+    "types": "go vet type-checks the changed packages",
+    "tests": "the guard and the security test pass against Postgres 16; the full run with CI's new command comes after the review"
+  }
+}

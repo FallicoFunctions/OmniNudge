@@ -211,6 +211,12 @@
       "name": "What changes the process-wide state that lazy code reads?",
       "trigger": "code reads process-wide state on first use and caches it: the working directory, environment variables, the clock, a global, a sync.Once",
       "asks": "Find everything in the same process that can change that state before the first read, and ask what the cached value becomes when it runs first. A lazily-read value is correct only for the order in which the tests happen to run today; -run, -shuffle or one new file changes the order. TestDSN named each package test database after the working directory on the first NewTest() call -- and a handlers test calls t.Chdir(t.TempDir()), so whenever it ran first the whole handlers binary would have been named after a temp directory like 001, possibly one shared with another package, which is exactly the cross-package collision the change existed to remove. Read the state once, before any test can run (a package-level variable), or pass it in."
+    },
+    {
+      "id": "H2",
+      "name": "Did the tests run, or skip?",
+      "trigger": "a gate or a control reports a test as passing, and that test can skip -- on a missing variable, an unreachable service, a failed connection",
+      "asks": "Run it with -v and count PASS against SKIP; 'ok' is printed for a package whose every test skipped. Then find every skip condition in the tests the change touches and ask whether CI meets it. In one session 'ok' came three times from skipped tests: all sixteen changed integration tests (TEST_DATABASE_URL unset locally), the workers database test inside a timed full run reported as proof the database was created, and security's SQL injection test, which dialled a user CI does not have and skipped on every run since it was written. Given a real database it failed four subtests on assumptions nobody had ever checked. A test that always skips is not a weak test; it is no test, and the suite stays green around it."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
