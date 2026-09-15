@@ -1,0 +1,239 @@
+{
+ "schema_version": 2,
+ "head": "1b355a1c1",
+ "base": "d67e47c15",
+ "scope": {
+  "files": [
+   "omnirave-web/src/lib/loginKey.ts",
+   "omnirave-web/src/lib/__tests__/loginKey.test.ts",
+   "omnirave-web/src/lib/session.ts",
+   "omnirave-web/src/lib/__tests__/session.test.ts"
+  ],
+  "boundaries": [
+   "POST /omnigame/runtime/auth/prelogin",
+   "POST /omnigame/runtime/auth/login",
+   "POST /omnigame/runtime/auth/signup",
+   "shared/crypto-vectors"
+  ]
+ },
+ "prior_ledgers_read": [
+  "8bc3efc78",
+  "a4d23fcc1",
+  "b2a87c547"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "omnirave-web: lib/loginKey.ts (the same pinned derivation as omnirave-babylon) and lib/session.ts (runtimeLogin asks the runtime pre-login through the same fetcher, then sends loginKey or, only on the old scheme, password; runtimeSignup refuses a short password and sends loginKey, kdfSalt, kdfIterations); tests."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "8bc3efc78 (K5b: keyless outside account, fixed), a4d23fcc1, b2a87c547."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the fetcher mock: /prelogin {username}; /login {username, loginKey, currentVenue, currentLoadout, currentSettings} for a login-key account and with password for an old-scheme one; /signup with loginKey, a 16-byte kdfSalt, kdfIterations 600000 and no password; the password appears in no call."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component changed; the popup still collects a username and password."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server read under K5b: the runtime pre-login answers scheme, kdf_salt, kdf_iterations; login and signup bind RuntimeAuthRequest."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "loginKey, kdfSalt, kdfIterations as in RuntimeAuthRequest; kdf_salt, kdf_iterations as in PreLoginResponse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The fields read from the pre-login are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Three derivations now (frontend, omnirave-babylon, omnirave-web), each pinned to shared/crypto-vectors/login-keys.json by its own test, so none can drift unseen. The packages build separately, so a shared module is not an option here."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "JSON.stringify of plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The vectors are the independent implementation's output."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both vectors, including the NFKC one, derive the pinned keys."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A login-key answer without settings throws before any login is posted; a short sign-up password is refused before any request."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A different salt gives a different key; the salt is 16 random bytes."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Mirrors the Babylon runtime reviewed in K5b and the main app's signInSecret and prepareSignUp."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: scheme 1, scheme 2, malformed answer, short password."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Failures throw Errors that useWorldSession shows in the popup."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One derivation in this package."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a client that sends the password': with both OmniRave runtimes changed, the remaining senders are the k6 and load-test scripts (next phase) and change-password, which has no screen."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "One request after local derivation."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted client-side."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "No finding, so no control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "omnirave-web has no node_modules here: its test files ran through a throwaway vitest config on the frontend's install; session.ts and loginKey.ts type-check with the frontend's tsc under the package's settings; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "The pass found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Not run against a live OmniGame server: that needs an account created and a password typed. Pinned by RuntimeAuthRequest's JSON tags and the shared vectors; recorded as unverified live."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the files that ran."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K5: the OmniRave clients never send the password of a login-key account. Kept for both runtimes."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller each (useWorldSession)."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Tests that use the session module: session.test.ts and loginKey.test.ts pass (19); useWorldSession.test.ts, App.test.tsx and WorldScene.test.tsx could not start here because React and Testing Library are not installed in omnirave-web; useWorldSession mocks runtimeLogin and runtimeSignup and passes the same credentials, so the change does not reach it."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "omnirave-web sources tsc ok (frontend's compiler, package settings)",
+  "vet": "n/a",
+  "lint": "pre-commit gate 0 failed",
+  "types": "as build",
+  "tests": "omnirave-web session and loginKey 19 passed; 3 React test files could not start (no React installed here)"
+ }
+}
