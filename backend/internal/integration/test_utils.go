@@ -43,13 +43,15 @@ func directConversationRequestBody(otherUserID int) []byte {
 	return []byte(fmt.Sprintf(`{"other_user_id":%d}`, otherUserID))
 }
 
-// getTestDB creates a DB connection using TEST_DATABASE_URL or skips tests
+// getTestDB connects to this package's own test database, or skips the tests
+// when TEST_DATABASE_URL is not set.
 func getTestDB(t *testing.T) *database.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
+	if os.Getenv("TEST_DATABASE_URL") == "" {
 		t.Skip("TEST_DATABASE_URL not set; skipping integration tests")
 	}
+	dsn, err := database.TestDSN()
+	require.NoError(t, err)
 	db, err := database.New(dsn)
 	require.NoError(t, err)
 	t.Cleanup(db.Close)
