@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +24,14 @@ func itLoginKey(fill byte) string {
 
 func postAuthJSON(t *testing.T, router *gin.Engine, path string, body any, bearer string) *httptest.ResponseRecorder {
 	t.Helper()
+	return sendAuthJSON(t, router, http.MethodPost, path, body, bearer)
+}
+
+func sendAuthJSON(t *testing.T, router *gin.Engine, method, path string, body any, bearer string) *httptest.ResponseRecorder {
+	t.Helper()
 	payload, err := json.Marshal(body)
 	require.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPost, path, bytes.NewReader(payload))
+	req, err := http.NewRequest(method, path, bytes.NewReader(payload))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.RemoteAddr = "198.51.100.7:40000"
@@ -122,6 +128,63 @@ func TestPreLoginAnswersAMissingNameInTheSameShape(t *testing.T) {
 	salt, err := base64.StdEncoding.DecodeString(ghost["kdf_salt"].(string))
 	require.NoError(t, err)
 	assert.Len(t, salt, 16)
+}
+
+func TestRecoveryCopyAndKeyBackupOverHTTP(t *testing.T) {
+	deps := newTestDeps(t)
+	name := uniqueRLUsername("backedup")
+	w := postAuthJSON(t, deps.Router, "/api/v1/auth/register", map[string]any{
+		"username": name, "login_key": itLoginKey(7), "kdf_salt": itKDFSalt, "kdf_iterations": 600000,
+		"accept_privacy_policy": true, "accept_terms": true,
+	}, "")
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	user, err := deps.UserRepo.GetByUsername(t.Context(), name)
+	require.NoError(t, err)
+	token, err := deps.AuthService.GenerateJWT(user.ID, user.Username, user.Role)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusUnauthorized, sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/recovery-key",
+		map[string]any{"recovery_wrapped_private_key": "copy-under-phrase"}, token).Code, "a session alone cannot replace the phrase")
+	assert.Equal(t, http.StatusBadRequest, sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/recovery-key",
+		map[string]any{"login_key": itLoginKey(7), "recovery_wrapped_private_key": ""}, token).Code)
+	w = sendAuthJSON(t, deps.Router, http.MethodPut, "/api/v1/auth/recovery-key",
+		map[string]any{"login_key": itLoginKey(7), "recovery_wrapped_private_key": "copy-under-phrase"}, token)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	w = sendAuthJSON(t, deps.Router, http.MethodGet, "/api/v1/auth/key-backup", nil, token)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var backup map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &backup))
+	assert.Equal(t, map[string]any{"kdf_salt": itKDFSalt, "kdf_iterations": float64(600000),
+		"recovery_wrapped_private_key": "copy-under-phrase"}, backup)
+}
+
+func TestAppPasswordOverHTTP(t *testing.T) {
+	deps := newTestDeps(t)
+	oauthOnly := &models.User{Username: uniqueRLUsername("googleuser"), PasswordHash: ""}
+	require.NoError(t, deps.UserRepo.Create(t.Context(), oauthOnly))
+	token, err := deps.AuthService.GenerateJWT(oauthOnly.ID, oauthOnly.Username, "user")
+	require.NoError(t, err)
+
+	set := func(rounds int, copy string) int {
+		return postAuthJSON(t, deps.Router, "/api/v1/auth/app-password", map[string]any{
+			"login_key": itLoginKey(4), "kdf_salt": itKDFSalt, "kdf_iterations": rounds, "encrypted_private_key": copy,
+		}, token).Code
+	}
+	assert.Equal(t, http.StatusBadRequest, set(1000, "copy-under-app-password"))
+	assert.Equal(t, http.StatusBadRequest, set(600000, ""))
+	require.Equal(t, http.StatusOK, set(600000, "copy-under-app-password"))
+
+	assert.Equal(t, http.StatusOK, postAuthJSON(t, deps.Router, "/api/v1/auth/login",
+		map[string]any{"username": oauthOnly.Username, "login_key": itLoginKey(4)}, "").Code, "the app password also signs in")
+	assert.Equal(t, http.StatusConflict, set(600000, "another-copy"), "once set, change-password applies")
+
+	withPassword := createUser(t, deps.UserRepo, uniqueRLUsername("haspassword"), "user")
+	passwordToken, err := deps.AuthService.GenerateJWT(withPassword.ID, withPassword.Username, withPassword.Role)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusConflict, postAuthJSON(t, deps.Router, "/api/v1/auth/app-password", map[string]any{
+		"login_key": itLoginKey(4), "kdf_salt": itKDFSalt, "kdf_iterations": 600000, "encrypted_private_key": "copy",
+	}, passwordToken).Code)
 }
 
 func TestPreLoginHasItsOwnLimit(t *testing.T) {

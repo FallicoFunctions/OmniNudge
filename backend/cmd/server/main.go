@@ -1353,6 +1353,10 @@ func main() {
 			protected.GET("/auth/encrypted-private-key", authHandler.GetEncryptedPrivateKey)
 			// It checks the current password, so it shares the sign-in limit.
 			protected.POST("/auth/login-key", authRateLimiter.Middleware(), authHandler.MoveToLoginKey)
+			protected.GET("/auth/key-backup", authHandler.GetKeyBackup)
+			// Both check or create a sign-in secret, so both share the sign-in limit.
+			protected.PUT("/auth/recovery-key", authRateLimiter.Middleware(), authHandler.StoreRecoveryKey)
+			protected.POST("/auth/app-password", authRateLimiter.Middleware(), authHandler.SetAppPassword)
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)

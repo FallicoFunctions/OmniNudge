@@ -525,6 +525,109 @@ func (h *AuthHandler) MoveToLoginKey(c *gin.Context) {
 	}
 }
 
+// GetKeyBackup returns what a device needs to unlock the private key: the
+// derivation settings and both wrapped copies. Neither copy opens without the
+// password or the recovery phrase.
+// @Summary      Get key backup
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  services.KeyBackup
+// @Failure      401  {object}  gin.H
+// @Router       /auth/key-backup [get]
+func (h *AuthHandler) GetKeyBackup(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	backup, err := services.GetKeyBackup(c.Request.Context(), h.userRepo, userID)
+	if err != nil {
+		slog.Error("key backup lookup failed", "error", err, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch key backup")
+		return
+	}
+	c.JSON(http.StatusOK, backup)
+}
+
+// StoreRecoveryKey stores the copy of the private key wrapped by the recovery
+// phrase. An account with a password proves it again with the secret it
+// signs in with.
+// @Summary      Store recovery copy
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  services.RecoveryKeyRequest  true  "Secret and recovery copy"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Router       /auth/recovery-key [put]
+func (h *AuthHandler) StoreRecoveryKey(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var req services.RecoveryKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	err := services.StoreRecoveryKey(c.Request.Context(), h.userRepo, userID, &req)
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, gin.H{"message": "Recovery copy stored"})
+	case errors.Is(err, services.ErrInvalidRecoveryCopy):
+		RespondError(c, http.StatusBadRequest, "Invalid recovery copy")
+	case errors.Is(err, services.ErrCurrentPasswordIncorrect):
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
+	default:
+		slog.Error("store recovery copy failed", "error", err, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to store recovery copy")
+	}
+}
+
+// SetAppPassword gives an account without a password (signed up through a
+// provider) its first password: a login key that also signs it in.
+// @Summary      Set app password
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  services.AppPasswordRequest  true  "Login key, KDF settings and wrapped private key"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      409  {object}  gin.H
+// @Router       /auth/app-password [post]
+func (h *AuthHandler) SetAppPassword(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var req services.AppPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	ctx := c.Request.Context()
+	err := services.SetAppPassword(ctx, h.userRepo, userID, &req)
+	switch {
+	case err == nil:
+		h.logAudit(ctx, &userID, "app_password_set", "user", &userID, c.ClientIP(), c.Request.UserAgent(), nil)
+		c.JSON(http.StatusOK, gin.H{"scheme": 2})
+	case errors.Is(err, services.ErrInvalidLoginKey):
+		RespondError(c, http.StatusBadRequest, "Invalid login key settings")
+	case errors.Is(err, services.ErrPrivateKeyNotRewrapped):
+		RespondError(c, http.StatusBadRequest, "The private key must be wrapped with the new key")
+	case errors.Is(err, services.ErrAccountHasPassword):
+		RespondError(c, http.StatusConflict, "This account already has a password")
+	default:
+		slog.Error("set app password failed", "error", err, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to set app password")
+	}
+}
+
 // UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync.
 // @Summary      Update encrypted private key
 // @Tags         Auth
