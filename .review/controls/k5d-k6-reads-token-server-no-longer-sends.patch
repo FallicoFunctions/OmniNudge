@@ -1,0 +1,16 @@
+diff --git a/k6/lib/auth.js b/k6/lib/auth.js
+index 9ef6e4ade..24863e2ba 100644
+--- a/k6/lib/auth.js
++++ b/k6/lib/auth.js
+@@ -15,6 +15,9 @@ export function loginBody(username, loginKey, password) {
+ export const ACCESS_COOKIE = 'omni_access';
+ 
+ export function accessTokenFrom(response) {
+-  const cookies = response && response.cookies ? response.cookies[ACCESS_COOKIE] : undefined;
+-  return cookies && cookies.length > 0 && cookies[0].value ? cookies[0].value : '';
++  try {
++    return JSON.parse(response.body).token || '';
++  } catch (_) {
++    return '';
++  }
+ }

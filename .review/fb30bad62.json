@@ -1,0 +1,461 @@
+{
+ "schema_version": 2,
+ "head": "b77ac1d17",
+ "base": "fb30bad62",
+ "scope": {
+  "files": [
+   "scripts/derive-login-key.mjs",
+   "k6/lib/auth.js",
+   "k6/lib/auth.test.mjs",
+   "k6/search.js",
+   "k6/feed.js"
+  ],
+  "boundaries": [
+   "POST /api/v1/auth/prelogin",
+   "POST /api/v1/auth/login response cookies",
+   "auth middleware Bearer header",
+   "shared/crypto-vectors"
+  ]
+ },
+ "prior_ledgers_read": [
+  "d67e47c15",
+  "8bc3efc78",
+  "a4d23fcc1"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "scripts/derive-login-key.mjs (prints an account's login key from the pre-login settings; PASSWORD from the environment; --self-test against the shared vectors); k6/lib/auth.js (loginBody, accessTokenFrom) with node tests; k6/search.js and k6/feed.js sign in with LOGIN_KEY or, on the old scheme, PASSWORD, and take the token from the omni_access cookie."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "d67e47c15 (K5c, nothing found), 8bc3efc78 (K5b), a4d23fcc1 (K5a)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "loginBody printed for both inputs: {username, login_key} with a key, {username, password} without; the helper's key for both vectors matches login-keys.json."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The response the scripts read, printed from the handler: /auth/login answers {\"user\": ...} and sets omni_access, omni_refresh and omni_csrf cookies; it sends no token in the body, but both scripts read res.json('token') and threw, so their sign-in path, the new LOGIN_KEY one included, could not work (k5d-k6-reads-token-server-no-longer-sends)."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "login_key as the /auth/login body binds it; omni_access as services.AccessTokenCookieName; kdf_salt and kdf_iterations as PreLoginResponse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The scripts send the token as a Bearer header, which api/middleware/auth.go reads before the cookie."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Fourth derivation (the helper, Node crypto) pinned by --self-test to the same vectors as the three client derivations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "JSON.stringify of plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The cookie fixture follows k6's res.cookies shape (name to an array of {name, value})."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both vectors; a seed user on the old scheme keeps its password path."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The helper refuses a missing username or PASSWORD (exit 2), an old-scheme account (exit 3) and a malformed pre-login answer."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The helper takes the server's salt and rounds; the vectors pin the edge cases."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: load-tests/utils/auth.js signs in with {email, password}, which the server's Login does not read (it reads a username), so those scenarios fail before any key question; seed users are old-scheme (bcrypt into password_hash). Left as it was and reported, outside this phase's login-key change."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of the helper and both loginBody branches reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "setup() throws with a message naming the cookie when no token comes back."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The sign-in logic lives once, in k6/lib/auth.js, for both scripts."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a script that reads a token the server no longer sends': k6/auth.js only checks a 401 for a wrong password and reads no token; load-tests/utils/auth.js reads body.token too, but its {email, password} request fails earlier, reported under E1."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "node --test k6/lib/auth.test.mjs: 4 passed; both scripts parse (node --check on .mjs copies); helper --self-test ok: 2 vectors; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "B3 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "k6 is not installed here, so the scripts were not run against a server; they parse as modules, their sign-in logic is the tested helper, and the helper's derivation matches the shared vectors."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "node --test reported no skipped tests."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K5 load scripts: a login-key account can be load-tested without its password reaching the server. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One caller per script."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The changed module k6/lib/auth.js is imported by k6/search.js and k6/feed.js, both parsed; no other file imports it."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k5d-k6-reads-token-server-no-longer-sends",
+     "summary": "The k6 feed and search scripts read a token from the login response body, but the server now signs in with cookies and sends none, so their sign-in always threw.",
+     "found_by": "B3",
+     "fix_commit": "b77ac1d17",
+     "control": {
+      "patch": ".review/controls/k5d-k6-reads-token-server-no-longer-sends.patch",
+      "runner": "bash",
+      "tests": [
+       "node --test k6/lib/auth.test.mjs || { echo \"1 failed\"; exit 1; }"
+      ],
+      "observed": "FAIL: the omni_access cookie test fails; 1 failed"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "scripts/derive-login-key.mjs (prints an account's login key from the pre-login settings; PASSWORD from the environment; --self-test against the shared vectors); k6/lib/auth.js (loginBody, accessTokenFrom) with node tests; k6/search.js and k6/feed.js sign in with LOGIN_KEY or, on the old scheme, PASSWORD, and take the token from the omni_access cookie."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "d67e47c15 (K5c, nothing found), 8bc3efc78 (K5b), a4d23fcc1 (K5a)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "loginBody printed for both inputs: {username, login_key} with a key, {username, password} without; the helper's key for both vectors matches login-keys.json."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Pass 2: the token comes from the omni_access cookie and is sent as Bearer, which the middleware accepts; a missing cookie gives a clear error."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "login_key as the /auth/login body binds it; omni_access as services.AccessTokenCookieName; kdf_salt and kdf_iterations as PreLoginResponse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The scripts send the token as a Bearer header, which api/middleware/auth.go reads before the cookie."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Fourth derivation (the helper, Node crypto) pinned by --self-test to the same vectors as the three client derivations."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "JSON.stringify of plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The cookie fixture follows k6's res.cookies shape (name to an array of {name, value})."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both vectors; a seed user on the old scheme keeps its password path."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The helper refuses a missing username or PASSWORD (exit 2), an old-scheme account (exit 3) and a malformed pre-login answer."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "The helper takes the server's salt and rounds; the vectors pin the edge cases."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: load-tests/utils/auth.js signs in with {email, password}, which the server's Login does not read (it reads a username), so those scenarios fail before any key question; seed users are old-scheme (bcrypt into password_hash). Left as it was and reported, outside this phase's login-key change."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of the helper and both loginBody branches reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "setup() throws with a message naming the cookie when no token comes back."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The sign-in logic lives once, in k6/lib/auth.js, for both scripts."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: no other k6 script signs in."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "accessTokenFrom made to read body.token again from b77ac1d17: the cookie test fails, the hook's selector prints 1 failed; at the commit it exits 0."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "node --test k6/lib/auth.test.mjs: 4 passed; both scripts parse (node --check on .mjs copies); helper --self-test ok: 2 vectors; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "k6 is not installed here, so the scripts were not run against a server; they parse as modules, their sign-in logic is the tested helper, and the helper's derivation matches the shared vectors."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "node --test reported no skipped tests."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K5 load scripts: a login-key account can be load-tested without its password reaching the server. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One caller per script."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The changed module k6/lib/auth.js is imported by k6/search.js and k6/feed.js, both parsed; no other file imports it."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "node --check on both scripts",
+  "vet": "n/a",
+  "lint": "pre-commit gate 0 failed",
+  "types": "n/a (plain JS)",
+  "tests": "node --test 4 passed; helper self-test 2 vectors"
+ }
+}
