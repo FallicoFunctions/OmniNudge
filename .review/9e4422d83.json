@@ -1,0 +1,446 @@
+{
+  "schema_version": 2,
+  "head": "92b19d6c7",
+  "base": "9e4422d83",
+  "scope": {
+    "files": [
+      "backend/internal/services/auth.go",
+      "backend/internal/services/auth_login_key.go",
+      "backend/internal/services/auth_login_key_test.go",
+      "backend/internal/models/user.go",
+      "backend/internal/models/user_login_keys_test.go",
+      "backend/internal/ports/user_repository.go",
+      "backend/internal/repository/user_postgres.go",
+      "backend/internal/services/mocks/user_repository.go"
+    ],
+    "boundaries": [
+      "client -> Register/Login request structs (bound by the handlers)",
+      "AuthService -> UserRepository (three implementations)",
+      "users row: password_hash, auth_scheme, kdf_*, encrypted_private_key"
+    ]
+  },
+  "prior_ledgers_read": [
+    "d475aa2f2",
+    "9803e5f57"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "92b19d6c7: RegisterRequest and LoginRequest gain login_key (and salt, rounds); auth_login_key.go adds registrationCredentials, validateLoginKey, PreLogin, placeholderSalt and MoveToLoginKey; UpgradeToLoginKey in models, ports, the Postgres wrapper and the mock; Create writes the scheme."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "d475aa2f2 (K1a) found Create not reading auth_scheme back; this phase builds on that fix. No earlier finding on sign-in."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the stored rows for two account kinds through the tests: a key sign-up stores scheme 2, the salt, 600000 rounds and a bcrypt of the key (not the key); a password sign-up stores scheme 1 with no salt."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The handlers bind these request structs directly, so the new JSON fields (login_key, kdf_salt, kdf_iterations) reach the service today; the pre-login and move endpoints arrive in K1b-2."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the rows back after each write in the models test: after the move, scheme 2 and the new key copy; after a password write, scheme 1 with salt and rounds NULL."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "MinKDFIterations (600000) matches users_auth_scheme_check; the salt size bounds match what PreLogin returns (16 bytes for a missing name)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "PreLoginResponse carries scheme, kdf_salt, kdf_iterations: exactly what the app needs to derive the login key."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The rule 'scheme 2 signs in only with its key' lives once, in Login; the OmniGame runtime login calls the same Login, so it inherits the rule."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The new UpgradeToLoginKey parameter is carried by all three implementations; go build ./... and go vet ./... pass on the whole backend."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The mock mirrors the SQL: moves once, clears salt on a password write, replaces the key copy; the models test checks the real SQL does the same."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Login keys in tests are 32 random-looking bytes in base64, as the app will send; salts are 16 bytes."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: a 31-byte key, a non-base64 key, an 8-byte salt, 599999 and 10000001 rounds, a key with a password, a password to a scheme 2 account, a key to a scheme 1 account, a second move, a move with the wrong password."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundaries: exactly 600000 rounds and a 16-byte salt are accepted; one below is refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every writer of password_hash: the reset handler (auth.go:636) and change-password (users.go:1165) call UpdatePassword with a bcrypt of the raw password, which left scheme 2 in place (finding k1b-password-write-keeps-scheme). Account deletion and data export compare the raw password and so refuse scheme 2 accounts: they fail closed until phase K2 moves them."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The 'wrong kind of secret' branch is reached by each case in TestSchemeTwoSignsInOnlyWithItsLoginKey."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal returns the same 'invalid username or password' and is logged with the scheme, not the secret."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "PreLogin gives banned and deleted accounts the placeholder answer, as Login refuses them."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The KDF bounds live once in auth_login_key.go."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that store a private key copy: UpdateEncryptedPrivateKey (the app's own upload) is unchanged; the move now replaces the copy itself."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No shared state; the move is guarded by WHERE auth_scheme = 1, so two concurrent moves cannot both succeed."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Each write is one UPDATE; no multi-step transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration in this phase."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "After a password reset on a scheme 2 account the key copy wrapped with the old derived key stays; the app will ask for the recovery phrase (phase K4)."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both controls replayed as the hook runs them (TEST_DATABASE_URL unset): each fails its own assertion (expected 1, actual 2; expected wrapped-by-wrap-key, actual wrapped-by-password) and passes at HEAD."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Register and Login are the functions every sign-up and sign-in route calls, including the OmniGame runtime handler."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and vet with the integration tag); golangci-lint 0 issues; tests: services 75 PASS, models 3, handlers auth/login/register/password/reset 51, integration sign-in 2, all with 0 FAIL and 0 SKIP."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Added I1: the key-copy finding came from rereading the approved plan's promise ('deletes the password copy') against the code, a technique no row named."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the SQL against real Postgres 16 and read the rows back; no model output involved."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed Login the secrets it must refuse (see D2); each refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state; the fake salt is computed per call."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Reread the plan's sentences for K1b: 'the server never gets the password' holds for scheme 2 (Login refuses a password there); 'deletes the password copy' did not hold (finding k1b-move-keeps-password-copy); 'never silently makes a new key pair' is the app's, phase K4."
+        }
+      ],
+      "findings": [
+        {
+          "id": "k1b-password-write-keeps-scheme",
+          "summary": "A password reset or change stored a bcrypt of the raw password through UpdatePassword but left auth_scheme 2, so sign-in would ask for a login key the new hash could never match.",
+          "found_by": "E1",
+          "fix_commit": "92b19d6c7",
+          "control": {
+            "patch": ".review/controls/k1b-password-write-keeps-scheme.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/models/ -run 'TestLoginKeyMoveAndPasswordWritesKeepTheSchemeTrue'"
+            ],
+            "observed": "With the patch, TEST_DATABASE_URL unset: FAIL, expected 1, actual 2 (a password hash means the password scheme). Without: ok."
+          }
+        },
+        {
+          "id": "k1b-move-keeps-password-copy",
+          "summary": "Moving an account to the login key changed only the login columns, so the private key copy wrapped with a password the server had seen stayed on the server, against the plan's promise that the move deletes it.",
+          "found_by": "I1",
+          "fix_commit": "92b19d6c7",
+          "control": {
+            "patch": ".review/controls/k1b-move-keeps-password-copy.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/models/ -run 'TestLoginKeyMoveAndPasswordWritesKeepTheSchemeTrue'"
+            ],
+            "observed": "With the patch: FAIL, expected wrapped-by-wrap-key, actual wrapped-by-password. Without: ok."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 covers the two fixes: UpdatePassword returns an account to scheme 1, and UpgradeToLoginKey replaces the key copy in the same UPDATE, with the new parameter in all three implementations."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "d475aa2f2 (K1a) found Create not reading auth_scheme back; this phase builds on that fix. No earlier finding on sign-in."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the stored rows for two account kinds through the tests: a key sign-up stores scheme 2, the salt, 600000 rounds and a bcrypt of the key (not the key); a password sign-up stores scheme 1 with no salt."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The handlers bind these request structs directly, so the new JSON fields (login_key, kdf_salt, kdf_iterations) reach the service today; the pre-login and move endpoints arrive in K1b-2."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the rows back after each write in the models test: after the move, scheme 2 and the new key copy; after a password write, scheme 1 with salt and rounds NULL."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "MinKDFIterations (600000) matches users_auth_scheme_check; the salt size bounds match what PreLogin returns (16 bytes for a missing name)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "PreLoginResponse carries scheme, kdf_salt, kdf_iterations: exactly what the app needs to derive the login key."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The rule 'scheme 2 signs in only with its key' lives once, in Login; the OmniGame runtime login calls the same Login, so it inherits the rule."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The new UpgradeToLoginKey parameter is carried by all three implementations; go build ./... and go vet ./... pass on the whole backend."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The mock mirrors the SQL: moves once, clears salt on a password write, replaces the key copy; the models test checks the real SQL does the same."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Login keys in tests are 32 random-looking bytes in base64, as the app will send; salts are 16 bytes."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Checked; nothing new."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: a 31-byte key, a non-base64 key, an 8-byte salt, 599999 and 10000001 rounds, a key with a password, a password to a scheme 2 account, a key to a scheme 1 account, a second move, a move with the wrong password."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundaries: exactly 600000 rounds and a 16-byte salt are accepted; one below is refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "No writer of password_hash leaves a scheme that its hash cannot satisfy."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The 'wrong kind of secret' branch is reached by each case in TestSchemeTwoSignsInOnlyWithItsLoginKey."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal returns the same 'invalid username or password' and is logged with the scheme, not the secret."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "PreLogin gives banned and deleted accounts the placeholder answer, as Login refuses them."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The KDF bounds live once in auth_login_key.go."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places that store a private key copy: UpdateEncryptedPrivateKey (the app's own upload) is unchanged; the move now replaces the copy itself."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No shared state; the move is guarded by WHERE auth_scheme = 1, so two concurrent moves cannot both succeed."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Each write is one UPDATE; no multi-step transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration in this phase."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "After a password reset on a scheme 2 account the key copy wrapped with the old derived key stays; the app will ask for the recovery phrase (phase K4)."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both controls hold at 92b19d6c7."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Register and Login are the functions every sign-up and sign-in route calls, including the OmniGame runtime handler."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and vet with the integration tag); golangci-lint 0 issues; tests: services 75 PASS, models 3, handlers auth/login/register/password/reset 51, integration sign-in 2, all with 0 FAIL and 0 SKIP."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the SQL against real Postgres 16 and read the rows back; no model output involved."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed Login the secrets it must refuse (see D2); each refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazily cached state; the fake salt is computed per call."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's promises for K1b now hold on the server side."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok, and with -tags=integration",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "services 75, models 3, handlers 51, integration 2 PASS; 0 FAIL, 0 SKIP"
+  }
+}

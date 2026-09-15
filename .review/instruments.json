@@ -217,6 +217,12 @@
       "name": "Did the tests run, or skip?",
       "trigger": "a gate or a control reports a test as passing, and that test can skip -- on a missing variable, an unreachable service, a failed connection",
       "asks": "Run it with -v and count PASS against SKIP; 'ok' is printed for a package whose every test skipped. Then find every skip condition in the tests the change touches and ask whether CI meets it. In one session 'ok' came three times from skipped tests: all sixteen changed integration tests (TEST_DATABASE_URL unset locally), the workers database test inside a timed full run reported as proof the database was created, and security's SQL injection test, which dialled a user CI does not have and skipped on every run since it was written. Given a real database it failed four subtests on assumptions nobody had ever checked. A test that always skips is not a weak test; it is no test, and the suite stays green around it."
+    },
+    {
+      "id": "I1",
+      "name": "Does the change keep every promise of the approved plan?",
+      "trigger": "the change is one phase of a plan the user approved",
+      "asks": "Reread the plan's own sentences for this phase and check each against the code: every 'deletes', 'never', 'only' and 'at once' is a guarantee someone will rely on without looking. The login-key plan said the move to the new scheme 'deletes the password copy'; the first cut of the move changed only the login columns, so the private key copy wrapped with a password the server had seen would have stayed on the server for good. Nothing in the diff was wrong on its own terms, and no test asked, because the test was written from the code rather than from the plan."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
