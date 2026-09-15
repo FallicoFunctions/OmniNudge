@@ -18,9 +18,11 @@ jobs:
   backend:
     name: Backend (Go)
     runs-on: ubuntu-latest
-    # The unit tests alone take about 21 minutes (race detector, -p 1). With
-    # Dependabot running a dozen pull requests at once the runners slow down, and
-    # 45 minutes cancelled whole runs before any test could fail.
+    # Each test package has its own database (database.TestDSN), so packages run
+    # side by side; with one shared database and one lock, the unit tests took
+    # about 21 minutes whatever -p said. With Dependabot running a dozen pull
+    # requests at once the runners slow down, and 45 minutes cancelled whole runs
+    # before any test could fail.
     timeout-minutes: 60
 
     services:
@@ -109,7 +111,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
           REDIS_ADDR: localhost:6379
-        run: go test -v -race -count=1 -timeout=15m -p 1 -coverprofile=coverage.out ./internal/...
+        run: go test -v -race -count=1 -timeout=15m -p 4 -coverprofile=coverage.out ./internal/...
 
       - name: Run integration tests
         working-directory: backend

@@ -17,10 +17,11 @@ import (
 
 func getRolloutTestDB(t *testing.T) *database.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
+	if os.Getenv("TEST_DATABASE_URL") == "" {
 		t.Skip("TEST_DATABASE_URL not set; skipping rollout DB integration test")
 	}
+	dsn, err := database.TestDSN()
+	require.NoError(t, err)
 
 	db, err := database.New(dsn)
 	require.NoError(t, err)

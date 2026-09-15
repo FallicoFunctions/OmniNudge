@@ -2,12 +2,21 @@ package database
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	zlog "github.com/rs/zerolog/log"
 )
 
@@ -24,17 +33,129 @@ const (
 	testOperationTimeout = 30 * time.Second
 )
 
-// NewTest creates a database connection that can be used inside tests.
-// It prefers TEST_DATABASE_URL if set, falls back to DATABASE_URL, and
-// finally uses a sensible local default. Tests are expected to run migrations
-// or cleanup steps as needed after obtaining the handle.
-func NewTest() (*Database, error) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		dsn = os.Getenv("DATABASE_URL")
+// postgresMaxIdentifier is how many bytes of a database name Postgres keeps.
+const postgresMaxIdentifier = 63
+
+var (
+	testDSNOnce sync.Once
+	testDSN     string
+	errTestDSN  error
+	nonNameRune = regexp.MustCompile(`[^a-z0-9]+`)
+
+	// A test binary starts in its package's directory. Read it now, before any
+	// test runs: a test that calls t.Chdir before the first NewTest would
+	// otherwise name the whole package's database after its temp directory.
+	startDir, errStartDir = os.Getwd()
+)
+
+// testPackageDir is the directory the test binary started in.
+func testPackageDir() (string, error) {
+	return startDir, errStartDir
+}
+
+// TestDSN returns the connection string of this test binary's own database,
+// creating the database on first use.
+//
+// Every package once shared one database, and every test held one advisory lock
+// on it, so the whole suite ran one test at a time whatever `go test -p` said.
+// Advisory locks belong to a database, so a database per package keeps the lock
+// meaning "one test at a time in this package" and lets packages run side by
+// side. The database is kept between runs, so later runs only check migrations.
+//
+// The base address is TEST_DATABASE_URL, else DATABASE_URL, else a local
+// default; its user must be allowed to create databases.
+func TestDSN() (string, error) {
+	testDSNOnce.Do(func() {
+		base := os.Getenv("TEST_DATABASE_URL")
+		if base == "" {
+			base = os.Getenv("DATABASE_URL")
+		}
+		if base == "" {
+			base = defaultTestDSN
+		}
+		dir, err := testPackageDir()
+		if err != nil {
+			errTestDSN = fmt.Errorf("find the test package directory: %w", err)
+			return
+		}
+		testDSN, errTestDSN = ensurePackageDatabase(base, dir)
+	})
+	return testDSN, errTestDSN
+}
+
+// ensurePackageDatabase creates the package's database on the base server if it
+// is missing, and returns the base address pointed at it.
+func ensurePackageDatabase(base, packageDir string) (string, error) {
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Path == "" || parsed.Path == "/" {
+		return "", fmt.Errorf("test database address must be a postgres:// URL with a database name")
 	}
-	if dsn == "" {
-		dsn = defaultTestDSN
+	name := packageDatabaseName(strings.TrimPrefix(parsed.Path, "/"), packageDir)
+
+	ctx, cancel := context.WithTimeout(context.Background(), testOperationTimeout)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, base)
+	if err != nil {
+		return "", fmt.Errorf("connect to the base test database: %w", err)
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+
+	var exists bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
+		return "", fmt.Errorf("look up test database %q: %w", name, err)
+	}
+	if !exists {
+		_, err := conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize())
+		var pgErr *pgconn.PgError
+		switch {
+		case err == nil:
+		case errors.As(err, &pgErr) && pgErr.Code == "42P04":
+			// Another run of the same package created it first.
+		case errors.As(err, &pgErr) && pgErr.Code == "42501":
+			return "", fmt.Errorf("the test database user cannot create databases, and each test package needs its own; grant it once with: ALTER ROLE %s CREATEDB", parsed.User.Username())
+		default:
+			return "", fmt.Errorf("create test database %q: %w", name, err)
+		}
+	}
+
+	parsed.Path = "/" + name
+	return parsed.String(), nil
+}
+
+// packageDatabaseName names a package's test database after its directory under
+// internal/, beneath the base name: omninudge_test_handlers,
+// omninudge_test_omnigame_repository. The name always contains "test", which is
+// what ResetTestData checks before it truncates anything.
+func packageDatabaseName(base, packageDir string) string {
+	dir := filepath.ToSlash(packageDir)
+	rel := filepath.Base(packageDir)
+	if i := strings.LastIndex(dir, "/internal/"); i >= 0 {
+		rel = dir[i+len("/internal/"):]
+	}
+	suffix := strings.Trim(nonNameRune.ReplaceAllString(strings.ToLower(rel), "_"), "_")
+
+	prefix := strings.ToLower(base)
+	if !strings.Contains(prefix, "test") {
+		prefix += "_test"
+	}
+	name := prefix + "_" + suffix
+	if len(name) <= postgresMaxIdentifier {
+		return name
+	}
+	// Postgres would cut a longer name short, and two packages could then share
+	// one database without either knowing.
+	sum := sha256.Sum256([]byte(name))
+	tag := hex.EncodeToString(sum[:])[:8]
+	return name[:postgresMaxIdentifier-len(tag)-1] + "_" + tag
+}
+
+// NewTest creates a connection to this test binary's own database (see
+// TestDSN). Tests are expected to run migrations or cleanup steps as needed
+// after obtaining the handle.
+func NewTest() (*Database, error) {
+	dsn, err := TestDSN()
+	if err != nil {
+		return nil, err
 	}
 
 	// Integration tests intentionally use a small, on-demand pool. A separate
