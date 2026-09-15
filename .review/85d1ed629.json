@@ -1,0 +1,221 @@
+{
+  "schema_version": 2,
+  "head": "3f220c5a0",
+  "base": "85d1ed629",
+  "scope": {
+    "files": [
+      "backend/internal/utils/password.go",
+      "backend/internal/utils/password_test.go",
+      "backend/internal/handlers/users.go",
+      "backend/internal/security/security_remediation_static_test.go"
+    ],
+    "boundaries": [
+      "test binary vs server binary (testing.Testing())",
+      "change-password handler -> utils"
+    ]
+  },
+  "prior_ledgers_read": [
+    "9e4422d83",
+    "85d1ed629"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "utils/password.go: passwordCost() returns bcrypt.MinCost in a test binary (testing.Testing()) and productionCost 12 otherwise; users.go change-password uses utils.HashPassword and utils.CheckPassword; the static security test and a new utils test."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "9e4422d83 (K1b-1) and 85d1ed629 have no finding on password hashing; the static security test came from an earlier remediation that pinned change-password to cost 12, and that promise is kept."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload is built."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No response changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "productionCost is 12, the value the old code and the static guard both used."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No shape crosses a boundary."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Password hashing now lives in one place; change-password no longer carries its own copy."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No produced value in a fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "CheckPassword refuses a wrong password against a cost-4 hash."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No boundary input."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every bcrypt.GenerateFromPassword in the module: utils (now cost-aware), users.go (now uses utils), cmd/seed (its own cost for seed data, never run in tests). No test asserts the cost of a HashPassword hash other than the new one."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "No branch became unreachable: both costs are reached, one per kind of binary."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Hash and check errors reach the same responses as before."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The cost depends only on testing.Testing(), which a server binary cannot turn on."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The duplicated bcrypt call in users.go is gone."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other secret hashing: none besides bcrypt."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Test hashes at cost 4 live only in test databases."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control; the static guard was probed under G3."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "HashPassword is called by sign-up, the reset handler, change-password, the move to a login key and every test user helper."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; utils 1, security 1, handlers password tests 8 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real thing: a throwaway cmd built with go run hashed through utils.HashPassword and printed bcrypt cost 12, and the hash verified; inside a test binary the unit test reads cost 4. Two binaries, two costs, as intended. The throwaway was deleted."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the static guard a weaker production cost (productionCost = 10): it failed with 'password.go no longer hashes stored passwords at bcrypt cost 12'. File restored."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "testing.Testing() is fixed for the life of the process; nothing caches it wrongly."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All three runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The approved step was 'lowest cost in test binaries only, production keeps 12'; both halves were checked by running each kind of binary."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "utils 1, security 1, handlers password 8 PASS, 0 SKIP; server binary probe printed cost 12"
+  }
+}
