@@ -96,6 +96,41 @@ export async function setAppPassword(phrase: string, password: string): Promise<
   return keys;
 }
 
+/**
+ * A new recovery phrase for an account with a password, proved with it: the
+ * password's wrap key opens the copy on the server, and the key is wrapped
+ * again under a new phrase. Nothing is sent until the phrase is saved (see
+ * PendingPhrase). Throws "Wrong password" when the copy does not open.
+ */
+export async function replacePhraseWithPassword(password: string): Promise<PendingPhrase> {
+  const backup = await api.get<KeyBackup>('/auth/key-backup');
+  if (
+    backup.auth_scheme !== 2 ||
+    !backup.kdf_salt ||
+    !backup.kdf_iterations ||
+    !backup.encrypted_private_key
+  ) {
+    throw new Error('This account has no copy its password opens');
+  }
+  const keys = await deriveLoginKeys(password, backup.kdf_salt, backup.kdf_iterations);
+  let privateKey: string;
+  try {
+    privateKey = await unwrapSecret(backup.encrypted_private_key, keys.wrapKey);
+  } catch {
+    throw new Error('Wrong password');
+  }
+  return prepareRecoveryCopy(privateKey, { login_key: keys.loginKey });
+}
+
+/**
+ * A new recovery phrase for an account with no password, proved with its
+ * current phrase, which opens the recovery copy. The server takes the session
+ * as proof for such an account; the old phrase proves it here.
+ */
+export async function replacePhraseWithPhrase(oldPhrase: string): Promise<PendingPhrase> {
+  return prepareRecoveryCopy(await openRecoveryCopy(oldPhrase), {});
+}
+
 /** A new login key and its settings, for a sign-up or a password reset. */
 export async function prepareSignUp(password: string): Promise<{ keys: LoginKeys } & KdfSettings> {
   const settings: KdfSettings = { kdf_salt: newKdfSalt(), kdf_iterations: DEFAULT_KDF_ITERATIONS };
@@ -138,12 +173,36 @@ export async function createAccountKeys(keys: LoginKeys | null): Promise<string>
   return recoveryPhrase;
 }
 
+/**
+ * A new phrase whose copy is not on the server yet. The screen shows the phrase
+ * and calls save() only once the user holds it: the copy on the server is then
+ * replaced, and until then the old phrase keeps working. save() sends the same
+ * copy each time, so a failed save can simply run again.
+ */
+export interface PendingPhrase {
+  phrase: string;
+  save: () => Promise<void>;
+}
+
+async function prepareRecoveryCopy(
+  privateKey: string,
+  proof: AccountProof
+): Promise<PendingPhrase> {
+  const phrase = newRecoveryPhrase();
+  const copy = await wrapSecret(privateKey, await deriveRecoveryKey(phrase));
+  return {
+    phrase,
+    save: async () => {
+      await api.put('/auth/recovery-key', { recovery_wrapped_private_key: copy, ...proof });
+    },
+  };
+}
+
 /** A new phrase, and the private key wrapped by it on the server. */
 export async function storeRecoveryCopy(privateKey: string, proof: AccountProof): Promise<string> {
-  const recoveryPhrase = newRecoveryPhrase();
-  const copy = await wrapSecret(privateKey, await deriveRecoveryKey(recoveryPhrase));
-  await api.put('/auth/recovery-key', { recovery_wrapped_private_key: copy, ...proof });
-  return recoveryPhrase;
+  const pending = await prepareRecoveryCopy(privateKey, proof);
+  await pending.save();
+  return pending.phrase;
 }
 
 /**

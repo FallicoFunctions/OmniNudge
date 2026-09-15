@@ -15,6 +15,8 @@ import {
   moveWithoutKey,
   prepareSignUp,
   recoverWithPhrase,
+  replacePhraseWithPassword,
+  replacePhraseWithPhrase,
   setAppPassword,
   signInSecret,
   unlockAfterSignIn,
@@ -313,6 +315,84 @@ describe('the app password', () => {
       'This account has no recovery copy'
     );
     expect(api.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('a new recovery phrase from Settings', () => {
+  const passwordAccount = async (wrappedWith: string) => ({
+    auth_scheme: 2,
+    has_password: true,
+    kdf_salt: salt,
+    kdf_iterations: FEW_ROUNDS,
+    encrypted_private_key: await wrapSecret(
+      'the-private-key',
+      (await deriveLoginKeys(wrappedWith, salt, FEW_ROUNDS)).wrapKey
+    ),
+  });
+
+  it('sends nothing until the user holds the new phrase, then the copy it opens', async () => {
+    serverAnswers({ '/auth/key-backup': await passwordAccount('correct horse') });
+    const pending = await replacePhraseWithPassword('correct horse');
+    expect(isValidRecoveryPhrase(pending.phrase)).toBe(true);
+    expect(api.put).not.toHaveBeenCalled();
+
+    await pending.save();
+    const keys = await deriveLoginKeys('correct horse', salt, FEW_ROUNDS);
+    const [recovery] = bodiesSentTo('put', '/auth/recovery-key');
+    expect(recovery.login_key).toBe(keys.loginKey);
+    expect(recovery).not.toHaveProperty('password');
+    await expect(
+      unwrapSecret(
+        recovery.recovery_wrapped_private_key as string,
+        await deriveRecoveryKey(pending.phrase)
+      )
+    ).resolves.toBe('the-private-key');
+
+    // A save that failed is simply run again, with the same copy.
+    await pending.save();
+    const [first, second] = bodiesSentTo('put', '/auth/recovery-key');
+    expect(second).toEqual(first);
+  });
+
+  it('says "Wrong password" and sends nothing when the copy does not open', async () => {
+    serverAnswers({ '/auth/key-backup': await passwordAccount('another password') });
+    await expect(replacePhraseWithPassword('correct horse')).rejects.toThrow('Wrong password');
+    serverAnswers({ '/auth/key-backup': { auth_scheme: 1, has_password: true } });
+    await expect(replacePhraseWithPassword('correct horse')).rejects.toThrow(
+      'no copy its password opens'
+    );
+    expect(api.put).not.toHaveBeenCalled();
+  });
+
+  it('proves an account with no password with its current phrase, and sends nothing until saved', async () => {
+    const oldPhrase = newRecoveryPhrase();
+    serverAnswers({
+      '/auth/key-backup': {
+        auth_scheme: 1,
+        has_password: false,
+        recovery_wrapped_private_key: await wrapSecret(
+          'the-private-key',
+          await deriveRecoveryKey(oldPhrase)
+        ),
+      },
+    });
+    const pending = await replacePhraseWithPhrase(oldPhrase);
+    expect(pending.phrase).not.toBe(oldPhrase);
+    expect(api.put).not.toHaveBeenCalled();
+
+    await pending.save();
+    const [recovery] = bodiesSentTo('put', '/auth/recovery-key');
+    expect(recovery).not.toHaveProperty('login_key');
+    await expect(
+      unwrapSecret(
+        recovery.recovery_wrapped_private_key as string,
+        await deriveRecoveryKey(pending.phrase)
+      )
+    ).resolves.toBe('the-private-key');
+
+    vi.mocked(api.put).mockClear();
+    await expect(replacePhraseWithPhrase(newRecoveryPhrase())).rejects.toThrow();
+    expect(api.put).not.toHaveBeenCalled();
   });
 });
 
