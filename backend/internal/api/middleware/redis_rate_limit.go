@@ -145,6 +145,13 @@ func AuthRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 5, 15*time.Minute, "rate:auth").FailClosed()
 }
 
+// PreLoginRateLimiter bounds the pre-login lookup that comes before every
+// sign-in: 30 per minute per IP. It is kept apart from AuthRateLimiter so a
+// sign-in does not spend two of its five attempts.
+func PreLoginRateLimiter(cache services.Cache) *RedisRateLimiter {
+	return NewRedisRateLimiter(cache, 30, time.Minute, "rate:prelogin").FailClosed()
+}
+
 // PasswordResetRateLimiter creates a distributed rate limiter for password resets
 // 3 reset requests per hour per IP
 func PasswordResetRateLimiter(cache services.Cache) *RedisRateLimiter {

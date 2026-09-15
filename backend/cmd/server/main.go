@@ -920,6 +920,7 @@ func main() {
 	// Auth rate limiters — Redis-backed so they work across restarts and are IP-keyed
 	// (no user_id exists at login/register time, so the Redis limiter falls back to ClientIP).
 	authRateLimiter := middleware.AuthRateLimiter(cache)
+	preLoginRateLimiter := middleware.PreLoginRateLimiter(cache)
 	passwordResetRateLimiter := middleware.PasswordResetRateLimiter(cache)
 	messageSendRateLimiter := middleware.MessageSendRateLimiter(cache)
 	analyticsRateLimiter := middleware.NewRedisRateLimiter(cache, 120, time.Minute, "rate:analytics").FailClosed()
@@ -1138,9 +1139,11 @@ func main() {
 			if cfg.AppEnv == "development" {
 				auth.POST("/register", authHandler.Register)
 				auth.POST("/login", authHandler.Login)
+				auth.POST("/prelogin", authHandler.PreLogin)
 			} else {
 				auth.POST("/register", authRateLimiter.Middleware(), authHandler.Register)
 				auth.POST("/login", authRateLimiter.Middleware(), authHandler.Login)
+				auth.POST("/prelogin", preLoginRateLimiter.Middleware(), authHandler.PreLogin)
 			}
 
 			// Password reset — 3 requests per hour per IP
@@ -1348,6 +1351,8 @@ func main() {
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
 			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)
 			protected.GET("/auth/encrypted-private-key", authHandler.GetEncryptedPrivateKey)
+			// It checks the current password, so it shares the sign-in limit.
+			protected.POST("/auth/login-key", authRateLimiter.Middleware(), authHandler.MoveToLoginKey)
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)

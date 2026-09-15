@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -453,6 +454,75 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"public_keys": publicKeys})
+}
+
+// PreLogin tells the app how an account proves its password: the password
+// itself (scheme 1) or a login key derived with the returned salt and rounds.
+// @Summary      Pre-login
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  services.PreLoginResponse
+// @Failure      400  {object}  gin.H
+// @Router       /auth/prelogin [post]
+func (h *AuthHandler) PreLogin(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	resp, err := h.authService.PreLogin(c.Request.Context(), h.userRepo, req.Username)
+	if err != nil {
+		slog.Error("pre-login lookup failed", "error", err)
+		RespondError(c, http.StatusServiceUnavailable, "Sign-in is temporarily unavailable")
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// MoveToLoginKey moves the signed-in account from sending its password to
+// sending a login key, and replaces the private key copy wrapped with the
+// password.
+// @Summary      Move to a login key
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  services.LoginKeyUpgradeRequest  true  "Current password, login key, KDF settings and rewrapped private key"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      409  {object}  gin.H
+// @Router       /auth/login-key [post]
+func (h *AuthHandler) MoveToLoginKey(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var req services.LoginKeyUpgradeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	ctx := c.Request.Context()
+	err := h.authService.MoveToLoginKey(ctx, h.userRepo, userID, &req)
+	switch {
+	case err == nil:
+		h.logAudit(ctx, &userID, "login_key_enabled", "user", &userID, c.ClientIP(), c.Request.UserAgent(), nil)
+		c.JSON(http.StatusOK, gin.H{"scheme": 2})
+	case errors.Is(err, services.ErrInvalidLoginKey):
+		RespondError(c, http.StatusBadRequest, "Invalid login key settings")
+	case errors.Is(err, services.ErrCurrentPasswordIncorrect):
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
+	case errors.Is(err, services.ErrAlreadyOnLoginKey):
+		RespondError(c, http.StatusConflict, "Account already signs in with a login key")
+	default:
+		slog.Error("move to login key failed", "error", err, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to update sign-in")
+	}
 }
 
 // UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync.

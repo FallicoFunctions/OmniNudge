@@ -24,9 +24,15 @@ const (
 	maxKDFSaltBytes  = 64
 )
 
-// ErrAlreadyOnLoginKey is returned when an account that already signs in with
-// a login key is asked to move to one.
-var ErrAlreadyOnLoginKey = errors.New("account already signs in with a login key")
+var (
+	// ErrAlreadyOnLoginKey is returned when an account that already signs in
+	// with a login key is asked to move to one.
+	ErrAlreadyOnLoginKey = errors.New("account already signs in with a login key")
+	// ErrInvalidLoginKey wraps every refusal of the login key, salt or rounds.
+	ErrInvalidLoginKey = errors.New("invalid login key settings")
+	// ErrCurrentPasswordIncorrect is returned when the move's password proof fails.
+	ErrCurrentPasswordIncorrect = errors.New("current password is incorrect")
+)
 
 // PreLoginResponse tells the app how to prove a password to the server.
 type PreLoginResponse struct {
@@ -78,13 +84,13 @@ func registrationCredentials(req *RegisterRequest) (registrationSecret, error) {
 
 func validateLoginKey(loginKey, kdfSalt string, kdfIterations int) error {
 	if key, err := base64.StdEncoding.DecodeString(loginKey); err != nil || len(key) != loginKeyBytes {
-		return fmt.Errorf("login key must be %d bytes, base64", loginKeyBytes)
+		return fmt.Errorf("%w: login key must be %d bytes, base64", ErrInvalidLoginKey, loginKeyBytes)
 	}
 	if salt, err := base64.StdEncoding.DecodeString(kdfSalt); err != nil || len(salt) < minKDFSaltBytes || len(salt) > maxKDFSaltBytes {
-		return fmt.Errorf("kdf salt must be %d to %d bytes, base64", minKDFSaltBytes, maxKDFSaltBytes)
+		return fmt.Errorf("%w: kdf salt must be %d to %d bytes, base64", ErrInvalidLoginKey, minKDFSaltBytes, maxKDFSaltBytes)
 	}
 	if kdfIterations < MinKDFIterations || kdfIterations > maxKDFIterations {
-		return fmt.Errorf("kdf iterations must be between %d and %d", MinKDFIterations, maxKDFIterations)
+		return fmt.Errorf("%w: kdf iterations must be between %d and %d", ErrInvalidLoginKey, MinKDFIterations, maxKDFIterations)
 	}
 	return nil
 }
@@ -132,7 +138,7 @@ func (s *AuthService) MoveToLoginKey(ctx context.Context, userRepo ports.UserRep
 		return ErrAlreadyOnLoginKey
 	}
 	if err := utils.CheckPassword(user.PasswordHash, req.CurrentPassword); err != nil {
-		return errors.New("current password is incorrect")
+		return ErrCurrentPasswordIncorrect
 	}
 	hash, err := utils.HashPassword(req.LoginKey)
 	if err != nil {

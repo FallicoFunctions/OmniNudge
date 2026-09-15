@@ -181,11 +181,12 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 
-	var authLimit, sendLimit []gin.HandlerFunc
+	var authLimit, preLoginLimit, sendLimit []gin.HandlerFunc
 	if rateLimited {
 		limitCache := services.NewMemoryCache()
 		t.Cleanup(limitCache.Stop)
 		authLimit = []gin.HandlerFunc{middleware.AuthRateLimiter(limitCache).Middleware()}
+		preLoginLimit = []gin.HandlerFunc{middleware.PreLoginRateLimiter(limitCache).Middleware()}
 		sendLimit = []gin.HandlerFunc{middleware.MessageSendRateLimiter(limitCache).Middleware()}
 	}
 	limited := func(limit []gin.HandlerFunc, h gin.HandlerFunc) []gin.HandlerFunc {
@@ -201,6 +202,7 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 		{
 			auth.POST("/register", limited(authLimit, authHandler.Register)...)
 			auth.POST("/login", limited(authLimit, authHandler.Login)...)
+			auth.POST("/prelogin", limited(preLoginLimit, authHandler.PreLogin)...)
 			auth.GET("/me", middleware.AuthRequired(authService), authHandler.GetMe)
 		}
 
@@ -260,6 +262,7 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 			protected.POST("/messages", limited(sendLimit, messagesHandler.SendMessage)...)
 			protected.POST("/messages/forward", limited(sendLimit, messagesHandler.ForwardMessage)...)
 			protected.POST("/mod-mail", limited(sendLimit, modMailHandler.CreateModMail)...)
+			protected.POST("/auth/login-key", limited(authLimit, authHandler.MoveToLoginKey)...)
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
