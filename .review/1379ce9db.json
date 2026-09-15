@@ -1,0 +1,221 @@
+{
+  "schema_version": 2,
+  "head": "88b6a0c38",
+  "base": "1379ce9db",
+  "scope": {
+    "files": [
+      "backend/internal/handlers/users.go",
+      "backend/internal/handlers/auth.go",
+      "backend/internal/handlers/users_change_password_test.go",
+      "backend/internal/handlers/auth_email_test.go"
+    ],
+    "boundaries": [
+      "client -> POST /users/change-password, POST /auth/reset-password",
+      "handlers -> services.ChangeLoginKey, services.ResetToLoginKey"
+    ]
+  },
+  "prior_ledgers_read": [
+    "1379ce9db",
+    "b530f73c2"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "users.go: changePasswordRequest embeds services.LoginKeyChangeRequest; ChangePassword routes scheme 2 accounts to changeLoginKey and checks the password rules itself; auth.go: ResetPassword takes login_key and settings or new_password, calls ResetToLoginKey, and guards a nil user. New users_change_password_test.go and TestResetPassword_WithLoginKey."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "1379ce9db (K2b-1) built the functions these handlers call; b530f73c2 found GetByID omitting the hash, which change-password had silently depended on; no handler test covered change-password until now."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read the statuses the client receives: change-password on a password account gives 401 (wrong current), 400 (short new), 409 (login-key fields), 200 with the new hash verifying; on a login-key account 409 (password fields), 401 (wrong current key), 400 (no rewrapped copy), 400 (1000 rounds), 200 with the new copy stored. Reset gives 400 for a password and a key together, 400 for bad rounds, 200 for a valid key."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "The rows are read back by the handler tests; no new query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The JSON names match the service structs: current_login_key, new_login_key, kdf_salt, kdf_iterations, encrypted_private_key, login_key."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The web app's change-password body (current_password, new_password) still takes the password path with the same statuses; only a malformed-JSON body's message changed text, still 400."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule duplicated; both handlers call the services."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added to a model."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The handlers use the production repository in the tests, not the mock that once hid GetByID's missing hash."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The reset token is minted by ForgotPassword, as in production."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused as listed under B3, including a scheme 2 account sending its password."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The rounds boundary is covered by K1b's tests."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "A reset with new_password on a scheme 2 account goes through UpdatePassword, which returns the account to scheme 1 (K1b-1's fix), so an older app can still reset."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of changeLoginKey's switch and of the reset's key path is reached by a test; the nil-user guard is reachable only in a race (a token is deleted with its account), so it has no test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Unexpected errors are logged with the user and answered 500; nothing is swallowed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Nothing gated on a flag."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other handlers that set a password: none besides these two and the move."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No new shared state."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Reset with bad settings returns before MarkAsUsed: the test's later valid reset used the same token. Both success paths mark the token used, invalidate other reset tokens and end every session."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A reset with a key clears the copy wrapped by the forgotten password; the recovery copy stays for the phrase (K4)."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The handlers are the ones cmd/server routes for /users/change-password and /auth/reset-password."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; handlers 74, integration 4, services 64 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the handlers against real Postgres 16 with a real reset token from ForgotPassword."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed change-password a change without the rewrapped copy on an account that has one: refused (400)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K2b promises at the HTTP boundary: a change replaces the copy and never drops it; a reset clears it; a scheme 2 account never sends its password. Each is a handler test."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "handlers 74, integration 4, services 64 PASS; 0 FAIL, 0 SKIP"
+  }
+}
