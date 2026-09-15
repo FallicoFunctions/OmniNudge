@@ -1,0 +1,463 @@
+{
+ "schema_version": 2,
+ "head": "d6698da45",
+ "base": "8bc3efc78",
+ "scope": {
+  "files": [
+   "omnirave-babylon/src/network/loginKey.ts",
+   "omnirave-babylon/src/network/__tests__/loginKey.test.ts",
+   "omnirave-babylon/src/network/runtimeAuth.ts",
+   "omnirave-babylon/src/network/__tests__/runtimeAuth.test.ts",
+   "frontend/src/contexts/AuthContext.tsx",
+   "frontend/src/contexts/__tests__/AuthContext.test.tsx"
+  ],
+  "boundaries": [
+   "POST /omnigame/runtime/auth/prelogin",
+   "POST /omnigame/runtime/auth/login",
+   "POST /omnigame/runtime/auth/signup",
+   "shared/crypto-vectors",
+   "AuthContext first sign-in"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a4d23fcc1",
+  "cdbe1cbe1",
+  "b2a87c547"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "omnirave-babylon: loginKey.ts (PBKDF2-SHA256 over the NFKC password, HKDF-SHA256 under omninudge/login-key/v1) and runtimeAuth.ts (runtime pre-login, then loginKey or, only on the old scheme, password; sign-up sends loginKey, kdfSalt, kdfIterations); tests. frontend AuthContext: first keys for an account with no key pair."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a4d23fcc1 (K5a: stale auth flow tests), cdbe1cbe1, b2a87c547 (K4c-2 AuthContext)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the fetch mock: /prelogin {username}; /login {username, loginKey, currentVenue} for a login-key account and {username, password, currentVenue} for an old-scheme one; /signup {username, loginKey, kdfSalt (16 bytes), kdfIterations 600000, ...} with no password; the password string appears in no call."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The main app's key step printed for an account made outside it (no public key, no copies) as well as for one that had keys (k5b finding under E6)."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server read: POST /omnigame/runtime/auth/prelogin answers services.PreLoginResponse (scheme, kdf_salt, kdf_iterations) behind the pre-login limit; login and signup bind model.RuntimeAuthRequest."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "loginKey, kdfSalt, kdfIterations match types.go RuntimeAuthRequest; kdf_salt and kdf_iterations match PreLoginResponse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The pre-login fields the runtime reads are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Two implementations of the derivation (frontend loginKeys.ts, omnirave loginKey.ts): both match shared/crypto-vectors/login-keys.json, computed by Node crypto, so they cannot drift unseen."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed; the OmniGame runtime auth contract is read under C1 and C2."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "JSON.stringify of plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The vectors are the independent implementation's output, not the code under test."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both vectors, including the non-ASCII 'P\u00e4ssw\u00f6rd \u2713' (NFKC), derive the pinned keys."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A login-key answer without settings is refused with no login posted; a short sign-up password is refused before any request."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A different salt gives a different key; the salt is 16 random bytes."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: the runtime mirrors signInSecret and prepareSignUp of the main app."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: scheme 1, scheme 2, malformed answer, network failure, bad response."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure reaches the popup as RuntimeAuthError."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One derivation per client, both pinned by the shared vectors."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'an account made by another client': an account created by the OmniRave runtime has a login key but no key pair; at its first main-app sign-in AuthContext found no copy and showed the fresh-start step that warns old encrypted messages will be gone, for an account that never had any (k5b-keyless-account-warned-of-lost-messages)."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Sign-in and sign-up are single requests after local derivation."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing persisted client-side."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "omnirave-babylon has no node_modules here: its two test files ran through a throwaway vitest config on the frontend's install (16 passed), and its two source files type-check with the frontend's tsc under the package's settings; frontend tsc -b and eslint clean; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "E6 names the technique; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Not run against a live OmniGame server: that needs an account created and a password typed, which this session may not do. The contract is pinned by RuntimeAuthRequest's JSON tags and by the shared vectors; recorded as unverified live."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the OmniRave files; the one skipped frontend test predates this work."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K5: the OmniRave client never sends the password of a login-key account. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller each (createRuntime)."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "AuthContext changed: all 45 frontend test files that import or mock a changed module ran: 45 passed, 347 tests passed, 1 skipped."
+    }
+   ],
+   "findings": [
+    {
+     "id": "k5b-keyless-account-warned-of-lost-messages",
+     "summary": "An account made in OmniRave, with no key pair, met the fresh-start warning about losing old messages at its first main-app sign-in instead of getting its first keys.",
+     "found_by": "E6",
+     "fix_commit": "d6698da45",
+     "control": {
+      "patch": ".review/controls/k5b-keyless-account-warned-of-lost-messages.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/AuthContext.test.tsx -t 'made outside this app'"
+      ],
+      "observed": "FAIL: needs-recovery instead of show-phrase, twice"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "omnirave-babylon: loginKey.ts (PBKDF2-SHA256 over the NFKC password, HKDF-SHA256 under omninudge/login-key/v1) and runtimeAuth.ts (runtime pre-login, then loginKey or, only on the old scheme, password; sign-up sends loginKey, kdfSalt, kdfIterations); tests. frontend AuthContext: first keys for an account with no key pair."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a4d23fcc1 (K5a: stale auth flow tests), cdbe1cbe1, b2a87c547 (K4c-2 AuthContext)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Bodies printed through the fetch mock: /prelogin {username}; /login {username, loginKey, currentVenue} for a login-key account and {username, password, currentVenue} for an old-scheme one; /signup {username, loginKey, kdfSalt (16 bytes), kdfIterations 600000, ...} with no password; the password string appears in no call."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The main app's key step printed for an account made outside it (no public key, no copies) as well as for one that had keys (k5b finding under E6)."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Server read: POST /omnigame/runtime/auth/prelogin answers services.PreLoginResponse (scheme, kdf_salt, kdf_iterations) behind the pre-login limit; login and signup bind model.RuntimeAuthRequest."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "loginKey, kdfSalt, kdfIterations match types.go RuntimeAuthRequest; kdf_salt and kdf_iterations match PreLoginResponse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The pre-login fields the runtime reads are the ones the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Two implementations of the derivation (frontend loginKeys.ts, omnirave loginKey.ts): both match shared/crypto-vectors/login-keys.json, computed by Node crypto, so they cannot drift unseen."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed; the OmniGame runtime auth contract is read under C1 and C2."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "JSON.stringify of plain objects."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The vectors are the independent implementation's output, not the code under test."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both vectors, including the non-ASCII 'P\u00e4ssw\u00f6rd \u2713' (NFKC), derive the pinned keys."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A login-key answer without settings is refused with no login posted; a short sign-up password is refused before any request."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A different salt gives a different key; the salt is 16 random bytes."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings compared: the runtime mirrors signInSecret and prepareSignUp of the main app."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch reached: scheme 1, scheme 2, malformed answer, network failure, bad response."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every failure reaches the popup as RuntimeAuthError."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One derivation per client, both pinned by the shared vectors."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Pass 2: an account with a copy but no public key still gets the phrase step, never new keys (asserted); accounts with keys are unchanged."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Sign-in and sign-up are single requests after local derivation."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing persisted client-side."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both neverHadKeys checks removed from d6698da45: the two outside-account tests fail, needs-recovery instead of show-phrase."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "omnirave-babylon has no node_modules here: its two test files ran through a throwaway vitest config on the frontend's install (16 passed), and its two source files type-check with the frontend's tsc under the package's settings; frontend tsc -b and eslint clean; pre-commit gate 0 failed."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Not run against a live OmniGame server: that needs an account created and a password typed, which this session may not do. The contract is pinned by RuntimeAuthRequest's JSON tags and by the shared vectors; recorded as unverified live."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard, check or hook added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "vitest 0 skipped in the OmniRave files; the one skipped frontend test predates this work."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "K5: the OmniRave client never sends the password of a login-key account. Kept."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller each (createRuntime)."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "AuthContext changed: all 45 frontend test files that import or mock a changed module ran: 45 passed, 347 tests passed, 1 skipped."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "frontend tsc -b ok; omnirave sources tsc ok (frontend's compiler, package settings)",
+  "vet": "n/a",
+  "lint": "eslint clean; pre-commit gate 0 failed",
+  "types": "as build",
+  "tests": "omnirave 16 passed; frontend H3 set 45 files, 347 passed, 1 skipped (pre-existing)"
+ }
+}

@@ -1,0 +1,28 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index 01c412f8a..e048887d4 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -114,9 +114,6 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
+     ) {
+       return { status: { state: 'ready' }, held };
+     }
+-    if (await neverHadKeys(account)) {
+-      return { status: phraseShown(await createAccountKeys(held.keys)), held };
+-    }
+     const backup = await api.get<KeyBackup>('/auth/key-backup');
+     return {
+       status: { state: 'needs-recovery', hasRecoveryCopy: !!backup.recovery_wrapped_private_key },
+@@ -133,13 +130,6 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
+         };
+       }
+     }
+-    if (await neverHadKeys(account)) {
+-      const keys = await moveWithoutKey(held.password);
+-      return {
+-        status: phraseShown(await createAccountKeys(keys)),
+-        held: { kind: 'login-key', keys },
+-      };
+-    }
+     // No key the browser can export: the only way on is a fresh start.
+     return { status: { state: 'needs-recovery', hasRecoveryCopy: false }, held };
+   }
