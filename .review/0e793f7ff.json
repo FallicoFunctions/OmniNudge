@@ -1,0 +1,221 @@
+{
+  "schema_version": 2,
+  "head": "67385a167",
+  "base": "0e793f7ff",
+  "scope": {
+    "files": [
+      "backend/internal/handlers/auth.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/integration/test_utils.go",
+      "backend/internal/integration/auth_login_key_integration_test.go"
+    ],
+    "boundaries": [
+      "client -> GET /auth/key-backup, PUT /auth/recovery-key, POST /auth/app-password",
+      "handlers -> services (K4a-1)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "0e793f7ff",
+    "cc906d5e5"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "handlers/auth.go: GetKeyBackup, StoreRecoveryKey, SetAppPassword over the K4a-1 service functions; cmd/server routes (recovery-key and app-password behind the sign-in limiter); the same routes in the test router; integration tests with a sendAuthJSON helper for PUT and GET."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "0e793f7ff (K4a-1) built the service functions these handlers call and found nothing; no prior finding on these endpoints."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No outbound payload."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read what the client receives over HTTP: key-backup returns exactly {kdf_salt, kdf_iterations 600000, recovery_wrapped_private_key}; recovery-key answers 401 to a session alone, 400 to an empty copy, 200 with the login key; app-password answers 400 (1000 rounds), 400 (no copy), 200, then 409, and 409 for an account with a password; the new app password then signs in (200)."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No new query; the repository method was read back in K4a-1."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The JSON names the handlers bind are the service structs' (login_key, password, recovery_wrapped_private_key, kdf_salt, kdf_iterations, encrypted_private_key)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "KeyBackup is returned unwrapped; empty fields are omitted, as the test shows for the absent encrypted copy."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The handlers hold no rules; the proof and password checks live in the services reviewed in K4a-1."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Test accounts are created through the repository and the register endpoint."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No new parsing."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused over HTTP as listed under B3."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "The size bound was covered in K4a-1."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling signed-in auth routes (login-key, encrypted-private-key, public-key) sit beside these; the two that check or create a secret share the sign-in limiter, as login-key does."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the two handlers' switches is reached by a request in the integration tests, except the 500 default."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Unexpected errors are logged with the user and answered 500; the success path of app-password writes the audit event app_password_set."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The limiter keys on the signed-in user (AuthRequired sets user_id), so one user's failures cannot lock out another; key-backup is unlimited, as the existing encrypted-private-key read is, since it returns only what the session's own account holds."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated."
+        },
+        {
+          "id": "E6",
+          "status": "na",
+          "why": "No other shape of this kind."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing new persisted beyond K4a-1."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The routes are registered in cmd/server and the test router; the tests reach them over HTTP."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... and go vet ./... pass (and with the integration tag); golangci-lint 0 issues; integration 12, handlers 48 PASS."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "This pass found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the endpoints over HTTP against real Postgres 16 through the production repository."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed recovery-key a session with no secret: refused (401). Fed app-password an account that has a password: refused (409)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No cached state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Both runs with -v: 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's K4a-2 promises: the three endpoints, and the sign-in limit on the two that touch a secret. Each is exercised over HTTP."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet ./... ok, and with the integration tag",
+    "lint": "golangci-lint 0 issues; pre-commit gate 0 failed",
+    "types": "go build type-checks the backend",
+    "tests": "integration 12, handlers 48 PASS; 0 FAIL, 0 SKIP"
+  }
+}
