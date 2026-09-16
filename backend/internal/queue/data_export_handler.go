@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	zlog "github.com/rs/zerolog/log"
 
@@ -290,14 +292,14 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
 		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content, 
-		       sender_encrypted_content, shared_encryption_iv, created_at, deleted_for_sender, deleted_for_recipient
+		       sender_encrypted_content, shared_encryption_iv, sent_at, deleted_for_sender, deleted_for_recipient
 		FROM messages
 		WHERE (sender_id = $1 OR recipient_id = $1)
 	`
 	if !includeDeleted {
 		query += " AND (CASE WHEN sender_id = $1 THEN NOT deleted_for_sender ELSE NOT deleted_for_recipient END)"
 	}
-	query += " ORDER BY created_at DESC LIMIT 50000"
+	query += " ORDER BY sent_at DESC LIMIT 50000"
 
 	rows, err := db.Query(ctx, query, userID)
 	if err != nil {
@@ -312,7 +314,7 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 		RecipientID      int       `json:"recipient_id"`
 		Content          string    `json:"content"`
 		ContentEncrypted string    `json:"content_encrypted_base64"`
-		CreatedAt        time.Time `json:"created_at"`
+		SentAt           time.Time `json:"sent_at"`
 	}
 
 	messages := []Message{}
@@ -324,7 +326,7 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 		if err := rows.Scan(
 			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.RecipientID,
 			&encryptedContent, &senderEncryptedContent, &sharedIV,
-			&msg.CreatedAt, &deletedSender, &deletedRecipient,
+			&msg.SentAt, &deletedSender, &deletedRecipient,
 		); err != nil {
 			continue
 		}
@@ -350,12 +352,12 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 
 func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
-		SELECT id, title, content, created_at, deleted_at
+		SELECT id, title, body, created_at, is_deleted
 		FROM platform_posts
-		WHERE user_id = $1
+		WHERE author_id = $1
 	`
 	if !includeDeleted {
-		query += " AND deleted_at IS NULL"
+		query += " AND NOT is_deleted"
 	}
 	query += " ORDER BY created_at DESC LIMIT 10000"
 
@@ -366,17 +368,17 @@ func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeD
 	defer rows.Close()
 
 	type Post struct {
-		ID        int        `json:"id"`
-		Title     string     `json:"title"`
-		Content   *string    `json:"content"`
-		CreatedAt time.Time  `json:"created_at"`
-		DeletedAt *time.Time `json:"deleted_at,omitempty"`
+		ID        int       `json:"id"`
+		Title     string    `json:"title"`
+		Body      *string   `json:"body"`
+		CreatedAt time.Time `json:"created_at"`
+		IsDeleted bool      `json:"is_deleted"`
 	}
 
 	posts := []Post{}
 	for rows.Next() {
 		var post Post
-		if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.CreatedAt, &post.DeletedAt); err != nil {
+		if err := rows.Scan(&post.ID, &post.Title, &post.Body, &post.CreatedAt, &post.IsDeleted); err != nil {
 			continue
 		}
 		posts = append(posts, post)
@@ -782,12 +784,12 @@ func exportOmniChatMediaData(ctx context.Context, db *pgxpool.Pool, userID int, 
 
 func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
-		SELECT id, post_id, content, created_at, deleted_at
+		SELECT id, post_id, body, created_at, is_deleted
 		FROM post_comments
 		WHERE user_id = $1
 	`
 	if !includeDeleted {
-		query += " AND deleted_at IS NULL"
+		query += " AND NOT is_deleted"
 	}
 	query += " ORDER BY created_at DESC LIMIT 10000"
 
@@ -798,17 +800,17 @@ func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 	defer rows.Close()
 
 	type Comment struct {
-		ID        int        `json:"id"`
-		PostID    int        `json:"post_id"`
-		Content   string     `json:"content"`
-		CreatedAt time.Time  `json:"created_at"`
-		DeletedAt *time.Time `json:"deleted_at,omitempty"`
+		ID        int       `json:"id"`
+		PostID    int       `json:"post_id"`
+		Body      string    `json:"body"`
+		CreatedAt time.Time `json:"created_at"`
+		IsDeleted bool      `json:"is_deleted"`
 	}
 
 	comments := []Comment{}
 	for rows.Next() {
 		var comment Comment
-		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.Content, &comment.CreatedAt, &comment.DeletedAt); err != nil {
+		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.Body, &comment.CreatedAt, &comment.IsDeleted); err != nil {
 			continue
 		}
 		comments = append(comments, comment)
@@ -823,7 +825,7 @@ func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	// Post votes
 	postVotes, err := db.Query(ctx, `
-		SELECT post_id, vote_type, created_at
+		SELECT post_id, is_upvote, created_at
 		FROM post_votes
 		WHERE user_id = $1
 		ORDER BY created_at DESC LIMIT 10000
@@ -835,14 +837,14 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 
 	type PostVote struct {
 		PostID    int       `json:"post_id"`
-		VoteType  int       `json:"vote_type"`
+		IsUpvote  bool      `json:"is_upvote"`
 		CreatedAt time.Time `json:"created_at"`
 	}
 
 	pVotes := []PostVote{}
 	for postVotes.Next() {
 		var vote PostVote
-		if err := postVotes.Scan(&vote.PostID, &vote.VoteType, &vote.CreatedAt); err != nil {
+		if err := postVotes.Scan(&vote.PostID, &vote.IsUpvote, &vote.CreatedAt); err != nil {
 			continue
 		}
 		pVotes = append(pVotes, vote)
@@ -850,7 +852,7 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 
 	// Comment votes
 	commentVotes, err := db.Query(ctx, `
-		SELECT comment_id, vote_type, created_at
+		SELECT comment_id, is_upvote, created_at
 		FROM comment_votes
 		WHERE user_id = $1
 		ORDER BY created_at DESC LIMIT 10000
@@ -862,14 +864,14 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 
 	type CommentVote struct {
 		CommentID int       `json:"comment_id"`
-		VoteType  int       `json:"vote_type"`
+		IsUpvote  bool      `json:"is_upvote"`
 		CreatedAt time.Time `json:"created_at"`
 	}
 
 	cVotes := []CommentVote{}
 	for commentVotes.Next() {
 		var vote CommentVote
-		if err := commentVotes.Scan(&vote.CommentID, &vote.VoteType, &vote.CreatedAt); err != nil {
+		if err := commentVotes.Scan(&vote.CommentID, &vote.IsUpvote, &vote.CreatedAt); err != nil {
 			continue
 		}
 		cVotes = append(cVotes, vote)
@@ -884,10 +886,10 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 func exportSavedData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	// Saved posts
 	savedPosts, err := db.Query(ctx, `
-		SELECT post_id, saved_at
+		SELECT post_id, created_at
 		FROM saved_posts
 		WHERE user_id = $1
-		ORDER BY saved_at DESC LIMIT 10000
+		ORDER BY created_at DESC LIMIT 10000
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -944,7 +946,7 @@ func exportHubsData(ctx context.Context, db *pgxpool.Pool, userID int) (interfac
 	hubs, err := db.Query(ctx, `
 		SELECT id, name, description, created_at
 		FROM hubs
-		WHERE creator_id = $1
+		WHERE created_by = $1
 		ORDER BY created_at DESC
 	`, userID)
 	if err != nil {
@@ -976,17 +978,23 @@ func exportHubsData(ctx context.Context, db *pgxpool.Pool, userID int) (interfac
 
 func exportSettingsData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	var settings struct {
-		ThemePreference      *string `json:"theme_preference"`
-		NotificationsEnabled bool    `json:"notifications_enabled"`
-		EmailNotifications   bool    `json:"email_notifications"`
+		Theme                 *string `json:"theme"`
+		ShowPushNotifications bool    `json:"show_push_notifications"`
+		DailyDigest           bool    `json:"daily_digest"`
+		BatchNotifications    bool    `json:"batch_notifications"`
 	}
 
 	err := db.QueryRow(ctx, `
-		SELECT theme_preference, notifications_enabled, email_notifications
+		SELECT theme, show_push_notifications, daily_digest, batch_notifications
 		FROM user_settings
 		WHERE user_id = $1
-	`, userID).Scan(&settings.ThemePreference, &settings.NotificationsEnabled, &settings.EmailNotifications)
+	`, userID).Scan(&settings.Theme, &settings.ShowPushNotifications, &settings.DailyDigest, &settings.BatchNotifications)
 
+	// An account that never changed a setting has no row. That is an empty
+	// section, not a failed export.
+	if errors.Is(err, pgx.ErrNoRows) {
+		return settings, nil
+	}
 	if err != nil {
 		return nil, err
 	}
