@@ -303,10 +303,19 @@ func TestWSHandler_BroadcastsChatMessagesToAllConnections(t *testing.T) {
 		"body": "See you in the neon room",
 	}))
 
-	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
+	// A join broadcasts a snapshot to every connection, so the chat message is
+	// not always the next thing this one reads: on a slow machine the join
+	// broadcast arrives after the connection's own join snapshot. Skip the
+	// snapshots until the chat arrives, under one deadline for the whole wait.
+	_ = secondConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 
 	var secondMessage map[string]any
-	require.NoError(t, secondConn.ReadJSON(&secondMessage))
+	for {
+		require.NoError(t, secondConn.ReadJSON(&secondMessage))
+		if secondMessage["type"] != "world_snapshot" {
+			break
+		}
+	}
 	require.Equal(t, "chat_message", secondMessage["type"])
 	require.Equal(t, "guest-1", secondMessage["playerId"])
 	require.Equal(t, "Guest-1", secondMessage["playerName"])
