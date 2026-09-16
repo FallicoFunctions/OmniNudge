@@ -58,6 +58,25 @@ func setTestGroupHistory(t *testing.T, db *testutil.TestDatabase, conversationID
 	require.NoError(t, err)
 }
 
+// Rotation wraps the next key with each member's public key, so a member
+// without one stops the group. Real members have published a key.
+func publishTestPublicKey(t *testing.T, db *testutil.TestDatabase, userIDs ...int) {
+	t.Helper()
+	for _, id := range userIDs {
+		_, err := db.Pool.Exec(context.Background(),
+			`UPDATE users SET public_key = $1 WHERE id = $2`, fmt.Sprintf("public-key-for-%d", id), id)
+		require.NoError(t, err)
+	}
+}
+
+func memberIDs(members []services.GroupMember) []int {
+	ids := make([]int, 0, len(members))
+	for _, m := range members {
+		ids = append(ids, m.UserID)
+	}
+	return ids
+}
+
 // What a member's client sends: the key wrapped with each member's public key.
 func wrappedCopies(version int, members ...int) map[int]string {
 	copies := map[int]string{}
@@ -76,13 +95,14 @@ func TestGroupKeyFirstVersionGoesToEveryMember(t *testing.T) {
 	owner := fixtures.CreateUniqueUser("gk_owner")
 	member := fixtures.CreateUniqueUser("gk_member")
 	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID)
 
 	state, err := svc.State(ctx, group, owner.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 0, state.ActiveVersion, "a group with no key needs one before the next message")
 	assert.Equal(t, 0, state.LatestVersion)
 	assert.True(t, state.HistoryVisible, "a group with no settings row shows its history")
-	assert.ElementsMatch(t, []int{owner.ID, member.ID}, state.Members)
+	assert.ElementsMatch(t, []int{owner.ID, member.ID}, memberIDs(state.Members))
 	assert.Empty(t, state.MyCopies)
 
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
@@ -108,6 +128,7 @@ func TestGroupKeyCopiesMustMatchTheMembers(t *testing.T) {
 	member := fixtures.CreateUniqueUser("gk_member")
 	outsider := fixtures.CreateUniqueUser("gk_outsider")
 	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID)
 
 	refused := []*services.GroupKeyRotation{
 		{KeyVersion: 1, Copies: wrappedCopies(1, owner.ID)},
@@ -132,6 +153,7 @@ func TestGroupKeyVersionsFollowOneAnotherAndOnlyWhenStale(t *testing.T) {
 	owner := fixtures.CreateUniqueUser("gk_owner")
 	member := fixtures.CreateUniqueUser("gk_member")
 	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID)
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
 		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID, member.ID),
 	}))
@@ -151,10 +173,44 @@ func TestGroupKeyVersionsFollowOneAnotherAndOnlyWhenStale(t *testing.T) {
 	state, err := svc.State(ctx, group, owner.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 2, state.ActiveVersion)
-	assert.ElementsMatch(t, []int{owner.ID}, state.Members, "the member who left gets no copy of the new version")
+	assert.ElementsMatch(t, []int{owner.ID}, memberIDs(state.Members), "the member who left gets no copy of the new version")
 
 	_, err = svc.State(ctx, group, member.ID)
 	assert.ErrorIs(t, err, services.ErrNotGroupMember)
+}
+
+// A member who never published a key cannot be given a copy, so the group
+// cannot rotate at all. The sender must learn that, and not that its copies
+// were wrong: the copies are exactly right, and the member is the problem.
+func TestGroupKeyWaitsForAMemberWithNoPublicKey(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	fixtures := testutil.NewFixtures(t, db)
+	svc := services.NewGroupKeyService(db.Pool)
+	ctx := context.Background()
+
+	owner := fixtures.CreateUniqueUser("gk_owner")
+	member := fixtures.CreateUniqueUser("gk_member")
+	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID)
+
+	state, err := svc.State(ctx, group, owner.ID)
+	require.NoError(t, err)
+	keys := map[int]string{}
+	for _, m := range state.Members {
+		keys[m.UserID] = m.PublicKey
+	}
+	assert.Equal(t, fmt.Sprintf("public-key-for-%d", owner.ID), keys[owner.ID],
+		"the state carries the key each copy must be wrapped with")
+	assert.Empty(t, keys[member.ID], "and names the member who holds the group back")
+
+	assert.ErrorIs(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID, member.ID),
+	}), services.ErrGroupKeyNoPublicKey)
+
+	publishTestPublicKey(t, db, member.ID)
+	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID, member.ID),
+	}), "and the same rotation goes through once that member has a key")
 }
 
 func TestGroupKeyIsClosedToNonMembers(t *testing.T) {
@@ -184,6 +240,7 @@ func TestGroupKeyHistoryReachesANewMemberWhenTheGroupShowsIt(t *testing.T) {
 	member := fixtures.CreateUniqueUser("gk_member")
 	newcomer := fixtures.CreateUniqueUser("gk_newcomer")
 	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID, newcomer.ID)
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
 		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID, member.ID),
 	}))
@@ -218,6 +275,7 @@ func TestGroupKeyHistoryStaysShutWhenTheGroupHidesIt(t *testing.T) {
 	owner := fixtures.CreateUniqueUser("gk_owner")
 	newcomer := fixtures.CreateUniqueUser("gk_newcomer")
 	group := newTestGroup(t, db, owner.ID)
+	publishTestPublicKey(t, db, owner.ID, newcomer.ID)
 	setTestGroupHistory(t, db, group, false)
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
 		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID),
@@ -254,6 +312,7 @@ func TestGroupKeyHistoryNeedsAVersionTheSenderHolds(t *testing.T) {
 	newcomer := fixtures.CreateUniqueUser("gk_newcomer")
 	latecomer := fixtures.CreateUniqueUser("gk_latecomer")
 	group := newTestGroup(t, db, owner.ID)
+	publishTestPublicKey(t, db, owner.ID, newcomer.ID, latecomer.ID)
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
 		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID),
 	}))

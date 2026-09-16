@@ -29,6 +29,8 @@ var (
 	ErrGroupKeyCopies = errors.New("the key copies do not match the group's members")
 	// ErrGroupKeyHistory refuses older-version copies the rules do not allow.
 	ErrGroupKeyHistory = errors.New("these older key copies are not allowed")
+	// ErrGroupKeyNoPublicKey is returned while a member has published no key.
+	ErrGroupKeyNoPublicKey = errors.New("a member has published no public key")
 )
 
 // A 32-byte key wrapped with RSA-OAEP 2048 is 256 bytes, 344 in base64.
@@ -39,13 +41,21 @@ type GroupKeyCopy struct {
 	WrappedKey string `json:"wrapped_key"`
 }
 
+// GroupMember is a current member and the public key the next copy must be
+// wrapped with. PublicKey is empty for a member who has never published one,
+// and that member holds the whole group back: nobody can wrap a key for them.
+type GroupMember struct {
+	UserID    int    `json:"user_id"`
+	PublicKey string `json:"public_key"`
+}
+
 // GroupKeyState is what a member needs to read and to send: its own copies,
 // and, when ActiveVersion is 0, what the next version must cover.
 type GroupKeyState struct {
 	ActiveVersion  int            `json:"active_version"`
 	LatestVersion  int            `json:"latest_version"`
 	HistoryVisible bool           `json:"history_visible"`
-	Members        []int          `json:"members"`
+	Members        []GroupMember  `json:"members"`
 	MissingHistory map[int][]int  `json:"missing_history"`
 	MyCopies       []GroupKeyCopy `json:"my_copies"`
 }
@@ -92,11 +102,11 @@ func (s *GroupKeyService) State(ctx context.Context, conversationID, userID int)
 }
 
 func groupKeyState(ctx context.Context, q groupKeyQuerier, conversationID, userID int) (*GroupKeyState, error) {
-	members, err := groupMemberIDs(ctx, q, conversationID)
+	members, err := groupMembers(ctx, q, conversationID)
 	if err != nil {
 		return nil, err
 	}
-	if !containsInt(members, userID) {
+	if !isGroupMember(members, userID) {
 		return nil, ErrNotGroupMember
 	}
 	state := &GroupKeyState{Members: members, MissingHistory: map[int][]int{}, MyCopies: []GroupKeyCopy{}}
@@ -197,11 +207,18 @@ func (s *GroupKeyService) Rotate(ctx context.Context, conversationID, userID int
 	if req.KeyVersion != state.LatestVersion+1 {
 		return ErrGroupKeyVersion
 	}
+	// A member with no published key can be given no copy, so the group cannot
+	// rotate at all. Say that, instead of blaming the copies the sender sent.
+	for _, member := range state.Members {
+		if member.PublicKey == "" {
+			return ErrGroupKeyNoPublicKey
+		}
+	}
 	if len(req.Copies) != len(state.Members) {
 		return ErrGroupKeyCopies
 	}
 	for _, member := range state.Members {
-		if !validGroupKeyCopy(req.Copies[member]) {
+		if !validGroupKeyCopy(req.Copies[member.UserID]) {
 			return ErrGroupKeyCopies
 		}
 	}
@@ -281,11 +298,14 @@ func insertGroupKeyCopy(ctx context.Context, tx pgx.Tx, keyID, member int, wrapp
 	return nil
 }
 
-func groupMemberIDs(ctx context.Context, q groupKeyQuerier, conversationID int) ([]int, error) {
+// The join to users is a LEFT join on purpose: a member must never drop out of
+// this list, because a member nobody sees is a member nobody wraps a key for.
+func groupMembers(ctx context.Context, q groupKeyQuerier, conversationID int) ([]GroupMember, error) {
 	rows, err := q.Query(ctx, `
-		SELECT p.user_id
+		SELECT p.user_id, COALESCE(u.public_key, '')
 		FROM conversation_participants p
 		JOIN conversations c ON c.id = p.conversation_id
+		LEFT JOIN users u ON u.id = p.user_id
 		WHERE p.conversation_id = $1 AND c.is_group = TRUE
 		ORDER BY p.user_id
 	`, conversationID)
@@ -293,15 +313,24 @@ func groupMemberIDs(ctx context.Context, q groupKeyQuerier, conversationID int) 
 		return nil, fmt.Errorf("read group members: %w", err)
 	}
 	defer rows.Close()
-	members := []int{}
+	members := []GroupMember{}
 	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
+		var m GroupMember
+		if err := rows.Scan(&m.UserID, &m.PublicKey); err != nil {
 			return nil, err
 		}
-		members = append(members, id)
+		members = append(members, m)
 	}
 	return members, rows.Err()
+}
+
+func isGroupMember(members []GroupMember, want int) bool {
+	for _, m := range members {
+		if m.UserID == want {
+			return true
+		}
+	}
+	return false
 }
 
 func validGroupKeyCopy(wrapped string) bool {

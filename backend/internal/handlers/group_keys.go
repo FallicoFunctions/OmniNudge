@@ -112,6 +112,10 @@ func (h *GroupKeyHandler) RotateGroupKey(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, "The key copies do not match the group's members")
 	case errors.Is(err, services.ErrGroupKeyHistory):
 		RespondError(c, http.StatusBadRequest, "Those older key copies are not allowed")
+	case errors.Is(err, services.ErrGroupKeyNoPublicKey):
+		// Not the sender's doing: a member has never published a key, so no
+		// client can wrap the next version for them.
+		RespondError(c, http.StatusConflict, "A member has not set up encryption yet")
 	default:
 		slog.Error("store group key version failed", "error", err, "conversation_id", conversationID, "user_id", userID)
 		RespondError(c, http.StatusInternalServerError, "Failed to store the group key")

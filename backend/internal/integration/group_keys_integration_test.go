@@ -34,6 +34,15 @@ func newGroupWithMembers(t *testing.T, deps *TestDeps, ownerID int, memberIDs ..
 	return conversationID
 }
 
+// Rotation wraps the next key with each member's public key, so every member
+// must have published one before the group can have a key at all.
+func publishPublicKey(t *testing.T, deps *TestDeps, userIDs ...int) {
+	t.Helper()
+	for _, id := range userIDs {
+		require.NoError(t, deps.UserRepo.UpdatePublicKey(t.Context(), id, fmt.Sprintf("public-key-for-%d", id)))
+	}
+}
+
 // Every join and every leave ends the active version, so no message goes out
 // under a key a newcomer lacks or a former member still holds.
 func TestGroupMembershipChangesEndTheKeyVersion(t *testing.T) {
@@ -42,6 +51,7 @@ func TestGroupMembershipChangesEndTheKeyVersion(t *testing.T) {
 	member := createUser(t, deps.UserRepo, uniqueRLUsername("hookmember"), "user")
 	newcomer := createUser(t, deps.UserRepo, uniqueRLUsername("hooknewcomer"), "user")
 	group := newGroupWithMembers(t, deps, owner.ID, member.ID)
+	publishPublicKey(t, deps, owner.ID, member.ID, newcomer.ID)
 
 	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	require.NoError(t, err)
@@ -99,6 +109,7 @@ func TestGroupMembershipChangesEndTheKeyVersion(t *testing.T) {
 	// version must end with it, or the group would keep sending under a key the
 	// banned member still holds.
 	banned := createUser(t, deps.UserRepo, uniqueRLUsername("hookbanned"), "user")
+	publishPublicKey(t, deps, banned.ID)
 	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/participants", group),
 		map[string]any{"user_id": banned.ID}, ownerToken)
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
@@ -117,6 +128,7 @@ func TestGroupKeyRoutesOverHTTP(t *testing.T) {
 	member := createUser(t, deps.UserRepo, uniqueRLUsername("keymember"), "user")
 	outsider := createUser(t, deps.UserRepo, uniqueRLUsername("keyoutsider"), "user")
 	group := newGroupWithMembers(t, deps, owner.ID, member.ID)
+	publishPublicKey(t, deps, owner.ID, member.ID)
 
 	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 	require.NoError(t, err)
@@ -134,7 +146,16 @@ func TestGroupKeyRoutesOverHTTP(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &state))
 	assert.Equal(t, float64(0), state["active_version"])
 	assert.Equal(t, true, state["history_visible"])
-	assert.ElementsMatch(t, []any{float64(owner.ID), float64(member.ID)}, state["members"])
+	members, ok := state["members"].([]any)
+	require.True(t, ok)
+	ids := []any{}
+	for _, m := range members {
+		entry, ok := m.(map[string]any)
+		require.True(t, ok)
+		ids = append(ids, entry["user_id"])
+		assert.NotEmpty(t, entry["public_key"], "the sender wraps the next key with these")
+	}
+	assert.ElementsMatch(t, []any{float64(owner.ID), float64(member.ID)}, ids)
 	assert.Empty(t, state["my_copies"])
 
 	// Nobody outside the group may read the state or store a version.
