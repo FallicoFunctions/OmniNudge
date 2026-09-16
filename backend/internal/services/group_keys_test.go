@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/omninudge/backend/internal/services"
@@ -211,6 +212,35 @@ func TestGroupKeyWaitsForAMemberWithNoPublicKey(t *testing.T) {
 	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
 		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID, member.ID),
 	}), "and the same rotation goes through once that member has a key")
+}
+
+// The bound on a stored copy must admit anything a publishable key can make.
+// The publish path takes a public key of any size up to its own bound, and a
+// large modulus wraps a 32-byte key to well over 2 KB. A copy the group
+// refuses on size is a member who can never be given the key at all, and the
+// refusal would name the copies, which are not the problem.
+func TestGroupKeyCopyFitsAnyPublishableKey(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	fixtures := testutil.NewFixtures(t, db)
+	svc := services.NewGroupKeyService(db.Pool)
+	ctx := context.Background()
+
+	owner := fixtures.CreateUniqueUser("gk_owner")
+	member := fixtures.CreateUniqueUser("gk_member")
+	group := newTestGroup(t, db, owner.ID, member.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID)
+
+	// Longer than the old 2 KB bound, shorter than a publishable key allows.
+	wrapped := strings.Repeat("A", 3000)
+	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 1,
+		Copies:     map[int]string{owner.ID: wrapped, member.ID: wrapped},
+	}))
+
+	state, err := svc.State(ctx, group, member.ID)
+	require.NoError(t, err)
+	require.Len(t, state.MyCopies, 1)
+	assert.Equal(t, wrapped, state.MyCopies[0].WrappedKey, "the copy is stored whole")
 }
 
 func TestGroupKeyIsClosedToNonMembers(t *testing.T) {

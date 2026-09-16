@@ -33,8 +33,13 @@ var (
 	ErrGroupKeyNoPublicKey = errors.New("a member has published no public key")
 )
 
-// A 32-byte key wrapped with RSA-OAEP 2048 is 256 bytes, 344 in base64.
-const maxGroupKeyCopyBytes = 2048
+// A 32-byte key wrapped with RSA-OAEP 2048 is 256 bytes, 344 in base64. The
+// bound follows the one the publish path allows a public key, and must never
+// be smaller: a bigger modulus wraps to more than 2 KB, so a tighter bound
+// here would refuse every copy that member could ever be given and wedge the
+// group behind ErrGroupKeyCopies, which is the error this phase exists to
+// stop a member from seeing when the copies are not the problem.
+const maxGroupKeyCopyBytes = maxWrappedCopyBytes
 
 type GroupKeyCopy struct {
 	KeyVersion int    `json:"key_version"`
