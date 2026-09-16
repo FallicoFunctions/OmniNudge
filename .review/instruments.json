@@ -247,6 +247,12 @@
       "name": "Run the signed-in E2E specs when a change can take over the screen",
       "trigger": "a change adds or alters something that can cover, block or redirect the whole app: a gate, a full-screen step, a modal on sign-in, a redirect, an inert root",
       "asks": "Unit tests and H3 import modules; Playwright specs load the app in a browser and import nothing, so neither sees a screen-wide overlay. Run every spec that signs in (grep auth/me and login in tests/**/*.spec.ts) with the local Playwright before pushing. The K4d key gate covered the app in two signed-in specs for six pushes because only CI ran them."
+    },
+    {
+      "id": "H5",
+      "name": "Build the shared test fixture the whole package builds",
+      "trigger": "a change adds routes, handlers or state to a fixture every test in a package shares: a test router, a common setup helper, a package-level registry",
+      "asks": "A narrow selector builds only what the selected test touches; the package builds one process, where a second registration of the same route or name panics at construction and kills every test in it. Before trusting a selector, grep the package for other files that register onto the same shared object, and run the whole package once. G1c added participant, leave and ban routes to test_utils.go while groups_integration_test.go already registered three of them on the same base.Router: gin panicked, the whole integration package died in CI, and every local selector still passed."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

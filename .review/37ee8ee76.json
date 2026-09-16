@@ -1,0 +1,143 @@
+{
+ "schema_version": 2,
+ "head": "37ee8ee76",
+ "base": "37ee8ee76",
+ "scope": {
+  "files": [
+   "backend/internal/integration/groups_integration_test.go",
+   ".review/instruments.json"
+  ],
+  "boundaries": [
+   "base.Router, the one gin engine every test in the integration package builds",
+   "POST /groups/:id/participants",
+   "DELETE /groups/:id/participants/:user_id",
+   "POST /groups/:id/members/:user_id/ban",
+   "the integration build tag"
+  ]
+ },
+ "prior_ledgers_read": [
+  "af4bacefe",
+  "800d8e003",
+  "a848b585c"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "One file. newGroupTestDeps stops registering the three routes test_utils.go took over in G1c (POST participants, DELETE participants/:user_id, POST members/:user_id/ban), and drops the groupAdminHandler and the services import that only those lines used. It keeps the four routes only it registers: create, list participants, role, settings."},
+    {"id": "A2", "status": "applied", "evidence": "af4bacefe (G1c, the ledger for the change that added the colliding routes), 800d8e003 (G1b, which first added key routes to the same fixture), a848b585c (G1a, the service). None of the three names a collision on the shared router: the gap is real, not already recorded."},
+    {"id": "B1", "status": "applied", "evidence": "Printed the artifact itself, not the source: a throwaway test built newGroupTestDeps and dumped gin's Routes(). 87 routes, every method+path registered exactly once, and the ten group routes carry production's spelling. Deleted after reading."},
+    {"id": "B2", "status": "na", "why": "No markup; server side."},
+    {"id": "B3", "status": "na", "why": "No response body changed. The artifact that changed is the route table, read under B1."},
+    {"id": "B4", "status": "na", "why": "No SQL and no stored row changed."},
+    {"id": "C1", "status": "applied", "evidence": "Compared every group path in the fixture against cmd/server/main.go: same methods, same parameter spelling (:id, :user_id). A fixture that registers paths production does not would prove nothing."},
+    {"id": "C2", "status": "applied", "evidence": "newGroupTestDeps still returns GroupRouter = base.Router, so every caller receives the same shape as before."},
+    {"id": "C3", "status": "na", "why": "No two implementations to run side by side."},
+    {"id": "C4", "status": "na", "why": "No worker or provider."},
+    {"id": "C5", "status": "na", "why": "No serialiser."},
+    {"id": "C6", "status": "na", "why": "No untyped accessor."},
+    {"id": "C7", "status": "applied", "evidence": "The fixture is the producer here. Its router now matches production's group routes one for one (C1), and the tests drive those routes rather than handler functions."},
+    {"id": "D1", "status": "applied", "evidence": "TestCreateGroupConversation passes at HEAD, verbosely: === RUN then --- PASS (0.31s)."},
+    {"id": "D2", "status": "na", "why": "No input validation path changed."},
+    {"id": "D3", "status": "na", "why": "No boundary values."},
+    {"id": "E1", "status": "applied", "evidence": "Sibling fixtures compared: reddit_handler_integration_test.go and notifications_integration_test.go each build their own engine. groups_integration_test.go is the only file that registers onto the shared base.Router, which is why it was the only one that could collide."},
+    {"id": "E2", "status": "applied", "evidence": "No branch became unreachable. The removed add and remove routes still resolve, registered by test_utils.go on the same engine, so groups_integration_test.go:153 and :191 still drive them. No test in that file ever called the ban route it registered."},
+    {"id": "E3", "status": "na", "why": "No error swallowed."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "applied", "evidence": "The duplication was the defect. Each route now has one owner: test_utils.go for membership and keys, groups_integration_test.go for create, list, role and settings."},
+    {"id": "E6", "status": "applied", "evidence": "Shape 'a second registration on a shared object': grepped every route registration in the package, then confirmed against the printed table under B1 that no method+path repeats."},
+    {"id": "F1", "status": "applied", "evidence": "Whole package under -race -p 4: 0 DATA RACE."},
+    {"id": "F2", "status": "na", "why": "No transaction or lock."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "No delete or cancel path."},
+    {"id": "G1", "status": "applied", "evidence": "Control built and replayed by hand; see the finding."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "gofmt clean, go build ./... ok, go vet ok with and without -tags=integration, golangci-lint 0 issues once given --build-tags=integration (without the tag it sees no files in this package at all)."},
+    {"id": "Z1", "status": "applied", "evidence": "The technique that found this was not in the list: CI built the whole package, every local selector passed. Added H5 before closing the review, and the finding names it."},
+    {"id": "B5", "status": "na", "why": "No model or provider output."},
+    {"id": "E7", "status": "na", "why": "Nothing starts before its governing decision."},
+    {"id": "G3", "status": "applied", "evidence": "Fed the check the thing it exists to refuse: restoring one duplicate route makes gin panic inside newGroupTestDeps and the package reports FAIL, so the control is not blind."},
+    {"id": "B6", "status": "na", "why": "No layout."},
+    {"id": "E8", "status": "applied", "evidence": "The shared gin engine is exactly process-wide state that later code reads. Two files wrote to it; the printed table (B1) is the read-back, and it is now clean."},
+    {"id": "H2", "status": "applied", "evidence": "TEST_DATABASE_URL is unset here, and a skipped package still prints ok, so the first run proved nothing. Re-ran with -v: === RUN, --- PASS, no SKIP. The whole package reported 0 skipped."},
+    {"id": "I1", "status": "applied", "evidence": "The approved G plan is untouched. This repairs the test fixture G1c broke; no protocol behaviour changed."},
+    {"id": "F5", "status": "applied", "evidence": "Two entry points did run the same side effect: two files registering the same route on one engine. That is the defect, and each route now has a single owner."},
+    {"id": "B7", "status": "na", "why": "No layer."},
+    {"id": "H3", "status": "applied", "evidence": "Every test file in the package imports this fixture, so the whole package was run rather than a selector: ok in 43.262s, 0 failed."},
+    {"id": "H4", "status": "na", "why": "No app code; nothing can cover the screen."},
+    {"id": "H5", "status": "applied", "evidence": "The new instrument, applied to its own fix: ran the entire integration package with -race -p 4 as CI does, so one process builds one router across every test file. ok 43.262s, 0 FAIL, 0 SKIP, 0 DATA RACE."}
+   ],
+   "findings": [
+    {
+     "id": "ci-shared-router-route-collision",
+     "summary": "G1c added participant, leave and ban routes to test_utils.go while groups_integration_test.go already registered three of them on the same base.Router. Gin panics on the second registration, so the whole integration package died in CI while every local selector passed.",
+     "found_by": "H5",
+     "fix_commit": "37ee8ee76",
+     "control": {
+      "patch": ".review/controls/ci-shared-router-route-collision.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -run TestCreateGroupConversation -tags=integration"
+      ],
+      "observed": "panic: handlers are already registered for path '/api/v1/groups/:id/participants', raised in newGroupTestDeps at groups_integration_test.go:50; FAIL github.com/omninudge/backend/internal/integration 0.889s. The same selector passes at HEAD."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {"id": "A1", "status": "applied", "evidence": "Scope unchanged: the one test file, plus the new instrument in .review/instruments.json."},
+    {"id": "A2", "status": "applied", "evidence": "Same three ledgers; re-read for a finding of this shape and found none."},
+    {"id": "B1", "status": "applied", "evidence": "The route table was printed after the fix, from the real engine: 87 routes, no repeat."},
+    {"id": "B2", "status": "na", "why": "No markup; server side."},
+    {"id": "B3", "status": "na", "why": "No response body changed."},
+    {"id": "B4", "status": "na", "why": "No SQL and no stored row changed."},
+    {"id": "C1", "status": "applied", "evidence": "Fixture paths still match cmd/server/main.go one for one."},
+    {"id": "C2", "status": "applied", "evidence": "GroupRouter is still base.Router; no caller changed."},
+    {"id": "C3", "status": "na", "why": "No two implementations."},
+    {"id": "C4", "status": "na", "why": "No worker or provider."},
+    {"id": "C5", "status": "na", "why": "No serialiser."},
+    {"id": "C6", "status": "na", "why": "No untyped accessor."},
+    {"id": "C7", "status": "applied", "evidence": "Checked the review-time code itself: the comment added above the routes names the four the fixture keeps and the four test_utils.go owns, and the printed table agrees with it."},
+    {"id": "D1", "status": "applied", "evidence": "The whole package passes, not only the named selector."},
+    {"id": "D2", "status": "na", "why": "No input validation path changed."},
+    {"id": "D3", "status": "na", "why": "No boundary values."},
+    {"id": "E1", "status": "applied", "evidence": "Still the only file registering on the shared engine."},
+    {"id": "E2", "status": "applied", "evidence": "No test lost a route: the package passes with 0 failed and 0 skipped, so nothing quietly stopped resolving."},
+    {"id": "E3", "status": "na", "why": "No error swallowed."},
+    {"id": "E4", "status": "na", "why": "No flag."},
+    {"id": "E5", "status": "applied", "evidence": "One owner per route, confirmed against the printed table."},
+    {"id": "E6", "status": "applied", "evidence": "No other repeat of the shape anywhere in the engine: 87 routes, 87 distinct method+path pairs."},
+    {"id": "F1", "status": "applied", "evidence": "-race, 0 DATA RACE."},
+    {"id": "F2", "status": "na", "why": "No transaction or lock."},
+    {"id": "F3", "status": "na", "why": "No migration."},
+    {"id": "F4", "status": "na", "why": "No delete or cancel path."},
+    {"id": "G1", "status": "applied", "evidence": "The patch is scoped to the one Go file. The first attempt also captured the uncommitted instruments.json edit, which would have polluted the hook's replay; rebuilt with a path-scoped diff and verified again by hand."},
+    {"id": "G2", "status": "na", "why": "No guard added."},
+    {"id": "H1", "status": "applied", "evidence": "gofmt clean, build ok, vet ok both ways, lint 0 issues with the build tag."},
+    {"id": "Z1", "status": "applied", "evidence": "Pass 2 found nothing."},
+    {"id": "B5", "status": "na", "why": "No model or provider output."},
+    {"id": "E7", "status": "na", "why": "Nothing starts before its governing decision."},
+    {"id": "G3", "status": "applied", "evidence": "The control fails as a test, on a real runtime panic, not because the patch stopped the package compiling: restoring only the participants line keeps groupHandler in scope, so it builds and then panics."},
+    {"id": "B6", "status": "na", "why": "No layout."},
+    {"id": "E8", "status": "applied", "evidence": "The engine is read back after both writers have run, and it is clean."},
+    {"id": "H2", "status": "applied", "evidence": "0 skipped across the whole package; the selector run was confirmed with -v."},
+    {"id": "I1", "status": "applied", "evidence": "No protocol behaviour changed."},
+    {"id": "F5", "status": "applied", "evidence": "One owner per route."},
+    {"id": "B7", "status": "na", "why": "No layer."},
+    {"id": "H3", "status": "applied", "evidence": "Whole package run, not a selector."},
+    {"id": "H4", "status": "na", "why": "No app code."},
+    {"id": "H5", "status": "applied", "evidence": "Pass 2: the whole package still builds one router and passes."}
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint --build-tags=integration 0 issues",
+  "types": "go build",
+  "tests": "whole integration package, -race -p 4: ok 43.262s, 0 failed, 0 skipped, 0 data races"
+ }
+}

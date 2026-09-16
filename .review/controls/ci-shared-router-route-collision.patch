@@ -1,0 +1,12 @@
+diff --git a/backend/internal/integration/groups_integration_test.go b/backend/internal/integration/groups_integration_test.go
+index 6c85f4d51..fb74df4f5 100644
+--- a/backend/internal/integration/groups_integration_test.go
++++ b/backend/internal/integration/groups_integration_test.go
+@@ -47,6 +47,7 @@ func newGroupTestDeps(t *testing.T) *groupTestDeps {
+ 		// (add, remove, leave, ban); gin panics if they are registered twice.
+ 		protected.POST("/groups", groupHandler.CreateGroup)
+ 		protected.GET("/groups/:id/participants", groupHandler.GetGroupParticipants)
++		protected.POST("/groups/:id/participants", groupHandler.AddGroupParticipant)
+ 		protected.PATCH("/groups/:id/participants/:user_id/role", groupHandler.UpdateParticipantRole)
+ 		protected.GET("/groups/:id/settings", groupHandler.GetGroupSettings)
+ 	}
