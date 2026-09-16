@@ -94,6 +94,21 @@ func TestGroupMembershipChangesEndTheKeyVersion(t *testing.T) {
 	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/leave", group), map[string]any{}, memberToken)
 	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
 	assert.Equal(t, float64(0), activeVersion(ownerToken), "a leave ends the version")
+
+	// A banned member: the ban removes them inside its own transaction, and the
+	// version must end with it, or the group would keep sending under a key the
+	// banned member still holds.
+	banned := createUser(t, deps.UserRepo, uniqueRLUsername("hookbanned"), "user")
+	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/participants", group),
+		map[string]any{"user_id": banned.ID}, ownerToken)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	storeVersion(4, owner.ID, banned.ID)
+	require.Equal(t, float64(4), activeVersion(ownerToken))
+
+	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/members/%d/ban", group, banned.ID),
+		map[string]any{"reason": "spam", "delete_messages": false}, ownerToken)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, float64(0), activeVersion(ownerToken), "a ban ends the version")
 }
 
 func TestGroupKeyRoutesOverHTTP(t *testing.T) {
