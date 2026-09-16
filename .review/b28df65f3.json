@@ -686,6 +686,222 @@
     }
    ],
    "findings": []
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Scope unchanged: the four G1d files plus the copy bound fixed in pass 2. This pass added no code."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-read the prior ledgers and, this pass, grepped them for a data-export finding. 238b7ec7d records k4e1-export-sends-password, so the export path has history: known ground, not a rediscovery."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No new artifact of this kind: pass 1 printed the key state and nothing this pass changed it."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed; this pass added no code."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The instrument done properly at last. Earlier passes read copies back through State; this one printed the stored rows across a membership change. After v1: active=true, member_count=2, copies=2. After a join: v1 active=false with both copies still present, so a member keeps the history it already holds. After v2: v2 active=true member_count=3 copies=3, v1 still there and inactive. encrypted_group_key is NULL on every row, so the server really does keep no key of its own."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The seam no earlier pass compared: the Go bound against the column. group_key_members.encrypted_key_for_user is TEXT, unbounded, so the constant is the only bound and the schema cannot disagree with it. Raising the constant in pass 2 widened nothing the database would refuse."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Still no consumer of the state shape outside the tests."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider inside the reviewed scope."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "member_count is written by Rotate and read by nothing; the printed rows show it matching the real copy count at every version, so the value is at least honest where it sits."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The printed rows are what the fixtures produce, and they match what the protocol describes: one row per version, one copy per member, the old version kept and inactive."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Both packages pass whole; the printed rows are the passing behaviour, not a summary of it."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No new input path this pass; the hostile cases were driven in passes 1 and 2."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No new boundary this pass; the size boundary was measured in pass 2."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Followed the other consumer of group_key_members: the data export at data_export.go:213. Its query is scoped WHERE gkm.user_id = $1, so it returns only the requesting user's own copies and never another member's."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Two columns are written or defined but read nowhere: member_count (written by Rotate) and encrypted_group_key (written by nothing). Migration 212 already documents the second as unused. Dead data, not a defect, and dropping a column is a migration this phase does not need."
+    },
+    {
+     "id": "E3",
+     "status": "na",
+     "why": "No error handling changed this pass."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; this pass added no code."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'who else reads the wrapped copies': grepped every consumer of encrypted_key_for_user. Two exist, the key service and the data export, and the export scopes to the caller's own rows."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed this pass; both packages already ran clean under -race."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed this pass."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "The migrations were read this pass rather than assumed: 014 creates both tables with TEXT key columns, and 212 drops NOT NULL from encrypted_group_key and created_by so a version outlives the account that made it. The printed rows show created_by populated and the server key column NULL throughout."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The printed rows answer the orphan question directly: ending a version deletes nothing, so a member who was there keeps every copy it already had."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added this pass."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, build ok, vet ok with and without the integration tag, lint 0 issues. No code changed this pass."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 4 found nothing in scope and needed no new instrument. C1 pointed at the schema rather than at Go, which the instrument already covers."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added this pass; pass 2's was fed both inputs."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The throwaway printed rows and reported --- PASS, so it ran rather than matching nothing."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The stored rows match the approved protocol exactly: one shared key per group in numbered versions, one wrapped copy per member, a join ending the active version, and the next sender making the next one for the current members."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added this pass."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "na",
+     "why": "No module changed this pass, so there is no dependent test to re-run."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed this pass; the throwaway was deleted and the tree is clean."
+    }
+   ],
+   "findings": []
   }
  ],
  "gates": {
