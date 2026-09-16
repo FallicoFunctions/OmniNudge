@@ -1,0 +1,252 @@
+{
+ "schema_version": 2,
+ "head": "4d3abbe1a",
+ "base": "4d3abbe1a",
+ "scope": {
+  "files": [
+   "backend/internal/database/migrations/213_drop_export_session_keys.up.sql",
+   "backend/internal/database/migrations/213_drop_export_session_keys.down.sql",
+   "backend/internal/database/omnichat_expansion_migration_test.go",
+   "backend/internal/workers/retention_worker.go",
+   "backend/internal/services/scrubber.go",
+   "backend/internal/utils/crypto.go"
+  ],
+  "boundaries": [
+   "the schema after the drop and after the rollback",
+   "the migration chain through 149's rename",
+   "the retention worker's scheduled cleanup",
+   "the account scrub list",
+   "utils/crypto.go's remaining callers"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a848b585c",
+  "e77c30dfb",
+  "28cc0d299"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Phase B, six files: migration 213 drops export_session_keys and its two indexes, its down migration rebuilds the table, the migration test carries 213 at the head of both rollback lists with the stale column assertion removed, and the retention worker, scrubber and crypto.go lose the code the drop orphans."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a848b585c records g1a-migration-not-in-rollback-lists: a migration missing from those two lists failed both tests on their first step. That told me what the tests check and, more useful here, what they do not."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No built string or payload; this phase removes a table and the code that named it."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed; nothing has written this table since the export stopped decrypting."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The artifact this phase produces is the schema itself, and the gap the migration tests leave: they prove the chain rolls back without error, never that the rollback restores the same table. Rolled 213 back for real and read what came out. Absent at head, present after rollback, and every element matches the snapshot taken before the drop: seven columns in order with their types, nullability and defaults; encrypted_key rather than decrypted_key_base64; both foreign keys ON DELETE CASCADE; the primary key on id; both named indexes; and no unique constraint, as the original had none."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The spelling is the seam. 213's down had to rebuild the post-149 shape, because 149's own down renames encrypted_key back and would fail against the older name. The probe confirms encrypted_key is what the rollback produces."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The callers receive nothing new: the table had no reader left after Phase A, and the three helpers removed from crypto.go had no caller anywhere in the repository."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Checked that what remains is still wired: DecryptRSA, DeriveKeyFromPassword and DecryptWithPassword stay in crypto.go and keep their imports; only io became orphaned and was removed."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixture is the migration chain itself, and it matches production: the test migrates the full tree rather than a trimmed subset, so 213 sits on the same 212 predecessors it will have in production."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: both migration tests green with 0 failed and 0 skipped, and all four changed packages pass whole -- database, utils, workers, services."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No input validation path changed; this phase removes code rather than accepting anything new."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "The boundary that matters is the rollback depth. List 1 walks 67 entries from 213 down to 147, so it passes through 149's down, which renames the column on the table 213's down rebuilt. That interaction is exercised, not assumed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the two callers of the dropped table. The scrubber guards every entry with to_regclass and so was safe either way; the retention worker had no guard at all. Same table, opposite exposure."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The removed block was the only statement inside the worker's if !w.cfg.DryRun, so the conditional went with it rather than being left empty. Read the function back afterwards: the loop, the dry-run branch and the audit update are intact."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The discarded error is the whole point of removing that line: _, _ = w.db.Exec meant a DELETE against a missing table would have thrown on every scheduled run and said nothing."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "crypto.go keeps one copy of what is still used and loses three functions nothing called. Verified by grepping the whole repository for each name after removal."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a reference to a table that will not exist': swept every Go, SQL, TypeScript, Markdown and YAML file. What remains is migrations 031 and 149, which must keep naming it because they are its history, and prior ledgers. No live code."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed; the migration runner owns its own."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "The instrument for exactly this phase. 213 is the next free number, it heads both rollback lists as g1a's finding requires, and the up and down were both run: applied, rolled back, and the chain continued through 212 and 211."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The orphan question: dropping the table cascades nothing outward, because both its foreign keys point inward, from it to data_export_requests and users. Nothing references it."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added in this phase."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, and vet clean under both tag settings -- run on its own line after a && chain let a failed build skip it earlier in this phase."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument needed. B4 names this exactly: read the stored thing rather than the code that writes it, which here means the restored schema rather than the migration file."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added in this phase."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Measured rather than assumed: both migration tests reported 0 failed and 0 skipped, and each package run captured go test's own exit code before any pipe could swallow it."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to drop the table and the code it left behind, and that is all this does. The blank line the removal left in the worker is tidied; nothing else was widened."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Every package with a changed file was run whole rather than by selector: database, utils, workers and services."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "crypto.go and the migration test are shared by their whole packages, so those packages ran entire rather than a narrow run."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "both migration tests 0 failed 0 skipped with the rollback exercised; database ok 25.9s, utils ok 0.3s, workers ok 5.3s, services ok 28.2s, all 0 failed 0 skipped"
+ }
+}

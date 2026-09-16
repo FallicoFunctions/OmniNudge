@@ -930,7 +930,6 @@ func (w *RetentionWorker) cleanupExpiredExports(ctx context.Context) {
 		// Mark as expired in DB to preserve audit record
 		_, _ = w.db.Exec(ctx, `UPDATE data_export_requests SET status = 'expired' WHERE export_id = $1`, exportID)
 	}
-
 }
 
 // ─── Message cleanup ─────────────────────────────────────────────────────────
