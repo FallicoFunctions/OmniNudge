@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -12,31 +11,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	zlog "github.com/rs/zerolog/log"
 
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/utils"
 )
 
 // DataExportHandler handles GDPR data export requests
 type DataExportHandler struct {
-	db        *pgxpool.Pool
-	queue     dataExportEnqueuer
-	storage   services.StorageService
-	masterKey []byte
+	db      *pgxpool.Pool
+	queue   dataExportEnqueuer
+	storage services.StorageService
 }
 
 type dataExportEnqueuer interface {
 	EnqueueDataExport(context.Context, queue.DataExportPayload) error
 }
 
-func NewDataExportHandler(db *pgxpool.Pool, queueClient dataExportEnqueuer, storage services.StorageService, masterKey string) *DataExportHandler {
+func NewDataExportHandler(db *pgxpool.Pool, queueClient dataExportEnqueuer, storage services.StorageService) *DataExportHandler {
 	return &DataExportHandler{
-		db:        db,
-		queue:     queueClient,
-		storage:   storage,
-		masterKey: []byte(masterKey),
+		db:      db,
+		queue:   queueClient,
+		storage: storage,
 	}
 }
 
@@ -92,13 +87,13 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		return
 	}
 
-	// 1. Re-authenticate the user
-	var username, passwordHash string
+	// Re-authenticate the user. The export carries only ciphertext, so this
+	// proves who is asking; it never opens a key.
+	var passwordHash string
 	var authScheme int
-	var encryptedPrivateKey *string
 	err := h.db.QueryRow(c.Request.Context(), `
-		SELECT username, password_hash, auth_scheme, encrypted_private_key FROM users WHERE id = $1
-	`, userID).Scan(&username, &passwordHash, &authScheme, &encryptedPrivateKey)
+		SELECT password_hash, auth_scheme FROM users WHERE id = $1
+	`, userID).Scan(&passwordHash, &authScheme)
 
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch user data")
@@ -136,15 +131,6 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 			validated = append(validated, dataType)
 		}
 		req.DataTypes = validated
-	}
-
-	// 2. Prepare E2E session keys if messages are being exported
-	usesE2E := false
-	for _, dt := range req.DataTypes {
-		if dt == "messages" {
-			usesE2E = true
-			break
-		}
 	}
 
 	// Generate unique export ID
@@ -186,8 +172,6 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		return
 	}
 
-	// The parent row must exist before export_session_keys because the latter has
-	// a foreign key to data_export_requests(export_id).
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 	if _, err = tx.Exec(c.Request.Context(), `
 		INSERT INTO data_export_requests (
@@ -196,79 +180,6 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	`, userID, exportID, req.DataTypes, req.IncludeDeleted, expiresAt); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
 		return
-	}
-
-	if usesE2E && encryptedPrivateKey != nil {
-		// Decrypt private key using password (using username as salt as per schema)
-		// NOTE: In production, a dedicated salt should be used.
-		privKeyPEM, err := utils.DecryptWithPassword(*encryptedPrivateKey, req.Password, base64.StdEncoding.EncodeToString([]byte(username)))
-		if err != nil {
-			zlog.Warn().Int("user_id", userID).Err(err).Msg("private key decryption failed during data export")
-			RespondError(c, http.StatusInternalServerError, "Failed to decrypt encryption keys. Please update your security settings.")
-			return
-		}
-
-		// Fetch group keys for the user
-		rows, err := tx.Query(c.Request.Context(), `
-			SELECT gk.id, gkm.encrypted_key_for_user
-			FROM group_encryption_keys gk
-			JOIN group_key_members gkm ON gk.id = gkm.group_key_id
-			WHERE gkm.user_id = $1
-		`, userID)
-		if err != nil {
-			zlog.Warn().Err(err).Msg("failed to fetch group keys during data export")
-			RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-			return
-		} else {
-			type preparedKey struct {
-				id        int
-				encrypted string
-			}
-			prepared := make([]preparedKey, 0)
-			for rows.Next() {
-				var keyID int
-				var encryptedKey string
-				if err := rows.Scan(&keyID, &encryptedKey); err != nil {
-					rows.Close()
-					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-					return
-				}
-
-				// Decrypt group key with user's RSA private key
-				rawKey, err := utils.DecryptRSA(encryptedKey, privKeyPEM)
-				if err != nil {
-					rows.Close()
-					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-					return
-				}
-
-				// Re-encrypt with system master key for temporary storage
-				encryptedWithSystem, err := utils.EncryptWithSystemKey(rawKey, h.masterKey)
-				if err != nil {
-					rows.Close()
-					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-					return
-				}
-
-				prepared = append(prepared, preparedKey{id: keyID, encrypted: encryptedWithSystem})
-			}
-			rowsErr := rows.Err()
-			rows.Close()
-			if rowsErr != nil {
-				RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-				return
-			}
-			for _, key := range prepared {
-				if _, err := tx.Exec(c.Request.Context(), `
-					INSERT INTO export_session_keys (export_id, user_id, group_key_id, encrypted_key)
-					VALUES ($1, $2, $3, $4)
-					ON CONFLICT (export_id, group_key_id) DO UPDATE SET encrypted_key = EXCLUDED.encrypted_key
-				`, exportID, userID, key.id, key.encrypted); err != nil {
-					RespondError(c, http.StatusInternalServerError, "Failed to prepare encrypted export")
-					return
-				}
-			}
-		}
 	}
 
 	if err := tx.Commit(c.Request.Context()); err != nil {
@@ -282,12 +193,9 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	}
 
 	if err := h.queue.EnqueueDataExport(c.Request.Context(), payload); err != nil {
-		// Mark failed and purge short-lived decrypted session material when the
-		// export cannot be queued. A later request can then retry safely.
+		// Mark the request failed when it cannot be queued, so a later request
+		// can retry safely.
 		_, _ = h.db.Exec(c.Request.Context(), `
-			WITH deleted_keys AS (
-				DELETE FROM export_session_keys WHERE export_id = $1
-			)
 			UPDATE data_export_requests
 			SET status = 'failed', completed_at = NOW()
 			WHERE export_id = $1

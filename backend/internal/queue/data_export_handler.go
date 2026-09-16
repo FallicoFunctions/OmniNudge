@@ -19,7 +19,7 @@ import (
 )
 
 // NewDataExportHandler creates a GDPR data export job handler
-func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, masterKey string, email *services.EmailService) JobHandler {
+func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, email *services.EmailService) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {
 		var payload DataExportPayload
 		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
@@ -60,41 +60,8 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		}
 		defer func() { _ = os.RemoveAll(tempDir) }()
 
-		// 1. Fetch encrypted session keys for E2E decryption
-		// Map conversation_id -> list of keys (historic and current)
-		sessionKeys := make(map[int][][]byte)
-		rows, err := db.Query(ctx, `
-			SELECT gek.conversation_id, esk.encrypted_key
-			FROM export_session_keys esk
-			JOIN group_encryption_keys gek ON esk.group_key_id = gek.id
-			WHERE esk.export_id = $1 AND esk.user_id = $2
-		`, payload.ExportID, payload.UserID)
-		if err != nil {
-			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to load export keys: %v", err))
-		}
-		for rows.Next() {
-			var convID int
-			var encryptedKey string
-			if err := rows.Scan(&convID, &encryptedKey); err != nil {
-				rows.Close()
-				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export key: %v", err))
-			}
-			// Decrypt session key using the system master key. A partial key set
-			// would produce an apparently successful but unreadable user export.
-			rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
-			if err != nil {
-				rows.Close()
-				return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to decrypt export key: %v", err))
-			}
-			sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
-		}
-		if rowsErr := rows.Err(); rowsErr != nil {
-			rows.Close()
-			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to read export keys: %v", rowsErr))
-		}
-		rows.Close()
-
-		// 2. Export each data type to its own JSON file
+		// Export each data type to its own JSON file. Encrypted sections travel
+		// as the ciphertext the database holds: the worker has no key to open.
 		for _, dataType := range payload.DataTypes {
 			var data interface{}
 			var err error
@@ -103,7 +70,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			case "profile":
 				data, err = exportProfileData(ctx, db, payload.UserID)
 			case "messages":
-				data, err = exportMessagesData(ctx, db, payload.UserID, payload.IncludeDeleted, sessionKeys)
+				data, err = exportMessagesData(ctx, db, payload.UserID, payload.IncludeDeleted)
 			case "posts":
 				data, err = exportPostsData(ctx, db, payload.UserID, payload.IncludeDeleted)
 			case "comments":
@@ -240,17 +207,6 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			return fmt.Errorf("failed to update completion status: %w", err)
 		}
 
-		// 6. Purge temporary session keys.
-		// Use a fresh context with a deadline — the job context may already be
-		// cancelled, but session keys must always be cleaned up regardless.
-		purgeCtx, purgeCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer purgeCancel()
-		if _, purgeErr := db.Exec(purgeCtx, `
-			DELETE FROM export_session_keys WHERE export_id = $1
-		`, payload.ExportID); purgeErr != nil {
-			zlog.Warn().Err(purgeErr).Str("export_id", payload.ExportID).Msg("data_export: failed to purge session keys")
-		}
-
 		// 7. Send email notification
 		var storedEmail *string
 		var emailEncrypted bool
@@ -331,7 +287,7 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 	return profile, nil
 }
 
-func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool, conversationKeys map[int][][]byte) (interface{}, error) {
+func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
 		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content, 
 		       sender_encrypted_content, shared_encryption_iv, created_at, deleted_for_sender, deleted_for_recipient
@@ -378,23 +334,10 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 			msg.ContentEncrypted = senderEncryptedContent
 		}
 
-		// Try to decrypt if we have session keys
-		decrypted := false
-		if keys, ok := conversationKeys[msg.ConversationID]; ok {
-			// Try all keys for this conversation (solving historic key decryption)
-			for _, key := range keys {
-				plaintext, err := utils.DecryptAESGCM(msg.ContentEncrypted, key, sharedIV)
-				if err == nil {
-					msg.Content = plaintext
-					decrypted = true
-					break // Stop on first successful decryption
-				}
-			}
-		}
-
-		if !decrypted {
-			msg.Content = "[Encrypted Content - Key Unavailable]"
-		}
+		// The server holds no key of any kind, so it cannot read a message. The
+		// ciphertext travels in content_encrypted_base64, and only a device that
+		// holds the owner's private key can open it.
+		msg.Content = "[Encrypted Content - Key Unavailable]"
 
 		messages = append(messages, msg)
 	}

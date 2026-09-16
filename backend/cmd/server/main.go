@@ -438,7 +438,7 @@ func main() {
 			omniChatGenerationWorker, cfg, queueThumbnailService)
 		if err := jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
-			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
+			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, emailService),
 			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService, queueClient),
 			Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
 			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
@@ -652,7 +652,7 @@ func main() {
 	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient, cfg.VirusScan.FailClosed)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
-	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, storageService, cfg.Encryption.Key)
+	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, storageService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
 	groupHandler := handlers.NewGroupHandler(db.Pool)

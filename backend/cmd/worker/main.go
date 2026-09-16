@@ -161,7 +161,7 @@ func main() {
 		Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
 		ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, thumbnailService, storageService),
 		EmailSend:           queue.NewEmailHandler(emailService),
-		DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
+		DataExport:          queue.NewDataExportHandler(db.Pool, storageService, emailService),
 		ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
 		MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 		WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,

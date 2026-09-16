@@ -59,7 +59,7 @@ func setupDataExportHandlerTest(t *testing.T) (*DataExportHandler, *database.Dat
 	require.NoError(t, userRepo.Create(ctx, user))
 
 	queueStub := &stubDataExportQueue{}
-	handler := NewDataExportHandler(db.Pool, queueStub, nil, "test-master-key-32-chars-padded!!")
+	handler := NewDataExportHandler(db.Pool, queueStub, nil)
 
 	return handler, db, user.ID, queueStub
 }
