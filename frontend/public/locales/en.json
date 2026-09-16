@@ -1603,6 +1603,7 @@
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
+      "encryptionFailed": "This message could not be encrypted, so it was not sent.",
       "userUnavailable": "This user is not available.",
       "sendingTooFast": "You are sending messages too fast. Wait a minute and try again.",
       "forwardConversationMissing": "Forward target conversation not found.",

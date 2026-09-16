@@ -13,6 +13,7 @@ import type {
 } from '../types/messages';
 import type { UserProfile } from '../types/users';
 import { encryptMessage } from '../utils/encryption';
+import { MessageNotSent } from '../utils/messageSendErrors';
 import { getUserPublicKey, getOwnKeys } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 
@@ -191,48 +192,44 @@ export const messagesService = {
           const publicKeys = await encryptionService.getPublicKeys([recipientId]);
           const recipientPublicKeyBase64 = publicKeys[recipientId];
 
-          if (recipientPublicKeyBase64) {
-            // Import recipient's public key
-            const recipientPublicKey = await getUserPublicKey(
-              recipientId,
-              recipientPublicKeyBase64
+          if (!recipientPublicKeyBase64) {
+            throw new MessageNotSent(
+              'recipient-key-unusable',
+              'The recipient has published no encryption key'
             );
-
-            if (recipientPublicKey) {
-              // Encrypt the message
-              encryptedContent = await encryptMessage(data.content, recipientPublicKey);
-              encryptionVersion = 'v2';
-            } else {
-              // Fallback to plaintext if key import fails
-              console.warn('Failed to import recipient public key, sending plaintext');
-              encryptedContent = data.content;
-              encryptionVersion = 'plaintext';
-            }
-          } else {
-            // Recipient hasn't set up encryption yet, send plaintext
-            console.warn('Recipient has no public key, sending plaintext');
-            encryptedContent = data.content;
-            encryptionVersion = 'plaintext';
           }
+          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+          if (!recipientPublicKey) {
+            throw new MessageNotSent(
+              'recipient-key-unusable',
+              'The recipient key could not be read'
+            );
+          }
+          encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+          encryptionVersion = 'v2';
         } catch (error) {
-          // Fallback to plaintext if encryption fails
-          console.error('Encryption failed, sending plaintext:', error);
-          encryptedContent = data.content;
-          encryptionVersion = 'plaintext';
+          // A refusal is already the reason; anything else becomes one. Nothing
+          // here falls back to sending in clear, which is what this replaced.
+          if (error instanceof MessageNotSent) throw error;
+          throw new MessageNotSent('encryption-failed', 'The message could not be encrypted');
         }
       } else if (data.content) {
+        // A group conversation has no other_user, so it lands here. G3c seals
+        // these under the group key; until then they travel as they always have.
         encryptedContent = data.content;
         encryptionVersion = 'plaintext';
       }
 
-      if (data.content && ownKeys?.publicKey) {
+      if (data.content) {
+        if (!ownKeys?.publicKey) {
+          throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
+        }
         try {
           senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
-        } catch (error) {
-          console.error('Failed to encrypt sender copy, storing plaintext:', error);
-          senderEncryptedContent = data.content;
+        } catch {
+          throw new MessageNotSent('encryption-failed', 'The sender copy could not be encrypted');
         }
-      } else if (!data.content) {
+      } else {
         senderEncryptedContent = undefined;
       }
     }

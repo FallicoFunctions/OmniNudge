@@ -1250,7 +1250,7 @@ export default function MessagesPage() {
       }
     },
     onError: (error: unknown) => {
-      const key = messageSendErrorKey((error as Error & { status?: number }).status);
+      const key = messageSendErrorKey(error);
       if (key) alert(t(key));
     },
   });
