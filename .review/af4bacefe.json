@@ -1,0 +1,473 @@
+{
+ "schema_version": 2,
+ "head": "38bebf34d",
+ "base": "af4bacefe",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/groups.go",
+   "backend/internal/handlers/group_admin.go",
+   "backend/internal/integration/test_utils.go",
+   "backend/internal/integration/group_keys_integration_test.go"
+  ],
+  "boundaries": [
+   "conversation_participants",
+   "group_encryption_keys.is_active",
+   "POST /groups/:id/participants",
+   "DELETE /groups/:id/participants/:user_id",
+   "POST /groups/:id/leave",
+   "POST /groups/:id/members/:user_id/ban",
+   "POST /groups/invites/:invite_id/accept"
+  ]
+ },
+ "prior_ledgers_read": [
+  "800d8e003",
+  "a848b585c",
+  "fb30bad62"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "MarkGroupKeyStale at every membership change: AddGroupParticipant, RemoveGroupParticipant and LeaveGroup on the pool; AcceptGroupInvite and BanGroupMember inside their own transactions. The integration test router gained the participant, leave and ban routes, and the integration test drives each path."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "800d8e003 (G1b ledger, which added the routes), a848b585c (G1a: the service and MarkGroupKeyStale)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The key state JSON after each membership change: active_version 0 after a join, a removal, a leave and a ban; back to the stored version after each rotation."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Every path driven over HTTP: POST participants 201, DELETE participant 204, POST leave 204, POST ban 200, and the key state read between each."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows behind those answers: the active version ends (is_active FALSE) while every stored copy stays, so members keep reading the history they already hold."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "MarkGroupKeyStale takes the same handle the surrounding code already uses: the pool where the change is a single statement, the transaction where it is not."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The handlers pass the conversation id they already validated; the service decides everything else."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One function ends a version, called from five places; no handler writes that SQL itself."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group and its members are built as CreateGroup builds them, through the real routes for every change."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A join, an invite acceptance, a removal, a leave and a ban each end the version."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A failed membership change writes nothing: the invite and ban paths do both inside one transaction."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A removal that matches no row answers 404 before anything is marked stale."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling paths compared: every place that writes conversation_participants now ends the version; CreateGroup needs none, since a group has no version before its first rotation."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Branch by branch: the join, removal and leave paths were driven by the new test, but the ban hook in group_admin.go was reached by nothing, because the integration router registered no ban route. An untested hook in its own transaction is exactly where a later edit drops the call (g1c-ban-leaves-the-key-version-active)."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed MarkGroupKeyStale is not swallowed: each call answers 500 (the ban path also logs with its handler prefix) instead of reporting a membership change whose key version still stands."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The rule lives in the service; the handlers only call it."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a membership change that forgets the key': grepped every INSERT INTO and DELETE FROM conversation_participants in the handlers; all five now end the version, and CreateGroup is the documented exception."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state; the service serialises rotations."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The invite and ban paths mark the version stale inside the same transaction as the membership row, so a rollback undoes both."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Ending a version keeps every stored copy: a member who leaves keeps what it could already read, and reads nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built after the fix; see pass 2."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok with and without the integration tag, golangci-lint 0 issues; the membership and routes tests passed, and the handlers package passed (263s)."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "E2 names it; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the rule the thing it exists to refuse: with the ban hook removed the test fails, so the check is not blind; and a removal that matches no row still answers 404 without ending a version."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: a join or a leave ends the version, and the next sender makes the next one for exactly the current members. G1c is that rule, wired to every membership path."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One call per path."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The changed handlers were exercised by the whole handlers package and by the integration tests that drive their routes."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": [
+    {
+     "id": "g1c-ban-leaves-the-key-version-active",
+     "summary": "The ban path ended the key version but no test reached it: the integration router had no ban route, so a later edit could drop that call unseen.",
+     "found_by": "E2",
+     "fix_commit": "38bebf34d",
+     "control": {
+      "patch": ".review/controls/g1c-ban-leaves-the-key-version-active.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -run TestGroupMembershipChangesEndTheKeyVersion -tags=integration"
+      ],
+      "observed": "FAIL: a ban ends the version, expected 0"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "MarkGroupKeyStale at every membership change: AddGroupParticipant, RemoveGroupParticipant and LeaveGroup on the pool; AcceptGroupInvite and BanGroupMember inside their own transactions. The integration test router gained the participant, leave and ban routes, and the integration test drives each path."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "800d8e003 (G1b ledger, which added the routes), a848b585c (G1a: the service and MarkGroupKeyStale)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The key state JSON after each membership change: active_version 0 after a join, a removal, a leave and a ban; back to the stored version after each rotation."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Every path driven over HTTP: POST participants 201, DELETE participant 204, POST leave 204, POST ban 200, and the key state read between each."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows behind those answers: the active version ends (is_active FALSE) while every stored copy stays, so members keep reading the history they already hold."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "MarkGroupKeyStale takes the same handle the surrounding code already uses: the pool where the change is a single statement, the transaction where it is not."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The handlers pass the conversation id they already validated; the service decides everything else."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "One function ends a version, called from five places; no handler writes that SQL itself."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No serialiser."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group and its members are built as CreateGroup builds them, through the real routes for every change."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A join, an invite acceptance, a removal, a leave and a ban each end the version."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A failed membership change writes nothing: the invite and ban paths do both inside one transaction."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "A removal that matches no row answers 404 before anything is marked stale."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling paths compared: every place that writes conversation_participants now ends the version; CreateGroup needs none, since a group has no version before its first rotation."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Pass 2: every one of the five paths is now driven over HTTP, and each ends the version."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed MarkGroupKeyStale is not swallowed: each call answers 500 (the ban path also logs with its handler prefix) instead of reporting a membership change whose key version still stands."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The rule lives in the service; the handlers only call it."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a membership change that forgets the key': grepped every INSERT INTO and DELETE FROM conversation_participants in the handlers; all five now end the version, and CreateGroup is the documented exception."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state; the service serialises rotations."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The invite and ban paths mark the version stale inside the same transaction as the membership row, so a rollback undoes both."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Ending a version keeps every stored copy: a member who leaves keeps what it could already read, and reads nothing new."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The ban hook removed from 38bebf34d: the membership test fails with \"a ban ends the version\", expecting 0. At the commit the same selector passes."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok with and without the integration tag, golangci-lint 0 issues; the membership and routes tests passed, and the handlers package passed (263s)."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the rule the thing it exists to refuse: with the ban hook removed the test fails, so the check is not blind; and a removal that matches no row still answers 404 without ending a version."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: a join or a leave ends the version, and the next sender makes the next one for exactly the current members. G1c is that rule, wired to every membership path."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One call per path."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The changed handlers were exercised by the whole handlers package and by the integration tests that drive their routes."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "integration group key tests 2, handlers package: 0 failed, 0 skipped"
+ }
+}
