@@ -115,7 +115,31 @@ export async function sealGroupMessage(
   groupKey: CryptoKey,
   keyVersion: number
 ): Promise<string> {
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  return sealGroupMessageWithIv(
+    plaintext,
+    groupKey,
+    keyVersion,
+    window.crypto.getRandomValues(new Uint8Array(12))
+  );
+}
+
+/**
+ * The sealing itself, with the IV supplied rather than drawn.
+ *
+ * Callers use sealGroupMessage, which draws a fresh IV: a group reuses one key
+ * across many messages, and a repeated IV under one GCM key breaks it. This
+ * exists so the shared vectors can pin what this client produces. Without a
+ * deterministic seam a test can only compare WebCrypto with Node directly,
+ * which proves nothing about the bytes this module writes.
+ */
+export async function sealGroupMessageWithIv(
+  plaintext: string,
+  groupKey: CryptoKey,
+  keyVersion: number,
+  // Narrowed: a bare Uint8Array may be backed by a SharedArrayBuffer, which is
+  // not a BufferSource. getRandomValues already returns this narrower form.
+  iv: Uint8Array<ArrayBuffer>
+): Promise<string> {
   const data = await window.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     groupKey,

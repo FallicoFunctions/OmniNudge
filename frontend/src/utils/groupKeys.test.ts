@@ -6,11 +6,12 @@ import {
   newGroupKey,
   openGroupMessage,
   sealGroupMessage,
+  sealGroupMessageWithIv,
   sealedKeyVersion,
   unwrapGroupKey,
   wrapGroupKeyForMembers,
 } from './groupKeys';
-import { arrayBufferToBase64, exportKeyPair, generateKeyPair } from './encryption';
+import { exportKeyPair, generateKeyPair } from './encryption';
 
 interface Vectors {
   groupKey: string;
@@ -95,19 +96,18 @@ describe('sealing the shared vectors', () => {
   // client's ciphertext diverge would round-trip through openGroupMessage and
   // pass every test above, while no other client could read what it writes.
   it.each(vectors.messages)(
-    'produces the same bytes Node did for version $keyVersion',
+    'produces the same envelope Node did for version $keyVersion',
     async (vector) => {
       const key = await importVectorKey();
       const ivBuffer = Buffer.from(vector.iv, 'base64');
       const iv = new Uint8Array(
         ivBuffer.buffer.slice(ivBuffer.byteOffset, ivBuffer.byteOffset + ivBuffer.byteLength)
       );
-      const data = await window.crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
-        key,
-        new TextEncoder().encode(vector.plaintext)
-      );
-      expect(arrayBufferToBase64(data)).toBe(JSON.parse(vector.sealed).data);
+      // Through the module, not around it: comparing window.crypto against Node
+      // would pin WebCrypto to itself and say nothing about what this client writes.
+      const sealed = await sealGroupMessageWithIv(vector.plaintext, key, vector.keyVersion, iv);
+      expect(JSON.parse(sealed).data).toBe(JSON.parse(vector.sealed).data);
+      expect(sealed).toBe(vector.sealed);
     }
   );
 });
