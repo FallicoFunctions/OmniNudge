@@ -42,6 +42,7 @@ type Message struct {
 	MediaType                *string        `json:"media_type,omitempty"`
 	MediaSize                *int           `json:"media_size,omitempty"`
 	EncryptionVersion        string         `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
+	GroupKeyVersion          *int           `json:"group_key_version,omitempty"`    // Which group key version sealed this; nil unless a group message
 	MediaEncryptionKey       *string        `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
 	MediaEncryptionIV        *string        `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
 	SenderMediaEncryptionKey *string        `json:"sender_media_encryption_key,omitempty"`
@@ -89,9 +90,9 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
 			message_type, reply_to, thread_root, media_file_id, media_url, media_type, media_size, encryption_version,
 			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
-			is_multi_recipient, shared_encryption_iv, delete_at
+			is_multi_recipient, shared_encryption_iv, delete_at, group_key_version
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		RETURNING id, sent_at
 	`
 
@@ -116,6 +117,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.IsMultiRecipient,
 		message.SharedEncryptionIV,
 		message.DeleteAt,
+		message.GroupKeyVersion,
 	).Scan(&message.ID, &message.SentAt)
 
 	if err != nil {
@@ -183,6 +185,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -216,6 +219,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.MediaType,
 		&message.MediaSize,
 		&message.EncryptionVersion,
+		&message.GroupKeyVersion,
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
 		&message.SenderMediaEncryptionKey,
@@ -253,6 +257,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -307,6 +312,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.MediaType,
 			&message.MediaSize,
 			&message.EncryptionVersion,
+			&message.GroupKeyVersion,
 			&message.MediaEncryptionKey,
 			&message.MediaEncryptionIV,
 			&message.SenderMediaEncryptionKey,
@@ -348,6 +354,7 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -407,6 +414,7 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 			&message.MediaType,
 			&message.MediaSize,
 			&message.EncryptionVersion,
+			&message.GroupKeyVersion,
 			&message.MediaEncryptionKey,
 			&message.MediaEncryptionIV,
 			&message.SenderMediaEncryptionKey,
@@ -441,6 +449,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -490,6 +499,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 			&message.MediaType,
 			&message.MediaSize,
 			&message.EncryptionVersion,
+			&message.GroupKeyVersion,
 			&message.MediaEncryptionKey,
 			&message.MediaEncryptionIV,
 			&message.SenderMediaEncryptionKey,
@@ -531,6 +541,7 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -587,6 +598,7 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 			&message.MediaType,
 			&message.MediaSize,
 			&message.EncryptionVersion,
+			&message.GroupKeyVersion,
 			&message.MediaEncryptionKey,
 			&message.MediaEncryptionIV,
 			&message.SenderMediaEncryptionKey,
@@ -811,6 +823,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		       COALESCE(m.media_type, mf.file_type) as media_type,
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version,
+		       m.group_key_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
@@ -849,6 +862,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.MediaType,
 		&message.MediaSize,
 		&message.EncryptionVersion,
+		&message.GroupKeyVersion,
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
 		&message.SenderMediaEncryptionKey,

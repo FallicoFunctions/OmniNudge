@@ -395,6 +395,7 @@ type SendMessageRequest struct {
 	IsMultiRecipient         bool           `json:"is_multi_recipient,omitempty"`   // True for multi-recipient messages (mod mail)
 	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"` // Shared IV for multi-recipient messages
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
+	GroupKeyVersion          *int           `json:"group_key_version,omitempty"`    // Which group key version sealed this; a group message only
 }
 
 type ForwardMessageRequest struct {
@@ -410,6 +411,7 @@ type ForwardMessageRequest struct {
 	IsMultiRecipient         *bool          `json:"is_multi_recipient,omitempty"`
 	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"`
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`
+	GroupKeyVersion          *int           `json:"group_key_version,omitempty"`
 }
 
 type forwardTargetContext struct {
@@ -815,6 +817,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		IsMultiRecipient:         req.IsMultiRecipient,
 		SharedEncryptionIV:       req.SharedEncryptionIV,
 		RecipientKeys:            req.RecipientKeys,
+		GroupKeyVersion:          req.GroupKeyVersion,
 	}
 
 	if h.autoDeleteSvc != nil {
@@ -1233,6 +1236,9 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			IsMultiRecipient:         original.IsMultiRecipient,
 			SharedEncryptionIV:       original.SharedEncryptionIV,
 			RecipientKeys:            original.RecipientKeys,
+			// A forward is re-sealed by the sender for its new group, so the
+			// version travels from the request, never from the original.
+			GroupKeyVersion: req.GroupKeyVersion,
 		}
 		if isEncryptedForward {
 			if req.MediaEncryptionKey != nil {
