@@ -656,6 +656,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
 	groupHandler := handlers.NewGroupHandler(db.Pool)
+	groupKeyHandler := handlers.NewGroupKeyHandler(services.NewGroupKeyService(db.Pool))
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	paymentsHandler := handlers.NewPaymentsHandler(cryptoPaymentRepo, planSvc, cryptoVerifySvc, priceOracleSvc)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
@@ -1645,6 +1646,9 @@ func main() {
 			protected.PUT("/groups/:id/settings", groupHandler.UpdateGroupSettings)
 			protected.POST("/groups/:id/invites", groupHandler.CreateGroupInvite)
 			protected.POST("/groups/:id/leave", groupHandler.LeaveGroup)
+			// The group's key versions: the server keeps only wrapped copies.
+			protected.GET("/groups/:id/keys", groupKeyHandler.GetGroupKeys)
+			protected.POST("/groups/:id/keys", groupKeyHandler.RotateGroupKey)
 			protected.POST("/groups/:id/transfer-ownership", groupHandler.TransferOwnership)
 
 			// Group admin controls (F10)
