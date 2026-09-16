@@ -291,13 +291,15 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 
 func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
-		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content, 
-		       sender_encrypted_content, shared_encryption_iv, sent_at, deleted_for_sender, deleted_for_recipient
+		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
+		       COALESCE(sender_encrypted_content, ''), COALESCE(shared_encryption_iv, ''),
+		       COALESCE(sent_at, 'epoch'::timestamptz),
+		       COALESCE(deleted_for_sender, FALSE), COALESCE(deleted_for_recipient, FALSE)
 		FROM messages
 		WHERE (sender_id = $1 OR recipient_id = $1)
 	`
 	if !includeDeleted {
-		query += " AND (CASE WHEN sender_id = $1 THEN NOT deleted_for_sender ELSE NOT deleted_for_recipient END)"
+		query += " AND (CASE WHEN sender_id = $1 THEN NOT COALESCE(deleted_for_sender, FALSE) ELSE NOT COALESCE(deleted_for_recipient, FALSE) END)"
 	}
 	query += " ORDER BY sent_at DESC LIMIT 50000"
 
@@ -352,12 +354,12 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 
 func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
-		SELECT id, title, body, created_at, is_deleted
+		SELECT id, title, body, COALESCE(created_at, 'epoch'::timestamptz), COALESCE(is_deleted, FALSE)
 		FROM platform_posts
 		WHERE author_id = $1
 	`
 	if !includeDeleted {
-		query += " AND NOT is_deleted"
+		query += " AND NOT COALESCE(is_deleted, FALSE)"
 	}
 	query += " ORDER BY created_at DESC LIMIT 10000"
 
@@ -784,12 +786,12 @@ func exportOmniChatMediaData(ctx context.Context, db *pgxpool.Pool, userID int, 
 
 func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
 	query := `
-		SELECT id, post_id, body, created_at, is_deleted
+		SELECT id, post_id, body, COALESCE(created_at, 'epoch'::timestamptz), COALESCE(is_deleted, FALSE)
 		FROM post_comments
 		WHERE user_id = $1
 	`
 	if !includeDeleted {
-		query += " AND NOT is_deleted"
+		query += " AND NOT COALESCE(is_deleted, FALSE)"
 	}
 	query += " ORDER BY created_at DESC LIMIT 10000"
 
@@ -825,7 +827,7 @@ func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	// Post votes
 	postVotes, err := db.Query(ctx, `
-		SELECT post_id, is_upvote, created_at
+		SELECT post_id, is_upvote, COALESCE(created_at, 'epoch'::timestamptz)
 		FROM post_votes
 		WHERE user_id = $1
 		ORDER BY created_at DESC LIMIT 10000
@@ -852,7 +854,7 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 
 	// Comment votes
 	commentVotes, err := db.Query(ctx, `
-		SELECT comment_id, is_upvote, created_at
+		SELECT comment_id, is_upvote, COALESCE(created_at, 'epoch'::timestamptz)
 		FROM comment_votes
 		WHERE user_id = $1
 		ORDER BY created_at DESC LIMIT 10000
@@ -918,7 +920,7 @@ func exportSavedData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
 func exportHubsData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	// Hub subscriptions
 	subs, err := db.Query(ctx, `
-		SELECT hub_id, subscribed_at
+		SELECT hub_id, COALESCE(subscribed_at, 'epoch'::timestamptz)
 		FROM hub_subscriptions
 		WHERE user_id = $1
 		ORDER BY subscribed_at DESC
@@ -944,7 +946,7 @@ func exportHubsData(ctx context.Context, db *pgxpool.Pool, userID int) (interfac
 
 	// Hubs created by user
 	hubs, err := db.Query(ctx, `
-		SELECT id, name, description, created_at
+		SELECT id, name, description, COALESCE(created_at, 'epoch'::timestamptz)
 		FROM hubs
 		WHERE created_by = $1
 		ORDER BY created_at DESC
@@ -985,7 +987,7 @@ func exportSettingsData(ctx context.Context, db *pgxpool.Pool, userID int) (inte
 	}
 
 	err := db.QueryRow(ctx, `
-		SELECT theme, show_push_notifications, daily_digest, batch_notifications
+		SELECT theme, show_push_notifications, COALESCE(daily_digest, FALSE), batch_notifications
 		FROM user_settings
 		WHERE user_id = $1
 	`, userID).Scan(&settings.Theme, &settings.ShowPushNotifications, &settings.DailyDigest, &settings.BatchNotifications)
