@@ -16,7 +16,6 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,18 +39,16 @@ func newGroupTestDeps(t *testing.T) *groupTestDeps {
 	base := newTestDeps(t)
 
 	groupHandler := handlers.NewGroupHandler(base.DB.Pool)
-	groupAdminHandler := handlers.NewGroupAdminHandler(base.DB.Pool, base.Hub, services.NoopCache{})
 
 	protected := base.Router.Group("/api/v1")
 	protected.Use(middleware.AuthRequired(base.AuthService))
 	{
+		// newTestDeps already owns the routes a membership change needs
+		// (add, remove, leave, ban); gin panics if they are registered twice.
 		protected.POST("/groups", groupHandler.CreateGroup)
 		protected.GET("/groups/:id/participants", groupHandler.GetGroupParticipants)
-		protected.POST("/groups/:id/participants", groupHandler.AddGroupParticipant)
-		protected.DELETE("/groups/:id/participants/:user_id", groupHandler.RemoveGroupParticipant)
 		protected.PATCH("/groups/:id/participants/:user_id/role", groupHandler.UpdateParticipantRole)
 		protected.GET("/groups/:id/settings", groupHandler.GetGroupSettings)
-		protected.POST("/groups/:id/members/:user_id/ban", groupAdminHandler.BanGroupMember)
 	}
 
 	return &groupTestDeps{
