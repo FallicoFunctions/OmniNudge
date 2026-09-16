@@ -1,0 +1,250 @@
+{
+ "schema_version": 2,
+ "head": "28cc0d299",
+ "base": "28cc0d299",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/data_export.go",
+   "backend/internal/queue/data_export_handler.go",
+   "frontend/src/pages/SettingsPage.tsx",
+   "frontend/src/services/accountService.ts",
+   "frontend/public/locales/en.json"
+  ],
+  "boundaries": [
+   "exportDataTypes against the worker's switch",
+   "the client's data_types against the backend allowlist",
+   "the promise text a user reads in Settings",
+   "the export archive a user downloads"
+  ]
+ },
+ "prior_ledgers_read": [
+  "e77c30dfb",
+  "238b7ec7d",
+  "b28df65f3"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "No code changed in this review. It re-examines the export work already committed (5b40d8b11, c40f0414f, eb8250376) from the seam and consumer side, which the previous review approached from the section side."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read e77c30dfb, the previous review of this same work, and 238b7ec7d, which records k4e1-export-sends-password on this endpoint. Also swept every ledger for a wording or locale finding: 21 exist across the repository, none about the export's promise text."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The artifact this pass assembles is one layer up from the sections: the set of data types a request asks for. Both lists were emitted and compared rather than read by eye."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Applied rather than skipped as server-side, which was the same narrow reasoning that kept B5 unapplied for four passes elsewhere. Read the rendered promise a user sees in Settings: seven bullets naming profile, messages, posts and comments, votes and saved, hubs, settings and encryption keys. Every one is true of the export today; six of the seven were false before this work."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed in this pass; the previous review printed both rotation and state bodies."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No stored row changed in this pass."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The seam that fails hardest: a type in the allowlist with no case in the worker's switch hits default and fails the entire job. Emitted both lists and compared in both directions with comm. Thirteen names each, no difference either way."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client's side of the same seam. SettingsPage sends exactly those thirteen names in the same order, with a comment naming backend/internal/handlers/data_export.go as the authority. DataExportOptions types data_types as string[], so nothing but this agreement holds it together."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the same thing to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed; the queue payload is untouched."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The encryption_keys section is wired to a real purpose: it ships the user's still-wrapped private key, which is what a device needs to open the ciphertext the export carries."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixtures now match what a producer emits, which is what the previous review corrected: every section is driven by name, and an account that owns nothing reaches the no-row paths."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: all thirteen sections build, both include_deleted forms run, and rows written with NULL columns come back."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No new hostile input this pass; the NULL and no-row shapes were driven in the previous review."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No new boundary this pass."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the frontend's list, the backend allowlist and the worker's switch as three statements of one fact. All three agree."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable: every case in the switch is reachable from the allowlist, and every allowlist entry has a case."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The swallowed error is recorded and unchanged: a failed section is logged and replaced with an error string. That is why seven broken sections went unnoticed, and it is why the promise text was false for months."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The thirteen names live in three places by necessity, in two languages. The backend pair is compared mechanically here; the client's copy carries a comment naming its authority."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'two lists of the same names that can drift'. This one has drifted before: the code records that encryption_keys was requested by the settings page while absent from the allowlist, so every export from the UI was rejected. It is aligned now."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed; the sections are read-only queries."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed in this pass."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. Dropping export_session_keys is Phase B, which has not started."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete or orphan path changed in this pass."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added in this pass."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok. No code changed, so these confirm HEAD rather than a new change."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument needed. C1 and C2 name this exactly: two sides of a seam stating the same fact, compared mechanically."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added in this pass; the previous review fed each one both inputs."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The comparisons emitted their lists and the diffs were empty in both directions, so the check ran rather than matching nothing silently."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to stop the server decrypting, and only that. This pass added no code and widened nothing."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added; the sections only read."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "na",
+     "why": "No module changed in this pass, so there is no dependent test to re-run."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code changed; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed in this pass; the tree is clean."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "no code changed in this pass; the queue package was green at this HEAD (ok 87.183s, 0 failed) in the preceding review"
+ }
+}
