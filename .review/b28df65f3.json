@@ -902,6 +902,222 @@
     }
    ],
    "findings": []
+  },
+  {
+   "pass": 5,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Scope unchanged: the four G1d files and the copy bound fixed in pass 2. This pass added no code."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Prior ledgers re-read; 238b7ec7d's k4e1-export-sends-password remains the only neighbouring record, and nothing prior covers a real-key round trip."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The key state read again, this time carrying real material: an RSA-2048 public key comes back as 392 base64 characters and an RSA-4096 one as 736, each decoding to a parseable SPKI DER."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The rotation body accepted real wrapped copies and answered 201, and the member's own state came back carrying exactly one copy, its own."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The stored copy was read back and decrypted, not merely compared as a string: the bytes the database returned unwrap to the original 32-byte group key."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The arithmetic I asserted twice is now measured. An RSA-2048 copy is 344 base64 characters and an RSA-4096 copy 684, against a bound of 16384, so the bound raised in pass 2 sits far above anything a normal key produces."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Still no consumer of the state shape outside the tests."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the reviewed code; the Go and browser sides are compared under C4."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The other implementation is the browser. The app publishes exportKey('spki') base64 and imports with RSA-OAEP/SHA-256, and utils.DecryptRSA uses sha256.New() with an empty label, so the Go and WebCrypto sides agree on primitive, hash and label."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "public_key is wired through to its real purpose for the first time: the value the state returns was parsed and used to encrypt, not merely displayed."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "This retires the caveat pass 1 recorded. The suites use placeholder strings, so a real key had never crossed this path; it has now, at two sizes, and the placeholders turn out to be faithful for every server-side step because the server never parses a key."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: both round trips completed and both tests reported --- PASS."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No new hostile input this pass; the refusals were driven in passes 1 and 2."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension that matters, key size: RSA-2048 and RSA-4096, with the copy length scaling 344 to 684 as predicted."
+    },
+    {
+     "id": "E1",
+     "status": "na",
+     "why": "No sibling changed; the export consumer was compared in pass 4."
+    },
+    {
+     "id": "E2",
+     "status": "na",
+     "why": "No branch changed this pass, and the dead columns were recorded in pass 4."
+    },
+    {
+     "id": "E3",
+     "status": "na",
+     "why": "No error handling changed this pass."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; this pass added no code."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a place where the real thing was never run': the whole phase had been reviewed with placeholders. Running it for real was the one technique four passes had skipped."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed this pass; both packages already ran clean under -race."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed this pass."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration; the schema was read in pass 4."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete or orphan path changed; the surviving copies were printed in pass 4."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added this pass."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, build ok, vet ok with and without the integration tag, lint 0 issues. No code changed this pass."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 5 needed no new instrument. B5 already names this technique; four passes had marked it na on too narrow a reading, and applying it as written was the whole of this pass."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Applied at last, and the reason it was skipped was wrong. Passes 1 to 4 recorded 'no model or provider output', but the real system on the other side of this boundary is RSA itself. Generated real keys, published base64 SPKI exactly as the app does, read the key back from the state, parsed it, wrapped a real 32-byte group key with RSA-OAEP/SHA-256, stored it through the real route and unwrapped it as the other member. The key survives byte for byte at 2048 and at 4096 bits."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added this pass; pass 2's was fed both inputs."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Both round trips printed their measurements and reported --- PASS, so they ran rather than matching nothing."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved protocol now stands proven end to end rather than by description: one shared key, wrapped per member with that member's published key, stored by the server as opaque text, and readable only by the member it was wrapped for."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added this pass."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "na",
+     "why": "No module changed this pass, so there is no dependent test to re-run."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed; the throwaway was deleted and the tree is clean."
+    }
+   ],
+   "findings": []
   }
  ],
  "gates": {
