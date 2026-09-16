@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { messagesService } from '../services/messagesService';
+import { messageSendErrorKey } from '../utils/messageSendErrors';
 import type { Message } from '../types/messages';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -41,6 +43,7 @@ export function useMessageEdit({
   recipientId,
 }: UseMessageEditOptions): UseMessageEditReturn {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState<string>('');
   const [historyMessageId, setHistoryMessageId] = useState<number | null>(null);
@@ -114,11 +117,15 @@ export function useMessageEdit({
         };
       });
     },
-    onError: (_, __, context) => {
+    onError: (error, _variables, context) => {
       // Roll back optimistic update
       if (context?.previous !== undefined) {
         queryClient.setQueryData(['messages', conversationId], context.previous);
       }
+      // The rollback alone puts the old text back and says nothing, so an edit
+      // that refused to travel in clear would read as an edit that never
+      // happened. Name the reason instead.
+      alert(t(messageSendErrorKey(error) ?? 'messages.errors.editFailed'));
     },
   });
 

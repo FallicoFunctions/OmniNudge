@@ -27,11 +27,10 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
   const [encryptionWarning, setEncryptionWarning] = useState<string | null>(null);
 
   const prepareEncryptionPayload = async (): Promise<
-    | (MultiRecipientEncryptionResult & {
-        is_multi_recipient: true;
-        encryption_version: string;
-      })
-    | { is_multi_recipient: false; encryption_version: string; message: string }
+    MultiRecipientEncryptionResult & {
+      is_multi_recipient: true;
+      encryption_version: string;
+    }
   > => {
     // Fetch hub moderators and admins to build the participant list
     const recipients = await modMailService.getRecipients(hubName);
@@ -40,9 +39,13 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       new Set([user?.id, ...recipientIds].filter((id): id is number => typeof id === 'number'))
     );
 
+    // Both refusals below throw rather than send. This one used to return the
+    // raw message with encryption_version 'plaintext', so the one branch where
+    // no recipient could be encrypted for was the branch that sent in clear.
     if (!participantIds.length) {
-      setEncryptionWarning(t('modMailModal.encryption.noParticipants'));
-      return { is_multi_recipient: false, encryption_version: 'plaintext', message };
+      const errorMsg = t('modMailModal.encryption.noParticipants');
+      setEncryptionWarning(errorMsg);
+      throw new Error(errorMsg);
     }
 
     // Fetch public keys for all participants
@@ -100,26 +103,17 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
   const createMutation = useMutation({
     mutationFn: async () => {
       const encryptionPayload = await prepareEncryptionPayload();
-      const request =
-        encryptionPayload.is_multi_recipient === true
-          ? {
-              hub_name: hubName,
-              subject,
-              encrypted_content: encryptionPayload.encryptedContent,
-              sender_encrypted_content:
-                encryptionPayload.senderEncryptedContent ?? encryptionPayload.encryptedContent,
-              encryption_version: encryptionPayload.encryption_version,
-              is_multi_recipient: encryptionPayload.is_multi_recipient,
-              shared_encryption_iv: encryptionPayload.sharedIv,
-              recipient_keys: encryptionPayload.recipientKeys,
-            }
-          : {
-              hub_name: hubName,
-              subject,
-              message: encryptionPayload.message,
-              encryption_version: encryptionPayload.encryption_version,
-              is_multi_recipient: false,
-            };
+      const request = {
+        hub_name: hubName,
+        subject,
+        encrypted_content: encryptionPayload.encryptedContent,
+        sender_encrypted_content:
+          encryptionPayload.senderEncryptedContent ?? encryptionPayload.encryptedContent,
+        encryption_version: encryptionPayload.encryption_version,
+        is_multi_recipient: encryptionPayload.is_multi_recipient,
+        shared_encryption_iv: encryptionPayload.sharedIv,
+        recipient_keys: encryptionPayload.recipientKeys,
+      };
 
       return modMailService.createModMail(request);
     },

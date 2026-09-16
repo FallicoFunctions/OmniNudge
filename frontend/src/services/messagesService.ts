@@ -266,28 +266,41 @@ export const messagesService = {
     let encryptionVersion = 'plaintext';
 
     const ownKeys = await getOwnKeys();
+    // An edit replaces the content of a message that was sent encrypted, so a
+    // fallback here is worse than one on the send path: it downgrades a message
+    // that was already protected. The edit refuses instead.
     if (recipientId) {
       try {
         const publicKeys = await encryptionService.getPublicKeys([recipientId]);
         const recipientPublicKeyBase64 = publicKeys[recipientId];
-        if (recipientPublicKeyBase64) {
-          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
-          if (recipientPublicKey) {
-            encryptedContent = await encryptMessage(data.content, recipientPublicKey);
-            encryptionVersion = 'v2';
-          }
+        if (!recipientPublicKeyBase64) {
+          throw new MessageNotSent(
+            'recipient-key-unusable',
+            'The recipient has published no encryption key'
+          );
         }
+        const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+        if (!recipientPublicKey) {
+          throw new MessageNotSent('recipient-key-unusable', 'The recipient key could not be read');
+        }
+        encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+        encryptionVersion = 'v2';
       } catch (error) {
-        console.error('Message edit encryption failed, falling back to plaintext:', error);
+        if (error instanceof MessageNotSent) throw error;
+        throw new MessageNotSent('encryption-failed', 'The edit could not be encrypted');
       }
     }
 
-    if (ownKeys?.publicKey) {
-      try {
-        senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
-      } catch (error) {
-        console.error('Failed to encrypt sender copy for edited message:', error);
-      }
+    if (!ownKeys?.publicKey) {
+      throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
+    }
+    try {
+      senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
+    } catch {
+      throw new MessageNotSent(
+        'encryption-failed',
+        'The edited sender copy could not be encrypted'
+      );
     }
 
     return api.patch<Message>(`/messages/${messageId}`, {

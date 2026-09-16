@@ -29,7 +29,11 @@ vi.mock('../../src/services/keyManagementService', () => ({
 
 vi.mock('../../src/services/encryptionService', () => ({
   encryptionService: {
-    getPublicKeys: vi.fn(async () => ({ 1: 'recipient-key-b64' })),
+    // Keyed by 2, the other_user every conversation fixture below returns. Keyed
+    // by 1 this map never matched the recipient, so getPublicKeys answered
+    // undefined and the send fell back to plaintext -- which the assertion below
+    // did not look at, so the suite was green while testing the wrong path.
+    getPublicKeys: vi.fn(async () => ({ 2: 'recipient-key-b64' })),
   },
 }));
 
@@ -88,7 +92,10 @@ describe('Messaging flows', () => {
 
     const result = await messagesService.sendMessage({ conversation_id: 1, content: 'Hello' });
 
-    expect(mockApi.post).toHaveBeenCalledWith('/messages', expect.objectContaining({ conversation_id: 1 }));
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/messages',
+      expect.objectContaining({ conversation_id: 1, encryption_version: 'v2' })
+    );
     expect(result.content).toBe('Hello');
   });
 
@@ -112,7 +119,13 @@ describe('Messaging flows', () => {
   });
 
   it('TestReaction_AddsToMessage: addReaction posts emoji to /messages/{id}/reactions', async () => {
-    const reaction = { id: 1, message_id: 10, user_id: 1, emoji: '👍', created_at: new Date().toISOString() };
+    const reaction = {
+      id: 1,
+      message_id: 10,
+      user_id: 1,
+      emoji: '👍',
+      created_at: new Date().toISOString(),
+    };
     mockApi.post.mockResolvedValueOnce(reaction);
 
     const result = await reactionsService.addReaction(10, '👍');
@@ -125,7 +138,10 @@ describe('Messaging flows', () => {
     mockApi.get.mockResolvedValueOnce({ id: 1, other_user: { id: 2 } });
     mockApi.patch.mockResolvedValueOnce(makeMessage({ content: 'Updated', is_edited: true }));
 
-    const result = await messagesService.editMessage(10, { conversation_id: 1, content: 'Updated' });
+    const result = await messagesService.editMessage(10, {
+      conversation_id: 1,
+      content: 'Updated',
+    });
 
     expect(mockApi.patch).toHaveBeenCalledWith('/messages/10', expect.any(Object));
     expect(result.is_edited).toBe(true);
@@ -136,7 +152,7 @@ describe('Messaging flows', () => {
 
     await messagesService.deleteMessage(10);
 
-    expect(mockApi.delete).toHaveBeenCalledWith("/messages/10");
+    expect(mockApi.delete).toHaveBeenCalledWith('/messages/10');
   });
 
   it('TestConversationList_LoadsCorrectly: getConversationsPage returns conversations array', async () => {

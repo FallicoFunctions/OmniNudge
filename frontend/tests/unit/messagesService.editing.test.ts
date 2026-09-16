@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { messagesService } from '../../src/services/messagesService';
+import { encryptionService } from '../../src/services/encryptionService';
+import { getOwnKeys } from '../../src/services/keyManagementService';
+import { MessageNotSent } from '../../src/utils/messageSendErrors';
 
 const { mockApi } = vi.hoisted(() => ({
   mockApi: {
@@ -71,6 +74,38 @@ describe('messagesService editing helpers', () => {
       content: 'hello edit',
       encryption_version: 'v2',
     });
+  });
+
+  // An edit replaces the content of a message that was already sent encrypted.
+  // Falling back to plaintext here does not fail to protect a new message; it
+  // strips the protection from one that had it. So the edit must refuse, and
+  // nothing may reach the server when it does.
+  it('refuses to edit when the recipient has published no usable key', async () => {
+    vi.mocked(encryptionService.getPublicKeys).mockResolvedValueOnce({});
+
+    await expect(
+      messagesService.editMessage(99, {
+        conversation_id: 88,
+        content: 'hello edit',
+        recipient_id: 42,
+      })
+    ).rejects.toMatchObject({ refusal: 'recipient-key-unusable' });
+
+    expect(mockApi.patch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to edit when this device has no keys of its own', async () => {
+    vi.mocked(getOwnKeys).mockResolvedValueOnce(null as never);
+
+    await expect(
+      messagesService.editMessage(99, {
+        conversation_id: 88,
+        content: 'hello edit',
+        recipient_id: 42,
+      })
+    ).rejects.toBeInstanceOf(MessageNotSent);
+
+    expect(mockApi.patch).not.toHaveBeenCalled();
   });
 
   it('forwards message with normalized include_media default', async () => {

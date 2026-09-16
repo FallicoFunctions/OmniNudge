@@ -3582,7 +3582,12 @@ export default function MessagesPage() {
                                     sentAt={message.sent_at}
                                     isSaving={isEditSaving}
                                     onSave={(content) =>
-                                      saveEdit(message.id, content).then(() => undefined)
+                                      saveEdit(message.id, content).then(
+                                        () => undefined,
+                                        // The hook names the reason; this only keeps
+                                        // the rejection from going unhandled.
+                                        () => undefined
+                                      )
                                     }
                                     onCancel={cancelEdit}
                                     isOwnMessage={isOwnMessage}
