@@ -65,30 +65,40 @@ describe('rotating the key', () => {
     expect(vi.mocked(api.post).mock.calls[0][1]).toEqual(withHistory);
   });
 
-  it('names a member who has published no key, which the sender cannot fix', async () => {
-    vi.mocked(api.post).mockRejectedValue(
-      httpError(409, 'A member has not set up encryption yet', 'conflict')
-    );
-    await expect(rotateGroupKey(42, rotation)).rejects.toBeInstanceOf(GroupKeyRotationRefused);
-    await rotateGroupKey(42, rotation).catch((error: GroupKeyRotationRefused) => {
-      expect(error.refusal).toBe('member-not-set-up');
-    });
+  it.each([
+    ['group_key_member_not_set_up', 'member-not-set-up'],
+    ['group_key_current', 'key-is-current'],
+    ['group_key_version_taken', 'version-taken'],
+    ['group_key_copies_mismatch', 'copies-do-not-match'],
+    ['group_key_history_not_allowed', 'history-not-allowed'],
+  ])('reads %s as %s', async (code, refusal) => {
+    vi.mocked(api.post).mockRejectedValue(httpError(409, 'whatever the server says', code));
+    const error = await rotateGroupKey(42, rotation).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(GroupKeyRotationRefused);
+    expect((error as GroupKeyRotationRefused).refusal).toBe(refusal);
   });
 
-  it('tells that apart from a key that is already current', async () => {
-    vi.mocked(api.post).mockRejectedValue(httpError(409, 'The group key is current', 'conflict'));
-    await rotateGroupKey(42, rotation).catch((error: GroupKeyRotationRefused) => {
-      expect(error.refusal).toBe('key-is-current');
-    });
+  it('does not depend on the wording, which is for people and may be rewritten', async () => {
+    // Three refusals share a 409, so a client reading the prose would collapse
+    // them the first time somebody rewrote a sentence.
+    vi.mocked(api.post).mockRejectedValue(
+      httpError(
+        409,
+        'Somebody here still needs to finish setting up.',
+        'group_key_member_not_set_up'
+      )
+    );
+    const error = await rotateGroupKey(42, rotation).catch((e: unknown) => e);
+    expect((error as GroupKeyRotationRefused).refusal).toBe('member-not-set-up');
+    expect((error as GroupKeyRotationRefused).message).toBe(
+      'Somebody here still needs to finish setting up.'
+    );
   });
 
-  it('names copies that do not cover the members', async () => {
-    vi.mocked(api.post).mockRejectedValue(
-      httpError(400, "The key copies do not match the group's members")
-    );
-    await rotateGroupKey(42, rotation).catch((error: GroupKeyRotationRefused) => {
-      expect(error.refusal).toBe('copies-do-not-match');
-    });
+  it('passes a coded error it does not know through unchanged', async () => {
+    const unknown = httpError(409, 'Something new', 'group_key_something_new');
+    vi.mocked(api.post).mockRejectedValue(unknown);
+    await expect(rotateGroupKey(42, rotation)).rejects.toBe(unknown);
   });
 
   it('passes anything else through unchanged, rather than calling it a refusal', async () => {

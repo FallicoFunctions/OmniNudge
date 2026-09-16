@@ -103,19 +103,23 @@ func (h *GroupKeyHandler) RotateGroupKey(c *gin.Context) {
 		c.JSON(http.StatusCreated, gin.H{"key_version": req.KeyVersion})
 	case errors.Is(err, services.ErrNotGroupMember):
 		RespondError(c, http.StatusForbidden, "Not a member of this group")
+	// Each refusal carries its own reason. Three of these are 409s, and a code
+	// derived from the status alone makes them one opaque answer: a client
+	// could then tell them apart only by matching the message, which is a
+	// contract in two languages that reworing one line would silently break.
 	case errors.Is(err, services.ErrGroupKeyCurrent):
 		// Somebody else made a version, or no member has joined or left since.
-		RespondError(c, http.StatusConflict, "The group key is current")
+		RespondErrorCoded(c, http.StatusConflict, "group_key_current", "The group key is current")
 	case errors.Is(err, services.ErrGroupKeyVersion):
-		RespondError(c, http.StatusConflict, "That is not the next key version")
+		RespondErrorCoded(c, http.StatusConflict, "group_key_version_taken", "That is not the next key version")
 	case errors.Is(err, services.ErrGroupKeyCopies):
-		RespondError(c, http.StatusBadRequest, "The key copies do not match the group's members")
+		RespondErrorCoded(c, http.StatusBadRequest, "group_key_copies_mismatch", "The key copies do not match the group's members")
 	case errors.Is(err, services.ErrGroupKeyHistory):
-		RespondError(c, http.StatusBadRequest, "Those older key copies are not allowed")
+		RespondErrorCoded(c, http.StatusBadRequest, "group_key_history_not_allowed", "Those older key copies are not allowed")
 	case errors.Is(err, services.ErrGroupKeyNoPublicKey):
 		// Not the sender's doing: a member has never published a key, so no
 		// client can wrap the next version for them.
-		RespondError(c, http.StatusConflict, "A member has not set up encryption yet")
+		RespondErrorCoded(c, http.StatusConflict, "group_key_member_not_set_up", "A member has not set up encryption yet")
 	default:
 		slog.Error("store group key version failed", "error", err, "conversation_id", conversationID, "user_id", userID)
 		RespondError(c, http.StatusInternalServerError, "Failed to store the group key")

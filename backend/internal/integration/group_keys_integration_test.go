@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -207,4 +208,66 @@ func TestGroupKeyRoutesOverHTTP(t *testing.T) {
 			fmt.Sprint(member.ID): "v2-for-member",
 		},
 	}, memberToken).Code)
+}
+
+// The client tells one refusal from another by the code, because three of them
+// share a 409 and the message is for people. That is a contract in two
+// languages: these assert the bytes the server actually sends, so a rename on
+// either side cannot pass unnoticed with both suites still green.
+func TestGroupKeyRefusalsCarryTheirOwnCode(t *testing.T) {
+	deps := newTestDeps(t)
+	owner := createUser(t, deps.UserRepo, uniqueRLUsername("codeowner"), "user")
+	member := createUser(t, deps.UserRepo, uniqueRLUsername("codemember"), "user")
+	newcomer := createUser(t, deps.UserRepo, uniqueRLUsername("codenewcomer"), "user")
+	group := newGroupWithMembers(t, deps, owner.ID, member.ID)
+	publishPublicKey(t, deps, owner.ID)
+
+	token, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	require.NoError(t, err)
+	keys := fmt.Sprintf("/api/v1/groups/%d/keys", group)
+
+	codeOf := func(w *httptest.ResponseRecorder) string {
+		t.Helper()
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body), w.Body.String())
+		code, _ := body["code"].(string)
+		return code
+	}
+	rotate := func(version int, ids ...int) *httptest.ResponseRecorder {
+		copies := map[string]string{}
+		for _, id := range ids {
+			copies[fmt.Sprint(id)] = fmt.Sprintf("v%d-for-%d", version, id)
+		}
+		return postAuthJSON(t, deps.Router, keys, map[string]any{
+			"key_version": version, "copies": copies,
+		}, token)
+	}
+
+	// A member who has published no key: the sender can do nothing about it.
+	w := rotate(1, owner.ID, member.ID)
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Equal(t, "group_key_member_not_set_up", codeOf(w))
+
+	publishPublicKey(t, deps, member.ID, newcomer.ID)
+
+	// Copies that do not cover the members.
+	w = rotate(1, owner.ID)
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Equal(t, "group_key_copies_mismatch", codeOf(w))
+
+	w = rotate(1, owner.ID, member.ID)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	// A key that is already current.
+	w = rotate(2, owner.ID, member.ID)
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Equal(t, "group_key_current", codeOf(w))
+
+	// A join ends the version, so the next one must be the next number.
+	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/participants", group),
+		map[string]any{"user_id": newcomer.ID}, token)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	w = rotate(9, owner.ID, member.ID, newcomer.ID)
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Equal(t, "group_key_version_taken", codeOf(w))
 }

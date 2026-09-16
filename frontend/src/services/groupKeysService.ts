@@ -43,14 +43,32 @@ export interface GroupKeyRotation {
   history?: Record<number, Record<number, string>>;
 }
 
-/** Why a rotation was refused, when the reason is not the sender's doing. */
+/** Why a rotation was refused. */
 export type RotationRefusal =
   /** A member has published no key, so no copy can be made for them. */
   | 'member-not-set-up'
   /** Another member rotated first, or no member has joined or left since. */
   | 'key-is-current'
+  /** Another member took this version number first. */
+  | 'version-taken'
   /** The copies do not cover exactly the current members. */
-  | 'copies-do-not-match';
+  | 'copies-do-not-match'
+  /** Older copies were sent that the group's history setting does not allow. */
+  | 'history-not-allowed';
+
+/**
+ * The server's reason for each refusal. Three of these share a 409, so the
+ * status cannot tell them apart and the message must not be asked to: wording
+ * is for people, and a contract written in prose across two languages breaks
+ * silently the first time somebody rewrites a sentence.
+ */
+const REFUSAL_BY_CODE: Record<string, RotationRefusal> = {
+  group_key_member_not_set_up: 'member-not-set-up',
+  group_key_current: 'key-is-current',
+  group_key_version_taken: 'version-taken',
+  group_key_copies_mismatch: 'copies-do-not-match',
+  group_key_history_not_allowed: 'history-not-allowed',
+};
 
 export class GroupKeyRotationRefused extends Error {
   constructor(
@@ -92,23 +110,13 @@ export async function rotateGroupKey(
 
 /**
  * The fetch client throws a plain Error carrying the response status and the
- * server's code, so a refusal is read from those rather than from a body: this
- * is not the axios client, and error.response is always undefined here.
+ * server's code, so a refusal is read from the code: this is not the axios
+ * client, and error.response is always undefined here. The message is carried
+ * through for display and is never branched on.
  */
 function asRefusal(error: unknown): unknown {
   if (!(error instanceof Error)) return error;
-  const { status } = error as Error & { status?: number };
-  const message = error.message;
-  if (status === 409) {
-    // The server sends the same 409 for a member with no key and for a key
-    // that is already current, and only the message tells them apart.
-    const refusal: RotationRefusal = /encryption/i.test(message)
-      ? 'member-not-set-up'
-      : 'key-is-current';
-    return new GroupKeyRotationRefused(refusal, message);
-  }
-  if (status === 400 && /copies/i.test(message)) {
-    return new GroupKeyRotationRefused('copies-do-not-match', message);
-  }
-  return error;
+  const { code } = error as Error & { code?: string };
+  const refusal = code ? REFUSAL_BY_CODE[code] : undefined;
+  return refusal ? new GroupKeyRotationRefused(refusal, error.message) : error;
 }
