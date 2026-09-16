@@ -10,7 +10,7 @@ import {
   unwrapGroupKey,
   wrapGroupKeyForMembers,
 } from './groupKeys';
-import { exportKeyPair, generateKeyPair } from './encryption';
+import { arrayBufferToBase64, exportKeyPair, generateKeyPair } from './encryption';
 
 interface Vectors {
   groupKey: string;
@@ -85,6 +85,31 @@ describe('the sealed envelope', () => {
     const sealed = await sealGroupMessage('for this group only', await newGroupKey(), 1);
     await expect(openGroupMessage(sealed, await newGroupKey())).rejects.toThrow();
   });
+});
+
+describe('sealing the shared vectors', () => {
+  // The tests above prove WebCrypto OPENS what Node sealed. They cannot prove
+  // it SEALS the same bytes, because sealGroupMessage draws a fresh IV every
+  // time and so can never be compared to a fixed vector. Sealing deterministically
+  // with the vector's own IV closes the other direction: a change that made this
+  // client's ciphertext diverge would round-trip through openGroupMessage and
+  // pass every test above, while no other client could read what it writes.
+  it.each(vectors.messages)(
+    'produces the same bytes Node did for version $keyVersion',
+    async (vector) => {
+      const key = await importVectorKey();
+      const ivBuffer = Buffer.from(vector.iv, 'base64');
+      const iv = new Uint8Array(
+        ivBuffer.buffer.slice(ivBuffer.byteOffset, ivBuffer.byteOffset + ivBuffer.byteLength)
+      );
+      const data = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        new TextEncoder().encode(vector.plaintext)
+      );
+      expect(arrayBufferToBase64(data)).toBe(JSON.parse(vector.sealed).data);
+    }
+  );
 });
 
 describe('wrapping the key for members', () => {
