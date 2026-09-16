@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "head": "7aa4b8305",
+ "head": "3e17ce025",
  "base": "b28df65f3",
  "scope": {
   "files": [
@@ -27,48 +27,663 @@
   {
    "pass": 1,
    "instruments": [
-    {"id": "A1", "status": "applied", "evidence": "Four files. The key state carries each member's public key instead of an id alone (GroupMember); rotation refuses with its own error while any member has published none; the handler maps that to 409; both test suites publish keys for their members, and a new test covers the keyless member."},
-    {"id": "A2", "status": "applied", "evidence": "37ee8ee76 (today's, the shared test router), af4bacefe (G1c), 800d8e003 (G1b), a848b585c (G1a). Also grepped every ledger for a member-public-key finding: the nearby ones (k4c1-public-key-session-only, k4b-partial-failure-orphans-keys) are about account keys, not group membership. This is new ground."},
-    {"id": "B1", "status": "applied", "evidence": "Printed the real key state for two materially different inputs. One member keyless: members:[{user_id:1,public_key:\"public-key-for-1\"},{user_id:2,public_key:\"\"}]. Every member keyed: both carry their key. The state names who holds the group back; it does not merely omit them."},
-    {"id": "B2", "status": "na", "why": "No markup; server side."},
-    {"id": "B3", "status": "applied", "evidence": "The real HTTP bodies, same two inputs: rotation with a keyless member answers 409 {\"error\":\"A member has not set up encryption yet\"}; once that member publishes a key the identical rotation answers 201 {\"key_version\":1}."},
-    {"id": "B4", "status": "applied", "evidence": "Read the SQL the state is built from: groupMembers LEFT JOINs users and COALESCEs the key to ''. Checked the schema rather than assuming: conversation_participants_user_id_fkey REFERENCES users(id) ON DELETE CASCADE, so a participant without a user row cannot exist and the LEFT JOIN guards a state the schema forbids today. It stays because an INNER JOIN would silently drop a member if that ever changed, and a dropped member is one nobody wraps a key for."},
-    {"id": "C1", "status": "applied", "evidence": "public_key carries the same value users.public_key holds, which is what the account-key path publishes and what importPublicKey reads on the client, so the two sides of the seam name the same bytes."},
-    {"id": "C2", "status": "applied", "evidence": "The shape change is caller-visible, so I looked for callers: no Go consumer outside the two test files, and the frontend has no group-key types yet (G2 is unwritten). Nothing receives the old []int."},
-    {"id": "C3", "status": "na", "why": "No two implementations to run side by side."},
-    {"id": "C4", "status": "na", "why": "No worker or provider."},
-    {"id": "C5", "status": "applied", "evidence": "The field is wired, not merely declared: the printed artifact carries real key values, and rotation changes its answer (409 against 201) on whether the field is empty."},
-    {"id": "C6", "status": "na", "why": "No untyped accessor."},
-    {"id": "C7", "status": "applied", "evidence": "The fixtures now match what a real producer emits. Every group-key test publishes keys for its members, through UserRepository.UpdatePublicKey in the integration suite. Before this the tests modelled a group whose members held no keys at all, which cannot occur in an encrypted group."},
-    {"id": "D1", "status": "applied", "evidence": "Real inputs that must pass: the all-keyed rotation answers 201, and the eight group-key unit tests pass."},
-    {"id": "D2", "status": "applied", "evidence": "Hostile inputs that must fail: a rotation naming a keyless member answers 409 and writes nothing, because the check runs before any INSERT; an outsider answers 403; copies that do not cover the members answer 400."},
-    {"id": "D3", "status": "applied", "evidence": "Boundaries: a group of one member; a member list where exactly one member of two lacks a key; a rotation for a version that is not the next one."},
-    {"id": "E1", "status": "applied", "evidence": "Compared the siblings that also wrap keys per recipient. modmail.go:385 tolerates a participant with no key and messages.go:712 does the same, both fail-closed: that participant cannot decrypt, nothing is exposed, and the frontend warns. A shared-key group cannot copy that: its copies must cover exactly the members, so skipping a keyless member would hand somebody a group they cannot read while the rest believe it is encrypted. Refusing is the consistent answer for a shared key, tolerating for a per-recipient one."},
-    {"id": "E2", "status": "applied", "evidence": "No branch became unreachable: containsInt is still used at line 283 for the history versions, and groupMembers and isGroupMember are both reached from groupKeyState. golangci-lint reports 0 issues, and it flags unused unexported functions."},
-    {"id": "E3", "status": "applied", "evidence": "Nothing is swallowed: the keyless case gets its own error rather than being folded into ErrGroupKeyCopies, which is the whole point of the change."},
-    {"id": "E4", "status": "na", "why": "No flag."},
-    {"id": "E5", "status": "applied", "evidence": "GetPublicKeysByIDs already exists, with one caller (handlers/auth.go:452). It is deliberately not reused here: the state needs the keys joined to the participants with COALESCE in a single query, through a querier that also runs inside the rotation transaction. A second round trip through the repository would read the members and their keys at two different moments."},
-    {"id": "E6", "status": "applied", "evidence": "Shape 'a member nobody wraps a key for': grepped every per-recipient key path in the backend (modmail, messages, search, message_recipient_keys). All of them fail closed, none exposes content."},
-    {"id": "F1", "status": "applied", "evidence": "Both packages under -race: 0 data races."},
-    {"id": "F2", "status": "applied", "evidence": "The keyless check runs inside the rotation transaction, before the first INSERT, and the deferred rollback leaves nothing behind. The existing test asserts that a refused rotation stores nothing."},
-    {"id": "F3", "status": "na", "why": "No migration. The messages.group_key_version column belongs to G3, where the send path uses it; adding it now would be a column no code writes."},
-    {"id": "F4", "status": "na", "why": "No delete, cancel or orphan path."},
-    {"id": "G1", "status": "na", "why": "The pass found nothing, so there is no fix to control."},
-    {"id": "G2", "status": "applied", "evidence": "The guard is reachable: it was reached in the printed run and in the new test, not only in theory."},
-    {"id": "H1", "status": "applied", "evidence": "gofmt clean, go build ./... ok, go vet ok with and without -tags=integration, golangci-lint --build-tags=integration 0 issues across services, handlers and integration."},
-    {"id": "Z1", "status": "applied", "evidence": "No technique was needed that the list does not name. H5, added earlier today, covered the package-level risk this change carried."},
-    {"id": "B5", "status": "na", "why": "No model or provider output."},
-    {"id": "E7", "status": "na", "why": "Nothing starts before its governing decision."},
-    {"id": "G3", "status": "applied", "evidence": "Fed the guard the thing it exists to refuse, and then the thing it must accept: with one member keyless the rotation is refused with ErrGroupKeyNoPublicKey, and the identical rotation goes through once that member publishes a key. The new test asserts both halves, so a guard that always refused would fail it."},
-    {"id": "B6", "status": "na", "why": "No layout."},
-    {"id": "E8", "status": "na", "why": "No lazily cached process state."},
-    {"id": "H2", "status": "applied", "evidence": "Measured rather than assumed, because a skipped package still prints ok: the eight group-key tests printed --- PASS under -v, and both packages reported 0 skipped."},
-    {"id": "I1", "status": "applied", "evidence": "The approved protocol says the server stores one copy per member, wrapped with that member's public key. Carrying those keys in the state is what lets a client do that at all, and refusing a keyless member keeps 'copies cover exactly the members' true instead of quietly weakening it."},
-    {"id": "F5", "status": "applied", "evidence": "State and Rotate read the members through one function, so the two entry points cannot disagree about who is in the group."},
-    {"id": "B7", "status": "na", "why": "No layer."},
-    {"id": "H3", "status": "applied", "evidence": "Every test that imports the changed code was run, not the tests beside it: the whole services package (ok 54.866s) and the whole integration package (ok 48.075s)."},
-    {"id": "H4", "status": "na", "why": "No app code; nothing can cover the screen."},
-    {"id": "H5", "status": "applied", "evidence": "Whole packages, never selectors, both with -race -p 4 as CI runs them. The first integration attempt reported [setup failed] with 'build constraints exclude all Go files' because I omitted -tags=integration; that is a run that never happened rather than one that passed, so I re-ran it correctly before believing it."}
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Four files. The key state carries each member's public key instead of an id alone (GroupMember); rotation refuses with its own error while any member has published none; the handler maps that to 409; both test suites publish keys for their members, and a new test covers the keyless member."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "37ee8ee76 (today's, the shared test router), af4bacefe (G1c), 800d8e003 (G1b), a848b585c (G1a). Also grepped every ledger for a member-public-key finding: the nearby ones (k4c1-public-key-session-only, k4b-partial-failure-orphans-keys) are about account keys, not group membership. This is new ground."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the real key state for two materially different inputs. One member keyless: members:[{user_id:1,public_key:\"public-key-for-1\"},{user_id:2,public_key:\"\"}]. Every member keyed: both carry their key. The state names who holds the group back; it does not merely omit them."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The real HTTP bodies, same two inputs: rotation with a keyless member answers 409 {\"error\":\"A member has not set up encryption yet\"}; once that member publishes a key the identical rotation answers 201 {\"key_version\":1}."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the SQL the state is built from: groupMembers LEFT JOINs users and COALESCEs the key to ''. Checked the schema rather than assuming: conversation_participants_user_id_fkey REFERENCES users(id) ON DELETE CASCADE, so a participant without a user row cannot exist and the LEFT JOIN guards a state the schema forbids today. It stays because an INNER JOIN would silently drop a member if that ever changed, and a dropped member is one nobody wraps a key for."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "public_key carries the same value users.public_key holds, which is what the account-key path publishes and what importPublicKey reads on the client, so the two sides of the seam name the same bytes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The shape change is caller-visible, so I looked for callers: no Go consumer outside the two test files, and the frontend has no group-key types yet (G2 is unwritten). Nothing receives the old []int."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The field is wired, not merely declared: the printed artifact carries real key values, and rotation changes its answer (409 against 201) on whether the field is empty."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixtures now match what a real producer emits. Every group-key test publishes keys for its members, through UserRepository.UpdatePublicKey in the integration suite. Before this the tests modelled a group whose members held no keys at all, which cannot occur in an encrypted group."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: the all-keyed rotation answers 201, and the eight group-key unit tests pass."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile inputs that must fail: a rotation naming a keyless member answers 409 and writes nothing, because the check runs before any INSERT; an outsider answers 403; copies that do not cover the members answer 400."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundaries: a group of one member; a member list where exactly one member of two lacks a key; a rotation for a version that is not the next one."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the siblings that also wrap keys per recipient. modmail.go:385 tolerates a participant with no key and messages.go:712 does the same, both fail-closed: that participant cannot decrypt, nothing is exposed, and the frontend warns. A shared-key group cannot copy that: its copies must cover exactly the members, so skipping a keyless member would hand somebody a group they cannot read while the rest believe it is encrypted. Refusing is the consistent answer for a shared key, tolerating for a per-recipient one."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable: containsInt is still used at line 283 for the history versions, and groupMembers and isGroupMember are both reached from groupKeyState. golangci-lint reports 0 issues, and it flags unused unexported functions."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed: the keyless case gets its own error rather than being folded into ErrGroupKeyCopies, which is the whole point of the change."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "GetPublicKeysByIDs already exists, with one caller (handlers/auth.go:452). It is deliberately not reused here: the state needs the keys joined to the participants with COALESCE in a single query, through a querier that also runs inside the rotation transaction. A second round trip through the repository would read the members and their keys at two different moments."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a member nobody wraps a key for': grepped every per-recipient key path in the backend (modmail, messages, search, message_recipient_keys). All of them fail closed, none exposes content."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Both packages under -race: 0 data races."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The keyless check runs inside the rotation transaction, before the first INSERT, and the deferred rollback leaves nothing behind. The existing test asserts that a refused rotation stores nothing."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. The messages.group_key_version column belongs to G3, where the send path uses it; adding it now would be a column no code writes."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete, cancel or orphan path."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "The pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: it was reached in the printed run and in the new test, not only in theory."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok with and without -tags=integration, golangci-lint --build-tags=integration 0 issues across services, handlers and integration."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No technique was needed that the list does not name. H5, added earlier today, covered the package-level risk this change carried."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the guard the thing it exists to refuse, and then the thing it must accept: with one member keyless the rotation is refused with ErrGroupKeyNoPublicKey, and the identical rotation goes through once that member publishes a key. The new test asserts both halves, so a guard that always refused would fail it."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Measured rather than assumed, because a skipped package still prints ok: the eight group-key tests printed --- PASS under -v, and both packages reported 0 skipped."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved protocol says the server stores one copy per member, wrapped with that member's public key. Carrying those keys in the state is what lets a client do that at all, and refusing a keyless member keeps 'copies cover exactly the members' true instead of quietly weakening it."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "State and Rotate read the members through one function, so the two entry points cannot disagree about who is in the group."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Every test that imports the changed code was run, not the tests beside it: the whole services package (ok 54.866s) and the whole integration package (ok 48.075s)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "Whole packages, never selectors, both with -race -p 4 as CI runs them. The first integration attempt reported [setup failed] with 'build constraints exclude all Go files' because I omitted -tags=integration; that is a run that never happened rather than one that passed, so I re-ran it correctly before believing it."
+    }
+   ],
+   "findings": []
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Same four files, plus the fix this pass found: maxGroupKeyCopyBytes now follows maxWrappedCopyBytes, with the test that holds it there."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-read the prior ledgers and, this pass, grepped every ledger for a finding of this shape. None records a bound on a stored key copy."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Pass 1 printed the key state. This pass went after a different artifact: anything generated from the Go types. There is none -- GroupKeyState and the keys route appear only in the two Go files, backend/docs holds hand-written Markdown, and no swagger artifact is committed."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed this pass: the bound governs what is stored, not what the handler answers, and pass 1 printed both rotation bodies."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The stored row is exactly what this pass is about. The new test reads the copy back through State and asserts it was stored whole: a 3000-character copy comes back byte for byte, where the old bound refused to store it at all."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The finding. maxGroupKeyCopyBytes bounded a stored copy at 2048 while the publish path takes a public key up to maxWrappedCopyBytes (16384). A large modulus wraps a 32-byte key to more than 2 KB, so every copy that member could be given was refused on size."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "No client mirrors this shape: grepped frontend/src, omnirave-web/src and omnirave-babylon/src for active_version, my_copies and missing_history. G2 is unwritten, so nothing consumed the old []int."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Checked the producer of the field the state now carries: StorePublicKey validates emptiness and a length cap only, with no format check anywhere (no ParsePKIX, no pem.Decode)."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixtures publish placeholder strings, not real SPKI keys. The server never parses a public key, so the fixture is faithful for every server-side path; a client that must import one is G2's concern."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Nine group key tests pass, and the whole services package passes under -race."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Hostile sizes: a copy longer than the old bound is now stored whole; the control proves the old bound refused it."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundaries measured rather than guessed: RSA-2048 wraps to 344 base64 chars, RSA-16384 to about 2732, and the old bound sat between them."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings on the same chain: StoreRecoveryKey, UpdateEncryptedPrivateKey and StorePublicKey all bound their payload by maxWrappedCopyBytes. The group copy was the only one on this chain with a different number."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable; validGroupKeyCopy is still the only consumer of the bound."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is folded into anything: an oversized copy still returns ErrGroupKeyCopies and a keyless member still returns ErrGroupKeyNoPublicKey, so neither refusal hides behind the other."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Corrects pass 1, which argued only against the Go repository method. GET /auth/public-keys is registered in production (main.go:1353), so a client could fetch member keys separately. Carrying them in the key state is still right, because the members and their keys must come from one moment: a join between two calls yields copies that will not match the members the server checks against."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a bound that refuses what another bound admits': grepped every use of both constants. The group copy was the only mismatch."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "-race on the services package: 0 data races."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The bound is checked before the transaction writes anything."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. The messages.group_key_version column belongs to G3, where the send path uses it; adding it now would be a column no code writes."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete, cancel or orphan path."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built and replayed by hand; see the finding."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The bound is reachable: the control shows the old one refusing a copy."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, vet ok with and without the integration tag, lint 0 issues."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new technique: C1 is exactly the instrument for this, and it earned its place."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the bound the input it must accept and the one it must refuse: a 3000-character copy is stored whole now, and the control shows it refused before."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The new test was confirmed running under -v, not inferred from a package that printed ok."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved protocol gives every member a copy. A bound that refuses every copy a member could receive breaks that promise silently."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One bound, one consumer: validGroupKeyCopy is the only reader of maxGroupKeyCopyBytes, so the fresh copies and the history copies cannot disagree about what fits."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The whole services package was run, not the tests beside the change."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "Whole packages under -race, never selectors: services ok 54.989s, integration ok 48.442s with -tags=integration."
+    }
+   ],
+   "findings": [
+    {
+     "id": "g1d-copy-bound-smaller-than-publishable-key",
+     "summary": "maxGroupKeyCopyBytes refused a stored copy over 2 KB while the publish path admits a public key whose modulus wraps to more than that, so every copy such a member could ever be given was refused on size and the group could never rotate again -- reported as ErrGroupKeyCopies, the very error this phase added its own error to stop a sender from seeing.",
+     "found_by": "C1",
+     "fix_commit": "3e17ce025",
+     "control": {
+      "patch": ".review/controls/g1d-copy-bound-smaller-than-publishable-key.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/services/ -run TestGroupKeyCopyFitsAnyPublishableKey"
+      ],
+      "observed": "With the bound back at 2048 the test fails at group_keys_test.go:235, 'Received unexpected error' (ErrGroupKeyCopies) -- a real assertion failure, not a build break. The same selector passes at HEAD."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Scope unchanged; the fix is one constant and its test."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Same ledgers; nothing of this shape recorded before."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The artifact the fix changed was printed again in pass 1's form and is unaffected: the bound governs storage, not the state's shape."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed: the fix is one constant, and the bodies pass 1 printed are unaffected."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the stored row back after the fix: the copy is returned whole by State, so the bound governs acceptance only and does not truncate what it stores."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Walked the rest of the chain after the fix. maxWrappedCopyBytes governs all four stored copies; the group copy now follows it. The real gate on a rotation is the 1 MB API body limit (main.go:1121), which binds before either constant."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Still no consumer outside the tests."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The bound is wired: the control changes the outcome."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Fixtures unchanged and still faithful for server-side paths."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Nine group key tests pass; both packages pass whole."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Worst case measured rather than assumed: 250 members (MaxParticipants 250) at realistic RSA-2048 copies is about 86 KB, well inside the 1 MB body limit, so raising the per-row bound widened no write."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "History is bounded by real state, not by the sender: checkGroupKeyHistory rejects any version the sender does not hold and any pair not genuinely missing, before the transaction issues a single SELECT."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "All four stored copies on this chain now share one bound."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable: validGroupKeyCopy is still the sole consumer of the bound, and golangci-lint reports 0 issues, which flags unused unexported code."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed: both refusals keep their own errors, and the size refusal still names the copies because there the copies genuinely are the problem."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One constant, one meaning, in one place."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "No other bound on this chain disagrees."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "Both packages under -race: services ok 54.989s and integration ok 48.442s, 0 data races in either."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Unchanged: the refusal happens before any write."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. The messages.group_key_version column belongs to G3, where the send path uses it; adding it now would be a column no code writes."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete, cancel or orphan path."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The control fails as a test, at group_keys_test.go:235, with a real assertion error rather than a build break."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable, not theoretical: replaying the control puts the old bound back and validGroupKeyCopy refuses the copy, failing the test at group_keys_test.go:235."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, vet ok, lint 0 issues."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 3 found nothing, and needed no technique the list does not name. C1 found pass 2's defect and C1 re-walked the rest of the chain here, which is the instrument working as intended."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "The guard refuses and accepts the right inputs, proven both ways."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "0 skipped across both packages."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Still matches the approved protocol."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One bound with one consumer, so the copy path and the history path cannot disagree about what fits."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Every test that imports the changed constant was run, not the tests beside it: the whole services package (ok 54.989s) and the whole integration package (ok 48.442s, -tags=integration)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "services ok 54.989s and integration ok 48.442s, both whole, both -race."
+    }
    ],
    "findings": []
   }
@@ -76,8 +691,8 @@
  "gates": {
   "build": "go build ./... ok",
   "vet": "go vet ok, with and without -tags=integration",
-  "lint": "golangci-lint --build-tags=integration 0 issues (services, handlers, integration)",
+  "lint": "golangci-lint --build-tags=integration 0 issues",
   "types": "go build",
-  "tests": "services package -race: ok 54.866s, 0 failed, 0 skipped, 0 races, with the eight group key tests confirmed running under -v; integration package -tags=integration -race -p 4: ok 48.075s, 0 failed, 0 skipped, 0 races"
+  "tests": "services package -race: ok 54.989s, nine group key tests confirmed running under -v; integration package -tags=integration -race -p 4: ok 48.442s, 0 failed, 0 skipped, 0 races"
  }
 }
