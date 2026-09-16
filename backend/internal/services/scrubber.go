@@ -66,7 +66,7 @@ func (s *ScrubberService) ScrubUser(ctx context.Context, userID int) error {
 		{"subreddit_presence", "user_id = $1"}, {"user_status", "user_id = $1"}, {"device_tokens", "user_id = $1"},
 		{"policy_acceptances", "user_id = $1"}, {"retention_settings_audit", "changed_by = $1"},
 		{"feature_flag_overrides", "user_id = $1"}, {"user_bans", "user_id = $1"}, {"account_deletion_log", "user_id = $1"},
-		{"export_session_keys", "user_id = $1"}, {"data_export_requests", "user_id = $1"}, {"user_feedback", "user_id = $1"},
+		{"data_export_requests", "user_id = $1"}, {"user_feedback", "user_id = $1"},
 		{"bug_reports", "user_id = $1"}, {"user_settings", "user_id = $1"}, {"invitations", "inviter_id = $1 OR invited_user_id = $1"},
 	}
 

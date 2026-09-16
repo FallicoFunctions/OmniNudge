@@ -931,9 +931,6 @@ func (w *RetentionWorker) cleanupExpiredExports(ctx context.Context) {
 		_, _ = w.db.Exec(ctx, `UPDATE data_export_requests SET status = 'expired' WHERE export_id = $1`, exportID)
 	}
 
-	if !w.cfg.DryRun {
-		_, _ = w.db.Exec(ctx, "DELETE FROM export_session_keys WHERE expires_at < NOW()")
-	}
 }
 
 // ─── Message cleanup ─────────────────────────────────────────────────────────

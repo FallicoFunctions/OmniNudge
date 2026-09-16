@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -91,89 +90,6 @@ func DecryptWithPassword(ciphertextBase64 string, password string, saltBase64 st
 	plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
 	if err != nil {
 		return "", fmt.Errorf("AES-GCM decryption failed (wrong password?): %w", err)
-	}
-
-	return string(plaintext), nil
-}
-
-// EncryptWithSystemKey encrypts data using a system master key (AES-GCM)
-// Used for short-term storage of session keys in the database
-func EncryptWithSystemKey(plaintext string, masterKey []byte) (string, error) {
-	block, err := aes.NewCipher(masterKey)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
-	}
-
-	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
-}
-
-// DecryptWithSystemKey decrypts data using a system master key
-func DecryptWithSystemKey(ciphertextBase64 string, masterKey []byte) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(ciphertextBase64)
-	if err != nil {
-		return "", err
-	}
-
-	block, err := aes.NewCipher(masterKey)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-
-	nonceSize := gcm.NonceSize()
-	if len(data) < nonceSize {
-		return "", errors.New("ciphertext too short")
-	}
-
-	nonce, actualCiphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return string(plaintext), nil
-}
-
-// DecryptAESGCM decrypts data using a raw AES key and a base64-encoded nonce
-func DecryptAESGCM(ciphertextBase64 string, key []byte, nonceBase64 string) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(ciphertextBase64)
-	if err != nil {
-		return "", fmt.Errorf("decoding ciphertext failed: %w", err)
-	}
-	nonce, err := base64.StdEncoding.DecodeString(nonceBase64)
-	if err != nil {
-		return "", fmt.Errorf("decoding nonce failed: %w", err)
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-
-	if len(nonce) != gcm.NonceSize() {
-		return "", fmt.Errorf("invalid nonce size: expected %d, got %d", gcm.NonceSize(), len(nonce))
-	}
-
-	plaintext, err := gcm.Open(nil, nonce, data, nil)
-	if err != nil {
-		return "", fmt.Errorf("AES-GCM decryption failed: %w", err)
 	}
 
 	return string(plaintext), nil
