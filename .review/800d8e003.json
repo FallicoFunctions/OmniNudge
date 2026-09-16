@@ -1,0 +1,471 @@
+{
+ "schema_version": 2,
+ "head": "4757a417f",
+ "base": "800d8e003",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/group_keys.go",
+   "backend/cmd/server/main.go",
+   "backend/internal/integration/test_utils.go",
+   "backend/internal/integration/group_keys_integration_test.go",
+   "backend/internal/omniraveworld/server/ws_handler_test.go"
+  ],
+  "boundaries": [
+   "GET /groups/:id/keys",
+   "POST /groups/:id/keys",
+   "services.GroupKeyService",
+   "the world server's chat broadcast test"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a848b585c",
+  "fb30bad62",
+  "5ba782a38"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "handlers/group_keys.go (GET and POST /groups/:id/keys over services.GroupKeyService), the routes in cmd/server, the same two routes in the integration test router, and an integration test that drives them over HTTP. The flaky chat broadcast test in omniraveworld/server was hardened in the same session and is recorded below."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a848b585c (G1a's base, K5e), 254554f51 ledger a848b585c.json (G1a): the service these routes call."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The JSON the client receives, printed by the integration test: active_version, latest_version, history_visible, members, missing_history and my_copies, with only the caller's own wrapped copy."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Every status the handler can send was driven over HTTP: 200 for state, 201 for a stored version, 403 for a non-member on both routes, 400 for copies that miss a member, 409 for a version that is not the next one."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows behind those answers were read back through the service in G1a's tests; here the HTTP answers are the artifact."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The JSON field names are the service's own struct tags; the route shape matches the other /groups/:id routes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The handler passes the caller's user id from the auth middleware, as the service expects, and maps each named service error to one status."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Who may hold a copy is decided once, in the service; the handler only translates errors."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "gin binds the request; no hand-written decoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group is built as CreateGroup builds one, and the users come from the integration fixtures."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A member reads the state and stores the first version."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A non-member is refused on both routes; copies that miss a member are refused; a version that is not the next one is refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty copy is refused by the service (G1a); the handler refuses an unparsable id and an unparsable body."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling group routes compared: like them, these check membership before doing anything, and they read the id the same way."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of both handlers is reached by the integration test or by G1a's service tests."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Unexpected errors log with the conversation and user id and answer 500; every expected error has its own status."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One conversation-id parser for both routes."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a route that trusts the caller': both routes take the user id from the middleware, never from the body or the query."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state in the handler; the service serialises rotations."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A refused rotation writes nothing (G1a's transaction)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration in this phase (212 landed in G1a)."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing is deleted by these routes."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built for the routes fix; see pass 2. The chat-test hardening has none, for the reason under H3."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok with and without the integration tag, golangci-lint 0 issues; the routes test passed, and the whole backend suite passed locally with CI's flags (34 packages)."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "H3 named it; no new instrument."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each rule the thing it refuses (see D2); each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: the server stores wrapped copies only and decides who may hold one. G1b exposes exactly that and adds no key handling of its own."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller per route; two senders racing are settled in the service."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "CI's Backend job failed on the G1a push, in a package this work never touched: TestWSHandler_BroadcastsChatMessagesToAllConnections read world_snapshot where it demanded chat_message. A join broadcasts a snapshot to every connection, so the chat is not always the next message; the test now skips snapshots until the chat arrives. Recorded here without a control: the extra snapshot could not be forced on this machine (a probe showed one snapshot then the chat, three runs in a row), and a control that passes proves nothing, so none is claimed."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": [
+    {
+     "id": "g1b-key-state-open-to-non-members",
+     "summary": "Control for the membership check on the key routes: without it, anyone signed in could read a group's key state and store a version.",
+     "found_by": "G3",
+     "fix_commit": "874ff43bc",
+     "control": {
+      "patch": ".review/controls/g1b-key-state-open-to-non-members.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -run TestGroupKeyRoutesOverHTTP -tags=integration"
+      ],
+      "observed": "FAIL: expected 403, got 200 for a non-member on both routes"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "handlers/group_keys.go (GET and POST /groups/:id/keys over services.GroupKeyService), the routes in cmd/server, the same two routes in the integration test router, and an integration test that drives them over HTTP. The flaky chat broadcast test in omniraveworld/server was hardened in the same session and is recorded below."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "a848b585c (G1a's base, K5e), 254554f51 ledger a848b585c.json (G1a): the service these routes call."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The JSON the client receives, printed by the integration test: active_version, latest_version, history_visible, members, missing_history and my_copies, with only the caller's own wrapped copy."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No component; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Every status the handler can send was driven over HTTP: 200 for state, 201 for a stored version, 403 for a non-member on both routes, 400 for copies that miss a member, 409 for a version that is not the next one."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The rows behind those answers were read back through the service in G1a's tests; here the HTTP answers are the artifact."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The JSON field names are the service's own struct tags; the route shape matches the other /groups/:id routes."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The handler passes the caller's user id from the auth middleware, as the service expects, and maps each named service error to one status."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Who may hold a copy is decided once, in the service; the handler only translates errors."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "gin binds the request; no hand-written decoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test group is built as CreateGroup builds one, and the users come from the integration fixtures."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A member reads the state and stores the first version."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A non-member is refused on both routes; copies that miss a member are refused; a version that is not the next one is refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty copy is refused by the service (G1a); the handler refuses an unparsable id and an unparsable body."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling group routes compared: like them, these check membership before doing anything, and they read the id the same way."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of both handlers is reached by the integration test or by G1a's service tests."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Unexpected errors log with the conversation and user id and answer 500; every expected error has its own status."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "One conversation-id parser for both routes."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a route that trusts the caller': both routes take the user id from the middleware, never from the body or the query."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "No shared state in the handler; the service serialises rotations."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "A refused rotation writes nothing (G1a's transaction)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration in this phase (212 landed in G1a)."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Nothing is deleted by these routes."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Verified both ways for the member check (see G1 evidence)."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok with and without the integration tag, golangci-lint 0 issues; the routes test passed, and the whole backend suite passed locally with CI's flags (34 packages)."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts early."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed each rule the thing it refuses (see D2); each refused."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every run reported 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: the server stores wrapped copies only and decides who may hold one. G1b exposes exactly that and adds no key handling of its own."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "One caller per route; two senders racing are settled in the service."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Pass 2: the chat test passed 20 times with -race here, and the whole world-server package twice; the routes test and the full backend suite passed under CI's flags."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; no app code runs here."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "group key routes 1, world server package 2 runs, chat test 20 runs, full backend suite 34 packages: 0 failed, 0 skipped"
+ }
+}

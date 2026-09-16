@@ -1,0 +1,14 @@
+diff --git a/backend/internal/services/group_keys.go b/backend/internal/services/group_keys.go
+index 395183bf5..aa155f1c5 100644
+--- a/backend/internal/services/group_keys.go
++++ b/backend/internal/services/group_keys.go
+@@ -96,9 +96,6 @@ func groupKeyState(ctx context.Context, q groupKeyQuerier, conversationID, userI
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if !containsInt(members, userID) {
+-		return nil, ErrNotGroupMember
+-	}
+ 	state := &GroupKeyState{Members: members, MissingHistory: map[int][]int{}, MyCopies: []GroupKeyCopy{}}
+ 
+ 	if err := q.QueryRow(ctx, `
