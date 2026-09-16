@@ -1,0 +1,17 @@
+{
+  "groupKey": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "messages": [
+    {
+      "keyVersion": 1,
+      "iv": "AAECAwQFBgcICQoL",
+      "plaintext": "the first message under version one",
+      "sealed": "{\"v\":1,\"k\":1,\"iv\":\"AAECAwQFBgcICQoL\",\"data\":\"M2qzO6OMsGj5YfruwpoZCub28lqUHi1cTgKX9nQGbpJufss9AIV+fXK2U6vdwqwpp9Bw\"}"
+    },
+    {
+      "keyVersion": 7,
+      "iv": "CwoJCAcGBQQDAgEA",
+      "plaintext": "a later version, and an accent: Pässwörd ✓",
+      "sealed": "{\"v\":1,\"k\":7,\"iv\":\"CwoJCAcGBQQDAgEA\",\"data\":\"Qd01c0INH72J2+gICqJJMad63N0zfNGUeZg6D8unCwukmPVKeBDc+EJINBdguLCQbe1pfhdVFijU1VPkZFI=\"}"
+    }
+  ]
+}
