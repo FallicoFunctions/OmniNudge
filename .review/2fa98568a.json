@@ -1,0 +1,480 @@
+{
+ "schema_version": 2,
+ "head": "022a3c796",
+ "base": "2fa98568a",
+ "scope": {
+  "files": [
+   "frontend/src/services/groupKeysService.ts",
+   "frontend/src/services/__tests__/groupKeysService.test.ts",
+   "backend/internal/handlers/group_keys.go",
+   "backend/internal/integration/group_keys_integration_test.go"
+  ],
+  "boundaries": [
+   "the refusal a client receives",
+   "the error code across two languages",
+   "GET and POST /groups/:id/keys",
+   "lib/api's thrown Error"
+  ]
+ },
+ "prior_ledgers_read": [
+  "10c4f8b92",
+  "cd683f853",
+  "b28df65f3"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "G2b: groupKeysService.ts and its tests, the client for GET and POST /groups/:id/keys. The fix that followed also touched handlers/group_keys.go and the integration test."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "10c4f8b92 records call-R2, the same defect in the transcription route: four failures told apart by matching substrings of the service's error messages. That ledger is why this pass looked at the discriminator at all."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The artifact is the refusal a client receives. Read the real bodies the handler sends and compared them against what the client branches on."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; this is a service module with no rendered output."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The HTTP body itself: error, code, message and request_id. The code is what distinguishes a refusal, and errorCodeFromStatus was collapsing three of them into 'conflict'."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No stored row; the client writes nothing and the server's storage was reviewed in G1."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The finding, and its cause. Three refusals share a 409, so the status cannot separate them; the client separated them by matching prose, which is a contract in two languages with nothing holding it together."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Matched the client's interfaces against the Go JSON tags one by one: active_version, latest_version, history_visible, members[].user_id and public_key, missing_history, my_copies[].key_version and wrapped_key."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No second implementation of this client to run differentially."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The contract with the server is the point of the fix: each refusal now carries its own machine-readable reason, and both ends assert it."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The public keys in the state are wired to their purpose: a test asserts they arrive, because without them the client can wrap for nobody."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test fixtures mimic what lib/api throws: a plain Error carrying status and code, not an AxiosError. Getting that wrong would have made every refusal branch unreachable."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: the state is returned as sent, a rotation returns the stored version, and history copies travel when the group shows its history."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Refusals that must be recognised: all five codes, plus an unknown code and a plain 500, which must pass through untouched rather than be dressed as refusals."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension that matters: the same code with the server's real message, and with a rewritten one. Only the second exposes a prose matcher."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared against the sibling service: accountKeysService uses lib/api, whose thrown Error carries status and code. services/api.ts is the axios client and a different contract; using the wrong one would have left error.response undefined and every branch dead."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable: every code in the map is driven by a test, and the fall-through is driven by two."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed. An unknown code passes through as itself rather than becoming a refusal the caller cannot act on."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The instrument that found it, and the same one that found call-R2: a rule that exists in two places as prose, where rewording one line silently changes the other's meaning."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'behaviour decided by reading server prose', swept across src/services and src/lib. One other behavioural match exists: hubAIDesignerService.ts:107 tests error.message against a TIMEOUT_ERROR_PATTERN. It predates this change and is outside this review's scope, so it is reported in the session rather than widened into this phase. The dozen further hits are that service's own tests asserting what a user-facing message says, which is testing copy, not branching on it."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency; the service is two request functions."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction on the client."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete, cancel or orphan path."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built and replayed by hand; see the finding."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: every refusal branch is driven, and the control shows what happens without it."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Prettier clean, eslint clean, tsc -b --force silent, go build ok, gofmt clean, go vet clean under the integration tag."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument. E5 names this exactly, and the prior ledger it matches was found by the same one."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the guard the input it exists to refuse: an unknown code, which must not become a refusal, and a 500, which must pass through."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Measured rather than assumed: twelve client tests and the backend refusal test were read case by case, not inferred from an exit code."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: the client reads the key state and stores the next version. G2b is that and nothing wider."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect beyond the request itself."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Both sides of the changed contract were run: the client's own test file, and the integration test that drives the routes over HTTP."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; this is a service with no UI yet."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed; the new backend test adds to a file whose helpers it reuses unchanged."
+    }
+   ],
+   "findings": [
+    {
+     "id": "g2b-refusal-told-by-prose",
+     "summary": "The client told one rotation refusal from another by matching the server's message text, because errorCodeFromStatus collapsed three distinct 409s into one 'conflict' code and left nothing else to branch on. Rewording a sentence would have changed the client's behaviour silently; worse, the matcher was already wrong for three of the five refusals, since version-taken, copies-do-not-match and history-not-allowed all fell through to key-is-current. Each refusal now carries its own reason via RespondErrorCoded and the client maps code to meaning, with the message kept for display only.",
+     "found_by": "E5",
+     "fix_commit": "022a3c796",
+     "control": {
+      "patch": ".review/controls/g2b-refusal-told-by-prose.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/services/__tests__/groupKeysService.test.ts"
+      ],
+      "observed": "With the prose matcher restored, six tests fail and six pass. Three failures read 'expected key-is-current to be version-taken / copies-do-not-match / history-not-allowed', which is the collapse itself; the reworded-message case and the unknown-code case fail too. Real assertion failures, and the suite still builds."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "The fix from pass 1 is new code: the handler's five coded refusals, the client's code map, and the tests on both sides."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "10c4f8b92 records call-R2, the same defect in the transcription route: four failures told apart by matching substrings of the service's error messages. That ledger is why this pass looked at the discriminator at all."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The artifact is the refusal a client receives. Read the real bodies the handler sends and compared them against what the client branches on."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; this is a service module with no rendered output."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Read the server's real bytes again after the fix, over HTTP: each refusal now answers with its own code, asserted in the integration test."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No stored row; the client writes nothing and the server's storage was reviewed in G1."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The two sides now agree by identifier rather than by sentence, and both ends assert the identifiers, so neither can be renamed unnoticed."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Matched the client's interfaces against the Go JSON tags one by one: active_version, latest_version, history_visible, members[].user_id and public_key, missing_history, my_copies[].key_version and wrapped_key."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No second implementation of this client to run differentially."
+    },
+    {
+     "id": "C4",
+     "status": "applied",
+     "evidence": "The contract with the server is the point of the fix: each refusal now carries its own machine-readable reason, and both ends assert it."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The public keys in the state are wired to their purpose: a test asserts they arrive, because without them the client can wrap for nobody."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test fixtures mimic what lib/api throws: a plain Error carrying status and code, not an AxiosError. Getting that wrong would have made every refusal branch unreachable."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: the state is returned as sent, a rotation returns the stored version, and history copies travel when the group shows its history."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Refusals that must be recognised: all five codes, plus an unknown code and a plain 500, which must pass through untouched rather than be dressed as refusals."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension that matters: the same code with the server's real message, and with a rewritten one. Only the second exposes a prose matcher."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared against the sibling service: accountKeysService uses lib/api, whose thrown Error carries status and code. services/api.ts is the axios client and a different contract; using the wrong one would have left error.response undefined and every branch dead."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable: every code in the map is driven by a test, and the fall-through is driven by two."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Nothing is swallowed. An unknown code passes through as itself rather than becoming a refusal the caller cannot act on."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The rule now lives in one place per side, as a code, and a test on each side pins it. That is what call-R2's control was missing."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'behaviour decided by reading server prose', swept across src/services and src/lib. One other behavioural match exists: hubAIDesignerService.ts:107 tests error.message against a TIMEOUT_ERROR_PATTERN. It predates this change and is outside this review's scope, so it is reported in the session rather than widened into this phase. The dozen further hits are that service's own tests asserting what a user-facing message says, which is testing copy, not branching on it."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency; the service is two request functions."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction on the client."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete, cancel or orphan path."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The control restores the prose matcher. Six tests fail, and three of them show the regex collapsing version-taken, copies-do-not-match and history-not-allowed into key-is-current, because those three share a 409 and none contains the word it matched on. The original client was already wrong for three of five refusals, not merely fragile."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: every refusal branch is driven, and the control shows what happens without it."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "Prettier clean, eslint clean, tsc -b --force silent, go build ok, gofmt clean, go vet clean under the integration tag."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found nothing. The control is what showed how much worse the defect was than it looked."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the guard the input it exists to refuse: an unknown code, which must not become a refusal, and a 500, which must pass through."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The control's failures were read individually: six failed, six passed, each with a real assertion message."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved G plan: the client reads the key state and stores the next version. G2b is that and nothing wider."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect beyond the request itself."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Both sides of the changed contract were run: the client's own test file, and the integration test that drives the routes over HTTP."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide change; this is a service with no UI yet."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed; the new backend test adds to a file whose helpers it reuses unchanged."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok; tsc -b --force silent",
+  "vet": "go vet clean with -tags=integration",
+  "lint": "eslint clean, prettier clean, gofmt clean",
+  "types": "tsc -b --force",
+  "tests": "client 12 passed; backend TestGroupKeyRefusalsCarryTheirOwnCode passed"
+ }
+}

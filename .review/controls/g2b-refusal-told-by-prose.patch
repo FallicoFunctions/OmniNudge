@@ -1,0 +1,24 @@
+diff --git a/frontend/src/services/groupKeysService.ts b/frontend/src/services/groupKeysService.ts
+index 2bf249b6a..d3a9fc22a 100644
+--- a/frontend/src/services/groupKeysService.ts
++++ b/frontend/src/services/groupKeysService.ts
+@@ -116,7 +116,16 @@ export async function rotateGroupKey(
+  */
+ function asRefusal(error: unknown): unknown {
+   if (!(error instanceof Error)) return error;
+-  const { code } = error as Error & { code?: string };
+-  const refusal = code ? REFUSAL_BY_CODE[code] : undefined;
+-  return refusal ? new GroupKeyRotationRefused(refusal, error.message) : error;
++  const { status } = error as Error & { status?: number };
++  const message = error.message;
++  if (status === 409) {
++    const refusal: RotationRefusal = /encryption/i.test(message)
++      ? 'member-not-set-up'
++      : 'key-is-current';
++    return new GroupKeyRotationRefused(refusal, message);
++  }
++  if (status === 400 && /copies/i.test(message)) {
++    return new GroupKeyRotationRefused('copies-do-not-match', message);
++  }
++  return error;
+ }
