@@ -1,0 +1,13 @@
+diff --git a/backend/internal/queue/data_export_handler.go b/backend/internal/queue/data_export_handler.go
+index 60c2747c5..2d289a7a6 100644
+--- a/backend/internal/queue/data_export_handler.go
++++ b/backend/internal/queue/data_export_handler.go
+@@ -987,7 +987,7 @@ func exportSettingsData(ctx context.Context, db *pgxpool.Pool, userID int) (inte
+ 	}
+ 
+ 	err := db.QueryRow(ctx, `
+-		SELECT theme, show_push_notifications, COALESCE(daily_digest, FALSE), batch_notifications
++		SELECT theme, show_push_notifications, daily_digest, batch_notifications
+ 		FROM user_settings
+ 		WHERE user_id = $1
+ 	`, userID).Scan(&settings.Theme, &settings.ShowPushNotifications, &settings.DailyDigest, &settings.BatchNotifications)

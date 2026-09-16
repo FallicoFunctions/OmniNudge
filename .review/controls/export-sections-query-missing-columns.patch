@@ -1,0 +1,65 @@
+diff --git a/backend/internal/queue/data_export_handler.go b/backend/internal/queue/data_export_handler.go
+index 60c2747c5..063d39358 100644
+--- a/backend/internal/queue/data_export_handler.go
++++ b/backend/internal/queue/data_export_handler.go
+@@ -827,7 +827,7 @@ func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
+ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
+ 	// Post votes
+ 	postVotes, err := db.Query(ctx, `
+-		SELECT post_id, is_upvote, COALESCE(created_at, 'epoch'::timestamptz)
++		SELECT post_id, vote_type, COALESCE(created_at, 'epoch'::timestamptz)
+ 		FROM post_votes
+ 		WHERE user_id = $1
+ 		ORDER BY created_at DESC LIMIT 10000
+@@ -839,14 +839,14 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
+ 
+ 	type PostVote struct {
+ 		PostID    int       `json:"post_id"`
+-		IsUpvote  bool      `json:"is_upvote"`
++		VoteType  int       `json:"vote_type"`
+ 		CreatedAt time.Time `json:"created_at"`
+ 	}
+ 
+ 	pVotes := []PostVote{}
+ 	for postVotes.Next() {
+ 		var vote PostVote
+-		if err := postVotes.Scan(&vote.PostID, &vote.IsUpvote, &vote.CreatedAt); err != nil {
++		if err := postVotes.Scan(&vote.PostID, &vote.VoteType, &vote.CreatedAt); err != nil {
+ 			continue
+ 		}
+ 		pVotes = append(pVotes, vote)
+@@ -854,7 +854,7 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
+ 
+ 	// Comment votes
+ 	commentVotes, err := db.Query(ctx, `
+-		SELECT comment_id, is_upvote, COALESCE(created_at, 'epoch'::timestamptz)
++		SELECT comment_id, vote_type, COALESCE(created_at, 'epoch'::timestamptz)
+ 		FROM comment_votes
+ 		WHERE user_id = $1
+ 		ORDER BY created_at DESC LIMIT 10000
+@@ -866,14 +866,14 @@ func exportVotesData(ctx context.Context, db *pgxpool.Pool, userID int) (interfa
+ 
+ 	type CommentVote struct {
+ 		CommentID int       `json:"comment_id"`
+-		IsUpvote  bool      `json:"is_upvote"`
++		VoteType  int       `json:"vote_type"`
+ 		CreatedAt time.Time `json:"created_at"`
+ 	}
+ 
+ 	cVotes := []CommentVote{}
+ 	for commentVotes.Next() {
+ 		var vote CommentVote
+-		if err := commentVotes.Scan(&vote.CommentID, &vote.IsUpvote, &vote.CreatedAt); err != nil {
++		if err := commentVotes.Scan(&vote.CommentID, &vote.VoteType, &vote.CreatedAt); err != nil {
+ 			continue
+ 		}
+ 		cVotes = append(cVotes, vote)
+@@ -948,7 +948,7 @@ func exportHubsData(ctx context.Context, db *pgxpool.Pool, userID int) (interfac
+ 	hubs, err := db.Query(ctx, `
+ 		SELECT id, name, description, COALESCE(created_at, 'epoch'::timestamptz)
+ 		FROM hubs
+-		WHERE created_by = $1
++		WHERE creator_id = $1
+ 		ORDER BY created_at DESC
+ 	`, userID)
+ 	if err != nil {

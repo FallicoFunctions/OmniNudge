@@ -1,0 +1,946 @@
+{
+ "schema_version": 2,
+ "head": "eb8250376",
+ "base": "e77c30dfb",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/data_export.go",
+   "backend/internal/queue/data_export_handler.go",
+   "backend/cmd/server/main.go",
+   "backend/cmd/worker/main.go",
+   "backend/internal/handlers/data_export_test.go",
+   "backend/internal/queue/data_export_messages_test.go",
+   "backend/internal/queue/data_export_sections_test.go"
+  ],
+  "boundaries": [
+   "the export archive a user downloads",
+   "POST /account/export",
+   "export_session_keys",
+   "every table an export section queries",
+   "the worker's per-section error path"
+  ]
+ },
+ "prior_ledgers_read": [
+  "238b7ec7d",
+  "b28df65f3",
+  "af4bacefe"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Two changes under review: the export stops decrypting (five files), and the messages section it left behind turned out not to run at all."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "238b7ec7d records k4e1-export-sends-password, a frontend finding about this same endpoint; the client still sends accountProof, so that work is intact. Scanned every ledger for an export column or section finding: none."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The instrument that found the defect. Producing the messages section a user receives failed outright: ERROR column \"created_at\" does not exist. The messages table has sent_at. The section could never have run."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The worker's answer to a failed section, read rather than assumed: it logs a warning, writes {\"error\": \"data unavailable\"} into that file, and finishes. The export still arrives and still reports success."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the stored rows the sections claim to read. The messages section carries ciphertext for both cases: sender_encrypted_content for a message the user sent, encrypted_content for one received."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Compared every SELECT against information_schema rather than the migration files, which later ALTERs can supersede. Six more sections named columns their tables do not have."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The export archive is the consumer. Its shape changes only where a column was wrong; the JSON keys now name the real columns."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the same thing to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed; the queue payload is untouched."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The wrapped private key in the encryption_keys section is wired, not decorative: it is the copy a device needs to open the ciphertext the export now carries."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Eight of thirteen sections had no test at all, and the four that did are the only four that worked. Nothing had ever executed the others."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: all thirteen sections now build against the real schema, and both include_deleted forms run."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "An account that owns nothing, which is the shape that reaches a QueryRow section's no-row path. The settings section would have failed on ErrNoRows even after its column fix."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension the code branches on: a message the user sent and one received, which choose different ciphertext columns."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The four OmniChat sections are the siblings that work. They have seven tests between them; the broken six had none."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable. The worker's per-section error path stays, and still catches a genuinely failing section."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The swallowed error is the heart of it: a failed section is logged and replaced with an error string, so seven of thirteen sections failed silently for as long as the code existed."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; the fixes are corrections in place."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a section nothing ever ran': probed all nine untested sections at once. Six were broken. Also swept for the same wrong names elsewhere: vote_type exists genuinely in reddit_comment_votes, a different table."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed; the sections are read-only queries."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed by these fixes."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. Dropping export_session_keys is Phase B, which has not started."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The export's own cleanup paths were read: the worker purges session keys, and that purge goes with the table in Phase B."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built and replayed by hand; see the finding."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: the new test drives every section, and the control shows it failing when the columns are wrong."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok, and the whole queue package green at 87s."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument needed. B1 found it by trying to produce the artifact, and E6 carried the same question to the other twelve sections."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the check the input it exists to refuse: with the old column names restored, the votes and hubs sections fail the build-against-schema test."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The new tests were confirmed running, with named subtests per section, rather than inferred from a package that printed ok."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to stop the server decrypting, and only that. These fixes repair what that change exposed; they do not extend the scope."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added; the sections only read."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The whole queue package was run, not the tests beside the change, because the change is in a file every section shares."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "A shared file in the queue package changed, so the whole package ran rather than a selector."
+    }
+   ],
+   "findings": [
+    {
+     "id": "export-sections-query-missing-columns",
+     "summary": "Seven of thirteen export sections selected columns their tables do not have, so each failed and the worker replaced it with {\"error\": \"data unavailable\"} while still reporting the export a success. Nothing had ever run them: eight sections had no test, and the four that did are the only four that worked.",
+     "found_by": "B1",
+     "fix_commit": "c40f0414f",
+     "control": {
+      "patch": ".review/controls/export-sections-query-missing-columns.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestEveryExportSectionBuildsAgainstTheSchema"
+      ],
+      "observed": "With the old column names restored, the votes and hubs subtests fail with 'must build against the real schema'. A real assertion failure; the package still compiles."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "The fixes from pass 1 are new code nobody has reviewed, so this pass reads them rather than the original defects."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "238b7ec7d records k4e1-export-sends-password, a frontend finding about this same endpoint; the client still sends accountProof, so that work is intact. Scanned every ledger for an export column or section finding: none."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the messages section again after the fix: it now carries ciphertext for both the sent and the received case."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The worker's answer to a failed section, read rather than assumed: it logs a warning, writes {\"error\": \"data unavailable\"} into that file, and finishes. The export still arrives and still reports success."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the stored rows the sections claim to read. The messages section carries ciphertext for both cases: sender_encrypted_content for a message the user sent, encrypted_content for one received."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The finding. Compared each scanned column's nullability against its Go target: user_settings.daily_digest is nullable and was scanned into a plain bool, so a row holding NULL there fails."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The export archive is the consumer. Its shape changes only where a column was wrong; the JSON keys now name the real columns."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the same thing to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed; the queue payload is untouched."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The wrapped private key in the encryption_keys section is wired, not decorative: it is the copy a device needs to open the ciphertext the export now carries."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "And the reason my own test missed it: the probe account has no settings row, so it takes the ErrNoRows path and the Scan never runs with a real row."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: all thirteen sections now build against the real schema, and both include_deleted forms run."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A settings row written with NULL in its nullable columns on purpose, which is the shape that reaches the Scan."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension the code branches on: a message the user sent and one received, which choose different ciphertext columns."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The four OmniChat sections are the siblings that work. They have seven tests between them; the broken six had none."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable. The worker's per-section error path stays, and still catches a genuinely failing section."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The swallowed error is the heart of it: a failed section is logged and replaced with an error string, so seven of thirteen sections failed silently for as long as the code existed."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; the fixes are corrections in place."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Asked whether the same shape existed elsewhere in the sections I had just rewritten, which set up pass 3."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed; the sections are read-only queries."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed by these fixes."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. Dropping export_session_keys is Phase B, which has not started."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The export's own cleanup paths were read: the worker purges session keys, and that purge goes with the table in Phase B."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built for this finding too; reverting the COALESCE fails the settings test."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: the new test drives every section, and the control shows it failing when the columns are wrong."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok, and the whole queue package green at 87s."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Still no new instrument: C1 names exactly this, matching a schema fact against the code that consumes it."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "The control shows the guard is not blind: without COALESCE the NULL row fails, with it the row exports."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The new tests were confirmed running, with named subtests per section, rather than inferred from a package that printed ok."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to stop the server decrypting, and only that. These fixes repair what that change exposed; they do not extend the scope."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added; the sections only read."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The whole queue package was run, not the tests beside the change, because the change is in a file every section shares."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "A shared file in the queue package changed, so the whole package ran rather than a selector."
+    }
+   ],
+   "findings": [
+    {
+     "id": "export-settings-null-column",
+     "summary": "user_settings.daily_digest is nullable and was scanned into a plain bool, so any account whose row holds NULL there would fail the settings section. The section's own test missed it because an account with no settings row takes the ErrNoRows path and never reaches the Scan.",
+     "found_by": "C1",
+     "fix_commit": "eb8250376",
+     "control": {
+      "patch": ".review/controls/export-settings-null-column.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestExportSettingsHandlesNullAndPopulatedRows"
+      ],
+      "observed": "Without COALESCE the test fails with 'a settings row holding NULL must still export'."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2's fix was one column. This pass asks the same question of every column every section scans."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "238b7ec7d records k4e1-export-sends-password, a frontend finding about this same endpoint; the client still sends accountProof, so that work is intact. Scanned every ledger for an export column or section finding: none."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Ran the sections with rows written NULL on purpose and read the counts. Posts, comments and messages returned zero rows."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The worker's answer to a failed section, read rather than assumed: it logs a warning, writes {\"error\": \"data unavailable\"} into that file, and finishes. The export still arrives and still reports success."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the stored rows the sections claim to read. The messages section carries ciphertext for both cases: sender_encrypted_content for a message the user sent, encrypted_content for one received."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The audit: created_at and is_deleted on platform_posts and post_comments, created_at on both vote tables and hubs, subscribed_at on hub_subscriptions, and sent_at plus both deleted flags on messages are all nullable, all scanned into non-pointer targets."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The export archive is the consumer. Its shape changes only where a column was wrong; the JSON keys now name the real columns."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the same thing to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed; the queue payload is untouched."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The wrapped private key in the encryption_keys section is wired, not decorative: it is the copy a device needs to open the ciphertext the export now carries."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Eight of thirteen sections had no test at all, and the four that did are the only four that worked. Nothing had ever executed the others."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "The rows must come back, and at first they did not: counts of zero until the predicates were fixed."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "The sharper half, and only running it showed the difference: NOT NULL evaluates to NULL, not TRUE, so 'AND NOT is_deleted' excluded every row whose flag was NULL before Scan was ever reached."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension the code branches on: a message the user sent and one received, which choose different ciphertext columns."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The four OmniChat sections are the siblings that work. They have seven tests between them; the broken six had none."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable. The worker's per-section error path stays, and still catches a genuinely failing section."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Every loop answers a failed Scan with continue, so this never errors: the row simply leaves the export with nothing in the file to say it existed. Worse than the error string, which at least announced itself."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; the fixes are corrections in place."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a section nothing ever ran': probed all nine untested sections at once. Six were broken. Also swept for the same wrong names elsewhere: vote_type exists genuinely in reddit_comment_votes, a different table."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed; the sections are read-only queries."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed by these fixes."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. Dropping export_session_keys is Phase B, which has not started."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The export's own cleanup paths were read: the worker purges session keys, and that purge goes with the table in Phase B."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Control built: reverting the COALESCE work returns the zero counts."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The guard is reachable: the new test drives every section, and the control shows it failing when the columns are wrong."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, go vet ok, and the whole queue package green at 87s."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "C1 again, applied to nullability rather than to names. The first repair put COALESCE in the select lists alone and the rows still vanished."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "The control reproduces the exact failure seen before the fix, on posts, comments and messages."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The new tests were confirmed running, with named subtests per section, rather than inferred from a package that printed ok."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to stop the server decrypting, and only that. These fixes repair what that change exposed; they do not extend the scope."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added; the sections only read."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The whole queue package was run, not the tests beside the change, because the change is in a file every section shares."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "A shared file in the queue package changed, so the whole package ran rather than a selector."
+    }
+   ],
+   "findings": [
+    {
+     "id": "export-null-column-drops-row",
+     "summary": "Every export loop answers a failed Scan with continue, so a NULL in a column scanned into a non-pointer target removed the row from the export entirely, with nothing in the file to say it existed. The deleted filters were sharper still: NOT NULL evaluates to NULL rather than TRUE, so any row whose is_deleted or deleted_for_recipient was NULL was excluded before Scan was reached.",
+     "found_by": "C1",
+     "fix_commit": "eb8250376",
+     "control": {
+      "patch": ".review/controls/export-null-column-drops-row.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/queue/ -run TestExportSectionsKeepRowsWithNullColumns"
+      ],
+      "observed": "Reverting the COALESCE work returns counts of zero: 'the post survives its NULL columns' expected 1, actual 0, and the same for comments and messages."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 4,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Nothing changed in this pass. It exists to check the three fixes and find nothing, which is the loop's stopping condition."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "238b7ec7d records k4e1-export-sends-password, a frontend finding about this same endpoint; the client still sends accountProof, so that work is intact. Scanned every ledger for an export column or section finding: none."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The sections were run once more after the last fix: every one builds, and the NULL rows come back."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The worker's answer to a failed section, read rather than assumed: it logs a warning, writes {\"error\": \"data unavailable\"} into that file, and finishes. The export still arrives and still reports success."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Read the stored rows the sections claim to read. The messages section carries ciphertext for both cases: sender_encrypted_content for a message the user sent, encrypted_content for one received."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Checked my own repair rather than the defect: every column wrapped in COALESCE carries a real default (now(), CURRENT_TIMESTAMP, false), so a NULL can only come from a deliberate insert like the test's. The 'epoch' sentinel will not appear in real data."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The two genuinely defaultless columns, messages.sender_encrypted_content and shared_encryption_iv, are coalesced to an empty string rather than a fabricated value, which is honest for an absent ciphertext."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations of the same thing to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed; the queue payload is untouched."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "The wrapped private key in the encryption_keys section is wired, not decorative: it is the copy a device needs to open the ciphertext the export now carries."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The OmniChat fixtures seed real values, so their tests may never drive a NULL. Checked their scan targets directly instead: every nullable column there is a pointer."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: all thirteen sections now build against the real schema, and both include_deleted forms run."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "An account that owns nothing, which is the shape that reaches a QueryRow section's no-row path. The settings section would have failed on ErrNoRows even after its column fix."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Two materially different inputs along the dimension the code branches on: a message the user sent and one received, which choose different ciphertext columns."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The profile section corroborates it. It has no test, yet passed the empty-account check with bio and avatar_url genuinely NULL, so pointer targets are the codebase's normal pattern."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch became unreachable. The worker's per-section error path stays, and still catches a genuinely failing section."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The swallowed error is the heart of it: a failed section is logged and replaced with an error string, so seven of thirteen sections failed silently for as long as the code existed."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; the fixes are corrections in place."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Swept the remaining sections for the same shape and found none: the six broken ones were the exception, not the rule."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed; the sections are read-only queries."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed by these fixes."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration. Dropping export_session_keys is Phase B, which has not started."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "The export's own cleanup paths were read: the worker purges session keys, and that purge goes with the table in Phase B."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "All three controls rebuilt against the current HEAD and verified to apply cleanly, after the first was left stale by a later commit to the same lines."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "Each control fails as a test with a real assertion, never as a build break."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, build ok, vet ok, whole queue package green at 87.183s."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 4 found nothing, and needed no technique the list does not already name."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the check the input it exists to refuse: with the old column names restored, the votes and hubs sections fail the build-against-schema test."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "The new tests were confirmed running, with named subtests per section, rather than inferred from a package that printed ok."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was to stop the server decrypting, and only that. These fixes repair what that change exposed; they do not extend the scope."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added; the sections only read."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The whole queue package was run, not the tests beside the change, because the change is in a file every section shares."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "A shared file in the queue package changed, so the whole package ran rather than a selector."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "whole queue package: ok 87.183s, 0 failed; every export section driven by name, plus NULL-row and include_deleted variants"
+ }
+}

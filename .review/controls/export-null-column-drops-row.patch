@@ -1,0 +1,43 @@
+diff --git a/backend/internal/queue/data_export_handler.go b/backend/internal/queue/data_export_handler.go
+index 60c2747c5..5dea5402b 100644
+--- a/backend/internal/queue/data_export_handler.go
++++ b/backend/internal/queue/data_export_handler.go
+@@ -299,7 +299,7 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
+ 		WHERE (sender_id = $1 OR recipient_id = $1)
+ 	`
+ 	if !includeDeleted {
+-		query += " AND (CASE WHEN sender_id = $1 THEN NOT COALESCE(deleted_for_sender, FALSE) ELSE NOT COALESCE(deleted_for_recipient, FALSE) END)"
++		query += " AND (CASE WHEN sender_id = $1 THEN NOT deleted_for_sender ELSE NOT deleted_for_recipient END)"
+ 	}
+ 	query += " ORDER BY sent_at DESC LIMIT 50000"
+ 
+@@ -354,12 +354,12 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
+ 
+ func exportPostsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+ 	query := `
+-		SELECT id, title, body, COALESCE(created_at, 'epoch'::timestamptz), COALESCE(is_deleted, FALSE)
++		SELECT id, title, body, created_at, is_deleted
+ 		FROM platform_posts
+ 		WHERE author_id = $1
+ 	`
+ 	if !includeDeleted {
+-		query += " AND NOT COALESCE(is_deleted, FALSE)"
++		query += " AND NOT is_deleted"
+ 	}
+ 	query += " ORDER BY created_at DESC LIMIT 10000"
+ 
+@@ -786,12 +786,12 @@ func exportOmniChatMediaData(ctx context.Context, db *pgxpool.Pool, userID int,
+ 
+ func exportCommentsData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+ 	query := `
+-		SELECT id, post_id, body, COALESCE(created_at, 'epoch'::timestamptz), COALESCE(is_deleted, FALSE)
++		SELECT id, post_id, body, created_at, is_deleted
+ 		FROM post_comments
+ 		WHERE user_id = $1
+ 	`
+ 	if !includeDeleted {
+-		query += " AND NOT COALESCE(is_deleted, FALSE)"
++		query += " AND NOT is_deleted"
+ 	}
+ 	query += " ORDER BY created_at DESC LIMIT 10000"
+ 
