@@ -1,0 +1,247 @@
+{
+ "schema_version": 2,
+ "head": "6f5a99da7",
+ "base": "6f5a99da7",
+ "scope": {
+  "files": [
+   "backend/internal/workers/retention_worker.go",
+   ".review/4d3abbe1a.json"
+  ],
+  "boundaries": [
+   "the control set replayed by the stop hook",
+   "the protections two staled controls documented",
+   "the retention worker's scheduled cleanup"
+  ]
+ },
+ "prior_ledgers_read": [
+  "a848b585c",
+  "e77c30dfb",
+  "28cc0d299",
+  "4d3abbe1a"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "The commit under review is the Phase B ledger plus a single deletion: the blank line the removed DELETE block left in the retention worker. Verified from the commit's own file list rather than from memory, after a truncated git show made me doubt it."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read a848b585c (g1a-migration-not-in-rollback-lists), e77c30dfb and 28cc0d299. a848b585c matters most here: its control is one of the patches this session staled, so it set this pass's main question."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No built string or payload; the commit is a ledger and one blank line."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No markup; server side."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No response body changed."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The artifact this pass assembled is the control set itself, applied against the working tree: 128 patches, 26 of which no longer apply at HEAD. Read rather than counted, because the number alone says nothing about whether it matters."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The decisive seam, and the reason 26 stale patches are not a defect. The hook selects controls with jq over [.passes[].findings[]] of the ledger being verified, not from the contents of .review/controls/, so only the current ledger's controls are ever replayed. Read the hook rather than inferring it from the fact that it has never complained."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The three controls belonging to the current generation of ledgers all still apply at HEAD: export-null-column-drops-row, export-sections-query-missing-columns and export-settings-null-column."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "No two implementations to run side by side."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or provider contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Checked that the staled controls' protections are wired rather than merely present. TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly still exists, and Phase B did not just leave it standing: it fired, because 213 had to be added to both rollback lists or that test fails on its first step."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The fixture question turned inward: a control patch is a fixture for a past finding, and it decays as the code moves. That is inherent, not breakage -- requiring 128 patches to stay applicable forever would mean never refactoring."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Real inputs that must pass: the workers package run after the tidy, ok 3.594s with 0 failed and 0 skipped, so the gate reflects the tree as it now stands rather than as it stood before the change."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No input path changed; the commit removes one blank line."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No boundary values changed."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Compared the two protections this session staled. Both are still live: TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly at omnichat_expansion_migration_test.go:10, and TestGroupKeyRoutesOverHTTP at group_keys_integration_test.go:125."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "No branch changed. The blank line sat between the loop's closing brace and the function's, so removing it altered layout only, and gofmt agrees."
+    },
+    {
+     "id": "E3",
+     "status": "na",
+     "why": "No error handling changed."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "No duplication introduced; the commit removes a line."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Shape 'a recorded check that can no longer be re-run': swept all 128 control patches, not only this session's. 26 are stale, every one of them from a ledger already verified when it was written, and none replayable by the hook again."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No concurrency changed."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration in this commit; 213 was reviewed in the preceding ledger."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "No delete or orphan path changed."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "This pass found nothing, so there is no fix to control."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "gofmt clean, go build ./... ok, vet clean under both tag settings -- run on its own line, because a && chain let a failed build skip vet earlier in this session while a trailing echo still printed reassurance."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "No new instrument needed. C1 names this exactly: read what consumes the artifact before judging it. The hook's selection logic is what turned an alarming count into an expected one."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or provider output in this path."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before its governing decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added in this commit."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout in the rendered sense; the only change is Go source whitespace."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No lazily cached process state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Measured rather than assumed: the workers run reported 0 failed and 0 skipped, with go test's own exit code captured before any pipe could swallow it."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The approved plan was Phase B and its review. This commit is that review's ledger plus the tidy Phase B left behind; nothing was widened."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect added."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The workers package was run whole after the change rather than by selector, because retention_worker.go is shared by that package."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No app code; nothing can cover the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "The one changed file is shared by its package, so that package ran entire. The gap this closed was my own: I had run workers before making the tidy and committed it afterwards."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... ok",
+  "vet": "go vet ok, with and without -tags=integration",
+  "lint": "golangci-lint 0 issues",
+  "types": "go build",
+  "tests": "workers package after the tidy: ok 3.594s, 0 failed, 0 skipped"
+ }
+}
