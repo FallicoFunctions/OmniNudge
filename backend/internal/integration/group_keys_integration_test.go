@@ -34,6 +34,68 @@ func newGroupWithMembers(t *testing.T, deps *TestDeps, ownerID int, memberIDs ..
 	return conversationID
 }
 
+// Every join and every leave ends the active version, so no message goes out
+// under a key a newcomer lacks or a former member still holds.
+func TestGroupMembershipChangesEndTheKeyVersion(t *testing.T) {
+	deps := newTestDeps(t)
+	owner := createUser(t, deps.UserRepo, uniqueRLUsername("hookowner"), "user")
+	member := createUser(t, deps.UserRepo, uniqueRLUsername("hookmember"), "user")
+	newcomer := createUser(t, deps.UserRepo, uniqueRLUsername("hooknewcomer"), "user")
+	group := newGroupWithMembers(t, deps, owner.ID, member.ID)
+
+	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	require.NoError(t, err)
+	memberToken, err := deps.AuthService.GenerateJWT(member.ID, member.Username, member.Role)
+	require.NoError(t, err)
+
+	keysPath := fmt.Sprintf("/api/v1/groups/%d/keys", group)
+	activeVersion := func(token string) float64 {
+		t.Helper()
+		w := sendAuthJSON(t, deps.Router, http.MethodGet, keysPath, nil, token)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var state map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &state))
+		return state["active_version"].(float64)
+	}
+	storeVersion := func(version int, members ...int) {
+		t.Helper()
+		copies := map[string]string{}
+		for _, id := range members {
+			copies[fmt.Sprint(id)] = fmt.Sprintf("v%d-for-%d", version, id)
+		}
+		w := postAuthJSON(t, deps.Router, keysPath, map[string]any{
+			"key_version": version, "copies": copies,
+		}, ownerToken)
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	storeVersion(1, owner.ID, member.ID)
+	require.Equal(t, float64(1), activeVersion(ownerToken))
+
+	// A join.
+	w := postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/participants", group),
+		map[string]any{"user_id": newcomer.ID}, ownerToken)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	assert.Equal(t, float64(0), activeVersion(ownerToken), "a join ends the version")
+
+	storeVersion(2, owner.ID, member.ID, newcomer.ID)
+	require.Equal(t, float64(2), activeVersion(ownerToken))
+
+	// A member removed by an admin.
+	w = sendAuthJSON(t, deps.Router, http.MethodDelete,
+		fmt.Sprintf("/api/v1/groups/%d/participants/%d", group, newcomer.ID), nil, ownerToken)
+	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+	assert.Equal(t, float64(0), activeVersion(ownerToken), "a removal ends the version")
+
+	storeVersion(3, owner.ID, member.ID)
+	require.Equal(t, float64(3), activeVersion(ownerToken))
+
+	// A member who leaves of their own accord.
+	w = postAuthJSON(t, deps.Router, fmt.Sprintf("/api/v1/groups/%d/leave", group), map[string]any{}, memberToken)
+	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+	assert.Equal(t, float64(0), activeVersion(ownerToken), "a leave ends the version")
+}
+
 func TestGroupKeyRoutesOverHTTP(t *testing.T) {
 	deps := newTestDeps(t)
 	owner := createUser(t, deps.UserRepo, uniqueRLUsername("keyowner"), "user")

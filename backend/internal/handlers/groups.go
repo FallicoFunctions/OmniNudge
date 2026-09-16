@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // GroupHandler handles group conversation HTTP endpoints.
@@ -536,6 +537,12 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to add participant")
 		return
 	}
+	// The members changed, so the active key version no longer fits them: the
+	// next member who sends makes the next version for exactly this group.
+	if err := services.MarkGroupKeyStale(ctx, h.pool, conversationID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
+		return
+	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Participant added"})
 }
@@ -604,6 +611,10 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 	}
 	if result.RowsAffected() == 0 {
 		RespondError(c, http.StatusNotFound, "Participant not found")
+		return
+	}
+	if err := services.MarkGroupKeyStale(c.Request.Context(), h.pool, conversationID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
 		return
 	}
 
@@ -1039,6 +1050,13 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		return
 	}
 
+	// In the same transaction as the join: the join and the end of the key
+	// version stand or fall together.
+	if err := services.MarkGroupKeyStale(ctx, tx, conversationID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
+		return
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to commit")
 		return
@@ -1181,6 +1199,10 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 	`, conversationID, userID)
 	if err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to leave group")
+		return
+	}
+	if err := services.MarkGroupKeyStale(c.Request.Context(), h.pool, conversationID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
 		return
 	}
 

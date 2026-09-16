@@ -435,6 +435,15 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		return
 	}
 
+	// A banned member keeps every key version it already holds, so the group
+	// needs a new one before the next message: end the active version here, in
+	// the same transaction as the removal.
+	if err = services.MarkGroupKeyStale(ctx, tx, convID); err != nil {
+		log.Printf("[GroupAdmin] BanGroupMember: end group key version err=%v", err)
+		RespondError(c, http.StatusInternalServerError, "Failed to ban member")
+		return
+	}
+
 	if err = tx.Commit(ctx); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: commit err=%v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to ban member")
