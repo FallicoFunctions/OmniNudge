@@ -1,0 +1,13 @@
+diff --git a/frontend/src/utils/groupKeys.ts b/frontend/src/utils/groupKeys.ts
+index 36c79189a..4ef8030ab 100644
+--- a/frontend/src/utils/groupKeys.ts
++++ b/frontend/src/utils/groupKeys.ts
+@@ -143,7 +143,7 @@ export async function sealGroupMessageWithIv(
+   const data = await window.crypto.subtle.encrypt(
+     { name: 'AES-GCM', iv },
+     groupKey,
+-    encoder.encode(plaintext)
++    encoder.encode(plaintext.normalize('NFD'))
+   );
+   const sealed: SealedGroupMessage = {
+     v: GROUP_SEAL_VERSION,
