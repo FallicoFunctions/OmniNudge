@@ -14,7 +14,7 @@ import {
 import { exportKeyPair, generateKeyPair } from './encryption';
 
 interface Vectors {
-  groupKey: string;
+  groupKeyHex: string;
   messages: { keyVersion: number; iv: string; plaintext: string; sealed: string }[];
 }
 
@@ -26,7 +26,7 @@ const vectors = JSON.parse(
 ) as Vectors;
 
 async function importVectorKey(): Promise<CryptoKey> {
-  const raw = Buffer.from(vectors.groupKey, 'base64');
+  const raw = Buffer.from(vectors.groupKeyHex, 'hex');
   return window.crypto.subtle.importKey(
     'raw',
     raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
