@@ -26,6 +26,7 @@ vi.mock('../../hooks/useFormat', () => ({
 vi.mock('../../services/messagesService', () => ({
   messagesService: {
     getMessages: vi.fn().mockResolvedValue({ messages: [], next_cursor: null }),
+    getMessagesPage: vi.fn().mockResolvedValue({ messages: [], next_cursor: null }),
     sendMessage: vi.fn().mockResolvedValue({ id: 99, content: 'reply' }),
   },
 }));
@@ -74,6 +75,9 @@ vi.mock('../../components/common/StatusMessage', () => ({
 }));
 
 import ModMailConversationPage from '../ModMailConversationPage';
+import { messagesService } from '../../services/messagesService';
+import { getOwnKeys } from '../../services/keyManagementService';
+import { decryptMessage } from '../../utils/encryption';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -93,6 +97,41 @@ const createWrapper = () => {
 describe('ModMailConversationPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  // This page had its own copy of the display rule, testing
+  // encryption_version === 'v1' alone, so a v2 mod mail message was shown as
+  // ciphertext. The suite asserted only that a body element existed.
+  it('shows the decrypted text of a v2 message, never the stored blob', async () => {
+    const CIPHER = 'v2:modmail-blob-that-must-never-be-shown';
+    vi.mocked(getOwnKeys).mockResolvedValue({ privateKey: {}, publicKey: {} } as never);
+    vi.mocked(decryptMessage).mockResolvedValue('the real mod mail text' as never);
+    vi.mocked(messagesService.getMessagesPage).mockResolvedValue({
+      messages: [
+        {
+          id: 5,
+          conversation_id: 1,
+          sender_id: 42,
+          encrypted_content: CIPHER,
+          encryption_version: 'v2',
+          message_type: 'text',
+          sent_at: new Date().toISOString(),
+        },
+      ],
+      next_cursor: null,
+    } as never);
+
+    const Wrapper = createWrapper();
+    const { container } = render(
+      <Wrapper>
+        <ModMailConversationPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('the real mod mail text');
+    });
+    expect(container.textContent).not.toContain('modmail-blob-that-must-never-be-shown');
   });
 
   it('renders without crashing', () => {
