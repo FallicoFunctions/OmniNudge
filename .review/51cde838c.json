@@ -1,0 +1,397 @@
+{
+  "schema_version": 2,
+  "head": "23698daae",
+  "base": "51cde838c",
+  "scope": {
+    "files": [
+      "frontend/src/hooks/useDecryptedContent.ts",
+      "frontend/src/hooks/__tests__/useDecryptedContent.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/pages/SearchResultsPage.tsx",
+      "frontend/src/pages/ModMailConversationPage.tsx",
+      "frontend/src/pages/__tests__/ModMailConversationPage.test.tsx",
+      "frontend/src/components/feed/CompactPostCard.tsx",
+      "frontend/src/components/feed/__tests__/CompactPostCard.decrypt.test.tsx",
+      "frontend/src/components/messages/PinnedMessagesBar.tsx",
+      "frontend/tests/unit/pinnedMessagesBar.test.tsx",
+      "frontend/tests/setup/test-setup.ts"
+    ],
+    "boundaries": [
+      "the text a reader sees in place of a stored message",
+      "what each surface shows when the text cannot be recovered",
+      "the seam between needsDecryption and decryptForDisplay",
+      "the reader's key pair, loaded per message or per page"
+    ]
+  },
+  "prior_ledgers_read": [
+    "0a4bb3a71 -- the immediately preceding review, of G3b. Its findings were all of one shape: a path that showed or sent something it should have refused. That shape is what this review followed into the display surfaces.",
+    "9803e5f57 -- fe-silent-429: a refusal that reached nobody. Consulted because the display rule's failure statuses decide what each caller shows.",
+    "7c62d192b -- no findings recorded; consulted for prior work on these pages."
+  ],
+  "notes": [
+    "The commit under review claimed the rule lived in six places. It lived in eight. The count came from memory rather than from a sweep, and was wrong twice before a mechanical enumeration settled it.",
+    "Twice during this review I navigated these files with line numbers that my own edits had already invalidated, because deleting the extracted hooks shifted every line below them. Both times the read landed on unrelated code. Every later edit was anchored on unique text instead.",
+    "Commit 6767ec885 was made while one test was red. The run reported one failure and one error and I committed without reading it. Corrected forward in 23698daae rather than amended away."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "G3c-0 replaced five implementations of the display rule with one shared function plus a hook, across MessagesPage, ExpandedMessage and SearchResultsPage. The boundary crossed is what a reader sees in place of a stored message."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 0a4bb3a71, 9803e5f57 and 7c62d192b before starting. The first is this review's own predecessor and named the shape to follow."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Deferred to the differential, which is the artifact for a refactor: not one payload, but the same inputs through both implementations."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The artifact here is the rendered text per surface. The differential printed it for eight message shapes across four key and decryption states."
+        },
+        { "id": "B3", "status": "na", "why": "No handler changed; this is client-side display only." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The status values are one union in one module; no caller spells them independently."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Checked what each of the five callers receives. They disagree about failure, which is why the result carries a status rather than only text."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The instrument that found both defects. Ran the five old implementations and the new shared one over eight message shapes crossed with keys present or absent and decryption succeeding or throwing, and diffed what each call site would display. Reading the diff had found neither."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or provider contract." },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The new optional ownKeys parameter crosses a seam: undefined means load them, null means there are none. Both batch callers pass the resolved value, so null is never mistaken for absent."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Each control breaks the reader, not the writer: reverting the guard makes the status wrong, and reverting the key memo makes the loader run again."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The differential's fixtures were the message shapes production stores, including the one that mattered: an own message held only as the copy wrapped for the recipient."
+        },
+        { "id": "D1", "status": "applied", "evidence": "Ordinary plaintext, v1 and v2 messages all still display; the suites for every consuming page pass." },
+        { "id": "D2", "status": "applied", "evidence": "The inputs that must not display as text -- unreadable own copies, failed decryption -- now report failure rather than handing back the blob." },
+        { "id": "D3", "status": "applied", "evidence": "Empty ciphertext, a version string nobody recognises, and a prefix without a matching version were all exercised." },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The search results page was the sibling that proved the others wrong: it alone tested the v2: prefix for an own message, which is the check the extraction had dropped."
+        },
+        { "id": "E2", "status": "applied", "evidence": "No branch became unreachable; the early return for an unreadable own copy is reached by a real stored message." },
+        { "id": "E3", "status": "applied", "evidence": "Every failure reaches a caller that decides what to show. None is swallowed." },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Found the second defect: the old search page hoisted one getOwnKeys call above its loop, and the extraction put it inside, once per message and twice per mod mail message."
+        },
+        { "id": "E5", "status": "applied", "evidence": "The point of the change: one rule instead of five." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept for both shapes. Deferred the surface sweep to pass 2, which is where it found what pass 1 had missed."
+        },
+        { "id": "F1", "status": "na", "why": "No goroutine or shared mutable state." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing is written; a failure leaves the surface showing its own choice of fallback." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing is persisted by a display path." },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both fixes controlled; each replay produced a real assertion failure, and the differential was re-run afterwards to confirm only the approved rows remained."
+        },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook ran the artifact guard, the CI checks and i18n:verify on every commit." },
+        { "id": "H1", "status": "applied", "evidence": "tsc -b --force silent, eslint clean, prettier clean, i18n:verify OK." },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "The technique was a differential run of two implementations, which is C3. No new instrument needed."
+        },
+        { "id": "B5", "status": "na", "why": "Nothing in this change produces output through a model or another system." },
+        { "id": "E7", "status": "na", "why": "No side effect is started before a later branch decides whether it was wanted." },
+        { "id": "G3", "status": "applied", "evidence": "Each control is a known-bad input replayed against its own test." },
+        { "id": "B6", "status": "na", "why": "No shared bar, header or row changed in this pass." },
+        { "id": "E8", "status": "na", "why": "No process-wide state read lazily." },
+        { "id": "H2", "status": "applied", "evidence": "Ran with a verbose reporter and counted named tests rather than trusting a summary line." },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase's promise was that five call sites keep their behaviour. The differential tested that sentence directly, and it was false in two rows."
+        },
+        { "id": "F5", "status": "na", "why": "No side effect to start twice; these paths only read." },
+        { "id": "B7", "status": "na", "why": "No overlay or fixed layer." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran every suite importing the changed modules, eleven files, all passing."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing added that can cover, block or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture touched in this pass." }
+      ],
+      "findings": [
+        {
+          "id": "g3c0-own-message-blob-shown-as-text",
+          "summary": "An own message held only as the copy wrapped for the recipient came back as not-encrypted, so every surface showed the raw blob as though it were the message. This device cannot open that copy; the extraction had adopted the hole from the five copies that had it, while the search results page was the one place that got it right by testing the v2: prefix.",
+          "found_by": "C3",
+          "fix_commit": "4a1ca5847",
+          "control": {
+            "patch": ".review/controls/g3c0-own-message-blob-shown-as-text.patch",
+            "runner": "vitest",
+            "tests": ["src/hooks/__tests__/useDecryptedContent.test.ts -t 'raw blob'"],
+            "observed": "AssertionError: expected 'not-encrypted' to be 'failed' -- the rule reports the blob as ordinary text."
+          }
+        },
+        {
+          "id": "g3c0-keys-loaded-once-per-message",
+          "summary": "getOwnKeys was called once per message, and twice for a mod mail message. It caches nothing: each call opens IndexedDB and imports a key. The search results page had loaded them once above its loop, and the extraction made that one load per result.",
+          "found_by": "E4",
+          "fix_commit": "4a1ca5847",
+          "control": {
+            "patch": ".review/controls/g3c0-keys-loaded-once-per-message.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useDecryptedContent.test.ts -t 'loads the reader keys once'"
+            ],
+            "observed": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Scope is now the two pass 1 fixes as well, which nobody had reviewed."
+        },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records either pass 1 finding, so neither is a re-fix." },
+        { "id": "B1", "status": "applied", "evidence": "Re-ran the differential after the fixes; only the four approved rows and two declared improvements remained." },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Read what each surface actually renders. The pinned bar rendered message.encrypted_content directly, in the row and in the title attribute."
+        },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "The migrated surfaces use the shared union; none reintroduces a version literal." },
+        { "id": "C2", "status": "applied", "evidence": "Each migrated caller passes the message, ownership and reader id the rule expects." },
+        { "id": "C3", "status": "applied", "evidence": "The differential re-run is the comparison; the remaining rows were each traced to an approved change." },
+        { "id": "C4", "status": "na", "why": "No worker or provider contract." },
+        { "id": "C5", "status": "applied", "evidence": "No field added; the sweep looked instead for surfaces reading the stored field directly." },
+        { "id": "C6", "status": "applied", "evidence": "The pinned bar control was rebuilt after it passed, and now breaks the reader that actually renders the row." },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The mod mail suite mocked getMessages while the page's list calls getMessagesPage, so the fixture never matched what production calls and the query threw."
+        },
+        { "id": "D1", "status": "applied", "evidence": "Plaintext previews still render synchronously in the pinned bar, which is what keeps its existing suite honest." },
+        { "id": "D2", "status": "applied", "evidence": "Each new test asserts the stored ciphertext never appears." },
+        { "id": "D3", "status": "applied", "evidence": "needsDecryption was exercised over empty, unknown-version, prefixed and own-copy cases." },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Asked which surfaces carried a defence the others lacked, and found three that carried none."
+        },
+        { "id": "E2", "status": "applied", "evidence": "The old local hooks were removed entirely rather than left unreferenced." },
+        { "id": "E3", "status": "applied", "evidence": "The pinned bar now says a message is encrypted rather than showing its bytes." },
+        { "id": "E4", "status": "applied", "evidence": "The pinned bar loads keys once for the whole bar, not once per pinned message." },
+        { "id": "E5", "status": "applied", "evidence": "Three more copies folded into the one rule." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The instrument that found all three. Swept for the shape rather than counting from memory: surfaces rendering encrypted_content, and every getOwnKeys call site."
+        },
+        { "id": "F1", "status": "na", "why": "No concurrency." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing persisted; a cancelled effect drops its result." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted." },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "One control passed when replayed, which is itself a finding and is recorded below. All five then failed for real."
+        },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook ran on each commit in this pass." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "The technique was E6, already an instrument. The lesson was to enumerate mechanically rather than from memory, which E6 already says." },
+        { "id": "B5", "status": "na", "why": "No model or provider output." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "G3", "status": "applied", "evidence": "Every control replayed against its own test." },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "The pinned bar row changed its text source, not its layout; the text is still one truncated line in the same box."
+        },
+        { "id": "E8", "status": "na", "why": "No process-wide lazy state." },
+        { "id": "H2", "status": "applied", "evidence": "Counted named tests per suite; the single skip is pre-existing in MessagesPage.test.tsx." },
+        { "id": "I1", "status": "applied", "evidence": "The phase promised one rule for display. Three surfaces still had their own, so the promise was not yet kept." },
+        { "id": "F5", "status": "na", "why": "Read-only paths." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran every suite importing the changed modules after each fix, including the two suites that had never covered these surfaces."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed in this pass." }
+      ],
+      "findings": [
+        {
+          "id": "g3c0-feed-card-showed-ciphertext",
+          "summary": "CompactPostCard's feed preview was a seventh copy of the rule, testing encryption_version === 'v1' alone with no v2 and no prefix check, so every v2 message rendered as raw ciphertext in the feed. It also carried the own-message hole, loaded keys twice per card in a list, and painted the ciphertext before attempting to decrypt. Neither it nor its only renderer had any test.",
+          "found_by": "E6",
+          "fix_commit": "df82b5500",
+          "control": {
+            "patch": ".review/controls/g3c0-feed-card-showed-ciphertext.patch",
+            "runner": "vitest",
+            "tests": ["src/components/feed/__tests__/CompactPostCard.decrypt.test.tsx"],
+            "observed": "AssertionError: expected 'Aalicev2:blob-that-must-never-be-show...' not to contain 'blob-that-must-never-be-shown'."
+          }
+        },
+        {
+          "id": "g3c0-pinned-bar-showed-ciphertext",
+          "summary": "PinnedMessagesBar did not decrypt at all. It returned encrypted_content truncated to eighty characters, as the row text and as the title attribute, so every pinned encrypted message showed its ciphertext. The first control for this fix PASSED when replayed, which is its own finding: every message in that suite was plaintext, where the old and new code agree, so nothing there could see the defect.",
+          "found_by": "E6",
+          "fix_commit": "df82b5500",
+          "control": {
+            "patch": ".review/controls/g3c0-pinned-bar-showed-ciphertext.patch",
+            "runner": "vitest",
+            "tests": ["tests/unit/pinnedMessagesBar.test.tsx"],
+            "observed": "Rebuilt after the blind control was fixed in efc3405b6. AssertionError: expected '1 pinned messagev2:secret-blob-nobody...' not to contain 'secret-blob'."
+          }
+        },
+        {
+          "id": "g3c0-modmail-page-showed-ciphertext",
+          "summary": "ModMailConversationPage was an eighth copy, with the same narrow 'v1' test, the same own-message hole and the same two key loads per message. Its suite asserted only that a body element existed, so nothing there could have noticed.",
+          "found_by": "E6",
+          "fix_commit": "df82b5500",
+          "control": {
+            "patch": ".review/controls/g3c0-modmail-page-showed-ciphertext.patch",
+            "runner": "vitest",
+            "tests": ["src/pages/__tests__/ModMailConversationPage.test.tsx"],
+            "observed": "AssertionError: expected 'modMailConversationPage.actions.backT...' to contain 'the real mod mail text'. The page renders and the decrypted text is absent, rather than the container being empty."
+          }
+        },
+        {
+          "id": "g3c0-needs-decryption-predicate",
+          "summary": "Making the pinned bar decrypt would have made its text asynchronous for every message, including messages that were never encrypted, which breaks the synchronous assertions in its suite and delays text that needs no keys. A pure predicate was needed so a surface can paint such text on the first render instead of after a round trip.",
+          "found_by": "E1",
+          "fix_commit": "df82b5500",
+          "control": {
+            "patch": ".review/controls/g3c0-needs-decryption-predicate.patch",
+            "runner": "vitest",
+            "tests": ["src/hooks/__tests__/useDecryptedContent.test.ts -t 'needsDecryption'"],
+            "observed": "AssertionError: expected false to be true -- the narrowed predicate misjudges v2 and prefixed messages."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope re-derived from the commits: five commits over eleven files since the base." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records any pass 2 finding." },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Assembled the artifact that had never been tested: the agreement between needsDecryption and decryptForDisplay, over ten message shapes crossed with ownership and key presence. All forty combinations agree."
+        },
+        { "id": "B2", "status": "applied", "evidence": "Each migrated surface now has a test asserting the decrypted text appears and the stored blob never does." },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "Zero version literals remain outside the shared rule." },
+        { "id": "C2", "status": "applied", "evidence": "Every caller of the rule passes the message, ownership and reader id; the batch callers also pass the keys." },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The consistency harness is a differential between two functions that must agree. It found nothing, which is the result that lets this pass close."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or provider contract." },
+        { "id": "C5", "status": "applied", "evidence": "No field added anywhere in this pass." },
+        { "id": "C6", "status": "applied", "evidence": "All six controls replayed after the shared setup changed; each still failed for a real reason." },
+        { "id": "C7", "status": "applied", "evidence": "The mod mail fixture now calls the method production calls, and the page renders through it." },
+        { "id": "D1", "status": "applied", "evidence": "The complete suite passes: 182 files, 1167 tests." },
+        { "id": "D2", "status": "applied", "evidence": "Every surface test asserts the ciphertext is absent." },
+        { "id": "D3", "status": "applied", "evidence": "The consistency matrix included empty, unknown-version and prefix-without-version cases." },
+        { "id": "E1", "status": "applied", "evidence": "Checked the remaining surfaces: the thread renderer routes through the shared rule, and the system-message branch shows text that is never encrypted." },
+        { "id": "E2", "status": "applied", "evidence": "No unreachable branch left behind by the migrations." },
+        { "id": "E3", "status": "applied", "evidence": "No failure is swallowed; each surface chooses a visible outcome." },
+        { "id": "E4", "status": "applied", "evidence": "No surface loads keys per item any more." },
+        { "id": "E5", "status": "applied", "evidence": "One rule, one predicate, one place." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Three sweeps, all clean: raw decrypt call sites reduced to the two deliberate survivors, zero version literals outside the rule, and the only remaining direct render of encrypted_content is the system-message branch, which is never encrypted."
+        },
+        { "id": "F1", "status": "na", "why": "No concurrency." },
+        { "id": "F2", "status": "applied", "evidence": "Cancelled effects drop their results; nothing is written." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted." },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Six controls, six real assertion failures, replayed once more after the shared test setup changed underneath them."
+        },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook invoked the guards automatically on all five commits." },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b --force silent; eslint clean; prettier clean on every file in scope; i18n:verify OK."
+        },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "na", "why": "Nothing here produces output through a model or another system." },
+        { "id": "E7", "status": "na", "why": "No side effect starts before the decision that governs it." },
+        { "id": "G3", "status": "applied", "evidence": "Every control was fed the input it exists to refuse and refused it." },
+        { "id": "B6", "status": "na", "why": "No layout changed; only the source of a line of text." },
+        { "id": "E8", "status": "na", "why": "No process-wide lazy state." },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "182 files ran and 1167 tests passed; the single skip is pre-existing and unrelated to display."
+        },
+        { "id": "I1", "status": "applied", "evidence": "The promise was one rule for turning a message into text. It is now one rule, and the sweep proves no surface keeps its own." },
+        { "id": "F5", "status": "na", "why": "Read-only paths." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "tests/setup/test-setup.ts is imported by every suite, so a narrow run could not cover it. Ran the complete frontend suite: 182 files, 1167 passed."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing added that can cover, block or redirect the app." },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The shared test setup is exactly this instrument's subject. The scrollIntoView stub is guarded because ThreadView's suite installs and removes its own; its nine tests still pass, and so does the whole suite."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean on every changed file; prettier clean on every changed file",
+    "types": "tsc -b --force",
+    "tests": "complete frontend suite: 182 files, 1167 passed, 1 pre-existing skip. Six controls each replayed to a real assertion failure, and replayed again after the shared test setup changed."
+  }
+}
