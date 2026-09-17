@@ -1,0 +1,13 @@
+diff --git a/frontend/public/locales/en.json b/frontend/public/locales/en.json
+index 08eae77fb..15bf37f36 100644
+--- a/frontend/public/locales/en.json
++++ b/frontend/public/locales/en.json
+@@ -737,7 +737,7 @@
+       "messageRequired": "Message is required"
+     },
+     "encryption": {
+-      "noParticipants": "No participants found to encrypt the message for, so it was not sent.",
++      "noParticipants": "No participants found to encrypt the message for; sending plaintext.",
+       "senderMissingKeys": "CRITICAL: You have not set up encryption keys. Cannot send mod mail.",
+       "noRecipientsEnabled": "CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail."
+     }

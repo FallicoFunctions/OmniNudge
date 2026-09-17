@@ -306,7 +306,11 @@ export const messagesService = {
     return api.patch<Message>(`/messages/${messageId}`, {
       encrypted_content: encryptedContent,
       sender_encrypted_content: senderEncryptedContent,
-      content: data.content,
+      // The plaintext does not travel. EditMessageRequest still declares a
+      // content field and the handler never reads it: the edit history row
+      // stores the message's own ciphertext, and the UPDATE touches only the
+      // encrypted columns. Sending it put the cleartext on the wire, and in
+      // every log along it, to be dropped on arrival.
       encryption_version: encryptionVersion,
     });
   },

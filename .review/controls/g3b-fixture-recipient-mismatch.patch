@@ -1,0 +1,13 @@
+diff --git a/frontend/tests/integration/messagingFlows.test.tsx b/frontend/tests/integration/messagingFlows.test.tsx
+index 2be66e487..300b1fc82 100644
+--- a/frontend/tests/integration/messagingFlows.test.tsx
++++ b/frontend/tests/integration/messagingFlows.test.tsx
+@@ -33,7 +33,7 @@ vi.mock('../../src/services/encryptionService', () => ({
+     // by 1 this map never matched the recipient, so getPublicKeys answered
+     // undefined and the send fell back to plaintext -- which the assertion below
+     // did not look at, so the suite was green while testing the wrong path.
+-    getPublicKeys: vi.fn(async () => ({ 2: 'recipient-key-b64' })),
++    getPublicKeys: vi.fn(async () => ({ 1: 'recipient-key-b64' })),
+   },
+ }));
+ 

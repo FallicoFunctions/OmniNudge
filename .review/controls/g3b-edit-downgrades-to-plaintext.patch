@@ -1,0 +1,33 @@
+diff --git a/frontend/src/services/messagesService.ts b/frontend/src/services/messagesService.ts
+index 59dcdab07..afd9bafa1 100644
+--- a/frontend/src/services/messagesService.ts
++++ b/frontend/src/services/messagesService.ts
+@@ -273,21 +273,15 @@ export const messagesService = {
+       try {
+         const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+         const recipientPublicKeyBase64 = publicKeys[recipientId];
+-        if (!recipientPublicKeyBase64) {
+-          throw new MessageNotSent(
+-            'recipient-key-unusable',
+-            'The recipient has published no encryption key'
+-          );
+-        }
+-        const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+-        if (!recipientPublicKey) {
+-          throw new MessageNotSent('recipient-key-unusable', 'The recipient key could not be read');
++        if (recipientPublicKeyBase64) {
++          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
++          if (recipientPublicKey) {
++            encryptedContent = await encryptMessage(data.content, recipientPublicKey);
++            encryptionVersion = 'v2';
++          }
+         }
+-        encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+-        encryptionVersion = 'v2';
+       } catch (error) {
+-        if (error instanceof MessageNotSent) throw error;
+-        throw new MessageNotSent('encryption-failed', 'The edit could not be encrypted');
++        console.error('Message edit encryption failed, falling back to plaintext:', error);
+       }
+     }
+ 

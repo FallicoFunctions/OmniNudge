@@ -1,0 +1,23 @@
+diff --git a/frontend/src/components/modmail/ModMailModal.tsx b/frontend/src/components/modmail/ModMailModal.tsx
+index 106fc3ba3..8d2ed898f 100644
+--- a/frontend/src/components/modmail/ModMailModal.tsx
++++ b/frontend/src/components/modmail/ModMailModal.tsx
+@@ -43,9 +43,15 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
+     // raw message with encryption_version 'plaintext', so the one branch where
+     // no recipient could be encrypted for was the branch that sent in clear.
+     if (!participantIds.length) {
+-      const errorMsg = t('modMailModal.encryption.noParticipants');
+-      setEncryptionWarning(errorMsg);
+-      throw new Error(errorMsg);
++      setEncryptionWarning(t('modMailModal.encryption.noParticipants'));
++      return {
++        encryptedContent: message,
++        senderEncryptedContent: message,
++        sharedIv: '',
++        recipientKeys: {},
++        is_multi_recipient: true as const,
++        encryption_version: 'plaintext',
++      };
+     }
+ 
+     // Fetch public keys for all participants

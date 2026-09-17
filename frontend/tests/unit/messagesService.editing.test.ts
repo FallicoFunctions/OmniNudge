@@ -71,9 +71,14 @@ describe('messagesService editing helpers', () => {
     expect(mockApi.patch).toHaveBeenCalledWith('/messages/99', {
       encrypted_content: 'enc:hello edit',
       sender_encrypted_content: 'enc:hello edit',
-      content: 'hello edit',
       encryption_version: 'v2',
     });
+    // The body used to carry the plaintext in a content field the handler never
+    // reads. Naming the fields is not enough to catch that coming back, because
+    // an extra field is exactly what toHaveBeenCalledWith would report -- but
+    // only if someone reads the diff. State the rule instead.
+    const body = mockApi.patch.mock.calls[0][1] as Record<string, unknown>;
+    expect(Object.values(body)).not.toContain('hello edit');
   });
 
   // An edit replaces the content of a message that was already sent encrypted.

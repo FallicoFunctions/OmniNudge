@@ -1,0 +1,12 @@
+diff --git a/frontend/src/hooks/useMessageEdit.ts b/frontend/src/hooks/useMessageEdit.ts
+index eb1bf0930..5ab05c055 100644
+--- a/frontend/src/hooks/useMessageEdit.ts
++++ b/frontend/src/hooks/useMessageEdit.ts
+@@ -125,7 +125,6 @@ export function useMessageEdit({
+       // The rollback alone puts the old text back and says nothing, so an edit
+       // that refused to travel in clear would read as an edit that never
+       // happened. Name the reason instead.
+-      alert(t(messageSendErrorKey(error) ?? 'messages.errors.editFailed'));
+     },
+   });
+ 
