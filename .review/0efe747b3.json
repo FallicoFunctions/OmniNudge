@@ -1,0 +1,236 @@
+{
+  "schema_version": 2,
+  "head": "7dcb24ef9",
+  "base": "0efe747b3",
+  "scope": {
+    "files": [
+      "frontend/src/hooks/useDecryptedContent.ts",
+      "frontend/src/hooks/__tests__/useDecryptedContent.group.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/feed/CompactPostCard.tsx"
+    ],
+    "boundaries": [
+      "a sealed group envelope becoming text on screen",
+      "which ciphertext a reader opens: the shared envelope or a per-reader copy",
+      "the agreement between needsDecryption and decryptForDisplay",
+      "the conversation and reader a group key is fetched for"
+    ]
+  },
+  "prior_ledgers_read": [
+    "da9ed20de -- the key cache this phase consumes. Its pass 1 finding was a suite that mocked the thing it claimed to prove, which is why this phase's tests open envelopes Node computed rather than fixtures written here.",
+    "51cde838c -- the extraction that made this a one-branch change, and whose pass 3 pinned the agreement between needsDecryption and decryptForDisplay with a throwaway harness. That harness is the reason the first finding below was caught at all.",
+    "cd683f853 -- g2a-seal-bytes-unpinned: vectors pinned in one direction only.",
+    "af4bacefe -- a required call no test reached."
+  ],
+  "notes": [
+    "Both findings came from one move: printing what the rule returns for seven shapes of group message, instead of reading the branch order. The first shape that misbehaved was an own message whose sender copy is an empty string, which no test had ever constructed.",
+    "tsc reported no errors when conversation_id joined DecryptableMessage. The stand-in and every fixture are cast through unknown, so the compiler could not enforce the new field on any of them. That is why the second finding existed and why the runtime paths were printed rather than trusted.",
+    "The E6 sweep found three more places using the same ?? fallback that cannot catch an empty string: MessageEditHistory twice, the forward path in MessagesPage, and the edit merge in WebSocketContext. All three were proven unreachable rather than fixed. The only client path that stores an empty sender copy is the voice message send, where encrypted_content is empty too and the version is none, so a blank render is correct; the service default yields a real value or undefined; the forward path throws on empty; and the edit handler rejects an empty encrypted_content with a 400, so an edit event cannot carry one."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One branch in the shared display rule, plus the conversation field it needs, the reader threaded through the edit helper, and the stand-in. The boundary is a sealed envelope becoming text on screen."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read da9ed20de, 51cde838c, cd683f853 and af4bacefe first. The second named the invariant that caught the first finding."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Found the first defect. Printed status, text, needsDecryption and the cache arguments for seven shapes of group message. An own message with an empty sender copy came back not-encrypted with empty text while needsDecryption said true."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "What a surface paints is the text this rule returns, and for the broken shape that was an empty string where a readable message existed."
+        },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "GROUP_ENCRYPTION_VERSION is spelled once and compared once; the key version comes out of the envelope rather than from a second source."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The branch passes conversation, version, reader and keys in the order groupKeyForVersion declares, asserted by reading back the recorded call arguments."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "needsDecryption and decryptForDisplay are two implementations of one question. The probe ran both over the same shapes and they disagreed on one."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or external provider." },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Found the second defect. conversation_id was added to DecryptableMessage and the compiler enforced it nowhere, because the stand-in and the fixtures are cast through unknown. A message without one reached the cache."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The envelopes are the ones Node computed in shared/crypto-vectors, not values typed here, so opening one proves this reads what another implementation wrote."
+        },
+        { "id": "C6", "status": "applied", "evidence": "Both controls break a reader: one restores the guard order, the other drops the conversation check, and each fails its test." },
+        { "id": "D1", "status": "applied", "evidence": "A normal group message from another member, and one of the reader's own, both open to the vector plaintext." },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "No key for the version, no reader, no device keys, no conversation and a damaged envelope each refuse rather than show the envelope as text."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary that mattered was the empty string, which ?? does not treat as absent. That is what the first finding was."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every other path prefers the sender copy. A group message must not, because it is sealed once for everyone, and a test gives the sender a decoy copy to prove the envelope wins."
+        },
+        { "id": "E2", "status": "applied", "evidence": "Every branch is reachable, including the no-conversation refusal, which the probe reached." },
+        { "id": "E3", "status": "applied", "evidence": "Each refusal returns a status a surface can act on; none is swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "The key is fetched through the cache, so a screen of group messages costs one request." },
+        { "id": "E5", "status": "applied", "evidence": "One branch in one rule, which is what the extraction was for." },
+        { "id": "E6", "status": "applied", "evidence": "Deferred the sweep for the same shape elsewhere to pass 2." },
+        { "id": "F1", "status": "na", "why": "No shared mutable state here; the cache owns that and has its own review." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing is written; a refusal leaves the surface to choose what to show." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted." },
+        { "id": "G1", "status": "applied", "evidence": "Both fixes controlled, both replays produced real assertion failures, and the artifact was printed again afterwards." },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook ran the guards on every commit in this phase." },
+        { "id": "G3", "status": "applied", "evidence": "Each control feeds the rule the input it must refuse, and it refuses." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "Both techniques already have rows: B1 for printing the artifact, C5 for a declared field nothing enforces." },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The envelopes are opened with real WebCrypto against vectors another implementation produced; the damaged-envelope path throws a real SyntaxError rather than a stub."
+        },
+        { "id": "E7", "status": "na", "why": "Nothing is started before the branch that decides whether it was wanted." },
+        { "id": "B6", "status": "na", "why": "No layout changed." },
+        { "id": "E8", "status": "na", "why": "This rule holds no process-wide state; the cache does, and has its own ledger." },
+        { "id": "H2", "status": "applied", "evidence": "Read each named test rather than a summary line; no skips in this area." },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase promised that a group message is sealed once and the sender opens the same envelope. The decoy sender copy test holds it to that sentence."
+        },
+        { "id": "F5", "status": "na", "why": "No side effect to start twice; this path only reads." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The branch order changed for every message, not only group ones, so twelve suites covering DM, mod mail, thread, search, feed, pinned bar and edit ran together: 85 passed."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." }
+      ],
+      "findings": [
+        {
+          "id": "g3c1-empty-sender-copy-hid-the-envelope",
+          "summary": "The per-reader rule ran before the group branch, and ?? does not fall back on an empty string, so an own group message whose sender copy was empty returned not-encrypted with empty text. The readable envelope sat in encrypted_content and was never looked at, and needsDecryption said the message needed opening, so the two disagreed. The group branch is now answered first, because a group message has no per-reader ciphertext at all.",
+          "found_by": "B1",
+          "fix_commit": "7dcb24ef9",
+          "control": {
+            "patch": ".review/controls/g3c1-empty-sender-copy-hid-the-envelope.patch",
+            "runner": "vitest",
+            "tests": ["src/hooks/__tests__/useDecryptedContent.group.test.ts"],
+            "observed": "Two failures, one of them from the consistency row that was a throwaway harness in the previous review: expected { status: 'not-encrypted', text: '' } to deeply equal { status: 'decrypted', ... }, and expected true to be false."
+          }
+        },
+        {
+          "id": "g3c1-group-key-fetched-for-no-conversation",
+          "summary": "A group message with no conversation id reached the key cache, which bucketed a key under it. The compiler could not enforce the new field: the stand-in and every fixture are cast through unknown. The branch now refuses when there is no conversation to fetch for.",
+          "found_by": "C5",
+          "fix_commit": "7dcb24ef9",
+          "control": {
+            "patch": ".review/controls/g3c1-group-key-fetched-for-no-conversation.patch",
+            "runner": "vitest",
+            "tests": ["src/hooks/__tests__/useDecryptedContent.group.test.ts"],
+            "observed": "AssertionError: expected 'decrypted' to be 'failed'. One failed, thirteen passed."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope now includes the reordered branch and the three tests written in pass 1." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records either pass 1 finding." },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed all ten shapes again after the reorder, group and not. Every row agrees, the three broken rows are fixed, and DM plaintext, DM v2 and mod mail are unchanged."
+        },
+        { "id": "B2", "status": "applied", "evidence": "The text each shape yields was read, not inferred." },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "One version constant, one comparison." },
+        { "id": "C2", "status": "applied", "evidence": "The cache is called with conversation, version, reader and keys, or not called at all." },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The agreement between needsDecryption and decryptForDisplay is now a permanent test over five shapes rather than a throwaway, because it caught a real defect one phase after it was written."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "The one cast that can hide a required field is the stand-in, which now carries a conversation id." },
+        { "id": "C6", "status": "applied", "evidence": "Both controls replayed again after the fix; both still fail for real." },
+        { "id": "C7", "status": "applied", "evidence": "Fixtures remain the Node-computed envelopes." },
+        { "id": "D1", "status": "applied", "evidence": "85 tests pass across the twelve suites the reorder can reach." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal still refuses." },
+        { "id": "D3", "status": "applied", "evidence": "The empty string is now covered on the group path by a permanent test." },
+        { "id": "E1", "status": "applied", "evidence": "Compared against the forward path, which faces the same empty-string question and answers it by throwing, which is right for forwarding and wrong for display." },
+        { "id": "E2", "status": "applied", "evidence": "No branch became unreachable; the per-reader guard still runs for every non-group message." },
+        { "id": "E3", "status": "applied", "evidence": "No failure is swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "No per-message request; the cache still answers once per conversation." },
+        { "id": "E5", "status": "applied", "evidence": "The guard exists once, after the group branch." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept for the ?? that cannot catch an empty string. Three more places have it, and all three were proven unreachable rather than changed: the only writer of an empty sender copy is the voice send, where the envelope is empty too; the forward path throws on empty; and the edit handler rejects an empty ciphertext with a 400, so the merge cannot receive one. Also swept for casts that hide a required field: one, and it now carries the field."
+        },
+        { "id": "F1", "status": "na", "why": "No shared mutable state in this rule." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing is written." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted." },
+        { "id": "G1", "status": "applied", "evidence": "Two controls, two real assertion failures, and the artifact printed once more afterwards." },
+        { "id": "G2", "status": "applied", "evidence": "The hooks ran on the fix commit." },
+        { "id": "G3", "status": "applied", "evidence": "Both known-bad inputs are refused." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "applied", "evidence": "Real WebCrypto again, opening vectors another implementation sealed." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        { "id": "E8", "status": "na", "why": "No process-wide state in this rule." },
+        { "id": "H2", "status": "applied", "evidence": "Twelve suites, 85 passed, one pre-existing skip, counted rather than assumed." },
+        { "id": "I1", "status": "applied", "evidence": "Receive still lands before send: nothing writes group-v1 yet, so no existing message changed behaviour." },
+        { "id": "F5", "status": "na", "why": "Read-only path." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran with an explicit exit check rather than a piped tail, because a piped failure is invisible to set -e and that had already let a red test through earlier in this session."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean; prettier clean on every changed file",
+    "types": "tsc -b --force",
+    "tests": "12 suites, 85 passed, 1 pre-existing skip, run with an explicit exit check. Two controls each replayed to a real assertion failure."
+  }
+}

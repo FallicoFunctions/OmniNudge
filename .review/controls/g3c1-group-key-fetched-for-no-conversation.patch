@@ -1,0 +1,13 @@
+diff --git a/frontend/src/hooks/useDecryptedContent.ts b/frontend/src/hooks/useDecryptedContent.ts
+index aadc029d2..b9de83b88 100644
+--- a/frontend/src/hooks/useDecryptedContent.ts
++++ b/frontend/src/hooks/useDecryptedContent.ts
+@@ -125,7 +125,7 @@ export async function decryptForDisplay(
+     // The group key is fetched for a named reader in a named conversation.
+     // Without either there is nobody and nowhere to fetch for, and guessing
+     // would bucket a key under a conversation that does not exist.
+-    if (currentUserId === undefined || !message.conversation_id) {
++    if (currentUserId === undefined) {
+       return { status: 'failed', text: sealed };
+     }
+     try {
