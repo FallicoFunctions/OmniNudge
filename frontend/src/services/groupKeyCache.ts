@@ -20,8 +20,8 @@
  * as missing. Whoever rotates must call forgetGroupKeys, or this page keeps
  * saying the message cannot be read until it reloads.
  */
-import { getGroupKeyState } from './groupKeysService';
-import { unwrapGroupKey } from '../utils/groupKeys';
+import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from './groupKeysService';
+import { newGroupKey, unwrapGroupKey, wrapGroupKeyForMembers } from '../utils/groupKeys';
 import { getOwnKeys } from './keyManagementService';
 import type { KeyPair } from '../utils/encryption';
 
@@ -136,4 +136,97 @@ export function forgetGroupKeys(conversationId?: number, readerId?: number): voi
   knownMissing.delete(key);
   inFlight.delete(key);
   failedAt.delete(key);
+}
+
+/** Why a sender cannot get a key to seal with. */
+export type NoGroupKeyReason =
+  /** This device holds no keys of its own. */
+  | 'no-device-keys'
+  /** A member has published no usable key, so no copy can be made for them. */
+  | 'member-key-unusable';
+
+export class NoGroupKeyToSendWith extends Error {
+  constructor(
+    readonly reason: NoGroupKeyReason,
+    message: string
+  ) {
+    super(message);
+    this.name = 'NoGroupKeyToSendWith';
+  }
+}
+
+export interface GroupKeyForSending {
+  key: CryptoKey;
+  version: number;
+}
+
+/**
+ * The key to seal the next group message with.
+ *
+ * A group is born with no key, and a join or a leave ends the one it had, so
+ * the next member who sends makes the next version. That is why sending, not
+ * joining, is where a key appears.
+ *
+ * Refusing beats sending: if any member has published no usable key, nobody
+ * makes a copy for them, and going ahead would hand somebody a group they
+ * cannot read while everyone else believes it is encrypted.
+ */
+export async function groupKeyForSending(
+  conversationId: number,
+  senderId: number,
+  ownKeys?: KeyPair | null
+): Promise<GroupKeyForSending> {
+  const keys = ownKeys !== undefined ? ownKeys : await getOwnKeys();
+  if (!keys) {
+    throw new NoGroupKeyToSendWith('no-device-keys', 'This device has no encryption keys');
+  }
+
+  const state = await getGroupKeyState(conversationId);
+  if (state.active_version > 0) {
+    const current = await groupKeyForVersion(conversationId, state.active_version, senderId, keys);
+    if (current) return { key: current, version: state.active_version };
+    // The version is current and this device cannot open it, so there is
+    // nothing to seal with. Making the next one is what a sender does.
+  }
+
+  const fresh = await newGroupKey();
+  const { copies, unusable } = await wrapGroupKeyForMembers(
+    fresh,
+    state.members.map((member) => ({ userId: member.user_id, publicKey: member.public_key }))
+  );
+  if (unusable.length > 0) {
+    throw new NoGroupKeyToSendWith(
+      'member-key-unusable',
+      `No usable key for ${unusable.length} member(s) of this group`
+    );
+  }
+
+  const next = state.latest_version + 1;
+  try {
+    const stored = await rotateGroupKey(conversationId, { key_version: next, copies });
+    // The cache remembers versions this reader could not get, and the rotation
+    // just granted one. Without this the sender's own new message would read as
+    // unreadable until the page reloaded.
+    forgetGroupKeys(conversationId, senderId);
+    return { key: fresh, version: stored };
+  } catch (error) {
+    const lostTheRace =
+      error instanceof GroupKeyRotationRefused &&
+      (error.refusal === 'key-is-current' || error.refusal === 'version-taken');
+    if (!lostTheRace) throw error;
+
+    // Another member rotated first. Their version is the one to send under.
+    forgetGroupKeys(conversationId, senderId);
+    const settled = await getGroupKeyState(conversationId);
+    if (settled.active_version > 0) {
+      const theirs = await groupKeyForVersion(
+        conversationId,
+        settled.active_version,
+        senderId,
+        keys
+      );
+      if (theirs) return { key: theirs, version: settled.active_version };
+    }
+    throw error;
+  }
 }
