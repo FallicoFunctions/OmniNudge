@@ -1,0 +1,286 @@
+{
+  "schema_version": 2,
+  "head": "4106a2347",
+  "base": "000de0034",
+  "scope": {
+    "files": [
+      "frontend/src/services/messagesService.ts",
+      "frontend/src/services/__tests__/messagesService.groupSend.test.ts",
+      "frontend/src/hooks/usePinnedMessages.ts",
+      "frontend/tests/unit/usePinnedMessages.test.tsx",
+      "frontend/src/utils/messageSendErrors.ts",
+      "frontend/src/types/messages.ts",
+      "frontend/public/locales/en.json"
+    ],
+    "boundaries": [
+      "which branch a conversation lands in when a message is sent",
+      "the encryption_version label against the payload it describes",
+      "the request body the server receives for a group send",
+      "what a websocket pin event puts into the pinned bar"
+    ]
+  },
+  "prior_ledgers_read": [
+    "f4de50ef6 -- the sender key helper this phase calls. Its findings were a doubled state fetch and a control that stopped applying; the second is why every control here was re-applied after each refactor.",
+    "da9ed20de -- the key cache. Its finding that a suite mocked the thing it claimed to prove is why the group send tests assert the request body rather than the absence of a throw.",
+    "0efe747b3 -- the display rule these messages are read back through.",
+    "51cde838c -- the extraction whose findings were surfaces painting ciphertext as text. The third finding below is that same defect arriving through a different door."
+  ],
+  "notes": [
+    "Both pass 1 findings came from printing which branch each kind of conversation lands in, rather than reading the chain.",
+    "The probe that found them also printed a PLAINTEXT ON THE WIRE marker against the direct message rows, which was wrong: the probe mocks encryptMessage as RSA(content), so its ciphertext contains the secret by construction. The real function does not. A marker like that is only meaningful on rows whose content is not shaped by the mock.",
+    "The GROUP WITH other_user row that exposed the ordering defect is a shape the server cannot produce: user1_id is NULL for group rows, so GetOtherUserID returns 0 and the lookup finds nobody. The ordering was changed anyway, because the safety of an encryption decision rested on a column convention rather than on intent, and GetConversation populates other_user without the conversation_type guard its sibling list endpoint has.",
+    "The caller-supplied ciphertext label was likewise unreachable: every caller passes a version today. It becomes reachable the moment a group caller supplies one, which is G4.",
+    "Not fixed, and outside this frontend phase: the server still builds the pin event preview from encrypted_content and broadcasts it. The field is useless to every client now that the client ignores it. It is not a disclosure -- the ciphertext goes to a participant who already holds it -- but it is worth removing on the Go side.",
+    "usePinnedMessages contained both the right pattern and the wrong one. The pin mutation at line 118 spreads the real message from cache and only overrides pin metadata, guarded so it fabricates nothing when the message is absent. The websocket handler eighty lines below had diverged from it, and the diverged one was the path a server event reached."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The group send path and the identity change behind it: sendMessage seals under the group key, and the cache buckets on this device's published key. The boundary is which branch a conversation lands in and what the server then receives."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read f4de50ef6, da9ed20de, 0efe747b3 and 51cde838c before starting. None records either finding."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Found both defects. Printed the request body for seven kinds of conversation: group, group carrying an other_user, direct message, direct message without one, mod mail, a caller supplying its own ciphertext, and media without text."
+        },
+        { "id": "B2", "status": "na", "why": "Nothing is rendered by the send path." },
+        { "id": "B3", "status": "na", "why": "No handler changed; the Go side was read, not modified." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "group-v1 is spelled once, in groupKeys, and fits the character varying(10) column with two characters to spare."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "group_key_version reaches the wire and matches the envelope's own k, which the server has bound and stored since G3a."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The group branch and the recipient branch are two answers to one question. The matrix ran both against a conversation that satisfies each, and the wrong one won."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or external provider." },
+        { "id": "C5", "status": "applied", "evidence": "group_key_version was added to the request type and is populated only on the group branch." },
+        { "id": "C6", "status": "applied", "evidence": "Both controls break a reader: one restores the branch order, the other the label default, and each fails its own assertion." },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The group-with-other-user row is a fixture the producer cannot emit, which is recorded in the notes rather than defended against as though it were live."
+        },
+        { "id": "D1", "status": "applied", "evidence": "An ordinary group send seals and an ordinary direct message is untouched, both asserted against the real body." },
+        { "id": "D2", "status": "applied", "evidence": "A conversation that is neither refuses; ciphertext without a version refuses; every rotation refusal maps to something a person can read." },
+        { "id": "D3", "status": "applied", "evidence": "Media without text, mod mail without content, and a caller-supplied ciphertext were each exercised." },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The recipient branch carries a refusal for an unusable key; the group branch needed the same for an unusable member key, and has it."
+        },
+        { "id": "E2", "status": "applied", "evidence": "Every branch of the chain is reachable by some real conversation, and the one that was not is recorded as such." },
+        { "id": "E3", "status": "applied", "evidence": "No refusal is swallowed: each becomes a MessageNotSent the page can name." },
+        { "id": "E4", "status": "applied", "evidence": "The sealing asks the cache once per send; the cache itself was measured in the previous review." },
+        { "id": "E5", "status": "applied", "evidence": "One place decides the group key for sending, and one place maps refusals to words." },
+        { "id": "E6", "status": "applied", "evidence": "Deferred the sweep for both shapes to pass 2, where it found the third defect." },
+        { "id": "F1", "status": "na", "why": "No shared mutable state in the send path itself." },
+        { "id": "F2", "status": "applied", "evidence": "Every refusal throws before api.post, so a refused send writes nothing." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted by a refused send." },
+        { "id": "G1", "status": "applied", "evidence": "Both fixes controlled; each replay produced a real assertion failure, and the matrix was printed again afterwards." },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook ran the artifact guard, the CI checks and i18n:verify on every commit." },
+        { "id": "G3", "status": "applied", "evidence": "Each control feeds the send the input it must handle, and the assertion refuses the old answer." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "B1 already names the technique: print what the code does, for more than one input." },
+        { "id": "B5", "status": "na", "why": "No model or provider output; the crypto is exercised for real in the cache and envelope suites." },
+        { "id": "E7", "status": "applied", "evidence": "Nothing is started before the branch that decides whether it was wanted; the key is fetched inside the group branch only." },
+        { "id": "B6", "status": "na", "why": "No layout changed." },
+        { "id": "E8", "status": "na", "why": "The send path holds no process-wide state." },
+        { "id": "H2", "status": "applied", "evidence": "Read each named test rather than a summary line." },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase promised a group message is sealed once with no per-reader copy. The body shows no sender copy and an envelope that opens, and a test pins both."
+        },
+        { "id": "F5", "status": "na", "why": "One send is one side effect; concurrent sends are the cache's concern and were tested there." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Ran every suite that exercises sending, including mod mail and editing, before and after the change." },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        { "id": "G4", "status": "applied", "evidence": "All six existing controls were re-applied after refactoring messagesService; all six still applied and failed." }
+      ],
+      "findings": [
+        {
+          "id": "g3c2b-group-lost-to-the-recipient-branch",
+          "summary": "The recipient test was asked before the group test, so a group conversation carrying an other_user would have its message wrapped for that one member and every other member locked out, while it still looked properly encrypted. It cannot happen today only because user1_id is NULL for group rows -- a column convention holding up an encryption decision, in a handler that populates other_user without the conversation_type guard its sibling list endpoint has.",
+          "found_by": "B1",
+          "fix_commit": "ccccb0865",
+          "control": {
+            "patch": ".review/controls/g3c2b-group-lost-to-the-recipient-branch.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/messagesService.groupSend.test.ts"],
+            "observed": "AssertionError: expected 'v2' to be 'group-v1'. The group is RSA-wrapped for one member instead of sealed."
+          }
+        },
+        {
+          "id": "g3c2b-ciphertext-labelled-plaintext",
+          "summary": "A caller that supplies its own ciphertext had it labelled plaintext. skipClientEncryption bypasses the encryption block, and encryption_version defaulted to plaintext whenever no version was given, so the label described the payload wrongly. Unreachable today because every caller passes a version, and reachable the moment a group caller supplies one.",
+          "found_by": "B1",
+          "fix_commit": "ccccb0865",
+          "control": {
+            "patch": ".review/controls/g3c2b-ciphertext-labelled-plaintext.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/messagesService.groupSend.test.ts"],
+            "observed": "AssertionError: promise resolved \"undefined\" instead of rejecting. The unlabelled ciphertext is accepted and stored as plaintext."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope now includes the reordered chain and the new refusal, which nobody had reviewed." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records either pass 1 finding." },
+        { "id": "B1", "status": "applied", "evidence": "Printed the matrix again: the group carrying an other_user now seals, unlabelled ciphertext refuses, and every other row is unchanged." },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Found the third defect by asking what the pinned bar actually holds: an entry built from a ciphertext preview, labelled with a version no branch tests."
+        },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "The 'unknown' version matches no branch anywhere, which is what made the entry render raw." },
+        { "id": "C2", "status": "applied", "evidence": "The REST pinned list returns a real message with encryption_version and the sender copy; the event does not, and the two disagreed." },
+        { "id": "C3", "status": "applied", "evidence": "Two sources feed one cache. The REST one was correct and the websocket one was not, and merging let the wrong one win." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "The event type carries preview and message_type only; everything else the old handler filled in was invented." },
+        { "id": "C6", "status": "applied", "evidence": "The control breaks the reader by restoring the fabricated entry, and both new assertions fail." },
+        { "id": "C7", "status": "applied", "evidence": "The test now uses a preview shaped like what the server really sends: a truncated v2 ciphertext, not the word 'preview'." },
+        { "id": "D1", "status": "applied", "evidence": "A pin event for a message this page holds keeps the real ciphertext and version." },
+        { "id": "D2", "status": "applied", "evidence": "A pin event for a message it does not hold asks the server rather than inventing an entry." },
+        { "id": "D3", "status": "applied", "evidence": "The absent-message case is the boundary, and it is covered by its own test." },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The same file already had the right pattern: the pin mutation spreads the real message and fabricates nothing when it is absent. The websocket handler had diverged from its own neighbour."
+        },
+        { "id": "E2", "status": "applied", "evidence": "Both branches of the new handler are reachable and both are tested." },
+        { "id": "E3", "status": "applied", "evidence": "The refetch is visible to the caller through the query state rather than silently swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "One refetch per pin event for a message this page lacks, not one per render." },
+        { "id": "E5", "status": "applied", "evidence": "The handler now uses the same shape as the mutation beside it." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Found the defect and then closed the shape: only two Message constructions exist across contexts and hooks, one always correct and one now fixed. The sweep for payload-describing defaults found only the one already guarded."
+        },
+        { "id": "F1", "status": "na", "why": "No concurrency introduced." },
+        { "id": "F2", "status": "applied", "evidence": "The invalidate path writes nothing itself; the refetch replaces the list atomically." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "A pin event no longer overwrites a correct entry with an invented one." },
+        { "id": "G1", "status": "applied", "evidence": "The fix is controlled and the control fails on both assertions." },
+        { "id": "G2", "status": "applied", "evidence": "The hooks ran on the fix commit." },
+        { "id": "G3", "status": "applied", "evidence": "The control feeds the handler the event it must not trust, and the test refuses the old answer." },
+        { "id": "H1", "status": "applied", "evidence": "Gates green." },
+        { "id": "Z1", "status": "applied", "evidence": "E6 and B2 already name the techniques used; no new instrument needed." },
+        { "id": "B5", "status": "na", "why": "No model or provider output." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "The bar's layout is unchanged; only the source of its text." },
+        { "id": "E8", "status": "na", "why": "No process-wide state." },
+        { "id": "H2", "status": "applied", "evidence": "Each named test read individually; the old test that asserted the defect was replaced rather than deleted." },
+        { "id": "I1", "status": "applied", "evidence": "The promise that no surface paints ciphertext as text is kept on this path too." },
+        { "id": "F5", "status": "na", "why": "No side effect started twice." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Ran the pinned, bar, page, send and display suites together after the change." },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        { "id": "G4", "status": "applied", "evidence": "All nine controls re-applied after the pin fix; all nine applied and failed." }
+      ],
+      "findings": [
+        {
+          "id": "g3c2b-pin-event-painted-ciphertext",
+          "summary": "The server builds a pin event's preview from the stored encrypted_content, cut to 120 characters. The client made a Message out of it with encryption_version 'unknown' -- a value no branch of the display rule tests -- so needsDecryption answered false and the pinned bar painted those characters as though they were the message. For a group message the cut also destroys the envelope, so nothing downstream could open it. Worse than a bad new row: merging replaces an entry by id, so a correct one fetched over REST was overwritten by the invented one.",
+          "found_by": "E6",
+          "fix_commit": "bf8b50e00",
+          "control": {
+            "patch": ".review/controls/g3c2b-pin-event-painted-ciphertext.patch",
+            "runner": "vitest",
+            "tests": ["tests/unit/usePinnedMessages.test.tsx"],
+            "observed": "Two failures: expected 'v2:AAAAciphertext-cut-at-120-chars' to be 'v2:the-whole-real-ciphertext', and the refetch never happens -- expected getPinnedMessages to be called 2 times, but got 1."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope re-derived from the commits: four since the base across four source and test files plus three control patches." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records the pass 2 finding." },
+        { "id": "B1", "status": "applied", "evidence": "The send matrix and the pinned entry were both printed after their fixes and both read correctly." },
+        { "id": "B2", "status": "applied", "evidence": "The pinned bar now holds the real message or waits for the server; it never holds a truncated preview." },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "One spelling of group-v1; no version literal outside the shared rule." },
+        { "id": "C2", "status": "applied", "evidence": "The request body and the pinned entry both match what their consumers expect." },
+        { "id": "C3", "status": "applied", "evidence": "REST and websocket now agree about what a pinned message is." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "No field added in this pass." },
+        { "id": "C6", "status": "applied", "evidence": "All nine controls break a reader, and all nine fail." },
+        { "id": "C7", "status": "applied", "evidence": "Fixtures match what producers emit; the two that did not are recorded as impossible." },
+        { "id": "D1", "status": "applied", "evidence": "The complete suite passes: 188 files, 1224 tests." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal still refuses." },
+        { "id": "D3", "status": "applied", "evidence": "The absent-message and unlabelled-ciphertext boundaries are both pinned by tests." },
+        { "id": "E1", "status": "applied", "evidence": "The two Message constructions in this area now share one shape." },
+        { "id": "E2", "status": "applied", "evidence": "No unreachable branch left behind." },
+        { "id": "E3", "status": "applied", "evidence": "No failure swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "No per-item request introduced; the pin refetch happens once per event that needs it." },
+        { "id": "E5", "status": "applied", "evidence": "Nothing duplicated." },
+        { "id": "E6", "status": "applied", "evidence": "Both shapes swept and closed: one conversation_type decision in a send path, one payload-describing default, two Message constructions." },
+        { "id": "F1", "status": "na", "why": "No concurrency introduced." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing half-written on any refusal path." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "No correct cache entry can be replaced by an invented one." },
+        { "id": "G1", "status": "applied", "evidence": "Nine controls, nine real failures, replayed after the last change to any file they target." },
+        { "id": "G2", "status": "applied", "evidence": "The hooks ran on all four commits." },
+        { "id": "G3", "status": "applied", "evidence": "Every control was fed its known-bad input and refused it; the replay also checked for the opposite outcome, a control that passes, and none did." },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc silent, eslint clean, i18n:verify OK. prettier lists 17 files it would reformat and not one is a file this review touched, so there is no formatting regression."
+        },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "na", "why": "No model or provider output." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout changed." },
+        { "id": "E8", "status": "na", "why": "No process-wide state in these paths." },
+        { "id": "H2", "status": "applied", "evidence": "1224 passed and 1 skipped, the skip pre-existing and unrelated." },
+        { "id": "I1", "status": "applied", "evidence": "Every promise of this phase is enforced by a test rather than by a sentence in a commit message." },
+        { "id": "F5", "status": "na", "why": "No side effect can start twice." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "usePinnedMessages is imported widely, so the whole frontend suite ran rather than a selection: 188 files, 1224 passed, run with an explicit exit check."
+        },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        { "id": "G4", "status": "applied", "evidence": "All nine controls applied and failed after the final change, checked by a replay that reports a refusal and a pass differently." }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean; prettier clean on every file this review touched",
+    "types": "tsc -b --force",
+    "tests": "complete frontend suite: 188 files, 1224 passed, 1 pre-existing skip. Nine controls each applied and each failed on replay."
+  }
+}
