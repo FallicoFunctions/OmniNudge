@@ -1,0 +1,258 @@
+{
+  "schema_version": 2,
+  "head": "5d30e1d6a",
+  "base": "f4de50ef6",
+  "scope": {
+    "files": [
+      "frontend/src/services/groupKeyCache.ts",
+      "frontend/src/services/__tests__/groupKeyForSending.test.ts",
+      ".review/instruments.json",
+      ".review/controls/groupkeycache-unwrap-never-proven.patch",
+      ".review/controls/g3c2a-sender-fetched-state-twice.patch"
+    ],
+    "boundaries": [
+      "how many times a send asks the server for the group key state",
+      "which key version a sender seals under",
+      "the refusal when a member has published no usable key",
+      "whether a control patch is still evidence after the file it targets changes"
+    ]
+  },
+  "prior_ledgers_read": [
+    "da9ed20de -- the cache this phase extends. Its findings were a suite that mocked what it claimed to prove, and a required call nothing enforced. Both shaped how this phase was tested.",
+    "0efe747b3 -- the display rule that consumes these keys; its findings came from printing what the rule returns rather than reading it, which is the move that found this phase's first defect too.",
+    "b28df65f3 -- g1d: a stored public key is guaranteed non-empty, never usable. That is why groupKeyForSending refuses on an unusable member key rather than skipping the member.",
+    "af4bacefe -- g1c: a required call that no test reached, so a later edit could drop it unseen.",
+    "cd683f853 -- g2a: vectors pinned in one direction only."
+  ],
+  "notes": [
+    "Both findings came from printing what the code does rather than reading it. The first was a table of what groupKeyForSending does in each situation, which showed two state fetches where one was needed. The second came from re-applying every control after refactoring a file they target.",
+    "The same table showed two things that are unreachable rather than broken, and they are recorded here rather than fixed. Rotating an empty set of copies needs a group with no members, but groupMembers lists participants of a conversation the caller must belong to and State refuses a non-member, so a successful fetch always contains the sender: the probe only produced it because the mock returned an empty member list beside a successful fetch, which the server cannot do. A member holding no copy of a current version needs a damaged copy, because MarkGroupKeyStale clears is_active on every join and leave and active_version is the newest active row.",
+    "Priming the cache on every send discards that reader's record of versions it cannot open. Measured rather than assumed: two asks for an unopenable version cost one fetch, and after a send three more asks cost two. So a send costs one extra fetch, not one per message, and the record rebuilds itself."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One function deciding which key a sender seals with, plus its suite. The boundary is how often the server is asked and which version is chosen."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read da9ed20de, 0efe747b3, b28df65f3, af4bacefe and cd683f853 before starting. b28df65f3 is why the unusable-member refusal exists at all."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Found the defect. Printed a table of what groupKeyForSending does for five situations: which calls it makes, at which version, and what it returns. The common path showed states=2."
+        },
+        { "id": "B2", "status": "na", "why": "Nothing is rendered by this function." },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "The next version is latest_version + 1, and the value returned is the one the server stored, not the one requested." },
+        { "id": "C2", "status": "applied", "evidence": "The rotation body carries key_version and a copy per member, matching what GroupKeyRotation declares and what the handler binds." },
+        { "id": "C3", "status": "applied", "evidence": "The active-version path and the mint path are two routes to one answer; the table ran both and compared what each produced." },
+        { "id": "C4", "status": "na", "why": "No worker or external provider." },
+        { "id": "C5", "status": "applied", "evidence": "members carries user_id and public_key from the server and is mapped to userId and publicKey for the wrap; both halves were read rather than assumed." },
+        { "id": "C6", "status": "applied", "evidence": "The control breaks the reader: it removes the priming so the cache must fetch again, and the one-fetch assertion fails." },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Found a fixture that cannot occur: the probe's empty member list alongside a successful state fetch. The server cannot produce that, because State refuses a caller who is not in the member list."
+        },
+        { "id": "D1", "status": "applied", "evidence": "A group with a usable active version, and a group with none, both produce a key to seal with." },
+        { "id": "D2", "status": "applied", "evidence": "An unusable member key refuses and rotates nothing; no device keys refuses before touching the network." },
+        { "id": "D3", "status": "applied", "evidence": "Version zero, a version this device cannot open, and losing the race are all covered." },
+        { "id": "E1", "status": "applied", "evidence": "The server refuses rotation when a member has published no key; the client refuses for the same reason rather than skipping that member, which is the rule b28df65f3 established." },
+        { "id": "E2", "status": "applied", "evidence": "Every branch is reachable except the two recorded as unreachable in the notes." },
+        { "id": "E3", "status": "applied", "evidence": "A refusal it cannot recover from is rethrown unchanged rather than flattened into a generic failure." },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The subject of the finding: a send asked for the same state twice, which is one wasted round trip on every message after the first."
+        },
+        { "id": "E5", "status": "applied", "evidence": "The unwrap loop is shared between the fetching path and the priming path rather than copied, because collapsing a duplicate of that exact loop was a finding in this module's own review." },
+        { "id": "E6", "status": "applied", "evidence": "Deferred the sweep for the same refetch shape to pass 2." },
+        { "id": "F1", "status": "applied", "evidence": "Two members sending at once is the ordinary case; the loser takes the winner's version rather than failing." },
+        { "id": "F2", "status": "applied", "evidence": "A refused rotation writes nothing, and the sender falls back to reading the winner's version." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "forgetGroupKeys runs after every rotation, so the record of missing versions cannot outlive the grant that fixes it." },
+        { "id": "G1", "status": "applied", "evidence": "The fix is controlled, and the control produced a real assertion failure rather than a build break." },
+        { "id": "G2", "status": "applied", "evidence": "The rotation ratchet runs as an ordinary test on every run; it passes trivially for this file, which is why the forget call is proven by effect instead." },
+        { "id": "G3", "status": "applied", "evidence": "The control feeds the function the situation it must handle in one fetch, and the assertion refuses two." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "B1 already names the technique that found this: print what the code does, for more than one situation." },
+        { "id": "B5", "status": "na", "why": "No model or provider output; the crypto here is exercised for real in the cache's own real-key suite." },
+        { "id": "E7", "status": "applied", "evidence": "Nothing is started before the decision that governs it: the mint happens only after the active version is found wanting." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        { "id": "E8", "status": "applied", "evidence": "The module's maps are process-wide, and priming writes to them; the suite clears them before each test." },
+        { "id": "H2", "status": "applied", "evidence": "Each named test was read rather than counted from a summary." },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase promised that a member with no usable key blocks the send rather than being skipped. A test holds it to that: the refusal rotates nothing."
+        },
+        { "id": "F5", "status": "applied", "evidence": "Two senders can mint at the same moment; that is the race the retry exists for, and it is tested." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Ran every suite that imports the cache or the envelope helpers." },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        {
+          "id": "G4",
+          "status": "na",
+          "why": "The technique was not named yet. Pass 2 added it, after finding a control that no longer applied."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g3c2a-sender-fetched-state-twice",
+          "summary": "A send fetched the group key state twice on the common path: once to decide whether the group had an active version, and again inside the cache on the miss that followed. That is one wasted round trip on every message after the first, which is the per-item request shape the cache review removed one phase earlier, reintroduced a layer up. The cache can now be seeded with a state the caller already holds.",
+          "found_by": "B1",
+          "fix_commit": "b3ef24adf",
+          "control": {
+            "patch": ".review/controls/g3c2a-sender-fetched-state-twice.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/groupKeyForSending.test.ts"],
+            "observed": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 2 times."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope now includes primeFromState, unwrapCopies and the rewritten race path." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records the pass 1 finding." },
+        { "id": "B1", "status": "applied", "evidence": "Printed the table again: the common paths are one fetch, and losing the race is two, which is correct because the winner's version must be read." },
+        { "id": "B2", "status": "na", "why": "Nothing rendered." },
+        { "id": "B3", "status": "na", "why": "No handler." },
+        { "id": "B4", "status": "na", "why": "No query or migration." },
+        { "id": "C1", "status": "applied", "evidence": "No constant changed." },
+        { "id": "C2", "status": "applied", "evidence": "primeFromState takes the same GroupKeyState the service returns." },
+        { "id": "C3", "status": "applied", "evidence": "The primed path and the fetching path must agree about which versions are open; they share one unwrap loop, so they cannot drift." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "No field added." },
+        { "id": "C6", "status": "applied", "evidence": "All six controls were replayed, which is how the stale one was found." },
+        { "id": "C7", "status": "applied", "evidence": "The empty-members fixture was traced to the server and shown impossible, rather than defended against." },
+        { "id": "D1", "status": "applied", "evidence": "82 tests pass across the eight suites this touches." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal still refuses." },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Measured what priming costs the missing record at the boundary that matters: one extra fetch per send, not one per message."
+        },
+        { "id": "E1", "status": "applied", "evidence": "No sibling holds a defence this path lost." },
+        { "id": "E2", "status": "applied", "evidence": "No branch became unreachable." },
+        { "id": "E3", "status": "applied", "evidence": "No failure is swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "One fetch on the common path, proven by assertion rather than by reading." },
+        { "id": "E5", "status": "applied", "evidence": "One unwrap loop, shared." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept for the refetch shape: only three getGroupKeyState call sites exist, all inside the cache; groupKeyCache is the only module that caches and fetches together; and the one display caller holds no state it could prime with."
+        },
+        { "id": "F1", "status": "applied", "evidence": "Concurrent asks still collapse to one request." },
+        { "id": "F2", "status": "applied", "evidence": "Priming writes only after a successful unwrap." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "Priming clears the missing record and the cooldown, which is correct after a fresh state." },
+        { "id": "G1", "status": "applied", "evidence": "Found that a control had stopped being evidence; rebuilt it and required the original failure signature." },
+        { "id": "G2", "status": "applied", "evidence": "The hooks ran on the fix commit." },
+        { "id": "G3", "status": "applied", "evidence": "The rebuilt control was fed its known-bad input and refused it." },
+        { "id": "H1", "status": "applied", "evidence": "Gates green." },
+        { "id": "Z1", "status": "applied", "evidence": "The technique had no row, so G4 was added before the review ended." },
+        { "id": "B5", "status": "na", "why": "No model or provider output." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        { "id": "E8", "status": "applied", "evidence": "Priming writes to the module-level maps; the suite clears them between tests." },
+        { "id": "H2", "status": "applied", "evidence": "Counted named tests, not summary lines." },
+        { "id": "I1", "status": "applied", "evidence": "The phase's promise about refusing an unusable member key is unchanged and still tested." },
+        { "id": "F5", "status": "applied", "evidence": "The race path still returns the winner's version." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Eight suites run together after the change." },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Found the defect. Re-applying every control after refactoring groupKeyCache.ts showed one refused outright: git apply reported that the patch does not apply, because extracting unwrapCopies moved the line it targeted."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g3c2a-control-stopped-applying",
+          "summary": "Extracting unwrapCopies out of openMyCopies during this review moved the line that the control for groupkeycache-unwrap-never-proven was written against, so git apply refused it. That control is the one showing a mocked suite could not see the private key swapped for the public one, and it had quietly stopped being evidence. A control that cannot apply proves as little as one that passes, and reads worse, because a refusal looks like a skip rather than a failure.",
+          "found_by": "G4",
+          "fix_commit": "5d30e1d6a",
+          "control": {
+            "patch": ".review/controls/groupkeycache-unwrap-never-proven.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/groupKeyCache.real.test.ts"],
+            "observed": "Before the rebuild git apply reported: patch failed at groupKeyCache.ts:48, patch does not apply. After it, the patch applies and the mocked suite passes 11 of 11 while the real-crypto suite fails with expected null not to be null and a real TypeError from decrypt -- the signature it had when first built."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope re-derived: two source commits and one repair commit since the base." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records the pass 2 finding." },
+        { "id": "B1", "status": "applied", "evidence": "The situation table stands from pass 2; no source changed after it, only a patch file and the instrument list." },
+        { "id": "B2", "status": "na", "why": "Nothing rendered." },
+        { "id": "B3", "status": "na", "why": "No handler." },
+        { "id": "B4", "status": "na", "why": "No query or migration." },
+        { "id": "C1", "status": "applied", "evidence": "No constant changed." },
+        { "id": "C2", "status": "applied", "evidence": "No shape changed." },
+        { "id": "C3", "status": "applied", "evidence": "The two paths still share one unwrap loop." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "No field added." },
+        { "id": "C6", "status": "applied", "evidence": "Every control breaks a reader, and every one failed." },
+        { "id": "C7", "status": "applied", "evidence": "Fixtures match what the producers emit; the one that did not is recorded as impossible." },
+        { "id": "D1", "status": "applied", "evidence": "82 tests pass across eight suites." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal still refuses." },
+        { "id": "D3", "status": "applied", "evidence": "The measured boundaries hold." },
+        { "id": "E1", "status": "applied", "evidence": "No sibling defence is missing here." },
+        { "id": "E2", "status": "applied", "evidence": "No unreachable branch." },
+        { "id": "E3", "status": "applied", "evidence": "No failure swallowed." },
+        { "id": "E4", "status": "applied", "evidence": "One fetch on the common path." },
+        { "id": "E5", "status": "applied", "evidence": "Nothing duplicated." },
+        { "id": "E6", "status": "applied", "evidence": "The refetch sweep from pass 2 still holds; no new call sites exist." },
+        { "id": "F1", "status": "applied", "evidence": "Concurrent asks collapse to one." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing half-written." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "forgetGroupKeys still clears every map it owns." },
+        { "id": "G1", "status": "applied", "evidence": "Six controls, six real failures, replayed after the last change to any file they target." },
+        { "id": "G2", "status": "applied", "evidence": "The hooks ran on both commits." },
+        { "id": "G3", "status": "applied", "evidence": "Each control refused its known-bad input, and the replay also checked for the opposite failure: a control that passes with its fix reverted. None did." },
+        { "id": "H1", "status": "applied", "evidence": "prettier clean, tsc silent, eslint clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "na", "why": "No model or provider output." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        { "id": "E8", "status": "applied", "evidence": "The module-level maps are cleared between tests, and the suite passes in a full run." },
+        { "id": "H2", "status": "applied", "evidence": "82 passed, no skips in this area." },
+        { "id": "I1", "status": "applied", "evidence": "Every promise of the phase is enforced by a test rather than by a sentence." },
+        { "id": "F5", "status": "applied", "evidence": "The race is still covered." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Eight suites, 82 tests, run with an explicit exit check rather than a piped tail." },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "All six controls re-applied after the last change to the files they target. All six applied and all six failed, checked by a replay that would have reported either a refusal or a pass."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean; prettier clean on every changed file",
+    "types": "tsc -b --force",
+    "tests": "8 suites, 82 passed, run with an explicit exit check. Six controls each applied and each failed on replay."
+  }
+}
