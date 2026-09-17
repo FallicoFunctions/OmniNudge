@@ -21,6 +21,7 @@
  * saying the message cannot be read until it reloads.
  */
 import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from './groupKeysService';
+import type { GroupKeyState } from './groupKeysService';
 import { newGroupKey, unwrapGroupKey, wrapGroupKeyForMembers } from '../utils/groupKeys';
 import { getOwnKeys } from './keyManagementService';
 import type { KeyPair } from '../utils/encryption';
@@ -42,10 +43,9 @@ const FAILURE_COOLDOWN_MS = 5000;
 
 const bucket = (readerId: number, conversationId: number) => `${readerId}:${conversationId}`;
 
-/** Every version of this group's key that this device can open. */
-async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<VersionMap> {
+/** The versions in a state this device can open. */
+async function unwrapCopies(state: GroupKeyState, ownKeys: KeyPair): Promise<VersionMap> {
   const versions: VersionMap = new Map();
-  const state = await getGroupKeyState(conversationId);
   for (const copy of state.my_copies) {
     try {
       versions.set(copy.key_version, await unwrapGroupKey(copy.wrapped_key, ownKeys.privateKey));
@@ -54,6 +54,32 @@ async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<V
       console.warn('Could not open this device copy of a group key:', copy.key_version, error);
     }
   }
+  return versions;
+}
+
+/** Every version of this group's key that this device can open. */
+async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<VersionMap> {
+  return unwrapCopies(await getGroupKeyState(conversationId), ownKeys);
+}
+
+/**
+ * Store the keys in a state the caller already fetched.
+ *
+ * Without this a sender pays for the same state twice: once to decide whether
+ * the group has an active version, and again inside the cache on the miss that
+ * follows. That is one wasted round trip on every message after the first.
+ */
+async function primeFromState(
+  conversationId: number,
+  readerId: number,
+  state: GroupKeyState,
+  ownKeys: KeyPair
+): Promise<VersionMap> {
+  const versions = await unwrapCopies(state, ownKeys);
+  const key = bucket(readerId, conversationId);
+  held.set(key, versions);
+  knownMissing.delete(key);
+  failedAt.delete(key);
   return versions;
 }
 
@@ -182,8 +208,11 @@ export async function groupKeyForSending(
   }
 
   const state = await getGroupKeyState(conversationId);
+  // Seed the cache with what was just fetched, rather than letting it fetch the
+  // same state again on the miss below.
+  const opened = await primeFromState(conversationId, senderId, state, keys);
   if (state.active_version > 0) {
-    const current = await groupKeyForVersion(conversationId, state.active_version, senderId, keys);
+    const current = opened.get(state.active_version);
     if (current) return { key: current, version: state.active_version };
     // The version is current and this device cannot open it, so there is
     // nothing to seal with. Making the next one is what a sender does.
@@ -218,14 +247,10 @@ export async function groupKeyForSending(
     // Another member rotated first. Their version is the one to send under.
     forgetGroupKeys(conversationId, senderId);
     const settled = await getGroupKeyState(conversationId);
+    const theirs = await primeFromState(conversationId, senderId, settled, keys);
     if (settled.active_version > 0) {
-      const theirs = await groupKeyForVersion(
-        conversationId,
-        settled.active_version,
-        senderId,
-        keys
-      );
-      if (theirs) return { key: theirs, version: settled.active_version };
+      const winner = theirs.get(settled.active_version);
+      if (winner) return { key: winner, version: settled.active_version };
     }
     throw error;
   }

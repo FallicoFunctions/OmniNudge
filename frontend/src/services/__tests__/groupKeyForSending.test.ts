@@ -74,6 +74,9 @@ describe('groupKeyForSending', () => {
       version: 3,
     });
     expect(rotateGroupKey).not.toHaveBeenCalled();
+    // The common path: every message after the first. Asking the server twice
+    // for the same state is one wasted round trip per message.
+    expect(getGroupKeyState).toHaveBeenCalledTimes(1);
   });
 
   it('makes the next version when the group has none', async () => {
