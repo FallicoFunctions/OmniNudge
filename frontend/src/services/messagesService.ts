@@ -212,6 +212,17 @@ export const messagesService = {
     let encryptedContent = data.encrypted_content ?? data.content ?? '';
     let senderEncryptedContent =
       data.sender_encrypted_content ?? (data.content ? data.content : undefined);
+    // A caller that brings its own ciphertext must say what it is. Defaulting to
+    // plaintext labelled those bytes as readable text, which is wrong about the
+    // payload and would store group media mislabelled the moment a group caller
+    // supplies one. Every caller today passes a version; this refuses the first
+    // one that forgets rather than guessing on its behalf.
+    if (data.encrypted_content && !data.encryption_version) {
+      throw new MessageNotSent(
+        'encryption-failed',
+        'A caller supplied ciphertext without saying how it was encrypted'
+      );
+    }
     let encryptionVersion: string =
       data.encryption_version ?? (data.content ? 'plaintext' : 'none');
     let groupKeyVersion: number | undefined = data.group_key_version;
@@ -220,7 +231,20 @@ export const messagesService = {
     const ownKeys = await getOwnKeys();
 
     if (!skipClientEncryption) {
-      if (data.content && recipientId) {
+      if (data.content && conversation?.conversation_type === 'group') {
+        // Asked before the recipient test on purpose. A group message is sealed
+        // once under the group's shared key -- there is no per-reader copy, so
+        // the sender opens the same envelope as everyone else. If a group ever
+        // arrived carrying an other_user, the recipient branch below would wrap
+        // it for that one member and lock the rest of the group out, while the
+        // message still looked properly encrypted. Today that cannot happen
+        // only because user1_id is NULL for group rows, which is a column
+        // convention holding up an encryption decision.
+        const { key, version } = await groupKeyForSendingOrRefuse(conversationId, ownKeys);
+        encryptedContent = await sealGroupMessage(data.content, key, version);
+        encryptionVersion = GROUP_ENCRYPTION_VERSION;
+        groupKeyVersion = version;
+      } else if (data.content && recipientId) {
         try {
           // Fetch recipient's public key
           const publicKeys = await encryptionService.getPublicKeys([recipientId]);
@@ -247,14 +271,6 @@ export const messagesService = {
           if (error instanceof MessageNotSent) throw error;
           throw new MessageNotSent('encryption-failed', 'The message could not be encrypted');
         }
-      } else if (data.content && conversation?.conversation_type === 'group') {
-        // A group message is sealed once under the group's shared key. There is
-        // no per-reader copy, so the sender opens the same envelope as everyone
-        // else and needs no copy wrapped for themselves.
-        const { key, version } = await groupKeyForSendingOrRefuse(conversationId, ownKeys);
-        encryptedContent = await sealGroupMessage(data.content, key, version);
-        encryptionVersion = GROUP_ENCRYPTION_VERSION;
-        groupKeyVersion = version;
       } else if (data.content) {
         // Neither a direct message nor a group: nothing here can encrypt it, and
         // sending it in clear is what this whole path exists to stop.

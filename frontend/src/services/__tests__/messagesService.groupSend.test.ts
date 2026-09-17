@@ -105,6 +105,56 @@ describe('sending to a group', () => {
     expect(groupKeyForSending).not.toHaveBeenCalled();
   });
 
+  // The group test is asked before the recipient test. If a group ever arrived
+  // carrying an other_user, the recipient branch would wrap the message for that
+  // one member and lock the rest of the group out, while it still looked
+  // encrypted. Today that cannot happen only because user1_id is NULL for group
+  // rows, which is a column convention holding up an encryption decision.
+  it('seals a group even when the conversation carries an other_user', async () => {
+    const key = await newGroupKey();
+    vi.mocked(groupKeyForSending).mockResolvedValue({ key, version: 4 } as never);
+    mockApi.get.mockResolvedValueOnce({ ...asGroup(), other_user: { id: 2 } });
+    mockApi.post.mockResolvedValueOnce({ id: 1 });
+
+    await messagesService.sendMessage({ conversation_id: 9, content: SECRET });
+    const body = mockApi.post.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.encryption_version).toBe(GROUP_ENCRYPTION_VERSION);
+    expect(body.group_key_version).toBe(4);
+    await expect(openGroupMessage(body.encrypted_content as string, key)).resolves.toBe(SECRET);
+  });
+
+  // Defaulting to plaintext labelled a caller's ciphertext as readable text.
+  // Every caller passes a version today, so this refuses the first one that
+  // forgets rather than guessing on its behalf.
+  it('refuses ciphertext a caller supplies without saying how it was encrypted', async () => {
+    mockApi.get.mockResolvedValueOnce(asGroup());
+
+    await expect(
+      messagesService.sendMessage({
+        conversation_id: 9,
+        content: SECRET,
+        encrypted_content: 'somebody-elses-ciphertext',
+      })
+    ).rejects.toMatchObject({ refusal: 'encryption-failed' });
+    expect(mockApi.post).not.toHaveBeenCalled();
+  });
+
+  it('accepts ciphertext that does say how it was encrypted', async () => {
+    mockApi.get.mockResolvedValueOnce({ id: 1, conversation_type: 'dm', other_user: { id: 2 } });
+    mockApi.post.mockResolvedValueOnce({ id: 1 });
+
+    await messagesService.sendMessage({
+      conversation_id: 1,
+      encrypted_content: 'already-encrypted',
+      encryption_version: 'v2',
+    });
+    const body = mockApi.post.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.encrypted_content).toBe('already-encrypted');
+    expect(body.encryption_version).toBe('v2');
+  });
+
   it('refuses a conversation that is neither a direct message nor a group', async () => {
     mockApi.get.mockResolvedValueOnce({ id: 5, conversation_type: 'dm', other_user: undefined });
 
