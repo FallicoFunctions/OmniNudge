@@ -1,0 +1,19 @@
+diff --git a/frontend/src/hooks/useCallManager.ts b/frontend/src/hooks/useCallManager.ts
+index eae571e56..27f2e8dd2 100644
+--- a/frontend/src/hooks/useCallManager.ts
++++ b/frontend/src/hooks/useCallManager.ts
+@@ -344,14 +344,6 @@ export function useCallManager(): UseCallManagerReturn {
+         const constraints: MediaStreamConstraints =
+           callType === 'video' ? { audio: true, video: qualityConstraints } : { audio: true };
+         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+-        // cleanup has already run if the caller left while the permission
+-        // prompt was open, and it stopped a stream that had not arrived yet.
+-        // Returning here also stops an outgoing call being placed for a screen
+-        // nobody is looking at.
+-        if (!mountedRef.current) {
+-          stream.getTracks().forEach((track) => track.stop());
+-          return;
+-        }
+         setLocalStream(stream);
+ 
+         // Capture first camera device id.

@@ -1,0 +1,538 @@
+{
+  "schema_version": 2,
+  "head": "92990c8f9",
+  "base": "6e346b3fd",
+  "scope": {
+    "files": [
+      "frontend/src/hooks/useVoiceRecorder.ts",
+      "frontend/tests/unit/useVoiceRecorder.test.ts",
+      "frontend/src/hooks/useCallManager.ts",
+      "frontend/tests/unit/useCallManager.unmount.test.ts",
+      "frontend/src/hooks/useScreenShare.ts",
+      "frontend/tests/unit/useScreenShare.unmount.test.ts",
+      ".review/instruments.json"
+    ],
+    "boundaries": [
+      "who releases a MediaStream the browser returns after the permission prompt",
+      "the order of a React unmount cleanup against a pending await",
+      "whether a call is placed on the server for a screen that is gone"
+    ]
+  },
+  "prior_ledgers_read": [
+    "ba2c83dd4 -- the review this one re-examines. Its single finding was a blob URL held for the life of the page, and its E6 row swept createObjectURL sites only. Sweeping the acquisition verbs instead found three more, with far worse consequences.",
+    "51cde838c and da9ed20de -- cited by that ledger and re-read for anything about resource release. Neither records any."
+  ],
+  "notes": [
+    "This review exists because the previous one was told to go again. It went again and found three defects worse than the one it had closed on, all of one shape. The stopping condition is evidence, and the previous review stopped on the feeling of completeness: pass 2 there re-asked the instruments of the eight lines it had just written, and never asked them of the rest of the repository.",
+    "The consequence ladder matters more than the count. A blob URL wastes memory. These three leave a microphone, a camera and a screen capture live, with the operating system indicator lit, until the page is reloaded -- and the widest window of all belongs to the acquisitions that wait on a permission prompt, because they wait on a person.",
+    "useCallManager and useScreenShare had no tests whatsoever before this pass. A 600-line hook that handles calls, and a hook that shares the screen.",
+    "The guard is written four times rather than extracted, deliberately, because each site releases a different thing. If a fifth appears, extract it.",
+    "Residual, not fixed and not reachable by these tests: in switchCamera a second await (sender.replaceTrack) sits between the guard and setLocalStream, so an unmount inside that microsecond window would still orphan the new track. The realistic window is the permission prompt, which the guard now covers.",
+    "Pass 2 re-ran the sweep and came back empty, which is the difference between this ledger and the one before it: the previous pass 2 re-asked the instruments only of the lines just written. Asking them of the repository is what found three live-device leaks."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Scope is the code least reviewed in the repository: the fix written during the previous review (9aa958b82), its test, the amended instrument and the ledger. The E6 sweep then carried the review into three more hooks: useVoiceRecorder, useCallManager and useScreenShare. The boundary in every case is who releases a resource the browser handed back after an await."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read ba2c83dd4.json, the ledger this review re-examines, plus the G3c and cache ledgers it cites. None records a resource-release finding, which is why F6 did not exist until this pass."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Nothing assembles a prompt, request or message. The artifacts here are a MediaStream and a blob URL, which B5 and F6 cover."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No markup changed. The three fixed hooks return the same values to the same components; the only behavioural difference is on a path where the component is already unmounted and renders nothing."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query, migration or stored row changed."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No code, key or enum crosses a seam here."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The three hooks return unchanged shapes. Verified by tsc -b across the project and by the untouched consumers."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The repository holds two correct implementations of this rule, in useVoicePlayer and useLiveVoiceCall, and had three incorrect ones. The correct pair was read first and the fixes were written to match them rather than inventing a fourth pattern."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field was added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader broken is the release path. Each control removes the guard and the test then observes the resource never being stopped: a real assertion failure, not a compile break."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No test supplies a value that other production code mints; the streams are fixtures of the browser API, faked as the existing suite fakes them."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The real input that must pass is an ordinary recording or call: the existing useVoiceRecorder suite still starts, stops, errors and cancels (4 passed), so the guard does not refuse the normal path."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The input that must fail is a resource arriving after the view is gone. All three tests supply exactly that, by holding the permission promise open across the unmount."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary is the instant of unmount. Each test resolves the permission promise strictly after unmount, which is the worst case; the normal case resolves strictly before and is covered by the pre-existing tests."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The defence is the disposed-flag check that useVoicePlayer and useLiveVoiceCall both carry after every await. Three hooks lacked it. It is the same repository, the same pattern, and two of the three sat beside a correct one."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every new branch is reached by a test. The pre-existing branches are untouched: the guard adds a return, it does not alter any condition already there. In switchCamera and setVideoQuality the existing !newVideoTrack guard gained a second reason, and both reasons lead to the same stop-and-return."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The new returns are deliberately silent. There is nobody to tell: the view that asked is gone. No error is swallowed, because no error occurred -- permission was granted, just too late to matter."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates any of these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The guard is now written four times in three files rather than extracted. Left deliberately: each site stops a different thing (one stream, a stream plus a server call, a screen capture) and a shared helper would have to take a callback to be useful. Recorded so the next review can disagree."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Found all three findings. Starting from the blob-URL leak, grepped every acquisition of a stream in the frontend and asked the same question at each: getUserMedia (7 sites), getDisplayMedia (1), createObjectURL (19). useVoicePlayer and useLiveVoiceCall were already correct; callRecorder is released by its caller, which guards correctly; three hooks were not."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine. The shared state is a per-instance ref, and the race is with React unmount ordering rather than with a thread."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction, lock ordering or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The question that started this whole chain, asked of three more hooks: what is left behind. A microphone, a camera and a screen capture, each live until the page reloaded."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls cut, each replayed by hand after its fix was committed. All three fail with AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times -- a real assertion, and the file still compiles with the patch applied. Each fix was committed before its patch was cut, so restoring the file could not destroy work."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Proved rather than assumed, with the command CI runs. vitest list discovered 1255 tests, up from 1252, and each of the three new test names appears exactly once. useCallManager and useScreenShare had NO tests at all before this pass."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b exit 0 after each change, eslint exit 0 over all six touched files, prettier clean, i18n check and guard clean, tracked-artifact guard clean."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "A pass that found something by a technique the list did not name, so the technique was added: F6, who releases what the await returned. E6 pointed at the shape; nothing told a reviewer to enumerate the acquisition verbs and check each against its cleanup. F6 now does, and names useVoicePlayer and useLiveVoiceCall as the patterns to copy."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Applied by reasoning about what cannot be run, and then by running what can. The real consequence -- a camera or microphone indicator staying lit -- needs hardware permission that I must not grant on this account, so it was not reproduced in a live browser. What WAS run for real: the previous review's harness, in the built-in browser, proving the blob-URL path this shape came from. For these three the evidence is the control patches: each test observes zero stop() calls without the fix and exactly one with it, which is the same assertion a hardware check would make."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Applied and it sharpened two of the fixes. startCall and answerCall do more than take a stream after the await: they place a call on the server and mark it active. Returning early stops an outgoing call being created for a screen nobody is looking at, which is a second defect of the same line."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each guard was fed the thing it exists to refuse -- a stream arriving after unmount -- and refused it. Without the guard the same input passes straight through, which is what the controls demonstrate."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout, bar, header or row changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "No process-wide lazy state is read. mountedRef is per hook instance and is set true in the effect body so a StrictMode remount restores it."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted, not trusted. 34 passed and 0 skipped across the four suites. The three new tests each ran rather than skipping: they are the named passing lines in the verbose output."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "No approved plan phase is in scope. These are review findings against review-time code, not a planned phase."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Two entry points can start the same acquisition: startCall and answerCall in one hook, and start() called twice in the recorder. The guard is per acquisition rather than per hook, so each started stream is released by the continuation that took it, whichever one that is."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay, modal or full-screen step changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated with every spelling, as the amended instrument now demands, and by basename: useVoiceRecorder, useCallManager, useScreenShare, VoiceRecorderButton and CallScreen. Only three test files touch them at all. Ran all three plus the media hook: 34 passed."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Not run and not needed: no gate, overlay, redirect or inert root changed. The three fixes only add an early return on an unmounted path."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture, router or package-level registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The three fixed files had no control patch written against them before this pass, checked by grep over every patch in .review/controls. The three patches added here were each replayed after their own commit, and the previous review's control for useDecryptedMedia was left untouched because no file it targets changed."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The new instrument, and it found the second and third findings. Enumerating the acquisition verbs rather than reasoning about the code is what turned one blob-URL leak into four release bugs across three hooks."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a0r2-microphone-left-live-on-unmount",
+          "summary": "useVoiceRecorder.start awaited getUserMedia and stored the stream afterwards, so unmounting while the permission prompt was open left the cleanup stopping an empty ref -- the microphone stayed live, with an AudioContext and a 50ms interval running, until the page reloaded.",
+          "found_by": "E6",
+          "fix_commit": "c135f3d8d",
+          "control": {
+            "patch": ".review/controls/g4a0r2-microphone-left-live-on-unmount.patch",
+            "runner": "vitest",
+            "tests": [
+              "tests/unit/useVoiceRecorder.test.ts -t \"goes away before permission\""
+            ],
+            "observed": "Passes at HEAD. With the patch applied the test fails with AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times -- the device was never stopped. A real assertion failure; the file still compiles."
+          }
+        },
+        {
+          "id": "g4a0r2-call-devices-left-live-on-unmount",
+          "summary": "All four acquisitions in useCallManager handed their stream to setLocalStream after the await, and cleanup stops only what reached state, so a stream arriving after unmount had no owner: camera and microphone stayed live. startCall and answerCall also continued to place or accept a call for a screen that was gone.",
+          "found_by": "F6",
+          "fix_commit": "ee9a7906c",
+          "control": {
+            "patch": ".review/controls/g4a0r2-call-devices-left-live-on-unmount.patch",
+            "runner": "vitest",
+            "tests": [
+              "tests/unit/useCallManager.unmount.test.ts"
+            ],
+            "observed": "Passes at HEAD. With the patch applied the test fails with AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times -- the device was never stopped. A real assertion failure; the file still compiles."
+          }
+        },
+        {
+          "id": "g4a0r2-screen-capture-left-live-on-unmount",
+          "summary": "useScreenShare.startSharing assigned the captured stream to its ref only after the picker resolved, so leaving the call while choosing a window left the screen being captured with nothing able to stop it, and told the server a share had started.",
+          "found_by": "F6",
+          "fix_commit": "92990c8f9",
+          "control": {
+            "patch": ".review/controls/g4a0r2-screen-capture-left-live-on-unmount.patch",
+            "runner": "vitest",
+            "tests": [
+              "tests/unit/useScreenShare.unmount.test.ts"
+            ],
+            "observed": "Passes at HEAD. With the patch applied the test fails with AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times -- the device was never stopped. A real assertion failure; the file still compiles."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is three guards and three tests. Same boundary: who releases what the await returned."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records a resource-release finding; ba2c83dd4 was re-read before pass 1 and again here."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Nothing assembles a prompt, request or message."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No markup changed. The guarded paths render nothing because the component is gone."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Nothing persisted changed."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No code, key or enum crosses a seam."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "All three hooks return unchanged shapes; tsc -b passes across the project and no consumer changed."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The fixes were written against the five correct implementations in this repository rather than invented. Pass 2 read all five: useVoicePlayer, useLiveVoiceCall, WebSocketContext, OmniChatCallModal and OmniChatCallProvider. Each checks a disposed, released, closed or epoch flag after its await and releases what it just took."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Each control breaks the release path and the test observes zero stops. Verified by hand, three times."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture supplies a production-minted value."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The normal path still works: the pre-existing voice recorder suite starts, stops, errors and cancels, 4 passed."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The input that must be refused -- a resource arriving after unmount -- is refused at all three sites."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary is the unmount instant; each test resolves strictly after it."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The guards now match the pattern the correct five already carried. No sibling defence remains unclaimed by these three hooks."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Checked the one thing that could have made the guards unreachable or harmful: both cleanup callbacks are useCallback with EMPTY dependency arrays, so the effects they sit in are genuinely unmount-only. A non-empty array would have run cleanup mid-call on every identity change, ending live calls and toggling the flag. It does not."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The new returns are silent by design; the view that asked is gone. No error is swallowed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Still four copies of a three-line guard, still deliberate, recorded in the notes for the next review to challenge."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept the shape once more and the sweep came back empty. Every acquisition verb F6 names was enumerated: getUserMedia (7), getDisplayMedia (1), createObjectURL (19), new WebSocket (2), new AudioContext (2), new EventSource (0), setInterval and addEventListener inside async bodies (7 candidates, mechanically scanned). All are either fixed, correct, or synchronous in an effect body whose cleanup owns them."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine; the refs are per instance."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Nothing is left behind at any of the three sites now, measured once per site."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All three controls replayed by hand after their commits: three real AssertionErrors, no compile breaks."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Proved with the command CI runs: vitest list discovers 1255 tests and each new test name appears exactly once."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Final run on the finished tree: tsc -b 0, eslint 0 over all seven touched files, prettier clean."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing found this pass, so there is nothing to add. F6 was added in pass 1 and applied here."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Unchanged from pass 1 and honest about its limit: the live-hardware indicator was not reproduced, because granting camera or microphone permission on this account is not mine to do. The assertion a hardware check would make -- the track is stopped exactly once -- is what each control demonstrates."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Re-asked of the LiveKit path, which was the last plausible instance: the room is built synchronously, stored in a ref, disconnected by its own cleanup, and active is checked immediately before connect. Nothing starts before the decision that governs it."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each guard refused the known-bad input; without it the same input passes."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "mountedRef is set true in the effect body, so a StrictMode remount restores it. The false-then-true toggle happens synchronously within one commit, with no await point between, so no guard can observe the transient false."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "34 passed and 0 skipped. No test in this set can skip."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "No approved plan phase in scope."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Each acquisition is released by the continuation that took it, so two entry points cannot strand one another."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Re-enumerated with every spelling and by basename; only three test files touch the three hooks, and all ran."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "No gate, overlay, redirect or inert root changed."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The three new patches were replayed after the commits that created them. The previous review's control was left alone because no file it targets changed, re-checked by grep."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "Applied as written and found nothing further. The verbs were enumerated rather than reasoned about, which is the whole point of the instrument."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0 over all six touched files",
+    "format": "prettier --check clean",
+    "types": "tsc -b exit 0",
+    "tests": "34 passed, 0 skipped across the four suites; vitest list discovers 1255 tests, up from 1252",
+    "i18n": "i18n:check and i18n:guard clean"
+  }
+}

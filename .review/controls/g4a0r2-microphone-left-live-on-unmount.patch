@@ -1,0 +1,21 @@
+diff --git a/frontend/src/hooks/useVoiceRecorder.ts b/frontend/src/hooks/useVoiceRecorder.ts
+index beece5ccd..5cc3b24a8 100644
+--- a/frontend/src/hooks/useVoiceRecorder.ts
++++ b/frontend/src/hooks/useVoiceRecorder.ts
+@@ -108,16 +108,6 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
+       return;
+     }
+ 
+-    // Asking for the microphone waits on the person, so the recorder can be
+-    // gone by the time permission arrives. cleanup has then already run and
+-    // found an empty ref, and everything below would start against a view that
+-    // no longer exists: a live microphone, an open AudioContext and a 50ms
+-    // timer, none of which anything would ever stop.
+-    if (!mountedRef.current) {
+-      stream.getTracks().forEach((track) => track.stop());
+-      return;
+-    }
+-
+     streamRef.current = stream;
+ 
+     // Set up audio analyser for live level.
