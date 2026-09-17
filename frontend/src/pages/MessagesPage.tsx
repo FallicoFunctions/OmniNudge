@@ -2007,13 +2007,15 @@ export default function MessagesPage() {
     const decryptAllMessages = async () => {
       setIsDecryptingForSearch(true);
       const map = new Map<number, string>();
+      // Loaded once for the whole page of messages, not once per message.
+      const ownKeys = await getOwnKeys();
 
       await Promise.all(
         orderedMessages.map(async (msg) => {
           if (!msg.encrypted_content) return;
 
           const isOwn = msg.sender_id === user?.id;
-          const result = await decryptForDisplay(msg, isOwn, user?.id);
+          const result = await decryptForDisplay(msg, isOwn, user?.id, ownKeys);
           // A message that threw is left out of the map, as it always was; one
           // this device simply has no keys for still shows what is stored.
           if (result.status === 'failed') return;

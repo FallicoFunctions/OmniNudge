@@ -30,6 +30,7 @@ import type { UserProfile } from '../types/users';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { getPostUrl } from '../utils/postUrl';
 import { decryptForDisplay } from '../hooks/useDecryptedContent';
+import { getOwnKeys } from '../services/keyManagementService';
 import {
   getHiddenPostIdSet,
   getHiddenRedditPostIdSet,
@@ -646,6 +647,8 @@ export default function SearchResultsPage() {
     const decryptPreviews = async () => {
       setIsDecryptingMessagePreviews(true);
       const previews: Record<number, string> = {};
+      // Loaded once for the whole page of results, not once per result.
+      const ownKeys = await getOwnKeys();
 
       for (const message of messageResults.messages) {
         if (message.search_snippet && message.search_snippet.trim()) {
@@ -653,7 +656,12 @@ export default function SearchResultsPage() {
           continue;
         }
 
-        const result = await decryptForDisplay(message, message.sender_id === user?.id, user?.id);
+        const result = await decryptForDisplay(
+          message,
+          message.sender_id === user?.id,
+          user?.id,
+          ownKeys
+        );
         // A message with nothing stored gets no preview at all, as before.
         if (result.status === 'not-encrypted' && !result.text) continue;
         // Raw ciphertext is not an answer for somebody reading search results.

@@ -19,6 +19,7 @@
  */
 import { useEffect, useState } from 'react';
 import { decryptMessage, decryptMultiRecipientContent } from '../utils/encryption';
+import type { KeyPair } from '../utils/encryption';
 import { getOwnKeys } from '../services/keyManagementService';
 import type { Message } from '../types/messages';
 
@@ -63,8 +64,21 @@ function cipherTextFor(message: DecryptableMessage, isOwnMessage: boolean): stri
 export async function decryptForDisplay(
   message: DecryptableMessage,
   isOwnMessage: boolean,
-  currentUserId?: number
+  currentUserId?: number,
+  /**
+   * The reader's keys, when the caller already holds them. Loading them is not
+   * free -- it opens IndexedDB and imports a key -- and a caller decrypting a
+   * page of results would otherwise pay that for every message. Pass undefined
+   * to have them loaded here; pass null to say there are none.
+   */
+  ownKeys?: KeyPair | null
 ): Promise<DecryptedContent> {
+  let resolvedKeys = ownKeys;
+  const keysOnce = async (): Promise<KeyPair | null> => {
+    if (resolvedKeys === undefined) resolvedKeys = await getOwnKeys();
+    return resolvedKeys;
+  };
+
   const cipherText = cipherTextFor(message, isOwnMessage);
   if (!cipherText) return { status: 'not-encrypted', text: '' };
 
@@ -73,7 +87,7 @@ export async function decryptForDisplay(
   // copy of this did.
   if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
     try {
-      const keys = await getOwnKeys();
+      const keys = await keysOnce();
       const encryptedKey = currentUserId ? message.recipient_keys?.[currentUserId] : null;
       if (keys?.privateKey && encryptedKey) {
         const text = await decryptMultiRecipientContent(
@@ -89,6 +103,18 @@ export async function decryptForDisplay(
     }
   }
 
+  // A message this device sent, held only as the copy wrapped for the recipient.
+  // This device's key cannot open that copy, so attempting it is certain to
+  // fail -- but the raw blob is not the text either, and putting it on screen
+  // as though it were is worse than saying it cannot be read.
+  const looksEncrypted =
+    cipherText.startsWith('v2:') ||
+    message.encryption_version === 'v1' ||
+    message.encryption_version === 'v2';
+  if (isOwnMessage && !message.sender_encrypted_content && looksEncrypted) {
+    return { status: 'failed', text: cipherText };
+  }
+
   const shouldAttemptDecrypt = Boolean(
     (isOwnMessage && message.sender_encrypted_content) ||
     (!isOwnMessage &&
@@ -98,7 +124,7 @@ export async function decryptForDisplay(
   );
   if (!shouldAttemptDecrypt) return { status: 'not-encrypted', text: cipherText };
 
-  const keys = await getOwnKeys();
+  const keys = await keysOnce();
   if (!keys) return { status: 'no-keys', text: cipherText };
 
   try {

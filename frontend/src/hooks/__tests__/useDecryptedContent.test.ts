@@ -107,12 +107,58 @@ describe('decryptForDisplay', () => {
 
   // These two are separate on purpose. Conversation search shows the stored
   // value for one and leaves the message out of the list for the other.
+  // Reading a plaintext message needs no keys at all. The search results page
+  // used to load keys once above its loop and label every message when there
+  // were none, including messages that were never encrypted.
+  it('shows a message that was never encrypted, with no keys and no key load', async () => {
+    vi.mocked(getOwnKeys).mockResolvedValue(null);
+    const message = makeMessage({ encrypted_content: 'hi', encryption_version: 'plaintext' });
+    await expect(decryptForDisplay(message, false, 9)).resolves.toEqual({
+      status: 'not-encrypted',
+      text: 'hi',
+    });
+    expect(getOwnKeys).not.toHaveBeenCalled();
+  });
+
   it('says when this device holds no keys', async () => {
     vi.mocked(getOwnKeys).mockResolvedValue(null);
     await expect(decryptForDisplay(makeMessage(), false, 9)).resolves.toEqual({
       status: 'no-keys',
       text: 'v2:cipher',
     });
+  });
+
+  // The sender kept no copy of their own, so the only ciphertext is the one
+  // wrapped for the recipient. This device cannot open it. Showing that blob as
+  // if it were the message is worse than saying it cannot be read.
+  it('does not show the raw blob for an own message it cannot open', async () => {
+    haveKeys();
+    const message = makeMessage({
+      encrypted_content: 'v2:for-the-recipient',
+      sender_encrypted_content: undefined,
+      encryption_version: 'v2',
+    });
+    const result = await decryptForDisplay(message, true, 2);
+    expect(result.status).toBe('failed');
+    expect(decryptMessage).not.toHaveBeenCalled();
+  });
+
+  it('loads the reader keys once, and not at all when handed them', async () => {
+    vi.mocked(decryptMessage).mockResolvedValue('hello');
+    const handed = { privateKey: {}, publicKey: {} } as never;
+    await decryptForDisplay(makeMessage(), false, 9, handed);
+    expect(getOwnKeys).not.toHaveBeenCalled();
+
+    haveKeys();
+    const modMail = makeMessage({
+      is_multi_recipient: true,
+      shared_encryption_iv: 'iv',
+      recipient_keys: { 9: 'w' },
+    });
+    vi.mocked(decryptMultiRecipientContent).mockRejectedValue(new Error('no'));
+    await decryptForDisplay(modMail, false, 9);
+    // Once for the mod mail attempt and once for the fall-through would be two.
+    expect(vi.mocked(getOwnKeys).mock.calls.length).toBe(1);
   });
 
   it('says when opening was tried and failed', async () => {
