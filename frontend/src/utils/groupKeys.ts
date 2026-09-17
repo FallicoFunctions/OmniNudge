@@ -21,6 +21,15 @@ import {
 /** The envelope version this module writes and reads. */
 export const GROUP_SEAL_VERSION = 1;
 
+/**
+ * The encryption_version a sealed group message carries.
+ *
+ * messages.encryption_version is character varying(10), so this value has two
+ * characters to spare and a longer name would be rejected by the database
+ * rather than by review.
+ */
+export const GROUP_ENCRYPTION_VERSION = 'group-v1';
+
 export interface SealedGroupMessage {
   v: typeof GROUP_SEAL_VERSION;
   /** The group key version this was sealed under. */
