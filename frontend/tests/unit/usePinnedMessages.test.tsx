@@ -69,19 +69,32 @@ describe('usePinnedMessages', () => {
     expect(messagesService.getPinnedMessages).toHaveBeenCalledWith(55);
   });
 
-  it('applies websocket message-pinned events to pinned cache', async () => {
+  // The server builds the event's preview from the stored ciphertext, cut to
+  // 120 characters. It is neither readable text nor an openable envelope, and
+  // the old handler filed it as encryption_version 'unknown', which matches no
+  // branch in the display rule -- so the bar painted it. Merging replaces an
+  // entry by id, so a correct one fetched over REST was overwritten by it.
+  const PREVIEW = 'v2:AAAAciphertext-cut-at-120-chars';
+
+  it('pins the real message, not the ciphertext preview, when this page has it', async () => {
     vi.mocked(messagesService.getPinnedMessages).mockResolvedValue({ pinned_messages: [] });
-    const { wrapper } = createWrapper();
+    const { wrapper, queryClient } = createWrapper();
+    const real: Message = {
+      ...makePinnedMessage(99),
+      pinned: false,
+      encrypted_content: 'v2:the-whole-real-ciphertext',
+      sender_encrypted_content: 'v2:my-own-copy',
+      encryption_version: 'v2',
+    };
+    queryClient.setQueryData(['messages', 55], {
+      pages: [{ messages: [real] }],
+      pageParams: [''],
+    });
+
     const { result } = renderHook(
-      () =>
-        usePinnedMessages({
-          conversationId: 55,
-          currentUserId: 1,
-          currentUserRole: 'user',
-        }),
+      () => usePinnedMessages({ conversationId: 55, currentUserId: 1, currentUserRole: 'user' }),
       { wrapper }
     );
-
     await waitFor(() => expect(result.current.isLoadingPinned).toBe(false));
 
     act(() => {
@@ -93,7 +106,7 @@ describe('usePinnedMessages', () => {
             conversation_id: 55,
             pinned_by: 2,
             pinned_at: new Date().toISOString(),
-            preview: 'preview',
+            preview: PREVIEW,
             message_type: 'text',
           },
         })
@@ -103,6 +116,48 @@ describe('usePinnedMessages', () => {
     await waitFor(() => {
       expect(result.current.pinnedMessages.some((message) => message.id === 99)).toBe(true);
     });
+
+    const pinned = result.current.pinnedMessages.find((message) => message.id === 99);
+    expect(pinned?.encrypted_content).toBe('v2:the-whole-real-ciphertext');
+    expect(pinned?.encryption_version).toBe('v2');
+    expect(pinned?.pinned_by).toBe(2);
+    // The truncated preview must never become the message.
+    expect(pinned?.encrypted_content).not.toBe(PREVIEW);
+  });
+
+  it('asks the server instead of inventing an entry when this page lacks the message', async () => {
+    vi.mocked(messagesService.getPinnedMessages).mockResolvedValue({ pinned_messages: [] });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => usePinnedMessages({ conversationId: 55, currentUserId: 1, currentUserRole: 'user' }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.isLoadingPinned).toBe(false));
+    expect(messagesService.getPinnedMessages).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('message-pinned', {
+          detail: {
+            type: 'message_pinned',
+            message_id: 99,
+            conversation_id: 55,
+            pinned_by: 2,
+            pinned_at: new Date().toISOString(),
+            preview: PREVIEW,
+            message_type: 'text',
+          },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(messagesService.getPinnedMessages).toHaveBeenCalledTimes(2);
+    });
+    // Nothing was fabricated out of the preview while the refetch was pending.
+    expect(
+      result.current.pinnedMessages.some((message) => message.encrypted_content === PREVIEW)
+    ).toBe(false);
   });
 
   it('calls pin mutation service method', async () => {

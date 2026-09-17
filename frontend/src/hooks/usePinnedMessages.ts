@@ -199,26 +199,37 @@ export function usePinnedMessages({
       const detail = (event as CustomEvent<WsMessagePinEvent>).detail;
       if (!detail || detail.conversation_id !== conversationId) return;
 
-      const nextPinnedMessage: Message = {
-        id: detail.message_id,
-        conversation_id: detail.conversation_id,
-        sender_id: 0,
-        recipient_id: 0,
-        encrypted_content: detail.preview ?? '',
-        message_type: detail.message_type || 'text',
-        sent_at: detail.pinned_at ?? new Date().toISOString(),
-        encryption_version: 'unknown',
-        pinned: true,
-        pinned_by: detail.pinned_by ?? null,
-        pinned_at: detail.pinned_at ?? new Date().toISOString(),
-      };
+      // The event's preview is built from the stored ciphertext, cut to 120
+      // characters, so it is neither readable text nor an openable envelope --
+      // and a version of 'unknown' matches no branch in the display rule, so
+      // the bar painted those characters as if they were the message. Worse,
+      // merging replaces an entry by id, so a correct one fetched over REST was
+      // overwritten by this. Use the message this page already has, and ask the
+      // server when it has none.
+      const known = queryClient
+        .getQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>([
+          'messages',
+          conversationId,
+        ])
+        ?.pages.flatMap((page) => page.messages)
+        .find((message) => message.id === detail.message_id);
 
-      queryClient.setQueryData<PinnedMessagesResponse>(
-        ['pinnedMessages', conversationId],
-        (prev) => ({
-          pinned_messages: mergePinnedMessage(prev?.pinned_messages ?? [], nextPinnedMessage),
-        })
-      );
+      if (known) {
+        const nextPinnedMessage: Message = {
+          ...known,
+          pinned: true,
+          pinned_by: detail.pinned_by ?? null,
+          pinned_at: detail.pinned_at ?? new Date().toISOString(),
+        };
+        queryClient.setQueryData<PinnedMessagesResponse>(
+          ['pinnedMessages', conversationId],
+          (prev) => ({
+            pinned_messages: mergePinnedMessage(prev?.pinned_messages ?? [], nextPinnedMessage),
+          })
+        );
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ['pinnedMessages', conversationId] });
+      }
 
       queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
         ['messages', conversationId],
