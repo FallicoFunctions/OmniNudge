@@ -89,6 +89,9 @@ export function useCallManager(): UseCallManagerReturn {
   // Issue 1: Keep a ref to activeCall so the auto-reject timer callback
   // can read the latest value without needing it in the dependency array.
   const activeCallRef = useRef<Call | null>(null);
+  // Every acquisition below awaits the person's permission, and cleanup can only
+  // stop a stream that already reached state. See the guards after each await.
+  const mountedRef = useRef(true);
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
@@ -253,7 +256,9 @@ export function useCallManager(): UseCallManagerReturn {
           audio: false,
         });
         const newVideoTrack = newStream.getVideoTracks()[0];
-        if (!newVideoTrack) {
+        // An unmount during the wait leaves this stream with no owner: cleanup
+        // stopped the old one and will never see this.
+        if (!newVideoTrack || !mountedRef.current) {
           newStream.getTracks().forEach((t) => t.stop());
           return;
         }
@@ -292,7 +297,9 @@ export function useCallManager(): UseCallManagerReturn {
           audio: false,
         });
         const newVideoTrack = newStream.getVideoTracks()[0];
-        if (!newVideoTrack) {
+        // An unmount during the wait leaves this stream with no owner: cleanup
+        // stopped the old one and will never see this.
+        if (!newVideoTrack || !mountedRef.current) {
           newStream.getTracks().forEach((t) => t.stop());
           return;
         }
@@ -337,6 +344,14 @@ export function useCallManager(): UseCallManagerReturn {
         const constraints: MediaStreamConstraints =
           callType === 'video' ? { audio: true, video: qualityConstraints } : { audio: true };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        // cleanup has already run if the caller left while the permission
+        // prompt was open, and it stopped a stream that had not arrived yet.
+        // Returning here also stops an outgoing call being placed for a screen
+        // nobody is looking at.
+        if (!mountedRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         setLocalStream(stream);
 
         // Capture first camera device id.
@@ -380,6 +395,12 @@ export function useCallManager(): UseCallManagerReturn {
       const constraints: MediaStreamConstraints =
         callType === 'video' ? { audio: true, video: qualityConstraints } : { audio: true };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // As in startCall: the answerer may be gone before permission arrives,
+      // and answering then would mark a call active with nobody in it.
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       setLocalStream(stream);
 
       if (callType === 'video') {
@@ -608,7 +629,9 @@ export function useCallManager(): UseCallManagerReturn {
 
   // Cleanup on unmount.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       cleanup();
     };
   }, [cleanup]);
