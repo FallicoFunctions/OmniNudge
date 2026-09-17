@@ -157,4 +157,28 @@ describe('useDecryptedMedia', () => {
 
     expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:decrypted');
   });
+
+  // The test above unmounts after the decrypt has landed, which is the case that
+  // always worked. This one unmounts while it is still running: the effect's
+  // cleanup has then already run, so a blob URL made afterwards is held for the
+  // life of the page -- one whole decrypted file per file the reader scrolls
+  // past mid-decrypt.
+  it('releases the blob when the reader scrolls away before the decrypt lands', async () => {
+    let release: (blob: Blob) => void = () => {};
+    vi.mocked(decryptFile).mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        release = resolve;
+      }) as never
+    );
+
+    const { unmount } = render(message({ media_url: '/u/a.png', ...ENCRYPTED }));
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalled());
+
+    unmount();
+    release(new Blob(['plain']));
+    await waitFor(() =>
+      expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:decrypted')
+    );
+    expect(vi.mocked(globalThis.URL.createObjectURL).mock.calls).toHaveLength(1);
+  });
 });

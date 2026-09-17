@@ -97,8 +97,16 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
         );
 
         const blobUrl = URL.createObjectURL(decryptedBlob);
+        // The cleanup below has already run if the reader scrolled this file out
+        // of view while it was decrypting, so assigning it now would revoke
+        // nothing and the whole decrypted file would be held for the life of the
+        // page. useVoicePlayer settles the same race the same way.
+        if (!isMounted) {
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
         cleanup = () => URL.revokeObjectURL(blobUrl);
-        if (isMounted) setMediaSrc(blobUrl);
+        setMediaSrc(blobUrl);
       } catch (error) {
         console.warn('Could not decrypt this media file:', error);
         if (isMounted) setMediaSrc(originalUrl);
