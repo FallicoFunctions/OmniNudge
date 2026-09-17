@@ -5,7 +5,7 @@
  * on the screen.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { decryptForDisplay } from '../useDecryptedContent';
+import { decryptForDisplay, needsDecryption } from '../useDecryptedContent';
 import { decryptMessage, decryptMultiRecipientContent } from '../../utils/encryption';
 import { getOwnKeys } from '../../services/keyManagementService';
 import type { Message } from '../../types/messages';
@@ -168,5 +168,24 @@ describe('decryptForDisplay', () => {
       status: 'failed',
       text: 'v2:cipher',
     });
+  });
+});
+
+describe('needsDecryption', () => {
+  it.each([
+    ['plaintext', { encrypted_content: 'hi', encryption_version: 'plaintext' }, false, false],
+    ['v1 from other', { encrypted_content: 'c', encryption_version: 'v1' }, false, true],
+    ['v2 from other', { encrypted_content: 'c', encryption_version: 'v2' }, false, true],
+    ['prefixed only', { encrypted_content: 'v2:c', encryption_version: 'x' }, false, true],
+    ['nothing stored', { encrypted_content: '' }, false, false],
+    ['own, unreadable copy', { encrypted_content: 'v2:r', encryption_version: 'v2' }, true, true],
+    [
+      'own with sender copy',
+      { encrypted_content: 'r', sender_encrypted_content: 'v2:m', encryption_version: 'v2' },
+      true,
+      true,
+    ],
+  ])('%s', (_name, message, isOwn, expected) => {
+    expect(needsDecryption(makeMessage(message as Partial<Message>), isOwn)).toBe(expected);
   });
 });

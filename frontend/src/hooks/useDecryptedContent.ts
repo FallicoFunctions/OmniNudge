@@ -61,6 +61,29 @@ function cipherTextFor(message: DecryptableMessage, isOwnMessage: boolean): stri
     : message.encrypted_content;
 }
 
+/**
+ * Whether this message needs keys and an await before it can be shown. Pure, so
+ * a surface can paint text that needs no decryption immediately instead of
+ * after a round trip. Both surfaces that lacked this painted the ciphertext
+ * first and replaced it a moment later, which is a blob on screen either way.
+ */
+export function needsDecryption(message: DecryptableMessage, isOwnMessage: boolean): boolean {
+  const cipherText = cipherTextFor(message, isOwnMessage);
+  if (!cipherText) return false;
+  if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
+    return true;
+  }
+  const looksEncrypted =
+    cipherText.startsWith('v2:') ||
+    message.encryption_version === 'v1' ||
+    message.encryption_version === 'v2';
+  // Held only as the recipient copy: unreadable here, but not plain text either.
+  if (isOwnMessage && !message.sender_encrypted_content && looksEncrypted) return true;
+  return Boolean(
+    (isOwnMessage && message.sender_encrypted_content) || (!isOwnMessage && looksEncrypted)
+  );
+}
+
 export async function decryptForDisplay(
   message: DecryptableMessage,
   isOwnMessage: boolean,

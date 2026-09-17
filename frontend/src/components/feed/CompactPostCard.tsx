@@ -9,8 +9,7 @@ import { ImageCarousel } from './ImageCarousel';
 import { ExpandedPost } from './ExpandedPost';
 import { ExpandedMessage } from './ExpandedMessage';
 import { useAuth } from '../../contexts/AuthContext';
-import { decryptMessage, decryptMultiRecipientContent } from '../../utils/encryption';
-import { getOwnKeys } from '../../services/keyManagementService';
+import { useDecryptedContent } from '../../hooks/useDecryptedContent';
 import { hubsService } from '../../services/hubsService';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
@@ -68,6 +67,12 @@ type PostWithMedia = {
   hub?: { name?: string | null } | null;
 };
 
+/** A stable stand-in, so the hook below is never called conditionally. */
+const NO_MESSAGE = {
+  encrypted_content: '',
+  encryption_version: 'none',
+} as unknown as Message;
+
 function DecryptedMessagePreview({
   message,
   isOwnMessage,
@@ -77,80 +82,7 @@ function DecryptedMessagePreview({
   isOwnMessage: boolean;
   userId?: number;
 }) {
-  const [preview, setPreview] = useState('');
-
-  useEffect(() => {
-    if (!message) {
-      setPreview('');
-      return;
-    }
-    const cipherText = isOwnMessage
-      ? (message.sender_encrypted_content ?? message.encrypted_content)
-      : message.encrypted_content;
-
-    if (!cipherText) {
-      setPreview('');
-      return;
-    }
-
-    setPreview(cipherText);
-
-    const attemptDecryption = async () => {
-      if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
-        try {
-          const keys = await getOwnKeys();
-          const encryptedKey = userId ? message.recipient_keys?.[userId] : null;
-          if (keys?.privateKey && encryptedKey) {
-            const decrypted = await decryptMultiRecipientContent(
-              cipherText,
-              encryptedKey,
-              message.shared_encryption_iv,
-              keys.privateKey
-            );
-            setPreview(decrypted);
-            return;
-          }
-        } catch (error) {
-          console.warn('Failed to decrypt multi-recipient preview:', error);
-        }
-      }
-
-      const shouldAttemptDecrypt = Boolean(
-        (isOwnMessage && message.sender_encrypted_content) ||
-        (!isOwnMessage && message.encryption_version === 'v1')
-      );
-
-      if (!shouldAttemptDecrypt) {
-        setPreview(cipherText);
-        return;
-      }
-
-      try {
-        const keys = await getOwnKeys();
-        if (!keys) {
-          setPreview(cipherText);
-          return;
-        }
-        const decrypted = await decryptMessage(cipherText, keys.privateKey);
-        setPreview(decrypted);
-      } catch (error) {
-        console.warn('Failed to decrypt preview, showing ciphertext:', error);
-        setPreview(cipherText);
-      }
-    };
-
-    attemptDecryption();
-  }, [
-    message,
-    isOwnMessage,
-    message?.encrypted_content,
-    message?.sender_encrypted_content,
-    message?.encryption_version,
-    message?.is_multi_recipient,
-    message?.shared_encryption_iv,
-    message?.recipient_keys,
-    userId,
-  ]);
+  const preview = useDecryptedContent(message ?? NO_MESSAGE, isOwnMessage, userId);
 
   if (!preview) {
     return null;

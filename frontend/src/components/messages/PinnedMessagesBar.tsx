@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { decryptForDisplay, needsDecryption } from '../../hooks/useDecryptedContent';
+import { getOwnKeys } from '../../services/keyManagementService';
 import type { Message } from '../../types/messages';
 
 interface PinnedMessagesBarProps {
@@ -15,12 +17,65 @@ interface PinnedMessagesBarProps {
 
 const COLLAPSED_VISIBLE_COUNT = 3;
 
-const previewText = (message: Message): string => {
+/**
+ * The bar showed message.encrypted_content directly, so every pinned encrypted
+ * message appeared as ciphertext, in the row and in its title attribute.
+ */
+function useDecryptedPreviews(messages: Message[], currentUserId?: number): Map<number, string> {
+  const [texts, setTexts] = useState<Map<number, string>>(new Map());
+
+  const pending = useMemo(
+    () =>
+      messages.filter(
+        (message) =>
+          message.message_type === 'text' &&
+          needsDecryption(message, message.sender_id === currentUserId)
+      ),
+    [messages, currentUserId]
+  );
+
+  useEffect(() => {
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      // Once for the whole bar, not once per pinned message.
+      const ownKeys = await getOwnKeys();
+      const next = new Map<number, string>();
+      for (const message of pending) {
+        const result = await decryptForDisplay(
+          message,
+          message.sender_id === currentUserId,
+          currentUserId,
+          ownKeys
+        );
+        if (result.status === 'decrypted') next.set(message.id, result.text);
+      }
+      if (!cancelled) setTexts(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pending, currentUserId]);
+
+  return texts;
+}
+
+const previewText = (
+  message: Message,
+  decrypted: Map<number, string>,
+  currentUserId: number | undefined,
+  encryptedLabel: string
+): string => {
   if (message.message_type !== 'text') {
     return `[${message.message_type}]`;
   }
 
-  const content = message.encrypted_content || '';
+  // Text that needs no keys is shown at once; anything else waits, and says so
+  // rather than showing the stored blob.
+  const content = needsDecryption(message, message.sender_id === currentUserId)
+    ? (decrypted.get(message.id) ?? encryptedLabel)
+    : message.encrypted_content || '';
+
   if (content.length <= 80) {
     return content;
   }
@@ -43,6 +98,9 @@ export function PinnedMessagesBar({
     () => (expanded ? pinnedMessages : pinnedMessages.slice(0, COLLAPSED_VISIBLE_COUNT)),
     [expanded, pinnedMessages]
   );
+
+  const decryptedPreviews = useDecryptedPreviews(visibleMessages, currentUserId);
+  const encryptedLabel = t('messages.encrypted');
 
   if (pinnedMessages.length === 0) {
     return null;
@@ -87,9 +145,11 @@ export function PinnedMessagesBar({
                 type="button"
                 onClick={() => onJumpToMessage(message.id)}
                 className="min-w-0 flex-1 text-left text-xs text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                title={previewText(message)}
+                title={previewText(message, decryptedPreviews, currentUserId, encryptedLabel)}
               >
-                <span className="block truncate">{previewText(message)}</span>
+                <span className="block truncate">
+                  {previewText(message, decryptedPreviews, currentUserId, encryptedLabel)}
+                </span>
               </button>
               {canUnpin && (
                 <button

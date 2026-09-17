@@ -1,0 +1,13 @@
+diff --git a/frontend/src/hooks/useDecryptedContent.ts b/frontend/src/hooks/useDecryptedContent.ts
+index c83d2b4a7..07b955b0c 100644
+--- a/frontend/src/hooks/useDecryptedContent.ts
++++ b/frontend/src/hooks/useDecryptedContent.ts
+@@ -111,7 +111,7 @@ export async function decryptForDisplay(
+     cipherText.startsWith('v2:') ||
+     message.encryption_version === 'v1' ||
+     message.encryption_version === 'v2';
+-  if (isOwnMessage && !message.sender_encrypted_content && looksEncrypted) {
++  if (false && isOwnMessage && !message.sender_encrypted_content && looksEncrypted) {
+     return { status: 'failed', text: cipherText };
+   }
+ 
