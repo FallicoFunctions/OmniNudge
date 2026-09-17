@@ -38,6 +38,20 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe('rotating a group key', () => {
+  // The guard answers "no offenders" either when there are none or when it read
+  // nothing at all. Those look identical from the assertion below, and this
+  // repository has already shipped a check that passed for months because it
+  // was pointed at an empty project. So prove the scan sees the tree first.
+  it('actually reads the source tree it claims to check', () => {
+    const files = sourceFiles(SRC).map((file) => relative(process.cwd(), file));
+
+    expect(files.length).toBeGreaterThan(50);
+    expect(files).toContain(join('src', 'services', 'groupKeysService.ts'));
+    expect(files).toContain(join('src', 'services', 'groupKeyCache.ts'));
+    // Tests are excluded, so the file this rule exists for must not appear.
+    expect(files.some((file) => file.includes('__tests__'))).toBe(false);
+  });
+
   it('is never done by a module that does not also forget the cached keys', () => {
     const offenders = sourceFiles(SRC)
       .filter((file) => relative(process.cwd(), file) !== DECLARES_IT)

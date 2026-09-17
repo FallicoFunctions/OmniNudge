@@ -1,0 +1,10 @@
+diff --git a/frontend/src/services/__probe__/rotatesWithoutForgetting.ts b/frontend/src/services/__probe__/rotatesWithoutForgetting.ts
+new file mode 100644
+index 000000000..b9c9204c4
+--- /dev/null
++++ b/frontend/src/services/__probe__/rotatesWithoutForgetting.ts
+@@ -0,0 +1,4 @@
++import { rotateGroupKey } from '../groupKeysService';
++
++/** Rotates and never forgets the cached keys. The ratchet must refuse this. */
++export const probe = () => rotateGroupKey(1, { key_version: 1, copies: {} });
