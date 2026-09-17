@@ -1,17 +1,17 @@
 diff --git a/frontend/src/services/groupKeyCache.ts b/frontend/src/services/groupKeyCache.ts
-index cce446212..083c7b689 100644
+index 36bf5330c..0ea03b992 100644
 --- a/frontend/src/services/groupKeyCache.ts
 +++ b/frontend/src/services/groupKeyCache.ts
-@@ -208,11 +208,8 @@ export async function groupKeyForSending(
+@@ -218,11 +218,8 @@ export async function groupKeyForSending(
    }
  
    const state = await getGroupKeyState(conversationId);
 -  // Seed the cache with what was just fetched, rather than letting it fetch the
 -  // same state again on the miss below.
--  const opened = await primeFromState(conversationId, senderId, state, keys);
+-  const opened = await primeFromState(conversationId, state, keys);
    if (state.active_version > 0) {
 -    const current = opened.get(state.active_version);
-+    const current = await groupKeyForVersion(conversationId, state.active_version, senderId, keys);
++    const current = await groupKeyForVersion(conversationId, state.active_version, keys);
      if (current) return { key: current, version: state.active_version };
      // The version is current and this device cannot open it, so there is
      // nothing to seal with. Making the next one is what a sender does.
