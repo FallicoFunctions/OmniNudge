@@ -1,0 +1,582 @@
+{
+  "schema_version": 2,
+  "head": "c3f98b3c5",
+  "base": "0a4bb3a71",
+  "scope": {
+    "files": [
+      "frontend/src/services/messagesService.ts",
+      "frontend/src/utils/messageSendErrors.ts",
+      "frontend/src/utils/__tests__/messageSendErrors.test.ts",
+      "frontend/src/hooks/useMessageEdit.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/modmail/ModMailModal.tsx",
+      "frontend/src/components/modmail/__tests__/ModMailModal.test.tsx",
+      "frontend/public/locales/en.json",
+      "frontend/tests/unit/messagesService.editing.test.ts",
+      "frontend/tests/unit/useMessageEdit.test.tsx",
+      "frontend/tests/integration/messagingFlows.test.tsx"
+    ],
+    "boundaries": [
+      "the POST /messages body the server receives",
+      "the PATCH /messages/:id body the server receives",
+      "the refusal a sender sees when a message cannot be encrypted",
+      "EditMessageRequest across TypeScript and Go",
+      "the English text shown when encryption is refused"
+    ]
+  },
+  "prior_ledgers_read": [
+    "9803e5f57 -- fe-silent-429: a send refused by the rate limit left the message unsent with nothing on screen, because the error handler read only 403 and 404. That is the same defect class this phase widens: a refusal that reaches nobody. It is why R2 was looked for at all.",
+    "7c62d192b -- no findings recorded; consulted for messagesService history.",
+    "a4d23fcc1 -- k5a: auth flow integration tests still mocked the old key services after the code moved, and main stayed red for five pushes. That ledger is why H3 was run early here rather than at the end, which is what caught the fixture defect.",
+    "8bc3efc78 -- k5b used E6 to follow a shape into its neighbours; the same move found four of this review's six findings."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "G3b removed three plaintext fallbacks from messagesService.sendMessage, widened messageSendErrorKey from a status to an error, added one locale key and changed the MessagesPage onError call site. Boundaries crossed: the POST body, and the refusal shown to the sender."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 9803e5f57, 7c62d192b and a4d23fcc1 before touching anything. fe-silent-429 in the first is the same class of defect as R2 and named it in advance; a4d23fcc1 is why the importer suites were run early."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Deferred to pass 2, where it was run properly for three inputs. In this pass only the code was read, which is exactly why the body defect survived pass 1."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Read the text the user receives for each refusal. modMailModal.encryption.noParticipants still read 'sending plaintext' after the code stopped doing it -- finding g3b-warning-promised-plaintext."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed in this pass. The Go side was read (handlers/messages.go EditMessage) but not modified."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the edit-history INSERT at handlers/messages.go:1653. It writes currentEncryptedContent into both the content and encrypted_content columns, never req.Content -- the evidence that the plaintext field was dead on arrival."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The refusal codes are a TypeScript union (SendRefusal) mapped to locale keys in one record; no literal is spelled twice. No cross-language code was added this phase."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "messageSendErrorKey now receives the error rather than error.status. A refusal never reaches the server and carries no status, so reading the status alone returned undefined and the page showed nothing -- the field the caller read was not the field the sender set."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "sendMessage and editMessage are two implementations of one rule (never send in clear). They disagreed: send refused, edit fell back. Finding g3b-edit-downgrades-to-plaintext."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external provider is involved in sending or editing a message."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No field was added to a struct crossing a boundary this phase. The reverse was checked instead: EditMessageRequest.Content is declared in Go and read by nothing."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader was mutated, not only the field: the control for R2 removes the alert and the test fails, and the control for the fixture reverts only the mock so the strengthened assertion has to catch it."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The integration fixture keyed its public-key map to user 1 while every conversation fixture returns other_user 2, so getPublicKeys never matched what production would return. Finding g3b-fixture-recipient-mismatch."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A normal DM send and a normal edit both still produce v2 ciphertext; 13 suites and 76 tests pass."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The inputs this code exists to refuse -- no recipient key, an unreadable key, no own keys, a throw from encryptMessage -- now all refuse on both the send and the edit path, asserted by tests."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Empty content is the boundary that matters here: a voice message sends encryption_version 'none' with empty content, and the guard is written as `if (data.content)` so it leaves that path alone."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Asked what the neighbouring senders do that this one does not. ExpandedMessage alerts and returns on a missing key; ModMailModal's two later refusals throw. editMessage and ModMailModal's first branch did neither -- two findings."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Making ModMailModal's first branch throw made the whole non-encrypted request branch unreachable. That branch and its half of the return type were removed rather than left as dead code."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "useMessageEdit's onError rolled the optimistic edit back and told the user nothing, and the MessagesPage call site left the rejection unhandled. Finding g3b-refused-edit-is-silent."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "skipClientEncryption gates the whole encryption block. Checked that callers supplying their own encrypted_content (ExpandedMessage, MessagesPage media, ModMail) are unaffected by the new refusals."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The refusal-to-locale-key mapping exists once, in REFUSAL_KEYS. useMessageEdit reuses messageSendErrorKey rather than repeating the mapping."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Followed the plaintext-fallback shape out of sendMessage into every sibling: editMessage, ModMailModal, ModMailConversationPage, ExpandedMessage, ColumnFeed, WebSocketContext. Two were defective; the rest already refused."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state; this is client-side request construction."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "The refusals throw before api.post or api.patch is called, so a partial failure leaves nothing written. The edit's optimistic cache update is rolled back by onError, asserted by a test."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration in this scope."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A refused edit leaves nothing behind: no PATCH is sent and the optimistic cache entry is restored to the prior ciphertext."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Five controls built and replayed by hand; each produced a real assertion failure, not a build break. The artifact was printed once more before closing and showed no plaintext field in either body."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The i18n guard is wired into the commit hook and ran on every commit here. Confirmed it counts only literal-string alerts, so alert(t(key)) is invisible to it -- which is why R2's alert does not trip it."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b --force silent, eslint clean, i18n:verify OK after every edit."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Every technique used here already has a row: E1, E6, E3, C7, H3, B2. No new instrument needed in this pass."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "Nothing in this change produces output through a model, a provider or another system. No prompt or model input was touched."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Checked what starts before the refusal decides. The media upload in MessagesPage does start before encryption is settled, but no send or upload is started by the paths changed here: every refusal throws before any request."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the i18n guard and the tests the thing they exist to refuse. Each of the five controls is a known-bad input replayed against its own test."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Nothing was added to a shared bar, header, toolbar or row; no layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide state is read lazily here; no working directory, environment variable, clock or sync.Once."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Ran with a verbose reporter and counted: 7 named tests in messagingFlows, all reported individually. Nothing skipped silently -- the one skip in the wider run is a pre-existing skip in MessagesPage.test.tsx."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's sentence for this phase was 'no message anywhere is sent in clear because encryption failed', and 'also fix DMs'. Held the code to the word anywhere, which is what sent the review into editMessage and mod mail rather than stopping at sendMessage."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Listed every caller that can start a send: MessagesPage (three), ExpandedMessage, ColumnFeed, ModMailConversationPage. None starts the same side effect concurrently with another; each is a distinct user action."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No fixed overlay, modal or full-screen step was added. The refusal uses the alert already used by the send path."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "messagesService's behaviour changed, so every test importing it was run rather than only the tests beside the change. That is what caught the fixture defect: TestSendMessage failed at HEAD and passed with the two source files reverted."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "The new alert fires only on a failed edit, and no signed-in Playwright spec edits a message. MessagesPage already alerted on a failed send before this change, so nothing new can cover the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No route, handler or package-level fixture was added. The new tests are self-contained files with their own mocks."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g3b-fixture-recipient-mismatch",
+          "summary": "The integration fixture keyed its public-key map to user 1 while every conversation fixture returns other_user 2, so getPublicKeys never matched and TestSendMessage had been exercising the plaintext fallback all along, asserting only conversation_id.",
+          "found_by": "H3",
+          "fix_commit": "552091d43",
+          "control": {
+            "patch": ".review/controls/g3b-fixture-recipient-mismatch.patch",
+            "runner": "vitest",
+            "tests": ["tests/integration/messagingFlows.test.tsx -t 'TestSendMessage'"],
+            "observed": "FAIL: 1 failed, 6 skipped. The send throws MessageNotSent because the key map answers undefined for the recipient the fixture actually uses."
+          }
+        },
+        {
+          "id": "g3b-edit-downgrades-to-plaintext",
+          "summary": "editMessage fell back to plaintext on a missing key, an unreadable key and any throw, then PATCHed anyway -- stripping the protection from a message that had been sent encrypted.",
+          "found_by": "E6",
+          "fix_commit": "552091d43",
+          "control": {
+            "patch": ".review/controls/g3b-edit-downgrades-to-plaintext.patch",
+            "runner": "vitest",
+            "tests": ["tests/unit/messagesService.editing.test.ts -t 'refuses to edit'"],
+            "observed": "AssertionError: promise resolved \"undefined\" instead of rejecting -- the edit went out in clear instead of refusing."
+          }
+        },
+        {
+          "id": "g3b-refused-edit-is-silent",
+          "summary": "useMessageEdit rolled the optimistic edit back and showed nothing, so an edit refused for want of encryption read exactly like an edit that never happened.",
+          "found_by": "E3",
+          "fix_commit": "552091d43",
+          "control": {
+            "patch": ".review/controls/g3b-refused-edit-is-silent.patch",
+            "runner": "vitest",
+            "tests": ["tests/unit/useMessageEdit.test.tsx -t 'names the reason'"],
+            "observed": "AssertionError: expected \"vi.fn()\" to be called with arguments -- the alert never fires, the user is told nothing."
+          }
+        },
+        {
+          "id": "g3b-modmail-sends-raw-message",
+          "summary": "ModMailModal returned the raw message with encryption_version 'plaintext' when no participant could be encrypted for, while its two sibling refusals threw.",
+          "found_by": "E6",
+          "fix_commit": "552091d43",
+          "control": {
+            "patch": ".review/controls/g3b-modmail-sends-raw-message.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/modmail/__tests__/ModMailModal.test.tsx -t 'sends nothing'"
+            ],
+            "observed": "AssertionError: expected the rendered text to contain the refusal warning -- instead the modal posted the message and reported success."
+          }
+        },
+        {
+          "id": "g3b-warning-promised-plaintext",
+          "summary": "The English warning for that branch still read 'sending plaintext' after the code stopped sending anything at all.",
+          "found_by": "B2",
+          "fix_commit": "552091d43",
+          "control": {
+            "patch": ".review/controls/g3b-warning-promised-plaintext.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/modmail/__tests__/ModMailModal.test.tsx -t 'does not promise'"
+            ],
+            "observed": "AssertionError: expected 'no participants found to encrypt the ...' not to contain 'plaintext'."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Scope after pass 1 is larger than the scope before it: five fixes and two new test files, none of which anybody had reviewed. That is what this pass covers."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Re-read against 9803e5f57's fe-silent-429 to confirm the new refusal path does not repeat it: every refusal now maps to a locale key, and the fallback key covers the errors it cannot name."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the real request bodies for three materially different inputs: a DM send, a group send with no other_user, and a DM edit. The edit body carried \"content\": \"seven\" beside the ciphertext. Finding g3b-edit-body-carried-plaintext. Reading the code had not shown it in pass 1."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Re-read the corrected warning text and the new editFailed string; both describe what the code now does."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read the Go handler that receives the printed body: EditMessage binds Content as an optional pointer and never reads it, and the response is unaffected by its absence."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the edit-history INSERT and the UPDATE. The history row stores the message's existing ciphertext in both columns; the UPDATE sets only the encrypted fields. Nothing reads the plaintext, so removing it changes no stored row."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Checked the field names across the seam: encrypted_content, sender_encrypted_content and encryption_version are spelled identically in the TypeScript body and the Go struct tags."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The Go struct's Content is *string with omitempty and no binding:\"required\", so the shape the caller now sends still satisfies the shape the server expects."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Compared the two bodies for the same content side by side. The send had never carried a content field and the edit did -- two implementations of one rule, disagreeing, which is precisely what made the leak visible."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or provider contract involved." },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The removed field was hand-written into the body literal, not generated. Confirmed no other line in the service adds it back."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The new assertion reads the body back through the mock and requires that no value equals the plaintext, rather than only naming the three fields that should be there."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The artifact script mints its inputs the way production does -- a real conversation fixture with other_user, a real recipient id -- rather than hand-writing a body."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A normal send and a normal edit still produce v2 ciphertext in both fields."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Re-ran the refusal inputs against the fixed code: all still refuse, and none reaches api.patch."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Checked the group input, where recipientId is undefined: it takes the documented G3c branch rather than falling into a refusal, so group sending is not broken between commits."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The send body was the sibling that proved the edit body wrong: it sends no content field and always has."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Confirmed the removed ModMail branch is unreachable and that removing it left no other caller depending on the union's second member."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Checked every consumer of the new throws: MessagesPage names the reason on send, useMessageEdit on edit, ColumnFeed shows a generic send error. None swallows silently."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Re-checked skipClientEncryption against the new edit refusals: editMessage has no such gate, so no caller bypasses them."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The plaintext-field rule is asserted in one place rather than repeated across the body's three field assertions."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept every service for the same shape -- a plaintext field beside a ciphertext one in a request body. No other occurrence: the remaining content: hits are function parameters in hubsService and omnichatService, which are not end-to-end encrypted."
+        },
+        { "id": "F1", "status": "na", "why": "No concurrency introduced." },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "The removal changes nothing transactional: the handler's transaction reads the message, writes history from stored values and updates the encrypted columns."
+        },
+        { "id": "F3", "status": "na", "why": "No migration in this scope." },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "No orphan: the field removed was never persisted from the request."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control built and replayed: restoring the field fails the edit test with a real assertion error. The bodies were then printed once more and both came back with no plaintext field."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The commit hook ran the artifact guard, the CI checks and i18n:verify on each of the two review commits."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b silent, eslint clean, i18n:verify OK."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "The technique that found the leak -- print the body and compare it with the sibling body for the same input -- is already B1 combined with E1. No new row required."
+        },
+        { "id": "B5", "status": "na", "why": "No model or provider output in this change." },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing is started before the refusal: both refusals throw before api.patch."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The control is the known-bad input: the field restored, replayed against its own test, which fails."
+        },
+        { "id": "B6", "status": "na", "why": "No layout change." },
+        { "id": "E8", "status": "na", "why": "No process-wide lazy state." },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted passes rather than trusting 'ok': 17 tests across the three edit-related suites, none skipped."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan says no message travels in clear. A body carrying the plaintext beside the ciphertext travels in clear even though the message is encrypted, so the promise covers it."
+        },
+        { "id": "F5", "status": "applied", "evidence": "No new entry point to the edit side effect." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran the remaining importers not covered in pass 1 -- useArchive, usePinnedMessages, MainLayout, ThreadView -- all pass."
+        },
+        { "id": "H4", "status": "na", "why": "No screen-covering change; see pass 1." },
+        { "id": "H5", "status": "na", "why": "No shared fixture touched." }
+      ],
+      "findings": [
+        {
+          "id": "g3b-edit-body-carried-plaintext",
+          "summary": "The PATCH body sent the plaintext in a content field beside the ciphertext. The server never reads it: the edit-history row stores the message's own ciphertext and the UPDATE touches only the encrypted columns, so the cleartext crossed the network, and every log along it, to be dropped on arrival.",
+          "found_by": "B1",
+          "fix_commit": "c3f98b3c5",
+          "control": {
+            "patch": ".review/controls/g3b-edit-body-carried-plaintext.patch",
+            "runner": "vitest",
+            "tests": [
+              "tests/unit/messagesService.editing.test.ts -t 'edits message with encrypted payload'"
+            ],
+            "observed": "AssertionError: expected \"vi.fn()\" to be called with arguments: [ '/messages/99', { ...(3) } ] -- the body has a fourth field holding the plaintext."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Scope re-derived from the commits: 0a4bb3a71, 552091d43, c3f98b3c5 across 11 files and 5 boundaries. No file changed since pass 2 other than the one-line body removal and its test."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records either finding of pass 2, so nothing here is a re-fix."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed both bodies a third time, after the fix, with an explicit leak check: plaintext fields in send: [], plaintext fields in edit: []."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Both changed strings read correctly and neither promises a behaviour the code no longer has."
+        },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        { "id": "C1", "status": "applied", "evidence": "Field names still match across the seam." },
+        { "id": "C2", "status": "applied", "evidence": "The three-field body satisfies the Go struct; only the required encrypted_content is mandatory." },
+        { "id": "C3", "status": "applied", "evidence": "Send and edit now agree on the rule: neither carries a plaintext field, and both refuse rather than downgrade." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "applied", "evidence": "No field added anywhere this pass." },
+        { "id": "C6", "status": "applied", "evidence": "All six controls replayed; every one produced a real assertion failure." },
+        { "id": "C7", "status": "applied", "evidence": "The fixture now mints the recipient the way production resolves it, and asserts the version the production path produces." },
+        { "id": "D1", "status": "applied", "evidence": "76 tests pass across 13 suites." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal input still refuses." },
+        { "id": "D3", "status": "applied", "evidence": "Empty content and the group branch both still behave as documented." },
+        { "id": "E1", "status": "applied", "evidence": "Swept the remaining senders -- ColumnFeed, ModMailConversationPage, ExpandedMessage, WebSocketContext -- and found no sibling still carrying a defence these paths lack." },
+        { "id": "E2", "status": "applied", "evidence": "No branch left unreachable by this pass's change." },
+        { "id": "E3", "status": "applied", "evidence": "Every refusal reaches a person: alert on send, alert on edit, composer error in ColumnFeed." },
+        { "id": "E4", "status": "applied", "evidence": "No conditional excludes these paths." },
+        { "id": "E5", "status": "applied", "evidence": "Nothing duplicated." },
+        { "id": "E6", "status": "applied", "evidence": "The plaintext-beside-ciphertext sweep across all of src/services and src/hooks returned nothing further." },
+        { "id": "F1", "status": "na", "why": "No concurrency." },
+        { "id": "F2", "status": "applied", "evidence": "Refusals precede every request; nothing half-written." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "A refused edit leaves no trace, and the cache is restored." },
+        { "id": "G1", "status": "applied", "evidence": "Six controls, six real failures, artifact reprinted after the last fix." },
+        { "id": "G2", "status": "applied", "evidence": "The commit hook invoked the guards automatically on all three commits." },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b --force silent; eslint clean; i18n:verify OK; prettier --list-different names 17 files and not one of them is a file G3b or this review touched, so there is no formatting regression."
+        },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "na", "why": "Nothing in this change produces output through a model or another system." },
+        { "id": "E7", "status": "applied", "evidence": "No side effect starts before the decision that governs it." },
+        { "id": "G3", "status": "applied", "evidence": "All six known-bad inputs replayed and refused correctly." },
+        { "id": "B6", "status": "na", "why": "No layout change." },
+        { "id": "E8", "status": "na", "why": "No process-wide lazy state." },
+        { "id": "H2", "status": "applied", "evidence": "76 passed, 1 skipped, and the single skip is pre-existing in MessagesPage.test.tsx, unrelated to encryption." },
+        { "id": "I1", "status": "applied", "evidence": "Every promise of the phase is now kept on both the send and the edit path, in the message and in the request that carries it." },
+        { "id": "F5", "status": "applied", "evidence": "No entry point can run these side effects twice at once." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "All 13 suites importing the changed modules run together: 76 passed." },
+        { "id": "H4", "status": "na", "why": "No screen-covering change." },
+        { "id": "H5", "status": "na", "why": "No shared fixture touched." }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean on src/ and tests/; prettier clean on every file in scope (the 17 files it would reformat are all pre-existing and outside this change)",
+    "types": "tsc -b --force",
+    "tests": "13 suites, 76 passed, 1 pre-existing skip; 6 controls each replayed to a real assertion failure"
+  }
+}
