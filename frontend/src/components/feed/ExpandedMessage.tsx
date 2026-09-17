@@ -5,12 +5,10 @@ import { messagesService } from '../../services/messagesService';
 import { mediaService } from '../../services/mediaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
+import { useDecryptedMedia } from '../../hooks/useDecryptedMedia';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import { API_BASE_URL } from '../../lib/api';
-import { authenticatedFetch } from '../../services/authSession';
 import {
   encryptFile,
-  decryptFile,
   encryptKeyWithPublicKey,
   arrayBufferToBase64,
   encryptMessage,
@@ -42,113 +40,6 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('audio/')) return 'audio';
   return 'file';
-}
-
-function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | null {
-  const { t } = useTranslation();
-  const [mediaSrc, setMediaSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    let cleanup: (() => void) | undefined;
-
-    const decryptMedia = async () => {
-      const API_ORIGIN = new URL(API_BASE_URL).origin;
-      const originalUrl = message.media_url
-        ? message.media_url.startsWith('http')
-          ? message.media_url
-          : `${API_ORIGIN}${message.media_url.startsWith('/') ? '' : '/'}${message.media_url}`
-        : null;
-
-      if (!originalUrl) {
-        if (isMounted) setMediaSrc(null);
-        return;
-      }
-
-      const encryptedKey = isOwnMessage
-        ? (message.sender_media_encryption_key ?? message.media_encryption_key)
-        : message.media_encryption_key;
-
-      // If no encryption metadata, fall back to the stored URL
-      if (!encryptedKey || !message.media_encryption_iv) {
-        if (isMounted) setMediaSrc(originalUrl);
-        return;
-      }
-
-      try {
-        const keys = await getOwnKeys();
-        if (!keys) {
-          console.warn('No encryption keys available, displaying encrypted file as-is');
-          if (isMounted) setMediaSrc(originalUrl);
-          return;
-        }
-
-        const response = await authenticatedFetch(originalUrl);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const encryptedData = await response.arrayBuffer();
-
-        // Infer original MIME type from filename extension
-        const filename =
-          message.media_url?.split('/').pop() ?? t('messages.media.attachmentFallback');
-        const ext = filename.split('.').pop()?.toLowerCase();
-        let originalMimeType = 'application/octet-stream';
-
-        if (ext === 'jpg' || ext === 'jpeg') originalMimeType = 'image/jpeg';
-        else if (ext === 'png') originalMimeType = 'image/png';
-        else if (ext === 'gif') originalMimeType = 'image/gif';
-        else if (ext === 'webp') originalMimeType = 'image/webp';
-        else if (ext === 'mp4') originalMimeType = 'video/mp4';
-        else if (ext === 'webm') originalMimeType = 'video/webm';
-        else if (ext === 'mp3') originalMimeType = 'audio/mpeg';
-        else if (ext === 'wav') originalMimeType = 'audio/wav';
-        else if (ext === 'ogg') originalMimeType = 'audio/ogg';
-
-        const decryptedBlob = await decryptFile(
-          {
-            encryptedData,
-            encryptedKey,
-            iv: message.media_encryption_iv,
-            originalName: filename,
-            mimeType: originalMimeType,
-          },
-          keys.privateKey
-        );
-
-        const blobUrl = URL.createObjectURL(decryptedBlob);
-        cleanup = () => URL.revokeObjectURL(blobUrl);
-        if (isMounted) {
-          setMediaSrc(blobUrl);
-        }
-      } catch (error) {
-        console.error('[Media Decryption] Failed to decrypt media file:', error);
-        if (isMounted) {
-          setMediaSrc(originalUrl);
-        }
-      }
-    };
-
-    decryptMedia();
-
-    return () => {
-      isMounted = false;
-      if (cleanup) {
-        cleanup();
-      }
-    };
-  }, [
-    message.media_url,
-    message.media_encryption_key,
-    message.sender_media_encryption_key,
-    message.media_encryption_iv,
-    isOwnMessage,
-    t,
-  ]);
-
-  return mediaSrc;
 }
 
 interface MessageBubbleProps {

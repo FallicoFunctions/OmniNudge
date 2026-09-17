@@ -327,10 +327,43 @@ export async function encryptKeyWithPublicKey(
   return arrayBufferToBase64(encryptedKeyBuffer);
 }
 
+/** A file's own AES key, however the caller came by it. */
+export async function importFileKey(rawKey: ArrayBuffer): Promise<CryptoKey> {
+  return window.crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM', length: 256 }, false, [
+    'decrypt',
+  ]);
+}
+
 /**
- * Decrypt a file using hybrid decryption
- * 1. Decrypt AES key using own RSA private key
- * 2. Decrypt file data using AES key
+ * The bytes, given the file's own key.
+ *
+ * Separated from how that key was obtained: a direct message wraps it with the
+ * recipient's RSA key, and a group seals it under the group key. Only the
+ * unwrapping differs, so only the unwrapping should be written twice.
+ */
+export async function decryptFileWithKey(
+  encryptedFile: {
+    encryptedData: ArrayBuffer;
+    iv: string;
+    mimeType: string;
+  },
+  fileKey: CryptoKey
+): Promise<Blob> {
+  const iv = new Uint8Array(base64ToArrayBuffer(encryptedFile.iv));
+  const decryptedData = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    fileKey,
+    encryptedFile.encryptedData
+  );
+
+  return new Blob([decryptedData], { type: encryptedFile.mimeType });
+}
+
+/**
+ * Decrypt a file whose key was wrapped with this device's RSA public key.
+ *
+ * originalName is accepted and never read: the blob carries only its mime type.
+ * Left in place so callers keep compiling; it is dead weight, not a feature.
  */
 export async function decryptFile(
   encryptedFile: {
@@ -342,41 +375,13 @@ export async function decryptFile(
   },
   privateKey: CryptoKey
 ): Promise<Blob> {
-  // Decrypt AES key with RSA private key
-  const encryptedKeyBuffer = base64ToArrayBuffer(encryptedFile.encryptedKey);
   const aesKeyBuffer = await window.crypto.subtle.decrypt(
-    {
-      name: 'RSA-OAEP',
-    },
+    { name: 'RSA-OAEP' },
     privateKey,
-    encryptedKeyBuffer
+    base64ToArrayBuffer(encryptedFile.encryptedKey)
   );
 
-  // Import AES key
-  const aesKey = await window.crypto.subtle.importKey(
-    'raw',
-    aesKeyBuffer,
-    {
-      name: 'AES-GCM',
-      length: 256,
-    },
-    false,
-    ['decrypt']
-  );
-
-  // Decrypt file data with AES
-  const iv = new Uint8Array(base64ToArrayBuffer(encryptedFile.iv));
-  const decryptedData = await window.crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv,
-    },
-    aesKey,
-    encryptedFile.encryptedData
-  );
-
-  // Return as Blob with original mime type
-  return new Blob([decryptedData], { type: encryptedFile.mimeType });
+  return decryptFileWithKey(encryptedFile, await importFileKey(aesKeyBuffer));
 }
 
 export interface MultiRecipientEncryptionResult {
