@@ -18,6 +18,7 @@ export function useScreenShare(
   const [error, setError] = useState<string | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenSenderRef = useRef<RTCRtpSender | null>(null);
+  const mountedRef = useRef(true);
 
   const stopSharing = useCallback(() => {
     // Remove the screen track sender from the peer connection.
@@ -70,6 +71,16 @@ export function useScreenShare(
         return;
       }
 
+      // The picker waits on the person, so this screen can be gone by the time
+      // they choose. The unmount cleanup below has then already run against an
+      // empty ref, and nothing would ever stop this capture -- the browser
+      // would keep sharing the screen until the page reloaded. Returning also
+      // avoids telling the server a share started for a closed screen.
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       // Track is valid — now store references.
       screenStreamRef.current = stream;
       setScreenStream(stream);
@@ -119,7 +130,9 @@ export function useScreenShare(
 
   // Cleanup on unmount.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach((t) => t.stop());
         screenStreamRef.current = null;
