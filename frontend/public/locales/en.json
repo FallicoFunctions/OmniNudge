@@ -1604,6 +1604,8 @@
       "encryptionKeysMissing": "Your encryption keys are not set up",
       "sendFailed": "Failed to send message. Please try again.",
       "encryptionFailed": "This message could not be encrypted, so it was not sent.",
+      "groupMemberNotSetUp": "Someone in this group has not finished setting up encryption, so the message was not sent.",
+      "groupKeyUnavailable": "This group's encryption key is not available, so the message was not sent.",
       "editFailed": "The edit was not saved. Please try again.",
       "userUnavailable": "This user is not available.",
       "sendingTooFast": "You are sending messages too fast. Wait a minute and try again.",

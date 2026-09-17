@@ -154,6 +154,16 @@ describe('groupKeyForVersion', () => {
     expect(getOwnKeys).toHaveBeenCalledTimes(1);
   });
 
+  // A device that has published no key gets no bucket at all. Without that
+  // guard every such device would share one bucket keyed on the missing value,
+  // and read each other's keys out of it.
+  it('answers with nothing, and asks nothing, when this device published no key', async () => {
+    vi.mocked(getOwnPublicKeyBase64).mockReturnValue(null);
+
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(getGroupKeyState).not.toHaveBeenCalled();
+  });
+
   it('answers with nothing when this device holds no keys at all', async () => {
     vi.mocked(getOwnKeys).mockResolvedValue(null);
     expect(await groupKeyForVersion(7, 1)).toBeNull();

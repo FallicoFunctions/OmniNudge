@@ -14,6 +14,9 @@ import type {
 import type { UserProfile } from '../types/users';
 import { encryptMessage } from '../utils/encryption';
 import { MessageNotSent } from '../utils/messageSendErrors';
+import { GROUP_ENCRYPTION_VERSION, sealGroupMessage } from '../utils/groupKeys';
+import { groupKeyForSending, NoGroupKeyToSendWith } from './groupKeyCache';
+import { GroupKeyRotationRefused } from './groupKeysService';
 import { getUserPublicKey, getOwnKeys } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 
@@ -36,6 +39,36 @@ async function ensureConversationId(data: SendMessageRequest): Promise<number> {
   });
 
   return conversation.id;
+}
+
+/**
+ * The group key, with every refusal turned into one the sender can read.
+ *
+ * Only member-not-set-up names something a person can act on -- wait for them,
+ * or ask them to finish setting up. The other rotation refusals mean the
+ * request raced or was malformed, which is this app's problem, not advice.
+ */
+async function groupKeyForSendingOrRefuse(
+  conversationId: number,
+  ownKeys: Awaited<ReturnType<typeof getOwnKeys>>
+) {
+  try {
+    return await groupKeyForSending(conversationId, ownKeys);
+  } catch (error) {
+    if (error instanceof NoGroupKeyToSendWith) {
+      throw new MessageNotSent(
+        error.reason === 'member-key-unusable' ? 'group-member-not-set-up' : 'no-own-keys',
+        error.message
+      );
+    }
+    if (error instanceof GroupKeyRotationRefused) {
+      throw new MessageNotSent(
+        error.refusal === 'member-not-set-up' ? 'group-member-not-set-up' : 'no-group-key',
+        error.message
+      );
+    }
+    throw new MessageNotSent('no-group-key', 'The group key could not be read');
+  }
 }
 
 export const messagesService = {
@@ -181,6 +214,7 @@ export const messagesService = {
       data.sender_encrypted_content ?? (data.content ? data.content : undefined);
     let encryptionVersion: string =
       data.encryption_version ?? (data.content ? 'plaintext' : 'none');
+    let groupKeyVersion: number | undefined = data.group_key_version;
 
     // Encrypt message content if provided
     const ownKeys = await getOwnKeys();
@@ -213,14 +247,24 @@ export const messagesService = {
           if (error instanceof MessageNotSent) throw error;
           throw new MessageNotSent('encryption-failed', 'The message could not be encrypted');
         }
+      } else if (data.content && conversation?.conversation_type === 'group') {
+        // A group message is sealed once under the group's shared key. There is
+        // no per-reader copy, so the sender opens the same envelope as everyone
+        // else and needs no copy wrapped for themselves.
+        const { key, version } = await groupKeyForSendingOrRefuse(conversationId, ownKeys);
+        encryptedContent = await sealGroupMessage(data.content, key, version);
+        encryptionVersion = GROUP_ENCRYPTION_VERSION;
+        groupKeyVersion = version;
       } else if (data.content) {
-        // A group conversation has no other_user, so it lands here. G3c seals
-        // these under the group key; until then they travel as they always have.
-        encryptedContent = data.content;
-        encryptionVersion = 'plaintext';
+        // Neither a direct message nor a group: nothing here can encrypt it, and
+        // sending it in clear is what this whole path exists to stop.
+        throw new MessageNotSent(
+          'encryption-failed',
+          'This conversation has nobody to encrypt for'
+        );
       }
 
-      if (data.content) {
+      if (data.content && encryptionVersion !== GROUP_ENCRYPTION_VERSION) {
         if (!ownKeys?.publicKey) {
           throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
         }
@@ -250,6 +294,7 @@ export const messagesService = {
       is_multi_recipient: data.is_multi_recipient,
       shared_encryption_iv: data.shared_encryption_iv,
       recipient_keys: data.recipient_keys,
+      group_key_version: groupKeyVersion,
       reply_to: data.reply_to,
     });
   },

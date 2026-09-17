@@ -14,7 +14,11 @@ export type SendRefusal =
   /** This device has no keys of its own to encrypt the sender's copy with. */
   | 'no-own-keys'
   /** Encryption itself failed. */
-  | 'encryption-failed';
+  | 'encryption-failed'
+  /** A member of the group has published no usable key, so nobody can wrap for them. */
+  | 'group-member-not-set-up'
+  /** This device cannot get a key to seal the group message with. */
+  | 'no-group-key';
 
 export class MessageNotSent extends Error {
   constructor(
@@ -30,6 +34,8 @@ const REFUSAL_KEYS: Record<SendRefusal, string> = {
   'recipient-key-unusable': 'messages.errors.recipientKeyNotFound',
   'no-own-keys': 'messages.errors.encryptionKeysMissing',
   'encryption-failed': 'messages.errors.encryptionFailed',
+  'group-member-not-set-up': 'messages.errors.groupMemberNotSetUp',
+  'no-group-key': 'messages.errors.groupKeyUnavailable',
 };
 
 /**

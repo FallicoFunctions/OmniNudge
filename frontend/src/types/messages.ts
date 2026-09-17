@@ -187,6 +187,8 @@ export interface SendMessageRequest {
   is_multi_recipient?: boolean;
   shared_encryption_iv?: string;
   recipient_keys?: Record<number, string>;
+  /** Which group key version sealed this; a group message only. */
+  group_key_version?: number;
   reply_to?: number;
 }
 
