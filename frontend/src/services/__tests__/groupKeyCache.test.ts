@@ -7,11 +7,14 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { forgetGroupKeys, groupKeyForVersion } from '../groupKeyCache';
 import { getGroupKeyState } from '../groupKeysService';
 import { unwrapGroupKey } from '../../utils/groupKeys';
-import { getOwnKeys } from '../keyManagementService';
+import { getOwnKeys, getOwnPublicKeyBase64 } from '../keyManagementService';
 
 vi.mock('../groupKeysService', () => ({ getGroupKeyState: vi.fn() }));
 vi.mock('../../utils/groupKeys', () => ({ unwrapGroupKey: vi.fn() }));
-vi.mock('../keyManagementService', () => ({ getOwnKeys: vi.fn() }));
+vi.mock('../keyManagementService', () => ({
+  getOwnKeys: vi.fn(),
+  getOwnPublicKeyBase64: vi.fn(),
+}));
 
 const KEYS = { privateKey: {}, publicKey: {} } as never;
 
@@ -29,6 +32,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   forgetGroupKeys();
   vi.mocked(getOwnKeys).mockResolvedValue(KEYS);
+  vi.mocked(getOwnPublicKeyBase64).mockReturnValue('this-device-public-key');
   vi.mocked(unwrapGroupKey).mockImplementation(
     async (wrapped: string) => ({ opened: wrapped }) as never
   );
@@ -42,9 +46,9 @@ describe('groupKeyForVersion', () => {
   it('asks the server once for a conversation, however many messages need a key', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(1, 2));
 
-    const first = await groupKeyForVersion(7, 1, 42, KEYS);
-    const second = await groupKeyForVersion(7, 2, 42, KEYS);
-    const third = await groupKeyForVersion(7, 1, 42, KEYS);
+    const first = await groupKeyForVersion(7, 1, KEYS);
+    const second = await groupKeyForVersion(7, 2, KEYS);
+    const third = await groupKeyForVersion(7, 1, KEYS);
 
     expect(first).toEqual({ opened: 'wrapped-1' });
     expect(second).toEqual({ opened: 'wrapped-2' });
@@ -56,9 +60,9 @@ describe('groupKeyForVersion', () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(1));
 
     await Promise.all([
-      groupKeyForVersion(7, 1, 42, KEYS),
-      groupKeyForVersion(7, 1, 42, KEYS),
-      groupKeyForVersion(7, 1, 42, KEYS),
+      groupKeyForVersion(7, 1, KEYS),
+      groupKeyForVersion(7, 1, KEYS),
+      groupKeyForVersion(7, 1, KEYS),
     ]);
 
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
@@ -70,40 +74,43 @@ describe('groupKeyForVersion', () => {
   it('remembers a version this reader does not hold, and does not ask again', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(3));
 
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
 
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
   });
 
   it('still fetches a version it has not asked about before', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValueOnce(stateWith(1));
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toEqual({ opened: 'wrapped-1' });
+    expect(await groupKeyForVersion(7, 1, KEYS)).toEqual({ opened: 'wrapped-1' });
 
     // Somebody rotated; the next version is one this reader has never asked for.
     vi.mocked(getGroupKeyState).mockResolvedValueOnce(stateWith(1, 2));
-    expect(await groupKeyForVersion(7, 2, 42, KEYS)).toEqual({ opened: 'wrapped-2' });
+    expect(await groupKeyForVersion(7, 2, KEYS)).toEqual({ opened: 'wrapped-2' });
     expect(getGroupKeyState).toHaveBeenCalledTimes(2);
   });
 
   it('picks the version up again after a rotation clears the record', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValueOnce(stateWith(2));
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
 
-    forgetGroupKeys(7, 42);
+    forgetGroupKeys(7);
 
     vi.mocked(getGroupKeyState).mockResolvedValueOnce(stateWith(1, 2));
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toEqual({ opened: 'wrapped-1' });
+    expect(await groupKeyForVersion(7, 1, KEYS)).toEqual({ opened: 'wrapped-1' });
   });
 
   // This app keeps encryption keys across a logout on purpose, so a second
   // account signing in without a reload must not be handed the first one's key.
-  it('never serves one reader a key opened for another', async () => {
+  it('never serves one account a key opened for another', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(1));
 
-    await groupKeyForVersion(7, 1, 42, KEYS);
-    await groupKeyForVersion(7, 1, 99, KEYS);
+    await groupKeyForVersion(7, 1, KEYS);
+    // A second account signs in without a page reload: its published key is
+    // different, so it must not read the first account's bucket.
+    vi.mocked(getOwnPublicKeyBase64).mockReturnValue('public-key-of-somebody-else');
+    await groupKeyForVersion(7, 1, KEYS);
 
     expect(getGroupKeyState).toHaveBeenCalledTimes(2);
   });
@@ -115,41 +122,41 @@ describe('groupKeyForVersion', () => {
       return { opened: wrapped } as never;
     });
 
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
-    expect(await groupKeyForVersion(7, 2, 42, KEYS)).toEqual({ opened: 'wrapped-2' });
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 2, KEYS)).toEqual({ opened: 'wrapped-2' });
   });
 
   it('holds a failure briefly, then tries again', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     vi.mocked(getGroupKeyState).mockRejectedValue(new Error('offline'));
 
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, KEYS)).toBeNull();
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
 
     // After the cooldown the reader recovers without reloading the page.
     now.mockReturnValue(1_000_000 + 5_001);
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(1));
-    expect(await groupKeyForVersion(7, 1, 42, KEYS)).toEqual({ opened: 'wrapped-1' });
+    expect(await groupKeyForVersion(7, 1, KEYS)).toEqual({ opened: 'wrapped-1' });
     expect(getGroupKeyState).toHaveBeenCalledTimes(2);
   });
 
   it('treats null keys as no keys, and does not go looking for them', async () => {
-    expect(await groupKeyForVersion(7, 1, 42, null)).toBeNull();
+    expect(await groupKeyForVersion(7, 1, null)).toBeNull();
     expect(getOwnKeys).not.toHaveBeenCalled();
     expect(getGroupKeyState).not.toHaveBeenCalled();
   });
 
   it('loads the device keys itself when the caller does not supply them', async () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(stateWith(1));
-    expect(await groupKeyForVersion(7, 1, 42)).toEqual({ opened: 'wrapped-1' });
+    expect(await groupKeyForVersion(7, 1)).toEqual({ opened: 'wrapped-1' });
     expect(getOwnKeys).toHaveBeenCalledTimes(1);
   });
 
   it('answers with nothing when this device holds no keys at all', async () => {
     vi.mocked(getOwnKeys).mockResolvedValue(null);
-    expect(await groupKeyForVersion(7, 1, 42)).toBeNull();
+    expect(await groupKeyForVersion(7, 1)).toBeNull();
     expect(getGroupKeyState).not.toHaveBeenCalled();
   });
 });

@@ -8,10 +8,12 @@
  *
  * Two things are deliberate:
  *
- * Entries are keyed by reader as well as conversation. A cached CryptoKey was
- * unwrapped with whichever device key was signed in when it was fetched, and
- * this app does not clear keys on logout, so an account switch without a reload
- * must not be served the previous account's key.
+ * Entries are keyed by this device's own published key as well as by the
+ * conversation. A cached CryptoKey was unwrapped with whichever device key was
+ * signed in when it was fetched, and this app does not clear keys on logout, so
+ * an account switch without a reload must not be served the previous account's
+ * key. Keying on the key material itself says that directly, and means no
+ * caller has to announce who it is: a service has no signed-in user to ask.
  *
  * A version this reader does not hold is remembered as missing. Without that, a
  * conversation full of messages sealed under a version the reader joined too
@@ -23,7 +25,7 @@
 import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from './groupKeysService';
 import type { GroupKeyState } from './groupKeysService';
 import { newGroupKey, unwrapGroupKey, wrapGroupKeyForMembers } from '../utils/groupKeys';
-import { getOwnKeys } from './keyManagementService';
+import { getOwnKeys, getOwnPublicKeyBase64 } from './keyManagementService';
 import type { KeyPair } from '../utils/encryption';
 
 type VersionMap = Map<number, CryptoKey>;
@@ -41,7 +43,15 @@ const failedAt = new Map<string, number>();
  */
 const FAILURE_COOLDOWN_MS = 5000;
 
-const bucket = (readerId: number, conversationId: number) => `${readerId}:${conversationId}`;
+/**
+ * Null when this device has published no key. Every caller already refuses in
+ * that case, but naming it keeps a missing key from becoming one shared bucket
+ * that every account would read from.
+ */
+function bucket(conversationId: number): string | null {
+  const own = getOwnPublicKeyBase64();
+  return own ? `${own}:${conversationId}` : null;
+}
 
 /** The versions in a state this device can open. */
 async function unwrapCopies(state: GroupKeyState, ownKeys: KeyPair): Promise<VersionMap> {
@@ -71,15 +81,16 @@ async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<V
  */
 async function primeFromState(
   conversationId: number,
-  readerId: number,
   state: GroupKeyState,
   ownKeys: KeyPair
 ): Promise<VersionMap> {
   const versions = await unwrapCopies(state, ownKeys);
-  const key = bucket(readerId, conversationId);
-  held.set(key, versions);
-  knownMissing.delete(key);
-  failedAt.delete(key);
+  const key = bucket(conversationId);
+  if (key) {
+    held.set(key, versions);
+    knownMissing.delete(key);
+    failedAt.delete(key);
+  }
   return versions;
 }
 
@@ -112,7 +123,6 @@ async function fetchVersions(
 export async function groupKeyForVersion(
   conversationId: number,
   keyVersion: number,
-  readerId: number,
   ownKeys?: KeyPair | null
 ): Promise<CryptoKey | null> {
   // undefined means "load them"; null means "there are none". decryptForDisplay
@@ -121,7 +131,8 @@ export async function groupKeyForVersion(
   const keys = ownKeys !== undefined ? ownKeys : await getOwnKeys();
   if (!keys) return null;
 
-  const key = bucket(readerId, conversationId);
+  const key = bucket(conversationId);
+  if (!key) return null;
   const alreadyHeld = held.get(key)?.get(keyVersion);
   if (alreadyHeld) return alreadyHeld;
   if (knownMissing.get(key)?.has(keyVersion)) return null;
@@ -149,15 +160,15 @@ export async function groupKeyForVersion(
 }
 
 /** Drops what is held, so a rotation made in this page is picked up. */
-export function forgetGroupKeys(conversationId?: number, readerId?: number): void {
-  if (conversationId === undefined || readerId === undefined) {
+export function forgetGroupKeys(conversationId?: number): void {
+  const key = conversationId === undefined ? null : bucket(conversationId);
+  if (key === null) {
     held.clear();
     knownMissing.clear();
     inFlight.clear();
     failedAt.clear();
     return;
   }
-  const key = bucket(readerId, conversationId);
   held.delete(key);
   knownMissing.delete(key);
   inFlight.delete(key);
@@ -199,7 +210,6 @@ export interface GroupKeyForSending {
  */
 export async function groupKeyForSending(
   conversationId: number,
-  senderId: number,
   ownKeys?: KeyPair | null
 ): Promise<GroupKeyForSending> {
   const keys = ownKeys !== undefined ? ownKeys : await getOwnKeys();
@@ -210,7 +220,7 @@ export async function groupKeyForSending(
   const state = await getGroupKeyState(conversationId);
   // Seed the cache with what was just fetched, rather than letting it fetch the
   // same state again on the miss below.
-  const opened = await primeFromState(conversationId, senderId, state, keys);
+  const opened = await primeFromState(conversationId, state, keys);
   if (state.active_version > 0) {
     const current = opened.get(state.active_version);
     if (current) return { key: current, version: state.active_version };
@@ -236,7 +246,7 @@ export async function groupKeyForSending(
     // The cache remembers versions this reader could not get, and the rotation
     // just granted one. Without this the sender's own new message would read as
     // unreadable until the page reloaded.
-    forgetGroupKeys(conversationId, senderId);
+    forgetGroupKeys(conversationId);
     return { key: fresh, version: stored };
   } catch (error) {
     const lostTheRace =
@@ -245,9 +255,9 @@ export async function groupKeyForSending(
     if (!lostTheRace) throw error;
 
     // Another member rotated first. Their version is the one to send under.
-    forgetGroupKeys(conversationId, senderId);
+    forgetGroupKeys(conversationId);
     const settled = await getGroupKeyState(conversationId);
-    const theirs = await primeFromState(conversationId, senderId, settled, keys);
+    const theirs = await primeFromState(conversationId, settled, keys);
     if (settled.active_version > 0) {
       const winner = theirs.get(settled.active_version);
       if (winner) return { key: winner, version: settled.active_version };

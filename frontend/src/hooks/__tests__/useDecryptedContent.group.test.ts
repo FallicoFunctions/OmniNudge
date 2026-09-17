@@ -66,10 +66,9 @@ describe('a sealed group message', () => {
       text: vector.plaintext,
     });
     // The version comes out of the envelope, not from a column.
-    expect(vi.mocked(groupKeyForVersion).mock.calls[0].slice(0, 3)).toEqual([
+    expect(vi.mocked(groupKeyForVersion).mock.calls[0].slice(0, 2)).toEqual([
       77,
       vector.keyVersion,
-      9,
     ]);
   });
 
@@ -96,10 +95,14 @@ describe('a sealed group message', () => {
     expect(result.text).toBe(vector.sealed);
   });
 
-  it('refuses rather than guess whose keys to use when the reader is unknown', async () => {
-    const result = await decryptForDisplay(groupMessage(), false, undefined);
-    expect(result.status).toBe('failed');
-    expect(groupKeyForVersion).not.toHaveBeenCalled();
+  // Who is asking is settled by this device's own published key, so a caller
+  // that does not know the user id is no longer a reason to refuse.
+  it('opens for a reader whose id the caller never knew', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+    await expect(decryptForDisplay(groupMessage(), false, undefined)).resolves.toEqual({
+      status: 'decrypted',
+      text: vector.plaintext,
+    });
   });
 
   it('says so when this device holds no keys at all', async () => {

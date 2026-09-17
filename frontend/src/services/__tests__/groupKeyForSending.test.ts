@@ -27,11 +27,13 @@ vi.mock('../../utils/groupKeys', () => ({
   unwrapGroupKey: vi.fn(),
   wrapGroupKeyForMembers: vi.fn(),
 }));
-vi.mock('../keyManagementService', () => ({ getOwnKeys: vi.fn() }));
+vi.mock('../keyManagementService', () => ({
+  getOwnKeys: vi.fn(),
+  getOwnPublicKeyBase64: vi.fn(() => 'this-device-public-key'),
+}));
 
 const KEYS = { privateKey: {}, publicKey: {} } as never;
 const CONVERSATION = 7;
-const SENDER = 42;
 
 const state = (over: Record<string, unknown> = {}) =>
   ({
@@ -69,7 +71,7 @@ describe('groupKeyForSending', () => {
       })
     );
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).resolves.toEqual({
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toEqual({
       key: { opened: 'w3' },
       version: 3,
     });
@@ -83,7 +85,7 @@ describe('groupKeyForSending', () => {
     vi.mocked(getGroupKeyState).mockResolvedValue(state({ active_version: 0, latest_version: 2 }));
     vi.mocked(rotateGroupKey).mockResolvedValue(3);
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).resolves.toEqual({
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toEqual({
       key: { fresh: true },
       version: 3,
     });
@@ -99,12 +101,12 @@ describe('groupKeyForSending', () => {
   it('forgets what it recorded as missing, so its own new message is readable', async () => {
     // Ask for a version this reader does not hold: the cache records it missing.
     vi.mocked(getGroupKeyState).mockResolvedValue(state({ active_version: 0, latest_version: 2 }));
-    expect(await groupKeyForVersion(CONVERSATION, 3, SENDER, KEYS)).toBeNull();
+    expect(await groupKeyForVersion(CONVERSATION, 3, KEYS)).toBeNull();
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
 
     // Now send, which rotates and grants exactly that version.
     vi.mocked(rotateGroupKey).mockResolvedValue(3);
-    await groupKeyForSending(CONVERSATION, SENDER, KEYS);
+    await groupKeyForSending(CONVERSATION, KEYS);
 
     // Without the forget, this would answer null from the missing record.
     vi.mocked(getGroupKeyState).mockResolvedValue(
@@ -114,7 +116,7 @@ describe('groupKeyForSending', () => {
         my_copies: [{ key_version: 3, wrapped_key: 'w3' }],
       })
     );
-    expect(await groupKeyForVersion(CONVERSATION, 3, SENDER, KEYS)).toEqual({ opened: 'w3' });
+    expect(await groupKeyForVersion(CONVERSATION, 3, KEYS)).toEqual({ opened: 'w3' });
   });
 
   it('refuses, and rotates nothing, when a member has no usable key', async () => {
@@ -124,7 +126,7 @@ describe('groupKeyForSending', () => {
       unusable: [{ userId: 9, reason: 'missing' }],
     } as never);
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).rejects.toMatchObject({
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).rejects.toMatchObject({
       reason: 'member-key-unusable',
     });
     // Nobody gets a group they cannot read.
@@ -132,7 +134,7 @@ describe('groupKeyForSending', () => {
   });
 
   it('refuses before touching the network when this device has no keys', async () => {
-    await expect(groupKeyForSending(CONVERSATION, SENDER, null)).rejects.toBeInstanceOf(
+    await expect(groupKeyForSending(CONVERSATION, null)).rejects.toBeInstanceOf(
       NoGroupKeyToSendWith
     );
     expect(getGroupKeyState).not.toHaveBeenCalled();
@@ -152,7 +154,7 @@ describe('groupKeyForSending', () => {
       new GroupKeyRotationRefused('version-taken', 'That is not the next key version')
     );
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).resolves.toEqual({
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toEqual({
       key: { opened: 'theirs' },
       version: 3,
     });
@@ -166,7 +168,7 @@ describe('groupKeyForSending', () => {
     );
     vi.mocked(rotateGroupKey).mockRejectedValue(refusal);
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).rejects.toBe(refusal);
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).rejects.toBe(refusal);
   });
 
   it('makes a new version when the current one cannot be opened here', async () => {
@@ -175,7 +177,7 @@ describe('groupKeyForSending', () => {
     );
     vi.mocked(rotateGroupKey).mockResolvedValue(5);
 
-    await expect(groupKeyForSending(CONVERSATION, SENDER, KEYS)).resolves.toEqual({
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toEqual({
       key: { fresh: true },
       version: 5,
     });

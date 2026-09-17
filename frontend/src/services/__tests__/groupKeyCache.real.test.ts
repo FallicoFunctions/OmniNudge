@@ -11,10 +11,12 @@ import { newGroupKey, openGroupMessage, sealGroupMessage } from '../../utils/gro
 import { encryptKeyWithPublicKey, generateKeyPair, type KeyPair } from '../../utils/encryption';
 
 vi.mock('../groupKeysService', () => ({ getGroupKeyState: vi.fn() }));
-vi.mock('../keyManagementService', () => ({ getOwnKeys: vi.fn() }));
+vi.mock('../keyManagementService', () => ({
+  getOwnKeys: vi.fn(),
+  getOwnPublicKeyBase64: vi.fn(() => 'this-device-public-key'),
+}));
 
 const CONVERSATION = 7;
-const READER = 42;
 const VERSION = 4;
 
 let reader: KeyPair;
@@ -50,7 +52,7 @@ describe('the key the cache returns, with real crypto', () => {
     );
     const sealed = await sealGroupMessage('meet me at six', groupKey, VERSION);
 
-    const fromCache = await groupKeyForVersion(CONVERSATION, VERSION, READER, reader);
+    const fromCache = await groupKeyForVersion(CONVERSATION, VERSION, reader);
 
     expect(fromCache).not.toBeNull();
     // The whole point: this key came back through the cache, and it opens an
@@ -67,7 +69,7 @@ describe('the key the cache returns, with real crypto', () => {
       stateWith([{ key_version: VERSION, wrapped_key: wrappedForSomebodyElse }])
     );
 
-    expect(await groupKeyForVersion(CONVERSATION, VERSION, READER, reader)).toBeNull();
+    expect(await groupKeyForVersion(CONVERSATION, VERSION, reader)).toBeNull();
   });
 
   it('keeps the copy it can open when another copy in the same answer is damaged', async () => {
@@ -79,8 +81,8 @@ describe('the key the cache returns, with real crypto', () => {
     );
     const sealed = await sealGroupMessage('still readable', groupKey, VERSION);
 
-    expect(await groupKeyForVersion(CONVERSATION, 3, READER, reader)).toBeNull();
-    const fromCache = await groupKeyForVersion(CONVERSATION, VERSION, READER, reader);
+    expect(await groupKeyForVersion(CONVERSATION, 3, reader)).toBeNull();
+    const fromCache = await groupKeyForVersion(CONVERSATION, VERSION, reader);
     await expect(openGroupMessage(sealed, fromCache as CryptoKey)).resolves.toBe('still readable');
     // One answer served both questions.
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
@@ -91,8 +93,8 @@ describe('the key the cache returns, with real crypto', () => {
       stateWith([{ key_version: VERSION, wrapped_key: wrappedForReader }])
     );
 
-    const first = await groupKeyForVersion(CONVERSATION, VERSION, READER, reader);
-    const second = await groupKeyForVersion(CONVERSATION, VERSION, READER, reader);
+    const first = await groupKeyForVersion(CONVERSATION, VERSION, reader);
+    const second = await groupKeyForVersion(CONVERSATION, VERSION, reader);
 
     expect(first).toBe(second);
     expect(getGroupKeyState).toHaveBeenCalledTimes(1);
