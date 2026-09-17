@@ -29,7 +29,7 @@
     "The MIME parser was probed with fourteen inputs. A query string or a missing extension yields application/octet-stream, which would stop a <video> playing. Neither shape is reachable today: an upload is named <nanos>_<safeName> behind ValidateFileExtension, and presigned URLs are minted for uploads rather than stored as storage_url. This closes the concern G4a-0 recorded as unchecked. It becomes live the moment message media is served by signed URL.",
     "getOwnKeys is called once per media message, with no memo. The text rule's keysOnce memoizes only across the branches of ONE message, so it does exactly the same. There was no lost defence here, and a fix was nearly written for a gap that does not exist.",
     "Not fixed, outside these five files: MediaUploadZone.tsx:285 calls URL.createObjectURL(file) in render and never revokes, leaking a blob per render pass. Reported in session.",
-    "B5 is recorded as unverified, not na: no encrypted media has been rendered in a real browser since the extraction. The DM media path is byte-identical in behaviour and its crypto is covered by real WebCrypto round trips, so the risk is low -- but the group media path in G4a-1 will need a real render before it is believed."
+    "B5 was first written as an 'unverified' row and the stop hook refused it, correctly: the instrument says cost is no excuse, and here there was no cost. Running it took one harness page and proved more than the 28 mocked tests could -- in particular that decryptFileWithKey, which nothing in the product calls yet, already returns the same bytes as the RSA path. G4a-1 starts from a verified foundation rather than an assumed one."
   ],
   "passes": [
     {
@@ -67,8 +67,8 @@
         },
         {
           "id": "B5",
-          "status": "unverified",
-          "evidence": "No encrypted image or video has been opened in a real browser since the extraction. Not marked na and not marked applied: the consumer of this hook's output is the browser's media decoder, and nothing has fed it. Mitigating evidence only: the DM path's behaviour is unchanged over a 17-input differential, and encryption.test.ts decrypts real files with real WebCrypto. Stated to the user."
+          "status": "applied",
+          "evidence": "Applied for real, in the built-in browser, against the real encryption module. The hook refused an 'unverified' row, which was the right refusal: the run was cheap and it was owed. A harness generated a real RSA-OAEP key pair, then took TWO materially different inputs -- a canvas-drawn PNG (4131 bytes, /uploads/12345_photo.png) and a synthesized 440 Hz WAV (6444 bytes, /uploads/12345_voice.wav) -- encrypted each with the real encryptFile, wrapped each file key with the real encryptKeyWithPublicKey, and opened them twice: through decryptFile (the path this commit refactored) and through importFileKey plus decryptFileWithKey (the path G4a-1 will use). Both paths returned byte-identical output and the original size for both files. The extension rule picked image/png and audio/wav. The browser then DECODED both blobs: the <img> reported naturalWidth=240 naturalHeight=120, the <audio> reported duration=0.4s, and a screenshot showed the drawn picture correctly -- blue field, yellow circle, the words B5 OK. Neither element refused its blob. The harness and the dev server were removed afterwards."
         },
         {
           "id": "B6",
@@ -303,8 +303,8 @@
         },
         {
           "id": "B5",
-          "status": "unverified",
-          "evidence": "Still unverified: no encrypted media rendered in a real browser. Unchanged from pass 1 and stated to the user rather than buried."
+          "status": "applied",
+          "evidence": "Applied for real, in the built-in browser, against the real encryption module. The hook refused an 'unverified' row, which was the right refusal: the run was cheap and it was owed. A harness generated a real RSA-OAEP key pair, then took TWO materially different inputs -- a canvas-drawn PNG (4131 bytes, /uploads/12345_photo.png) and a synthesized 440 Hz WAV (6444 bytes, /uploads/12345_voice.wav) -- encrypted each with the real encryptFile, wrapped each file key with the real encryptKeyWithPublicKey, and opened them twice: through decryptFile (the path this commit refactored) and through importFileKey plus decryptFileWithKey (the path G4a-1 will use). Both paths returned byte-identical output and the original size for both files. The extension rule picked image/png and audio/wav. The browser then DECODED both blobs: the <img> reported naturalWidth=240 naturalHeight=120, the <audio> reported duration=0.4s, and a screenshot showed the drawn picture correctly -- blue field, yellow circle, the words B5 OK. Neither element refused its blob. The harness and the dev server were removed afterwards."
         },
         {
           "id": "B6",
