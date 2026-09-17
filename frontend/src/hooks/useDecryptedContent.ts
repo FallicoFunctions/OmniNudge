@@ -110,20 +110,24 @@ export async function decryptForDisplay(
     return resolvedKeys;
   };
 
-  const cipherText = cipherTextFor(message, isOwnMessage);
-  if (!cipherText) return { status: 'not-encrypted', text: '' };
-
   // A group message is sealed once under the group's shared key, so the sender
   // opens the same envelope everyone else does. There is no per-reader copy,
-  // which is why this reads encrypted_content rather than the sender's.
+  // which is why this reads encrypted_content rather than the sender's -- and
+  // why it is answered before the per-reader rule below runs at all. Behind
+  // that rule, a sender copy stored as an empty string made this return empty
+  // text while needsDecryption said the message needed opening, so the
+  // readable envelope beside it was never looked at.
   if (message.encryption_version === GROUP_ENCRYPTION_VERSION) {
     const sealed = message.encrypted_content;
     if (!sealed) return { status: 'not-encrypted', text: '' };
     const keys = await keysOnce();
     if (!keys) return { status: 'no-keys', text: sealed };
-    // The group key is fetched for a named reader, so without one there is
-    // nobody to fetch for. Refusing beats guessing at whose keys to use.
-    if (currentUserId === undefined) return { status: 'failed', text: sealed };
+    // The group key is fetched for a named reader in a named conversation.
+    // Without either there is nobody and nowhere to fetch for, and guessing
+    // would bucket a key under a conversation that does not exist.
+    if (currentUserId === undefined || !message.conversation_id) {
+      return { status: 'failed', text: sealed };
+    }
     try {
       const groupKey = await groupKeyForVersion(
         message.conversation_id,
@@ -140,6 +144,9 @@ export async function decryptForDisplay(
       return { status: 'failed', text: sealed };
     }
   }
+
+  const cipherText = cipherTextFor(message, isOwnMessage);
+  if (!cipherText) return { status: 'not-encrypted', text: '' };
 
   // Mod mail: one shared key, wrapped per participant. A failure here falls
   // through to the ordinary path rather than giving up, which is what every

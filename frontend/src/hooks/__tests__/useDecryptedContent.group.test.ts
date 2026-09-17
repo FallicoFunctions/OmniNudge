@@ -117,6 +117,53 @@ describe('a sealed group message', () => {
     expect(result.status).toBe('failed');
   });
 
+  // A sender copy stored as an empty string is not "no ciphertext": the
+  // envelope is right there in encrypted_content. Answering the per-reader rule
+  // first made this render blank while needsDecryption said otherwise.
+  it('opens the envelope even when the sender copy is an empty string', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+    const mine = groupMessage({ sender_encrypted_content: '' });
+
+    await expect(decryptForDisplay(mine, true, 5)).resolves.toEqual({
+      status: 'decrypted',
+      text: vector.plaintext,
+    });
+  });
+
+  it('refuses when there is no conversation to fetch a key for', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+    const orphan = groupMessage({ conversation_id: undefined as unknown as number });
+
+    const result = await decryptForDisplay(orphan, false, 9);
+    expect(result.status).toBe('failed');
+    // Never ask the cache to bucket a key under a conversation that is not there.
+    expect(groupKeyForVersion).not.toHaveBeenCalled();
+  });
+
+  // This invariant was a throwaway harness in the previous review. It caught a
+  // real defect one phase later, so it stays: every surface paints the stored
+  // text at once when needsDecryption says no work is needed, and a rule that
+  // disagreed would paint an envelope as though it were a message.
+  it.each([
+    ['a sealed group message', () => groupMessage(), false],
+    ['one of my own group messages', () => groupMessage(), true],
+    ['an empty sender copy', () => groupMessage({ sender_encrypted_content: '' }), true],
+    ['no envelope at all', () => groupMessage({ encrypted_content: '' }), false],
+    [
+      'plain text',
+      () => groupMessage({ encrypted_content: 'hello', encryption_version: 'plaintext' }),
+      false,
+    ],
+  ])('agrees with needsDecryption about %s', async (_name, build, isOwn) => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+    const message = build();
+
+    const needs = needsDecryption(message, isOwn);
+    const { status } = await decryptForDisplay(message, isOwn, 9);
+
+    expect(needs).toBe(status !== 'not-encrypted');
+  });
+
   it('is never treated as text that needs no decryption', () => {
     expect(needsDecryption(groupMessage(), false)).toBe(true);
     expect(needsDecryption(groupMessage(), true)).toBe(true);
