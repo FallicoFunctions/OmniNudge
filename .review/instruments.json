@@ -253,6 +253,12 @@
       "name": "Build the shared test fixture the whole package builds",
       "trigger": "a change adds routes, handlers or state to a fixture every test in a package shares: a test router, a common setup helper, a package-level registry",
       "asks": "A narrow selector builds only what the selected test touches; the package builds one process, where a second registration of the same route or name panics at construction and kills every test in it. Before trusting a selector, grep the package for other files that register onto the same shared object, and run the whole package once. G1c added participant, leave and ban routes to test_utils.go while groups_integration_test.go already registered three of them on the same base.Router: gin panicked, the whole integration package died in CI, and every local selector still passed."
+    },
+    {
+      "id": "G4",
+      "name": "Do the existing controls still apply?",
+      "trigger": "a file that any control patch was written against has changed",
+      "asks": "Re-apply every control for this review after touching a file one of them targets, and require it to fail as before. A refactor moves the lines a patch was written against and git apply then refuses it, so the control proves nothing while reading as a skip rather than as a failure -- which is worse than a control that passes, because a passing control at least runs. Extracting a helper out of groupKeyCache.ts during a review silently killed the control for that module's most valuable finding: the one showing a mocked suite could not see the private key swapped for the public one. The stop hook replays controls and would have caught it at the very end; catching it when the file changes is cheaper, and it is the only way to know a control is still evidence rather than a file that happens to exist."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

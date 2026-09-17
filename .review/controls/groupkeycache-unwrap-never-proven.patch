@@ -1,9 +1,9 @@
 diff --git a/frontend/src/services/groupKeyCache.ts b/frontend/src/services/groupKeyCache.ts
-index 94cd21a9d..21b9b3bfc 100644
+index cce446212..6092a9e61 100644
 --- a/frontend/src/services/groupKeyCache.ts
 +++ b/frontend/src/services/groupKeyCache.ts
-@@ -48,7 +48,7 @@ async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<V
-   const state = await getGroupKeyState(conversationId);
+@@ -48,7 +48,7 @@ async function unwrapCopies(state: GroupKeyState, ownKeys: KeyPair): Promise<Ver
+   const versions: VersionMap = new Map();
    for (const copy of state.my_copies) {
      try {
 -      versions.set(copy.key_version, await unwrapGroupKey(copy.wrapped_key, ownKeys.privateKey));
