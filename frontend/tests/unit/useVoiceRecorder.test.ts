@@ -68,6 +68,40 @@ describe('useVoiceRecorder', () => {
     });
   });
 
+  // Asking for the microphone waits on the person, so the recorder can be
+  // unmounted before permission arrives. The unmount cleanup then finds an
+  // empty ref and stops nothing, and the code after the await would leave a
+  // live microphone, an open AudioContext and a 50ms timer behind it.
+  it('stops the microphone when the recorder goes away before permission arrives', async () => {
+    const stop = vi.fn();
+    const stream: MockStream = { getTracks: () => [{ stop }] };
+    let grantPermission: (value: MediaStream) => void = () => {};
+    const getUserMedia = vi.fn(
+      () =>
+        new Promise<MediaStream>((resolve) => {
+          grantPermission = resolve;
+        })
+    );
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia },
+      configurable: true,
+      writable: true,
+    });
+
+    const { result, unmount } = renderHook(() => useVoiceRecorder());
+    act(() => {
+      void result.current.start();
+    });
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
+
+    unmount();
+    await act(async () => {
+      grantPermission(stream as unknown as MediaStream);
+    });
+
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
   it('starts and stops recording, producing an audio blob', async () => {
     const stop = vi.fn();
     const stream: MockStream = { getTracks: () => [{ stop }] };

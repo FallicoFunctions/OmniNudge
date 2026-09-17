@@ -41,6 +41,7 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const levelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const mountedRef = useRef(true);
 
   const cleanup = useCallback(() => {
     if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
@@ -74,7 +75,11 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   }, []);
 
   useEffect(() => {
-    return cleanup;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
   }, [cleanup]);
 
   const start = useCallback(async () => {
@@ -100,6 +105,16 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         setError(i18n.t('voice.recordingError'));
       }
       setState('error');
+      return;
+    }
+
+    // Asking for the microphone waits on the person, so the recorder can be
+    // gone by the time permission arrives. cleanup has then already run and
+    // found an empty ref, and everything below would start against a view that
+    // no longer exists: a live microphone, an open AudioContext and a 50ms
+    // timer, none of which anything would ever stop.
+    if (!mountedRef.current) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
 
