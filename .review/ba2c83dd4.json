@@ -1,0 +1,501 @@
+{
+  "schema_version": 2,
+  "head": "9aa958b82",
+  "base": "ba2c83dd4",
+  "scope": {
+    "files": [
+      "frontend/src/hooks/useDecryptedMedia.ts",
+      "frontend/src/hooks/__tests__/useDecryptedMedia.test.tsx",
+      "frontend/src/utils/encryption.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/feed/ExpandedMessage.tsx"
+    ],
+    "boundaries": [
+      "the argument handed to decryptFile: which wrapped key, which IV, which MIME type",
+      "the src attribute the browser receives for a media message",
+      "the blob URL store: what is created against what is revoked",
+      "the media_url shape the server really emits, against the extension parser that reads it"
+    ]
+  },
+  "prior_ledgers_read": [
+    "51cde838c -- the text analogue of this extraction. Its findings were surfaces painting ciphertext as text, and a keys-loaded-once fix. Both shapes were asked of media here: the first is deferred to G4a-2 by the approved plan, the second turned out not to be a gap at all.",
+    "0efe747b3 -- the display rule's follow-up. Its empty-sender-copy finding is the reason the media hook's ?? was checked against what the server actually writes.",
+    "da9ed20de -- the key cache. Its finding that a mocked suite proved nothing is why this pass insisted on finding a real-crypto suite for the decryptFile split rather than trusting 28 mocked tests.",
+    "000de0034 -- the group send path, the phase immediately before this one."
+  ],
+  "notes": [
+    "The differential run that justified this extraction reconstructed the two deleted copies from memory, and got their dependency arrays wrong: both listed individual fields, and MessagesPage also listed message.media_type. That did not invalidate the differential, because it compared input to output and a dependency array changes only re-run frequency -- and media_type appears nowhere in either old body, so dropping it changes no output. Recorded because the reconstruction was wrong in a way that could have mattered, and was checked rather than assumed.",
+    "Both old copies built the absolute URL from what looked like two different constants, MessagesPage's module-level API_ORIGIN and ExpandedMessage's local one. Both were new URL(API_BASE_URL).origin, so the seam is genuinely unchanged.",
+    "The MIME parser was probed with fourteen inputs. A query string or a missing extension yields application/octet-stream, which would stop a <video> playing. Neither shape is reachable today: an upload is named <nanos>_<safeName> behind ValidateFileExtension, and presigned URLs are minted for uploads rather than stored as storage_url. This closes the concern G4a-0 recorded as unchecked. It becomes live the moment message media is served by signed URL.",
+    "getOwnKeys is called once per media message, with no memo. The text rule's keysOnce memoizes only across the branches of ONE message, so it does exactly the same. There was no lost defence here, and a fix was nearly written for a gap that does not exist.",
+    "Not fixed, outside these five files: MediaUploadZone.tsx:285 calls URL.createObjectURL(file) in render and never revokes, leaking a blob per render pass. Reported in session.",
+    "B5 is recorded as unverified, not na: no encrypted media has been rendered in a real browser since the extraction. The DM media path is byte-identical in behaviour and its crypto is covered by real WebCrypto round trips, so the risk is low -- but the group media path in G4a-1 will need a real render before it is believed."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Five files. Two 100-plus-line copies of the media rule removed from a page and a feed component, replaced by one hook; decryptFile split into importFileKey, decryptFileWithKey and a decryptFile that composes them. The boundaries are the decryptFile argument, the src the browser gets, and the blob URL store."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 51cde838c, 0efe747b3, da9ed20de and 000de0034. The empty-sender-copy and keys-loaded-once shapes from those ledgers were both asked of this code; neither is a defect here, for reasons recorded in the notes."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The artifact crossing into the crypto is the decryptFile argument object. Printed it for two materially different dimensions: the ten extensions of the type table (asserting mimeType per entry), and own-message against other-message (asserting encryptedKey is KEY-FOR-ME versus KEY-FOR-RECIPIENT)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Filtered the whole diff of both components for src=, <img, <video, <audio and className: not one markup line changed. Every consumer still reads src={mediaSrc}, and all five call sites pass the same two arguments as before."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed. The Go side was read to settle what media_url really contains, not modified."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the stored shape rather than a query: media_url is COALESCE(mf.storage_url, m.media_url) and storage_url is '/uploads/' + userID + '/' + <nanos>_<safeName>, so the stored value always carries a real extension."
+        },
+        {
+          "id": "B5",
+          "status": "unverified",
+          "evidence": "No encrypted image or video has been opened in a real browser since the extraction. Not marked na and not marked applied: the consumer of this hook's output is the browser's media decoder, and nothing has fed it. Mitigating evidence only: the DM path's behaviour is unchanged over a 17-input differential, and encryption.test.ts decrypts real files with real WebCrypto. Stated to the user."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Nothing was added to a shared bar, header, toolbar or row; no layout changed."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay, modal or full-screen step is drawn by this change."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Compared the new MIME table against the old if/else chain entry by entry: same nine types, same fallback. Compared the two URL constants: both new URL(API_BASE_URL).origin."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "All five call sites listed before and after. Identical arguments at each: (currentMessage|message, isOwnMessage). None was dropped and none gained a different message object."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The differential over 17 inputs was run before the commit with 0 differences. This pass audited the differential itself by reading both deleted bodies out of git, which is how the dependency-array error in the reconstruction was found -- and confirmed the bodies, which is what the differential compared, were faithful."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker and no external provider contract is involved."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "The hook picks its key with ??, which falls back only on null or undefined. The Go model declares SenderMediaEncryptionKey *string and writes NULL explicitly, so an absent copy reaches the client as undefined and the fallback fires. The empty-string branch that would hide the envelope is not produced by the server."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader broken here is the blob-URL lifecycle rather than a field accessor: the control patch restores the original assignment order and the new test fails with a real AssertionError. The MIME reader is asserted per table entry rather than once."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Asked whether the tests' media_url has the shape production mints. Followed it to the producer: newName = <nanos>_<safeName>, gated by ValidateFileExtension, so the extension the parser depends on is always present. The fixtures are right about the one attribute the code reads."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "The ten real extensions all resolve to their types, including uppercase via toLowerCase and a multi-dot name (a.b.c.mp4 -> video/mp4)."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "archive.tar.gz, a trailing slash and a bare directory name all fall back to application/octet-stream rather than guessing a playable type."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Fourteen inputs through the parser: empty string, null, undefined, no extension, leading-dot name, trailing space, fragment, query string, absolute https URL, trailing slash. No throw on any; the two that would matter in production are unreachable, per the notes."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Found the finding. useVoicePlayer fetches, then checks mountedRef and revokes the blob URL it just made. The media hook made the blob and assigned a cleanup that had already run. The sibling carried the defence; this path did not."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Five branches: no media URL, no key or IV, no device keys, HTTP failure, decrypt failure. Each is reached by a named test, and the new early return is reached by the new one."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The catch warns and falls back to the stored URL, which for an encrypted file hands the browser ciphertext. That is deliberate and documented in the file header: both old copies did it, and the approved plan turns it into a refusal in G4a-2. Nothing is silently swallowed; the console carries the cause."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag or conditional gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Enumerated mechanically rather than from memory: exactly one call to decryptFile remains in the whole frontend, in this hook. No third copy of the media rule survives."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Grepped every createObjectURL in the frontend (19 sites) and looked for the same shape -- a blob URL made after an await, in a view that can already be gone. useVoicePlayer has the correct form; MediaUploadZone.tsx:285 leaks one per render but is a different component and outside these five files (reported, not fixed)."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The fetch and the decrypt both start before anything knows whether the view survives, and neither can be unstarted. That is exactly this finding's neighbourhood: the fix does not try to cancel, it releases what the started work produced."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "The one process-wide read is import.meta.env via API_BASE_URL. MessagesPage read it once at module load, the hook reads it per call; both read the same frozen build-time value, so no ordering can change the result."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine and no shared mutable state; each hook instance owns its own isMounted and cleanup."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction, lock or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Found the finding. Asked what is left behind when the view is undone mid-flight, and measured it: one blob URL created, zero revoked."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "The same message can be mounted by the list and by the expanded view at once; each hook instance fetches and decrypts independently, so the effect is duplicated work rather than an inconsistent result. Pre-existing in both copies and not a correctness defect."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control cut for the one finding and replayed by hand: it fails with AssertionError: expected \"vi.fn()\" to be called with arguments: [ 'blob:decrypted' ], which is a test failure and not a build break. The fix was committed before the patch was cut, so restoring the file could not destroy it."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new test is reachable by the runner that matters: it ran in the file's own suite (28 passed) and again inside the 11-suite H3 set, rather than only when named directly."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the guard the thing it exists to refuse. With the control applied, the unfixed code is refused by the test; without it, it passes. The guard sees something when it runs."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Checked every patch in .review/controls by full path and again by basename: not one targets any of the five changed files. The g3c0 family went to CompactPostCard, ModMailConversationPage, PinnedMessagesBar and useDecryptedContent, none of which this commit touched. The first grep returned nothing because the patches are cut from frontend/ and my pattern contained frontend/ -- rechecked rather than read as absence."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b exit 0, eslint exit 0 over all five files, prettier clean, i18n check and guard clean, tracked-build-artifact guard clean."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted rather than trusting 'ok'. The H3 set: 101 passed, 1 skipped, and the skip is named in the output (a pre-existing MessagesPage swipe test). encryption.test.ts: 25 passed, 0 skipped. The media file: 28 passed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran 11 suites that import or mock the changed modules: 101 passed, 1 pre-existing skip. Then found my own enumeration was short -- the pattern 'utils/encryption' missed encryption.test.ts, which imports './encryption' and is the only suite exercising the split against real WebCrypto. Ran it: 25 passed, including real round trips for a text file, a binary file, a large file and a wrong key. The instrument was amended to require every spelling of the path."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing here can cover, block or redirect the app; no gate, overlay or redirect changed."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture, router or package-level registry is involved."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The approved plan for G4a-0 promised an extraction with no behaviour change, and a decryptFile split making the file key's source a parameter. Both are kept: the split is real (decryptFile now composes importFileKey and decryptFileWithKey) and verified by real crypto. The one departure from 'no behaviour change' is this pass's fix, which is a deliberate, recorded correction rather than drift. The two new exports have no external consumer yet, by design: G4a-1 is what consumes them."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "F4 already named the technique that found the leak. The genuinely new lesson was a path-spelling miss in H3, so H3's text was amended to require every spelling of a module's import path, with the encryption.test.ts miss as its example."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a0-blob-leaked-on-scroll-away",
+          "summary": "The effect assigned its blob-URL cleanup after two awaits, so unmounting mid-decrypt left the cleanup with nothing to revoke and created the blob URL afterwards -- holding one whole decrypted file for the life of the page, per file scrolled past while decrypting.",
+          "found_by": "F4",
+          "fix_commit": "9aa958b82",
+          "control": {
+            "patch": ".review/controls/g4a0-blob-leaked-on-scroll-away.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useDecryptedMedia.test.tsx -t \"scrolls away\""
+            ],
+            "observed": "At HEAD the test passes (28 passed in the file). With the patch applied: 1 failed | 27 skipped, AssertionError: expected \"vi.fn()\" to be called with arguments: [ 'blob:decrypted' ]. A real assertion failure, not a compile error. The probe that found it measured created=1, revoked=0."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is eight lines in useDecryptedMedia.ts: an early return that releases the blob URL when the view is already gone. Same boundary as pass 1, the blob URL store."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records a blob-URL lifecycle finding; checked before writing pass 1 and again here."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The decryptFile argument is untouched by the fix. Re-confirmed by the 28-test file, which asserts mimeType per table entry and encryptedKey per reader."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The fix changes no markup. On the released path the hook returns null, exactly as before the decrypt started, so nothing new reaches the DOM."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Nothing persisted changed."
+        },
+        {
+          "id": "B5",
+          "status": "unverified",
+          "evidence": "Still unverified: no encrypted media rendered in a real browser. Unchanged from pass 1 and stated to the user rather than buried."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No shared bar, header or row changed."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay is drawn."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "No constant changed."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The hook still returns string | null and all five call sites are untouched."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule, one place; the second implementation no longer exists. Re-proved by E5 below."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider contract."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No field crosses a boundary in the fix."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader broken is the lifecycle itself, and the control does it: AssertionError, not a compile break."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "No fixture supplies a produced value in the fix; the media_url shape was settled against its producer in pass 1."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Parser untouched; the ten real extensions still resolve."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Parser untouched; hostile names still fall back to octet-stream."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Parser untouched."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The defence useVoicePlayer carries is now carried here too, in the same form: check the view, revoke, return."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Probed the OTHER way the new branch is reached -- a dependency change rather than an unmount. Printed the blob URLs: made blob:1 and blob:2, revoked blob:1, kept blob:2. Both routes into the branch are real and both are covered."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The early return is silent by design: an abandoned view has nobody to tell. The failure paths still warn with the cause."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Re-enumerated: still exactly one call to decryptFile in the frontend, and exactly one revoke-on-abandon rule in this hook."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The fix is the shape useVoicePlayer already had, so the shape is now consistent across both. MediaUploadZone remains the one outlier, reported and out of scope."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The decrypt still starts before the view is known to survive, which is unavoidable; the fix releases the product of the work that could not be unstarted."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "No process-wide state read was added."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction, lock or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The question that found the pass 1 finding, asked again of the fix: nothing is now left behind on either abandon route, measured on both."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Two mounted instances of the same message still decrypt independently, and each now releases its own blob. The fix makes the duplicate case cleaner, not worse."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control replayed by hand after the commit: passes at HEAD, fails with a real AssertionError with the patch applied."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new test runs in its own suite and inside the 11-suite H3 set, not only when named."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "With the control applied the test refuses the unfixed code, so the guard sees something."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The fix touched useDecryptedMedia.ts, which this review's own control now targets. Re-applied it after the change and required it to fail: it does, as a test. No other control targets any changed file."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint 0, prettier clean, i18n clean -- all run on the fixed tree."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted: 28 passed in the media file with 0 skips; H3 set 101 passed with 1 named pre-existing skip; encryption.test.ts 25 passed with 0 skips."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran the corrected enumeration: 11 suites plus encryption.test.ts, the suite the first spelling missed. All pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover, block or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan's promise for G4a-0 is kept, with the one recorded departure -- the leak fix -- which makes the extraction strictly better than the copies it replaced."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing was found this pass, so there is no new technique to add. H3 was already amended for the spelling lesson."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0 over all five changed files",
+    "format": "prettier --check clean",
+    "types": "tsc -b exit 0",
+    "tests": "useDecryptedMedia 28 passed; H3 set 11 suites 101 passed 1 pre-existing skip; encryption.test.ts 25 passed with real WebCrypto",
+    "i18n": "i18n:check and i18n:guard clean"
+  }
+}
