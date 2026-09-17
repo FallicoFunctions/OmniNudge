@@ -88,3 +88,11 @@ if (!window.matchMedia) {
 window.alert = vi.fn();
 window.confirm = vi.fn(() => true);
 window.scrollTo = vi.fn();
+
+// jsdom implements no layout, so scrollIntoView does not exist at all. Any test
+// that renders a message list trips this the moment a message arrives, and the
+// failure names the component rather than the environment. Guarded, because
+// ThreadView's suite installs and removes its own stub to assert scrolling.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn();
+}

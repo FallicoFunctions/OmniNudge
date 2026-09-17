@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/feed/CompactPostCard.tsx b/frontend/src/components/feed/CompactPostCard.tsx
+index 7feb62b3c..cab578f0b 100644
+--- a/frontend/src/components/feed/CompactPostCard.tsx
++++ b/frontend/src/components/feed/CompactPostCard.tsx
+@@ -82,7 +82,7 @@ function DecryptedMessagePreview({
+   isOwnMessage: boolean;
+   userId?: number;
+ }) {
+-  const preview = useDecryptedContent(message ?? NO_MESSAGE, isOwnMessage, userId);
++  const preview = message?.encrypted_content ?? '';
+ 
+   if (!preview) {
+     return null;

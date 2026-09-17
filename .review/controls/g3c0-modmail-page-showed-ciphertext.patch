@@ -1,0 +1,13 @@
+diff --git a/frontend/src/pages/ModMailConversationPage.tsx b/frontend/src/pages/ModMailConversationPage.tsx
+index 7cf702deb..fd7c6d1cc 100644
+--- a/frontend/src/pages/ModMailConversationPage.tsx
++++ b/frontend/src/pages/ModMailConversationPage.tsx
+@@ -31,7 +31,7 @@ function DecryptedMessageContent({
+   currentUserId?: number;
+   className?: string;
+ }) {
+-  const decryptedContent = useDecryptedContent(message, isOwnMessage, currentUserId);
++  const decryptedContent = message.encrypted_content;
+ 
+   if (!decryptedContent) return null;
+ 
