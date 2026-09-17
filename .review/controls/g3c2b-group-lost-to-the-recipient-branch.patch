@@ -1,0 +1,24 @@
+diff --git a/frontend/src/services/messagesService.ts b/frontend/src/services/messagesService.ts
+index 6b5792d48..82e56f2ae 100644
+--- a/frontend/src/services/messagesService.ts
++++ b/frontend/src/services/messagesService.ts
+@@ -231,7 +231,18 @@ export const messagesService = {
+     const ownKeys = await getOwnKeys();
+ 
+     if (!skipClientEncryption) {
+-      if (data.content && conversation?.conversation_type === 'group') {
++      if (data.content && recipientId) {
++        const publicKeys = await encryptionService.getPublicKeys([recipientId]);
++        const recipientPublicKeyBase64 = publicKeys[recipientId];
++        const recipientPublicKey = recipientPublicKeyBase64
++          ? await getUserPublicKey(recipientId, recipientPublicKeyBase64)
++          : null;
++        if (!recipientPublicKey) {
++          throw new MessageNotSent('recipient-key-unusable', 'no key');
++        }
++        encryptedContent = await encryptMessage(data.content, recipientPublicKey);
++        encryptionVersion = 'v2';
++      } else if (data.content && conversation?.conversation_type === 'group') {
+         // Asked before the recipient test on purpose. A group message is sealed
+         // once under the group's shared key -- there is no per-reader copy, so
+         // the sender opens the same envelope as everyone else. If a group ever

@@ -1,0 +1,17 @@
+diff --git a/frontend/src/services/messagesService.ts b/frontend/src/services/messagesService.ts
+index 6b5792d48..acb4748ce 100644
+--- a/frontend/src/services/messagesService.ts
++++ b/frontend/src/services/messagesService.ts
+@@ -217,12 +217,6 @@ export const messagesService = {
+     // payload and would store group media mislabelled the moment a group caller
+     // supplies one. Every caller today passes a version; this refuses the first
+     // one that forgets rather than guessing on its behalf.
+-    if (data.encrypted_content && !data.encryption_version) {
+-      throw new MessageNotSent(
+-        'encryption-failed',
+-        'A caller supplied ciphertext without saying how it was encrypted'
+-      );
+-    }
+     let encryptionVersion: string =
+       data.encryption_version ?? (data.content ? 'plaintext' : 'none');
+     let groupKeyVersion: number | undefined = data.group_key_version;
