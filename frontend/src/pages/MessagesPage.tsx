@@ -497,8 +497,14 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
  * Fix 7: Decrypt a message's text content on demand (one-shot, for edit form).
  * Mirrors the logic in useDecryptedContent but returns a Promise instead of state.
  */
-async function decryptMessageForEdit(message: Message, isOwnMessage: boolean): Promise<string> {
-  const { text } = await decryptForDisplay(message, isOwnMessage);
+async function decryptMessageForEdit(
+  message: Message,
+  isOwnMessage: boolean,
+  readerId?: number
+): Promise<string> {
+  // A group key is fetched for a named reader, so an edit with no reader can
+  // only refuse. Every caller of this has the signed-in user to hand.
+  const { text } = await decryptForDisplay(message, isOwnMessage, readerId);
   return text;
 }
 
@@ -3600,7 +3606,8 @@ export default function MessagesPage() {
                                         // Fix 7: decrypt on demand so edit form always starts with correct content
                                         const content = await decryptMessageForEdit(
                                           message,
-                                          isOwnMessage
+                                          isOwnMessage,
+                                          user?.id
                                         );
                                         startEdit(message, content);
                                         setMessageMenuOpen(null);
@@ -3617,7 +3624,8 @@ export default function MessagesPage() {
                                         // Fix 14: decrypt current content to show at top of history modal
                                         const content = await decryptMessageForEdit(
                                           message,
-                                          isOwnMessage
+                                          isOwnMessage,
+                                          user?.id
                                         );
                                         setHistoryCurrentContent(content);
                                         openHistory(message.id);

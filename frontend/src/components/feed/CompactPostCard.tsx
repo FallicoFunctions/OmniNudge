@@ -69,6 +69,7 @@ type PostWithMedia = {
 
 /** A stable stand-in, so the hook below is never called conditionally. */
 const NO_MESSAGE = {
+  conversation_id: 0,
   encrypted_content: '',
   encryption_version: 'none',
 } as unknown as Message;

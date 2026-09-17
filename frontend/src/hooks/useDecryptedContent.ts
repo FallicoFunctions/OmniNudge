@@ -20,6 +20,8 @@
 import { useEffect, useState } from 'react';
 import { decryptMessage, decryptMultiRecipientContent } from '../utils/encryption';
 import type { KeyPair } from '../utils/encryption';
+import { GROUP_ENCRYPTION_VERSION, openGroupMessage, sealedKeyVersion } from '../utils/groupKeys';
+import { groupKeyForVersion } from '../services/groupKeyCache';
 import { getOwnKeys } from '../services/keyManagementService';
 import type { Message } from '../types/messages';
 
@@ -46,6 +48,7 @@ export interface DecryptedContent {
  */
 export type DecryptableMessage = Pick<
   Message,
+  | 'conversation_id'
   | 'encrypted_content'
   | 'sender_encrypted_content'
   | 'encryption_version'
@@ -68,6 +71,11 @@ function cipherTextFor(message: DecryptableMessage, isOwnMessage: boolean): stri
  * first and replaced it a moment later, which is a blob on screen either way.
  */
 export function needsDecryption(message: DecryptableMessage, isOwnMessage: boolean): boolean {
+  // A sealed group envelope is JSON. Painting it as text is exactly what this
+  // predicate exists to prevent, so it must be answered before anything else.
+  if (message.encryption_version === GROUP_ENCRYPTION_VERSION) {
+    return Boolean(message.encrypted_content);
+  }
   const cipherText = cipherTextFor(message, isOwnMessage);
   if (!cipherText) return false;
   if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
@@ -104,6 +112,34 @@ export async function decryptForDisplay(
 
   const cipherText = cipherTextFor(message, isOwnMessage);
   if (!cipherText) return { status: 'not-encrypted', text: '' };
+
+  // A group message is sealed once under the group's shared key, so the sender
+  // opens the same envelope everyone else does. There is no per-reader copy,
+  // which is why this reads encrypted_content rather than the sender's.
+  if (message.encryption_version === GROUP_ENCRYPTION_VERSION) {
+    const sealed = message.encrypted_content;
+    if (!sealed) return { status: 'not-encrypted', text: '' };
+    const keys = await keysOnce();
+    if (!keys) return { status: 'no-keys', text: sealed };
+    // The group key is fetched for a named reader, so without one there is
+    // nobody to fetch for. Refusing beats guessing at whose keys to use.
+    if (currentUserId === undefined) return { status: 'failed', text: sealed };
+    try {
+      const groupKey = await groupKeyForVersion(
+        message.conversation_id,
+        sealedKeyVersion(sealed),
+        currentUserId,
+        keys
+      );
+      // Null is ordinary: a member who joined after a version ended never
+      // receives it when the group hides its history.
+      if (!groupKey) return { status: 'failed', text: sealed };
+      return { status: 'decrypted', text: await openGroupMessage(sealed, groupKey) };
+    } catch (error) {
+      console.warn('Failed to open a group message:', error);
+      return { status: 'failed', text: sealed };
+    }
+  }
 
   // Mod mail: one shared key, wrapped per participant. A failure here falls
   // through to the ordinary path rather than giving up, which is what every
@@ -166,6 +202,7 @@ export function useDecryptedContent(
 ): string {
   const [decryptedContent, setDecryptedContent] = useState<string>('');
   const {
+    conversation_id,
     encrypted_content,
     sender_encrypted_content,
     encryption_version,
@@ -178,6 +215,7 @@ export function useDecryptedContent(
     let cancelled = false;
     void decryptForDisplay(
       {
+        conversation_id,
         encrypted_content,
         sender_encrypted_content,
         encryption_version,
@@ -194,6 +232,7 @@ export function useDecryptedContent(
       cancelled = true;
     };
   }, [
+    conversation_id,
     encrypted_content,
     sender_encrypted_content,
     encryption_version,
