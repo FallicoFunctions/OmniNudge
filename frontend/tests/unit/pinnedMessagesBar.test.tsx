@@ -17,7 +17,33 @@ const makeMessage = (id: number, pinnedBy?: number): Message => ({
   pinned_at: new Date().toISOString(),
 });
 
+const makeEncryptedMessage = (id: number): Message => ({
+  ...makeMessage(id),
+  sender_id: 1,
+  encrypted_content: 'v2:secret-blob-nobody-should-read',
+  encryption_version: 'v2',
+});
+
 describe('PinnedMessagesBar', () => {
+  // The bar used to print message.encrypted_content straight into the row and
+  // into its title attribute, so every pinned encrypted message showed its
+  // ciphertext. No test here pinned an encrypted message, so nothing noticed.
+  it('never shows the stored ciphertext of an encrypted pinned message', () => {
+    const { container } = render(
+      <PinnedMessagesBar
+        pinnedMessages={[makeEncryptedMessage(1)]}
+        currentUserId={2}
+        expanded={true}
+        onToggleExpanded={vi.fn()}
+        onJumpToMessage={vi.fn()}
+        onUnpinMessage={vi.fn()}
+      />
+    );
+
+    expect(container.textContent).not.toContain('secret-blob');
+    expect(container.innerHTML).not.toContain('secret-blob');
+  });
+
   it('renders nothing when there are no pinned messages', () => {
     const { container } = render(
       <PinnedMessagesBar

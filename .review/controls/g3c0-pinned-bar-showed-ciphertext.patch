@@ -1,0 +1,15 @@
+diff --git a/frontend/src/components/messages/PinnedMessagesBar.tsx b/frontend/src/components/messages/PinnedMessagesBar.tsx
+index a6ce3571b..76e7cf51c 100644
+--- a/frontend/src/components/messages/PinnedMessagesBar.tsx
++++ b/frontend/src/components/messages/PinnedMessagesBar.tsx
+@@ -72,9 +72,7 @@ const previewText = (
+ 
+   // Text that needs no keys is shown at once; anything else waits, and says so
+   // rather than showing the stored blob.
+-  const content = needsDecryption(message, message.sender_id === currentUserId)
+-    ? (decrypted.get(message.id) ?? encryptedLabel)
+-    : message.encrypted_content || '';
++  const content = message.encrypted_content || '';
+ 
+   if (content.length <= 80) {
+     return content;

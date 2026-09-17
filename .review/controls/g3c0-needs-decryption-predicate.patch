@@ -1,0 +1,16 @@
+diff --git a/frontend/src/hooks/useDecryptedContent.ts b/frontend/src/hooks/useDecryptedContent.ts
+index 42ee9336a..e64e51d99 100644
+--- a/frontend/src/hooks/useDecryptedContent.ts
++++ b/frontend/src/hooks/useDecryptedContent.ts
+@@ -78,9 +78,9 @@ export function needsDecryption(message: DecryptableMessage, isOwnMessage: boole
+     message.encryption_version === 'v1' ||
+     message.encryption_version === 'v2';
+   // Held only as the recipient copy: unreadable here, but not plain text either.
+-  if (isOwnMessage && !message.sender_encrypted_content && looksEncrypted) return true;
+   return Boolean(
+-    (isOwnMessage && message.sender_encrypted_content) || (!isOwnMessage && looksEncrypted)
++    (isOwnMessage && message.sender_encrypted_content) ||
++      (!isOwnMessage && message.encryption_version === 'v1')
+   );
+ }
+ 
