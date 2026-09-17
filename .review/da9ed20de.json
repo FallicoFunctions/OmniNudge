@@ -1,0 +1,310 @@
+{
+  "schema_version": 2,
+  "head": "405b51ba5",
+  "base": "da9ed20de",
+  "scope": {
+    "files": [
+      "frontend/src/services/groupKeyCache.ts",
+      "frontend/src/services/__tests__/groupKeyCache.test.ts",
+      "frontend/src/services/__tests__/groupKeyCache.real.test.ts",
+      "frontend/src/services/__tests__/groupKeyRotationForgets.test.ts",
+      "frontend/src/utils/groupKeys.ts"
+    ],
+    "boundaries": [
+      "a wrapped copy from the server becoming a key that opens a message",
+      "how often the key routes are asked, per conversation and per reader",
+      "which reader a cached key belongs to",
+      "the promise that whoever rotates also forgets"
+    ]
+  },
+  "prior_ledgers_read": [
+    "cd683f853 -- g2a-seal-bytes-unpinned: the group vectors were pinned in one direction only, so the tests proved WebCrypto opens what Node sealed and nothing proved it produces what Node produced. That is the precedent that made the mocked cache suite suspect.",
+    "af4bacefe -- g1c-ban-leaves-the-key-version-active: the ban path ended the key version but no test reached it, so a later edit could drop that call unseen. The same shape as this phase's promise that whoever rotates must forget.",
+    "b28df65f3 -- g1d-copy-bound-smaller-than-publishable-key: a bound that refused copies the publish path admits. Read because this module consumes those copies.",
+    "51cde838c -- the immediately preceding review, whose findings were per-item work inside a loop. That is why this module caches at all."
+  ],
+  "notes": [
+    "During pass 2 I reverted a whole file with git checkout to undo a two-line probe, and destroyed the uncommitted test I had just written and proven. It was restored by an idempotent script that checked the file's real state rather than trusting my memory of it. The lesson is the same one this review keeps finding: revert what you changed, not the file.",
+    "openMyCopies awaits each RSA decrypt in turn rather than concurrently. Left as it is deliberately: the count is bounded by the versions this reader holds, it runs once per conversation per page, and a control for concurrency would have to be timing-based and therefore flaky.",
+    "The rotation guard asserts it read more than 50 source files. The real count is 441, so the floor is about an eleventh of the tree: large enough to catch a scan that reads nothing, far enough from the true count not to become a flake."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "A new service holding unwrapped group keys for the life of the page, its suite, and one shared constant. The boundary is a wrapped copy from the server becoming a key that opens a message."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cd683f853, af4bacefe, b28df65f3 and 51cde838c first. The first named the exact shape this pass found; the second named the shape of the unenforced call."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The artifact is a key that opens a real envelope. Built a real RSA pair, wrapped a real group key, and required the key the cache returns to open a message it never saw."
+        },
+        { "id": "B2", "status": "na", "why": "Nothing is rendered; this module has no screen." },
+        { "id": "B3", "status": "na", "why": "No handler changed." },
+        { "id": "B4", "status": "na", "why": "No query or migration changed." },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "GROUP_ENCRYPTION_VERSION is the one value the send and receive halves must agree on, and it is pinned beside the envelope version where the varchar(10) constraint is stated."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "my_copies gives key_version and wrapped_key; both are read, and the shape matches GroupKeyState as groupKeysService declares it."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The precedent instrument here: cd683f853 recorded vectors pinned in one direction. The same question asked of this suite showed it pinned bookkeeping only."
+        },
+        { "id": "C4", "status": "na", "why": "No worker or external provider." },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No field added to a crossing struct. The reverse was checked: every field of my_copies that the cache reads is one the service really returns."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Found the first defect. Every test mocked unwrapGroupKey, so the read was never exercised: a round trip through the real accessor was missing. Building one showed a swapped key argument passes all eleven mocked tests."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The fixture is minted the way production mints it: encryptKeyWithPublicKey over an exported AES key, not a hand-written string."
+        },
+        { "id": "D1", "status": "applied", "evidence": "A real member with a real copy gets a working key, proven by opening a sealed message." },
+        { "id": "D2", "status": "applied", "evidence": "A copy wrapped for another reader is refused, with a real OAEP decoding error rather than a stub." },
+        { "id": "D3", "status": "applied", "evidence": "Damaged base64, a version absent from the answer, and no device keys at all are each covered." },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "decryptForDisplay is the sibling: it gives undefined and null two different meanings for the same argument, and this module had collapsed them. Fixed before the commit under review."
+        },
+        { "id": "E2", "status": "applied", "evidence": "Every branch is reachable: held, known missing, cooldown, fetch, and the miss that records a missing version." },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A failure is not swallowed silently: it is logged, remembered briefly, and reported to the caller as null, which the display rule turns into a visible state."
+        },
+        { "id": "E4", "status": "applied", "evidence": "The reason this module exists. One request per conversation, not one per message; the sequential unwrap loop is recorded in the notes as considered." },
+        { "id": "E5", "status": "applied", "evidence": "One unwrap loop. A duplicate written minutes earlier was collapsed before the commit, and had already drifted by swallowing an error the original logs." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Deferred the wider sweep for the blind-suite shape to pass 3, where it found no recurrence."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "Concurrent asks are the normal case here: a screen of messages asks at once. inFlight collapses them to one request, asserted by a test."
+        },
+        { "id": "F2", "status": "applied", "evidence": "A failed fetch leaves nothing half-written: held is set only on success, and inFlight is cleared in a finally." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "forgetGroupKeys clears all four maps, for one bucket or for everything." },
+        { "id": "G1", "status": "applied", "evidence": "Both fixes controlled; each replay produced a real assertion failure, and the real-crypto proof was run again afterwards." },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new guard is wired as an ordinary test, so vitest runs it with everything else. Whether it sees anything was asked in pass 2."
+        },
+        { "id": "G3", "status": "applied", "evidence": "Fed the rotation guard a module that rotates without forgetting; it refused it by name." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both techniques already have rows: C6 for the round trip through the real accessor, I1 for a promise nothing enforces."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Run for real rather than described: WebCrypto generated the keys, wrapped the copy and threw the genuine OAEP errors seen in the output. No part of the crypto is simulated."
+        },
+        { "id": "E7", "status": "na", "why": "Nothing is started before a later branch decides whether it was wanted." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "Four mutable maps at module scope. Confirmed forgetGroupKeys clears all four in both branches, and that the suite clears them before each test."
+        },
+        { "id": "H2", "status": "applied", "evidence": "Ran with a verbose reporter and read each named test rather than a summary line." },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Found the second defect. The commit promised that whoever rotates must call forgetGroupKeys, and nothing anywhere enforced it."
+        },
+        { "id": "F5", "status": "applied", "evidence": "Many messages can start the same fetch at once; a test holds three concurrent asks and requires one request." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Ran every suite touching the cache, the key service and the envelope helpers." },
+        { "id": "H4", "status": "na", "why": "Nothing can cover or redirect the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." }
+      ],
+      "findings": [
+        {
+          "id": "groupkeycache-unwrap-never-proven",
+          "summary": "Every test mocked unwrapGroupKey, so the suite pinned how often the server is asked and who is served, and nothing proved a real wrapped copy opens at all. Passing the public key where the private one belongs satisfies all eleven of those tests while breaking every group message.",
+          "found_by": "C6",
+          "fix_commit": "f9d24a717",
+          "control": {
+            "patch": ".review/controls/groupkeycache-unwrap-never-proven.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/groupKeyCache.real.test.ts"],
+            "observed": "With the public key swapped in, the mocked suite still passes 11 of 11 while the real-crypto suite fails twice: expected null not to be null, and a real TypeError from decrypt."
+          }
+        },
+        {
+          "id": "groupkey-rotation-forget-unenforced",
+          "summary": "The cache remembers which versions a reader could not get, and a rotation can grant exactly those. The commit stated that whoever rotates must call forgetGroupKeys, and nothing checked it, so the next phase could omit the call and this page would keep saying those messages cannot be read.",
+          "found_by": "I1",
+          "fix_commit": "f9d24a717",
+          "control": {
+            "patch": ".review/controls/groupkey-rotation-forget-unenforced.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/groupKeyRotationForgets.test.ts"],
+            "observed": "The patch adds a module that rotates without forgetting. AssertionError names it: src/services/__probe__/rotatesWithoutForgetting.ts."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope now includes the two test files written in pass 1, which nobody had reviewed." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records either pass 1 finding, so neither is a re-fix." },
+        { "id": "B1", "status": "applied", "evidence": "The real-crypto proof was re-run and still opens a sealed envelope." },
+        { "id": "B2", "status": "na", "why": "Nothing is rendered." },
+        { "id": "B3", "status": "na", "why": "No handler." },
+        { "id": "B4", "status": "na", "why": "No query or migration." },
+        { "id": "C1", "status": "applied", "evidence": "The guard names rotateGroupKey and forgetGroupKeys exactly as the modules spell them." },
+        { "id": "C2", "status": "applied", "evidence": "The guard reads file text, so it depends on no shape that can drift silently." },
+        { "id": "C3", "status": "applied", "evidence": "Compared what the mocked suite and the real suite each catch, under the same reverted defect. Only the real one catches it." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "na", "why": "No field added." },
+        { "id": "C6", "status": "applied", "evidence": "Asked the same question of the new guard: it reads the tree, so break the reading. Blinding the scan root is the mutation, and it found the defect." },
+        { "id": "C7", "status": "applied", "evidence": "The probe module is built the way a real caller would be: it imports rotateGroupKey from the service and calls it." },
+        { "id": "D1", "status": "applied", "evidence": "The guard passes on the real tree, which holds no offender today." },
+        { "id": "D2", "status": "applied", "evidence": "It refuses the probe that rotates without forgetting." },
+        { "id": "D3", "status": "applied", "evidence": "Checked the edge that matters: a scan that reads nothing at all." },
+        { "id": "E1", "status": "applied", "evidence": "The repository's other guards assert what they found, not only what they did not find. This one did not, until now." },
+        { "id": "E2", "status": "applied", "evidence": "No unreachable branch; the exclusion of the declaring file is exercised by the real tree." },
+        { "id": "E3", "status": "applied", "evidence": "The guard reports offenders by path, so a failure names the file to fix." },
+        { "id": "E4", "status": "applied", "evidence": "The scan reads 441 files once per run, which is a test-time cost only." },
+        { "id": "E5", "status": "applied", "evidence": "One scan helper, used by both tests in the file." },
+        { "id": "E6", "status": "applied", "evidence": "Deferred the sweep for other blind suites to pass 3." },
+        { "id": "F1", "status": "na", "why": "The guard is synchronous and reads files." },
+        { "id": "F2", "status": "na", "why": "Nothing is written." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "na", "why": "Nothing persisted." },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The fix was controlled by blinding the scan root, and the control produced a real assertion failure rather than an empty pass."
+        },
+        { "id": "G2", "status": "applied", "evidence": "vitest runs the guard with every other suite; nothing special is needed to reach it." },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Found the defect. G2 asks whether anything runs the guard; this asks whether the guard sees anything when it runs, and it could have seen nothing."
+        },
+        { "id": "H1", "status": "applied", "evidence": "tsc, eslint, prettier and i18n all clean." },
+        { "id": "Z1", "status": "applied", "evidence": "G3 already names the technique; no new instrument required." },
+        { "id": "B5", "status": "applied", "evidence": "The real-crypto suite ran again on real WebCrypto." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "The guard resolves its root from process.cwd(), which is process-wide state a later change could move. That is what made the blind-scan case real rather than theoretical."
+        },
+        { "id": "H2", "status": "applied", "evidence": "Both named tests were read individually, not counted from a summary." },
+        { "id": "I1", "status": "applied", "evidence": "The guard now keeps its own promise: it checks the tree it says it checks." },
+        { "id": "F5", "status": "na", "why": "No side effect to start twice." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Re-ran every suite touching the phase after the change." },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." }
+      ],
+      "findings": [
+        {
+          "id": "groupkey-rotation-guard-scanned-nothing",
+          "summary": "The rotation guard asserted only that its offender list was empty, and an empty list is also what it returns after reading no files at all. A wrong scan root would have made it pass for ever while checking nothing, which is the defect this repository has already shipped once, in a type check pointed at an empty project.",
+          "found_by": "G3",
+          "fix_commit": "405b51ba5",
+          "control": {
+            "patch": ".review/controls/groupkey-rotation-guard-scanned-nothing.patch",
+            "runner": "vitest",
+            "tests": ["src/services/__tests__/groupKeyRotationForgets.test.ts"],
+            "observed": "With the scan root pointed at a directory holding no source, AssertionError: expected 0 to be greater than 50. Before the fix the same patch passed silently."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        { "id": "A1", "status": "applied", "evidence": "Scope re-derived from the commits: da9ed20de, f9d24a717 and 405b51ba5 across five files." },
+        { "id": "A2", "status": "applied", "evidence": "No prior ledger records the pass 2 finding." },
+        { "id": "B1", "status": "applied", "evidence": "The real-crypto proof ran once more and still opens a genuinely sealed envelope." },
+        { "id": "B2", "status": "na", "why": "Nothing is rendered." },
+        { "id": "B3", "status": "na", "why": "No handler." },
+        { "id": "B4", "status": "na", "why": "No query or migration." },
+        { "id": "C1", "status": "applied", "evidence": "One version constant, spelled once, with the column width recorded beside it." },
+        { "id": "C2", "status": "applied", "evidence": "The cache reads only key_version and wrapped_key, both of which GroupKeyState declares." },
+        { "id": "C3", "status": "applied", "evidence": "The mocked and real suites were compared under the same defect, and only the real one catches it." },
+        { "id": "C4", "status": "na", "why": "No worker or provider." },
+        { "id": "C5", "status": "na", "why": "No field added." },
+        { "id": "C6", "status": "applied", "evidence": "All three controls break a reader rather than a writer, and all three fail." },
+        { "id": "C7", "status": "applied", "evidence": "Fixtures are minted by production helpers throughout." },
+        { "id": "D1", "status": "applied", "evidence": "80 tests pass across the seven suites that touch this area." },
+        { "id": "D2", "status": "applied", "evidence": "Every refusal case still refuses." },
+        { "id": "D3", "status": "applied", "evidence": "Damaged copies, absent versions, no keys and a blind scan are all covered." },
+        { "id": "E1", "status": "applied", "evidence": "Checked the sibling crypto suites: they mock nothing and run on real vectors, which is the standard this module now meets." },
+        { "id": "E2", "status": "applied", "evidence": "No unreachable branch." },
+        { "id": "E3", "status": "applied", "evidence": "Every failure reaches a caller or a named assertion." },
+        { "id": "E4", "status": "applied", "evidence": "One request per conversation per reader; the sequential unwrap is recorded in the notes." },
+        { "id": "E5", "status": "applied", "evidence": "No duplicated rule remains in this module." },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept every test file for a suite that mocks the module it tests. None does. The three crypto suites mock nothing at all, and groupKeysService mocks only the network, so pass 1's shape does not recur."
+        },
+        { "id": "F1", "status": "applied", "evidence": "Concurrent asks still collapse to one request." },
+        { "id": "F2", "status": "applied", "evidence": "Nothing is half-written on failure." },
+        { "id": "F3", "status": "na", "why": "No migration." },
+        { "id": "F4", "status": "applied", "evidence": "forgetGroupKeys clears every map it owns." },
+        { "id": "G1", "status": "applied", "evidence": "Three controls, three real assertion failures, replayed after the last change to the files they touch." },
+        { "id": "G2", "status": "applied", "evidence": "The guard runs as an ordinary test on every run." },
+        { "id": "G3", "status": "applied", "evidence": "The guard refuses both known-bad inputs: a rotating module, and its own blindness." },
+        { "id": "H1", "status": "applied", "evidence": "tsc silent, eslint clean, prettier clean, i18n:verify OK." },
+        { "id": "Z1", "status": "applied", "evidence": "This pass found nothing, so there is no technique to add." },
+        { "id": "B5", "status": "applied", "evidence": "The crypto ran for real once more; the failure paths threw genuine OAEP errors." },
+        { "id": "E7", "status": "na", "why": "No early side effect." },
+        { "id": "B6", "status": "na", "why": "No layout." },
+        { "id": "E8", "status": "applied", "evidence": "The module's four maps are cleared between tests, and the guard now proves its process-wide root resolved to the real tree." },
+        { "id": "H2", "status": "applied", "evidence": "80 passed across 7 files, with no skips in this area." },
+        { "id": "I1", "status": "applied", "evidence": "Both promises this phase made are now enforced by a test rather than by a sentence in a commit message." },
+        { "id": "F5", "status": "applied", "evidence": "Three concurrent askers produce one request." },
+        { "id": "B7", "status": "na", "why": "No overlay." },
+        { "id": "H3", "status": "applied", "evidence": "Seven suites run together: the cache, its real-crypto proof, the guard, the key service, the envelope helpers, encryption and login keys." },
+        { "id": "H4", "status": "na", "why": "Nothing covers the app." },
+        { "id": "H5", "status": "na", "why": "No shared fixture changed." }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b --force silent",
+    "vet": "not applicable; no Go code changed",
+    "lint": "eslint clean; prettier clean on every changed file",
+    "types": "tsc -b --force",
+    "tests": "7 suites, 80 passed, no skips in this area. Three controls each replayed to a real assertion failure."
+  }
+}

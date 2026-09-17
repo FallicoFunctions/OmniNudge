@@ -1,0 +1,13 @@
+diff --git a/frontend/src/services/__tests__/groupKeyRotationForgets.test.ts b/frontend/src/services/__tests__/groupKeyRotationForgets.test.ts
+index 798afc3ea..7a11a6059 100644
+--- a/frontend/src/services/__tests__/groupKeyRotationForgets.test.ts
++++ b/frontend/src/services/__tests__/groupKeyRotationForgets.test.ts
+@@ -16,7 +16,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
+ import { join, relative } from 'node:path';
+ import { describe, expect, it } from 'vitest';
+ 
+-const SRC = join(process.cwd(), 'src');
++const SRC = join(process.cwd(), 'src', 'services', '__tests__');
+ /** Where rotateGroupKey is declared, rather than called. */
+ const DECLARES_IT = join('src', 'services', 'groupKeysService.ts');
+ 
