@@ -29,8 +29,7 @@ import type { Hub } from '../services/hubsService';
 import type { UserProfile } from '../types/users';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { getPostUrl } from '../utils/postUrl';
-import { decryptMessage } from '../utils/encryption';
-import { getOwnKeys } from '../services/keyManagementService';
+import { decryptForDisplay } from '../hooks/useDecryptedContent';
 import {
   getHiddenPostIdSet,
   getHiddenRedditPostIdSet,
@@ -646,7 +645,6 @@ export default function SearchResultsPage() {
     let cancelled = false;
     const decryptPreviews = async () => {
       setIsDecryptingMessagePreviews(true);
-      const keys = await getOwnKeys();
       const previews: Record<number, string> = {};
 
       for (const message of messageResults.messages) {
@@ -655,29 +653,14 @@ export default function SearchResultsPage() {
           continue;
         }
 
-        const cipherText =
-          message.sender_id === user?.id
-            ? (message.sender_encrypted_content ?? message.encrypted_content)
-            : message.encrypted_content;
-
-        if (!cipherText) continue;
-
-        if (!keys) {
-          previews[message.id] = t('messages.encrypted');
-          continue;
-        }
-
-        const shouldDecrypt = cipherText.startsWith('v2:') || message.encryption_version === 'v1';
-        if (!shouldDecrypt) {
-          previews[message.id] = cipherText;
-          continue;
-        }
-
-        try {
-          previews[message.id] = await decryptMessage(cipherText, keys.privateKey);
-        } catch {
-          previews[message.id] = t('messages.encrypted');
-        }
+        const result = await decryptForDisplay(message, message.sender_id === user?.id, user?.id);
+        // A message with nothing stored gets no preview at all, as before.
+        if (result.status === 'not-encrypted' && !result.text) continue;
+        // Raw ciphertext is not an answer for somebody reading search results.
+        previews[message.id] =
+          result.status === 'no-keys' || result.status === 'failed'
+            ? t('messages.encrypted')
+            : result.text;
       }
 
       if (!cancelled) {

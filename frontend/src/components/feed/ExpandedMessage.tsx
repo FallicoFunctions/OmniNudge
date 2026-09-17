@@ -9,14 +9,13 @@ import type { Conversation, Message, SendMessageRequest } from '../../types/mess
 import { API_BASE_URL } from '../../lib/api';
 import { authenticatedFetch } from '../../services/authSession';
 import {
-  decryptMessage,
   encryptFile,
   decryptFile,
   encryptKeyWithPublicKey,
   arrayBufferToBase64,
-  decryptMultiRecipientContent,
   encryptMessage,
 } from '../../utils/encryption';
+import { useDecryptedContent } from '../../hooks/useDecryptedContent';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
@@ -43,76 +42,6 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('audio/')) return 'audio';
   return 'file';
-}
-
-function useDecryptedContent(
-  message: Message,
-  isOwnMessage: boolean,
-  currentUserId?: number
-): string {
-  const [decryptedContent, setDecryptedContent] = useState<string>('');
-
-  useEffect(() => {
-    const cipherText = isOwnMessage
-      ? (message.sender_encrypted_content ?? message.encrypted_content)
-      : message.encrypted_content;
-
-    if (!cipherText) {
-      setDecryptedContent('');
-      return;
-    }
-
-    const attemptDecryption = async () => {
-      // Multi-recipient messages
-      if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
-        try {
-          const keys = await getOwnKeys();
-          const encryptedKey = currentUserId ? message.recipient_keys?.[currentUserId] : null;
-          if (keys?.privateKey && encryptedKey) {
-            const decrypted = await decryptMultiRecipientContent(
-              cipherText,
-              encryptedKey,
-              message.shared_encryption_iv,
-              keys.privateKey
-            );
-            setDecryptedContent(decrypted);
-            return;
-          }
-        } catch (error) {
-          console.warn('Failed to decrypt multi-recipient message:', error);
-        }
-      }
-
-      const shouldAttemptDecrypt = Boolean(
-        (isOwnMessage && message.sender_encrypted_content) ||
-        (!isOwnMessage &&
-          (message.encryption_version === 'v1' ||
-            message.encryption_version === 'v2' ||
-            cipherText.startsWith('v2:')))
-      );
-
-      if (!shouldAttemptDecrypt) {
-        setDecryptedContent(cipherText);
-        return;
-      }
-
-      try {
-        const keys = await getOwnKeys();
-        if (!keys) {
-          setDecryptedContent(cipherText);
-          return;
-        }
-        const decrypted = await decryptMessage(cipherText, keys.privateKey);
-        setDecryptedContent(decrypted);
-      } catch {
-        setDecryptedContent(cipherText);
-      }
-    };
-
-    attemptDecryption();
-  }, [message, isOwnMessage, currentUserId]);
-
-  return decryptedContent;
 }
 
 function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | null {

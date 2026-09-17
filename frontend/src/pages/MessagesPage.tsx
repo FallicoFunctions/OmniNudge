@@ -70,6 +70,7 @@ import {
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
+import { decryptForDisplay, useDecryptedContent } from '../hooks/useDecryptedContent';
 import { useFormat } from '../hooks/useFormat';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { EmptyConversations, EmptyInbox, EmptySearchResults } from '../components/empty';
@@ -338,91 +339,6 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
 }
 
 /**
- * Hook to decrypt a message's encrypted content (if necessary)
- * Returns decrypted plaintext or the original content when encryption isn't applied
- */
-function useDecryptedContent(
-  message: Message,
-  isOwnMessage: boolean,
-  currentUserId?: number
-): string {
-  const [decryptedContent, setDecryptedContent] = useState<string>('');
-
-  useEffect(() => {
-    const cipherText = isOwnMessage
-      ? (message.sender_encrypted_content ?? message.encrypted_content)
-      : message.encrypted_content;
-
-    if (!cipherText) return setDecryptedContent('');
-
-    const attemptDecryption = async () => {
-      // Multi-recipient (mod mail) messages
-      if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
-        try {
-          const keys = await getOwnKeys();
-          const encryptedKey = currentUserId ? message.recipient_keys?.[currentUserId] : null;
-          if (keys?.privateKey && encryptedKey) {
-            const decrypted = await decryptMultiRecipientContent(
-              cipherText,
-              encryptedKey,
-              message.shared_encryption_iv,
-              keys.privateKey
-            );
-            setDecryptedContent(decrypted);
-            return;
-          }
-        } catch (error) {
-          console.warn('Failed to decrypt multi-recipient message, falling back:', error);
-        }
-      }
-
-      const shouldAttemptDecrypt = Boolean(
-        (isOwnMessage && message.sender_encrypted_content) ||
-        (!isOwnMessage &&
-          (message.encryption_version === 'v1' ||
-            message.encryption_version === 'v2' ||
-            cipherText.startsWith('v2:')))
-      );
-
-      if (!shouldAttemptDecrypt) {
-        setDecryptedContent(cipherText);
-        return;
-      }
-
-      try {
-        const keys = await getOwnKeys();
-        if (!keys) {
-          // No keys available, return ciphertext
-          setDecryptedContent(cipherText);
-          return;
-        }
-
-        const decrypted = await decryptMessage(cipherText, keys.privateKey);
-        setDecryptedContent(decrypted);
-      } catch (error) {
-        // Decryption failed, content might be plaintext
-        console.warn('Failed to decrypt message, displaying as plaintext:', error);
-        setDecryptedContent(cipherText);
-      }
-    };
-
-    attemptDecryption();
-  }, [
-    currentUserId,
-    isOwnMessage,
-    message.encrypted_content,
-    message.encryption_version,
-    message.id,
-    message.is_multi_recipient,
-    message.recipient_keys,
-    message.sender_encrypted_content,
-    message.shared_encryption_iv,
-  ]);
-
-  return decryptedContent;
-}
-
-/**
  * Component to display decrypted message content
  */
 function DecryptedMessageContent({
@@ -582,29 +498,8 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
  * Mirrors the logic in useDecryptedContent but returns a Promise instead of state.
  */
 async function decryptMessageForEdit(message: Message, isOwnMessage: boolean): Promise<string> {
-  const cipherText = isOwnMessage
-    ? (message.sender_encrypted_content ?? message.encrypted_content)
-    : message.encrypted_content;
-
-  if (!cipherText) return '';
-
-  const shouldAttemptDecrypt = Boolean(
-    (isOwnMessage && message.sender_encrypted_content) ||
-    (!isOwnMessage &&
-      (message.encryption_version === 'v1' ||
-        message.encryption_version === 'v2' ||
-        cipherText.startsWith('v2:')))
-  );
-
-  if (!shouldAttemptDecrypt) return cipherText;
-
-  try {
-    const keys = await getOwnKeys();
-    if (!keys?.privateKey) return cipherText;
-    return await decryptMessage(cipherText, keys.privateKey);
-  } catch {
-    return cipherText;
-  }
+  const { text } = await decryptForDisplay(message, isOwnMessage);
+  return text;
 }
 
 const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
@@ -2117,56 +2012,12 @@ export default function MessagesPage() {
         orderedMessages.map(async (msg) => {
           if (!msg.encrypted_content) return;
 
-          try {
-            const isOwn = msg.sender_id === user?.id;
-            const cipherText = isOwn
-              ? (msg.sender_encrypted_content ?? msg.encrypted_content)
-              : msg.encrypted_content;
-
-            if (!cipherText) return;
-
-            // Handle multi-recipient (mod mail) messages
-            if (msg.is_multi_recipient && msg.shared_encryption_iv && msg.recipient_keys) {
-              const keys = await getOwnKeys();
-              const encryptedKey = user?.id ? msg.recipient_keys?.[user.id] : null;
-              if (keys?.privateKey && encryptedKey) {
-                const decrypted = await decryptMultiRecipientContent(
-                  cipherText,
-                  encryptedKey,
-                  msg.shared_encryption_iv,
-                  keys.privateKey
-                );
-                map.set(msg.id, decrypted);
-                return;
-              }
-            }
-
-            // Handle standard encrypted messages
-            const shouldAttemptDecrypt = Boolean(
-              (isOwn && msg.sender_encrypted_content) ||
-              (!isOwn &&
-                (msg.encryption_version === 'v1' ||
-                  msg.encryption_version === 'v2' ||
-                  cipherText.startsWith('v2:')))
-            );
-
-            if (!shouldAttemptDecrypt) {
-              map.set(msg.id, cipherText);
-              return;
-            }
-
-            const keys = await getOwnKeys();
-            if (!keys) {
-              map.set(msg.id, cipherText);
-              return;
-            }
-
-            const decrypted = await decryptMessage(cipherText, keys.privateKey);
-            map.set(msg.id, decrypted);
-          } catch (error) {
-            console.warn('[Search] Failed to decrypt message:', msg.id, error);
-            // Skip this message in search if decryption fails
-          }
+          const isOwn = msg.sender_id === user?.id;
+          const result = await decryptForDisplay(msg, isOwn, user?.id);
+          // A message that threw is left out of the map, as it always was; one
+          // this device simply has no keys for still shows what is stored.
+          if (result.status === 'failed') return;
+          map.set(msg.id, result.text);
         })
       );
 
