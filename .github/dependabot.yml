@@ -79,20 +79,11 @@ updates:
         applies-to: security-updates
         patterns: ['*']
 
-  - package-ecosystem: npm
-    directory: /omnirave-web
-    schedule:
-      interval: weekly
-    groups:
-      omnirave-web-dependencies:
-        patterns: ['*']
-        update-types: ['minor', 'patch']
-      omnirave-web-majors:
-        patterns: ['*']
-        update-types: ['major']
-      omnirave-web-security:
-        applies-to: security-updates
-        patterns: ['*']
+  # /omnirave-web is deliberately not scanned. It is the retired react-three-fiber
+  # runtime, replaced by /omnirave-babylon: nothing builds it, deploys it, or
+  # serves it, and it is kept only as reference material. Scanning it produced
+  # alerts nobody could act on, and the grouped bump in #86 raised react past the
+  # @react-three/fiber peer ceiling, which left the lockfile unresolvable.
 
   - package-ecosystem: npm
     directory: /omnirave-babylon
