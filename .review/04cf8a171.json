@@ -1,0 +1,528 @@
+{
+  "schema_version": 2,
+  "head": "9eda8b4b2",
+  "base": "04cf8a171",
+  "scope": {
+    "files": [
+      "frontend/src/utils/groupKeys.ts",
+      "frontend/src/utils/groupKeys.test.ts",
+      "frontend/src/hooks/useDecryptedMedia.ts",
+      "frontend/src/hooks/__tests__/useDecryptedMedia.test.tsx"
+    ],
+    "boundaries": [
+      "which branch a stored media key takes, group or per-recipient",
+      "the file key carried inside a group envelope, and the bytes it opens",
+      "what the browser is handed when a group file cannot be opened"
+    ]
+  },
+  "prior_ledgers_read": [
+    "ba2c83dd4 -- the extraction this builds on. Its B5 already proved decryptFileWithKey byte-identical to the RSA path in a real browser, which is why this phase could start from a verified foundation.",
+    "6e346b3fd -- the three live-device leaks, and the source of the publish() discipline reused here.",
+    "51cde838c and 0efe747b3 -- the text rule. Why the group branch is answered first and ignores the per-reader copy."
+  ],
+  "notes": [
+    "Live, outside these four files, and reported in session rather than fixed here: useDecryptedContent publishes result.text whatever the status, and decryptForDisplay returns the sealed envelope as the text of a failed decrypt. So a group TEXT message whose key version the reader cannot open paints the raw envelope into the bubble today. Proved by calling decryptForDisplay with an unavailable key and printing what the consumer receives. It is not a disclosure -- the reader is a group member who already holds those bytes -- but it is the same paint-ciphertext-as-text shape the G3c-0 review chased, surviving in the shared hook. Fixing it needs a decision about what a bubble should say, so it belongs to the user.",
+    "The media path detects a group file by shape and the text path detects it by encryption_version. That difference is deliberate: every branch in sendMessage that sets a version is gated on the message having text, so a photo with no caption is labelled none. Recorded because a future reader will see two rules and assume one is a mistake.",
+    "A shell trap cost a control: git diff > .review/controls/<patch> truncates that tracked file before git diff runs, so the patch captured itself being emptied and would not apply. Write the diff to a temp file and move it into place."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Four files. A shape predicate added to utils/groupKeys.ts, a group branch added to the one media rule, and their tests. The boundary is which branch a stored media key takes, and what the browser is handed when it cannot be opened."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read ba2c83dd4 (the extraction this builds on, whose B5 proved decryptFileWithKey against real crypto), 6e346b3fd, 51cde838c and 0efe747b3. The text rule ledgers are why the group branch is answered FIRST and ignores isOwnMessage."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Found the second finding. Printed the branch decision for eight realistic stored keys rather than reading the predicate: a real RSA-wrapped key, a real v1 envelope, a v2 envelope, an envelope missing k, plain JSON, empty, null and undefined. The v2 row read DIRECT MESSAGE, which is the defect."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The consumers are unchanged and still read src={mediaSrc}. What the browser receives on the new path is either a blob URL or null, and B5 looked at both in a real browser."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed; the Go side was not touched."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed. What the server stores in media_encryption_key is a string either way."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The envelope keys v, k, iv and data are spelled once, in SealedGroupMessage, and the new predicate reads that same interface rather than repeating string literals."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The hook still returns string | null and no call site changed. conversation_id was added to what it reads and to its dependency list, so a message that moves between conversations re-runs."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The rule lives in one place. The group branch reuses publish() and fetchEncrypted() rather than growing a second copy of the blob handling -- which matters because that blob handling carries the unmount fix from the previous review."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The other end is the sender, which does not exist yet: G4a-2 writes it. The shape both sides agree on is pinned by tests that seal with the production function rather than hand-written JSON, so the reader cannot drift from the writer."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field was added; the columns already exist and already hold strings."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader broken is the branch predicate itself, and the control does exactly that: with it reverted the v99 envelope goes down the RSA branch and the test fails on a real assertion."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The hook tests seal their envelopes with sealGroupMessage, the same function production will use, rather than hand-writing the JSON a fixture author imagines. The real-crypto test mints its IV and raw key through encryptFile."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A real v1 envelope is opened, and the key that comes out is asserted byte-for-byte equal to the key that went in."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A wrong group key is refused (groupKeys.test.ts and again in the browser), and a real RSA key is refused entry to the group branch."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Probed the predicate at its boundaries: empty string, null, undefined, non-JSON, JSON that is not an envelope, an envelope missing k, and a version beyond this build."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling is the text rule. Both now answer the group branch first, both ignore the per-reader copy for a group, and both read conversation_id. The difference is deliberate and recorded: text detects by column, media by shape, because a media-only message has no usable column."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every new branch is reached by a test: opened, no key, no conversation, unsupported version, and a sender copy that must be ignored. No existing branch changed meaning."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The group catch warns with the cause before showing nothing. Nothing is swallowed silently."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "publish() and fetchEncrypted() exist once and both branches use them, so the blob-URL race fixed in the previous review cannot be reintroduced by the new path."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Found a live defect outside these files, recorded in the notes and reported in session: the text rule publishes result.text whatever the status, so a group message the reader cannot open paints the raw envelope JSON into the bubble. Proved by calling decryptForDisplay with an unavailable key and printing what the consumer receives."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The blob URL is the thing left behind, and it is released by the shared publish(), which the new branch uses. Its control was regenerated this pass -- see the first finding."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Two controls, both replayed by hand: the regenerated blob-leak control fails with AssertionError on the scrolls-away test, and the new envelope control fails with AssertionError on the newer-version test. Both are real assertion failures and both files still compile with the patch applied."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both new tests are discovered by the command CI runs, not only when named: they appear in vitest list output for the default include."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint 0 over src, prettier clean on CI exact glob, i18n check and guard clean."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both findings were found by instruments already on the list, G4 and B1. Nothing new to add."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Applied for real in the built-in browser, on the path this phase adds. A harness minted a real group key, encrypted a canvas-drawn PNG and a synthesized WAV, sealed each file key with the production sealGroupMessage, then opened them exactly as the hook does: isSealedGroupEnvelope -> sealedKeyVersion (7) -> openGroupMessage -> importFileKey -> decryptFileWithKey. Both came back byte-exact (4612 and 6444 bytes) and the BROWSER DECODED both: the img reported 240x120 and rendered the picture correctly, the audio reported 0.4s. A second group key was refused. Harness and dev server removed afterwards."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision that governs it: the group branch resolves the key BEFORE fetching the bytes, so an unopenable file costs no request. Asserted in a test."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each guard was fed the thing it refuses. The predicate was given a v99 envelope and claimed it; parseSealed then refused the version inside the group branch, which is where showing nothing is the right answer."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout, bar or row changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "No process-wide lazy state is read."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted rather than trusting ok. 115 passed and 0 skipped across the 9-suite H3 set; 48 passed across the two suites after the fix. No test in this set can skip."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The approved plan says G4a-1 teaches the one rule to open a group-sealed file key, read before write. Kept exactly: nothing seals media for groups yet, no send path changed, and the direct message fallback is untouched until G4a-2 changes both. The one addition beyond the plan is the failure policy, which was put to the user and answered: show nothing."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "One acquisition per message; two entry points cannot start the same decrypt."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated by every spelling and by basename, as the amended instrument demands: 9 test files touch groupKeys or useDecryptedMedia. All ran, 115 passed."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover, block or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Found the first finding. Two controls target the changed files. g2a-seal-bytes-unpinned still applies. g4a0-blob-leaked-on-scroll-away did NOT: extracting publish() moved the lines it was written against, so it read as an existing control while proving nothing."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The new path acquires two things after an await: the fetched bytes and a blob URL. The bytes need no release; the blob URL is released by publish(), which carries the unmount guard. The group branch adds no new unreleased resource."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "Applies, because this hook releases a blob URL in its unmount cleanup -- and the failure mode F7 names was checked rather than assumed. The cleanup's input is a local variable in the effect closure, assigned where the resource is acquired, not a ref mirrored from state by another effect. No commit ordering can leave the cleanup holding the wrong thing, so the direct unmount() in the tests, which F7 warns is a batch of its own, is not hiding anything for this shape. The real parents mount this inside a message list and an expanded view, both of which can unmount it mid-decrypt; that route is the scrolls-away test."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a1-control-no-longer-applied",
+          "summary": "The control for the blob-URL leak stopped applying, because this phase extracted publish() out of the lines it was written against. It read as an existing control while proving nothing -- worse than a control that passes, because a passing one at least runs.",
+          "found_by": "G4",
+          "fix_commit": "9eda8b4b2",
+          "control": {
+            "patch": ".review/controls/g4a0-blob-leaked-on-scroll-away.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useDecryptedMedia.test.tsx -t \"scrolls away\""
+            ],
+            "observed": "Regenerated against the new structure. Applies again, and with it applied the test fails: AssertionError: expected \"vi.fn()\" to be called with arguments: [ blob:decrypted ]. A real assertion failure, not a compile break."
+          }
+        },
+        {
+          "id": "g4a1-newer-envelope-fell-to-the-rsa-branch",
+          "summary": "isSealedGroupEnvelope recognised only the current seal version, so an envelope sealed by a newer one was not claimed as a group file. It fell through to the per-recipient branch, failed to unwrap as an RSA key, and hit the catch that falls back to the stored URL -- handing the browser ciphertext, the one outcome this phase exists to prevent.",
+          "found_by": "B1",
+          "fix_commit": "9eda8b4b2",
+          "control": {
+            "patch": ".review/controls/g4a1-newer-envelope-fell-to-the-rsa-branch.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useDecryptedMedia.test.tsx -t \"newer version\""
+            ],
+            "observed": "With the version-strict predicate restored the test fails: AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times -- the fetch that only the RSA branch performs."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is the predicate fix and its test. Same boundary: which branch a stored media key takes."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records a version-gate finding; checked again before writing pass 1."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the branch table a second time with the fix in place, as G1 requires. The v2 row now reads GROUP, the real RSA key still reads DIRECT MESSAGE, and JSON arrays, null and bare numbers all fall to the DM guard rather than being claimed."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No markup changed; the consumers still read src={mediaSrc}."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No handler changed; the Go side was not touched."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No query or migration changed. What the server stores in media_encryption_key is a string either way."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "No constant changed; the predicate still reads the SealedGroupMessage shape."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "No signature changed. isSealedGroupEnvelope still takes a string and returns a boolean."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Still one rule in one place."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The writer does not exist yet; the shape stays pinned by tests that seal with the production function."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No struct field was added; the columns already exist and already hold strings."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The control breaks the predicate and the test fails on a real assertion."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Fixtures unchanged and still minted by production functions."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A real v1 envelope is still claimed and opened."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Re-probed the hostile inputs after the fix: a real RSA key, a JSON array, JSON null, a bare number and an envelope missing k are all refused entry to the group branch."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary is the version field, and it was probed either side: v1 opens, v2 and v99 are claimed and then refused."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The text rule remains the sibling, and the difference is recorded rather than accidental."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The widened predicate adds no branch; it moves which branch an input reaches. Every destination is covered by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "parseSealed throws inside the group try, which warns with the cause and then shows nothing."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No flag gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "One predicate, one place. The envelope keys are still spelled once in SealedGroupMessage."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Asked who else writes media_encryption_key: every producer passes base64 from encryptKeyWithPublicKey or forwards a caller value. No producer writes JSON there, so the widened predicate has no false-positive source in the product."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Unchanged from pass 1: No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Unchanged from pass 1: No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Nothing new is left behind; the fix touches a pure predicate."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both controls replayed again after their commits, by hand, and both fail as tests."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both tests are in the default vitest include and ran inside the suite rather than only when named."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0, eslint 0, prettier 0 on the final state."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing found this pass, so there is no technique to add."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Applied in pass 1 in a real browser, on the path this phase adds, and the fix does not touch the crypto that B5 exercised -- only which branch claims the envelope."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Unchanged: the key is still resolved before any byte is fetched."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The guard was fed v99 and claimed it, which is the point: claiming it is what allows the refusal to happen where showing nothing is correct."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No layout, bar or row changed."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "No process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "48 passed and 0 skipped across the two affected suites after the fix."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan is still kept: read before write, nothing seals media yet, no send path touched."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Unchanged from pass 1: One acquisition per message; two entry points cannot start the same decrypt."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The fix touches groupKeys.ts, whose importers were enumerated in pass 1; the 9-suite set was run and passed."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing can cover, block or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The only control targeting a file this pass changed is the new envelope control, replayed after its own commit. The regenerated blob control still applies."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "No resource is acquired by the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "The cleanup's input is still a local in the effect closure, not mirrored from state."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint src exit 0",
+    "format": "prettier --check on CI glob, exit 0",
+    "tests": "H3 set of 9 suites: 115 passed, 0 skipped; 48 passed across the two suites after the fix",
+    "i18n": "i18n:check and i18n:guard clean"
+  }
+}

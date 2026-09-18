@@ -1,22 +1,22 @@
 diff --git a/frontend/src/hooks/useDecryptedMedia.ts b/frontend/src/hooks/useDecryptedMedia.ts
-index 8246eeabb..fe5c5e49b 100644
+index a22d52c99..d2dbae170 100644
 --- a/frontend/src/hooks/useDecryptedMedia.ts
 +++ b/frontend/src/hooks/useDecryptedMedia.ts
-@@ -97,16 +97,8 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
-         );
+@@ -71,16 +71,8 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
+     /** The one place a blob URL is made, so the unmount race is settled once. */
+     const publish = (decrypted: Blob): void => {
+       const blobUrl = URL.createObjectURL(decrypted);
+-      // The cleanup below has already run if the reader scrolled this file out
+-      // of view while it was decrypting, so assigning it now would revoke
+-      // nothing and the whole decrypted file would be held for the life of the
+-      // page. useVoicePlayer settles the same race the same way.
+-      if (!isMounted) {
+-        URL.revokeObjectURL(blobUrl);
+-        return;
+-      }
+       cleanup = () => URL.revokeObjectURL(blobUrl);
+-      setMediaSrc(blobUrl);
++      if (isMounted) setMediaSrc(blobUrl);
+     };
  
-         const blobUrl = URL.createObjectURL(decryptedBlob);
--        // The cleanup below has already run if the reader scrolled this file out
--        // of view while it was decrypting, so assigning it now would revoke
--        // nothing and the whole decrypted file would be held for the life of the
--        // page. useVoicePlayer settles the same race the same way.
--        if (!isMounted) {
--          URL.revokeObjectURL(blobUrl);
--          return;
--        }
-         cleanup = () => URL.revokeObjectURL(blobUrl);
--        setMediaSrc(blobUrl);
-+        if (isMounted) setMediaSrc(blobUrl);
-       } catch (error) {
-         console.warn('Could not decrypt this media file:', error);
-         if (isMounted) setMediaSrc(originalUrl);
+     const fetchEncrypted = async (url: string): Promise<ArrayBuffer> => {
