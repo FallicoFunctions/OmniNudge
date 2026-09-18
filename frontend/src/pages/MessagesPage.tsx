@@ -381,11 +381,14 @@ async function decryptMessageForEdit(
   message: Message,
   isOwnMessage: boolean,
   readerId?: number
-): Promise<string> {
+): Promise<string | null> {
   // A group key is fetched for a named reader, so an edit with no reader can
   // only refuse. Every caller of this has the signed-in user to hand.
-  const { text } = await decryptForDisplay(message, isOwnMessage, readerId);
-  return text;
+  const { status, text } = await decryptForDisplay(message, isOwnMessage, readerId);
+  // Null, never the text, when it could not be opened: the text of a failed
+  // decrypt is the ciphertext. Handing that to the edit box invites somebody to
+  // save a sealed envelope as the new plaintext of their own message.
+  return status === 'decrypted' || status === 'not-encrypted' ? text : null;
 }
 
 const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
@@ -3489,8 +3492,15 @@ export default function MessagesPage() {
                                           isOwnMessage,
                                           user?.id
                                         );
-                                        startEdit(message, content);
                                         setMessageMenuOpen(null);
+                                        // Refuse rather than open the editor on
+                                        // ciphertext: saving that would replace
+                                        // the message with its own envelope.
+                                        if (content === null) {
+                                          alert(t('messages.editHistory.cannotDecrypt'));
+                                          return;
+                                        }
+                                        startEdit(message, content);
                                       }}
                                     >
                                       {t('messages.actions.edit')}
@@ -3507,7 +3517,11 @@ export default function MessagesPage() {
                                           isOwnMessage,
                                           user?.id
                                         );
-                                        setHistoryCurrentContent(content);
+                                        // The history modal already has words
+                                        // for a version it cannot read.
+                                        setHistoryCurrentContent(
+                                          content ?? t('messages.editHistory.cannotDecrypt')
+                                        );
                                         openHistory(message.id);
                                         setMessageMenuOpen(null);
                                       }}

@@ -9,7 +9,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { decryptForDisplay, needsDecryption } from '../useDecryptedContent';
+import { renderHook, waitFor } from '@testing-library/react';
+import i18n from 'i18next';
+import { decryptForDisplay, needsDecryption, useDecryptedContent } from '../useDecryptedContent';
 import { groupKeyForVersion } from '../../services/groupKeyCache';
 import { getOwnKeys } from '../../services/keyManagementService';
 import { GROUP_ENCRYPTION_VERSION } from '../../utils/groupKeys';
@@ -170,5 +172,31 @@ describe('a sealed group message', () => {
   it('is never treated as text that needs no decryption', () => {
     expect(needsDecryption(groupMessage(), false)).toBe(true);
     expect(needsDecryption(groupMessage(), true)).toBe(true);
+  });
+});
+
+// What reaches the bubble, rather than what decryptForDisplay returns. The text
+// of a failed decrypt IS the ciphertext, so a hook that published it unread
+// painted a sealed envelope into the conversation -- which is what a member who
+// joined after a rotation saw for every message sealed under the older version.
+// SearchResultsPage already answered this the same way, with the same words.
+describe('what the bubble shows when the key is missing', () => {
+  it('names the message encrypted instead of printing its envelope', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(null);
+
+    const { result } = renderHook(() => useDecryptedContent(groupMessage(), false, 9));
+
+    await waitFor(() => expect(result.current).not.toBe(''));
+    expect(result.current).toBe(i18n.t('messages.encrypted'));
+    expect(result.current).not.toContain('"v"');
+    expect(result.current).not.toBe(vector.sealed);
+  });
+
+  it('still shows the real text when the key is there', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+
+    const { result } = renderHook(() => useDecryptedContent(groupMessage(), false, 9));
+
+    await waitFor(() => expect(result.current).toBe(vector.plaintext));
   });
 });

@@ -18,6 +18,7 @@
  * what conversation search puts on the screen.
  */
 import { useEffect, useState } from 'react';
+import i18n from 'i18next';
 import { decryptMessage, decryptMultiRecipientContent } from '../utils/encryption';
 import type { KeyPair } from '../utils/encryption';
 import { GROUP_ENCRYPTION_VERSION, openGroupMessage, sealedKeyVersion } from '../utils/groupKeys';
@@ -232,7 +233,17 @@ export function useDecryptedContent(
       isOwnMessage,
       currentUserId
     ).then((result) => {
-      if (!cancelled) setDecryptedContent(result.text);
+      if (cancelled) return;
+      // The text of a failed decrypt is the ciphertext itself, so publishing it
+      // unread paints a sealed envelope into the bubble -- which is what a
+      // reader sees today for a group message whose key version they never
+      // received. SearchResultsPage already answers this the same way, with the
+      // same words: raw ciphertext is not an answer for somebody reading.
+      setDecryptedContent(
+        result.status === 'failed' || result.status === 'no-keys'
+          ? i18n.t('messages.encrypted')
+          : result.text
+      );
     });
     return () => {
       cancelled = true;
