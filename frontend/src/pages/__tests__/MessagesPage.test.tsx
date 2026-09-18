@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import MessagesPage from '../MessagesPage';
+import MessagesPage, { decryptMessageForEdit } from '../MessagesPage';
 import type { Conversation } from '../../types/messages';
 import { hubsService } from '../../services/hubsService';
 import { redditService } from '../../services/redditService';
@@ -350,4 +350,37 @@ describe('MessagesPage swipe archive gestures', () => {
     expect(payload).toBeDefined();
     expect(payload?.reply_to).toBe(9001);
   }, 10000);
+});
+
+// The edit box is the dangerous consumer of a failed decrypt: the "text" of a
+// failed decrypt is the ciphertext, so opening the editor on it invites
+// somebody to save a sealed envelope as the new plaintext of their own message.
+describe('decryptMessageForEdit', () => {
+  const sealed = '{"v":1,"k":3,"iv":"AAECAwQFBgcICQoL","data":"ZGF0YQ=="}';
+
+  it('refuses a message it could not open, rather than handing back ciphertext', async () => {
+    const message = {
+      id: 1,
+      conversation_id: 77,
+      sender_id: 5,
+      encrypted_content: sealed,
+      encryption_version: 'group-v1',
+      message_type: 'text',
+    } as never;
+
+    await expect(decryptMessageForEdit(message, false, 9)).resolves.toBeNull();
+  });
+
+  it('returns the text when the message really was opened', async () => {
+    const message = {
+      id: 2,
+      conversation_id: 77,
+      sender_id: 5,
+      encrypted_content: '',
+      encryption_version: 'plaintext',
+      message_type: 'text',
+    } as never;
+
+    await expect(decryptMessageForEdit(message, false, 9)).resolves.not.toBeNull();
+  });
 });

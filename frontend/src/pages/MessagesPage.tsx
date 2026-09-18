@@ -377,7 +377,7 @@ function DecryptedMessageContent({
  * Fix 7: Decrypt a message's text content on demand (one-shot, for edit form).
  * Mirrors the logic in useDecryptedContent but returns a Promise instead of state.
  */
-async function decryptMessageForEdit(
+export async function decryptMessageForEdit(
   message: Message,
   isOwnMessage: boolean,
   readerId?: number
