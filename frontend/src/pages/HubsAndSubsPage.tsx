@@ -11,8 +11,7 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { useFormat } from '../hooks/useFormat';
 
 type CombinedSuggestion =
-  | { type: 'subreddit'; data: SubredditSuggestion }
-  | { type: 'hub'; data: Hub };
+  { type: 'subreddit'; data: SubredditSuggestion } | { type: 'hub'; data: Hub };
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const ITEMS_PER_PAGE = 90;

@@ -51,8 +51,7 @@ const MESSAGE_PAGE_SIZE = 50;
 type MessageSearchItem = MessageSearchResponse['messages'][number];
 type CrosspostTarget = { post: RedditApiPost };
 type HideTarget =
-  | { type: 'reddit'; post: RedditApiPost }
-  | { type: 'platform'; post: PlatformPost };
+  { type: 'reddit'; post: RedditApiPost } | { type: 'platform'; post: PlatformPost };
 
 export default function SearchResultsPage() {
   const { t } = useTranslation();

@@ -227,7 +227,7 @@ export function parseOmniChatMessage(
     buffer = '';
   };
 
-  for (let index = 0; index < normalizedContent.length; ) {
+  for (let index = 0; index < normalizedContent.length;) {
     if (normalizedContent.startsWith('**', index)) {
       if (bold) {
         flush();

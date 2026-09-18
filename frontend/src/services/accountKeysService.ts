@@ -32,14 +32,12 @@ export interface KdfSettings {
 
 /** What to send to sign in, and the wrap key when there is one. */
 export type SignInSecret =
-  | { scheme: 2; login_key: string; keys: LoginKeys }
-  | { scheme: 1; password: string };
+  { scheme: 2; login_key: string; keys: LoginKeys } | { scheme: 1; password: string };
 
 export type UnlockResult = 'unlocked' | 'needs-recovery';
 
 export type MoveResult =
-  | { status: 'moved'; recoveryPhrase: string; keys: LoginKeys }
-  | { status: 'no-exportable-key' };
+  { status: 'moved'; recoveryPhrase: string; keys: LoginKeys } | { status: 'no-exportable-key' };
 
 /** Asks the server how this account proves its password, and derives the proof. */
 export async function signInSecret(username: string, password: string): Promise<SignInSecret> {

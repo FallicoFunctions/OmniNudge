@@ -15,14 +15,7 @@ import {
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type SidebarTab =
-  | 'discover'
-  | 'search'
-  | 'chat'
-  | 'groups'
-  | 'create'
-  | 'explore'
-  | 'characters'
-  | 'newOmniAI';
+  'discover' | 'search' | 'chat' | 'groups' | 'create' | 'explore' | 'characters' | 'newOmniAI';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;

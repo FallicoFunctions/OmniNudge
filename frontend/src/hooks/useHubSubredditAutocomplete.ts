@@ -5,8 +5,7 @@ import { hubsService, type Hub } from '../services/hubsService';
 import type { SubredditSuggestion } from '../types/reddit';
 
 export type CombinedSuggestion =
-  | { type: 'subreddit'; data: SubredditSuggestion }
-  | { type: 'hub'; data: Hub };
+  { type: 'subreddit'; data: SubredditSuggestion } | { type: 'hub'; data: Hub };
 
 const AUTOCOMPLETE_MIN_LENGTH = 2;
 
