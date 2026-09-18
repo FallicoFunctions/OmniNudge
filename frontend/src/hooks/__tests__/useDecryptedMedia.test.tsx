@@ -149,6 +149,28 @@ describe('group media', () => {
     expect(decryptFile).not.toHaveBeenCalled();
   });
 
+  // The version field exists because it will change. A reader that did not
+  // recognise a newer envelope would send the file down the per-recipient
+  // branch, fail to unwrap it as an RSA key, and fall back to the stored bytes
+  // -- which are ciphertext. It must be claimed as a group file and then
+  // refused, not handed to the other branch.
+  it('shows nothing for an envelope sealed by a newer version than it can open', async () => {
+    const future = JSON.stringify({ v: 99, k: 4, iv: 'aXY=', data: 'ZGF0YQ==' });
+
+    const { result } = render(
+      message({
+        conversation_id: 55,
+        media_url: '/u/a.png',
+        media_encryption_key: future,
+        media_encryption_iv: 'IV',
+      })
+    );
+
+    await waitFor(() => expect(result.current).toBeNull());
+    expect(authenticatedFetch).not.toHaveBeenCalled();
+    expect(decryptFile).not.toHaveBeenCalled();
+  });
+
   it('shows nothing when the message has no conversation to fetch a key for', async () => {
     const { sealed } = await sealedFileKey();
 

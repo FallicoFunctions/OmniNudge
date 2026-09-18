@@ -179,12 +179,27 @@ export function sealedKeyVersion(sealed: string): number {
  * sender wrote rather than a convention about a neighbouring field.
  */
 export function isSealedGroupEnvelope(value: string): boolean {
+  let parsed: unknown;
   try {
-    parseSealed(value);
-    return true;
+    parsed = JSON.parse(value);
   } catch {
     return false;
   }
+  const shape = parsed as Partial<SealedGroupMessage> | null;
+  // Deliberately ANY numeric v, not only the version this build can open. The
+  // whole point of a version field is that it changes, and a reader that failed
+  // to recognise v2 would send the file down the per-recipient branch, fail to
+  // unwrap it as an RSA key, and fall back to showing the stored bytes -- which
+  // are ciphertext. Claiming it here instead lets parseSealed refuse the
+  // version inside the group branch, where the answer is to show nothing.
+  return (
+    typeof shape === 'object' &&
+    shape !== null &&
+    typeof shape.v === 'number' &&
+    typeof shape.k === 'number' &&
+    typeof shape.iv === 'string' &&
+    typeof shape.data === 'string'
+  );
 }
 
 /** Opens what sealGroupMessage produced; throws on the wrong key or a damaged copy. */
