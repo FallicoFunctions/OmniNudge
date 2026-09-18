@@ -1,0 +1,32 @@
+diff --git a/frontend/src/components/slideshow/MediaUploadZone.tsx b/frontend/src/components/slideshow/MediaUploadZone.tsx
+index cfa2837b1..9911e4c32 100644
+--- a/frontend/src/components/slideshow/MediaUploadZone.tsx
++++ b/frontend/src/components/slideshow/MediaUploadZone.tsx
+@@ -118,13 +118,7 @@ export function MediaUploadZone({
+   const ownedPreviewUrls = useRef(new Set<string>());
+   const normalizedAcceptedTypes = acceptedTypes.map((type) => type.toLowerCase().trim());
+ 
+-  useEffect(() => {
+-    const owned = ownedPreviewUrls.current;
+-    return () => {
+-      for (const url of owned) URL.revokeObjectURL(url);
+-      owned.clear();
+-    };
+-  }, []);
++  useEffect(() => {}, []);
+ 
+   const toSelectedMedia = (file: File): SelectedMedia => {
+     if (!resolveFileType(file).startsWith('image/')) return { file, previewUrl: null };
+@@ -134,11 +128,7 @@ export function MediaUploadZone({
+   };
+ 
+   const releasePreviews = (items: SelectedMedia[]) => {
+-    for (const { previewUrl } of items) {
+-      if (previewUrl && ownedPreviewUrls.current.delete(previewUrl)) {
+-        URL.revokeObjectURL(previewUrl);
+-      }
+-    }
++    void items;
+   };
+ 
+   const validateFiles = (files: File[]): { valid: File[]; errors: string[] } => {

@@ -1,0 +1,542 @@
+{
+  "schema_version": 2,
+  "head": "f04bb09fe",
+  "base": "c36c77c3e",
+  "scope": {
+    "files": [
+      "frontend/src/components/slideshow/MediaUploadZone.tsx",
+      "frontend/src/components/slideshow/MediaUploadZone.test.tsx"
+    ],
+    "boundaries": [
+      "the src attribute the browser receives for each selected file",
+      "the File[] handed to onFilesSelected, and what the consumer does with it",
+      "the browser's blob store: every object URL created against every one revoked",
+      "the commit in which the parent unmounts the child, against the commit in which the child's effects run"
+    ]
+  },
+  "prior_ledgers_read": [
+    "ba2c83dd4 -- where this item comes from. Its E6 row swept all 19 createObjectURL sites and recorded this one as reported and not fixed, being outside that change's five files. Its own finding was the same resource released too late rather than never.",
+    "6e346b3fd -- the three live-device leaks, and the ledger that added F6. Its shape is a resource acquired after an await; this component has no await, so the shape did not repeat, but its instruction to compare against useVoicePlayer rather than invent a pattern is what E1 was checked against.",
+    "b4bf42b71 -- the other ledger that mentions createObjectURL. No overlap: its blob URLs are download links that revoke inline."
+  ],
+  "notes": [
+    "A second session was working in this worktree throughout: it committed 5eebf2418 on top of this review's first commit, and the modifications to omnirave-web/package.json, omnirave-web/package-lock.json and .github/dependabot.yml in the working tree are its work, left alone here and kept out of the control patches. The first two control patches had to be rebuilt after a bare 'git diff' swept them in. The base sha is this session's own starting commit rather than the parent of the fix, because .review/cb96b466b.json was already taken by that session's grpc review.",
+    "The pre-existing MediaUploadZone.test.tsx sat beside the component rather than in __tests__, so the first cut of this work wrote a second test file and never ran the first. Both are now one file. Nothing was wrong in the tests that already existed; they simply never used an image, which is why a component that leaked a blob URL per render had a green suite.",
+    "B5 was run rather than reasoned about, and it cost one dev server and four minutes. It also caught a bad fixture of its own: a hand-typed base64 PNG that decoded nowhere, which would have read as 'the previews do not render' if the fixture had not been checked separately."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One component and its test file: frontend/src/components/slideshow/MediaUploadZone.tsx and MediaUploadZone.test.tsx. Boundaries: the src attribute the browser receives, the File[] handed to onFilesSelected, and the browser's blob store -- what is created against what is revoked."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read ba2c83dd4, which is where this item comes from: its E6 row swept all 19 createObjectURL sites and recorded 'MediaUploadZone.tsx:285 leaks one per render but is a different component and outside these five files (reported, not fixed)'. Also read its g4a0 finding (a cleanup assigned after two awaits) and grepped the other two ledgers that mention createObjectURL, 6e346b3fd and b4bf42b71, for an already-known shape. Nothing here had been fixed before."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt, request or message is assembled. The one built string, the input's accept list, is unchanged and already covered by the pre-existing test."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the real rendered markup for five materially different inputs -- image/png, application/pdf, an image with an EMPTY browser MIME and a .jpg name, an image with an UPPERCASE MIME, and video/mp4. The empty-MIME image was accepted with no error and drawn with the generic document icon: finding mediaupload-preview-ignored-extension-fallback. Re-printed after the fix: preview, icon, preview, preview, icon."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The seam is 'what type is this file'. resolveFileType is the file's own canonical answer and both the accept check and the per-MIME size table ask it; the preview branch asked file.type raw. They now spell it the same way."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "onFilesSelected still receives File[]. Traced the real consumer, MessagesPage.handleMultiFileUpload:1472: it reads file.name and file.type and encrypts the bytes, and never touches a preview URL, so releasing the URLs after the hand-off cannot reach it."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The is-an-image rule lived in two places, which is the same finding as B2's. One accessor now."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or external contract is involved."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct or serialiser crosses a process boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Mutated the readers rather than the writers. src={previewUrl} -> src={file.name}: 2 tests fail. ownedPreviewUrls.current.delete(previewUrl) -> .has(previewUrl), so the reader never retires the URL: the parent-shape test fails. Neither mutation is invisible to the suite."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The File fixtures are minted the way a browser mints them, including the shape the code actually reads: a File whose .type is '' with a known extension, which the pre-existing suite already proved is accepted for upload. The parent fixture was wrong in the same way and is finding mediaupload-cleanup-read-a-state-mirror."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs that must pass: png, jpg with no MIME, uppercase MIME, a space-padded MIME, unicode name, a zero-byte png. All accepted and all previewed."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs still refused: malware.exe is rejected by the pre-existing test, and video/pdf files get no object URL at all rather than an <img> pointed at them."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Probed the boundaries of the name parser through the preview branch: 'photo' with no extension and 'photo.' with a trailing dot are refused; '.jpg', 'тест.JPG' and 'PHOTO.JPEG' are accepted and previewed. The accept decision and the preview branch agree on every one, which is what the fix was for. Also probed the cap: with maxFiles=3 and five files offered, 3 tiles and exactly 3 object URLs -- the two the cap drops never get one."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The neighbouring paths that hold blob URLs -- useVoicePlayer, useCallManager, WallSection, InlineCreatePost, EditProfileModal, AdminPersonasTab -- all release from a ref written where the resource was acquired, or from a functional state update. This path now does the same. AdminPersonasTab's extra 'typeof URL.createObjectURL !== function' guard is for a service Blob in a mocked environment, not a defence this path lost; jsdom provides createObjectURL, printed as 'function'."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Both preview branches are still reachable by a real input: printed the icon branch for application/pdf and video/mp4 and the img branch for three kinds of image."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "No error is swallowed. Nothing here can fail: createObjectURL does not throw for a File, and revokeObjectURL on an unknown URL is a no-op by specification."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag or conditional gates this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The duplicated rule was 'is this file an image', in two spellings. One accessor now. The remaining two uses of the 'image/' literal are a size-table key and the preview test, which are different questions."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept the frontend for both shapes. createObjectURL inside a render expression: no other instance, so this was the last one, exactly as ba2c83dd4 recorded. A ref mirrored from state and then read by an unmount cleanup to release something: seven mirrored refs exist, and read all of them -- useVoicePlayer's stopCurrentRef is compared for identity only and releases through audioRef, useCallManager releases through acquisition-time refs and a functional setLocalStream, and the rest carry handlers rather than resources. No second instance of the third finding."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The object URL is deliberately taken before the decision it serves -- the user has not yet chosen to upload or remove. That is what makes it undoable, and all four exits undo it."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide state is read or cached."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing is persisted. The in-memory analogue is E6/F6's question and is covered there: remove, clear all, upload and unmount each release."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Two entry points reach handleFiles, the drop handler and the input change handler, and both go through the same validate-then-create path; neither can run while the other is mid-flight, since both are single DOM events. The cap is evaluated from the state both share."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "Enumerated every acquisition in the file: one, URL.createObjectURL, in an event handler with no await before or after it. Nothing here is acquired after an await, which is the failure this instrument names. The release side is the finding."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls built, each replayed by hand: all three apply cleanly, all three still compile, and each produces a real assertion failure while the suite passes at HEAD. Then printed the artifact again -- five inputs through the preview branch, and a real browser run."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard, hook or script was added. The new tests sit in the file the component's suite already used, and the directory run picks them up."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The new tests are fed the thing they exist to refuse: the three control patches are the known-bad inputs, and each one is refused with an assertion failure rather than a build error."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No control patch from any earlier review targets this file (grepped .review/controls). Re-applied all three of this review's controls after the last edit to the file: 4 failed, 1 failed, 1 failed."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b clean, eslint clean, prettier --check clean, and the repo's own commit checks ran on both commits: no tracked build artifacts, i18n-check and i18n-guard OK."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted rather than trusting 'ok': 10 of 10 tests in the changed suite report a tick and the file contains no skip, todo or environment condition. The one skip in the wider run, MessagesPage's checkbox keyboard test, predates this change."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated every dependent test by three spellings -- 'MessagesPage', 'slideshow' and the basename 'MediaUploadZone' -- and found six files, then ran all of them: 33 passed, 1 pre-existing skip. This is also where the first grep of the session was wrong: an unquoted --include glob made zsh abort the command, and the empty output read as 'this component has no consumer'. It has one, MessagesPage.tsx:3658, and that consumer is what finding three depends on. The pre-existing MediaUploadZone.test.tsx was found the same way; the new tests went into it rather than into a second file."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing here can cover, block or redirect the app. The zone renders inside an existing panel in MessagesPage and adds no overlay, gate or redirect."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture, router or package-level registry is involved."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Not a phase of an approved plan. This is the item ba2c83dd4 deferred as out of scope."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran it against the real thing rather than jsdom: served the component from the real Vite dev server in a real browser, with a host that hides the zone inside onFilesSelected exactly as MessagesPage does. Three real files, two of them canvas-generated PNGs. Both previews decoded at 64x64 -- including nomime.jpg, the file that used to draw the document icon -- and the pdf drew the icon. Removing the first tile left the survivor decoded at 64x64 while a fetch of the removed URL failed and a fetch of the survivor's succeeded: the right URL died. Clicking upload closed the zone and left every URL revoked exactly once and none fetchable. The first attempt printed naturalWidth 0 for both images and the fixture was to blame, not the code: a hand-typed base64 PNG that no browser would decode, which jsdom had no opinion about."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed. The tiles, the grid and the bar are untouched; the change is which of two existing branches a file takes and when a URL is released."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Two of the three findings were found by instruments already on the list (F6 for the leak, by way of the report; B2 for the preview branch). The third was not: the technique was to unmount the child the way its real parent unmounts it, in the same batch as the child's own state change. Added as F7 before closing."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No fixed overlay, modal or full-screen step is drawn."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "The technique this pass added. Applied to the finding that produced it: with the parent's shape in place the mirrored cleanup revokes each URL twice, and with ownership in an acquisition-time ref it revokes each once."
+        }
+      ],
+      "findings": [
+        {
+          "id": "mediaupload-preview-urls-never-released",
+          "summary": "The image preview was rendered with src={URL.createObjectURL(file)}, called during render with no release path, so every render pass leaked one blob URL holding the whole file -- and nothing ever revoked any of them, on remove, clear, upload or unmount.",
+          "found_by": "F6",
+          "fix_commit": "474d22a0a",
+          "control": {
+            "patch": ".review/controls/mediaupload-preview-urls-never-released.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/slideshow/MediaUploadZone.test.tsx -t \"revokes the object URL when the file is removed\"",
+              "src/components/slideshow/MediaUploadZone.test.tsx -t \"revokes every remaining object URL on unmount\""
+            ],
+            "observed": "At HEAD the file passes 10 of 10. With the patch applied, which empties releasePreviews and the unmount cleanup while still compiling: 4 failed | 6 passed, AssertionError: expected [] to deeply equal [ 'blob:preview-0' ] and expected [] to deeply equal [ 'blob:preview-0', 'blob:preview-1' ]. Real assertion failures, not a build error."
+          }
+        },
+        {
+          "id": "mediaupload-preview-ignored-extension-fallback",
+          "summary": "The preview branch asked file.type directly while the accept check and the size table ask resolveFileType, so an image the browser gave no MIME type for -- or an uppercase one -- was accepted for upload and then drawn with the generic document icon instead of a preview.",
+          "found_by": "B2",
+          "fix_commit": "474d22a0a",
+          "control": {
+            "patch": ".review/controls/mediaupload-preview-ignored-extension-fallback.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/slideshow/MediaUploadZone.test.tsx -t \"previews an image whose browser MIME is empty but extension is known\""
+            ],
+            "observed": "With the patch applied, restoring file.type.startsWith('image/'): 1 failed | 9 passed, Unable to find an element with the alt text: photo.jpg. Printing the markup for the same input shows the document-icon branch, and the pre-existing suite already proved that file is accepted for upload."
+          }
+        },
+        {
+          "id": "mediaupload-cleanup-read-a-state-mirror",
+          "summary": "The unmount cleanup released whatever the last effect had mirrored from state into a ref, so on the one path the real parent takes -- MessagesPage hides the zone inside its own onFilesSelected callback, batching the unmount with the zone's reset, where no effect runs in between -- the cleanup revoked URLs the component no longer owned, twice each. Ownership now lives in a ref written where the URL is created.",
+          "found_by": "F7",
+          "fix_commit": "474d22a0a",
+          "control": {
+            "patch": ".review/controls/mediaupload-cleanup-read-a-state-mirror.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/slideshow/MediaUploadZone.test.tsx -t \"revokes each URL once when the parent hides the zone inside the callback\""
+            ],
+            "observed": "With the patch applied, restoring the mirrored ref: 1 failed | 9 passed, AssertionError: expected [ 'blob:preview-0', ...(3) ] to deeply equal [ 'blob:preview-0', 'blob:preview-1' ] -- each URL revoked twice. The same measurement in a real browser at HEAD gives exactly one revoke per URL. Unmounting by hand in the test instead of through the parent passes under both versions, which is why the first cut of this test proved nothing."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Re-read the whole committed change top-down at HEAD rather than the edits as made: two files, the same three boundaries. Nothing new crosses."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No further ledger bears on this file; the three read in pass 1 are the only ones that mention an object URL."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Still no assembled prompt, request or message."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The markup was printed again for the five inputs after the fix and the branches are as recorded. No further input dimension exists here: the branch turns on one predicate over the file type."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Re-checked the three remaining 'image/' literals in the file. One is the preview predicate, one is a size-table key, one is in a test. They answer different questions and none is a second copy of the accept rule."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Re-read MessagesPage.handleMultiFileUpload end to end. It holds the File objects across several awaits per file, which is why the hand-off must pass files and not preview URLs, and it does."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One accessor for the file type, confirmed against the committed file."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No worker or provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct crosses a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The two reader mutations from pass 1 were re-run against the committed file: src={file.name} fails 2 tests, .delete -> .has fails the parent-shape test. The readers are still guarded."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Probed the one fixture dimension pass 1 had not: the cap. With maxFiles=3 and five images offered in two batches, the component keeps 3 tiles and creates exactly 3 object URLs, so the two files the cap drops never acquire one that nothing would release."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Unchanged from pass 1; the accept path is not touched by the fix and its pre-existing tests pass."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Unchanged; exe still refused, non-images still get no object URL."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The new probe is the cap arithmetic above -- valid.slice(0, maxFiles - selected.length) is the one expression in the file that could go negative. It cannot be reached with a negative argument, because the cap it enforces holds on every earlier pass through it."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Re-read useVoicePlayer and useCallManager in full rather than by grep line. Both release from acquisition-time refs; useCallManager also uses a functional setLocalStream, the other correct form. This path matches them."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Both branches printed reachable in pass 1; the cap probe adds the third state, a file offered and dropped, which renders no tile and no img."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing to swallow, re-confirmed: neither createObjectURL for a File nor revokeObjectURL can throw here."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The two loops that revoke -- releasePreviews over a list and the cleanup over the Set -- read the same Set and answer different questions, 'release these' and 'release everything left'. Not a duplicated rule."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The sweep was re-run against the committed tree: still no createObjectURL in a render expression anywhere in the frontend, and still no other mirrored ref feeding a resource release."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Unchanged: the URL is taken before the decision it serves, and every branch of that decision releases it."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide state."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Re-enumerated the exits from the committed file: remove, clear all, upload, unmount. Four, all releasing, and the cap probe shows a fifth path that never acquires."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Both entry points re-checked against the committed handleFiles: one shared validate-then-create path."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "Re-read the committed file for acquisitions after an await. There are none; the single acquisition sits in a synchronous handler."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All three controls replayed once more after the final edit to the file: each applies, each compiles, each fails for real. The artifact was printed again, and B5 ran it in a browser."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The controls are the known-bad probes and all three are refused."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Replayed after the last change to the file, which is the case this instrument exists for: 4 failed, 1 failed, 1 failed. No earlier review's control targets this file."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Re-ran every gate at HEAD: tsc -b clean, eslint clean, prettier --check clean, vitest 16 passed across the two suites plus the pre-existing skip."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted again at HEAD: 10 ticks in the changed file, no skip conditions in it, and the single skip in the wider run is MessagesPage's pre-existing one."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Re-ran all six dependent suites found by the three spellings, not only the file beside the change: 33 passed, 1 pre-existing skip."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can take over the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Not a plan phase."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Already run for real in pass 1, in a browser, for all three lifecycle paths; the fix did not change after that run, so there is nothing new to render. The recorded evidence is the run itself, not a payload read from a desk."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing was found this pass, so there is no new technique to add. F7, added last pass, is now on the list and was applied above."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "Applied to the committed code: the parent-shape test is in the suite and passes at HEAD, and it is the control for the third finding."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b clean (frontend)",
+    "lint": "eslint clean on src/components/slideshow; prettier --check clean",
+    "types": "tsc -b clean",
+    "tests": "vitest src/components/slideshow 10/10; the six dependent suites found by H3 33 passed, 1 pre-existing skip",
+    "repo_checks": "the commit hook ran on both commits: no tracked build artifacts, i18n-check and i18n-guard OK"
+  }
+}

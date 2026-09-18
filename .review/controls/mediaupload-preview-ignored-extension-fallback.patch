@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/slideshow/MediaUploadZone.tsx b/frontend/src/components/slideshow/MediaUploadZone.tsx
+index cfa2837b1..4c6c76b96 100644
+--- a/frontend/src/components/slideshow/MediaUploadZone.tsx
++++ b/frontend/src/components/slideshow/MediaUploadZone.tsx
+@@ -127,7 +127,7 @@ export function MediaUploadZone({
+   }, []);
+ 
+   const toSelectedMedia = (file: File): SelectedMedia => {
+-    if (!resolveFileType(file).startsWith('image/')) return { file, previewUrl: null };
++    if (!file.type.startsWith('image/')) return { file, previewUrl: null };
+     const previewUrl = URL.createObjectURL(file);
+     ownedPreviewUrls.current.add(previewUrl);
+     return { file, previewUrl };

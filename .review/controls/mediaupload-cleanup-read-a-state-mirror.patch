@@ -1,0 +1,41 @@
+diff --git a/frontend/src/components/slideshow/MediaUploadZone.tsx b/frontend/src/components/slideshow/MediaUploadZone.tsx
+index cfa2837b1..dbb05206e 100644
+--- a/frontend/src/components/slideshow/MediaUploadZone.tsx
++++ b/frontend/src/components/slideshow/MediaUploadZone.tsx
+@@ -115,29 +115,23 @@ export function MediaUploadZone({
+   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
+   const [errors, setErrors] = useState<string[]>([]);
+   const fileInputRef = useRef<HTMLInputElement>(null);
+-  const ownedPreviewUrls = useRef(new Set<string>());
++  const selectedMediaRef = useRef<SelectedMedia[]>(selectedMedia);
+   const normalizedAcceptedTypes = acceptedTypes.map((type) => type.toLowerCase().trim());
+ 
+   useEffect(() => {
+-    const owned = ownedPreviewUrls.current;
+-    return () => {
+-      for (const url of owned) URL.revokeObjectURL(url);
+-      owned.clear();
+-    };
+-  }, []);
++    selectedMediaRef.current = selectedMedia;
++  }, [selectedMedia]);
++
++  useEffect(() => () => releasePreviews(selectedMediaRef.current), []);
+ 
+   const toSelectedMedia = (file: File): SelectedMedia => {
+     if (!resolveFileType(file).startsWith('image/')) return { file, previewUrl: null };
+-    const previewUrl = URL.createObjectURL(file);
+-    ownedPreviewUrls.current.add(previewUrl);
+-    return { file, previewUrl };
++    return { file, previewUrl: URL.createObjectURL(file) };
+   };
+ 
+   const releasePreviews = (items: SelectedMedia[]) => {
+     for (const { previewUrl } of items) {
+-      if (previewUrl && ownedPreviewUrls.current.delete(previewUrl)) {
+-        URL.revokeObjectURL(previewUrl);
+-      }
++      if (previewUrl) URL.revokeObjectURL(previewUrl);
+     }
+   };
+ 
