@@ -584,6 +584,32 @@ describe('OmniChatCallModal', () => {
     });
     afterEach(() => vi.unstubAllGlobals());
 
+    // The level meter names the input device it is listening to, which means the
+    // RENDER has to see the microphone. It used to read it out of a ref while
+    // rendering: a ref changing does not re-render, so that line showed whatever
+    // was true at some earlier, unrelated render. Nothing covered this line at
+    // all -- the meter had no test of any kind.
+    it('names the real input device while listening', async () => {
+      vi.mocked(omnichatService.startCall).mockResolvedValue(call);
+
+      render(
+        <OmniChatCallModal
+          persona={persona}
+          conversationId={12}
+          mode="voice"
+          onClose={vi.fn()}
+          onAssistant={vi.fn()}
+        />
+      );
+
+      const meter = await waitFor(() => screen.getByTestId('omnichat-call-level'));
+      // 'Fake input' is the label on the stubbed audio track, and ', live' is
+      // its readyState, so this is the microphone that was actually opened
+      // rather than the generic fallback wording.
+      expect(meter.textContent).toContain('Fake input');
+      expect(meter.textContent).not.toContain('no sound from the microphone');
+    });
+
     // She speaks once, not twice.
     //
     // The sentence run starts at the top of the turn, before the code knows

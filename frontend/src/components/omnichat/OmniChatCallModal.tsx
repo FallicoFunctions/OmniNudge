@@ -108,7 +108,12 @@ export default function OmniChatCallModal({
   // permission per sentence, which no other site does.
   const microphoneRef = useRef<CallMicrophone | null>(null);
   const [heardLevel, setHeardLevel] = useState(0);
-  const [microphoneReady, setMicrophoneReady] = useState(false);
+  // The same microphone twice, deliberately. The ref owns it, and is written
+  // where it is acquired, so the cleanup can always release exactly what it
+  // took. This state exists so the render can SEE it: a ref changing does not
+  // re-render, so reading the ref while rendering hands the live call and the
+  // input-device label whatever was true at the last unrelated render.
+  const [microphone, setMicrophone] = useState<CallMicrophone | null>(null);
   const [startFailure, setStartFailure] = useState('');
   // The session a voice call's live connection belongs to. State rather than
   // the session ref, so the connection opens when it arrives.
@@ -134,8 +139,13 @@ export default function OmniChatCallModal({
   const callEpochRef = useRef(0);
   const onCloseRef = useRef(onClose);
   const onPaymentRequiredRef = useRef(onPaymentRequired);
-  onCloseRef.current = onClose;
-  onPaymentRequiredRef.current = onPaymentRequired;
+  // Written after the commit, not during the render. React can start a render
+  // and throw it away, and a discarded render must not leave these pointing at
+  // callbacks belonging to a commit that never happened.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onPaymentRequiredRef.current = onPaymentRequired;
+  }, [onClose, onPaymentRequired]);
   const dialogRef = useDialogFocus({
     // While paused the credits screen is open over the call, and the trap
     // listens on the whole document: its keys are that screen's.
@@ -429,8 +439,10 @@ export default function OmniChatCallModal({
 
   const startListeningRef = useRef<() => void>(() => {});
   const startListening = () => {
-    const microphone = microphoneRef.current;
-    if (!microphone) {
+    // The ref, not the state: this runs from a timer and a button, and it wants
+    // the microphone as it is now rather than as the last render saw it.
+    const mic = microphoneRef.current;
+    if (!mic) {
       // Not open YET is not the same as cannot open. Opening it is asynchronous
       // and the call reaches 'ready' first, so latching here stopped the
       // automatic start for the whole call -- which is why the microphone
@@ -443,7 +455,7 @@ export default function OmniChatCallModal({
     setListeningNotice('');
     setStatus('listening');
     const callEpoch = callEpochRef.current;
-    void recordUtterance(microphone, {
+    void recordUtterance(mic, {
       onListening: () => {
         if (closedRef.current || callEpochRef.current !== callEpoch) return;
         setStatus('listening');
@@ -490,7 +502,12 @@ export default function OmniChatCallModal({
     });
   };
 
-  startListeningRef.current = startListening;
+  // After the commit, for the same reason as the callbacks above: a render
+  // React discards must not leave this holding a closure over state that never
+  // took effect. No dependency list, because the point is the latest one.
+  useEffect(() => {
+    startListeningRef.current = startListening;
+  });
 
   // The microphone is opened once, when the call connects, and held until it
   // ends. Opening it per sentence prompted for permission per sentence.
@@ -508,14 +525,15 @@ export default function OmniChatCallModal({
       }
       microphoneRef.current = result;
       // The call is already 'ready' by now, so the effect that starts
-      // listening has been and gone. Start it here instead of waiting for the
-      // next thing to change.
-      setMicrophoneReady(true);
+      // listening has been and gone. Publishing it to state both starts that
+      // effect and lets the render see the microphone it is talking about.
+      setMicrophone(result);
     });
     return () => {
       released = true;
       microphoneRef.current?.release();
       microphoneRef.current = null;
+      setMicrophone(null);
     };
   }, []);
 
@@ -548,18 +566,18 @@ export default function OmniChatCallModal({
     // A voice call listens over its live connection, all the time.
     if (mode === 'voice') return;
     if (status !== 'ready' || !handsFree || closedRef.current) return;
-    if (!microphoneReady || autoListenBlockedRef.current) return;
+    if (!microphone || autoListenBlockedRef.current) return;
     const timer = window.setTimeout(() => {
       if (!closedRef.current) startListeningRef.current();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [mode, status, handsFree, microphoneReady]);
+  }, [mode, status, handsFree, microphone]);
 
   // A voice call is one live connection: the caller and she are heard as they
   // speak, so there is no turn to record, transcribe and send.
   const { resume } = useLiveVoiceCall({
     callId: mode === 'voice' ? liveCallId : null,
-    microphone: mode === 'voice' && microphoneReady ? microphoneRef.current : null,
+    microphone: mode === 'voice' ? microphone : null,
     muted: !handsFree,
     onState: setStatus,
     onHeard: setTranscript,
@@ -684,7 +702,7 @@ export default function OmniChatCallModal({
                 ? 'the microphone is not being measured'
                 : heardLevel > 0.002
                   ? 'hearing you'
-                  : `no sound from ${microphoneRef.current?.describeInput() ?? 'the microphone'}`}
+                  : `no sound from ${microphone?.describeInput() ?? 'the microphone'}`}
             </div>
           )}
           {listeningNotice && status !== 'error' && (
