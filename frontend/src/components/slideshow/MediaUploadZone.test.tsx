@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -138,15 +139,22 @@ describe('MediaUploadZone preview object URLs', () => {
     expect(revoked.sort()).toEqual(['blob:preview-0', 'blob:preview-1']);
   });
 
-  it('revokes each URL exactly once when upload is followed by unmount', () => {
-    // MessagesPage.handleMultiFileUpload hides the zone inside the callback, so the
-    // parent unmount lands in the same batch as this component's own reset. The
-    // cleanup must release what it still owns, not whatever state it last mirrored.
-    const { unmount } = select([image('first.png'), image('second.png')]);
+  it('revokes each URL once when the parent hides the zone inside the callback', () => {
+    // MessagesPage.handleMultiFileUpload calls setShowMultiUpload(false) at the top,
+    // so the zone unmounts in the same batch as its own reset and no effect runs in
+    // between. The cleanup has to release what it still owns, not what it last
+    // mirrored from state.
+    const Host = () => {
+      const [open, setOpen] = useState(true);
+      return open ? <MediaUploadZone onFilesSelected={() => setOpen(false)} /> : <p>closed</p>;
+    };
+    const { container } = render(<Host />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [image('first.png'), image('second.png')] } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload 2 files' }));
-    unmount();
 
+    expect(screen.getByText('closed')).toBeInTheDocument();
     expect(revoked).toEqual(['blob:preview-0', 'blob:preview-1']);
   });
 
