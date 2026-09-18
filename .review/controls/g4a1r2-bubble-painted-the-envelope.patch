@@ -1,0 +1,23 @@
+diff --git a/frontend/src/hooks/useDecryptedContent.ts b/frontend/src/hooks/useDecryptedContent.ts
+index 7eb290860..54d07491b 100644
+--- a/frontend/src/hooks/useDecryptedContent.ts
++++ b/frontend/src/hooks/useDecryptedContent.ts
+@@ -233,17 +233,7 @@ export function useDecryptedContent(
+       isOwnMessage,
+       currentUserId
+     ).then((result) => {
+-      if (cancelled) return;
+-      // The text of a failed decrypt is the ciphertext itself, so publishing it
+-      // unread paints a sealed envelope into the bubble -- which is what a
+-      // reader sees today for a group message whose key version they never
+-      // received. SearchResultsPage already answers this the same way, with the
+-      // same words: raw ciphertext is not an answer for somebody reading.
+-      setDecryptedContent(
+-        result.status === 'failed' || result.status === 'no-keys'
+-          ? i18n.t('messages.encrypted')
+-          : result.text
+-      );
++      if (!cancelled) setDecryptedContent(result.text);
+     });
+     return () => {
+       cancelled = true;

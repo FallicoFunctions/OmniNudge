@@ -1,0 +1,527 @@
+{
+  "schema_version": 2,
+  "head": "2559613c7",
+  "base": "cff7365eb",
+  "scope": {
+    "files": [
+      "frontend/src/hooks/useDecryptedContent.ts",
+      "frontend/src/hooks/__tests__/useDecryptedContent.group.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/pages/__tests__/MessagesPage.test.tsx"
+    ],
+    "boundaries": [
+      "what a bubble, feed card, expanded view and mod mail show when a message cannot be opened",
+      "what the edit box is pre-filled with",
+      "the status of a decrypt, against the text that accompanies it"
+    ]
+  },
+  "prior_ledgers_read": [
+    "04cf8a171 -- the review immediately before this one. It found this defect, proved it, recorded it in its notes and deferred it for a copy decision. This pass looked for that copy and found it already existed, so the deferral was wrong.",
+    "ba2c83dd4 and 6e346b3fd -- read for anything about display of failed decrypts; neither records one."
+  ],
+  "notes": [
+    "The previous review deferred this on the grounds that fixing it needed a decision about what a bubble should say. That was wrong, and the way to find out took one grep: SearchResultsPage already answers exactly this, for exactly these two statuses, with t(messages.encrypted). The lesson is that \"this needs a product decision\" is itself a claim to check, not a reason to stop.",
+    "H3 by module name is not enough. The first enumeration missed CompactPostCard.decrypt.test.tsx, which renders a consumer of the changed hook without importing it. Enumerate by CONSUMER as well as by module.",
+    "decryptMessageForEdit was exported so its refusal could be controlled. Exporting for testability was the smaller price than leaving the more dangerous half of the finding without a control."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Three files. useDecryptedContent stops publishing the text of a failed decrypt; MessagesPage stops handing that text to the edit box and the history modal. The boundary is what a reader sees when a message cannot be opened."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 04cf8a171 -- the review immediately before this one, which FOUND this defect, recorded it in its notes and deferred it for a copy decision. That deferral is what this pass overturned."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The artifact is the string a consumer receives. Printed it by calling decryptForDisplay with an unavailable key: status failed, text identical to the sealed envelope. Printed again after the fix through the control, whose failure names both values side by side."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Four consumers render this string: the conversation bubble, the feed card, the expanded view and mod mail. All four now receive the label instead of the envelope, because all four read the same hook."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query, migration or stored row changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The label is not a new literal: it is t('messages.encrypted'), the same key SearchResultsPage already uses for the same two statuses."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "decryptMessageForEdit changed shape from Promise<string> to Promise<string | null>, and both call sites were updated. tsc enforces that there is no third caller."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two implementations of one rule existed: SearchResultsPage handled failed and no-keys, the shared hook did not. They now agree, and the hook is the one place the four display consumers read."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "No external contract; the producer is decryptForDisplay in the same module."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The reader broken is the status check itself. Both controls revert it and both tests fail with real assertions that print the ciphertext they were handed."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "The fixtures are sealed envelopes of the shape the sender writes; the group vector file supplies the real one."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A message that really opens still shows its text: asserted for the group vector with the key present, and for a plaintext message through the edit helper."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "The input that must be refused is a sealed envelope with no key. Refused in both places."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The boundary is the status: decrypted and not-encrypted pass, failed and no-keys are labelled. All four are exercised."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Found the first finding. SearchResultsPage carried the defence -- label the two unreadable statuses rather than print their text -- and the shared hook did not, though four surfaces depend on it."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "No branch became unreachable. The new branch is reached by a test, and the old one still carries decrypted and not-encrypted."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing is swallowed. The refusal is visible: the editor says so, the history modal says so, the bubble says so."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The words exist once, in the locale file, and both call sites use the key rather than a second literal."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Found the second finding. Having fixed the hook, asked who else consumes result.text without its status: PinnedMessagesBar was already correct, SearchResultsPage was the model, and decryptMessageForEdit was not -- the worst of the three, because its consumer is an edit box."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted; the change is what a string says."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Two controls, both replayed by hand after their commits. The bubble control fails with expected {\"v\":1,\"k\":1,...} to be \"End-to-end encrypted\"; the edit control fails with expected {\"v\":1,\"k\":3,...} to be null. Real assertions, and both files still compile with the patch applied."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both tests run inside their suites rather than only when named, and both suites are in the default vitest include."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint 0, prettier 0, i18n check and guard clean. The guard matters here because the fix adds translated strings: alertCalls stays 0, because the alert uses t()."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Both findings came from instruments already on the list, E1 and E6. The one lesson worth keeping is recorded in the notes: H3 by module name misses a test that renders a consumer without importing the module."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "Nothing here crosses into a model, provider or other system. The artifact is a string, and the test asserts it exactly -- including the real English wording, which the control proved by printing \"End-to-end encrypted\" in its failure."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each guard was fed the thing it refuses -- a sealed envelope with no key -- and refused it."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted: 58 passed and 1 pre-existing skip across the 7-suite H3 set; the skip is a MessagesPage swipe test named in the output."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Not a plan phase. This is the review of G4a-1 finding a defect outside it and fixing it, which the skill asks for."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No side effect has two entry points here."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated twice. The first grep, by module name, missed CompactPostCard.decrypt.test.tsx, which renders a consumer without ever naming the hook. Re-enumerated by CONSUMER name and found three more suites. All 7 ran."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No existing control targets useDecryptedContent.ts or MessagesPage.tsx; checked by grep over every patch in .review/controls. The two added here were replayed after their own commits."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource is acquired after an await by the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed; the hook still cancels with a local flag."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a1r2-bubble-painted-the-envelope",
+          "summary": "useDecryptedContent published result.text whatever the status, and the text of a failed decrypt is the ciphertext. A group message whose key version the reader never received rendered as a raw sealed envelope in the conversation, the feed card, the expanded view and mod mail.",
+          "found_by": "E1",
+          "fix_commit": "28bebdd8b",
+          "control": {
+            "patch": ".review/controls/g4a1r2-bubble-painted-the-envelope.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useDecryptedContent.group.test.ts -t \"names the message encrypted\""
+            ],
+            "observed": "With the fix reverted the test fails: AssertionError: expected '{\"v\":1,\"k\":1,\"iv\":\"AAECAwQFBgcICQoL\",...' to be 'End-to-end encrypted'. The failure prints the defect itself."
+          }
+        },
+        {
+          "id": "g4a1r2-edit-box-opened-on-ciphertext",
+          "summary": "decryptMessageForEdit returned the text regardless of status, so the edit box could open pre-filled with a sealed envelope. Saving that would replace the message with its own ciphertext as plaintext, and the history modal showed the same envelope.",
+          "found_by": "E6",
+          "fix_commit": "28bebdd8b",
+          "control": {
+            "patch": ".review/controls/g4a1r2-edit-box-opened-on-ciphertext.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/pages/__tests__/MessagesPage.test.tsx -t \"refuses a message it could not open\""
+            ],
+            "observed": "With the fix reverted the test fails: AssertionError: expected '{\"v\":1,\"k\":3,\"iv\":\"AAECAwQFBgcICQoL\",...' to be null."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is a status branch in the hook, a null return in the edit helper, an export, and two tests."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records a fix here; 04cf8a171 recorded the defect and deferred it."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The string each consumer receives was printed once before the fix and once through each control after it. Both controls print the envelope beside the expected value."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Checked what each of the four consumers does with the new value. CompactPostCard returns null on an empty preview, and the label is not empty, so a message that could not be opened now renders the label where it previously rendered the envelope. Nothing renders differently for a message that opens."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No query, migration or stored row changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "One key, used by two call sites and already used by a third."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Promise<string | null> is enforced by tsc at both call sites; there is no third."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The hook and SearchResultsPage now answer the same question the same way."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "No external contract."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Both controls break the reader and both fail as tests."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Unchanged from pass 1: The fixtures are sealed envelopes of the shape the sender writes; the group vector file supplies the real one."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A message that opens still shows its text, asserted in both suites."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A sealed envelope with no key is refused in both places."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "All four statuses are exercised across the two suites."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The defence SearchResultsPage carried is now carried by the shared hook as well."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Asked whether labelling breaks a legacy plaintext message read on a device with no keys. It does not: such a message is not-encrypted, not no-keys, so it never reaches the new branch."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal is visible to the person who triggered it."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "One key, one place."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Swept the remaining consumers of decryptForDisplay a second time. PinnedMessagesBar takes text only when decrypted. SearchResultsPage labels. The conversation-search path omits failed and deliberately shows the stored value for no-keys, with a comment from an earlier review explaining why -- inspected and left alone rather than contradicting a recorded decision on no evidence."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Unchanged from pass 1: No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Unchanged from pass 1: No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing persisted; the change is what a string says."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Both controls replayed by hand after their commits; both fail with real assertions."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both tests ran inside their suites, not only when named."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0, eslint 0, prettier 0, i18n clean with alertCalls still 0."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing found this pass."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing here crosses into a model, provider or other system. The artifact is a string, and the test asserts it exactly -- including the real English wording, which the control proved by printing \"End-to-end encrypted\" in its failure."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Both guards refused the input they exist to refuse."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "Unchanged from pass 1: No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "58 passed and 1 named pre-existing skip across 7 suites."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Not a plan phase."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No side effect has two entry points here."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated by module AND by consumer, after the first enumeration missed a suite that renders a consumer without importing the module."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The two new controls target the two changed source files and were replayed after the commits that fixed them. No older control targets either file."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No resource is acquired after an await by the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No unmount cleanup changed; the hook still cancels with a local flag."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0",
+    "format": "prettier exit 0",
+    "tests": "H3 set of 7 suites: 58 passed, 1 pre-existing skip",
+    "i18n": "i18n:check and i18n:guard clean, alertCalls still 0"
+  }
+}

@@ -1,0 +1,18 @@
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index 383cb82b8..d5fb9bc33 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -384,11 +384,8 @@ export async function decryptMessageForEdit(
+ ): Promise<string | null> {
+   // A group key is fetched for a named reader, so an edit with no reader can
+   // only refuse. Every caller of this has the signed-in user to hand.
+-  const { status, text } = await decryptForDisplay(message, isOwnMessage, readerId);
+-  // Null, never the text, when it could not be opened: the text of a failed
+-  // decrypt is the ciphertext. Handing that to the edit box invites somebody to
+-  // save a sealed envelope as the new plaintext of their own message.
+-  return status === 'decrypted' || status === 'not-encrypted' ? text : null;
++  const { text } = await decryptForDisplay(message, isOwnMessage, readerId);
++  return text;
+ }
+ 
+ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
