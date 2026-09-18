@@ -1,6 +1,11 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+
+interface SelectedMedia {
+  file: File;
+  previewUrl: string | null;
+}
 
 interface MediaUploadZoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -107,10 +112,34 @@ export function MediaUploadZone({
 }: MediaUploadZoneProps) {
   const { t } = useTranslation();
   const [dragActive, setDragActive] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ownedPreviewUrls = useRef(new Set<string>());
   const normalizedAcceptedTypes = acceptedTypes.map((type) => type.toLowerCase().trim());
+
+  useEffect(() => {
+    const owned = ownedPreviewUrls.current;
+    return () => {
+      for (const url of owned) URL.revokeObjectURL(url);
+      owned.clear();
+    };
+  }, []);
+
+  const toSelectedMedia = (file: File): SelectedMedia => {
+    if (!resolveFileType(file).startsWith('image/')) return { file, previewUrl: null };
+    const previewUrl = URL.createObjectURL(file);
+    ownedPreviewUrls.current.add(previewUrl);
+    return { file, previewUrl };
+  };
+
+  const releasePreviews = (items: SelectedMedia[]) => {
+    for (const { previewUrl } of items) {
+      if (previewUrl && ownedPreviewUrls.current.delete(previewUrl)) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    }
+  };
 
   const validateFiles = (files: File[]): { valid: File[]; errors: string[] } => {
     const valid: File[] = [];
@@ -137,9 +166,9 @@ export function MediaUploadZone({
       valid.push(file);
     }
 
-    if (valid.length + selectedFiles.length > maxFiles) {
+    if (valid.length + selectedMedia.length > maxFiles) {
       errors.push(t('mediaUploadZone.errors.tooManyFiles', { max: maxFiles }));
-      return { valid: valid.slice(0, maxFiles - selectedFiles.length), errors };
+      return { valid: valid.slice(0, maxFiles - selectedMedia.length), errors };
     }
 
     return { valid, errors };
@@ -153,7 +182,7 @@ export function MediaUploadZone({
 
     setErrors(validationErrors);
     if (valid.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...valid]);
+      setSelectedMedia((prev) => [...prev, ...valid.map(toSelectedMedia)]);
     }
   };
 
@@ -181,18 +210,21 @@ export function MediaUploadZone({
   };
 
   const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    releasePreviews(selectedMedia.slice(index, index + 1));
+    setSelectedMedia((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleUpload = () => {
-    if (selectedFiles.length === 0) return;
-    onFilesSelected(selectedFiles);
-    setSelectedFiles([]);
+    if (selectedMedia.length === 0) return;
+    onFilesSelected(selectedMedia.map((item) => item.file));
+    releasePreviews(selectedMedia);
+    setSelectedMedia([]);
     setErrors([]);
   };
 
   const clearAll = () => {
-    setSelectedFiles([]);
+    releasePreviews(selectedMedia);
+    setSelectedMedia([]);
     setErrors([]);
   };
 
@@ -262,11 +294,11 @@ export function MediaUploadZone({
       )}
 
       {/* Selected files preview */}
-      {selectedFiles.length > 0 && (
+      {selectedMedia.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-gray-700">
-              {t('mediaUploadZone.selected.title', { count: selectedFiles.length })}
+              {t('mediaUploadZone.selected.title', { count: selectedMedia.length })}
             </p>
             <button onClick={clearAll} className="text-sm text-red-600 hover:text-red-700">
               {t('mediaUploadZone.actions.clearAll')}
@@ -274,18 +306,14 @@ export function MediaUploadZone({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {selectedFiles.map((file, index) => (
+            {selectedMedia.map(({ file, previewUrl }, index) => (
               <div
                 key={index}
                 className="relative group bg-gray-100 rounded-lg overflow-hidden aspect-square"
               >
                 {/* Preview */}
-                {file.type.startsWith('image/') ? (
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={file.name}
-                    className="w-full h-full object-cover"
-                  />
+                {previewUrl ? (
+                  <img src={previewUrl} alt={file.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gray-200">
                     <svg
@@ -344,7 +372,7 @@ export function MediaUploadZone({
               onClick={handleUpload}
               className="px-6 py-2 bg-[var(--color-primary)] text-white rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
             >
-              {t('mediaUploadZone.actions.upload', { count: selectedFiles.length })}
+              {t('mediaUploadZone.actions.upload', { count: selectedMedia.length })}
             </button>
           </div>
         </div>

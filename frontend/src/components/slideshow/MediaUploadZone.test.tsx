@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MediaUploadZone } from './MediaUploadZone';
 
 describe('MediaUploadZone', () => {
@@ -67,5 +67,95 @@ describe('MediaUploadZone', () => {
     expect(screen.queryByText('scan.pdf: Unsupported file type')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Upload 1 file' }));
     expect(onFilesSelected).toHaveBeenCalledWith([noMimeDoc]);
+  });
+});
+
+describe('MediaUploadZone preview object URLs', () => {
+  let created: string[];
+  let revoked: string[];
+
+  beforeEach(() => {
+    created = [];
+    revoked = [];
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
+      const url = `blob:preview-${created.length}`;
+      created.push(url);
+      return url;
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url) => {
+      revoked.push(String(url));
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  const image = (name: string, type = 'image/png') => new File(['bytes'], name, { type });
+
+  const select = (files: File[]) => {
+    const rendered = render(<MediaUploadZone onFilesSelected={vi.fn()} />);
+    const input = rendered.container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files } });
+    return rendered;
+  };
+
+  it('creates one object URL per image and keeps it across re-renders', () => {
+    const { container } = select([image('first.png')]);
+    expect(created).toEqual(['blob:preview-0']);
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [image('second.png')] } });
+
+    expect(created).toEqual(['blob:preview-0', 'blob:preview-1']);
+    expect(screen.getByAltText('first.png')).toHaveAttribute('src', 'blob:preview-0');
+    expect(screen.getByAltText('second.png')).toHaveAttribute('src', 'blob:preview-1');
+  });
+
+  it('previews an image whose browser MIME is empty but extension is known', () => {
+    select([image('photo.jpg', ''), image('scan.pdf', 'application/pdf')]);
+
+    expect(screen.getByAltText('photo.jpg')).toHaveAttribute('src', 'blob:preview-0');
+    expect(screen.queryByAltText('scan.pdf')).not.toBeInTheDocument();
+    expect(created).toEqual(['blob:preview-0']);
+  });
+
+  it('revokes the object URL when the file is removed', () => {
+    select([image('first.png'), image('second.png')]);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove file' })[0]);
+
+    expect(screen.queryByAltText('first.png')).not.toBeInTheDocument();
+    expect(revoked).toEqual(['blob:preview-0']);
+  });
+
+  it('revokes every remaining object URL on unmount', () => {
+    const { unmount } = select([image('first.png'), image('second.png')]);
+
+    unmount();
+
+    expect(revoked.sort()).toEqual(['blob:preview-0', 'blob:preview-1']);
+  });
+
+  it('revokes each URL exactly once when upload is followed by unmount', () => {
+    // MessagesPage.handleMultiFileUpload hides the zone inside the callback, so the
+    // parent unmount lands in the same batch as this component's own reset. The
+    // cleanup must release what it still owns, not whatever state it last mirrored.
+    const { unmount } = select([image('first.png'), image('second.png')]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload 2 files' }));
+    unmount();
+
+    expect(revoked).toEqual(['blob:preview-0', 'blob:preview-1']);
+  });
+
+  it('revokes every object URL when the selection is cleared', () => {
+    select([image('first.png')]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+
+    expect(screen.queryByAltText('first.png')).not.toBeInTheDocument();
+    expect(revoked).toEqual(['blob:preview-0']);
   });
 });
