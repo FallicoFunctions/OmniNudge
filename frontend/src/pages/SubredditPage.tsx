@@ -82,12 +82,10 @@ interface FeedRedditPostsResponse {
 }
 
 type CrosspostSource =
-  | { type: 'reddit'; post: FeedRedditPost }
-  | { type: 'platform'; post: LocalSubredditPost };
+  { type: 'reddit'; post: FeedRedditPost } | { type: 'platform'; post: LocalSubredditPost };
 
 type HideTarget =
-  | { type: 'reddit'; post: FeedRedditPost }
-  | { type: 'platform'; post: LocalSubredditPost };
+  { type: 'reddit'; post: FeedRedditPost } | { type: 'platform'; post: LocalSubredditPost };
 
 function getLocalPostUrl(post: LocalSubredditPost): string {
   const subredditSlug = post.target_subreddit ?? post.crosspost_origin_subreddit ?? null;

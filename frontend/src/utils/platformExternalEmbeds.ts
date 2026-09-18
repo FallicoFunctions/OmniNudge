@@ -2,8 +2,7 @@ import { sanitizeHttpUrl } from './crosspostHelpers';
 import { classifyPlatformExternalUrl } from './platformExternalProviders';
 
 export type PlatformExternalEmbed =
-  | { kind: 'iframe'; src: string }
-  | { kind: 'video'; src: string };
+  { kind: 'iframe'; src: string } | { kind: 'video'; src: string };
 
 function extractMatch(url: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {

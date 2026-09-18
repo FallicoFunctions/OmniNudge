@@ -107,12 +107,7 @@ export default function SettingsPage() {
   } = useSettings();
 
   type SettingsTab =
-    | 'general'
-    | 'notifications'
-    | 'privacy'
-    | 'encryption'
-    | 'appearance'
-    | 'audio_video';
+    'general' | 'notifications' | 'privacy' | 'encryption' | 'appearance' | 'audio_video';
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   const tabItems = useMemo(

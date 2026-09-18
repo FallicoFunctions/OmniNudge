@@ -72,12 +72,7 @@ export interface SavedRedditAPIComment {
 
 export interface SavedItemsResponse {
   type:
-    | 'all'
-    | 'posts'
-    | 'reddit_posts'
-    | 'reddit_comments'
-    | 'post_comments'
-    | 'reddit_api_comments';
+    'all' | 'posts' | 'reddit_posts' | 'reddit_comments' | 'post_comments' | 'reddit_api_comments';
   saved_posts?: SavedPost[];
   saved_reddit_posts?: SavedRedditPost[];
   saved_post_comments?: SavedPostComment[];

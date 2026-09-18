@@ -1,10 +1,5 @@
 export type PersonaCategory =
-  | 'roleplay'
-  | 'helper'
-  | 'romance'
-  | 'original'
-  | 'anime_game'
-  | 'fiction_media';
+  'roleplay' | 'helper' | 'romance' | 'original' | 'anime_game' | 'fiction_media';
 
 export type ResponseStyleProfile =
   | 'inherit'

@@ -29,8 +29,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const retryConfig = error.config as
-      | (typeof error.config & { _sessionRetry?: boolean })
-      | undefined;
+      (typeof error.config & { _sessionRetry?: boolean }) | undefined;
     const method = retryConfig?.method?.toUpperCase() ?? 'UNKNOWN';
     const url = retryConfig?.url ?? 'unknown-url';
     const status = error.response?.status;

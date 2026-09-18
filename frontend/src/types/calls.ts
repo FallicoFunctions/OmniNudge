@@ -29,8 +29,4 @@ export interface ICEServer {
 export type SignalType = 'offer' | 'answer' | 'candidate';
 
 export type CallManagerState =
-  | 'idle'
-  | 'ringing_outgoing'
-  | 'ringing_incoming'
-  | 'active'
-  | 'ended';
+  'idle' | 'ringing_outgoing' | 'ringing_incoming' | 'active' | 'ended';
