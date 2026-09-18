@@ -169,6 +169,24 @@ export function sealedKeyVersion(sealed: string): number {
   return parsed.k;
 }
 
+/**
+ * Whether this string is a group envelope rather than an RSA-wrapped key.
+ *
+ * Media asks this of the stored file key, because the column beside it cannot
+ * answer: every branch that sets encryption_version is gated on the message
+ * having text, so a photo sent with no caption is labelled 'none' however it
+ * was encrypted. The envelope describes itself, which is also the same rule the
+ * sender wrote rather than a convention about a neighbouring field.
+ */
+export function isSealedGroupEnvelope(value: string): boolean {
+  try {
+    parseSealed(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Opens what sealGroupMessage produced; throws on the wrong key or a damaged copy. */
 export async function openGroupMessage(sealed: string, groupKey: CryptoKey): Promise<string> {
   const parsed = parseSealed(sealed);

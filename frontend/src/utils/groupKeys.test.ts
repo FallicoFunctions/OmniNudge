@@ -11,7 +11,15 @@ import {
   unwrapGroupKey,
   wrapGroupKeyForMembers,
 } from './groupKeys';
-import { exportKeyPair, generateKeyPair } from './encryption';
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  decryptFileWithKey,
+  encryptFile,
+  exportKeyPair,
+  generateKeyPair,
+  importFileKey,
+} from './encryption';
 
 interface Vectors {
   groupKeyHex: string;
@@ -154,5 +162,62 @@ describe('wrapping the key for members', () => {
     ]);
     expect(Object.keys(copies)).toEqual(['3']);
     expect(unusable).toEqual([{ userId: 4, reason: 'unreadable' }]);
+  });
+});
+
+// A group file keeps its own AES key, and the group key only wraps it, so one
+// shared key never encrypts two files under one IV. Everything here is real
+// crypto: the mocked hook tests can prove the right arguments are passed and
+// nothing at all about whether the bytes survive the trip.
+describe('a file key carried in a group envelope', () => {
+  // jsdom's Blob has no arrayBuffer(), which is why the encryption suite reads
+  // one through a FileReader too.
+  const blobToBytes = (blob: Blob) =>
+    new Promise<Uint8Array>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(blob);
+    });
+
+  it('round-trips a real encrypted file through the group key', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 250, 251, 252]);
+    const original = new File([bytes], 'photo.png', { type: 'image/png' });
+    const encrypted = await encryptFile(original);
+    const groupKey = await newGroupKey();
+
+    // What the sender will put in media_encryption_key.
+    const sealed = await sealGroupMessage(
+      arrayBufferToBase64(encrypted.rawKey),
+      groupKey,
+      GROUP_SEAL_VERSION
+    );
+
+    // What the reader does with it.
+    const fileKey = await importFileKey(
+      base64ToArrayBuffer(await openGroupMessage(sealed, groupKey))
+    );
+    const opened = await decryptFileWithKey(
+      {
+        encryptedData: encrypted.encryptedData,
+        iv: arrayBufferToBase64(encrypted.iv.slice().buffer),
+        mimeType: 'image/png',
+      },
+      fileKey
+    );
+
+    expect(await blobToBytes(opened)).toEqual(bytes);
+    expect(opened.type).toBe('image/png');
+  });
+
+  it('refuses the file to a group key that did not seal it', async () => {
+    const encrypted = await encryptFile(new File(['secret'], 'photo.png'));
+    const sealed = await sealGroupMessage(
+      arrayBufferToBase64(encrypted.rawKey),
+      await newGroupKey(),
+      1
+    );
+
+    await expect(openGroupMessage(sealed, await newGroupKey())).rejects.toThrow();
   });
 });

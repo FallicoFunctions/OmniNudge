@@ -10,12 +10,29 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDecryptedMedia } from '../useDecryptedMedia';
-import { decryptFile } from '../../utils/encryption';
+import {
+  arrayBufferToBase64,
+  decryptFile,
+  decryptFileWithKey,
+  importFileKey,
+} from '../../utils/encryption';
+import { newGroupKey, sealGroupMessage } from '../../utils/groupKeys';
+import { groupKeyForVersion } from '../../services/groupKeyCache';
 import { getOwnKeys } from '../../services/keyManagementService';
 import { authenticatedFetch } from '../../services/authSession';
 import type { Message } from '../../types/messages';
 
-vi.mock('../../utils/encryption', () => ({ decryptFile: vi.fn() }));
+// The base64 helpers stay real, because the group path carries the file's key
+// through them and a stubbed pair would prove nothing about what is handed to
+// importFileKey. groupKeys stays real for the same reason: the envelopes in
+// these tests are sealed by the code that seals them in production.
+vi.mock('../../utils/encryption', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../utils/encryption')>()),
+  decryptFile: vi.fn(),
+  decryptFileWithKey: vi.fn(),
+  importFileKey: vi.fn(),
+}));
+vi.mock('../../services/groupKeyCache', () => ({ groupKeyForVersion: vi.fn() }));
 vi.mock('../../services/keyManagementService', () => ({ getOwnKeys: vi.fn() }));
 vi.mock('../../services/authSession', () => ({ authenticatedFetch: vi.fn() }));
 
@@ -45,7 +62,109 @@ beforeEach(() => {
   globalThis.URL.revokeObjectURL = vi.fn();
   vi.mocked(getOwnKeys).mockResolvedValue(KEYS);
   vi.mocked(decryptFile).mockResolvedValue(new Blob(['plain']) as never);
+  vi.mocked(decryptFileWithKey).mockResolvedValue(new Blob(['group-plain']) as never);
+  vi.mocked(importFileKey).mockResolvedValue({ type: 'file-key' } as never);
   respondOk();
+});
+
+// A group file is sealed once for the whole group: there is no per-reader copy,
+// and the stored key is an envelope rather than an RSA-wrapped key. The rule has
+// to recognise that from the envelope itself, because a message carrying a file
+// and no text is labelled encryption_version 'none'.
+describe('group media', () => {
+  const FILE_KEY_BYTES = new Uint8Array(32).fill(7);
+
+  /** A real envelope, sealed by the same function the sender uses. */
+  const sealedFileKey = async (version = 3) => {
+    const groupKey = await newGroupKey();
+    const sealed = await sealGroupMessage(
+      arrayBufferToBase64(FILE_KEY_BYTES.buffer),
+      groupKey,
+      version
+    );
+    return { groupKey, sealed };
+  };
+
+  it('opens the file with the group key for the version the envelope names', async () => {
+    const { groupKey, sealed } = await sealedFileKey(3);
+    vi.mocked(groupKeyForVersion).mockResolvedValue(groupKey);
+
+    const { result } = render(
+      message({
+        conversation_id: 55,
+        media_url: '/u/a.png',
+        media_encryption_key: sealed,
+        media_encryption_iv: 'IV',
+      })
+    );
+
+    await waitFor(() => expect(result.current).toBe('blob:decrypted'));
+    // The version came out of the envelope, not from a column beside it.
+    expect(groupKeyForVersion).toHaveBeenCalledWith(55, 3);
+    // The key handed to the file is the one that was sealed, byte for byte.
+    expect(new Uint8Array(vi.mocked(importFileKey).mock.calls[0][0])).toEqual(FILE_KEY_BYTES);
+    expect(vi.mocked(decryptFileWithKey).mock.calls[0][0]).toMatchObject({
+      iv: 'IV',
+      mimeType: 'image/png',
+    });
+    // The RSA path is for direct messages and must not run for a group file.
+    expect(decryptFile).not.toHaveBeenCalled();
+  });
+
+  it('shows nothing, not the stored ciphertext, when the version cannot be opened', async () => {
+    const { sealed } = await sealedFileKey();
+    vi.mocked(groupKeyForVersion).mockResolvedValue(null);
+
+    const { result } = render(
+      message({
+        conversation_id: 55,
+        media_url: '/u/a.png',
+        media_encryption_key: sealed,
+        media_encryption_iv: 'IV',
+      })
+    );
+
+    await waitFor(() => expect(groupKeyForVersion).toHaveBeenCalled());
+    expect(result.current).toBeNull();
+    // Nothing was even fetched: the bytes are unreadable without the key.
+    expect(authenticatedFetch).not.toHaveBeenCalled();
+  });
+
+  it('ignores the sender copy, because a group seals one envelope for everyone', async () => {
+    const { groupKey, sealed } = await sealedFileKey();
+    vi.mocked(groupKeyForVersion).mockResolvedValue(groupKey);
+
+    const { result } = render(
+      message({
+        conversation_id: 55,
+        media_url: '/u/a.png',
+        media_encryption_key: sealed,
+        sender_media_encryption_key: 'RSA-COPY-THAT-MUST-NOT-BE-USED',
+        media_encryption_iv: 'IV',
+      }),
+      true
+    );
+
+    await waitFor(() => expect(result.current).toBe('blob:decrypted'));
+    expect(decryptFile).not.toHaveBeenCalled();
+  });
+
+  it('shows nothing when the message has no conversation to fetch a key for', async () => {
+    const { sealed } = await sealedFileKey();
+
+    const { result } = render(
+      message({
+        conversation_id: undefined,
+        media_url: '/u/a.png',
+        media_encryption_key: sealed,
+        media_encryption_iv: 'IV',
+      })
+    );
+
+    await waitFor(() => expect(authenticatedFetch).not.toHaveBeenCalled());
+    expect(result.current).toBeNull();
+    expect(groupKeyForVersion).not.toHaveBeenCalled();
+  });
 });
 
 const render = (msg: Message, isOwn = false) => renderHook(() => useDecryptedMedia(msg, isOwn));

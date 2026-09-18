@@ -11,7 +11,14 @@
  * changing it is a decision for the phase that makes group media refuse.
  */
 import { useEffect, useState } from 'react';
-import { decryptFile } from '../utils/encryption';
+import {
+  base64ToArrayBuffer,
+  decryptFile,
+  decryptFileWithKey,
+  importFileKey,
+} from '../utils/encryption';
+import { isSealedGroupEnvelope, openGroupMessage, sealedKeyVersion } from '../utils/groupKeys';
+import { groupKeyForVersion } from '../services/groupKeyCache';
 import { getOwnKeys } from '../services/keyManagementService';
 import { authenticatedFetch } from '../services/authSession';
 import { API_BASE_URL } from '../lib/api';
@@ -49,17 +56,89 @@ function absoluteMediaUrl(mediaUrl: string | null | undefined): string | null {
 /** A blob URL for the decrypted file, or the stored URL when there is nothing to decrypt. */
 export function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | null {
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
-  const { media_url, media_encryption_iv, media_encryption_key, sender_media_encryption_key } =
-    message;
+  const {
+    conversation_id,
+    media_url,
+    media_encryption_iv,
+    media_encryption_key,
+    sender_media_encryption_key,
+  } = message;
 
   useEffect(() => {
     let isMounted = true;
     let cleanup: (() => void) | undefined;
 
+    /** The one place a blob URL is made, so the unmount race is settled once. */
+    const publish = (decrypted: Blob): void => {
+      const blobUrl = URL.createObjectURL(decrypted);
+      // The cleanup below has already run if the reader scrolled this file out
+      // of view while it was decrypting, so assigning it now would revoke
+      // nothing and the whole decrypted file would be held for the life of the
+      // page. useVoicePlayer settles the same race the same way.
+      if (!isMounted) {
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+      cleanup = () => URL.revokeObjectURL(blobUrl);
+      setMediaSrc(blobUrl);
+    };
+
+    const fetchEncrypted = async (url: string): Promise<ArrayBuffer> => {
+      const response = await authenticatedFetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.arrayBuffer();
+    };
+
     const decryptMedia = async () => {
       const originalUrl = absoluteMediaUrl(media_url);
       if (!originalUrl) {
         if (isMounted) setMediaSrc(null);
+        return;
+      }
+
+      // A group file is sealed once for the whole group, so there is no
+      // per-reader copy and isOwnMessage decides nothing here. This is answered
+      // before the per-reader rule below, and it asks the stored key what it is
+      // rather than asking encryption_version, which is 'none' on a message
+      // that carries a file and no text.
+      if (media_encryption_key && isSealedGroupEnvelope(media_encryption_key)) {
+        // Nothing to show rather than the stored bytes: those bytes are
+        // ciphertext, and a reader who joined after this version ended is never
+        // meant to see them.
+        if (!media_encryption_iv || !conversation_id) {
+          if (isMounted) setMediaSrc(null);
+          return;
+        }
+        try {
+          const groupKey = await groupKeyForVersion(
+            conversation_id,
+            sealedKeyVersion(media_encryption_key)
+          );
+          if (!groupKey) {
+            if (isMounted) setMediaSrc(null);
+            return;
+          }
+          // The file keeps its own AES key; the group key only wraps it, so one
+          // shared key never encrypts two files under one IV.
+          const fileKey = await importFileKey(
+            base64ToArrayBuffer(await openGroupMessage(media_encryption_key, groupKey))
+          );
+          publish(
+            await decryptFileWithKey(
+              {
+                encryptedData: await fetchEncrypted(originalUrl),
+                iv: media_encryption_iv,
+                mimeType: mimeTypeFor(media_url),
+              },
+              fileKey
+            )
+          );
+        } catch (error) {
+          console.warn('Could not open this group media file:', error);
+          if (isMounted) setMediaSrc(null);
+        }
         return;
       }
 
@@ -80,33 +159,18 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
           return;
         }
 
-        const response = await authenticatedFetch(originalUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const decryptedBlob = await decryptFile(
-          {
-            encryptedData: await response.arrayBuffer(),
-            encryptedKey,
-            iv: media_encryption_iv,
-            originalName: '',
-            mimeType: mimeTypeFor(media_url),
-          },
-          keys.privateKey
+        publish(
+          await decryptFile(
+            {
+              encryptedData: await fetchEncrypted(originalUrl),
+              encryptedKey,
+              iv: media_encryption_iv,
+              originalName: '',
+              mimeType: mimeTypeFor(media_url),
+            },
+            keys.privateKey
+          )
         );
-
-        const blobUrl = URL.createObjectURL(decryptedBlob);
-        // The cleanup below has already run if the reader scrolled this file out
-        // of view while it was decrypting, so assigning it now would revoke
-        // nothing and the whole decrypted file would be held for the life of the
-        // page. useVoicePlayer settles the same race the same way.
-        if (!isMounted) {
-          URL.revokeObjectURL(blobUrl);
-          return;
-        }
-        cleanup = () => URL.revokeObjectURL(blobUrl);
-        setMediaSrc(blobUrl);
       } catch (error) {
         console.warn('Could not decrypt this media file:', error);
         if (isMounted) setMediaSrc(originalUrl);
@@ -120,6 +184,7 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
       if (cleanup) cleanup();
     };
   }, [
+    conversation_id,
     media_url,
     media_encryption_iv,
     media_encryption_key,
