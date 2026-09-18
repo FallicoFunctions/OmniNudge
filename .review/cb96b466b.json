@@ -1,0 +1,262 @@
+{
+  "schema_version": 2,
+  "head": "cb96b466b",
+  "base": "cb96b466b",
+  "scope": {
+    "files": [
+      "backend/go.mod",
+      "backend/go.sum"
+    ],
+    "boundaries": [
+      "the module graph and the checksums that pin it",
+      "the Google Cloud client libraries that pull grpc in",
+      "whether the advisory's vulnerable entry point exists in this codebase at all"
+    ]
+  },
+  "prior_ledgers_read": [
+    "ba2c83dd4 -- the media rule extraction. No Go content.",
+    "6e346b3fd -- the three live-device leaks. No Go content.",
+    "Neither records a dependency change, so there was no prior finding to re-check here."
+  ],
+  "notes": [
+    "This review exists because the Stop hook refused to let the session end with an unreviewed commit, and it was right: cb96b466b was committed during the Dependabot work and nothing had reviewed it.",
+    "The change is three lines and most instruments are honestly not applicable. The two that carried weight were B4, which verified the checksums rather than trusting the command, and G3, which found that govulncheck had already answered the reachability question independently.",
+    "Dependabot and govulncheck answer DIFFERENT questions, and this commit is a clean demonstration. Dependabot asks whether a vulnerable version is present, and said yes. govulncheck asks whether vulnerable code is reached, and said no. A green govulncheck must never be read as \"the dependencies are current\", and a Dependabot alert must never be read as \"we are exploitable\". Recorded here because a future reviewer will meet both tools on the same repository.",
+    "Not verified, and the one real gap: neither the Go test suite nor CI has run on this commit. The suite was not run because the standing instruction is to ask first; CI has not run because the commit is unpushed. The bump is an indirect, patch-level change that compiles, vets and verifies, so the risk is low -- but it is unproven until the push."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "One commit, two files, three lines: google.golang.org/grpc 1.83.1 to 1.83.2 in backend/go.mod, with its two go.sum hashes. An INDIRECT dependency, so no Go source file changed. The boundary is the module graph and the checksums that pin it."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read the three ledgers of this session (ba2c83dd4, 6e346b3fd and the G3c/cache ones they cite). None concerns Go dependencies; this is the first dependency change any of them covers."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Nothing assembles a prompt, request or message. The artifact here is a module, covered by B4."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component and no markup."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The artifact that crosses the boundary is the module itself. go mod verify: \"all modules verified\", exit 0, so every downloaded module matches the recorded hash. go mod tidy changed nothing beyond the one dependency, confirmed by reading the whole diff rather than trusting the command."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No code, key or enum. The only constant is a version string, checked under B4."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No caller reads anything new; the dependency is indirect and no source file changed."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule lives in two places. E6 confirmed there is only one go.mod in the repository."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The other end is the Google Cloud client libraries. go mod why shows the only path: internal/services -> google.golang.org/api/option -> google.golang.org/grpc. We are a gRPC CLIENT through those libraries, never a server. A patch-level bump inside 1.83.x changes no API those libraries call, and the build proves it compiles."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor changed."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture involved."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No validation or parsing changed."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No validation or parsing changed."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No validation or parsing changed."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "No sibling path exists; a module version is global to the module graph."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The vulnerable branch is unreachable, and not by accident of version: the advisory requires a server built with xds.NewGRPCServer(). Grep over internal/ and cmd/ finds no grpc.NewServer, no xds reference, and no direct grpc import at all."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "No error handling changed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates this."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Nothing duplicated; one go.mod, one pin, confirmed under E6."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Asked where else this shape occurs: only one go.mod exists in the whole repository (find, excluding node_modules), and it holds exactly one grpc pin, now at 1.83.2. No second module or vendored copy lags behind."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state changed; -race would exercise unchanged code."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding, so no fix and no control."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The guard exists and it runs. .github/workflows/security.yml defines a govulncheck job that runs govulncheck ./... on every push, and the run on c36c77c3e records all five security jobs as success, none skipped."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build ./... exit 0, go vet ./internal/... ./cmd/... exit 0, go mod verify exit 0, all at this HEAD. The pre-commit hook also ran its CI checks, the tracked-artifact guard and the i18n checks clean."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Nothing was found, so there is no new technique to add. The govulncheck-versus-Dependabot distinction is recorded in the notes rather than promoted to an instrument, because it explained a result rather than finding a defect."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "No model, provider or other system produces output from this change. The nearest equivalent -- an independent tool judging the same question -- was applied under G3 with govulncheck."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the guard the known-bad input by accident of history, which is the strongest form of this test: run 35268666435 ran govulncheck against c36c77c3e, which still contained grpc 1.83.1, and its log says \"No vulnerabilities found. Your code is affected by 0 vulnerabilities.\" That is not a blind guard -- govulncheck is reachability-based, so it agrees independently with the E2 finding that no vulnerable symbol is reached. Two tools, reasoned separately, reached the same answer."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted honestly, and this is the gap in this review: the Go test suite has NOT been run for this commit, because the standing instruction is to ask before running tests. CI has also NOT run on cb96b466b, because the commit is not pushed. So the evidence is build, vet and checksum verification, plus govulncheck on the parent commit. Stated in session rather than buried here."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Not a phase of an approved plan. This is the first of three steps agreed in session for the Dependabot alerts."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No side effect has entry points."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "No module export, signature or behaviour changed, so no test mocks anything new. The Go packages that import the graph are covered by the build."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect a screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture or route registry changed; no Go test file was touched."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No control patch in .review/controls targets backend/go.mod or backend/go.sum; checked by grep over every patch. Nothing this commit touched invalidates an existing control."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource is acquired after an await."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... exit 0",
+    "vet": "go vet ./internal/... ./cmd/... exit 0",
+    "checksums": "go mod verify: all modules verified, exit 0",
+    "tests": "NOT RUN -- the standing instruction is to ask before running tests, and CI has not run either because the commit is unpushed",
+    "ci": "not yet run on cb96b466b; the parent c36c77c3e was green on all four workflows"
+  }
+}
