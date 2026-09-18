@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "head": "f04bb09fe",
+  "head": "c545d3ac2",
   "base": "c36c77c3e",
   "scope": {
     "files": [
@@ -22,7 +22,8 @@
   "notes": [
     "A second session was working in this worktree throughout: it committed 5eebf2418 on top of this review's first commit, and the modifications to omnirave-web/package.json, omnirave-web/package-lock.json and .github/dependabot.yml in the working tree are its work, left alone here and kept out of the control patches. The first two control patches had to be rebuilt after a bare 'git diff' swept them in. The base sha is this session's own starting commit rather than the parent of the fix, because .review/cb96b466b.json was already taken by that session's grpc review.",
     "The pre-existing MediaUploadZone.test.tsx sat beside the component rather than in __tests__, so the first cut of this work wrote a second test file and never ran the first. Both are now one file. Nothing was wrong in the tests that already existed; they simply never used an image, which is why a component that leaked a blob URL per render had a green suite.",
-    "B5 was run rather than reasoned about, and it cost one dev server and four minutes. It also caught a bad fixture of its own: a hand-typed base64 PNG that decoded nowhere, which would have read as 'the previews do not render' if the fixture had not been checked separately."
+    "B5 was run rather than reasoned about, and it cost one dev server and four minutes. It also caught a bad fixture of its own: a hand-typed base64 PNG that decoded nowhere, which would have read as 'the previews do not render' if the fixture had not been checked separately.",
+    "head names the last commit of code this review covers, c545d3ac2, rather than the commit that carries this ledger: the ledger cannot name its own sha, and amending to fix it is unsafe while another session shares the worktree."
   ],
   "passes": [
     {
