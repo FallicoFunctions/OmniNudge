@@ -1,5 +1,5 @@
 runpod==1.12.0
-boto3==1.43.94
+boto3==1.43.95
 Pillow==12.3.0
 accelerate==1.15.0
 diffusers==0.40.0
