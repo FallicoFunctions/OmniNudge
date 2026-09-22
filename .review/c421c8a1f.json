@@ -1,0 +1,513 @@
+{
+  "schema_version": 2,
+  "head": "76ac107d7",
+  "base": "c421c8a1f",
+  "scope": {
+    "files": [
+      "frontend/src/utils/mediaEncryption.ts",
+      "frontend/src/utils/mediaEncryption.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/feed/ExpandedMessage.tsx"
+    ],
+    "boundaries": [
+      "which key wraps which copy of a file key",
+      "the three key fields each send path hands to sendMessage",
+      "the order of upload and key wrapping"
+    ]
+  },
+  "prior_ledgers_read": [
+    "cff7365eb and 04cf8a171 -- the two reviews immediately before. Neither concerns the send side.",
+    "ba2c83dd4 -- the reading-side twin of this extraction. Its lesson, prove an extraction rather than assert it, is why this pass broke the callers."
+  ],
+  "notes": [
+    "A helper test guards the helper and says nothing about its callers. mediaEncryption.test.ts was correct and complete, and it could not have seen a caller passing the keys backwards, because it passes them forwards itself. The only instrument that reaches that is breaking the caller.",
+    "No test anywhere drives the ExpandedMessage send path: CompactPostCard.decrypt.test.tsx mocks ExpandedMessage away entirely. That is why a type-level guard was the right fix here rather than a call-site test -- the call-site test would have needed a new harness, and the type makes the whole class of mistake unwritable.",
+    "The helper now takes the whole KeyPair and reads only its publicKey. Narrowing it to Pick<KeyPair, \"publicKey\"> would say that more precisely at no cost to either caller, and was considered and left: the private key is a non-extractable CryptoKey, so passing its reference exposes nothing, and a further change here would be a commit and a control for something that is not a defect."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Four files. One helper extracted from two identical send paths -- the drag-and-drop multi-file upload and the expanded-message reply box -- plus its real-crypto test. The boundary is the three key fields each path hands to sendMessage."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cff7365eb and 04cf8a171, the two reviews immediately before this. Neither concerns the send side. ba2c83dd4 is the reading-side twin of this extraction, and its lesson -- prove an extraction preserves behaviour rather than assert it -- is why this pass mutated the callers instead of reading them."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The artifact is the triple of wrapped keys and IV that reaches sendMessage. The real-crypto test builds it for two materially different pairs -- recipient and sender distinct, then the same pair in both roles -- and opens each copy with the private key it was wrapped for."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No markup changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query, migration or stored row changed; the same three strings reach the server."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The three payload fields keep the same names at both sites; only the value source changed, from inline calls to sealed.*."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Read what each site sends: media_encryption_key from mediaEncryptionKey, sender_media_encryption_key from senderMediaEncryptionKey, media_encryption_iv from mediaEncryptionIv. Every field the reader expects is still set, from the right half of the result."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two copies of one rule became one. The composer, a third copy that genuinely differs, was left alone on purpose and says why in the helper's header."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The consumer is the reader built in G4a-0 and G4a-1, which unwraps media_encryption_key with the recipient's private key and sender_media_encryption_key with the sender's. The round-trip test does exactly that."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Found the finding. Broke the CALLER rather than the helper: swapped the recipient and sender key arguments at both call sites and ran every suite that touches them. 24 of 24 still passed. The helper tests pass the arguments correctly, so they guard the helper and say nothing about who calls it."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The keys in the test are minted by generateKeyPair, the same function the product uses, not stand-ins."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A real file opens for its recipient and for its sender."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A stranger's key is refused, and the ciphertext does not equal the plaintext."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Probed the degenerate case where recipient and sender are the same pair: both copies still open."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling is the composer, which wraps for the sender only when a public key exists. The two extracted sites already required one earlier in their flow, so passing the KeyPair loses nothing they had."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the two sites is unchanged; only the source of three values moved."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Both sites keep their existing catch and alert. A failure inside the helper reaches the same handler it reached before."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The five-step rule exists once. E6 below searched for a second copy of the shape of the defect."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched every function in frontend/src for two CryptoKey parameters. One hit, encryptForMultipleRecipients, is a false positive: the first CryptoKey is inside the element type of its recipients ARRAY, so its parameters are an array and a CryptoKey and a swap is already a compile error. The shape occurs nowhere else."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "That reorder removes a way to leave something behind: an upload whose key was never wrapped, attached to no message. Recorded in the commit rather than claimed as no change."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "One control, replayed by hand. It swaps the two keys INSIDE the helper -- the only place they still meet -- and the round-trip test fails because the recipient's private key cannot unwrap a key wrapped for the sender (a real WebCrypto OperationError). tsc still exits 0 with it applied, so this is a test failure, not a build break, and vitest's summary reads \"Tests 1 failed\", which is the hook's own marker."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The test runs inside its suite and is in the default include."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0, eslint 0, prettier 0 after collapsing the two calls to one line, i18n clean."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by C6, which is on the list. The lesson worth recording is in the notes: a helper test guards the helper, never its callers."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The output passes through WebCrypto, and that is exercised for real: every test in mediaEncryption.test.ts generates real RSA-OAEP pairs and real AES keys and decrypts real bytes, so a wrong key raises a real OperationError. The browser-level decode of these same functions was already proven in the ba2c83dd4 review; this change moves no crypto, only which argument carries which key."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The extraction reordered two effects, and the order is now better: the key is wrapped before the upload rather than after. If wrapping fails, the old order had already put the ciphertext on the server."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the new guard the exact input it exists to refuse: a throwaway file calling the helper with the arguments swapped. tsc refused it with TS2345, KeyPair is not assignable to CryptoKey, and passed again once the file was removed."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted: 20 passed, 1 pre-existing skip across the four suites that touch the change."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan split G4a-2 into an extraction and a behaviour change. Kept: nothing about what is sent changed, and the composer with its fallbacks waits for G4a-2b."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No side effect has two entry points here."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated by module AND by consumer. The consumer search found CompactPostCard.decrypt.test.tsx, which mocks ExpandedMessage away entirely -- so no test anywhere drives that send path, which is why this pass had to break the caller directly rather than trust a suite."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "One existing control targets MessagesPage.tsx, g4a1r2-edit-box-opened-on-ciphertext. Re-applied and re-run: it still applies and still fails with a real assertion."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource is acquired after an await by the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup is involved."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a2a-recipient-copy-wrapped-for-the-sender",
+          "summary": "encryptMediaForRecipient took the recipient and sender keys as two CryptoKey parameters, so passing them in the wrong order compiled and wrapped the recipient copy for the sender. Swapping them at both call sites left every test green: nothing guarded who calls the helper.",
+          "found_by": "C6",
+          "fix_commit": "76ac107d7",
+          "control": {
+            "patch": ".review/controls/g4a2a-recipient-copy-wrapped-for-the-sender.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/utils/mediaEncryption.test.ts -t \"gives both the recipient and the sender\""
+            ],
+            "observed": "With the keys swapped inside the helper -- the only place they still meet after the fix -- the round-trip test fails: the recipient private key cannot unwrap a key wrapped for the sender and WebCrypto raises OperationError. tsc still exits 0 with the patch applied, and vitest reports Tests 1 failed, the hook marker."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is one parameter type, from CryptoKey to KeyPair, and the two call sites that pass it."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records a type-level guard for key order; checked before pass 1."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the artifact the fix changed a second time, as G1 requires: the call sites themselves. Repeated the exact mutation from pass 1 at both REAL call sites. tsc refused both with TS2345 at ExpandedMessage.tsx:208 and MessagesPage.tsx:1515 -- the same mutation that left 24 of 24 tests green before the fix."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No markup changed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No query, migration or stored row changed; the same three strings reach the server."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "No field or constant changed."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The helper reads sender.publicKey, the same key both callers passed explicitly before."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Still one rule in one place."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The reader is unchanged and still unwraps each copy with the key it was made for."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No struct field added."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Re-broke the callers after the fix. The mutation no longer compiles, so it can no longer reach a test at all."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Fixtures unchanged, still minted by generateKeyPair."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Both readers still open their copies."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A stranger is still refused."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The same pair in both roles still works."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The composer, the one sibling not rewired, keeps its own optional sender wrap until G4a-2b."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Asked whether narrowing the parameter to KeyPair makes a caller unreachable: both callers already narrow their KeyPair to non-null before this call, which is why tsc accepts them."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "No error path changed."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "One helper, one signature."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The shape -- two same-typed security parameters -- was searched for across frontend/src in pass 1 and found nowhere else. Nothing added since."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Unchanged from pass 1: No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Unchanged from pass 1: No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Unchanged: no orphaned upload on a wrapping failure."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The control was replayed after its commit and fails as a test, with tsc still at 0."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Runs inside its suite."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0 on the restored tree, eslint 0, prettier 0."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing found this pass."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Unchanged from pass 1: real WebCrypto in every test, and no crypto moved."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Unchanged: the key is wrapped before the upload."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The guard refused the swapped call in a throwaway file in pass 1 and at the two real call sites in this pass."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "Unchanged from pass 1: No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "20 passed, 1 pre-existing skip."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Still the extraction half of the approved split; no behaviour of what is sent changed."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No side effect has two entry points here."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Unchanged enumeration; the fix touched no module beyond the four in scope."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The new control targets mediaEncryption.ts, the only file that changed in the fix, and was replayed after that commit. The edit-box control on MessagesPage.tsx still applies and still fails."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No resource is acquired after an await by the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No unmount cleanup is involved."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0",
+    "format": "prettier exit 0",
+    "tests": "20 passed, 1 pre-existing skip across the four suites touching the change",
+    "i18n": "clean"
+  }
+}
