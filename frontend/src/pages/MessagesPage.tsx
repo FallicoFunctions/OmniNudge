@@ -1512,11 +1512,7 @@ export default function MessagesPage() {
           const messageType = inferMessageTypeFromFile(file);
 
           // Encrypt the file and wrap its key for both readers
-          const sealed = await encryptMediaForRecipient(
-            file,
-            recipientPublicKey,
-            ownKeys.publicKey
-          );
+          const sealed = await encryptMediaForRecipient(file, recipientPublicKey, ownKeys);
 
           // Upload encrypted file
           const uploadResponse = await mediaService.uploadMedia(

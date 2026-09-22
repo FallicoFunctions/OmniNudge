@@ -22,6 +22,7 @@
  * arrives in G4a-2b.
  */
 import { encryptFile, encryptKeyWithPublicKey, arrayBufferToBase64 } from './encryption';
+import type { KeyPair } from './encryption';
 
 export interface EncryptedMediaForRecipient {
   /** The ciphertext. The caller decides what filename and type to upload it under. */
@@ -38,17 +39,25 @@ export interface EncryptedMediaForRecipient {
  *
  * The file keeps its own AES key; the RSA keys only wrap it. That is what makes
  * two readers possible without encrypting the bytes twice.
+ *
+ * The sender is passed as a whole KeyPair, not its public key, and that is
+ * deliberate. Two CryptoKey parameters of the same type let a caller pass them
+ * in the wrong order, which compiles, and wraps the "recipient" copy for the
+ * sender -- so the recipient can never open the file. Swapping them at both
+ * call sites left every test in the project green. With one CryptoKey and one
+ * KeyPair, a swap is a compile error, so the only place the two keys still
+ * meet is below, where the round-trip test guards it.
  */
 export async function encryptMediaForRecipient(
   file: File,
   recipientPublicKey: CryptoKey,
-  ownPublicKey: CryptoKey
+  sender: KeyPair
 ): Promise<EncryptedMediaForRecipient> {
   const encrypted = await encryptFile(file);
   return {
     encryptedData: encrypted.encryptedData,
     mediaEncryptionKey: await encryptKeyWithPublicKey(encrypted.rawKey, recipientPublicKey),
-    senderMediaEncryptionKey: await encryptKeyWithPublicKey(encrypted.rawKey, ownPublicKey),
+    senderMediaEncryptionKey: await encryptKeyWithPublicKey(encrypted.rawKey, sender.publicKey),
     // slice() because a Uint8Array may be backed by a larger buffer than the IV
     // itself, and the base64 of the whole buffer is not the base64 of the IV.
     mediaEncryptionIv: arrayBufferToBase64(encrypted.iv.slice().buffer),

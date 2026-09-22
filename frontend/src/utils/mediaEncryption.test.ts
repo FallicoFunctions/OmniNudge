@@ -20,7 +20,7 @@ describe('encryptMediaForRecipient', () => {
     const recipient = await generateKeyPair();
     const sender = await generateKeyPair();
 
-    const sealed = await encryptMediaForRecipient(file(), recipient.publicKey, sender.publicKey);
+    const sealed = await encryptMediaForRecipient(file(), recipient.publicKey, sender);
 
     // The recipient opens it with their copy.
     const forRecipient = await decryptFile(
@@ -53,7 +53,7 @@ describe('encryptMediaForRecipient', () => {
     const recipient = await generateKeyPair();
     const stranger = await generateKeyPair();
 
-    const sealed = await encryptMediaForRecipient(file(), recipient.publicKey, recipient.publicKey);
+    const sealed = await encryptMediaForRecipient(file(), recipient.publicKey, recipient);
 
     await expect(
       decryptFile(
@@ -71,7 +71,7 @@ describe('encryptMediaForRecipient', () => {
 
   it('encrypts the bytes rather than passing them through', async () => {
     const pair = await generateKeyPair();
-    const sealed = await encryptMediaForRecipient(file(), pair.publicKey, pair.publicKey);
+    const sealed = await encryptMediaForRecipient(file(), pair.publicKey, pair);
     // The plaintext must not survive anywhere in the ciphertext.
     expect(new Uint8Array(sealed.encryptedData)).not.toEqual(bytes);
     expect(sealed.encryptedData.byteLength).toBeGreaterThan(bytes.length);
