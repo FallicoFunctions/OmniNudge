@@ -47,8 +47,11 @@ async function ensureConversationId(data: SendMessageRequest): Promise<number> {
  * Only member-not-set-up names something a person can act on -- wait for them,
  * or ask them to finish setting up. The other rotation refusals mean the
  * request raced or was malformed, which is this app's problem, not advice.
+ *
+ * Exported because media seals under the same key and must refuse for the same
+ * reasons in the same words. One mapping, used by both senders.
  */
-async function groupKeyForSendingOrRefuse(
+export async function groupKeyForSendingOrRefuse(
   conversationId: number,
   ownKeys: Awaited<ReturnType<typeof getOwnKeys>>
 ) {

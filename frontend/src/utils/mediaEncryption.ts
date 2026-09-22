@@ -23,6 +23,7 @@
  */
 import { encryptFile, encryptKeyWithPublicKey, arrayBufferToBase64 } from './encryption';
 import type { KeyPair } from './encryption';
+import { sealGroupMessage } from './groupKeys';
 
 export interface EncryptedMediaForRecipient {
   /** The ciphertext. The caller decides what filename and type to upload it under. */
@@ -61,5 +62,48 @@ export async function encryptMediaForRecipient(
     // slice() because a Uint8Array may be backed by a larger buffer than the IV
     // itself, and the base64 of the whole buffer is not the base64 of the IV.
     mediaEncryptionIv: arrayBufferToBase64(encrypted.iv.slice().buffer),
+  };
+}
+
+export interface EncryptedMediaForGroup {
+  /** The ciphertext. The caller decides what filename and type to upload it under. */
+  encryptedData: ArrayBuffer;
+  /**
+   * The file's own AES key, sealed under the group key as an envelope. There is
+   * no sender copy: every member, the sender included, opens this one.
+   */
+  mediaEncryptionKey: string;
+  mediaEncryptionIv: string;
+  /** The group key version that sealed it, also recorded inside the envelope. */
+  groupKeyVersion: number;
+}
+
+/**
+ * Encrypt a file for everyone in a group.
+ *
+ * The file keeps its own AES key and the group key only seals that key, the
+ * same arrangement as a direct message with the envelope in place of two RSA
+ * copies. Reusing one shared key to encrypt the bytes of every file would mean
+ * one key under many IVs, which AES-GCM tolerates only while no IV ever repeats;
+ * a fresh key per file makes that question disappear.
+ *
+ * The group key is passed in rather than fetched here, as sealGroupMessage takes
+ * it, so this stays pure and the caller owns the refusal when there is no key.
+ */
+export async function encryptMediaForGroup(
+  file: File,
+  groupKey: CryptoKey,
+  version: number
+): Promise<EncryptedMediaForGroup> {
+  const encrypted = await encryptFile(file);
+  return {
+    encryptedData: encrypted.encryptedData,
+    mediaEncryptionKey: await sealGroupMessage(
+      arrayBufferToBase64(encrypted.rawKey),
+      groupKey,
+      version
+    ),
+    mediaEncryptionIv: arrayBufferToBase64(encrypted.iv.slice().buffer),
+    groupKeyVersion: version,
   };
 }

@@ -9,7 +9,7 @@ import {
   useQueries,
 } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { messagesService } from '../services/messagesService';
+import { groupKeyForSendingOrRefuse, messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
@@ -60,14 +60,11 @@ import { API_BASE_URL } from '../lib/api';
 import { authenticatedFetch } from '../services/authSession';
 import {
   decryptMessage,
-  encryptFile,
-  encryptKeyWithPublicKey,
-  arrayBufferToBase64,
   decryptMultiRecipientContent,
   encryptMessage,
   encryptForMultipleRecipients,
 } from '../utils/encryption';
-import { encryptMediaForRecipient } from '../utils/mediaEncryption';
+import { encryptMediaForGroup, encryptMediaForRecipient } from '../utils/mediaEncryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { decryptForDisplay, useDecryptedContent } from '../hooks/useDecryptedContent';
@@ -94,7 +91,7 @@ import {
   formatRedditSlideshowInput,
   parseRedditSlideshowInput,
 } from '../utils/redditSlideshowInput';
-import { messageSendErrorKey } from '../utils/messageSendErrors';
+import { MessageNotSent, messageSendErrorKey } from '../utils/messageSendErrors';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 const SEARCH_PAGE_SIZE = 50;
@@ -1590,6 +1587,7 @@ export default function MessagesPage() {
       let mediaEncryptionKey: string | undefined;
       let mediaEncryptionIv: string | undefined;
       let senderMediaEncryptionKey: string | undefined;
+      let groupKeyVersion: number | undefined;
 
       // Upload media first if selected
       if (selectedFile) {
@@ -1630,97 +1628,61 @@ export default function MessagesPage() {
           console.log('[Media Encryption] Existing conversation, recipient ID:', recipientId);
         }
 
-        // Encrypt the file if we have a recipient ID
-        let fileToUpload = selectedFile;
+        // A file is never uploaded unencrypted. Every way this could fail used to
+        // log a warning and upload the file in the clear -- including every file
+        // sent to a group, because a group has no single recipient to wrap for, so
+        // recipientId was always undefined there. Each is now a refusal, thrown
+        // before a byte leaves the device and shown by the catch below.
         const ownKeys = await getOwnKeys();
-        if (recipientId) {
-          console.log('[Media Encryption] Have recipient ID, attempting to encrypt file...');
-          try {
-            // Fetch recipient's public key
-            console.log('[Media Encryption] Fetching public keys for recipient:', recipientId);
-            const publicKeys = await encryptionService.getPublicKeys([recipientId]);
-            console.log('[Media Encryption] Public keys response:', publicKeys);
-            const recipientPublicKeyBase64 = publicKeys[recipientId];
-            console.log(
-              '[Media Encryption] Recipient public key (Base64):',
-              recipientPublicKeyBase64 ? `${recipientPublicKeyBase64.substring(0, 50)}...` : 'null'
-            );
-
-            if (recipientPublicKeyBase64) {
-              // Import recipient's public key
-              console.log('[Media Encryption] Importing recipient public key...');
-              const recipientPublicKey = await getUserPublicKey(
-                recipientId,
-                recipientPublicKeyBase64
-              );
-              console.log(
-                '[Media Encryption] Recipient public key imported:',
-                recipientPublicKey ? 'SUCCESS' : 'FAILED'
-              );
-
-              if (recipientPublicKey) {
-                // Encrypt the file
-                console.log('[Media Encryption] Encrypting file...');
-                const encryptedFile = await encryptFile(selectedFile);
-                const ivCopy = encryptedFile.iv.slice();
-                const ivBase64 = arrayBufferToBase64(ivCopy.buffer);
-                const encryptedKeyForRecipient = await encryptKeyWithPublicKey(
-                  encryptedFile.rawKey,
-                  recipientPublicKey
-                );
-
-                let encryptedKeyForSender: string | undefined;
-                if (ownKeys?.publicKey) {
-                  encryptedKeyForSender = await encryptKeyWithPublicKey(
-                    encryptedFile.rawKey,
-                    ownKeys.publicKey
-                  );
-                }
-
-                if (encryptedKeyForRecipient) {
-                  mediaEncryptionKey = encryptedKeyForRecipient;
-                  mediaEncryptionIv = ivBase64;
-                  senderMediaEncryptionKey = encryptedKeyForSender;
-
-                  console.log(
-                    '[Media Encryption] File encrypted successfully. Key:',
-                    mediaEncryptionKey.substring(0, 50) + '...',
-                    'IV:',
-                    mediaEncryptionIv?.substring(0, 30) + '...'
-                  );
-
-                  const encryptedBlob = new Blob([encryptedFile.encryptedData], {
-                    type: 'application/octet-stream',
-                  });
-                  fileToUpload = new File([encryptedBlob], selectedFile.name, {
-                    type: 'application/octet-stream',
-                  });
-                  console.log('[Media Encryption] Created encrypted file blob, ready to upload');
-                } else {
-                  console.warn(
-                    '[Media Encryption] Failed to encrypt AES key for recipient, uploading plain file'
-                  );
-                  mediaEncryptionKey = undefined;
-                  mediaEncryptionIv = undefined;
-                  senderMediaEncryptionKey = undefined;
-                }
-              } else {
-                console.warn(
-                  '[Media Encryption] Failed to import recipient public key, uploading unencrypted'
-                );
-              }
-            } else {
-              console.warn('[Media Encryption] Recipient has no public key, uploading unencrypted');
-            }
-          } catch (error) {
-            console.error(
-              '[Media Encryption] File encryption failed, uploading unencrypted:',
-              error
+        let encryptedData: ArrayBuffer;
+        if (
+          !isCreatingChat &&
+          selectedConversationId &&
+          selectedConversation?.conversation_type === 'group'
+        ) {
+          // One envelope for the whole group, sealed under the group key. The same
+          // refusals as group text, from the same mapping.
+          const { key, version } = await groupKeyForSendingOrRefuse(
+            selectedConversationId,
+            ownKeys
+          );
+          const sealed = await encryptMediaForGroup(selectedFile, key, version);
+          encryptedData = sealed.encryptedData;
+          mediaEncryptionKey = sealed.mediaEncryptionKey;
+          mediaEncryptionIv = sealed.mediaEncryptionIv;
+          groupKeyVersion = sealed.groupKeyVersion;
+        } else {
+          if (!recipientId) {
+            throw new MessageNotSent(
+              'recipient-key-unusable',
+              'This conversation has nobody to encrypt the file for'
             );
           }
-        } else {
-          console.warn('[Media Encryption] No recipient ID found, uploading unencrypted');
+          if (!ownKeys) {
+            throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
+          }
+          const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+          const recipientPublicKeyBase64 = publicKeys[recipientId];
+          const recipientPublicKey = recipientPublicKeyBase64
+            ? await getUserPublicKey(recipientId, recipientPublicKeyBase64)
+            : null;
+          if (!recipientPublicKey) {
+            throw new MessageNotSent(
+              'recipient-key-unusable',
+              'The recipient has no usable public key'
+            );
+          }
+          const sealed = await encryptMediaForRecipient(selectedFile, recipientPublicKey, ownKeys);
+          encryptedData = sealed.encryptedData;
+          mediaEncryptionKey = sealed.mediaEncryptionKey;
+          mediaEncryptionIv = sealed.mediaEncryptionIv;
+          senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
         }
+        // Uploaded as octet-stream, as this path always has been: the stored
+        // bytes are ciphertext, and the reader takes the type from the file name.
+        const fileToUpload = new File([encryptedData], selectedFile.name, {
+          type: 'application/octet-stream',
+        });
 
         // Upload the file (encrypted or original)
         const uploadedMedia = await uploadMediaMutation.mutateAsync(fileToUpload);
@@ -1792,13 +1754,17 @@ export default function MessagesPage() {
           media_encryption_key: mediaEncryptionKey,
           media_encryption_iv: mediaEncryptionIv,
           sender_media_encryption_key: senderMediaEncryptionKey,
+          group_key_version: groupKeyVersion,
           reply_to: replyTargetMessage?.id ?? undefined,
         });
       }
     } catch (error) {
       setUploadingMedia(false);
       console.error('Failed to send message:', error);
-      alert(t('messages.media.uploadFailed'));
+      // A refusal names its own reason -- a member not set up, no key on this
+      // device -- rather than the generic upload failure, which would tell the
+      // person to try again when trying again cannot help.
+      alert(t(messageSendErrorKey(error) ?? 'messages.media.uploadFailed'));
     }
   };
 
