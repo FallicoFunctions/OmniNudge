@@ -17,10 +17,12 @@ import (
 type stubMediaJobEnqueuer struct {
 	virusCalls     int
 	thumbnailCalls int
+	virusS3Key     string
 }
 
 func (s *stubMediaJobEnqueuer) EnqueueVirusScan(ctx context.Context, fileID int, filePath, s3Key string, uploadedBy int) error {
 	s.virusCalls++
+	s.virusS3Key = s3Key
 	return nil
 }
 
@@ -73,6 +75,9 @@ func TestUploadMediaUsesOwnerBoundCanonicalStorageObjectKey(t *testing.T) {
 		false,
 	)
 	handler.SetStorageService(storage)
+	enqueuer := &stubMediaJobEnqueuer{}
+	handler.queueClient = enqueuer
+	handler.virusScanEnabled = true
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -100,4 +105,9 @@ func TestUploadMediaUsesOwnerBoundCanonicalStorageObjectKey(t *testing.T) {
 	require.NotNil(t, media)
 	require.Equal(t, storage.uploadKey, media.StorageObjectKey)
 	require.Equal(t, "uploads/"+storage.uploadKey, media.StoragePath)
+	// The worker downloads the scan's key from the same storage. When objects
+	// moved under the owner's directory this stayed the bare filename, so every
+	// scan asked for an object that does not exist and the file stayed locked.
+	require.Equal(t, 1, enqueuer.virusCalls)
+	require.Equal(t, storage.uploadKey, enqueuer.virusS3Key)
 }

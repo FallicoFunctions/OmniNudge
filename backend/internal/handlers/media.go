@@ -797,7 +797,7 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 		if storageObjectKey == "" {
 			storageObjectKey = media.StoragePath
 		}
-		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, storageObjectKey, media.Filename, media.UserID); err != nil {
+		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, storageObjectKey, storageObjectKey, media.UserID); err != nil {
 			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue virus scan")
 			if h.virusScanFailClosed {
 				if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
