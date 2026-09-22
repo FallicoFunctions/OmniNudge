@@ -1,0 +1,519 @@
+{
+  "schema_version": 2,
+  "head": "830ab8a44",
+  "base": "d2697f1f3",
+  "scope": {
+    "files": [
+      "frontend/src/utils/mediaEncryption.ts",
+      "frontend/src/utils/mediaEncryption.test.ts",
+      "frontend/src/services/messagesService.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
+      "frontend/src/components/feed/ColumnFeed.tsx",
+      "frontend/src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx"
+    ],
+    "boundaries": [
+      "the bytes handed to the media upload",
+      "the request handed to sendMessage: which key, which IV, which version",
+      "whether a refused send leaves anything on the server"
+    ]
+  },
+  "prior_ledgers_read": [
+    "c421c8a1f -- the extraction this builds on, and the argument-order guard its review added.",
+    "cff7365eb and 04cf8a171 -- the reader side; why the writer is tested against the reader chain.",
+    "ba2c83dd4 -- where the reader was decoded in a real browser."
+  ],
+  "notes": [
+    "Classify every caller, not the ones you remember. The phase was planned around three send paths, and the plan was right about all three. A fourth, ColumnFeed, had never encrypted media at all, and no test drove it, so nothing had ever looked. It was found only by listing every call to uploadMedia in the frontend and asking of each one what it sends.",
+    "The page test is the verification the build explicitly deferred. Its power was checked in the strongest way available: run against the composer from before this phase, it failed four of six, printing the uploaded group bytes as the original PNG.",
+    "In this test environment the global typed-array constructors come from jsdom, so a copy made with new Uint8Array is still refused by Node WebCrypto as not an ArrayBuffer. Node Buffer is always Node realm and is accepted.",
+    "ColumnFeed returns its empty state whenever it has no items, for every column type, so a messages column with no conversations never shows its New Message box. A real but separate UX gap, recorded here and left alone.",
+    "Drag-and-drop into a group refuses with \"recipient not found\" before it uploads anything, because a group has no user1_id or user2_id. That is safe but misleading, and it means a file cannot be dropped into a group -- a separate UX gap, recorded here."
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The build changed four files: a pure group helper, the composer media block, an exported refusal mapping, and their tests. This review added a page-level test of the composer and fixed a fourth send path it found, ColumnFeed. The boundaries are the bytes handed to the upload and the request handed to sendMessage."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read c421c8a1f (the extraction this builds on), cff7365eb, 04cf8a171 and ba2c83dd4. The reading-side ledgers are why the writer was tested against the real reader chain, not against its own idea of the envelope."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The central instrument here, and the build had explicitly deferred it. Printed both artifacts that leave the device -- the uploaded bytes and the sendMessage request -- for five materially different inputs through the real page: a group, a group whose member has no key, a direct message, a recipient with no key, and a device with no keys. Real key pairs throughout. For the group and the direct message the uploaded bytes are not the file and the request key opens them to the original; for each refusal nothing is uploaded or sent and the alert names the reason."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The composer markup is unchanged; the only visible difference is which alert text appears on a refusal, asserted by the tests."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed. The server stores the media key strings as given and was read, not modified."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Refusal reasons are spelled once in SendRefusal and mapped once, by the exported groupKeyForSendingOrRefuse, for both group text and group media."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The request fields the reader reads are the fields the writer sets: media_encryption_key holds the envelope, media_encryption_iv the IV, group_key_version the version, and sender_media_encryption_key is absent for a group. Asserted field by field."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One refusal mapping serves both senders. The first attempt moved it into groupKeyCache and was reverted: from inside that module it calls groupKeyForSending directly, where a module mock cannot reach, so its own suite could no longer test it. Exporting it from messagesService kept one copy and a testable one."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The consumer is useDecryptedMedia. The page test opens the uploaded bytes through exactly its chain: isSealedGroupEnvelope, sealedKeyVersion, openGroupMessage, importFileKey, decryptFileWithKey."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field added; group_key_version already existed on the request and the model."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Broke the reader side of the new test in the strongest way available: ran it against the composer from BEFORE this phase. Four of six failed, and the first failure printed the uploaded bytes as 137 80 78 71 -- the original PNG. The test is not blind."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The fixture file carries a real PNG signature, and the group conversation carries the fields a real group has, including user1_id and user2_id null."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A group and a direct message both send, and both open."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Three refusals, each asserted to upload nothing and send nothing."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The degenerate inputs are the refusals themselves: no recipient key, no own keys, a member not set up."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling is group text, which refused for these reasons already. Media now refuses for the same reasons in the same words, from the same mapping."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the new composer block is reached by a page test: group, group refusal, direct message, and the two direct-message refusals."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Nothing is swallowed. Both the composer and ColumnFeed now show the refusal by name instead of a generic failure that invites a retry which cannot help."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Recorded rather than fixed: resolving a recipient public key and refusing without one now exists inline in three places -- messagesService for text, the composer, and ColumnFeed. A shared helper would be right, and belongs to its own change rather than to a review of this one."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Found the finding. Having closed the composer, asked whether ANY other path still uploads message media in the clear, and classified every caller of uploadMedia in the frontend rather than the ones I remembered. ColumnFeed uploaded the file itself for every new direct message it sent. The rest are the group avatar, public posts, walls, OmniChat and admin tooling, which are public by design."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A refusal now leaves nothing behind. Before this phase, the fallbacks uploaded a file and then sent it; a refused send leaves no orphaned upload."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "One control, replayed by hand. It restores ColumnFeed to its pre-fix form; tsc still exits 0, and both new tests fail -- the first printing the uploaded bytes as the original PNG."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both new suites are in the default vitest include and run inside the suite, not only when named."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0, eslint 0, prettier 0, i18n check and guard clean with alertCalls still 0."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by E6, which is on the list. The lesson is in the notes: classify every caller of the upload, not the callers you remember."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Applied as far as it can be from here, with the limit stated. The writer was verified against the real reader through real WebCrypto, and the reader itself was decoded in a real browser in the G4a-1 review. What was NOT run: an upload to the real server, because that needs a signed-in account, which is not mine to create or sign into. The encrypted upload shape is the one the composer has always used for direct messages. Said to the user in session."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Nothing starts before the decision that governs it: every refusal is thrown before the single upload, so a refused file never reaches the server. Asserted by the refusal tests counting zero uploads."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each refusal guard was fed the input it exists to refuse and refused it, and the whole new page suite was fed the pre-fix composer and failed on it."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "8 of 8 across the two new suites; H3 set 84 passed with 1 named pre-existing skip."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan for G4a-2 said: seal media on send for groups, and turn the direct-message fallbacks into refusals. Both are kept. The plan counted four fallbacks; there were five, and a fourth send path the plan did not know about, now fixed as well."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Group text and group media can both ask for a key in one send. They run in sequence, and the first rotation primes the cache, so the second receives the version the first made rather than minting another."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Enumerated by module and by consumer. Found and fixed during the build that messagesService.groupSend.test.ts mocks groupKeyCache in its old shape, which is what forced the refusal mapping to stay in messagesService."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The controls targeting MessagesPage.tsx and mediaEncryption.ts were written in the last two reviews. Both files changed in this phase; both controls were re-applied and still fail as tests."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "No resource is acquired after an await that needs releasing; the upload is a request, not a held handle."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a2b-feed-column-uploaded-the-file-itself",
+          "summary": "ColumnFeed.handleSendNewMessage uploaded the selected file itself and attached it to a direct message with no media key. The service encrypted the text, so the conversation read as end-to-end encrypted while the image sat on the server in the clear. There was no fallback to remove: the path never encrypted media, and no test drove it.",
+          "found_by": "E6",
+          "fix_commit": "830ab8a44",
+          "control": {
+            "patch": ".review/controls/g4a2b-feed-column-uploaded-the-file-itself.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx"
+            ],
+            "observed": "With ColumnFeed restored to its pre-fix form, tsc still exits 0 and both tests fail: AssertionError: expected Uint8Array[ 137, 80, 78, 71, 13, ... ] to not deeply equal Uint8Array[ 137, 80, 78, 71, 13, ... ] -- the uploaded bytes were the original PNG."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "The new code is the ColumnFeed fix and two test files."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "No prior ledger records ColumnFeed; checked before pass 1."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the artifacts again at HEAD, as G1 requires: both new suites re-run green, and the ColumnFeed request carries a key for each reader that opens the uploaded bytes."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The ColumnFeed error line now shows the refusal by name; asserted by the recipient-without-key test."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No handler changed. The server stores the media key strings as given and was read, not modified."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "ColumnFeed reuses SendRefusal and messageSendErrorKey; no new code or key was introduced."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "ColumnFeed sends media_encryption_key, media_encryption_iv and sender_media_encryption_key, the three fields the reader reads."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The recipient-key lookup is the third inline copy, recorded under E5 in pass 1."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The reader opens ColumnFeed files through the same direct-message chain, asserted per reader."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No struct field added; group_key_version already existed on the request and the model."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The control restores the pre-fix ColumnFeed and both tests fail on a real assertion."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The ColumnFeed fixture feed holds one conversation, the shape a real messages column has; with none the component renders only its empty state."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A file sent to a keyed recipient opens for both readers."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "A recipient without a key uploads nothing and sends nothing."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Text-only sends from ColumnFeed are untouched: the media block runs only when a file is selected."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "ColumnFeed now matches the composer exactly: same helper, same upload type, same refusals."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Asked the one path left unexercised: drag-and-drop into a group. Both user ids are null for a group, so it refuses with recipient-not-found BEFORE its first upload at MessagesPage.tsx:1515. It leaks nothing; its message is misleading, recorded in the notes."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The refusal reaches the ColumnFeed error line by name."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Unchanged from pass 1: No flag gates these paths."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Unchanged: three inline copies of the recipient-key lookup, recorded for a follow-up."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The sweep of every uploadMedia caller was complete in pass 1 and nothing was added since."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Unchanged from pass 1: No goroutine or shared mutable state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Unchanged from pass 1: No transaction or queue work."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Unchanged from pass 1: No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A refused ColumnFeed send leaves nothing on the server."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "The ColumnFeed control was replayed after its commit and fails as a test with tsc at 0."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Both new suites run inside the default include."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc 0, eslint 0, prettier 0 on the final tree."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Nothing found this pass."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Unchanged from pass 1, with the same stated limit: no upload to the real server, which needs a signed-in account."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "ColumnFeed refuses before uploading; asserted by zero uploads."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The recipient-without-key guard refused the input it exists to refuse."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Unchanged from pass 1: No layout changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "Unchanged from pass 1: No process-wide lazy state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "38 passed, 1 named pre-existing skip across the five suites re-run at HEAD."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan is kept, and exceeded by one path it did not know about."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "ColumnFeed resolves the recipient twice, once to validate the username and once to fetch the key. Both reads name the same user, so they cannot disagree."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "ColumnFeed is imported by MainLayout.test.tsx and HomePage.test.tsx, which render it for other reasons; both were in the H3 set and pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Unchanged from pass 1: Nothing can cover or redirect the app."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "Unchanged from pass 1: No shared Go fixture or route registry."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The new control targets ColumnFeed.tsx, the only product file changed this pass, and was replayed after that commit."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "No resource is held after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "Unchanged from pass 1: No unmount cleanup changed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "tsc -b exit 0",
+    "lint": "eslint exit 0",
+    "format": "prettier exit 0",
+    "tests": "8 of 8 in the two new suites; H3 set 84 passed, 1 pre-existing skip",
+    "i18n": "clean, alertCalls 0"
+  }
+}
