@@ -1,0 +1,15 @@
+diff --git a/frontend/src/services/mediaService.ts b/frontend/src/services/mediaService.ts
+index cddbcfe9a..b8a0e8179 100644
+--- a/frontend/src/services/mediaService.ts
++++ b/frontend/src/services/mediaService.ts
+@@ -63,9 +63,7 @@ export const mediaService = {
+     assertSafeMediaFile(file);
+     const formData = new FormData();
+     formData.append('file', file);
+-    if (options.encrypted) {
+-      formData.append('encrypted', 'true');
+-    }
++    void options;
+ 
+     const response = await api.post<MediaFile>('/media/upload', formData, {
+       // Clear the instance default Content-Type so the browser sets

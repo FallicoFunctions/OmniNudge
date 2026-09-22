@@ -1,0 +1,26 @@
+diff --git a/backend/internal/handlers/media.go b/backend/internal/handlers/media.go
+index 9172105e8..1be6729e1 100644
+--- a/backend/internal/handlers/media.go
++++ b/backend/internal/handlers/media.go
+@@ -228,7 +228,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
+ 	// plaintext upload can carry, and ServeUpload never lets a browser render
+ 	// it. The extension allow-list, the size cap for the extension's class, the
+ 	// quota and the virus scan all still apply.
+-	encrypted := c.PostForm("encrypted") == "true"
++	encrypted := c.PostForm("encrypted") == "not-yet-understood"
+ 	if encrypted {
+ 		contentType = encryptedMediaFileType
+ 	}
+diff --git a/backend/internal/handlers/uploads.go b/backend/internal/handlers/uploads.go
+index 8872c3b59..1ac68ed32 100644
+--- a/backend/internal/handlers/uploads.go
++++ b/backend/internal/handlers/uploads.go
+@@ -130,7 +130,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
+ 				c.Status(http.StatusNotFound)
+ 				return
+ 			}
+-			encryptedFile = media.FileType == encryptedMediaFileType
++			encryptedFile = media.FileType == "not-yet-understood"
+ 			switch media.ScanStatus {
+ 			case models.MediaScanStatusClean:
+ 			case models.MediaScanStatusInfected:

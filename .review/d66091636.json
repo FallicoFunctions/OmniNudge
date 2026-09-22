@@ -1,0 +1,533 @@
+{
+  "schema_version": 2,
+  "head": "9d59cc0dd",
+  "base": "d66091636",
+  "scope": {
+    "files": [
+      "backend/internal/handlers/media.go",
+      "backend/internal/handlers/uploads.go",
+      "backend/internal/api/middleware/security.go",
+      "backend/internal/handlers/media_encrypted_test.go",
+      "frontend/src/services/mediaService.ts",
+      "frontend/src/services/__tests__/mediaService.upload.test.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/feed/ColumnFeed.tsx",
+      "frontend/src/components/feed/ExpandedMessage.tsx",
+      "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
+      "frontend/src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx"
+    ],
+    "boundaries": [
+      "client FormData -> POST /media/upload",
+      "UploadMedia -> media_files row (file_type application/octet-stream)",
+      "ServeUpload -> Content-Type and Content-Disposition of an encrypted file",
+      "stored file_type -> SendMessage, the virus scan worker and the thumbnail queue"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/d2697f1f3.json",
+    ".review/c421c8a1f.json",
+    ".review/cff7365eb.json",
+    ".review/04cf8a171.json"
+  ],
+  "notes": "A re-review of G4a-2b. The fix was a server change, so pass 1 stopped to ask the user; they chose to fix the server in this review. The first commit attempt was refused by the pre-commit golangci-lint with five SA5011 reports in pending_deletion_targeting_test.go, a file this change does not touch; a clean HEAD worktree linted with 0 issues and so did the tree after 'golangci-lint cache clean', so the reports came from a stale local cache. Voice messages still upload unencrypted; that is phase G4b and will use this same server mode.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Re-review of G4a-2b after a clean close. The boundary no earlier pass had crossed was the upload itself: the ciphertext the client makes, and what /media/upload does with it."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d2697f1f3 (this phase's first review), c421c8a1f, cff7365eb and 04cf8a171. Every one of them tested the upload against a mocked mediaService, so none had ever seen the server's answer to ciphertext."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The contract with the other end: does /media/upload accept what the client now sends? Read UploadMedia: it ignores the declared Content-Type and sniffs the bytes, then requires an allowed type. Nothing in the handler or in mediaService.uploadMedia marked a file as encrypted."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E6",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by C4, confirmed by B5. Both are named; no new instrument is needed. The lesson is in C4's own question: every earlier pass mocked the other end."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran the real server rules (http.DetectContentType, NormalizeDetectedMIME, ValidateMIMEType against AllowedMediaTypes) on a real PNG and on the AES-GCM ciphertext of the same PNG, side by side. The PNG: image/png, ALLOWED=true. The ciphertext: application/octet-stream, ALLOWED=false -- a 415 for every encrypted file."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "H2",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "G4",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        }
+      ],
+      "findings": [
+        {
+          "id": "g4a2b-server-refused-every-ciphertext",
+          "summary": "UploadMedia sniffs an upload's bytes and requires an allowed media type, and ciphertext always sniffs as application/octet-stream, so the server answered every end-to-end encrypted upload with 415. Media sending in messages failed everywhere; it failed closed, so nothing leaked. Every earlier test mocked mediaService, so none had seen the server's answer.",
+          "found_by": "C4",
+          "fix_commit": "ff2f00f88",
+          "control": {
+            "patch": ".review/controls/g4a2b-server-refused-every-ciphertext.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/handlers/ -run '^(TestUploadMedia_EncryptedFiles|TestServeUpload_EncryptedFileIsADownload)$'"
+            ],
+            "observed": "With the flag comparison changed so it never matches: four subtests of TestUploadMedia_EncryptedFiles fail, expected 201 actual 415 and expected 413 actual 415, and the serve test fails on the Content-Type of the encrypted file. The package compiles. Without the patch: ok."
+          }
+        },
+        {
+          "id": "g4a2b-client-never-marked-ciphertext",
+          "summary": "mediaService.uploadMedia had no way to say a file was ciphertext, so even a server that could accept encrypted uploads had nothing to act on. The four message media paths now pass { encrypted: true }; other uploads send no flag and are still inspected.",
+          "found_by": "C4",
+          "fix_commit": "9d59cc0dd",
+          "control": {
+            "patch": ".review/controls/g4a2b-client-never-marked-ciphertext.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/services/__tests__/mediaService.upload.test.ts"
+            ],
+            "observed": "With the append removed (tsc still 0): 'tells the server an encrypted file cannot be inspected' fails, AssertionError: expected null to be 'true'. The plain-upload test still passes. Without the patch: 2 passed."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Seven source files over two commits. ff2f00f88: UploadMedia gains an encrypted mode, MaxSizeForExtension in security.go, ServeUpload serves an encrypted record as an octet-stream attachment, and media_encrypted_test.go. 9d59cc0dd: mediaService.uploadMedia(file, { encrypted }) and the four message media call sites. Boundaries: the multipart body to /media/upload, the stored media_files row, the served headers, and the stored file_type as later read by SendMessage, the scan worker and the thumbnail queue."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d2697f1f3, c421c8a1f, cff7365eb, 04cf8a171 and pass 1 above. The g4a1r2 and g4a2b controls touch files this change edits, so G4 re-applies them."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "The artifact the client builds is the FormData handed to api.post. mediaService.upload.test.ts reads it back for two inputs: with { encrypted: true } the body carries encrypted=true and the file; without it the field is absent. The page tests read the same call for three send paths (group composer, direct composer, feed column): all pass { encrypted: true }, with bytes that are not the original."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component renders anything new. The change adds an argument to four upload calls; the refusal alerts were printed in the first review and did not change."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed real response bodies from the real handler and a real database for three inputs with a throwaway test (deleted): an encrypted clip.mp4 and notes.pdf return 201 with file_type application/octet-stream and no width, height or thumbnail_url; a plain photo.png returns 201 as image/png with width 4, height 4 and a thumbnail. Refusals were read in media_encrypted_test.go: unmarked ciphertext 415 'Unsupported file type', encrypted .html 415 'Unsupported file extension', limit+17 413 'File size exceeds limit for this file type'."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the stored rows back after those uploads: clip.mp4 and notes.pdf are application/octet-stream, scan clean, width NULL; photo.png is image/png with its dimensions. No query or migration changed."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The field name 'encrypted' and its value 'true' are spelled the same in mediaService.ts and in c.PostForm(\"encrypted\") == \"true\"; the Go test writes the same field. encryptedMediaFileType is the one constant for the stored type on both the upload and the serve side."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The client reads the upload response id and storage_url, which are unchanged. SendMessage replaces the client's media_type with the stored file_type (octet-stream); the reader does not use it -- useDecryptedMedia takes the MIME type from the URL extension (mimeTypeFor), and the bubble decides image or video by message_type, which the client still sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The encrypted rule lives only in UploadMedia. processSingleUpload (batch, used by posts) and the presigned routes keep their own sniffing rules unchanged, and no client sends ciphertext to them: the frontend has no presigned upload call."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Re-applied to the fix. The other ends of the stored octet-stream type: SendMessage requires scan_status clean and copies file_type (fine); the virus scan worker runs validateStagedUpload -- which would refuse octet-stream -- only for pending-uploads/ paths, which /media/upload never writes; thumbnailJobTypeForMIME returns no job for octet-stream; forwarding copies the media fields unchanged."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field was added. The flag is a form field read in one place."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The form field is read by c.PostForm, a string accessor. The control patch changes the compared value and the tests fail with 415, so the accessor is exercised, not only declared."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The Go tests post random bytes as the ciphertext. That matches what the client produces for this purpose: pass 1 showed real AES-GCM ciphertext sniffs as application/octet-stream, the same as random bytes, and the handler never decrypts."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs that must pass: an encrypted .png, .mp4, .pdf and .webm, and one at its class limit plus the 16-byte tag. All 201."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs that must fail: ciphertext without the flag (415); an encrypted .html (415, extension still checked); limit+17 (413). An attacker who marks plaintext HTML as encrypted under a .png name gets it stored as octet-stream and served as an attachment with nosniff, so no browser renders it; TestServeUpload_EncryptedFileIsADownload pins that header pair."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundaries: limit+16 accepted, limit+17 refused, both tested. An unknown extension makes MaxSizeForExtension return false and the handler answers 415. The webm case proves the largest class wins for an extension with two classes."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: batch upload and presigned upload keep full inspection; they carry no message media. The encrypted path keeps every defence it can still use -- extension allow-list, class size cap, quota, virus scan -- and loses only the ones that read content."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "With encrypted true, ValidateStrictDocumentStructure still runs but its error is ignored (the condition is '!encrypted && err != nil'); the refusing branch is reachable for plaintext only, as intended. The IsImageType dimension branch is unreachable for encrypted records, as intended."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The client's upload failures reach the user: all four sites alert through messageSendErrorKey with messages.media.uploadFailed as the fallback. The server logs and answers each refusal with its own message."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Searched for conditions on file_type: IsImageType in UploadMedia, thumbnailJobTypeForMIME in the scan worker, the staged-upload check, and ServeUpload. Each treats octet-stream as not-an-image, which is correct for ciphertext."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "One constant for the stored type, one helper for the size cap. The three inline copies of the recipient-key lookup are the known E5 item from the first review, unchanged here."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The shape is 'a test mocked the other end, so a contract break was invisible'. Searched every uploadMedia caller: the six non-message callers (group avatar, admin personas, posts, wall, studio) upload plaintext and correctly send no flag. Voice messages still upload unencrypted; that is phase G4b, and it will need the same server mode."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state changed."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction. A refusal before the file is written leaves nothing; a refusal after it (document structure) removes the file, as before."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "An encrypted record is deleted by the same paths as any media file; nothing type-specific is left behind."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls, each replayed by hand. Server: with the flag comparison changed, TestUploadMedia_EncryptedFiles fails four subtests (expected 201, actual 415; expected 413, actual 415) and TestServeUpload_EncryptedFileIsADownload fails on the Content-Type. Client: without the append, mediaService.upload.test.ts fails 'expected null to be true'. The regenerated feed-column control still fails on the PNG bytes. Every run compiled."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The server guards are reached by the route /media/upload itself; the tests drive the real handler through a gin router."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet and gofmt clean; golangci-lint 0 issues on handlers after the stale cache was cleared (see notes); tsc -b 0; eslint 0 on all seven changed frontend files. The pre-commit hook passed both commits."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The other system is the server itself. Drove the real handler with a real database for encrypted and plain uploads and read the bodies and rows side by side (B3, B4). Not done: a send from a real browser through the dev stack, so the browser's own decryption of a served attachment was not observed. The readers fetch bytes with fetch(), which a Content-Disposition header does not change."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The guards were fed known-bad input: unmarked ciphertext, an .html name, limit+17. Each is refused."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No shared bar or row changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No process-wide lazy state is read."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "The Go tests use database.NewTest against the real test database and ran: 16 handler tests PASS and 17 integration tests PASS, none SKIP. One frontend test skips (MessagesPage.test.tsx:275, keyboard on a checkbox); it is an old it.skip and has nothing to do with media."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The approved plan for G4a-2b was 'seal group media and refuse instead of uploading in the clear'. Media could not be sent at all until this fix, so the fix is what makes the phase keep its promise. The user chose this fix in session."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "The upload starts from four entry points, but each call is one user action with its own file; nothing is shared between them."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran every test that imports or mocks a changed module. Frontend: 14 files that name mediaService, MessagesPage, ColumnFeed or ExpandedMessage -- 73 passed, 1 skipped. Go: the middleware package; media_queue_test, uploads_test and media_encrypted_test in handlers (16 tests); and the 17 integration tests that post to /media/upload or send media."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control whose patch touches a changed file. g4a1r2-edit-box-opened-on-ciphertext still applies. g4a2b-feed-column-uploaded-the-file-itself was stale because this fix added the flag to that call; regenerated with a three-way merge that restores the raw-file upload and keeps the flag, and it still fails both ColumnFeed tests on the PNG bytes."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource is acquired after an await in the changed code."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./... ok",
+    "vet": "go vet handlers and middleware ok; gofmt clean",
+    "lint": "golangci-lint handlers 0 issues; eslint 0 on the seven changed frontend files",
+    "types": "tsc -b 0",
+    "tests": "frontend 14 files 73 passed 1 skipped (old, unrelated); Go middleware ok, handlers 16 passed, integration 17 passed, none skipped"
+  }
+}

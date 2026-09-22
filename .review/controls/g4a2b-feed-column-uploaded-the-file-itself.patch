@@ -1,5 +1,5 @@
 diff --git a/frontend/src/components/feed/ColumnFeed.tsx b/frontend/src/components/feed/ColumnFeed.tsx
-index b4a571b42..53f9c904d 100644
+index 64017e047..ae89a043e 100644
 --- a/frontend/src/components/feed/ColumnFeed.tsx
 +++ b/frontend/src/components/feed/ColumnFeed.tsx
 @@ -7,10 +7,6 @@ import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
@@ -13,7 +13,7 @@ index b4a571b42..53f9c904d 100644
  import type { Message } from '../../types/messages';
  import type { CombinedFeedItem } from '../../services/feedService';
  import type { RedditApiPost } from '../../types/reddit';
-@@ -360,41 +356,11 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
+@@ -360,42 +356,11 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
      let mediaType: string | undefined;
      let mediaSize: number | undefined;
      let messageType: Message['message_type'] | undefined;
@@ -50,13 +50,14 @@ index b4a571b42..53f9c904d 100644
 -        mediaEncryptionIv = sealed.mediaEncryptionIv;
 -        senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
 -        const uploadedMedia = await mediaService.uploadMedia(
--          new File([sealed.encryptedData], selectedFile.name, { type: 'application/octet-stream' })
+-          new File([sealed.encryptedData], selectedFile.name, { type: 'application/octet-stream' }),
+-          { encrypted: true }
 -        );
-+        const uploadedMedia = await mediaService.uploadMedia(selectedFile);
++        const uploadedMedia = await mediaService.uploadMedia(selectedFile, { encrypted: true });
          mediaFileId = uploadedMedia.id;
          if (uploadedMedia.storage_url) {
            if (uploadedMedia.storage_url.startsWith('http')) {
-@@ -423,9 +389,6 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
+@@ -424,9 +389,6 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
          media_type: mediaType,
          media_size: mediaSize,
          message_type: messageType,
@@ -66,7 +67,7 @@ index b4a571b42..53f9c904d 100644
        });
  
        setMessageText('');
-@@ -434,10 +397,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
+@@ -435,10 +397,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
        setShowNewMessageInput(false);
        setPendingOpenConversationId(message.conversation_id);
        queryClient.invalidateQueries({ queryKey: ['column-feed', columnId] });
