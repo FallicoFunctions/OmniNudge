@@ -244,6 +244,30 @@ func GetMaxSizeForMIME(mimeType string) int64 {
 	return 10 * 1024 * 1024
 }
 
+// MaxSizeForExtension is the largest size that any type allowed for this
+// file's extension may have. It exists for an upload whose bytes cannot be
+// inspected to learn which of those types it really is: an end-to-end
+// encrypted file is opaque to the server, so its extension is the only thing
+// left that names its class.
+//
+// The largest, not the first, because an extension can name more than one
+// class: .webm is audio or video, and a webm video must not be held to the
+// audio limit. False when the extension names no allowed type at all.
+func MaxSizeForExtension(filename string) (int64, bool) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	mimes, ok := extensionToAllowedMIMEs[ext]
+	if !ok {
+		return 0, false
+	}
+	var largest int64
+	for _, mimeType := range mimes {
+		if size := GetMaxSizeForMIME(mimeType); size > largest {
+			largest = size
+		}
+	}
+	return largest, true
+}
+
 // NormalizeDetectedMIME maps generic detector outputs to safe, extension-aware MIME types.
 func NormalizeDetectedMIME(filename, mimeType string) string {
 	normalized := normalizeMIMEType(mimeType)

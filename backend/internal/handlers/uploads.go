@@ -76,6 +76,11 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	allowUntracked := isUntrackedUploadPathAllowed(cleanRelPath)
 	storagePath := filepath.ToSlash(filepath.Join("uploads", cleanRelPath))
 	publicUntrackedAsset := false
+	// Set once the record is known. An encrypted file keeps its original name,
+	// so c.File would take image/png from ".png" and hand ciphertext to a
+	// browser as an image. It must be a download the app decrypts, never
+	// something the browser tries to render.
+	encryptedFile := false
 
 	if h.mediaRepo != nil {
 		media, err := h.mediaRepo.GetByPublicURL(c.Request.Context(), publicURL)
@@ -125,6 +130,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 				c.Status(http.StatusNotFound)
 				return
 			}
+			encryptedFile = media.FileType == encryptedMediaFileType
 			switch media.ScanStatus {
 			case models.MediaScanStatusClean:
 			case models.MediaScanStatusInfected:
@@ -185,6 +191,11 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 		c.Writer.Header().Del("Pragma")
 		c.Writer.Header().Del("Expires")
 	}
+	if encryptedFile {
+		// Set before c.File, which only guesses a type when none is set.
+		c.Header("Content-Type", encryptedMediaFileType)
+		c.Header("Content-Disposition", "attachment")
+	}
 	c.File(absFile)
 }
 
@@ -218,7 +229,12 @@ func (h *UploadsHandler) serveRemoteTrackedMedia(c *gin.Context, media *models.M
 	}
 	defer func() { _ = reader.Close() }()
 	c.Header("Content-Type", media.FileType)
-	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, safeUploadResponseFilename(media.Filename)))
+	// The same rule as the local path: an encrypted file is a download.
+	disposition := "inline"
+	if media.FileType == encryptedMediaFileType {
+		disposition = "attachment"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf(`%s; filename=%q`, disposition, safeUploadResponseFilename(media.Filename)))
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")

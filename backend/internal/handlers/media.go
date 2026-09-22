@@ -34,6 +34,19 @@ const (
 	maxImageDimension  = 8000
 )
 
+const (
+	// encryptedMediaFileType marks a record whose bytes are end-to-end
+	// encrypted. No plaintext upload can carry it: application/octet-stream is
+	// not an allowed media type, and the detector's octet-stream is renamed for
+	// the only extensions that use it (.doc and .zip). So the stored type alone
+	// tells ServeUpload that a browser must never render this file.
+	encryptedMediaFileType = "application/octet-stream"
+
+	// encryptedMediaOverheadBytes is the 16-byte tag AES-GCM appends. Without
+	// it, a file exactly at the limit for its class is refused once encrypted.
+	encryptedMediaOverheadBytes = 16
+)
+
 // presignTTL is the validity window for S3 presigned PUT URLs.
 // Adjust via rebuild if a different value is needed for your deployment.
 const presignTTL = time.Hour
@@ -121,11 +134,13 @@ func (h *MediaHandler) SetPresignedUploadRepository(repo presignedUploadReposito
 // @Security     BearerAuth
 // @Accept       multipart/form-data
 // @Produce      json
-// @Param        file  formData  file  true  "Media file"
+// @Param        file       formData  file    true   "Media file"
+// @Param        encrypted  formData  string  false  "true when the file is end-to-end encrypted ciphertext"
 // @Success      201  {object}  models.MediaFile
 // @Failure      400  {object}  gin.H
 // @Failure      401  {object}  gin.H
 // @Failure      413  {object}  gin.H
+// @Failure      415  {object}  gin.H
 // @Failure      500  {object}  gin.H
 // @Router       /media/upload [post]
 func (h *MediaHandler) UploadMedia(c *gin.Context) {
@@ -204,8 +219,22 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 	contentType = middleware.NormalizeDetectedMIME(safeName, contentType)
 
+	// An end-to-end encrypted file is ciphertext. Its bytes sniff as
+	// application/octet-stream whatever it really is, so every content check
+	// below would refuse it -- which is how every encrypted file a client ever
+	// sent was rejected here. None of those checks can mean anything on
+	// ciphertext, so they are skipped for it, and what replaces them is
+	// narrower: the record is stored as encryptedMediaFileType, which no
+	// plaintext upload can carry, and ServeUpload never lets a browser render
+	// it. The extension allow-list, the size cap for the extension's class, the
+	// quota and the virus scan all still apply.
+	encrypted := c.PostForm("encrypted") == "true"
+	if encrypted {
+		contentType = encryptedMediaFileType
+	}
+
 	// Validate MIME type (P0-008 Security Audit)
-	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
+	if !encrypted && !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
 		_ = os.Remove(storagePath)
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{
 			"error": "Unsupported file type",
@@ -219,7 +248,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		})
 		return
 	}
-	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], contentType) {
+	if !encrypted && !middleware.ValidateNoSuspiciousSignatures(sniff[:n], contentType) {
 		_ = os.Remove(storagePath)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "File contains suspicious embedded signatures",
@@ -227,7 +256,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		})
 		return
 	}
-	if !middleware.ValidateExtensionMatchesMIME(safeName, contentType) {
+	if !encrypted && !middleware.ValidateExtensionMatchesMIME(safeName, contentType) {
 		_ = os.Remove(storagePath)
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{
 			"error": "File extension does not match detected content type",
@@ -239,6 +268,21 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	// Validate file size for MIME type
 	maxSizeForType := middleware.GetMaxSizeForMIME(contentType)
+	if encrypted {
+		// Held to the limit of the class the extension names, not the generic
+		// default the ciphertext's own type would give it, plus the tag AES-GCM
+		// adds, so a file exactly at its limit is not refused once encrypted.
+		limit, ok := middleware.MaxSizeForExtension(safeName)
+		if !ok {
+			_ = os.Remove(storagePath)
+			c.JSON(http.StatusUnsupportedMediaType, gin.H{
+				"error": "Unsupported file extension",
+				"name":  safeName,
+			})
+			return
+		}
+		maxSizeForType = limit + encryptedMediaOverheadBytes
+	}
 	if total > maxSizeForType {
 		_ = os.Remove(storagePath)
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
@@ -303,7 +347,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
+	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); !encrypted && err != nil {
 		_ = os.Remove(storagePath)
 		zlog.Warn().Err(err).Str("name", safeName).Str("type", contentType).Msg("invalid document structure")
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{
