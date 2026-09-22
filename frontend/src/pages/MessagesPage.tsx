@@ -67,6 +67,7 @@ import {
   encryptMessage,
   encryptForMultipleRecipients,
 } from '../utils/encryption';
+import { encryptMediaForRecipient } from '../utils/mediaEncryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { decryptForDisplay, useDecryptedContent } from '../hooks/useDecryptedContent';
@@ -1510,25 +1511,19 @@ export default function MessagesPage() {
         try {
           const messageType = inferMessageTypeFromFile(file);
 
-          // Encrypt the file
-          const encryptedFile = await encryptFile(file);
+          // Encrypt the file and wrap its key for both readers
+          const sealed = await encryptMediaForRecipient(
+            file,
+            recipientPublicKey,
+            ownKeys.publicKey
+          );
 
           // Upload encrypted file
           const uploadResponse = await mediaService.uploadMedia(
-            new File([encryptedFile.encryptedData], file.name, { type: file.type })
+            new File([sealed.encryptedData], file.name, { type: file.type })
           );
-
-          // Encrypt AES key for recipient
-          const recipientEncryptedKey = await encryptKeyWithPublicKey(
-            encryptedFile.rawKey,
-            recipientPublicKey
-          );
-
-          // Encrypt AES key for sender
-          const senderEncryptedKey = await encryptKeyWithPublicKey(
-            encryptedFile.rawKey,
-            ownKeys.publicKey
-          );
+          const recipientEncryptedKey = sealed.mediaEncryptionKey;
+          const senderEncryptedKey = sealed.senderMediaEncryptionKey;
 
           // Create auto-generated caption
           const captionText = `[${messageType === 'image' ? t('common.media.image') : t('common.media.video')}]`;
@@ -1546,7 +1541,7 @@ export default function MessagesPage() {
             media_size: file.size,
             message_type: messageType,
             media_encryption_key: recipientEncryptedKey,
-            media_encryption_iv: arrayBufferToBase64(encryptedFile.iv.slice().buffer),
+            media_encryption_iv: sealed.mediaEncryptionIv,
             sender_media_encryption_key: senderEncryptedKey,
             encryption_version: 'v2',
           });

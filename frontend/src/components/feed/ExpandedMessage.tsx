@@ -7,12 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import { useDecryptedMedia } from '../../hooks/useDecryptedMedia';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import {
-  encryptFile,
-  encryptKeyWithPublicKey,
-  arrayBufferToBase64,
-  encryptMessage,
-} from '../../utils/encryption';
+import { encryptMessage } from '../../utils/encryption';
+import { encryptMediaForRecipient } from '../../utils/mediaEncryption';
 import { useDecryptedContent } from '../../hooks/useDecryptedContent';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -209,24 +205,22 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
 
         setUploadingMedia(true);
         try {
-          const encryptedFile = await encryptFile(selectedFile);
+          const sealed = await encryptMediaForRecipient(
+            selectedFile,
+            recipientPublicKey,
+            keys.publicKey
+          );
           const uploadResponse = await mediaService.uploadMedia(
-            new File([encryptedFile.encryptedData], selectedFile.name, { type: selectedFile.type })
+            new File([sealed.encryptedData], selectedFile.name, { type: selectedFile.type })
           );
           mediaFileId = uploadResponse.id;
           mediaUrl = uploadResponse.storage_url;
           mediaType = selectedFile.type;
           mediaSize = selectedFile.size;
           messageType = inferMessageTypeFromFile(selectedFile);
-          mediaEncryptionKey = await encryptKeyWithPublicKey(
-            encryptedFile.rawKey,
-            recipientPublicKey
-          );
-          senderMediaEncryptionKey = await encryptKeyWithPublicKey(
-            encryptedFile.rawKey,
-            keys.publicKey
-          );
-          mediaEncryptionIv = arrayBufferToBase64(encryptedFile.iv.slice().buffer);
+          mediaEncryptionKey = sealed.mediaEncryptionKey;
+          senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
+          mediaEncryptionIv = sealed.mediaEncryptionIv;
         } catch (error) {
           console.error('Failed to upload media:', error);
           alert(t('messages.media.uploadFailed'));
