@@ -473,6 +473,7 @@ export default function MessagesPage() {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [checkingMedia, setCheckingMedia] = useState(false);
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
   const [replyTargetMessage, setReplyTargetMessage] = useState<Message | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
@@ -1008,7 +1009,9 @@ export default function MessagesPage() {
   const { archiveConversation, unarchiveConversation, isArchiving, isUnarchiving } = useArchive();
 
   const sendMessageMutation = useMutation({
-    mutationFn: (data: SendMessageRequest) => messagesService.sendMessage(data),
+    mutationFn: (data: SendMessageRequest) =>
+      messagesService.sendMessage(data, { onWaitingForMediaCheck: () => setCheckingMedia(true) }),
+    onSettled: () => setCheckingMedia(false),
     onSuccess: (message, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', message.conversation_id] });
       queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
@@ -1034,8 +1037,9 @@ export default function MessagesPage() {
       }
     },
     onError: (error: unknown) => {
-      const key = messageSendErrorKey(error);
-      if (key) alert(t(key));
+      // Every failure is said. A send that failed without a word left the file
+      // sitting in the composer with no sign that nothing went out.
+      alert(t(messageSendErrorKey(error) ?? 'messages.errors.sendFailed'));
     },
   });
 
@@ -1527,23 +1531,29 @@ export default function MessagesPage() {
           const senderEncryptedCaption = await encryptMessage(captionText, ownKeys.publicKey);
 
           // Send message
-          await messagesService.sendMessage({
-            conversation_id: selectedConversationId,
-            encrypted_content: encryptedCaption,
-            sender_encrypted_content: senderEncryptedCaption,
-            media_file_id: uploadResponse.id,
-            media_url: uploadResponse.storage_url,
-            media_type: file.type,
-            media_size: file.size,
-            message_type: messageType,
-            media_encryption_key: recipientEncryptedKey,
-            media_encryption_iv: sealed.mediaEncryptionIv,
-            sender_media_encryption_key: senderEncryptedKey,
-            encryption_version: 'v2',
-          });
+          await messagesService.sendMessage(
+            {
+              conversation_id: selectedConversationId,
+              encrypted_content: encryptedCaption,
+              sender_encrypted_content: senderEncryptedCaption,
+              media_file_id: uploadResponse.id,
+              media_url: uploadResponse.storage_url,
+              media_type: file.type,
+              media_size: file.size,
+              message_type: messageType,
+              media_encryption_key: recipientEncryptedKey,
+              media_encryption_iv: sealed.mediaEncryptionIv,
+              sender_media_encryption_key: senderEncryptedKey,
+              encryption_version: 'v2',
+            },
+            { onWaitingForMediaCheck: () => setCheckingMedia(true) }
+          );
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
-          alert(t('messages.media.uploadFailedFile', { filename: file.name }));
+          const key = messageSendErrorKey(error);
+          alert(key ? t(key) : t('messages.media.uploadFailedFile', { filename: file.name }));
+        } finally {
+          setCheckingMedia(false);
         }
       }
 
@@ -3807,7 +3817,11 @@ export default function MessagesPage() {
                     }
                     className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)] disabled:opacity-50"
                   >
-                    {uploadingMedia ? t('messages.uploading') : t('messages.send')}
+                    {checkingMedia
+                      ? t('messages.checkingFile')
+                      : uploadingMedia
+                        ? t('messages.uploading')
+                        : t('messages.send')}
                   </button>
                 </form>
               </div>

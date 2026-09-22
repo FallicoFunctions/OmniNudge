@@ -74,6 +74,47 @@ export async function groupKeyForSendingOrRefuse(
   }
 }
 
+/**
+ * How long a send with a file waits for the server's security scan.
+ *
+ * An upload is scanned after it is stored, and the server refuses to attach a
+ * file that has not passed (423) -- the file stays unreachable until then. The
+ * composer sends the moment the upload returns, which is almost always before
+ * the scan finishes, so without this wait nearly every file send failed.
+ */
+export const MEDIA_CHECK_WAIT_MS = 30_000;
+const MEDIA_CHECK_RETRY_DELAYS_MS = [500, 1000, 2000, 3000, 5000];
+
+export interface SendMessageOptions {
+  /** Called when the send starts waiting for its file's scan. */
+  onWaitingForMediaCheck?: () => void;
+}
+
+async function postOnceMediaIsChecked<T>(
+  post: () => Promise<T>,
+  hasMedia: boolean,
+  onWaiting?: () => void
+): Promise<T> {
+  const deadline = Date.now() + MEDIA_CHECK_WAIT_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await post();
+    } catch (error) {
+      if (!hasMedia || (error as { status?: number }).status !== 423) throw error;
+      const delay =
+        MEDIA_CHECK_RETRY_DELAYS_MS[Math.min(attempt, MEDIA_CHECK_RETRY_DELAYS_MS.length - 1)];
+      if (Date.now() + delay > deadline) {
+        throw new MessageNotSent(
+          'media-still-checking',
+          'The file had not passed its security scan in time'
+        );
+      }
+      if (attempt === 0) onWaiting?.();
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 export const messagesService = {
   async getConversations(includeArchived = false): Promise<Conversation[]> {
     const response = await this.getConversationsPage(includeArchived);
@@ -199,7 +240,7 @@ export const messagesService = {
     await api.delete(`/messages/${messageId}/pin`);
   },
 
-  async sendMessage(data: SendMessageRequest): Promise<Message> {
+  async sendMessage(data: SendMessageRequest, options: SendMessageOptions = {}): Promise<Message> {
     const conversationId = await ensureConversationId(data);
     const messageType =
       data.message_type ?? (data.media_file_id ? ('image' as Message['message_type']) : 'text');
@@ -297,7 +338,7 @@ export const messagesService = {
       }
     }
 
-    return api.post<Message>('/messages', {
+    const request = {
       conversation_id: conversationId,
       encrypted_content: encryptedContent,
       message_type: messageType,
@@ -315,7 +356,12 @@ export const messagesService = {
       recipient_keys: data.recipient_keys,
       group_key_version: groupKeyVersion,
       reply_to: data.reply_to,
-    });
+    };
+    return postOnceMediaIsChecked(
+      () => api.post<Message>('/messages', request),
+      Boolean(data.media_file_id || data.media_url),
+      options.onWaitingForMediaCheck
+    );
   },
 
   async editMessage(messageId: number, data: EditMessageRequest): Promise<Message> {

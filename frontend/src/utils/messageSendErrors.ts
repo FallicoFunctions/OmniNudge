@@ -18,7 +18,9 @@ export type SendRefusal =
   /** A member of the group has published no usable key, so nobody can wrap for them. */
   | 'group-member-not-set-up'
   /** This device cannot get a key to seal the group message with. */
-  | 'no-group-key';
+  | 'no-group-key'
+  /** The attached file had not passed the server's security scan in time. */
+  | 'media-still-checking';
 
 export class MessageNotSent extends Error {
   constructor(
@@ -36,6 +38,7 @@ const REFUSAL_KEYS: Record<SendRefusal, string> = {
   'encryption-failed': 'messages.errors.encryptionFailed',
   'group-member-not-set-up': 'messages.errors.groupMemberNotSetUp',
   'no-group-key': 'messages.errors.groupKeyUnavailable',
+  'media-still-checking': 'messages.errors.mediaStillChecking',
 };
 
 /**

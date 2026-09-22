@@ -1621,7 +1621,8 @@
       "forwardRecipientKeyFetchFailed": "Missing key for encrypted forward.",
       "forwardRecipientKeyImportFailed": "Failed to import key for encrypted forward.",
       "forwardFailed": "Failed to forward message.",
-      "forwardSelectConversation": "Select at least one conversation to forward to."
+      "forwardSelectConversation": "Select at least one conversation to forward to.",
+      "mediaStillChecking": "The file is still being checked for safety, so the message was not sent. Try again in a minute."
     },
     "editing": {
       "ariaInput": "Edit message text",
@@ -1788,7 +1789,8 @@
       "forwarding": "Forwarding...",
       "selectionCount_one": "{{count}} selected",
       "selectionCount_other": "{{count}} selected"
-    }
+    },
+    "checkingFile": "Checking the file..."
   },
   "posts": {
     "title": "Posts",
