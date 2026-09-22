@@ -225,8 +225,10 @@ describe('sending a file to a group', () => {
     await sendAFile();
     await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
 
-    // What left the device, first: the uploaded bytes are not the file.
+    // What left the device, first: the uploaded bytes are not the file, and the
+    // upload says so -- without the flag the server refuses every ciphertext.
     expect(state.uploaded).toHaveLength(1);
+    expect(vi.mocked(mediaService.uploadMedia).mock.calls[0][1]).toEqual({ encrypted: true });
     const uploaded = await bytesOf(state.uploaded[0]);
     expect(uploaded).not.toEqual(ORIGINAL);
     expect(state.uploaded[0].type).toBe('application/octet-stream');
@@ -277,6 +279,7 @@ describe('sending a file in a direct message', () => {
     await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
 
     expect(state.uploaded).toHaveLength(1);
+    expect(vi.mocked(mediaService.uploadMedia).mock.calls[0][1]).toEqual({ encrypted: true });
     const uploaded = await bytesOf(state.uploaded[0]);
     expect(uploaded).not.toEqual(ORIGINAL);
 

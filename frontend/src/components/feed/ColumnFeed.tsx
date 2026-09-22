@@ -393,7 +393,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         mediaEncryptionIv = sealed.mediaEncryptionIv;
         senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
         const uploadedMedia = await mediaService.uploadMedia(
-          new File([sealed.encryptedData], selectedFile.name, { type: 'application/octet-stream' })
+          new File([sealed.encryptedData], selectedFile.name, { type: 'application/octet-stream' }),
+          { encrypted: true }
         );
         mediaFileId = uploadedMedia.id;
         if (uploadedMedia.storage_url) {

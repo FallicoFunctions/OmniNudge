@@ -207,7 +207,8 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         try {
           const sealed = await encryptMediaForRecipient(selectedFile, recipientPublicKey, keys);
           const uploadResponse = await mediaService.uploadMedia(
-            new File([sealed.encryptedData], selectedFile.name, { type: selectedFile.type })
+            new File([sealed.encryptedData], selectedFile.name, { type: selectedFile.type }),
+            { encrypted: true }
           );
           mediaFileId = uploadResponse.id;
           mediaUrl = uploadResponse.storage_url;

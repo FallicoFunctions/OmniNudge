@@ -18,6 +18,7 @@ import type { ColumnConfig } from '../../../contexts/MultiColumnFeedContext';
 import { messagesService } from '../../../services/messagesService';
 import { encryptionService } from '../../../services/encryptionService';
 import { getOwnKeys, getUserPublicKey } from '../../../services/keyManagementService';
+import { mediaService } from '../../../services/mediaService';
 import { decryptFile, generateKeyPair } from '../../../utils/encryption';
 import type { KeyPair } from '../../../utils/encryption';
 
@@ -151,8 +152,9 @@ describe('the feed column new-message box, sending a file', () => {
     await sendAFileToAlice();
     await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
 
-    // What left the device: not the file.
+    // What left the device: not the file, and marked as ciphertext.
     expect(state.uploaded).toHaveLength(1);
+    expect(vi.mocked(mediaService.uploadMedia).mock.calls[0][1]).toEqual({ encrypted: true });
     const uploaded = await bytesOf(state.uploaded[0]);
     expect(uploaded).not.toEqual(ORIGINAL);
 

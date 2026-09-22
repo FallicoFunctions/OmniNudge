@@ -1001,7 +1001,9 @@ export default function MessagesPage() {
   });
 
   const uploadMediaMutation = useMutation({
-    mutationFn: (file: File) => mediaService.uploadMedia(file),
+    // The composer uploads only ciphertext: every file is sealed before it gets
+    // here, and a file that cannot be sealed is refused before it is sent.
+    mutationFn: (file: File) => mediaService.uploadMedia(file, { encrypted: true }),
   });
   const { archiveConversation, unarchiveConversation, isArchiving, isUnarchiving } = useArchive();
 
@@ -1513,7 +1515,8 @@ export default function MessagesPage() {
 
           // Upload encrypted file
           const uploadResponse = await mediaService.uploadMedia(
-            new File([sealed.encryptedData], file.name, { type: file.type })
+            new File([sealed.encryptedData], file.name, { type: file.type }),
+            { encrypted: true }
           );
           const recipientEncryptedKey = sealed.mediaEncryptionKey;
           const senderEncryptedKey = sealed.senderMediaEncryptionKey;

@@ -50,10 +50,22 @@ export interface BatchUploadResponse {
 }
 
 export const mediaService = {
-  async uploadMedia(file: File): Promise<MediaFile> {
+  /**
+   * Upload one file. Pass encrypted: true for end-to-end encrypted ciphertext.
+   *
+   * The server learns a file's type by sniffing its bytes, not by trusting the
+   * declared type, and ciphertext never sniffs as media: without the flag every
+   * encrypted file was refused as an unsupported type. The flag tells the server
+   * it cannot inspect these bytes, so it stores them as opaque and serves them
+   * back only as a download for this app to decrypt.
+   */
+  async uploadMedia(file: File, options: { encrypted?: boolean } = {}): Promise<MediaFile> {
     assertSafeMediaFile(file);
     const formData = new FormData();
     formData.append('file', file);
+    if (options.encrypted) {
+      formData.append('encrypted', 'true');
+    }
 
     const response = await api.post<MediaFile>('/media/upload', formData, {
       // Clear the instance default Content-Type so the browser sets
