@@ -34,11 +34,17 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
   const mountedRef = useRef(true);
   const playRequestRef = useRef(0);
 
+  // The blob URLs this player made itself, for recordings it fetched. Only
+  // those are its to free: an encrypted recording arrives as a blob URL its
+  // caller decrypted and owns, and revoking that one when playback ended left
+  // the message unplayable until the page was reloaded.
+  const ownedSourcesRef = useRef(new Set<string>());
+
   const releaseAudio = useCallback((audio: HTMLAudioElement) => {
     const source = audio.src;
     audio.pause();
     audio.src = '';
-    if (source.startsWith('blob:')) URL.revokeObjectURL(source);
+    if (ownedSourcesRef.current.delete(source)) URL.revokeObjectURL(source);
   }, []);
 
   const stopCurrent = useCallback(() => {
@@ -101,9 +107,10 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
             const response = await authenticatedFetch(url);
             if (!response.ok) throw new Error(`voice playback failed (${response.status})`);
             playableURL = URL.createObjectURL(await response.blob());
+            ownedSourcesRef.current.add(playableURL);
           }
           if (requestID !== playRequestRef.current || !mountedRef.current) {
-            if (playableURL.startsWith('blob:')) URL.revokeObjectURL(playableURL);
+            if (ownedSourcesRef.current.delete(playableURL)) URL.revokeObjectURL(playableURL);
             return;
           }
         } catch {
