@@ -77,7 +77,7 @@ type gzipResponseWriter struct {
 // body bytes are written. This is the earliest safe point to check whether we
 // should actually compress — if not, we cancel gzip here while headers are still mutable.
 func (g *gzipResponseWriter) WriteHeader(code int) {
-	if !g.bypass && shouldNotCompress(g.Header().Get("Content-Type")) {
+	if !g.bypass && g.shouldPassThrough() {
 		g.Header().Del("Content-Encoding")
 		g.gz.Reset(io.Discard)
 		g.bypass = true
@@ -90,7 +90,7 @@ func (g *gzipResponseWriter) WriteHeader(code int) {
 // here too so we don't accidentally compress the first write.
 func (g *gzipResponseWriter) Write(data []byte) (int, error) {
 	if !g.bypass && !g.Written() {
-		if shouldNotCompress(g.Header().Get("Content-Type")) {
+		if g.shouldPassThrough() {
 			g.Header().Del("Content-Encoding")
 			g.gz.Reset(io.Discard)
 			g.bypass = true
@@ -108,6 +108,15 @@ func (g *gzipResponseWriter) Flush() {
 		_ = g.gz.Flush()
 	}
 	g.ResponseWriter.Flush()
+}
+
+// shouldPassThrough reports whether this response must go out as the handler
+// wrote it. A handler that sets Content-Length after this middleware removed it
+// is streaming an exact byte count -- the media gateway does, for a file read
+// from object storage. Compressing that body sent a gzip stream under the raw
+// length, and the browser dropped the response (ERR_CONTENT_LENGTH_MISMATCH).
+func (g *gzipResponseWriter) shouldPassThrough() bool {
+	return g.Header().Get("Content-Length") != "" || shouldNotCompress(g.Header().Get("Content-Type"))
 }
 
 func shouldNotCompress(contentType string) bool {
