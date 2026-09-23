@@ -334,3 +334,22 @@ describe('the upload stand-in', () => {
     expect(vi.isMockFunction(mediaService.uploadMedia)).toBe(true);
   });
 });
+
+// jsdom has no layout, so this reads the two rules the layout depends on. At a
+// phone's width the text box kept its intrinsic width, and the Send button --
+// longer still while it said "Uploading..." -- was pushed off the screen. It
+// was measured in a browser at 320 and 375 pixels before and after.
+describe('the composer row on a phone', () => {
+  it('lets the text box shrink, so the send button stays on screen on one line', async () => {
+    state.conversations = [dmConversation];
+    const view = renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    const send = await screen.findByRole('button', { name: 'Send' });
+    const text = view.container.querySelector('form input[type="text"]') as HTMLInputElement;
+
+    expect(text.className.split(' ')).toContain('min-w-0');
+    expect(send.className.split(' ')).toEqual(
+      expect.arrayContaining(['shrink-0', 'whitespace-nowrap'])
+    );
+  });
+});

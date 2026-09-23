@@ -3802,7 +3802,7 @@ export default function MessagesPage() {
                       }
                     }}
                     placeholder={t('messages.compose.placeholder')}
-                    className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                   />
                   <VoiceRecorderButton
                     onVoiceMessage={handleVoiceMessage}
@@ -3815,7 +3815,7 @@ export default function MessagesPage() {
                       uploadingMedia ||
                       (isCreatingChat && !newChatUsername.trim())
                     }
-                    className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                    className="shrink-0 whitespace-nowrap rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)] disabled:opacity-50"
                   >
                     {checkingMedia
                       ? t('messages.checkingFile')

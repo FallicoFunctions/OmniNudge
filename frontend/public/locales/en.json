@@ -1790,7 +1790,7 @@
       "selectionCount_one": "{{count}} selected",
       "selectionCount_other": "{{count}} selected"
     },
-    "checkingFile": "Checking the file..."
+    "checkingFile": "Checking..."
   },
   "posts": {
     "title": "Posts",
