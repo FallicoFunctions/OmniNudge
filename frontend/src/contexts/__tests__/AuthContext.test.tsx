@@ -487,6 +487,43 @@ describe('a session that is still open', () => {
     await waitFor(() => expect(result.current.keyStatus).toEqual({ state: 'session-ended' }));
     expect(mocks.createAccountKeys).not.toHaveBeenCalled();
   });
+
+  it('asks for a new sign-in, not the password again, when the session ends at the password step', async () => {
+    server({ me: account, backup: backup({ encrypted_private_key: 'copy' }) });
+    deviceHolds(null);
+    const { result } = await renderAuth();
+    await waitFor(() => expect(result.current.keyStatus).toEqual({ state: 'needs-password' }));
+
+    mocks.get.mockRejectedValue(
+      Object.assign(new Error('Invalid or expired token'), { status: 401 })
+    );
+    await act(() => result.current.unlockWithPassword('correct horse'));
+    expect(result.current.keyStatus).toEqual({ state: 'session-ended' });
+  });
+
+  it('asks for a new sign-in, not a new phrase, when the session ends at the phrase step', async () => {
+    server({
+      me: account,
+      backup: { auth_scheme: 1, has_password: false, recovery_wrapped_private_key: 'copy' },
+    });
+    deviceHolds(null);
+    const { result } = await renderAuth();
+    await waitFor(() =>
+      expect(result.current.keyStatus).toEqual({ state: 'needs-recovery', hasRecoveryCopy: true })
+    );
+
+    mocks.recoverWithPhrase.mockRejectedValueOnce(new Error('The phrase does not match'));
+    await expect(act(() => result.current.recoverKeys('wrong words'))).rejects.toThrow(
+      'The phrase does not match'
+    );
+    expect(result.current.keyStatus).toEqual({ state: 'needs-recovery', hasRecoveryCopy: true });
+
+    mocks.recoverWithPhrase.mockRejectedValueOnce(
+      Object.assign(new Error('Invalid or expired token'), { status: 401 })
+    );
+    await act(() => result.current.recoverKeys('twelve words'));
+    expect(result.current.keyStatus).toEqual({ state: 'session-ended' });
+  });
 });
 
 describe('sign-out', () => {

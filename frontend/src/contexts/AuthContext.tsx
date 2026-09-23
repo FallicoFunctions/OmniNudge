@@ -81,6 +81,11 @@ const phraseShown = (phrase: string, offerAppPassword = false): KeyStatus => ({
   offerAppPassword,
 });
 
+// The server no longer knows the session: the browser did not keep the cookie
+// or it expired. No key step can succeed until the user signs in again.
+const sessionRejected = (error: unknown): boolean =>
+  (error as { status?: number } | null)?.status === 401;
+
 // A key on this device counts only if it is the account's current key: after a
 // fresh start elsewhere, the old one cannot read new messages.
 async function deviceHoldsAccountKey(account: User): Promise<boolean> {
@@ -234,9 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('[AuthContext] Could not set up message keys:', error);
-        // A retry cannot help a session the server rejects: the sign-in
-        // succeeded, but the cookie was not kept or has since expired.
-        if ((error as { status?: number }).status === 401) {
+        if (sessionRejected(error)) {
           commit(generation, { status: { state: 'session-ended' }, held: null });
         } else {
           commit(generation, { status: { state: 'failed' }, held });
@@ -369,6 +372,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // A step's own error would blame the password or the phrase, so a rejected
+  // session asks for a new sign-in instead.
+  const endSessionOnRejection = async (step: () => Promise<void>) => {
+    const generation = generationRef.current;
+    try {
+      await step();
+    } catch (error) {
+      if (
+        sessionRejected(error) &&
+        commit(generation, { status: { state: 'session-ended' }, held: null })
+      ) {
+        return;
+      }
+      throw error;
+    }
+  };
+
   const signedInAccount = (): User => {
     if (!accountRef.current) {
       throw new Error('Not signed in');
@@ -379,68 +399,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // For a session that was already open: the password unlocks the key on this
   // device, or moves an old-scheme account. A wrong password throws and the
   // step stays where it was.
-  const unlockWithPassword = async (password: string) => {
-    const generation = generationRef.current;
-    const account = signedInAccount();
-    const backup = await api.get<KeyBackup>('/auth/key-backup');
-    if (backup.auth_scheme !== 2 || !backup.kdf_salt || !backup.kdf_iterations) {
-      commit(generation, await resolveKeyStatus(account, { kind: 'old-password', password }));
-      return;
-    }
-    const keys = await deriveLoginKeys(password, backup.kdf_salt, backup.kdf_iterations);
-    const held: HeldSecret = { kind: 'login-key', keys };
-    if (backup.encrypted_private_key) {
-      const unlocked =
-        !!account.public_key && (await unlockAfterSignIn(keys, account.public_key)) === 'unlocked';
-      if (!unlocked) {
-        throw new Error('Wrong password');
+  const unlockWithPassword = (password: string) =>
+    endSessionOnRejection(async () => {
+      const generation = generationRef.current;
+      const account = signedInAccount();
+      const backup = await api.get<KeyBackup>('/auth/key-backup');
+      if (backup.auth_scheme !== 2 || !backup.kdf_salt || !backup.kdf_iterations) {
+        commit(generation, await resolveKeyStatus(account, { kind: 'old-password', password }));
+        return;
       }
-      commit(generation, { status: { state: 'ready' }, held });
-      return;
-    }
-    commit(generation, {
-      status: { state: 'needs-recovery', hasRecoveryCopy: !!backup.recovery_wrapped_private_key },
-      held,
+      const keys = await deriveLoginKeys(password, backup.kdf_salt, backup.kdf_iterations);
+      const held: HeldSecret = { kind: 'login-key', keys };
+      if (backup.encrypted_private_key) {
+        const unlocked =
+          !!account.public_key &&
+          (await unlockAfterSignIn(keys, account.public_key)) === 'unlocked';
+        if (!unlocked) {
+          throw new Error('Wrong password');
+        }
+        commit(generation, { status: { state: 'ready' }, held });
+        return;
+      }
+      commit(generation, {
+        status: { state: 'needs-recovery', hasRecoveryCopy: !!backup.recovery_wrapped_private_key },
+        held,
+      });
     });
-  };
 
-  const recoverKeys = async (phrase: string) => {
-    const generation = generationRef.current;
-    const account = signedInAccount();
-    const held = heldRef.current;
-    if (!account.public_key || (held?.kind !== 'login-key' && held?.kind !== 'no-password')) {
-      throw new Error('Sign in again to use the recovery phrase');
-    }
-    await recoverWithPhrase(
-      phrase,
-      held.kind === 'login-key' ? held.keys : null,
-      account.public_key
-    );
-    commit(generation, { status: { state: 'ready' }, held });
-  };
+  const recoverKeys = (phrase: string) =>
+    endSessionOnRejection(async () => {
+      const generation = generationRef.current;
+      const account = signedInAccount();
+      const held = heldRef.current;
+      if (!account.public_key || (held?.kind !== 'login-key' && held?.kind !== 'no-password')) {
+        throw new Error('Sign in again to use the recovery phrase');
+      }
+      await recoverWithPhrase(
+        phrase,
+        held.kind === 'login-key' ? held.keys : null,
+        account.public_key
+      );
+      commit(generation, { status: { state: 'ready' }, held });
+    });
 
   // New keys and a new phrase. Messages encrypted to the old key can no longer
   // be read; the screen warns and asks for a typed confirmation first.
-  const startFresh = async () => {
-    const generation = generationRef.current;
-    signedInAccount();
-    const held = heldRef.current;
-    let keys: LoginKeys | null;
-    if (held?.kind === 'login-key') {
-      keys = held.keys;
-    } else if (held?.kind === 'old-password') {
-      keys = await moveWithoutKey(held.password);
-    } else if (held?.kind === 'no-password') {
-      keys = null;
-    } else {
-      throw new Error('Sign in again to start fresh');
-    }
-    const phrase = await createAccountKeys(keys);
-    const next: HeldSecret = keys ? { kind: 'login-key', keys } : held;
-    if (commit(generation, { status: phraseShown(phrase, !keys), held: next })) {
-      await refreshUser();
-    }
-  };
+  const startFresh = () =>
+    endSessionOnRejection(async () => {
+      const generation = generationRef.current;
+      signedInAccount();
+      const held = heldRef.current;
+      let keys: LoginKeys | null;
+      if (held?.kind === 'login-key') {
+        keys = held.keys;
+      } else if (held?.kind === 'old-password') {
+        keys = await moveWithoutKey(held.password);
+      } else if (held?.kind === 'no-password') {
+        keys = null;
+      } else {
+        throw new Error('Sign in again to start fresh');
+      }
+      const phrase = await createAccountKeys(keys);
+      const next: HeldSecret = keys ? { kind: 'login-key', keys } : held;
+      if (commit(generation, { status: phraseShown(phrase, !keys), held: next })) {
+        await refreshUser();
+      }
+    });
 
   // The optional app password for an account with no password, offered on the
   // phrase step. On success the account signs in with it too, and the step ends.
