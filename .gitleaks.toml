@@ -1,0 +1,14 @@
+title = "OmniNudge"
+
+# Every default rule stays on; this file only adds exceptions.
+[extend]
+useDefault = true
+
+# Published test vectors: fixed passwords, phrases and salts with the keys they
+# derive, so every implementation of the login-key scheme can be checked against
+# the same answers. They are meant to be public, and they look exactly like
+# leaked keys ("loginKey": "<base64>"), so any commit that edits them fails the
+# scan. Limited to the JSON files in that one folder.
+[allowlist]
+description = "Published crypto test vectors, not secrets"
+paths = ['''^shared/crypto-vectors/[^/]+\.json$''']
