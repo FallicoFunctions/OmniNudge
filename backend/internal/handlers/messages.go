@@ -753,11 +753,12 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// sender cannot attach another user's upload or spoof its URL/type/size.
 	if hasMedia {
 		var (
-			mediaID    int
-			storageURL string
-			fileType   string
-			fileSize   int64
-			scanStatus string
+			mediaID          int
+			storageURL       string
+			fileType         string
+			fileSize         int64
+			scanStatus       string
+			originalFilename string
 		)
 		if req.MediaFileID != nil {
 			if *req.MediaFileID <= 0 {
@@ -765,17 +766,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				return
 			}
 			err = h.pool.QueryRow(c.Request.Context(), `
-				SELECT id, storage_url, file_type, file_size, scan_status
+				SELECT id, storage_url, file_type, file_size, scan_status, original_filename
 				FROM media_files
 				WHERE id = $1 AND user_id = $2
-			`, *req.MediaFileID, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+			`, *req.MediaFileID, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus, &originalFilename)
 		} else {
 			mediaURL := strings.TrimSpace(*req.MediaURL)
 			err = h.pool.QueryRow(c.Request.Context(), `
-				SELECT id, storage_url, file_type, file_size, scan_status
+				SELECT id, storage_url, file_type, file_size, scan_status, original_filename
 				FROM media_files
 				WHERE storage_url = $1 AND user_id = $2
-			`, mediaURL, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus)
+			`, mediaURL, userID).Scan(&mediaID, &storageURL, &fileType, &fileSize, &scanStatus, &originalFilename)
 		}
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -789,10 +790,15 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			RespondError(c, http.StatusLocked, "Media file is not available until security scanning completes")
 			return
 		}
+		mediaType, ok := messageMediaType(fileType, originalFilename, req.MediaType)
+		if !ok {
+			RespondError(c, http.StatusBadRequest, "Media type does not match the file")
+			return
+		}
 		mediaSize := int(fileSize)
 		req.MediaFileID = &mediaID
 		req.MediaURL = &storageURL
-		req.MediaType = &fileType
+		req.MediaType = &mediaType
 		req.MediaSize = &mediaSize
 	}
 
@@ -3161,4 +3167,32 @@ func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"pinned_messages": messages})
+}
+
+// messageMediaType is the type a message tells its readers to render the file as.
+//
+// For a file the server could inspect, that is the type it found, and whatever
+// the sender claims is ignored. An end-to-end encrypted file is stored as opaque
+// bytes, so the server has no type of its own to give: every encrypted image
+// arrived as application/octet-stream and was drawn as a download card. There
+// the sender's type is used, but only an allowed media type that agrees with the
+// file's extension -- which the server already stores, so this reveals nothing
+// new. A sender that names no type keeps the opaque one; a type that disagrees
+// with the file is refused.
+func messageMediaType(storedType, originalFilename string, declared *string) (string, bool) {
+	if storedType != encryptedMediaFileType {
+		return storedType, true
+	}
+	claimed := ""
+	if declared != nil {
+		claimed = strings.ToLower(strings.TrimSpace(*declared))
+	}
+	if claimed == "" || claimed == encryptedMediaFileType {
+		return encryptedMediaFileType, true
+	}
+	if !middleware.ValidateMIMEType(claimed, middleware.AllowedMediaTypes) ||
+		!middleware.ValidateExtensionMatchesMIME(originalFilename, claimed) {
+		return "", false
+	}
+	return claimed, true
 }
