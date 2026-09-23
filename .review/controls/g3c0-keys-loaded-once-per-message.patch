@@ -1,8 +1,8 @@
 diff --git a/frontend/src/hooks/useDecryptedContent.ts b/frontend/src/hooks/useDecryptedContent.ts
-index c83d2b4a7..73a4d01ee 100644
+index 7eb290860..79ee8f2f6 100644
 --- a/frontend/src/hooks/useDecryptedContent.ts
 +++ b/frontend/src/hooks/useDecryptedContent.ts
-@@ -75,8 +75,7 @@ export async function decryptForDisplay(
+@@ -107,8 +107,7 @@ export async function decryptForDisplay(
  ): Promise<DecryptedContent> {
    let resolvedKeys = ownKeys;
    const keysOnce = async (): Promise<KeyPair | null> => {
@@ -11,4 +11,4 @@ index c83d2b4a7..73a4d01ee 100644
 +    return getOwnKeys();
    };
  
-   const cipherText = cipherTextFor(message, isOwnMessage);
+   // A group message is sealed once under the group's shared key, so the sender

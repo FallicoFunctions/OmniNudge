@@ -1,20 +1,20 @@
 diff --git a/backend/internal/models/user.go b/backend/internal/models/user.go
-index c5cd4ac96..9feff9a59 100644
+index 3ec688cfb..86c41ca2a 100644
 --- a/backend/internal/models/user.go
 +++ b/backend/internal/models/user.go
-@@ -161,7 +161,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
- 	query := `
- 		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw)
- 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+@@ -167,7 +167,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
+ 		INSERT INTO users (username, username_normalized, email, email_lookup_hash, email_encrypted, password_hash, avatar_url, bio, nsfw,
+ 		                   auth_scheme, kdf_salt, kdf_iterations)
+ 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 -		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at, auth_scheme
 +		RETURNING id, created_at, last_seen, role, nsfw, token_version, plan, plan_expires_at
  	`
  
  	return r.pool.QueryRow(ctx, query,
-@@ -174,7 +174,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
- 		user.AvatarURL,
- 		user.Bio,
- 		user.NSFW,
+@@ -183,7 +183,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
+ 		scheme,
+ 		user.KDFSalt,
+ 		user.KDFIterations,
 -	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt, &user.AuthScheme)
 +	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW, &user.TokenVersion, &user.Plan, &user.PlanExpiresAt)
  }
