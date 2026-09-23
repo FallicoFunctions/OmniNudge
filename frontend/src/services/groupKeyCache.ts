@@ -22,7 +22,12 @@
  * as missing. Whoever rotates must call forgetGroupKeys, or this page keeps
  * saying the message cannot be read until it reloads.
  */
-import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from './groupKeysService';
+import {
+  getGroupKeyState,
+  rotateGroupKey,
+  shareGroupKeyHistory,
+  GroupKeyRotationRefused,
+} from './groupKeysService';
 import type { GroupKeyRotation, GroupKeyState } from './groupKeysService';
 import {
   newGroupKey,
@@ -215,6 +220,21 @@ async function wrapMissingHistory(
   return Object.keys(history).length > 0 ? history : undefined;
 }
 
+async function shareMissingHistory(
+  conversationId: number,
+  state: GroupKeyState,
+  ownKeys: KeyPair
+): Promise<void> {
+  try {
+    const history = await wrapMissingHistory(state, ownKeys);
+    if (history) await shareGroupKeyHistory(conversationId, history);
+  } catch (error) {
+    // Another member may have shared the same versions a moment earlier; the
+    // next send asks again for whatever is still missing.
+    console.warn('Could not share older group key versions:', conversationId, error);
+  }
+}
+
 /** Why a sender cannot get a key to seal with. */
 export type NoGroupKeyReason =
   /** This device holds no keys of its own. */
@@ -263,7 +283,13 @@ export async function groupKeyForSending(
   const opened = await primeFromState(conversationId, state, keys);
   if (state.active_version > 0) {
     const current = opened.get(state.active_version);
-    if (current) return { key: current, version: state.active_version };
+    if (current) {
+      // Members can lack older versions with no rotation coming to carry them:
+      // a group that turned its history on after they joined. A sender who
+      // holds those versions shares them beside its message, never in its way.
+      void shareMissingHistory(conversationId, state, keys);
+      return { key: current, version: state.active_version };
+    }
     // The version is current and this device cannot open it, so there is
     // nothing to seal with. Making the next one is what a sender does.
   }

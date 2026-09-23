@@ -14,7 +14,12 @@ import {
   groupKeyForSending,
   groupKeyForVersion,
 } from '../groupKeyCache';
-import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from '../groupKeysService';
+import {
+  getGroupKeyState,
+  rotateGroupKey,
+  shareGroupKeyHistory,
+  GroupKeyRotationRefused,
+} from '../groupKeysService';
 import {
   newGroupKey,
   rewrapGroupKeyCopy,
@@ -25,7 +30,12 @@ import { getOwnKeys } from '../keyManagementService';
 
 vi.mock('../groupKeysService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../groupKeysService')>();
-  return { ...actual, getGroupKeyState: vi.fn(), rotateGroupKey: vi.fn() };
+  return {
+    ...actual,
+    getGroupKeyState: vi.fn(),
+    rotateGroupKey: vi.fn(),
+    shareGroupKeyHistory: vi.fn(),
+  };
 });
 vi.mock('../../utils/groupKeys', () => ({
   newGroupKey: vi.fn(),
@@ -243,5 +253,53 @@ describe('the older versions a newcomer lacks', () => {
     expect(vi.mocked(rotateGroupKey).mock.calls[0][1].history).toEqual({
       2: { 9: 'w2-for-key-9' },
     });
+  });
+});
+
+// A group can turn its history on after members have joined. Their missing
+// versions then wait for no rotation -- the key is current -- so a sender who
+// holds them shares them alongside its message.
+describe('history a group turned on after members joined', () => {
+  const current = (over: Record<string, unknown> = {}) =>
+    state({
+      active_version: 3,
+      latest_version: 3,
+      missing_history: { 9: [1] },
+      my_copies: [
+        { key_version: 1, wrapped_key: 'w1' },
+        { key_version: 3, wrapped_key: 'w3' },
+      ],
+      ...over,
+    });
+
+  it('is shared by a sender who holds it, without a rotation', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(current());
+    vi.mocked(shareGroupKeyHistory).mockResolvedValue(undefined);
+
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toMatchObject({ version: 3 });
+
+    await vi.waitFor(() =>
+      expect(shareGroupKeyHistory).toHaveBeenCalledWith(CONVERSATION, { 1: { 9: 'w1-for-key-9' } })
+    );
+    expect(rotateGroupKey).not.toHaveBeenCalled();
+  });
+
+  it('is not shared while the group hides its history', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(current({ history_visible: false }));
+
+    await groupKeyForSending(CONVERSATION, KEYS);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(shareGroupKeyHistory).not.toHaveBeenCalled();
+  });
+
+  it('never stops the message when the share is refused', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(current());
+    vi.mocked(shareGroupKeyHistory).mockRejectedValue(new Error('group_key_history_not_allowed'));
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toMatchObject({ version: 3 });
+    await vi.waitFor(() => expect(warned).toHaveBeenCalled());
+    warned.mockRestore();
   });
 });

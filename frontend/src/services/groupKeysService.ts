@@ -109,6 +109,21 @@ export async function rotateGroupKey(
 }
 
 /**
+ * Hands older key versions to members who lack them, outside a rotation: how
+ * members a group already had come to read its history once it is turned on.
+ */
+export async function shareGroupKeyHistory(
+  conversationId: number,
+  history: NonNullable<GroupKeyRotation['history']>
+): Promise<void> {
+  try {
+    await api.post(`/groups/${conversationId}/keys/history`, { history });
+  } catch (error) {
+    throw asRefusal(error);
+  }
+}
+
+/**
  * The fetch client throws a plain Error carrying the response status and the
  * server's code, so a refusal is read from the code: this is not the axios
  * client, and error.response is always undefined here. The message is carried

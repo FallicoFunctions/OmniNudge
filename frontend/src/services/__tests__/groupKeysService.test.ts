@@ -5,6 +5,7 @@ import {
   getGroupKeyState,
   rotateGroupKey,
   type GroupKeyState,
+  shareGroupKeyHistory,
 } from '../groupKeysService';
 
 vi.mock('../../lib/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
@@ -105,5 +106,15 @@ describe('rotating the key', () => {
     const offline = httpError(500, 'Failed to store the group key');
     vi.mocked(api.post).mockRejectedValue(offline);
     await expect(rotateGroupKey(42, rotation)).rejects.toBe(offline);
+  });
+});
+
+describe('shareGroupKeyHistory', () => {
+  it('posts the older copies to the history route, in the shape the server binds', async () => {
+    vi.mocked(api.post).mockResolvedValue(undefined);
+    await shareGroupKeyHistory(42, { 1: { 9: 'v1-for-9' } });
+    expect(api.post).toHaveBeenCalledWith('/groups/42/keys/history', {
+      history: { 1: { 9: 'v1-for-9' } },
+    });
   });
 });
