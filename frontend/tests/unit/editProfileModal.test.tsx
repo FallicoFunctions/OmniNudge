@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditProfileModal from '../../src/components/profile/EditProfileModal';
+import { API_BASE_URL } from '../../src/lib/api';
 
 vi.mock('../../src/components/profile/ImageCropModal', () => ({
   default: ({ onConfirm }: { onConfirm: (file: File) => void }) => (
@@ -145,7 +146,11 @@ describe('EditProfileModal', () => {
       expect(onUploadAvatar).toHaveBeenCalledWith(expect.any(File));
     });
     await waitFor(() => {
-      expect(screen.getByAltText('Avatar Image')).toHaveAttribute('src', '/uploads/avatars/new-avatar_sq200.png');
+      // Uploads load through the API path, where the session cookie is sent.
+      expect(screen.getByAltText('Avatar Image')).toHaveAttribute(
+        'src',
+        `${API_BASE_URL}/uploads/avatars/new-avatar_sq200.png`
+      );
     });
   });
 
