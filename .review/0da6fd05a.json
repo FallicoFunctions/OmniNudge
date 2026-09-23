@@ -1,0 +1,270 @@
+{
+  "schema_version": 2,
+  "head": "0931e2573",
+  "base": "0da6fd05a",
+  "scope": {
+    "files": [
+      ".review/controls/live-call-dies-with-the-request.patch",
+      ".review/controls/live-call-second-socket.patch",
+      ".review/controls/live-setup-ignores-hangup.patch",
+      ".review/controls/resume-burst-hammers-ledger.patch",
+      ".review/controls/voice-R2.patch"
+    ],
+    "boundaries": [
+      "the hook replaying a control in a throwaway worktree"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/41824b03d.json",
+    ".review/d5a86a375.json",
+    ".review/0c0038fc6.json",
+    ".review/9680fbb02.json",
+    ".review/30db85f27.json"
+  ],
+  "notes": "Stale-control rebuild, phase 2 of 5 (live calls). One pass, no finding. 15 controls remain stale.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "0931e2573 rebuilds five control patches: live-call-dies-with-the-request, live-call-second-socket, live-setup-ignores-hangup, resume-burst-hammers-ledger, voice-R2. No code changed. Boundary: the hook replaying each control in a throwaway worktree."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read the owning ledgers 41824b03d (live-call x2), d5a86a375 (live-setup), 0c0038fc6 (resume-burst), 9680fbb02 (voice-R2) for selectors and observed failures, and 30db85f27 (phase 1)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Diffed the changed lines of each old and new patch. live-call-dies and voice-R2: identical. live-call-second-socket: also removes the zlog.Error line the claim gained since. live-setup: conn.Close() is now _ = conn.Close(). resume-burst: the throttle is now its own branch (time.Since(lastResume) < liveCallResumeInterval answers Paused and continues); the patch makes it < 0, never taken, which is the old patch's '>= 0' (always charge) on the new shape."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Replayed as the hook does: worktree at HEAD (LFS skipped), 'cd backend && go test <sel> -count=1', '--- FAIL:' required. All five: exit 0 at HEAD, non-zero with the patch, real failure."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "n/a: no code path."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Re-counted: 15 of 178 controls stale, the 20 minus these five."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No code changed; the controls run as the hook runs them, without -race."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "These controls belong to older ledgers; the hook replays them when a review lists them."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "n/a: no code; commit hook passed."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each refuses its defect with the recorded failure: 'Should be zero, but was 1'; 'An error is expected but got nil'; 'Dial took 15.0s after the caller hung up'; 'expected: 2'; 'the upload is not a recording' not in the error chain."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Counted with -v in the replay: every HEAD run had PASS lines and 0 SKIP (voice-R2: 5 PASS)."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase 2 of the approved plan: five live-call controls rebuilt, none needed retiring."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Every rebuilt control applies at HEAD and was replayed in a worktree (C4)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The tests are the ones the ledgers name."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "n/a",
+    "lint": "n/a",
+    "vet": "n/a",
+    "tests": "5 control tests pass at HEAD (0 skip) and fail with their patch, in a worktree"
+  }
+}
