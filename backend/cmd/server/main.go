@@ -1170,6 +1170,17 @@ func main() {
 			feed.GET("/home", feedHandler.GetHomeFeed)
 		}
 
+		// Private files are fetched here, not at /uploads/: the browser session
+		// cookie is scoped to /api/, so a request to /uploads/ arrives anonymous
+		// and every private file answers 404. /uploads/ stays for public avatars
+		// and banners, which need no session.
+		apiUploads := api.Group("/uploads")
+		apiUploads.Use(middleware.AuthOptional(authService))
+		{
+			apiUploads.GET("/*filepath", uploadsHandler.ServeUpload)
+			apiUploads.HEAD("/*filepath", uploadsHandler.ServeUpload)
+		}
+
 		// Public posts routes (no auth required for viewing)
 		posts := api.Group("/posts")
 		posts.Use(middleware.AuthOptional(authService))
