@@ -1,0 +1,264 @@
+{
+  "schema_version": 2,
+  "head": "58ff51feb",
+  "base": "34abff4d5",
+  "scope": {
+    "files": [
+      "frontend/tests/omnigame-launch.spec.ts"
+    ],
+    "boundaries": [
+      "the spec against the API origin",
+      "the API client's 401 dialog"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/5ba782a38.json",
+    ".review/065c6b6c5.json"
+  ],
+  "notes": "The per-run E2E flake. One pass, no finding. G4 rebuilt k5e-signed-in-e2e-covered-by-key-step, which this change made stale.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "58ff51feb: omnigame-launch.spec.ts answers every API call its tests do not mock with a 404, and waits for the signed-in user instead of polling a localStorage auth_token. Boundary: the spec against the API origin (a real server in CI's E2E job and in a local stack)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 5ba782a38 (K5e: the signed-in spec covered by the key step, control k5e-signed-in-e2e-covered-by-key-step) and 065c6b6c5 (which recorded the local failure at base). Neither found the 401 dialog."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or payload is built."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component changed."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed every request that reaches the new 404 route, for both tests. Guest: GET /auth/me x4 (the app treats it as signed out, as it did the 401). Signed-in: GET /feature-flags, /conversations, /users/me/friends/requests, POST /auth/ws-token, /users/me/ping x2, /logs/frontend. None opens a dialog; page errors are two 404 lines only."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "CI's E2E step sets VITE_API_URL=http://localhost:8080/api/v1 (ci.yml:339); the route pattern is http://localhost:8080/api/v1/**, so it matches in CI as it does locally."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The test's own routes (auth/me, key-backup, launch) are registered after the fallback, so Playwright tries them first; the signed-in run shows neither auth/me nor key-backup reaching the fallback."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No rule in two places."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The API client's contract: api.ts:78 opens the sign-in dialog on any 401 except /auth/me and /auth/logout; a 404 takes the toast path only. The fix relies on exactly that."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The fallback body has the shape the server uses for errors (error, message)."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Both tests in the file get the fallback; the guest test had the same exposure for any 401 a guest call can get."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "No branch in app code."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Unmocked calls still show as 404 console errors, so a test that starts depending on one is visible."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The CORS header set repeats omnichat.spec's corsHeaders; two spec files, left separate rather than adding a shared helper for one reuse."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every spec that fakes a signed-in user: omnigame-launch and e2e/omnichat. omnichat already routes all of localhost:8080/api/v1/** and answers unknown paths with 500, which opens no dialog. No other instance."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No finding. The change's own check: with the fallback removed, 3 of 5 runs failed on the z-50 sign-in overlay; with it, 20 of 20 passed with the real backend up."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The spec runs in CI E2E on every push touching frontend."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "eslint and prettier clean on the spec; hook checks passed on commit."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model output. Ran the real app against a real backend, which is how the failure was reproduced."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The spec still refuses a broken flow: k5e control (account without a device key) makes the signed-in test time out behind the key step."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No layout change."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Playwright counts read from the output: 20 passed, none skipped."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user asked to fix the flaky E2E test; the cause is found and removed, and the old poll that proved nothing is gone."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No side effect."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No layer added."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Only the spec changed; it was run in full."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Ran the changed signed-in spec 10 times each test, real backend up: 20/20."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "k5e-signed-in-e2e-covered-by-key-step patched this spec and no longer applied (its context line now sits beside answerUnmockedApiCalls). Rebuilt on HEAD: removing the device key and key-backup route fails the signed-in test, 3 attempts, 'key-step-title dialog intercepts pointer events'."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The spec runs the real app in a real browser."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a (test only)",
+    "types": "n/a (spec is not in tsc -b)",
+    "lint": "eslint, prettier clean",
+    "vet": "n/a",
+    "tests": "omnigame-launch 20/20 with a real backend; k5e control fails as expected"
+  }
+}
