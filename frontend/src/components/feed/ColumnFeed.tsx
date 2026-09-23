@@ -301,7 +301,9 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     );
   }
 
-  if (allPosts.length === 0) {
+  // A messages column keeps its layout when it is empty: New Message sits at
+  // its top, and an empty inbox is exactly when it is needed.
+  if (allPosts.length === 0 && config.feedType !== 'messages') {
     return (
       <div
         className={`column-feed flex items-center justify-center p-4 ${
@@ -575,6 +577,15 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
               </div>
             </div>
           )}
+        </div>
+      )}
+      {allPosts.length === 0 && (
+        <div className="p-4">
+          <EmptyState
+            illustration="noData"
+            title={t('emptyStates.inbox.title')}
+            description={t('emptyStates.inbox.description')}
+          />
         </div>
       )}
       {allPosts.map((post, index) => {

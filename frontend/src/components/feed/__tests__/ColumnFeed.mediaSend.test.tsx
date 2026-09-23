@@ -22,29 +22,22 @@ import { mediaService } from '../../../services/mediaService';
 import { decryptFile, generateKeyPair } from '../../../utils/encryption';
 import type { KeyPair } from '../../../utils/encryption';
 
-const state = vi.hoisted(() => ({ uploaded: [] as File[] }));
+const aConversation = {
+  id: 77,
+  conversation_type: 'dm',
+  created_at: '2026-01-01T00:00:00Z',
+  last_message_at: '2026-01-01T00:00:00Z',
+  unread_count: 0,
+  other_user: { id: 43, username: 'bob' },
+};
+const state = vi.hoisted(() => ({
+  uploaded: [] as File[],
+  conversations: [] as unknown[],
+}));
 
-// The column draws its "New Message" box only when it has at least one item:
-// with none it returns its empty state instead. So the feed holds one
-// conversation, which is what a real messages column looks like anyway.
 vi.mock('../../../hooks/useColumnFeed', () => ({
   useColumnFeed: () => ({
-    data: {
-      pages: [
-        {
-          conversations: [
-            {
-              id: 77,
-              conversation_type: 'dm',
-              created_at: '2026-01-01T00:00:00Z',
-              last_message_at: '2026-01-01T00:00:00Z',
-              unread_count: 0,
-              other_user: { id: 43, username: 'bob' },
-            },
-          ],
-        },
-      ],
-    },
+    data: { pages: [{ conversations: state.conversations }] },
     isLoading: false,
     isError: false,
     error: null,
@@ -140,6 +133,7 @@ let recipient: KeyPair;
 beforeEach(async () => {
   vi.clearAllMocks();
   state.uploaded = [];
+  state.conversations = [aConversation];
   own = await generateKeyPair();
   recipient = await generateKeyPair();
   vi.mocked(getOwnKeys).mockResolvedValue(own);
@@ -190,5 +184,31 @@ describe('the feed column new-message box, sending a file', () => {
     ).toBeInTheDocument();
     expect(state.uploaded).toHaveLength(0);
     expect(messagesService.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+// The column used to return its bare empty state when it had no items, before
+// drawing New Message -- so an empty inbox, the one time a person needs to
+// start a conversation, offered no way to start one.
+describe('an empty messages column', () => {
+  it('still offers New Message, above the empty inbox', () => {
+    state.conversations = [];
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <ColumnFeed
+            columnId="c1"
+            config={{ feedType: 'messages' } as unknown as ColumnConfig}
+            isActive
+            showBorder={false}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByRole('button', { name: i18n.t('emptyStates.inbox.actions.newMessage') })
+    ).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('emptyStates.inbox.title'))).toBeInTheDocument();
   });
 });
