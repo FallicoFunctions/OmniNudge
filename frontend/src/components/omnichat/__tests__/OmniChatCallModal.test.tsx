@@ -592,7 +592,7 @@ describe('OmniChatCallModal', () => {
     it('names the real input device while listening', async () => {
       vi.mocked(omnichatService.startCall).mockResolvedValue(call);
 
-      render(
+      const view = render(
         <OmniChatCallModal
           persona={persona}
           conversationId={12}
@@ -608,6 +608,11 @@ describe('OmniChatCallModal', () => {
       // rather than the generic fallback wording.
       expect(meter.textContent).toContain('Fake input');
       expect(meter.textContent).not.toContain('no sound from the microphone');
+      // The live socket opens after the meter shows. Left open, it closed during
+      // whichever test ran next, and one that asserts the socket stays open
+      // failed or passed depending on what happened to run between them.
+      await waitFor(() => expect(openLiveCallSocket).toHaveBeenCalled());
+      view.unmount();
     });
 
     // She speaks once, not twice.
