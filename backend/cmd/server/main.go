@@ -889,8 +889,7 @@ func main() {
 		// nobody should have to find; this needs only the microphone permission
 		// the browser already asks for.
 		SetCallTranscription(services.NewOmniChatCallTranscription(
-			openrouterClient, cfg.OpenRouter.TranscriptionModel)).
-		SetCallSentences(omniChatCallSpeech)
+			openrouterClient, cfg.OpenRouter.TranscriptionModel))
 	omniChatLiveCallHandler := handlers.NewOmniChatLiveCallHandler(
 		omniChatVoiceRepo, chatbotService,
 		services.GeminiLiveDialer(cfg.Gemini.APIKey, cfg.Gemini.LiveModel),
@@ -904,7 +903,6 @@ func main() {
 	omniChatVoiceRateLimiter := middleware.OmniChatVoiceRateLimiter(cache)
 	omniChatCallRateLimiter := middleware.OmniChatCallRateLimiter(cache)
 	omniChatTranscriptionRateLimiter := middleware.OmniChatCallTranscriptionRateLimiter(cache)
-	omniChatCallSentenceRateLimiter := middleware.OmniChatCallSentenceRateLimiter(cache)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -1602,7 +1600,6 @@ func main() {
 			protected.POST("/omnichat/calls/:call_id/turns", omniChatVoiceHandler.RecordCallTurn)
 			protected.POST("/omnichat/calls/:call_id/transcribe", omniChatTranscriptionRateLimiter.Middleware(), omniChatVoiceHandler.TranscribeCallTurn)
 			protected.GET("/omnichat/calls/:call_id/live", omniChatCallRateLimiter.Middleware(), omniChatLiveCallHandler.Connect)
-			protected.GET("/omnichat/conversations/:id/call-speech/:turn/:sequence", omniChatCallSentenceRateLimiter.Middleware(), omniChatVoiceHandler.GetCallSentenceSpeech)
 
 			protected.POST("/folders", foldersHandler.CreateFolder)
 			protected.GET("/folders", foldersHandler.ListFolders)

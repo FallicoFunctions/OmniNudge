@@ -223,20 +223,6 @@ func OmniChatCallRateLimiter(cache services.Cache) *RedisRateLimiter {
 	return NewRedisRateLimiter(cache, 5, time.Minute, "rate:omnichat_call").FailClosed()
 }
 
-// OmniChatCallSentenceRateLimiter bounds fetching her voice during a call.
-//
-// Its own budget, because a call now asks once per sentence rather than once
-// per reply, and the speak-button limiter it would otherwise share is sixty an
-// hour -- about twenty turns of one call, after which her voice would simply
-// stop with nothing on screen to say why.
-//
-// Six hundred an hour is roughly three sentences for every utterance the
-// transcription limiter allows, which is what a reply of "a sentence or three"
-// actually costs. The real price is charged by billing, once per turn.
-func OmniChatCallSentenceRateLimiter(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 600, time.Hour, "rate:omnichat_call_sentence").FailClosed()
-}
-
 // OmniChatCallTranscriptionRateLimiter bounds transcribing what somebody said,
 // which happens once per sentence rather than once per call.
 //

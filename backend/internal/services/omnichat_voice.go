@@ -278,59 +278,6 @@ func (s *OmniChatVoiceService) PreviewPresetSpeech(ctx context.Context, preset O
 	})
 }
 
-// SpeakSentence synthesises one sentence of a live call in her own voice.
-//
-// Nothing is stored. A call sentence is heard once, and writing 100 KB to
-// object storage for every sentence of every call would cost more than it could
-// ever save -- the ordinary speak button still synthesises and caches the whole
-// message the usual way.
-func (s *OmniChatVoiceService) SpeakSentence(ctx context.Context, voice *models.OmniChatPersonaVoice, sentence string) (*speech.Audio, error) {
-	if s == nil {
-		return nil, errors.New("character speech is unavailable")
-	}
-	if voice == nil {
-		return nil, ErrNotFound
-	}
-	if voice.Provider == "browser" {
-		return nil, ErrOmniChatBrowserVoice
-	}
-	sentence = SpokenText(sentence)
-	if strings.TrimSpace(sentence) == "" {
-		// A sentence that was nothing but narration has nothing to say aloud.
-		return nil, ErrNotFound
-	}
-	synthesizer := s.providers[voice.Provider]
-	if synthesizer == nil {
-		return nil, errors.New("character speech provider is unavailable")
-	}
-	model := voice.ModelID
-	if strings.TrimSpace(model) == "" {
-		model = s.defaultModels[voice.Provider]
-	}
-	languageCode := ""
-	if voice.LanguageCode != nil {
-		languageCode = strings.TrimSpace(*voice.LanguageCode)
-	}
-	// Shorter than the whole-message timeout on purpose: a sentence that takes
-	// a minute has already lost the call it was meant to keep moving.
-	sentenceCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	generated, err := synthesizer.Synthesize(sentenceCtx, voice.VoiceID, speech.Request{
-		Text: sentence, VoiceName: voice.VoiceName, ModelID: model, LanguageCode: languageCode,
-		VoiceSettings: &speech.VoiceSettings{
-			Stability: voice.Stability, SimilarityBoost: voice.SimilarityBoost,
-			Style: voice.Style, Speed: voice.Speed,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if !validOmniChatSpeechAudio(generated) {
-		return nil, errors.New("speech provider returned invalid audio metadata")
-	}
-	return generated, nil
-}
-
 func (s *OmniChatVoiceService) deleteSpeechObject(ctx context.Context, path string) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()

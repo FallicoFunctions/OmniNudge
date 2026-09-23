@@ -89,21 +89,6 @@ type OmniChatVoiceData interface {
 type OmniChatSpeechCreator interface {
 	GetOrCreateSpeech(ctx context.Context, userID, conversationID, messageID int) (*services.OmniChatSpeech, error)
 	PreviewPresetSpeech(ctx context.Context, preset services.OmniChatVoicePreset) (*speech.Audio, error)
-	SpeakSentence(ctx context.Context, voice *models.OmniChatPersonaVoice, sentence string) (*speech.Audio, error)
-}
-
-// omniChatCallSentenceReader hands back a sentence the generator produced
-// moments ago. The browser asks by number rather than sending the words, so
-// this route can never be asked to say something the server did not write.
-type omniChatCallSentenceReader interface {
-	Read(ctx context.Context, userID, conversationID int, turn string, sequence int) (string, bool, error)
-}
-
-// SetCallSentences wires the store that holds a call reply while it is being
-// spoken.
-func (h *OmniChatVoiceHandler) SetCallSentences(sentences omniChatCallSentenceReader) *OmniChatVoiceHandler {
-	h.callSentences = sentences
-	return h
 }
 
 type OmniChatVoiceHandler struct {
@@ -114,7 +99,6 @@ type OmniChatVoiceHandler struct {
 	voiceboxAvailable   bool
 	voiceCloningEnabled bool
 	transcription       omniChatCallTranscriber
-	callSentences       omniChatCallSentenceReader
 	billing             omniChatCallBilling
 }
 
@@ -306,73 +290,6 @@ func (h *OmniChatVoiceHandler) GetMessageSpeech(c *gin.Context) {
 	defer func() { _ = reader.Close() }()
 	writeOmniChatSpeechHeaders(c, audio.FileType, objectSize)
 	_, _ = io.Copy(c.Writer, &io.LimitedReader{R: reader, N: objectSize})
-}
-
-// GetCallSentenceSpeech turns one sentence of a live call into her voice.
-//
-// This is what makes a call feel like a call. The whole-reply route waits for
-// the last word to be written before the first one is spoken; this one is asked
-// for sentence one while sentence two is still being generated.
-//
-// The browser asks by turn and number, never by sending text: a route that
-// synthesised whatever a client typed would be a voice-cloning oracle wearing
-// somebody's character as a costume.
-func (h *OmniChatVoiceHandler) GetCallSentenceSpeech(c *gin.Context) {
-	conversationID, err1 := strconv.Atoi(c.Param("id"))
-	sequence, err2 := strconv.Atoi(c.Param("sequence"))
-	turn := c.Param("turn")
-	if err1 != nil || err2 != nil || conversationID <= 0 || sequence <= 0 || !services.ValidCallTurn(turn) {
-		RespondError(c, http.StatusBadRequest, "Invalid sentence")
-		return
-	}
-	if h.callSentences == nil || h.speech == nil {
-		RespondError(c, http.StatusServiceUnavailable, "Character speech is temporarily unavailable")
-		return
-	}
-	userID := c.GetInt("user_id")
-	sentence, found, err := h.callSentences.Read(c.Request.Context(), userID, conversationID, turn, sequence)
-	if err != nil {
-		RespondError(c, http.StatusServiceUnavailable, "Character speech is temporarily unavailable")
-		return
-	}
-	if !found {
-		// Ordinary, not a fault: the turn ended, or the call did.
-		RespondError(c, http.StatusNotFound, "That sentence is no longer available")
-		return
-	}
-
-	// Ownership is decided here, not by the cache. A sentence key is derived
-	// from a user id and would be enough on its own, which is exactly why it is
-	// not trusted on its own: one query settles both whether this conversation
-	// is theirs and whose voice it is.
-	voice, err := h.data.GetConversationVoiceOwned(c.Request.Context(), userID, conversationID)
-	if err != nil {
-		RespondError(c, http.StatusServiceUnavailable, "Character speech is temporarily unavailable")
-		return
-	}
-	if voice == nil {
-		RespondError(c, http.StatusNotFound, "Conversation not found")
-		return
-	}
-
-	audio, err := h.speech.SpeakSentence(c.Request.Context(), voice, sentence)
-	if errors.Is(err, services.ErrOmniChatBrowserVoice) {
-		RespondError(c, http.StatusConflict, "This character uses on-device speech")
-		return
-	}
-	if errors.Is(err, services.ErrNotFound) {
-		// Nothing in it was speech -- a sentence of pure narration. The caller
-		// skips it and asks for the next one. A 204 carries no body by
-		// definition, so this is a status and not an error document.
-		c.Status(http.StatusNoContent)
-		return
-	}
-	if err != nil {
-		RespondError(c, http.StatusServiceUnavailable, "Character speech is temporarily unavailable")
-		return
-	}
-	writeOmniChatSpeechHeaders(c, audio.ContentType, int64(len(audio.Bytes)))
-	_, _ = c.Writer.Write(audio.Bytes)
 }
 
 // writeOmniChatSpeechHeaders is written once because the two delivery paths
