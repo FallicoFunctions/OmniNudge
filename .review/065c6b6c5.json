@@ -1,0 +1,522 @@
+{
+  "schema_version": 2,
+  "head": "128147881",
+  "base": "065c6b6c5",
+  "scope": {
+    "files": [
+      "frontend/src/contexts/AuthContext.tsx",
+      "frontend/src/components/keys/KeySetupScreen.tsx",
+      "frontend/public/locales/en.json",
+      "frontend/src/contexts/__tests__/AuthContext.test.tsx",
+      "frontend/src/components/keys/__tests__/KeySetupScreen.test.tsx"
+    ],
+    "boundaries": [
+      "the HTTP status on an API error",
+      "the key status the gate reads",
+      "the key step on screen"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/1cc82cad7.json",
+    ".review/a20fb1d51.json",
+    ".review/b4bf42b71.json",
+    ".review/cf7bd57a2.json"
+  ],
+  "notes": "A 401 in the key step now asks for a new sign-in. Two passes, one finding (the password and phrase steps blamed the password and phrase). G4 rebuilt k4e2-offer-names-one-provider, stale since before this change. omnigame-launch.spec.ts:53 fails locally at base as well.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "265023249: a 401 during the key check shows 'Your session ended' with one Sign in again button instead of 'could not be unlocked' with Try again. Files: AuthContext.tsx, KeySetupScreen.tsx, en.json, two tests. Boundaries: the HTTP status the API clients put on an error, the key status the gate reads, the screen the user sees."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read the ledgers that touched AuthContext (1cc82cad7, a20fb1d51, b4bf42b71 and the K4 ledgers): none records a 401 inside the key step; the nearest is the /uploads cookie-path finding (2d871af07), a different route."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or payload is assembled."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered KeySetupScreen with the real en.json strings for two states. failed: h2 'Your messages could not be unlocked', buttons Try again and Sign out. session-ended: h2 'Your session ended', p 'The server did not accept this sign-in. Sign in again to read your messages.', one button 'Sign in again'; same dialog, aria-labelledby key-step-title."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "curl GET /api/v1/auth/key-backup on the running backend, two inputs: no cookie -> 401 {code: unauthorized, message: 'Authorization header required'}; a bad token -> 401 'Invalid or expired token'. Both reach the new branch; the first is exactly what Safari logged at 127.0.0.1."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or row."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The state name 'session-ended' is spelled the same in the KeyStatus type, the switch, and both tests; the three en.json keys match the t() calls (i18n:check passed in the commit hook)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "lib/api sets typed.status = response.status; axios 1.20 sets AxiosError.status (AxiosError.js:167). Every key call goes through one of the two, so the status field the check reads is the one both senders set."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule, sessionRejected, used by both the key check and the step wrapper."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "authenticatedFetch retries a 401 once after /auth/refresh, so a 401 that reaches the key step is final: a live refresh token never shows this screen."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to a serialized struct."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The status is read through one accessor; the control removes its use and the tests fail."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The test error is built the way ApiClient builds it: an Error whose message is the server message and a numeric status of 401."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: the password, phrase, fresh-start and app-password actions call the same APIs. The password step turned a 401 into 'Check your password', and the phrase step into 'wrong phrase'. Finding key-steps-session-rejected."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The failed state is still reached by any non-401 error (test 'reports a failure instead of making keys')."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The 401 is still logged with console.error before the state changes."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The 401 test lived inline once; after the finding it is one function."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Same shape, a 401 shown as a domain error, looked for in every key action (found in two, fixed in three, one left on purpose: setAppPassword, whose step still shows the unsaved phrase). Outside the gate, the rest of the app shows 401s as its own errors; not a gate, out of scope."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The held secret is dropped (held: null) on a rejected session, so nothing from it outlives the session."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control key-steps-session-rejected: with the rejection check removed from endSessionOnRejection, both new AuthContext tests fail ('Invalid or expired token' thrown to the step)."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint clean, prettier clean, i18n check and guard OK in the commit hook."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by E1 (sibling paths); already a row."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model output. Not reproduced in a real browser: reaching the key step needs a sign-in, which I cannot type. The unit tests and the real 401 bodies stand in."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No shared bar changed; the step uses the same card as the failed step."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Vitest tests do not skip on missing services; counts read from the output."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user asked for the key step to stop blaming the keys on a rejected session and to ask for a sign-in; both are done."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Callers of the key check: app open, sign-in, provider callback, retry. The new branch commits under the same generation guard as the old one, so a late 401 cannot overwrite a newer state."
+        },
+        {
+          "id": "B7",
+          "status": "applied",
+          "evidence": "The new step renders inside KeyScreen, the same z-[120] portal as every key step (control k4d-gate-under-higher-layers still fails when reverted)."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "43 test files that import or mock AuthContext or KeySetupScreen: 300 passed, 1 skipped (pre-existing skip)."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Ran the two signed-in specs that route /auth/key-backup (omnichat, omnigame-launch) in Chromium: omnichat passes. omnigame-launch.spec.ts:53 fails locally on a z-50 overlay over Play, and fails the same way on base 065c6b6c5 in a clean worktree, so it predates this change; the key gate is z-[120] and no spec answers the key step with 401."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "15 older controls patch AuthContext.tsx, KeySetupScreen.tsx or en.json. All re-applied at HEAD: 14 fail with real assertions (k4c2 x4, k4d x3, k5b, g3b, paywall x2, speak button, call minute, hang-up name). k4e2-offer-names-one-provider no longer applied, and was already stale at base 065c6b6c5 (en.json moved); rebuilt on the current file, it fails: 'expected ... to contain Discord'."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The context runs as production runs it; only the network and key services are mocked, as in every other AuthContext test."
+        }
+      ],
+      "findings": [
+        {
+          "id": "key-steps-session-rejected",
+          "summary": "A 401 in the password step said 'Check your password and try again', and in the phrase step that the phrase was wrong; neither was, the session had ended.",
+          "found_by": "E1",
+          "fix_commit": "128147881",
+          "control": {
+            "patch": ".review/controls/key-steps-session-rejected.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/contexts/__tests__/AuthContext.test.tsx -t 'when the session ends at the'"
+            ],
+            "observed": "Both tests fail: 'Error: Invalid or expired token' reaches the step instead of the state becoming session-ended."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over 265023249 and 128147881 (the finding's fix: endSessionOnRejection around unlockWithPassword, recoverKeys, startFresh)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read the ledgers that touched AuthContext (1cc82cad7, a20fb1d51, b4bf42b71 and the K4 ledgers): none records a 401 inside the key step; the nearest is the /uploads cookie-path finding (2d871af07), a different route."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt or payload is assembled."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered KeySetupScreen with the real en.json strings for two states. failed: h2 'Your messages could not be unlocked', buttons Try again and Sign out. session-ended: h2 'Your session ended', p 'The server did not accept this sign-in. Sign in again to read your messages.', one button 'Sign in again'; same dialog, aria-labelledby key-step-title."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "curl GET /api/v1/auth/key-backup on the running backend, two inputs: no cookie -> 401 {code: unauthorized, message: 'Authorization header required'}; a bad token -> 401 'Invalid or expired token'. Both reach the new branch; the first is exactly what Safari logged at 127.0.0.1."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or row."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The state name 'session-ended' is spelled the same in the KeyStatus type, the switch, and both tests; the three en.json keys match the t() calls (i18n:check passed in the commit hook)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "lib/api sets typed.status = response.status; axios 1.20 sets AxiosError.status (AxiosError.js:167). Every key call goes through one of the two, so the status field the check reads is the one both senders set."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule, sessionRejected, used by both the key check and the step wrapper."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "authenticatedFetch retries a 401 once after /auth/refresh, so a 401 that reaches the key step is final: a live refresh token never shows this screen."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to a serialized struct."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The status is read through one accessor; the control removes its use and the tests fail."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The test error is built the way ApiClient builds it: an Error whose message is the server message and a numeric status of 401."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a: no parsing."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Re-checked after the fix: the four key actions and retryKeys. retryKeys goes through the key check, which has the rule; setAppPassword is left out on purpose (it would take the phrase off screen). No other sibling."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The failed state is still reached by any non-401 error (test 'reports a failure instead of making keys')."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The 401 is still logged with console.error before the state changes."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "No flag."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The 401 test lived inline once; after the finding it is one function."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "No new instance of the shape."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The held secret is dropped (held: null) on a rejected session, so nothing from it outlives the session."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No new finding in this pass."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint clean after the wrapper moved to call time (react-hooks/refs refused a wrapper applied during render)."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "No model output. Not reproduced in a real browser: reaching the key step needs a sign-in, which I cannot type. The unit tests and the real 401 bodies stand in."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No guard added."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No shared bar changed; the step uses the same card as the failed step."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Vitest tests do not skip on missing services; counts read from the output."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user asked for the key step to stop blaming the keys on a rejected session and to ask for a sign-in; both are done."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Callers of the key check: app open, sign-in, provider callback, retry. The new branch commits under the same generation guard as the old one, so a late 401 cannot overwrite a newer state."
+        },
+        {
+          "id": "B7",
+          "status": "applied",
+          "evidence": "The new step renders inside KeyScreen, the same z-[120] portal as every key step (control k4d-gate-under-higher-layers still fails when reverted)."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "43 files, 300 passed, 1 skipped, after the fix."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Ran the two signed-in specs that route /auth/key-backup (omnichat, omnigame-launch) in Chromium: omnichat passes. omnigame-launch.spec.ts:53 fails locally on a z-50 overlay over Play, and fails the same way on base 065c6b6c5 in a clean worktree, so it predates this change; the key gate is z-[120] and no spec answers the key step with 401."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "15 older controls patch AuthContext.tsx, KeySetupScreen.tsx or en.json. All re-applied at HEAD: 14 fail with real assertions (k4c2 x4, k4d x3, k5b, g3b, paywall x2, speak button, call minute, hang-up name). k4e2-offer-names-one-provider no longer applied, and was already stale at base 065c6b6c5 (en.json moved); rebuilt on the current file, it fails: 'expected ... to contain Discord'."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The context runs as production runs it; only the network and key services are mocked, as in every other AuthContext test."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a (dev only; vite build not affected beyond typed code)",
+    "types": "tsc -b 0",
+    "lint": "eslint, prettier clean",
+    "vet": "n/a",
+    "tests": "43 files 300 passed 1 skipped; E2E omnichat pass, omnigame-launch:53 fails at base too"
+  }
+}

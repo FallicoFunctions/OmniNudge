@@ -1,0 +1,18 @@
+diff --git a/frontend/src/contexts/AuthContext.tsx b/frontend/src/contexts/AuthContext.tsx
+index e6cba3614..0217f9bd4 100644
+--- a/frontend/src/contexts/AuthContext.tsx
++++ b/frontend/src/contexts/AuthContext.tsx
+@@ -379,12 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+     try {
+       await step();
+     } catch (error) {
+-      if (
+-        sessionRejected(error) &&
+-        commit(generation, { status: { state: 'session-ended' }, held: null })
+-      ) {
+-        return;
+-      }
++      void generation;
+       throw error;
+     }
+   };
