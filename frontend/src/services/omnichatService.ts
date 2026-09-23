@@ -926,31 +926,6 @@ export const omnichatService = {
     return response.blob();
   },
 
-  /**
-   * One sentence of a call reply, in her voice.
-   *
-   * Asked for by number, never by sending the words: a route that synthesised
-   * whatever the browser typed would be a voice-cloning oracle wearing
-   * somebody's character as a costume.
-   *
-   * Null is an ordinary answer. A sentence of pure narration has nothing to say
-   * aloud (204), and a sentence whose turn has ended is gone (404). Both mean
-   * "skip this one", not "the call is broken".
-   */
-  async getCallSentenceSpeech(
-    conversationId: number,
-    turn: string,
-    sequence: number
-  ): Promise<Blob | null> {
-    const response = await authenticatedFetch(
-      `${API_BASE_URL}/omnichat/conversations/${conversationId}/call-speech/${encodeURIComponent(turn)}/${sequence}`
-    );
-    if (response.status === 204 || response.status === 404) return null;
-    if (!response.ok) throw new Error('Character speech is unavailable');
-    const audio = await response.blob();
-    return audio.size > 0 ? audio : null;
-  },
-
   async startCall(conversationId: number, mode: 'voice' | 'video'): Promise<OmniChatCallSession> {
     const response = await api.post<{ session: OmniChatCallSession }>(
       `/omnichat/conversations/${conversationId}/calls`,
