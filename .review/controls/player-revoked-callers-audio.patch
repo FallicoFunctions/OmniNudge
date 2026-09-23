@@ -1,0 +1,13 @@
+diff --git a/frontend/src/hooks/useVoicePlayer.ts b/frontend/src/hooks/useVoicePlayer.ts
+index 4ae56e13b..7f43b17ca 100644
+--- a/frontend/src/hooks/useVoicePlayer.ts
++++ b/frontend/src/hooks/useVoicePlayer.ts
+@@ -44,7 +44,7 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
+     const source = audio.src;
+     audio.pause();
+     audio.src = '';
+-    if (ownedSourcesRef.current.delete(source)) URL.revokeObjectURL(source);
++    if (source.startsWith('blob:')) URL.revokeObjectURL(source);
+   }, []);
+ 
+   const stopCurrent = useCallback(() => {

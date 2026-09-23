@@ -1,0 +1,12 @@
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index 1b45b8f11..281bca93f 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -1572,7 +1572,6 @@ export default function MessagesPage() {
+         // The message already exists and its recording never will. Take it
+         // back, for both people, rather than leave a voice message that can
+         // never be played; the person is told below.
+-        await messagesService.deleteMessage(msg.id, { deleteFor: 'both' }).catch(() => undefined);
+         throw uploadError;
+       }
+     } catch (err) {

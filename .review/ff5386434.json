@@ -1,0 +1,568 @@
+{
+  "schema_version": 2,
+  "head": "f1510a405",
+  "base": "ff5386434",
+  "scope": {
+    "files": [
+      "backend/internal/handlers/messages.go",
+      "backend/internal/handlers/messages_test.go",
+      "backend/internal/handlers/voice_messages.go",
+      "backend/internal/handlers/voice_messages_access_test.go",
+      "backend/internal/models/pin_event.go",
+      "frontend/public/locales/en.json",
+      "frontend/src/components/messages/VoiceMessage.tsx",
+      "frontend/src/components/messages/__tests__/VoiceMessage.test.tsx",
+      "frontend/src/hooks/__tests__/useDecryptedMedia.test.tsx",
+      "frontend/src/hooks/__tests__/useVoicePlayer.test.ts",
+      "frontend/src/hooks/useDecryptedMedia.ts",
+      "frontend/src/hooks/useVoicePlayer.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
+      "frontend/src/services/__tests__/groupKeyForSending.test.ts",
+      "frontend/src/services/groupKeyCache.ts",
+      "frontend/src/services/voiceMessagesService.ts",
+      "frontend/src/types/messages.ts",
+      "frontend/src/utils/__tests__/waveform.test.ts",
+      "frontend/src/utils/groupKeys.test.ts",
+      "frontend/src/utils/groupKeys.ts",
+      "frontend/src/utils/waveform.ts",
+      "frontend/tests/unit/usePinnedMessages.test.tsx"
+    ],
+    "boundaries": [
+      "voice upload and download",
+      "voice metadata GET",
+      "the audio element source",
+      "the pin event on the socket",
+      "the group key rotation request"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/cf1edd9dc.json",
+    ".review/d66091636.json"
+  ],
+  "notes": "G4b, G4c and G5. Found during the build and fixed there: voice routes refused direct messages (403), no voice message was ever sent (empty content refused), none could ever be played (nothing loaded the recording), and rotations never carried history. Playback of a decrypted recording and every group path remain unverified in a browser: the pane's key pair is unrepaired until the user signs in again, it has no microphone, and the account has no group.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "G4b (encrypted voice: server routes f4adb6f83, seal on send 2b47ca4f9, waveform and named type 814b52818, playback 31268bc2d, caption db24bb9b5), G4c (pin event without preview, 933fbd767) and G5 (history copies in the rotation, a5b85e58f). Boundaries: the voice upload and download, the voice metadata GET, the audio element's source, the pin event on the socket, the rotation request."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cf1edd9dc (the cleanups; its E6 lesson -- a mocked send hid a server rule -- is why B5 was run during the build, which found the empty-content refusal) and d66091636 (the media path these phases build on)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the recording that leaves the device for a group (opens under the group key) and a direct message (opens with each reader's key), the rotation request with history visible, hidden, and partly held, and the pin event as JSON (no preview, no content)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The voice component's three states rendered: Processing while the recording is missing or decrypting, the bubble once it is, 'Could not play voice message.' when it cannot be opened -- never the ciphertext."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Real responses in the browser during the build: upload 201; GET voice metadata with mime audio/wav and no waveform; download 200 application/octet-stream, 16060 bytes for a 16044-byte WAV, not starting RIFF."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The voice row: mime_type is the declared audio type, the message row carries the sealed file key and a v2 caption."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The voice route's encrypted signal is the message row's media_encryption_key, the same field the app sets; the rotation history shape is version -> member -> copy on both sides (TS and group_keys_test.go)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The voice component reads signed_url and mime_type from GET /messages/:id/voice; the upload response is read by nothing. The pin event's readers read type, ids, pinned_by, pinned_at and message_type, never preview."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One sealing rule for voice (sealFileForConversation); the waveform rule matches the server job (100 bars, peak per slice)."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Contracts checked against the other end, not a mock: the server refuses empty content without media (found during the build, fixed in db24bb9b5), the sender may delete for both (checked in DeleteMessage), GET voice answers 404 until the upload lands (the E7 finding)."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "PinEvent lost a field; its only consumer, the app type, dropped it too."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The older voice tests inserted participant rows no real direct message has; the new ones make the conversation the way the app does (found and fixed during the build)."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real recordings: WAV (sniffed), webm declared, mp4 by type; a 1-second WAV end to end in the browser."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "An encrypted upload declared text/html is refused; a stranger gets 403 on both voice routes; history is not sent when hidden; a 403 on voice metadata is not retried."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "A recording shorter than the bar count still draws 100 bars; the recording wait is bounded at 20 tries, 1.5 s apart."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: the file paths already waited for the scan (4bde149d7); the voice path had its own ordering -- message first, recording after -- which is where both E7 and F4 findings sit."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the voice component and the rotation history is reached by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A failed voice send reached only the console; it now alerts (2b47ca4f9). A failed history wrap is logged and the version reaches the newcomer at a later rotation."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The server skips the waveform job only for encrypted recordings; the history copies only while history is visible -- both tested both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "No new duplication; the dead voice_message field was removed."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched the shapes: other components revoking blob URLs they do not own (none receive decrypted media); other send paths that create a record before its content arrives (only voice)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction; the voice upload writes storage then the row, as before."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A failed voice upload left its audio message behind, unplayable, for both people. Finding below."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls, each failing with a real assertion: voice-gave-up-before-upload, voice-message-left-without-recording, player-revoked-callers-audio. Every build commit also ran its new tests against the old code before committing."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The voice wait, the take-back and the ownership set run on every voice message; nothing to invoke."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint and prettier clean on all 17 changed frontend files; go build, vet, gofmt clean; golangci-lint 0 issues on handlers and models."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "E7, F4 and F6 found them; all named. No new instrument."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Run for real during the build (dev stack, signed-in pane, the app's own modules driving the recorder's steps): the server path is as B3 says, and the bubble said it could not play rather than showing ciphertext. Not run for real: a successful decrypt and play, and anything in a group -- this pane's key pair stays broken until the user's next sign-in there, it has no microphone, and the account has no group. The three review fixes are client-side and pinned by tests; none has been exercised in a browser."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The audio message is created and broadcast before its recording is uploaded, so every open conversation mounts the voice component before the recording exists; with the app's single retry it settled on 'could not play'. Finding below."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Known-bad inputs: an encrypted upload declared as HTML, a stranger on both voice routes, history offered while hidden."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No bar or row changed width."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Frontend 528 passed, 1 skipped (the old keyboard it.skip). Go handlers 761 passed, 2 skipped (audio encoder, unrelated, one a fixed t.Skip); models ok; integration group keys 3 passed; services group keys 9 passed."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan: seal voice like other media and decrypt it for playback (G4b), stop the ciphertext preview (G4c), the history setting (G5). Each is delivered; G4b also had to wire playback that never existed and a send that never succeeded. Not delivered: turning history on later reaches existing members only at the next rotation."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "A voice send is one user action; the recorder is disabled while a send is pending."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "58 test files in src and tests name a changed module (VoiceMessage, useDecryptedMedia, useVoicePlayer, MessagesPage, groupKeyCache, voiceMessagesService, messages, groupKeys, waveform): all pass. The whole handlers and models packages ran."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied all 16 controls from this and the last three reviews against HEAD: all apply."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The voice player revoked every blob: source it released, including the decrypted URL its caller owns, so an encrypted voice message could not be played twice. Finding below."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "No unmount cleanup of a parent-owned resource changed beyond F6."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The voice handler test uses the real local storage service; the voice component is tested with its production query client default (retry: 1)."
+        }
+      ],
+      "findings": [
+        {
+          "id": "voice-gave-up-before-upload",
+          "summary": "The audio message is created and broadcast before its recording is uploaded; the voice component loaded it at once, got 404, retried once (the app default) and settled on 'could not play' for sender and recipient until a reload.",
+          "found_by": "E7",
+          "fix_commit": "17e880737",
+          "control": {
+            "patch": ".review/controls/voice-gave-up-before-upload.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/messages/__tests__/VoiceMessage.test.tsx"
+            ],
+            "observed": "With the 404 wait removed: 'Unable to find an element with the text: voice bubble' after three 404s, and a 403 is retried like anything else. Run under the app's own retry: 1."
+          }
+        },
+        {
+          "id": "voice-message-left-without-recording",
+          "summary": "When the recording upload failed, the audio message it belonged to stayed, in front of both people, as a voice message that could never be played.",
+          "found_by": "F4",
+          "fix_commit": "1cfdcca43",
+          "control": {
+            "patch": ".review/controls/voice-message-left-without-recording.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/pages/__tests__/MessagesPage.mediaSend.test.tsx"
+            ],
+            "observed": "With the take-back removed: expected deleteMessage to be called with [9100, { deleteFor: 'both' }]; the alert still says the send failed."
+          }
+        },
+        {
+          "id": "player-revoked-callers-audio",
+          "summary": "The voice player revoked every blob: source it released, including the decrypted blob URL VoiceMessage owns, so an encrypted voice message could not be played a second time.",
+          "found_by": "F6",
+          "fix_commit": "f1510a405",
+          "control": {
+            "patch": ".review/controls/player-revoked-callers-audio.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/hooks/__tests__/useVoicePlayer.test.ts"
+            ],
+            "observed": "With the old release restored: expected [ 'blob:decrypted-owned-by-the-caller' ] to not include it, after 'ended'. The player's own fetched URL is still freed (the second test passes either way)."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Full pass after the three fixes (17e880737, 1cfdcca43, f1510a405). The frontend and Go gates, G4 and the H3 run above were all taken at that HEAD."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cf1edd9dc (the cleanups; its E6 lesson -- a mocked send hid a server rule -- is why B5 was run during the build, which found the empty-content refusal) and d66091636 (the media path these phases build on)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the recording that leaves the device for a group (opens under the group key) and a direct message (opens with each reader's key), the rotation request with history visible, hidden, and partly held, and the pin event as JSON (no preview, no content)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The voice component's three states rendered: Processing while the recording is missing or decrypting, the bubble once it is, 'Could not play voice message.' when it cannot be opened -- never the ciphertext."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Real responses in the browser during the build: upload 201; GET voice metadata with mime audio/wav and no waveform; download 200 application/octet-stream, 16060 bytes for a 16044-byte WAV, not starting RIFF."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The voice row: mime_type is the declared audio type, the message row carries the sealed file key and a v2 caption."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The voice route's encrypted signal is the message row's media_encryption_key, the same field the app sets; the rotation history shape is version -> member -> copy on both sides (TS and group_keys_test.go)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The voice component reads signed_url and mime_type from GET /messages/:id/voice; the upload response is read by nothing. The pin event's readers read type, ids, pinned_by, pinned_at and message_type, never preview."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One sealing rule for voice (sealFileForConversation); the waveform rule matches the server job (100 bars, peak per slice)."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Contracts checked against the other end, not a mock: the server refuses empty content without media (found during the build, fixed in db24bb9b5), the sender may delete for both (checked in DeleteMessage), GET voice answers 404 until the upload lands (the E7 finding)."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "PinEvent lost a field; its only consumer, the app type, dropped it too."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The older voice tests inserted participant rows no real direct message has; the new ones make the conversation the way the app does (found and fixed during the build)."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real recordings: WAV (sniffed), webm declared, mp4 by type; a 1-second WAV end to end in the browser."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "An encrypted upload declared text/html is refused; a stranger gets 403 on both voice routes; history is not sent when hidden; a 403 on voice metadata is not retried."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "A recording shorter than the bar count still draws 100 bars; the recording wait is bounded at 20 tries, 1.5 s apart."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: the file paths already waited for the scan (4bde149d7); the voice path had its own ordering -- message first, recording after -- which is where both E7 and F4 findings sit."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch of the voice component and the rotation history is reached by a test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A failed voice send reached only the console; it now alerts (2b47ca4f9). A failed history wrap is logged and the version reaches the newcomer at a later rotation."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "The server skips the waveform job only for encrypted recordings; the history copies only while history is visible -- both tested both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "No new duplication; the dead voice_message field was removed."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched the shapes: other components revoking blob URLs they do not own (none receive decrypted media); other send paths that create a record before its content arrives (only voice)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "No transaction; the voice upload writes storage then the row, as before."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Re-read after the fix: a failed upload is the one undo path, and it now takes the message back."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Three controls, each failing with a real assertion: voice-gave-up-before-upload, voice-message-left-without-recording, player-revoked-callers-audio. Every build commit also ran its new tests against the old code before committing."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The voice wait, the take-back and the ownership set run on every voice message; nothing to invoke."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint and prettier clean on all 17 changed frontend files; go build, vet, gofmt clean; golangci-lint 0 issues on handlers and models."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Run for real during the build (dev stack, signed-in pane, the app's own modules driving the recorder's steps): the server path is as B3 says, and the bubble said it could not play rather than showing ciphertext. Not run for real: a successful decrypt and play, and anything in a group -- this pane's key pair stays broken until the user's next sign-in there, it has no microphone, and the account has no group. The three review fixes are client-side and pinned by tests; none has been exercised in a browser."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Re-read after the fix: the wait covers 404 only, for 30 s; nothing else in these phases starts before what it depends on."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Known-bad inputs: an encrypted upload declared as HTML, a stranger on both voice routes, history offered while hidden."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No bar or row changed width."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Frontend 528 passed, 1 skipped (the old keyboard it.skip). Go handlers 761 passed, 2 skipped (audio encoder, unrelated, one a fixed t.Skip); models ok; integration group keys 3 passed; services group keys 9 passed."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The plan: seal voice like other media and decrypt it for playback (G4b), stop the ciphertext preview (G4c), the history setting (G5). Each is delivered; G4b also had to wire playback that never existed and a send that never succeeded. Not delivered: turning history on later reaches existing members only at the next rotation."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "A voice send is one user action; the recorder is disabled while a send is pending."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "58 test files in src and tests name a changed module (VoiceMessage, useDecryptedMedia, useVoicePlayer, MessagesPage, groupKeyCache, voiceMessagesService, messages, groupKeys, waveform): all pass. The whole handlers and models packages ran."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied all 16 controls from this and the last three reviews against HEAD: all apply."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "Re-read after the fix: the player frees only what it made; the decrypt hook frees its own URL on unmount."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "No unmount cleanup of a parent-owned resource changed beyond F6."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The voice handler test uses the real local storage service; the voice component is tested with its production query client default (retry: 1)."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ok",
+    "vet": "go vet handlers, models; gofmt clean",
+    "lint": "golangci-lint 0 issues; eslint and prettier clean on 17 files",
+    "types": "tsc -b 0",
+    "tests": "frontend 58 files 528 passed 1 old skip; Go handlers 761 passed 2 unrelated skips, models ok, integration group keys 3, services group keys 9"
+  }
+}

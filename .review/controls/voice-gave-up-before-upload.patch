@@ -1,0 +1,14 @@
+diff --git a/frontend/src/components/messages/VoiceMessage.tsx b/frontend/src/components/messages/VoiceMessage.tsx
+index 5e60fdd18..4edcd5b42 100644
+--- a/frontend/src/components/messages/VoiceMessage.tsx
++++ b/frontend/src/components/messages/VoiceMessage.tsx
+@@ -28,9 +28,6 @@ export function VoiceMessage({ message, isOwn }: { message: Message; isOwn: bool
+     // The audio message is created, and broadcast, before its recording is
+     // uploaded, so the first answers are 404. Wait for it -- the app's single
+     // retry gave up while the upload was still running -- but not on a refusal.
+-    retry: (failures, error) =>
+-      (error as { status?: number }).status === 404 && failures < RECORDING_WAIT_RETRIES,
+-    retryDelay: RECORDING_WAIT_DELAY_MS,
+   });
+ 
+   const encrypted = Boolean(message.media_encryption_key);
