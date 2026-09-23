@@ -260,7 +260,7 @@
     },
     {
      "id": "R4",
-     "summary": "the sentence run started at the top of the turn while the choice of whether the avatar speaks the reply is made after the reply arrives, so on a video call she was heard twice -- once from the local speaker and once from the avatar's stream -- and the cancel that followed could not unsay what was already spoken",
+     "summary": "the sentence run started at the top of the turn while the choice of whether the avatar speaks the reply is made after the reply arrives, so on a video call she was heard twice -- once from the local speaker and once from the avatar's stream -- and the cancel that followed could not unsay what was already spoken (retired 2026-09-23: 28266de3b made a voice call one live connection to Gemini Live, and the call modal no longer starts a sentence run at all, so there is no local run left to double the avatar's voice; the patch is removed rather than given a control that proves something else)",
      "found_by": "E7",
      "fix_commit": "fd1c25e46",
      "control": {

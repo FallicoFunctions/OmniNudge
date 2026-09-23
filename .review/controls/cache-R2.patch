@@ -1,11 +1,11 @@
 diff --git a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
-index cb32c3904..b9e19e26b 100644
+index d9b7cf74e..38ee40598 100644
 --- a/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
 +++ b/frontend/src/components/omnichat/OmniChatMediaAssetView.tsx
-@@ -108,10 +108,6 @@ export default function OmniChatMediaAssetView({
-           <img
-             src={thumbnailSrc + retry}
+@@ -124,10 +124,6 @@ export default function OmniChatMediaAssetView({
+             src={withRetry(thumbnailSrc)}
              alt={alt}
+             crossOrigin="use-credentials"
 -            // The browser defers a tile below the fold on its own. An
 -            // IntersectionObserver here would be a second, worse copy of what
 -            // it already does for an img with a src.

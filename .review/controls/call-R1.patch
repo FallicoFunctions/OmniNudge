@@ -1,16 +1,23 @@
 diff --git a/frontend/src/components/omnichat/OmniChatCallModal.tsx b/frontend/src/components/omnichat/OmniChatCallModal.tsx
-index e673cc01a..7cb879fb4 100644
+index b1be31664..b4c10e322 100644
 --- a/frontend/src/components/omnichat/OmniChatCallModal.tsx
 +++ b/frontend/src/components/omnichat/OmniChatCallModal.tsx
-@@ -151,9 +151,8 @@ export default function OmniChatCallModal({
+@@ -171,8 +171,7 @@ export default function OmniChatCallModal({
      // database, every attempt, and two of the ten hourly starts spent on one
      // press of the phone. It was visible three separate times before anybody
      // read it as a bug rather than as noise.
 -    const callIdentity = `${conversationId}:${mode}`;
--    if (startedRef.current === callIdentity) return;
+-    if (startedRef.current === callIdentity) {
++    if (startedRef.current) {
+       // The development double-invoke ran the cleanup between the two
+       // invocations, and that cleanup marked this modal closed and moved the
+       // epoch on. The call it tore down is the one still in flight and about
+@@ -184,7 +183,7 @@ export default function OmniChatCallModal({
+       callEpochRef.current = startedEpochRef.current;
+       return;
+     }
 -    startedRef.current = callIdentity;
-+    if (startedRef.current) return;
 +    startedRef.current = 'started';
-     let active = true;
      closedRef.current = false;
      const callEpoch = ++callEpochRef.current;
+     startedEpochRef.current = callEpoch;

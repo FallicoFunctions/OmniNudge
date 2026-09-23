@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
-index c71737a25..9b0be3fc8 100644
+index 282d9d454..d2dcc0a68 100644
 --- a/.github/workflows/ci.yml
 +++ b/.github/workflows/ci.yml
 @@ -105,7 +105,7 @@ jobs:
@@ -10,4 +10,4 @@ index c71737a25..9b0be3fc8 100644
 +          args: --timeout=10m
            skip-cache: false
  
-       - name: Run unit tests
+       # One command for unit and integration tests: the integration package has
