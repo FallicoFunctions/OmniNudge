@@ -1,0 +1,528 @@
+{
+  "schema_version": 2,
+  "head": "661bc6733",
+  "base": "cf1edd9dc",
+  "scope": {
+    "files": [
+      ".gitleaks.toml",
+      "frontend/src/services/recipientKeys.ts",
+      "frontend/src/services/fileSealing.ts",
+      "frontend/src/services/messagesService.ts",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/feed/ColumnFeed.tsx",
+      "frontend/src/components/feed/ExpandedMessage.tsx",
+      "frontend/src/services/__tests__/recipientKeys.test.ts",
+      "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
+      "frontend/src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx",
+      "frontend/src/components/feed/__tests__/ExpandedMessage.send.test.tsx",
+      "frontend/tests/unit/editProfileModal.test.tsx"
+    ],
+    "boundaries": [
+      "the send request and the uploaded bytes",
+      "the recipient key the server publishes",
+      "the rendered feed column",
+      "the gitleaks scan in CI"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/d66091636.json",
+    ".review/d2697f1f3.json"
+  ],
+  "notes": "Cleanups asked for by the user. The CI failure on cf1edd9dc (a test outside src expecting the old avatar path) was fixed before this review opened, in 428908bc5; H3 now says to search frontend/tests too.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Review of the four cleanups on top of cf1edd9dc: one recipient-key lookup (recipientKeys.ts, 4275b3afc), group drag and drop through one sealing rule (fileSealing.ts, cde5cea8f), New Message in an empty messages column (e3ad9feb0), the gitleaks test-vector exception (4b18b2ef6), and the CI fix for the avatar path test (428908bc5). Boundaries: the send request and the uploaded bytes; the key the server publishes; the rendered column; the gitleaks scan."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d66091636 (the review these cleanups came out of: its E5 note named the three inline copies, and its pass-2 UX notes named the drop-into-group refusal and the empty column) and d2697f1f3, whose feed-column control this review touches."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the requests that leave the device for two conversation kinds each: a drop into a group (one sealed envelope, group_key_version, no sender copy) and into a direct message (caption as content, both key copies, each opening the uploaded bytes); the expanded view into a group (text as content) and a direct message (the file sealed for both readers with the key getPublicKeys returned)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The empty messages column, rendered: New Message above the inbox's own empty state ('No messages yet'); a non-messages column still renders its bare empty state."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read in B5: upload 201, send 423 then 201, the stored message body."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The stored message read back in B5: encryption_version v2, caption v2 ciphertext, media_type image/png, both key copies, 308 bytes for a 292-byte PNG."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "One refusal code for every missing or unreadable recipient key ('recipient-key-unusable'), mapped once by messageSendErrorKey; the gitleaks path pattern matches the paths gitleaks reports (repository-relative, as the scans show)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The drop path read user1_id/user2_id while every other sender read other_user; the server sends both for a direct message (ConversationWithDetails). Changed to other_user in 661bc6733 so there is one way to find a recipient."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two sealing rules existed (the composer's and drag and drop's); both now call sealFileForConversation. The DM branch that the feed column wrote out by hand became the same call."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "gitleaks-action loads .gitleaks.toml from the repository root; verified locally with the same rules: full-history git scans with and without the file differ by exactly the vector findings."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to anything that crosses a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor changed."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The page and column tests' fixtures now carry other_user as the server sends it; the new DM drop case failed on the old fixture only because the drop path read a field the fixture lacked -- which is what C2 changed."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs: a PNG dropped into a direct message (real browser) and into a group (test), a message typed into an expanded group and direct conversation."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs still refused: no own keys, a recipient that publishes no key or an unreadable one (both 'recipient-key-unusable'), a group member not set up. The same test-vector content copied outside shared/crypto-vectors is still caught by gitleaks."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "An empty inbox is the boundary for the column; a conversation with no other_user (group, mod mail) for the senders."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings of the drop path: the composer, the feed column's New Message box, the expanded view. The expanded view is the finding below."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "All branches reachable: sealFileForConversation group / DM / refusals."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal reaches the person: the drop and expanded paths alert through messageSendErrorKey; the expanded view's upload failure now names its refusal instead of a generic upload failure."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Conditions on conversation_type re-read in every sender; mod mail has its own multi-recipient path on the page, and the expanded view now refuses it through the service with a reason (before, it refused with \"recipient not found\")."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Found and removed: five copies of the recipient-key lookup, two of the sealing rule, a second rule for finding the recipient (C2). The multi-person forward keeps its batch lookup: a different shape, one request for many users."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The shape 'a sender looks for a single recipient, so groups stop at recipient not found' was searched in every send path. It is also in the feed column's expanded view: the column lists groups and expands them, and every send stopped. Finding below. Voice looks for no recipient (it is still unencrypted: G4b)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A refusal happens before any upload, so nothing is left behind."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "One finding, one control: expanded-view-refused-groups. With the view restored, all three new tests fail with real assertions (nothing is sent for the group; the direct message carries encrypted_content where content is expected). Each fix commit also had its new test run against the old code before committing: the drop test, the empty-column test."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The gitleaks exception is read by the CI job from the root .gitleaks.toml on every push; the scan tested locally with that file."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint and prettier clean on all 11 changed frontend files; the pre-commit hook passed every commit."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "E6 found it; named. One ratchet from this change set, for H3: search frontend/tests as well as src -- the red CI run on cf1edd9dc was a test outside src that the last review never ran."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran for real: the dev stack, the signed-in pane, a PNG dropped into the direct message. Upload 201, the send waited out the scan (423, then 201), no alert; the stored row is sealed as B4 says. Not shown for real: a group (the account has none, and the pane's key pair stays unrepaired until the user's next sign-in, so it can open no group key) and the empty column (the account has conversations). Those two are pinned by the page and column tests."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Known-bad input to gitleaks: the same key-shaped content outside the folder is flagged (2 findings); default rules stay on (useDefault)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No bar or row changed width."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "134 passed, 1 skipped (the old MessagesPage keyboard it.skip); nothing new skips."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Cleanups the user asked for by name; no plan phase."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Each send is one user action; the drop loop is sequential."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Searched src AND tests (the H3 amendment this review made, after tests/unit/editProfileModal.test.tsx turned CI red on cf1edd9dc): 20 test files name a changed module (ColumnFeed, ExpandedMessage, MessagesPage, fileSealing, messagesService, recipientKeys), all pass; all 37 files in tests/unit pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control this review and d66091636 own: 12 apply; g4a2b-feed-column-uploaded-the-file-itself (d2697f1f3) was stale after the column moved to sealFileForConversation, and is rebuilt so it still uploads the raw file: 'expected Uint8Array[137, 80, 78, 71, ...] to not deeply equal' the original."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "recipientKeys.ts and fileSealing.ts were made separate modules so the page tests, which mock keyManagementService and messagesService, run them for real on the production functions rather than on a stand-in."
+        }
+      ],
+      "findings": [
+        {
+          "id": "expanded-view-refused-groups",
+          "summary": "The feed column lists and expands group conversations, but its expanded view looked for a single recipient before sending, so every message into a group -- text or file -- stopped at 'recipient not found'.",
+          "found_by": "E6",
+          "fix_commit": "46e6be1ee",
+          "control": {
+            "patch": ".review/controls/expanded-view-refused-groups.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/feed/__tests__/ExpandedMessage.send.test.tsx"
+            ],
+            "observed": "With the view restored: 3 of 3 fail -- 'expected \"vi.fn()\" to be called at least once' for both group cases (nothing sent), and the direct-message case sends encrypted_content where content is expected. The test renders the real component; the only earlier test of it replaced it with a stub."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Full pass after the fix (46e6be1ee) and the drop-recipient change (661bc6733). The gates, the controls and the browser run in pass 1 were all taken at that HEAD."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d66091636 (the review these cleanups came out of: its E5 note named the three inline copies, and its pass-2 UX notes named the drop-into-group refusal and the empty column) and d2697f1f3, whose feed-column control this review touches."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the requests that leave the device for two conversation kinds each: a drop into a group (one sealed envelope, group_key_version, no sender copy) and into a direct message (caption as content, both key copies, each opening the uploaded bytes); the expanded view into a group (text as content) and a direct message (the file sealed for both readers with the key getPublicKeys returned)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The empty messages column, rendered: New Message above the inbox's own empty state ('No messages yet'); a non-messages column still renders its bare empty state."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Read in B5: upload 201, send 423 then 201, the stored message body."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The stored message read back in B5: encryption_version v2, caption v2 ciphertext, media_type image/png, both key copies, 308 bytes for a 292-byte PNG."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "One refusal code for every missing or unreadable recipient key ('recipient-key-unusable'), mapped once by messageSendErrorKey; the gitleaks path pattern matches the paths gitleaks reports (repository-relative, as the scans show)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The drop path read user1_id/user2_id while every other sender read other_user; the server sends both for a direct message (ConversationWithDetails). Changed to other_user in 661bc6733 so there is one way to find a recipient."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two sealing rules existed (the composer's and drag and drop's); both now call sealFileForConversation. The DM branch that the feed column wrote out by hand became the same call."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "gitleaks-action loads .gitleaks.toml from the repository root; verified locally with the same rules: full-history git scans with and without the file differ by exactly the vector findings."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field added to anything that crosses a boundary."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No untyped accessor changed."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The page and column tests' fixtures now carry other_user as the server sends it; the new DM drop case failed on the old fixture only because the drop path read a field the fixture lacked -- which is what C2 changed."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs: a PNG dropped into a direct message (real browser) and into a group (test), a message typed into an expanded group and direct conversation."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs still refused: no own keys, a recipient that publishes no key or an unreadable one (both 'recipient-key-unusable'), a group member not set up. The same test-vector content copied outside shared/crypto-vectors is still caught by gitleaks."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "An empty inbox is the boundary for the column; a conversation with no other_user (group, mod mail) for the senders."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings of the drop path: the composer, the feed column's New Message box, the expanded view. The expanded view is the finding below."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "All branches reachable: sealFileForConversation group / DM / refusals."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Every refusal reaches the person: the drop and expanded paths alert through messageSendErrorKey; the expanded view's upload failure now names its refusal instead of a generic upload failure."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Conditions on conversation_type re-read in every sender; mod mail has its own multi-recipient path on the page, and the expanded view now refuses it through the service with a reason (before, it refused with \"recipient not found\")."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Found and removed: five copies of the recipient-key lookup, two of the sealing rule, a second rule for finding the recipient (C2). The multi-person forward keeps its batch lookup: a different shape, one request for many users."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched again after the fix: no sender left that looks for a single recipient without asking the conversation kind first."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A refusal happens before any upload, so nothing is left behind."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "One finding, one control: expanded-view-refused-groups. With the view restored, all three new tests fail with real assertions (nothing is sent for the group; the direct message carries encrypted_content where content is expected). Each fix commit also had its new test run against the old code before committing: the drop test, the empty-column test."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The gitleaks exception is read by the CI job from the root .gitleaks.toml on every push; the scan tested locally with that file."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint and prettier clean on all 11 changed frontend files; the pre-commit hook passed every commit."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran for real: the dev stack, the signed-in pane, a PNG dropped into the direct message. Upload 201, the send waited out the scan (423, then 201), no alert; the stored row is sealed as B4 says. Not shown for real: a group (the account has none, and the pane's key pair stays unrepaired until the user's next sign-in, so it can open no group key) and the empty column (the account has conversations). Those two are pinned by the page and column tests."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Known-bad input to gitleaks: the same key-shaped content outside the folder is flagged (2 findings); default rules stay on (useDefault)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No bar or row changed width."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "134 passed, 1 skipped (the old MessagesPage keyboard it.skip); nothing new skips."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "Cleanups the user asked for by name; no plan phase."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "Each send is one user action; the drop loop is sequential."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Searched src AND tests (the H3 amendment this review made, after tests/unit/editProfileModal.test.tsx turned CI red on cf1edd9dc): 20 test files name a changed module (ColumnFeed, ExpandedMessage, MessagesPage, fileSealing, messagesService, recipientKeys), all pass; all 37 files in tests/unit pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control this review and d66091636 own: 12 apply; g4a2b-feed-column-uploaded-the-file-itself (d2697f1f3) was stale after the column moved to sealFileForConversation, and is rebuilt so it still uploads the raw file: 'expected Uint8Array[137, 80, 78, 71, ...] to not deeply equal' the original."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "recipientKeys.ts and fileSealing.ts were made separate modules so the page tests, which mock keyManagementService and messagesService, run them for real on the production functions rather than on a stand-in."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a (frontend only)",
+    "types": "tsc -b 0",
+    "lint": "eslint and prettier clean on the 11 changed files",
+    "tests": "20 related test files in src and tests, 134 passed, 1 old skip; tests/unit 37 files passed",
+    "vet": "n/a (no Go change)"
+  }
+}
