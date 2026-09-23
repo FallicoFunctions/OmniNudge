@@ -20,6 +20,7 @@ import { groupKeyForSendingOrRefuse, messagesService } from '../../services/mess
 import { encryptionService } from '../../services/encryptionService';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { mediaService } from '../../services/mediaService';
+import { voiceMessagesService } from '../../services/voiceMessagesService';
 import {
   base64ToArrayBuffer,
   decryptFile,
@@ -114,6 +115,7 @@ vi.mock('../../services/messagesService', () => ({
     })),
     getMessagesPage: vi.fn(async () => ({ messages: [], next_cursor: undefined })),
     getPinnedMessages: vi.fn(async () => ({ pinned_messages: [] })),
+    deleteMessage: vi.fn(async () => undefined),
     sendMessage: vi.fn(async () => ({
       id: 9100,
       conversation_id: 0,
@@ -532,6 +534,20 @@ describe('sending a voice message', () => {
       );
       expect(await bytesOf(opened)).toEqual(ORIGINAL);
     }
+  });
+
+  // The audio message is created before the recording is uploaded. If the
+  // upload fails, the message stays behind: a voice message that can never be
+  // played, in front of both people.
+  it('takes the audio message back when its recording cannot be uploaded', async () => {
+    state.conversations = [dmConversation];
+    vi.mocked(voiceMessagesService.upload).mockRejectedValueOnce(new Error('File too large'));
+
+    await recordAndSend();
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+    expect(messagesService.deleteMessage).toHaveBeenCalledWith(9100, { deleteFor: 'both' });
+    expect(alertSpy).toHaveBeenCalledWith(i18n.t('messages.errors.sendFailed'));
   });
 
   it('uploads nothing, and says why, when the recording cannot be sealed', async () => {

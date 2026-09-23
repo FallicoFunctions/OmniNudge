@@ -1562,11 +1562,19 @@ export default function MessagesPage() {
       });
       // Declared as the recording's own audio type: the reader rebuilds the
       // audio from it once decrypted.
-      await voiceMessagesService.upload(
-        msg.id,
-        new Blob([sealed.encryptedData], { type: blob.type }),
-        durationSeconds
-      );
+      try {
+        await voiceMessagesService.upload(
+          msg.id,
+          new Blob([sealed.encryptedData], { type: blob.type }),
+          durationSeconds
+        );
+      } catch (uploadError) {
+        // The message already exists and its recording never will. Take it
+        // back, for both people, rather than leave a voice message that can
+        // never be played; the person is told below.
+        await messagesService.deleteMessage(msg.id, { deleteFor: 'both' }).catch(() => undefined);
+        throw uploadError;
+      }
     } catch (err) {
       console.error('Failed to send voice message:', err);
       alert(t(messageSendErrorKey(err) ?? 'messages.errors.sendFailed'));
