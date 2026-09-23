@@ -200,7 +200,9 @@ describe('useDecryptedMedia', () => {
 
   it('shows the stored file directly when there is nothing to decrypt', async () => {
     const { result } = render(message({ media_url: '/uploads/plain.png' }));
-    await waitFor(() => expect(result.current).toBe('http://localhost:8080/uploads/plain.png'));
+    await waitFor(() =>
+      expect(result.current).toBe('http://localhost:8080/api/v1/uploads/plain.png')
+    );
     expect(decryptFile).not.toHaveBeenCalled();
   });
 
@@ -210,7 +212,7 @@ describe('useDecryptedMedia', () => {
 
     const relative = render(message({ media_url: 'uploads/y.png' }));
     await waitFor(() =>
-      expect(relative.result.current).toBe('http://localhost:8080/uploads/y.png')
+      expect(relative.result.current).toBe('http://localhost:8080/api/v1/uploads/y.png')
     );
   });
 

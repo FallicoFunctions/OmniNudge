@@ -31,8 +31,12 @@ export function resolveMediaUrl(url?: string | null, version?: string | null): s
   if (url.trim().toLowerCase().startsWith('data:') || url.startsWith('//') || url.includes('\\')) {
     return undefined;
   }
-  // /uploads/ paths are served same-origin in prod and via Vite proxy in dev.
-  if (url.startsWith('/uploads/')) return appendVersion(url, version);
+  // Uploads are fetched through the API's own path. The session cookie is
+  // scoped to /api/, so a request to /uploads/ -- same-origin or through the dev
+  // proxy -- arrives anonymous, and every private file answered 404.
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    return appendVersion(`${API_BASE_URL}/${url.replace(/^\//, '')}`, version);
+  }
   // Public frontend-bundled OmniChat assets are served by the frontend host.
   if (url.startsWith('/omnichat/')) return appendVersion(url, version);
   return appendVersion(`${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`, version);

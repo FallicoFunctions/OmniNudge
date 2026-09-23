@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { API_BASE_URL } from '../../lib/api';
 import { resolveMediaUrl } from '../mediaUrl';
 
 describe('resolveMediaUrl', () => {
@@ -9,8 +10,11 @@ describe('resolveMediaUrl', () => {
     );
   });
 
-  it('keeps uploaded media same-origin', () => {
-    expect(resolveMediaUrl('/uploads/avatar.png', 'v2')).toBe('/uploads/avatar.png?v=v2');
+  it('fetches uploads through the API path, where the session cookie is sent', () => {
+    expect(resolveMediaUrl('/uploads/7/photo.png', 'v2')).toBe(
+      `${API_BASE_URL}/uploads/7/photo.png?v=v2`
+    );
+    expect(new URL(resolveMediaUrl('/uploads/7/photo.png')!).pathname).toMatch(/^\/api\//);
   });
 
   it('does not render active or protocol-relative media metadata', () => {

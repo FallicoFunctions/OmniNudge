@@ -21,7 +21,7 @@ import { isSealedGroupEnvelope, openGroupMessage, sealedKeyVersion } from '../ut
 import { groupKeyForVersion } from '../services/groupKeyCache';
 import { getOwnKeys } from '../services/keyManagementService';
 import { authenticatedFetch } from '../services/authSession';
-import { API_BASE_URL } from '../lib/api';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 import type { Message } from '../types/messages';
 
 /**
@@ -44,13 +44,6 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 function mimeTypeFor(mediaUrl: string | null | undefined): string {
   const extension = mediaUrl?.split('/').pop()?.split('.').pop()?.toLowerCase();
   return (extension && MIME_BY_EXTENSION[extension]) || 'application/octet-stream';
-}
-
-function absoluteMediaUrl(mediaUrl: string | null | undefined): string | null {
-  if (!mediaUrl) return null;
-  if (mediaUrl.startsWith('http')) return mediaUrl;
-  const origin = new URL(API_BASE_URL).origin;
-  return `${origin}${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
 }
 
 /** A blob URL for the decrypted file, or the stored URL when there is nothing to decrypt. */
@@ -92,7 +85,7 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
     };
 
     const decryptMedia = async () => {
-      const originalUrl = absoluteMediaUrl(media_url);
+      const originalUrl = resolveMediaUrl(media_url) ?? null;
       if (!originalUrl) {
         if (isMounted) setMediaSrc(null);
         return;
