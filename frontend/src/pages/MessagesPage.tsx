@@ -1538,18 +1538,33 @@ export default function MessagesPage() {
   const handleVoiceMessage = async (blob: Blob, durationSeconds: number) => {
     if (!selectedConversationId || !user) return;
     try {
-      // Send an empty placeholder message with type 'audio' then upload the blob.
-      const req = {
+      // A recording is sealed like any other file, before a byte of it leaves
+      // the device. The sealed file key rides on the audio message, which is
+      // what tells the server the recording it then receives is ciphertext.
+      const sealed = await sealFileForConversation(
+        new File([blob], 'voice', { type: blob.type }),
+        selectedConversation?.conversation_type === 'group'
+          ? { groupId: selectedConversationId }
+          : { recipientId: selectedConversation?.other_user?.id }
+      );
+      const msg = await messagesService.sendMessage({
         conversation_id: selectedConversationId,
-        encrypted_content: '',
-        sender_encrypted_content: '',
-        message_type: 'audio' as const,
-        encryption_version: 'none',
-      };
-      const msg = await messagesService.sendMessage(req);
-      await voiceMessagesService.upload(msg.id, blob, durationSeconds);
+        message_type: 'audio',
+        media_encryption_key: sealed.mediaEncryptionKey,
+        media_encryption_iv: sealed.mediaEncryptionIv,
+        sender_media_encryption_key: sealed.senderMediaEncryptionKey,
+        group_key_version: sealed.groupKeyVersion,
+      });
+      // Declared as the recording's own audio type: the reader rebuilds the
+      // audio from it once decrypted.
+      await voiceMessagesService.upload(
+        msg.id,
+        new Blob([sealed.encryptedData], { type: blob.type }),
+        durationSeconds
+      );
     } catch (err) {
       console.error('Failed to send voice message:', err);
+      alert(t(messageSendErrorKey(err) ?? 'messages.errors.sendFailed'));
     }
   };
 

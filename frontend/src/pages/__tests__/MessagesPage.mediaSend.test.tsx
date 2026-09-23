@@ -37,6 +37,7 @@ import {
 import { MessageNotSent } from '../../utils/messageSendErrors';
 
 const state = vi.hoisted(() => ({
+  recordings: [] as Blob[],
   conversations: [] as unknown[],
   uploaded: [] as File[],
 }));
@@ -74,6 +75,30 @@ vi.mock('../../services/redditService', () => ({
   redditService: {
     autocompleteSubreddits: vi.fn(async () => []),
     getSubredditPosts: vi.fn(async () => ({ posts: [] })),
+  },
+}));
+// jsdom has no MediaRecorder: the recorder hands the page a recording, as the
+// real one does when a recording stops.
+vi.mock('../../components/messages/VoiceRecorderButton', () => ({
+  VoiceRecorderButton: ({
+    onVoiceMessage,
+  }: {
+    onVoiceMessage: (blob: Blob, durationSeconds: number) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onVoiceMessage(new Blob([ORIGINAL], { type: 'audio/webm' }), 3)}
+    >
+      Record a voice message
+    </button>
+  ),
+}));
+vi.mock('../../services/voiceMessagesService', () => ({
+  voiceMessagesService: {
+    upload: vi.fn(async (_messageId: number, recording: Blob) => {
+      state.recordings.push(recording);
+      return { voice_message_id: 1, storage_key: 'k', duration_seconds: 3 };
+    }),
   },
 }));
 vi.mock('../../services/messagesService', () => ({
@@ -208,6 +233,7 @@ let alertSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(async () => {
   vi.clearAllMocks();
   state.uploaded = [];
+  state.recordings = [];
   own = await generateKeyPair();
   recipient = await generateKeyPair();
   vi.mocked(getOwnKeys).mockResolvedValue(own);
@@ -437,5 +463,84 @@ describe('the composer row on a phone', () => {
     expect(send.className.split(' ')).toEqual(
       expect.arrayContaining(['shrink-0', 'whitespace-nowrap'])
     );
+  });
+});
+
+// Voice messages went to the server unencrypted: an empty audio message, then
+// the raw recording.
+describe('sending a voice message', () => {
+  async function recordAndSend() {
+    renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record a voice message' }));
+  }
+
+  it('in a group, uploads only a recording that opens under the group key', async () => {
+    state.conversations = [groupConversation];
+    const groupKey = await newGroupKey();
+    vi.mocked(groupKeyForSendingOrRefuse).mockResolvedValue({ key: groupKey, version: 6 });
+
+    await recordAndSend();
+    await waitFor(() => expect(state.recordings).toHaveLength(1));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    const request = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)![0];
+    expect(request.message_type).toBe('audio');
+    expect(isSealedGroupEnvelope(request.media_encryption_key!)).toBe(true);
+    expect(request.group_key_version).toBe(6);
+    const uploaded = await bytesOf(state.recordings[0]);
+    expect(uploaded).not.toEqual(ORIGINAL);
+    expect(state.recordings[0].type).toBe('audio/webm');
+    const fileKey = await importFileKey(
+      base64ToArrayBuffer(await openGroupMessage(request.media_encryption_key!, groupKey))
+    );
+    const opened = await decryptFileWithKey(
+      {
+        encryptedData: sameRealm(uploaded),
+        iv: request.media_encryption_iv!,
+        mimeType: 'audio/webm',
+      },
+      fileKey
+    );
+    expect(await bytesOf(opened)).toEqual(ORIGINAL);
+  });
+
+  it('in a direct message, uploads a recording each reader opens with their own key', async () => {
+    state.conversations = [dmConversation];
+
+    await recordAndSend();
+    await waitFor(() => expect(state.recordings).toHaveLength(1));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    const request = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)![0];
+    const uploaded = sameRealm(await bytesOf(state.recordings[0]));
+    for (const [reader, key] of [
+      [recipient, request.media_encryption_key!],
+      [own, request.sender_media_encryption_key!],
+    ] as const) {
+      const opened = await decryptFile(
+        {
+          encryptedData: uploaded,
+          encryptedKey: key,
+          iv: request.media_encryption_iv!,
+          originalName: '',
+          mimeType: 'audio/webm',
+        },
+        reader.privateKey
+      );
+      expect(await bytesOf(opened)).toEqual(ORIGINAL);
+    }
+  });
+
+  it('uploads nothing, and says why, when the recording cannot be sealed', async () => {
+    state.conversations = [dmConversation];
+    vi.mocked(encryptionService.getPublicKeys).mockResolvedValue({});
+
+    await recordAndSend();
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+    expect(alertSpy).toHaveBeenCalledWith(i18n.t('messages.errors.recipientKeyNotFound'));
+    expect(state.recordings).toHaveLength(0);
+    expect(messagesService.sendMessage).not.toHaveBeenCalled();
   });
 });
