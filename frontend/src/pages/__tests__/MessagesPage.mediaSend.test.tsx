@@ -486,6 +486,8 @@ describe('sending a voice message', () => {
     expect(alertSpy).not.toHaveBeenCalled();
     const request = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)![0];
     expect(request.message_type).toBe('audio');
+    // The server refuses a message with no content and no media file.
+    expect(request.content).toBe(`[${i18n.t('voice.caption')}]`);
     expect(isSealedGroupEnvelope(request.media_encryption_key!)).toBe(true);
     expect(request.group_key_version).toBe(6);
     const uploaded = await bytesOf(state.recordings[0]);

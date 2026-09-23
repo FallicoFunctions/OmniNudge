@@ -1549,6 +1549,11 @@ export default function MessagesPage() {
       );
       const msg = await messagesService.sendMessage({
         conversation_id: selectedConversationId,
+        // The server refuses a message with no content and no media file, and
+        // the recording only arrives after the message exists: an empty audio
+        // message was refused, so no voice message was ever sent. The caption
+        // is sealed like any text and is what the conversation list shows.
+        content: `[${t('voice.caption')}]`,
         message_type: 'audio',
         media_encryption_key: sealed.mediaEncryptionKey,
         media_encryption_iv: sealed.mediaEncryptionIv,
