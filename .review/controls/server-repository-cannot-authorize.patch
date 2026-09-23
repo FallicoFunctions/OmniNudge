@@ -1,0 +1,18 @@
+diff --git a/backend/internal/repository/media_file_postgres.go b/backend/internal/repository/media_file_postgres.go
+index 06b06a553..a66ecf108 100644
+--- a/backend/internal/repository/media_file_postgres.go
++++ b/backend/internal/repository/media_file_postgres.go
+@@ -34,13 +34,6 @@ var _ interface {
+ // conversation member read a private file. The gateway asks for it with a type
+ // assertion, so without this delegation the assertion failed silently and every
+ // signed-in request was judged as anonymous: every private file answered 404.
+-func (r *PostgresMediaFileRepository) CanUserAccessMedia(ctx context.Context, mediaID, userID int) (bool, error) {
+-	return r.inner.CanUserAccessMedia(ctx, mediaID, userID)
+-}
+-
+-var _ interface {
+-	CanUserAccessMedia(context.Context, int, int) (bool, error)
+-} = (*PostgresMediaFileRepository)(nil)
+ 
+ // NewPostgresMediaFileRepository constructs a PostgresMediaFileRepository.
+ func NewPostgresMediaFileRepository(pool *pgxpool.Pool) *PostgresMediaFileRepository {

@@ -1,0 +1,13 @@
+diff --git a/backend/internal/api/middleware/compression.go b/backend/internal/api/middleware/compression.go
+index 4b8a85842..b242f14e3 100644
+--- a/backend/internal/api/middleware/compression.go
++++ b/backend/internal/api/middleware/compression.go
+@@ -116,7 +116,7 @@ func (g *gzipResponseWriter) Flush() {
+ // from object storage. Compressing that body sent a gzip stream under the raw
+ // length, and the browser dropped the response (ERR_CONTENT_LENGTH_MISMATCH).
+ func (g *gzipResponseWriter) shouldPassThrough() bool {
+-	return g.Header().Get("Content-Length") != "" || shouldNotCompress(g.Header().Get("Content-Type"))
++	return shouldNotCompress(g.Header().Get("Content-Type"))
+ }
+ 
+ func shouldNotCompress(contentType string) bool {

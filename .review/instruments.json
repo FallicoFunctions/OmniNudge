@@ -271,6 +271,12 @@
       "name": "Unmount the way the parent really unmounts",
       "trigger": "a component releases a resource in an unmount cleanup, or keeps what the cleanup needs in a ref",
       "asks": "Find the real parent and reproduce HOW it unmounts the child: in the same batch as the child's own state change, mid-await, on a route change. rendered.unmount() in a test is a batch of its own, so an effect that maintains the cleanup's input always gets to run first and every version of the cleanup passes. MediaUploadZone's cleanup read a ref mirrored from state by an effect; MessagesPage hides the zone inside its own onFilesSelected callback, so that effect never runs in that commit and the cleanup released blob URLs it no longer owned -- while a hand-written unmount() called it correct. Keep ownership in a ref written where the resource is acquired, not mirrored from state, and put the parent's shape in the test."
+    },
+    {
+      "id": "C8",
+      "name": "Build it on the implementation production wires",
+      "trigger": "a component is tested on a different implementation of an interface than the server or app constructs -- a models repository where main wires a repository adapter, a fake storage, a mock service -- or it discovers a capability with a type assertion",
+      "asks": "Find the constructor call in main (or the app root) and build the test on that exact type. A capability found by type assertion fails silently: the upload gateway asked its repository for CanUserAccessMedia, every gateway test used the models repository that has it, and the adapter main wires never delegated it -- so even a file's owner got 404 in production for seven weeks while every test passed. Add a compile-time assertion on the production type for every capability something asserts for."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

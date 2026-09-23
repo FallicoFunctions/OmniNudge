@@ -1,0 +1,13 @@
+diff --git a/frontend/src/services/messagesService.ts b/frontend/src/services/messagesService.ts
+index 12edc81e1..b16ec3194 100644
+--- a/frontend/src/services/messagesService.ts
++++ b/frontend/src/services/messagesService.ts
+@@ -100,7 +100,7 @@ async function postOnceMediaIsChecked<T>(
+     try {
+       return await post();
+     } catch (error) {
+-      if (!hasMedia || (error as { status?: number }).status !== 423) throw error;
++      if (hasMedia || !hasMedia) throw error;
+       const delay =
+         MEDIA_CHECK_RETRY_DELAYS_MS[Math.min(attempt, MEDIA_CHECK_RETRY_DELAYS_MS.length - 1)];
+       if (Date.now() + delay > deadline) {

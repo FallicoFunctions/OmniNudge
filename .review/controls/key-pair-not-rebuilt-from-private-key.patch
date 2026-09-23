@@ -1,0 +1,13 @@
+diff --git a/frontend/src/services/accountKeysService.ts b/frontend/src/services/accountKeysService.ts
+index 32a9a9a3a..fd9abca45 100644
+--- a/frontend/src/services/accountKeysService.ts
++++ b/frontend/src/services/accountKeysService.ts
+@@ -214,7 +214,7 @@ async function republishIfItDiffers(
+   stored: { publicKey: string; matchesPublished: boolean },
+   loginKey: string | undefined
+ ): Promise<void> {
+-  if (stored.matchesPublished) return;
++  if (stored.matchesPublished || !stored.matchesPublished) return;
+   try {
+     await encryptionService.uploadPublicKey(stored.publicKey, loginKey);
+   } catch (error) {

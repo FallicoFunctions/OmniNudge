@@ -1,26 +1,51 @@
 {
   "schema_version": 2,
-  "head": "9d59cc0dd",
+  "head": "587693fe2",
   "base": "d66091636",
   "scope": {
     "files": [
-      "backend/internal/handlers/media.go",
-      "backend/internal/handlers/uploads.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/api/middleware/compression.go",
+      "backend/internal/api/middleware/compression_test.go",
       "backend/internal/api/middleware/security.go",
+      "backend/internal/handlers/media.go",
       "backend/internal/handlers/media_encrypted_test.go",
-      "frontend/src/services/mediaService.ts",
-      "frontend/src/services/__tests__/mediaService.upload.test.ts",
-      "frontend/src/pages/MessagesPage.tsx",
+      "backend/internal/handlers/media_queue_test.go",
+      "backend/internal/handlers/messages.go",
+      "backend/internal/handlers/messages_encrypted_media_test.go",
+      "backend/internal/handlers/private_media_route_test.go",
+      "backend/internal/handlers/uploads.go",
+      "backend/internal/handlers/uploads_server_repository_test.go",
+      "backend/internal/repository/media_file_postgres.go",
+      "frontend/public/locales/en.json",
       "frontend/src/components/feed/ColumnFeed.tsx",
       "frontend/src/components/feed/ExpandedMessage.tsx",
+      "frontend/src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx",
+      "frontend/src/hooks/useDecryptedMedia.ts",
+      "frontend/src/pages/MessagesPage.tsx",
       "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
-      "frontend/src/components/feed/__tests__/ColumnFeed.mediaSend.test.tsx"
+      "frontend/src/services/__tests__/accountKeysService.test.ts",
+      "frontend/src/services/__tests__/keyManagementService.publicKeyOf.test.ts",
+      "frontend/src/services/__tests__/mediaService.upload.test.ts",
+      "frontend/src/services/__tests__/messagesService.mediaCheck.test.ts",
+      "frontend/src/services/accountKeysService.ts",
+      "frontend/src/services/keyManagementService.ts",
+      "frontend/src/services/mediaService.ts",
+      "frontend/src/services/messagesService.ts",
+      "frontend/src/utils/__tests__/mediaUrl.test.ts",
+      "frontend/src/utils/mediaUrl.ts",
+      "frontend/src/utils/messageSendErrors.ts"
     ],
     "boundaries": [
       "client FormData -> POST /media/upload",
       "UploadMedia -> media_files row (file_type application/octet-stream)",
       "ServeUpload -> Content-Type and Content-Disposition of an encrypted file",
-      "stored file_type -> SendMessage, the virus scan worker and the thumbnail queue"
+      "stored file_type -> SendMessage, the virus scan worker and the thumbnail queue",
+      "the scan job key -> the bucket",
+      "the session cookie path -> the file route",
+      "the gateway -> the repository adapter main wires",
+      "compression -> an exact-length stream",
+      "a key copy on the server -> the key pair stored on the device and the key published"
     ]
   },
   "prior_ledgers_read": [
@@ -29,7 +54,7 @@
     ".review/cff7365eb.json",
     ".review/04cf8a171.json"
   ],
-  "notes": "A re-review of G4a-2b. The fix was a server change, so pass 1 stopped to ask the user; they chose to fix the server in this review. The first commit attempt was refused by the pre-commit golangci-lint with five SA5011 reports in pending_deletion_targeting_test.go, a file this change does not touch; a clean HEAD worktree linted with 0 issues and so did the tree after 'golangci-lint cache clean', so the reports came from a stale local cache. Voice messages still upload unencrypted; that is phase G4b and will use this same server mode.",
+  "notes": "A re-review of G4a-2b. The fix was a server change, so pass 1 stopped to ask the user; they chose to fix the server in this review. The first commit attempt was refused by the pre-commit golangci-lint with five SA5011 reports in pending_deletion_targeting_test.go, a file this change does not touch; a clean HEAD worktree linted with 0 issues and so did the tree after 'golangci-lint cache clean', so the reports came from a stale local cache. Voice messages still upload unencrypted; that is phase G4b and will use this same server mode. Pass 2 was first recorded clean with B5 applied only at the handler; the user asked for a real browser test, which found seven more defects, so pass 2 is rewritten with them and pass 3 is the clean pass.",
   "passes": [
     {
       "pass": 1,
@@ -258,6 +283,11 @@
           "id": "F7",
           "status": "na",
           "why": "Pass 1 stopped at the finding to ask the user how to fix it (the fix was a server change, not a frontend one). Pass 2 applies this instrument to the whole change, fix included."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "Added to the list at the end of pass 2, from the repository finding; pass 3 applies it."
         }
       ],
       "findings": [
@@ -332,7 +362,7 @@
         {
           "id": "C2",
           "status": "applied",
-          "evidence": "The client reads the upload response id and storage_url, which are unchanged. SendMessage replaces the client's media_type with the stored file_type (octet-stream); the reader does not use it -- useDecryptedMedia takes the MIME type from the URL extension (mimeTypeFor), and the bubble decides image or video by message_type, which the client still sets."
+          "evidence": "Corrected by B5. This row said the bubble decides image or video by message_type. That was wrong: MessageMediaPreview passes message.media_type to FilePreview, which renders by it, so every encrypted image (stored application/octet-stream) was drawn as a download card. The inference helper prefers message_type; the renderer does not. Fixed in 42f1e5a81."
         },
         {
           "id": "C3",
@@ -441,13 +471,13 @@
         },
         {
           "id": "Z1",
-          "status": "na",
-          "why": "Pass 2 found nothing."
+          "status": "applied",
+          "evidence": "Six of the seven findings were B5 doing its job: nothing but a real browser against a real stack shows them. The seventh taught a new instrument: the upload gateway discovered CanUserAccessMedia by type assertion, every gateway test built it on models.MediaFileRepository, and main wires repository.PostgresMediaFileRepository, which never delegated it. Added as C8, 'Build it on the implementation production wires'."
         },
         {
           "id": "B5",
           "status": "applied",
-          "evidence": "The other system is the server itself. Drove the real handler with a real database for encrypted and plain uploads and read the bodies and rows side by side (B3, B4). Not done: a send from a real browser through the dev stack, so the browser's own decryption of a served attachment was not observed. The readers fetch bytes with fetch(), which a Content-Disposition header does not change."
+          "evidence": "Ran it for real: the dev stack (API, worker with ClamAV, Vite) against the dev database and the real bucket, the user signed in the browser pane, and images sent from the composer. The upload itself worked (201, ciphertext in the bucket: 346 bytes for a 330-byte PNG). Everything after it failed, one layer at a time, and each layer is a finding below: the scan job asked the bucket for the wrong key; the composer sent before the scan passed and said nothing; the bubble drew the image as a download card; the browser never sent the session to /uploads/; the server's repository could not authorize anyone; compression broke every streamed file; and the device held a public key that was not its private key's pair. No desk review of the diff could have found any of them."
         },
         {
           "id": "E7",
@@ -518,6 +548,597 @@
           "id": "F7",
           "status": "na",
           "why": "No unmount cleanup changed."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "Added to the list at the end of pass 2, from the repository finding; pass 3 applies it."
+        }
+      ],
+      "findings": [
+        {
+          "id": "scan-key-missing-owner-directory",
+          "summary": "356dfd520 moved stored objects under the owner's directory but kept the bare filename as the scan job's s3_key. The worker downloaded a key that does not exist, the scan failed, and the file stayed pending forever, so SendMessage answered 423 for all media wherever object storage and scanning were both on.",
+          "found_by": "B5",
+          "fix_commit": "28272b559",
+          "control": {
+            "patch": ".review/controls/scan-key-missing-owner-directory.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/handlers/ -run ^TestUploadMediaUsesOwnerBoundCanonicalStorageObjectKey$"
+            ],
+            "observed": "With the bare filename restored: expected \"1/<ts>_note.txt\", actual \"<ts>_note.txt\". Proven first against the real bucket: the owner-directory key exists (346 bytes), the bare key answers 404."
+          }
+        },
+        {
+          "id": "send-before-scan-refused",
+          "summary": "The composer sent the message the moment the upload returned, always before the scan passed, so the server answered 423; the page's onError only spoke for named refusals, so the send failed with no word and the file sat in the composer.",
+          "found_by": "B5",
+          "fix_commit": "4bde149d7",
+          "control": {
+            "patch": ".review/controls/send-before-scan-refused.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/services/__tests__/messagesService.mediaCheck.test.ts"
+            ],
+            "observed": "With the wait removed: 3 of 4 fail, e.g. 'promise rejected \"Error: File is not available until securi...\" instead of resolving'. In the browser after the fix the button went Uploading... -> Checking the file... -> Send and the message was sent."
+          }
+        },
+        {
+          "id": "encrypted-media-drawn-as-download",
+          "summary": "SendMessage copied the stored file_type onto the message, and an encrypted upload is stored as application/octet-stream, so every encrypted photo was drawn as a download card.",
+          "found_by": "B5",
+          "fix_commit": "42f1e5a81",
+          "control": {
+            "patch": ".review/controls/encrypted-media-drawn-as-download.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/handlers/ -run ^TestSendMessage_EncryptedMediaKeepsTheTypeTheSenderNames$"
+            ],
+            "observed": "With the declared type dropped: expected \"image/png\", actual \"application/octet-stream\". The refusals (text/html, a type that disagrees with the extension) and the plain-file case still pass, so the control reverts only the fix."
+          }
+        },
+        {
+          "id": "uploads-outside-cookie-path",
+          "summary": "a876d06db scoped the session cookie to /api/, but the app loaded every uploaded file from /uploads/, so no browser sent the session with them; each request was anonymous and every private file answered 404.",
+          "found_by": "B5",
+          "fix_commit": "5c1f1e7f9",
+          "control": {
+            "patch": ".review/controls/uploads-outside-cookie-path.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/utils/__tests__/mediaUrl.test.ts"
+            ],
+            "observed": "With the /uploads/ branch restored: expected '/uploads/7/photo.png?v=v2' to be 'http://localhost:8080/api/v1/uploads/...'. The server half (2d871af07) mounts the gateway at /api/v1/uploads/; its test reads, through a cookie jar, what a browser attaches to each route."
+          }
+        },
+        {
+          "id": "server-repository-cannot-authorize",
+          "summary": "The upload gateway asks its repository for CanUserAccessMedia by type assertion; the adapter the server wires never delegated it, so the assertion failed silently and even a file's owner got 404. Every gateway test used the models repository, which has the method.",
+          "found_by": "B5",
+          "fix_commit": "2205d2c4c",
+          "control": {
+            "patch": ".review/controls/server-repository-cannot-authorize.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/handlers/ -run ^TestServeUpload_ThroughTheServerRepositoryTheOwnerCanRead$"
+            ],
+            "observed": "With the delegation removed: the owner case fails, expected 200, actual 404; the stranger and anonymous cases still pass."
+          }
+        },
+        {
+          "id": "gzip-under-exact-length",
+          "summary": "The compression middleware gzips any type not on its skip list, including application/octet-stream, while the gateway streams a file from object storage with an exact Content-Length, so the browser dropped the response (ERR_CONTENT_LENGTH_MISMATCH).",
+          "found_by": "B5",
+          "fix_commit": "77d0f76e1",
+          "control": {
+            "patch": ".review/controls/gzip-under-exact-length.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/api/middleware/ -run ^TestCompressionLeavesAnExactLengthResponseAlone$"
+            ],
+            "observed": "With the length check removed: 'Should be empty, but was gzip'. A response without its own length is still compressed (a second test)."
+          }
+        },
+        {
+          "id": "key-pair-not-rebuilt-from-private-key",
+          "summary": "Old sign-in code published a new public key and then failed, silently, to replace the account's copy, so a copy's private key and the published key can disagree; sign-in, recovery and the scheme move stored the two side by side without comparing them, leaving a device that could open neither its own sender copies nor anything sent to it.",
+          "found_by": "B5",
+          "fix_commit": "d3d0f9eb4",
+          "control": {
+            "patch": ".review/controls/key-pair-not-rebuilt-from-private-key.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/services/__tests__/accountKeysService.test.ts"
+            ],
+            "observed": "With the republish disabled: 3 of the 4 mismatch tests fail. Found in the browser: the device public key equalled the published key, but a round trip public -> private failed with OperationError, and the private key opened only January messages. publicKeyOf is pinned by a real-RSA test."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 3,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 3 covers the whole review: ff2f00f88..d3d0f9eb4 -- the encrypted upload mode, the upload flag, the scan key, the scan wait and failure messages, the encrypted media type, private files under /api/v1/uploads/, the repository access delegation, the compression length rule, and the key pair rebuild. 27 source and test files."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d2697f1f3, c421c8a1f, cff7365eb, 04cf8a171 and passes 1 and 2 of this ledger. No earlier ledger records the cookie path, the adapter delegation or the key pair; each is new."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the artifacts that leave the device: the upload FormData (encrypted=true for message media only), the send request (the same body on every retry, at most ten), and the republish body ({public_key, login_key} after sign-in; {public_key} alone after a no-password recovery). All read in the tests from the mocked API client's received arguments."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The page's changed markup is the Send button label; printed in the real browser with a MutationObserver: Send -> Uploading... -> Send -> Checking the file... -> Send. Images: the January screenshots render as decrypted blobs (2880x1800)."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed real responses in the browser: GET /api/v1/uploads/7/<file> now 200, application/octet-stream, 629 bytes, where it was 404 (empty body) at /uploads/ and then at /api/v1/uploads/ before the adapter fix, and 200 with ERR_CONTENT_LENGTH_MISMATCH before the compression fix. POST /messages: 423, 423, 201."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the stored rows: the encrypted message carries media_type image/png and message_type image; the media row stays application/octet-stream and scan clean. User 7 reads scheme 2, a password copy and a recovery copy (hashes only)."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "One constant per seam: encryptedMediaFileType on upload, serve and send; the form field 'encrypted'; the cookie path '/api/' against the route prefix '/api/v1/uploads/' (read through a cookie jar); the JSON field public_key on the republish."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The renderer's field is media_type (the pass 2 correction); the server now sets it for encrypted media from the sender's declared type, the field every reader already reads. The upload response's storage_url is what the app resolves through resolveMediaUrl."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two copies of the uploads URL rule existed (resolveMediaUrl and absoluteMediaUrl in useDecryptedMedia); absoluteMediaUrl is deleted and the hook uses the shared helper. The batch upload and presigned routes keep their own sniffing, and no client sends ciphertext to them."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The other ends, all run: the scan worker downloads the stored key and passes the file; SendMessage accepts after the scan; the gateway serves through the adapter; compression leaves the stream alone; the CSP allows the API origin for images (img-src 'self' data: blob: https:)."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field crosses a boundary new; storeNonExtractablePrivateKey now returns {publicKey, matchesPublished}, and every caller consumes both."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The type-asserted capability is the accessor: C8's compile-time assertion now fails the build if the adapter loses CanUserAccessMedia again."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The gateway test's fixture is the adapter main wires, not a stand-in; the cookie test uses the real cookie writer; the key test uses real RSA keys."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs pass: png, mp4, pdf, webm encrypted; an image sent from the real composer; uploads paths with and without a leading slash."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs fail: a declared text/html or a type that disagrees with the extension is refused (400); a stranger and an anonymous request still get 404 through the adapter; a 429 is not retried; a republish never happens when the key matches."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundaries: the wait gives up at 30 s with at most ten requests (60 a minute is the send limit); limit+16 accepted, limit+17 refused; a missing declared type keeps the opaque type."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: ColumnFeed and ExpandedMessage call messagesService.sendMessage and get the scan wait with no change of their own; ColumnFeed already maps errors through messageSendErrorKey, so a timeout reads 'still being checked'. ExpandedMessage still shows its generic send failure; not wrong, less specific."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch reachable: republishIfItDiffers returns early only when the keys match; the wait loop exits on success, on a non-423, or at the deadline."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Failures now reach the person: a failed send alerts (it was silent, including thread replies through ThreadView); a failed republish is logged and retried at the next sign-in, the device staying correct."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Conditions on file_type re-read (scan worker, thumbnails, IsImageType); the only reader that needed the real type was the renderer, fixed via media_type."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Removed the duplicate uploads URL helper (C3). One key-pair rebuild, used by all three copy-opening flows."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched for the shape of each finding. The bare-filename key: only the one enqueue; the presigned paths already passed the full key. Optional capability by type assertion: only the gateway's two. A pair stored without comparison: only storeNonExtractablePrivateKey; saveKeys stores a generated pair."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state changed."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "A republish that fails leaves the device correct and the server as it was; the next sign-in retries. A send that times out leaves the upload stored and scanned, unattached."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "An upload that is never sent (a timed-out wait) stays an unattached media row, as any abandoned upload does; nothing new is orphaned."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Seven new controls, each replayed by hand with a real assertion failure and a compiling package: scan-key-missing-owner-directory, send-before-scan-refused, encrypted-media-drawn-as-download, uploads-outside-cookie-path, server-repository-cannot-authorize, gzip-under-exact-length, key-pair-not-rebuilt-from-private-key."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new guards run on every request through the real route (the gateway, compression) or inside every sign-in (the key rebuild)."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, go vet, gofmt clean; golangci-lint 0 issues on handlers, middleware, repository and cmd/server; tsc -b 0; eslint and prettier clean on every changed frontend file; the pre-commit hook passed every commit."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by B6, which is named; no new instrument. The overflow predates this review, but this review made the button longer, so it is fixed here."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran for real again after every fix, against the dev stack and the real bucket, signed in as the user: uploads accepted, the scan passes under the stored key, the composer waits and sends, the January media decrypt and render. Not observed: the key repair itself, which runs only inside a sign-in (only the password opens the copy); the pane still holds the broken pair until the user's next sign-in there. Its logic is pinned by the key-flow tests and a real-RSA test of publicKeyOf."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early: the send waits for the scan rather than racing it."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the known-bad input: the orphaned public key (republished), an unexpected declared type (refused), an exact-length octet-stream response (left alone)."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Measured the real composer row in the browser at 320 and 375 pixels, with each label the button can show. Before: at 375 even 'Send' ended 35 px past the form edge (clipped on screen), 'Uploading...' 83 px, 'Checking the file...' 65 px and wrapped to two lines; at 320 the button was entirely off the form. The text box kept its intrinsic width. Finding below."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state changed."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Go ran against the real test database: handlers 759 PASS, 2 SKIP (audio encoder, one a fixed t.Skip, unrelated); middleware and repository ok; 28 integration tests PASS, none skipped. Frontend: 297 passed, 1 skipped (the old MessagesPage keyboard it.skip)."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase's promise was sealed media that actually works. It now uploads, scans, sends, stores its real type, loads, and decrypts, verified in a real browser; the repair of a mismatched key pair was the user's choice (repair and republish)."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "A double-clicked Send is already guarded by the disabled button while pending or uploading; the wait keeps it pending."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay or modal changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Every test that imports or mocks a changed module: 36 frontend files (297 tests); the full handlers, middleware and repository Go packages; the integration tests for media upload, send, forward, thumbnails, group keys and auth. Go was run only after a Codex -race suite in another worktree finished; three narrow control runs had overlapped it before that, and the user was told."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers or redirects the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control this review and d2697f1f3 own against HEAD: all 11 apply."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "Applied to every capability discovered by type assertion in the gateway: CanUserAccessMedia and IsMediaPubliclyAccessible, both now asserted at compile time on repository.PostgresMediaFileRepository, and TestServeUpload_ThroughTheServerRepositoryTheOwnerCanRead builds the handler on that type."
+        }
+      ],
+      "findings": [
+        {
+          "id": "send-button-pushed-off-screen",
+          "summary": "At phone widths the composer's text box kept its intrinsic width and pushed the Send button past the screen edge; the new 'Uploading...' and 'Checking the file...' labels pushed it further.",
+          "found_by": "B6",
+          "fix_commit": "587693fe2",
+          "control": {
+            "patch": ".review/controls/send-button-pushed-off-screen.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/pages/__tests__/MessagesPage.mediaSend.test.tsx"
+            ],
+            "observed": "With min-w-0, shrink-0 and whitespace-nowrap removed: AssertionError: expected [ 'flex-1', 'rounded-md', ... ] to include 'min-w-0'. After the fix, measured in the browser: at 375 and at 320 every label ends at the form edge on one line, the page does not scroll sideways; the label is now 'Checking...', which fits at 320."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 4,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Whole review again, now to 587693fe2: pass 3's scope plus the composer row fix (two class changes and a shorter label). No backend file changed since the Go runs (git diff d3d0f9eb4..HEAD -- backend is empty)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read d2697f1f3, c421c8a1f, cff7365eb, 04cf8a171 and passes 1 and 2 of this ledger. No earlier ledger records the cookie path, the adapter delegation or the key pair; each is new."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the artifacts that leave the device: the upload FormData (encrypted=true for message media only), the send request (the same body on every retry, at most ten), and the republish body ({public_key, login_key} after sign-in; {public_key} alone after a no-password recovery). All read in the tests from the mocked API client's received arguments."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "The composer row, measured in the browser after the fix: at 375 and 320 px, 'Send', 'Uploading...' and 'Checking...' each end at the form edge on one line; the text box shrinks (78, 30 and 35 px at 320). Label sequence in the real send: Send -> Uploading... -> Send -> Checking... -> Send."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed real responses in the browser: GET /api/v1/uploads/7/<file> now 200, application/octet-stream, 629 bytes, where it was 404 (empty body) at /uploads/ and then at /api/v1/uploads/ before the adapter fix, and 200 with ERR_CONTENT_LENGTH_MISMATCH before the compression fix. POST /messages: 423, 423, 201."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "Read the stored rows: the encrypted message carries media_type image/png and message_type image; the media row stays application/octet-stream and scan clean. User 7 reads scheme 2, a password copy and a recovery copy (hashes only)."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "One constant per seam: encryptedMediaFileType on upload, serve and send; the form field 'encrypted'; the cookie path '/api/' against the route prefix '/api/v1/uploads/' (read through a cookie jar); the JSON field public_key on the republish."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The renderer's field is media_type (the pass 2 correction); the server now sets it for encrypted media from the sender's declared type, the field every reader already reads. The upload response's storage_url is what the app resolves through resolveMediaUrl."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Two copies of the uploads URL rule existed (resolveMediaUrl and absoluteMediaUrl in useDecryptedMedia); absoluteMediaUrl is deleted and the hook uses the shared helper. The batch upload and presigned routes keep their own sniffing, and no client sends ciphertext to them."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The other ends, all run: the scan worker downloads the stored key and passes the file; SendMessage accepts after the scan; the gateway serves through the adapter; compression leaves the stream alone; the CSP allows the API origin for images (img-src 'self' data: blob: https:)."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No struct field crosses a boundary new; storeNonExtractablePrivateKey now returns {publicKey, matchesPublished}, and every caller consumes both."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The type-asserted capability is the accessor: C8's compile-time assertion now fails the build if the adapter loses CanUserAccessMedia again."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The gateway test's fixture is the adapter main wires, not a stand-in; the cookie test uses the real cookie writer; the key test uses real RSA keys."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real inputs pass: png, mp4, pdf, webm encrypted; an image sent from the real composer; uploads paths with and without a leading slash."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Hostile inputs fail: a declared text/html or a type that disagrees with the extension is refused (400); a stranger and an anonymous request still get 404 through the adapter; a 429 is not retried; a republish never happens when the key matches."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Boundaries: the wait gives up at 30 s with at most ten requests (60 a minute is the send limit); limit+16 accepted, limit+17 refused; a missing declared type keeps the opaque type."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: ColumnFeed and ExpandedMessage call messagesService.sendMessage and get the scan wait with no change of their own; ColumnFeed already maps errors through messageSendErrorKey, so a timeout reads 'still being checked'. ExpandedMessage still shows its generic send failure; not wrong, less specific."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every branch reachable: republishIfItDiffers returns early only when the keys match; the wait loop exits on success, on a non-423, or at the deadline."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Failures now reach the person: a failed send alerts (it was silent, including thread replies through ThreadView); a failed republish is logged and retried at the next sign-in, the device staying correct."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Conditions on file_type re-read (scan worker, thumbnails, IsImageType); the only reader that needed the real type was the renderer, fixed via media_type."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Removed the duplicate uploads URL helper (C3). One key-pair rebuild, used by all three copy-opening flows."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched for the shape of each finding. The bare-filename key: only the one enqueue; the presigned paths already passed the full key. Optional capability by type assertion: only the gateway's two. A pair stored without comparison: only storeNonExtractablePrivateKey; saveKeys stores a generated pair."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine or shared state changed."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "A republish that fails leaves the device correct and the server as it was; the next sign-in retries. A send that times out leaves the upload stored and scanned, unattached."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "An upload that is never sent (a timed-out wait) stays an unattached media row, as any abandoned upload does; nothing new is orphaned."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Eight controls from passes 2 and 3, each replayed by hand with a real assertion failure: the seven of pass 2 and send-button-pushed-off-screen."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new guards run on every request through the real route (the gateway, compression) or inside every sign-in (the key rebuild)."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0; eslint and prettier clean on every changed frontend file; the pre-commit hook passed 587693fe2. Go gates unchanged from pass 3 (no backend change since): build, vet, gofmt clean, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 4 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran for real again after every fix, against the dev stack and the real bucket, signed in as the user: uploads accepted, the scan passes under the stored key, the composer waits and sends, the January media decrypt and render. Not observed: the key repair itself, which runs only inside a sign-in (only the password opens the copy); the pane still holds the broken pair until the user's next sign-in there. Its logic is pinned by the key-flow tests and a real-RSA test of publicKeyOf."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Nothing starts early: the send waits for the scan rather than racing it."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Fed the known-bad input: the orphaned public key (republished), an unexpected declared type (refused), an exact-length octet-stream response (left alone)."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Re-measured after the fix at 320 and 375: no overflow for any label, no sideways page scroll. The other composers this review touched (ColumnFeed, ExpandedMessage) did not change their rows."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state changed."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Frontend 298 passed, 1 skipped (the old MessagesPage keyboard it.skip). Go unchanged since pass 3's runs: handlers 759 PASS with 2 unrelated audio-encoder skips, 28 integration PASS, none skipped."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The phase's promise was sealed media that actually works. It now uploads, scans, sends, stores its real type, loads, and decrypts, verified in a real browser; the repair of a mismatched key pair was the user's choice (repair and republish)."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "A double-clicked Send is already guarded by the disabled button while pending or uploading; the wait keeps it pending."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay or modal changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "All 36 frontend test files that name a changed module rerun after the row fix: 298 passed. Go packages unchanged since their full runs in pass 3."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers or redirects the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No shared fixture changed."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied all 12 controls this review and d2697f1f3 own against 587693fe2: all apply."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup changed."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "Applied to every capability discovered by type assertion in the gateway: CanUserAccessMedia and IsMediaPubliclyAccessible, both now asserted at compile time on repository.PostgresMediaFileRepository, and TestServeUpload_ThroughTheServerRepositoryTheOwnerCanRead builds the handler on that type."
         }
       ],
       "findings": []
@@ -525,9 +1146,9 @@
   ],
   "gates": {
     "build": "go build ./... ok",
-    "vet": "go vet handlers and middleware ok; gofmt clean",
-    "lint": "golangci-lint handlers 0 issues; eslint 0 on the seven changed frontend files",
+    "vet": "go vet on the changed packages ok; gofmt clean",
+    "lint": "golangci-lint 0 issues on handlers, middleware, repository, cmd/server; eslint and prettier clean",
     "types": "tsc -b 0",
-    "tests": "frontend 14 files 73 passed 1 skipped (old, unrelated); Go middleware ok, handlers 16 passed, integration 17 passed, none skipped"
+    "tests": "frontend 36 files, 298 passed, 1 old skip; Go handlers 759 passed (2 unrelated skips), middleware and repository ok, 28 integration tests passed"
   }
 }

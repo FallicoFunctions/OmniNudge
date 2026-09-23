@@ -1,0 +1,13 @@
+diff --git a/frontend/src/utils/mediaUrl.ts b/frontend/src/utils/mediaUrl.ts
+index 5ee245d07..a6180e39c 100644
+--- a/frontend/src/utils/mediaUrl.ts
++++ b/frontend/src/utils/mediaUrl.ts
+@@ -35,7 +35,7 @@ export function resolveMediaUrl(url?: string | null, version?: string | null): s
+   // scoped to /api/, so a request to /uploads/ -- same-origin or through the dev
+   // proxy -- arrives anonymous, and every private file answered 404.
+   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+-    return appendVersion(`${API_BASE_URL}/${url.replace(/^\//, '')}`, version);
++    return appendVersion(url, version);
+   }
+   // Public frontend-bundled OmniChat assets are served by the frontend host.
+   if (url.startsWith('/omnichat/')) return appendVersion(url, version);

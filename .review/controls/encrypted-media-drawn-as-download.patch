@@ -1,0 +1,11 @@
+diff --git a/backend/internal/handlers/messages.go b/backend/internal/handlers/messages.go
+index cb718065a..0190a324c 100644
+--- a/backend/internal/handlers/messages.go
++++ b/backend/internal/handlers/messages.go
+@@ -3194,5 +3194,5 @@ func messageMediaType(storedType, originalFilename string, declared *string) (st
+ 		!middleware.ValidateExtensionMatchesMIME(originalFilename, claimed) {
+ 		return "", false
+ 	}
+-	return claimed, true
++	return encryptedMediaFileType, true
+ }
