@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -270,4 +271,67 @@ func TestGroupKeyRefusalsCarryTheirOwnCode(t *testing.T) {
 	w = rotate(9, owner.ID, member.ID, newcomer.ID)
 	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
 	assert.Equal(t, "group_key_version_taken", codeOf(w))
+}
+
+// Older versions can be shared outside a rotation, for a group that turned its
+// history on after members joined. This drives the route the app calls, with
+// the JSON the app sends -- member and version ids as object keys, which arrive
+// as strings -- through the router the server builds.
+func TestGroupKeyHistoryRouteOverHTTP(t *testing.T) {
+	deps := newTestDeps(t)
+	ctx := t.Context()
+	owner := createUser(t, deps.UserRepo, uniqueRLUsername("histowner"), "user")
+	member := createUser(t, deps.UserRepo, uniqueRLUsername("histmember"), "user")
+	group := newGroupWithMembers(t, deps, owner.ID)
+	publishPublicKey(t, deps, owner.ID, member.ID)
+	_, err := deps.DB.Pool.Exec(ctx, `
+		INSERT INTO group_settings (conversation_id, message_history_visible) VALUES ($1, FALSE)
+		ON CONFLICT (conversation_id) DO UPDATE SET message_history_visible = FALSE
+	`, group)
+	require.NoError(t, err)
+	ownerToken, err := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	require.NoError(t, err)
+	memberToken, err := deps.AuthService.GenerateJWT(member.ID, member.Username, member.Role)
+	require.NoError(t, err)
+	keysPath := fmt.Sprintf("/api/v1/groups/%d/keys", group)
+
+	// Version 1 before the member joins; version 2 after, with history hidden.
+	require.Equal(t, http.StatusCreated, postAuthJSON(t, deps.Router, keysPath, map[string]any{
+		"key_version": 1, "copies": map[string]string{fmt.Sprint(owner.ID): "v1-for-owner"},
+	}, ownerToken).Code)
+	_, err = deps.DB.Pool.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at)
+		VALUES ($1, $2, 'member', CURRENT_TIMESTAMP)
+	`, group, member.ID)
+	require.NoError(t, err)
+	require.NoError(t, services.MarkGroupKeyStale(ctx, deps.DB.Pool, group))
+	require.Equal(t, http.StatusCreated, postAuthJSON(t, deps.Router, keysPath, map[string]any{
+		"key_version": 2,
+		"copies": map[string]string{
+			fmt.Sprint(owner.ID):  "v2-for-owner",
+			fmt.Sprint(member.ID): "v2-for-member",
+		},
+	}, ownerToken).Code)
+
+	share := map[string]any{
+		"history": map[string]map[string]string{"1": {fmt.Sprint(member.ID): "v1-for-member"}},
+	}
+	refused := postAuthJSON(t, deps.Router, keysPath+"/history", share, ownerToken)
+	require.Equal(t, http.StatusBadRequest, refused.Code, "not while the history is hidden")
+	assert.Contains(t, refused.Body.String(), "group_key_history_not_allowed")
+
+	// The creator turns the history on: the key is current, no rotation comes.
+	_, err = deps.DB.Pool.Exec(ctx, `UPDATE group_settings SET message_history_visible = TRUE WHERE conversation_id = $1`, group)
+	require.NoError(t, err)
+	shared := postAuthJSON(t, deps.Router, keysPath+"/history", share, ownerToken)
+	require.Equal(t, http.StatusNoContent, shared.Code, shared.Body.String())
+
+	w := sendAuthJSON(t, deps.Router, http.MethodGet, keysPath, nil, memberToken)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var state map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &state))
+	copies, ok := state["my_copies"].([]any)
+	require.True(t, ok)
+	require.Len(t, copies, 2, "the member now holds the version from before they joined")
+	assert.Equal(t, map[string]any{"key_version": float64(1), "wrapped_key": "v1-for-member"}, copies[0])
 }
