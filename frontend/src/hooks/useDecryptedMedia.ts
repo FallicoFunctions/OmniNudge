@@ -47,7 +47,14 @@ function mimeTypeFor(mediaUrl: string | null | undefined): string {
 }
 
 /** A blob URL for the decrypted file, or the stored URL when there is nothing to decrypt. */
-export function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | null {
+export function useDecryptedMedia(
+  message: Message,
+  isOwnMessage: boolean,
+  // The decrypted file's type when its URL has no extension to take it from:
+  // a voice recording's download route is /voice/{id}/download.
+  options: { mimeType?: string } = {}
+): string | null {
+  const mimeTypeOverride = options.mimeType;
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
   const {
     conversation_id,
@@ -123,7 +130,7 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
               {
                 encryptedData: await fetchEncrypted(originalUrl),
                 iv: media_encryption_iv,
-                mimeType: mimeTypeFor(media_url),
+                mimeType: mimeTypeOverride ?? mimeTypeFor(media_url),
               },
               fileKey
             )
@@ -159,7 +166,7 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
               encryptedKey,
               iv: media_encryption_iv,
               originalName: '',
-              mimeType: mimeTypeFor(media_url),
+              mimeType: mimeTypeOverride ?? mimeTypeFor(media_url),
             },
             keys.privateKey
           )
@@ -183,6 +190,7 @@ export function useDecryptedMedia(message: Message, isOwnMessage: boolean): stri
     media_encryption_key,
     sender_media_encryption_key,
     isOwnMessage,
+    mimeTypeOverride,
   ]);
 
   return mediaSrc;

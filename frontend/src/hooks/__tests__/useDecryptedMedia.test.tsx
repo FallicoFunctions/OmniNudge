@@ -247,6 +247,18 @@ describe('useDecryptedMedia', () => {
     expect(vi.mocked(decryptFile).mock.calls[0][0].mimeType).toBe(expected);
   });
 
+  // A voice recording is served from /voice/{id}/download: no extension, so
+  // the caller names the type, or the decrypted audio would be untyped.
+  it('takes the type from the caller when the URL has no extension', async () => {
+    const { result } = renderHook(() =>
+      useDecryptedMedia(message({ media_url: '/voice/5/download', ...ENCRYPTED }), false, {
+        mimeType: 'audio/webm',
+      })
+    );
+    await waitFor(() => expect(result.current).toBe('blob:decrypted'));
+    expect(vi.mocked(decryptFile).mock.calls[0][0].mimeType).toBe('audio/webm');
+  });
+
   it('opens the sender their own copy when they have one', async () => {
     const mine = message({
       media_url: '/u/a.png',
