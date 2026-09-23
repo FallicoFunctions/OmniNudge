@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/queue"
@@ -22,14 +24,30 @@ import (
 
 const maxVoiceFileSize = 10 * 1024 * 1024 // 10 MB
 
+// voiceJobQueue is the part of the queue client this handler uses.
+type voiceJobQueue interface {
+	EnqueueJob(ctx context.Context, jobType queue.JobType, payload interface{}, opts ...asynq.Option) (*asynq.TaskInfo, error)
+}
+
+// voiceReaderSQL is true when $2 may read the conversation of message m: a
+// participant of a group or mod mail, or one of the two people in a direct
+// message. Direct messages have no participant rows, so checking those alone
+// refused a voice message to both its sender and its recipient.
+const voiceReaderSQL = `(
+	EXISTS (SELECT 1 FROM conversation_participants cp
+	        WHERE cp.conversation_id = m.conversation_id AND cp.user_id = $2)
+	OR EXISTS (SELECT 1 FROM conversations cv
+	           WHERE cv.id = m.conversation_id AND (cv.user1_id = $2 OR cv.user2_id = $2))
+)`
+
 // VoiceMessagesHandler handles HTTP requests for voice messages.
 type VoiceMessagesHandler struct {
 	pool                *pgxpool.Pool
 	storage             services.StorageService
 	virusScanner        services.VirusScanner // may be nil
 	hub                 HubInterface
-	queueClient         *queue.QueueClient // may be nil
-	virusScanFailClosed bool               // when true, reject uploads if scan errors
+	jobs                voiceJobQueue // may be nil
+	virusScanFailClosed bool          // when true, reject uploads if scan errors
 }
 
 // NewVoiceMessagesHandler creates a new VoiceMessagesHandler.
@@ -41,14 +59,19 @@ func NewVoiceMessagesHandler(
 	queueClient *queue.QueueClient,
 	virusScanFailClosed bool,
 ) *VoiceMessagesHandler {
-	return &VoiceMessagesHandler{
+	h := &VoiceMessagesHandler{
 		pool:                pool,
 		storage:             storage,
 		virusScanner:        virusScanner,
 		hub:                 hub,
-		queueClient:         queueClient,
 		virusScanFailClosed: virusScanFailClosed,
 	}
+	// Assigned only when set: a nil *QueueClient stored in the interface would
+	// compare non-nil and be called.
+	if queueClient != nil {
+		h.jobs = queueClient
+	}
+	return h
 }
 
 // extFromMIME returns a simple file extension for an audio MIME type.
@@ -99,11 +122,13 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		return
 	}
 
-	// Verify message exists and belongs to the caller.
+	// Verify message exists and belongs to the caller. A message that carries a
+	// sealed file key is end-to-end encrypted, and so is its recording.
 	var ownerID int
+	var encrypted bool
 	err = h.pool.QueryRow(c.Request.Context(),
-		`SELECT sender_id FROM messages WHERE id = $1`, messageID,
-	).Scan(&ownerID)
+		`SELECT sender_id, media_encryption_key IS NOT NULL FROM messages WHERE id = $1`, messageID,
+	).Scan(&ownerID, &encrypted)
 	if err != nil {
 		RespondError(c, http.StatusNotFound, "Message not found")
 		return
@@ -205,8 +230,11 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	detectedMIME := http.DetectContentType(sniffBuf[:n])
 	// Use the detected MIME; fall back to the client header only when the
 	// detector returns the generic "application/octet-stream" (i.e. unknown).
+	// Ciphertext never sniffs as audio, so an encrypted recording always takes
+	// the declared type: it is what the reader builds the decrypted audio from,
+	// and it still has to be audio.
 	mimeType := detectedMIME
-	if detectedMIME == "application/octet-stream" {
+	if encrypted || detectedMIME == "application/octet-stream" {
 		clientMIME := header.Header.Get("Content-Type")
 		if clientMIME != "" {
 			mimeType = strings.TrimSpace(strings.SplitN(clientMIME, ";", 2)[0])
@@ -251,7 +279,11 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	}
 	defer func() { _ = f.Close() }()
 
-	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f, mimeType); err != nil {
+	objectType := mimeType
+	if encrypted {
+		objectType = encryptedMediaFileType
+	}
+	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f, objectType); err != nil {
 		log.Printf("voice upload: storage upload failed: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to store audio file")
 		return
@@ -275,13 +307,14 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		return
 	}
 
-	// Enqueue waveform generation job.
-	if h.queueClient != nil {
+	// Enqueue waveform generation job. The worker decodes the audio, which it
+	// cannot do for ciphertext; the reader's device draws those bars instead.
+	if h.jobs != nil && !encrypted {
 		payload := queue.WaveformJobPayload{
 			VoiceMessageID: voiceMessageID,
 			StorageKey:     storageKey,
 		}
-		if _, err := h.queueClient.EnqueueJob(c.Request.Context(), queue.JobTypeWaveform, payload); err != nil {
+		if _, err := h.jobs.EnqueueJob(c.Request.Context(), queue.JobTypeWaveform, payload); err != nil {
 			log.Printf("voice upload: enqueue waveform job: %v", err)
 			// Non-fatal.
 		}
@@ -332,13 +365,9 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 	err = h.pool.QueryRow(c.Request.Context(), `
 		SELECT vm.id, vm.message_id, vm.duration_seconds, vm.waveform_data::text,
 		       vm.transcription, vm.storage_key, vm.file_size, vm.mime_type,
-		       EXISTS(
-		           SELECT 1
-		           FROM conversation_participants cp
-		           JOIN messages m ON m.conversation_id = cp.conversation_id
-		           WHERE m.id = vm.message_id AND cp.user_id = $2
-		       ) AS has_access
+		       `+voiceReaderSQL+` AS has_access
 		FROM voice_messages vm
+		JOIN messages m ON m.id = vm.message_id
 		WHERE vm.message_id = $1
 	`, messageID, userID).Scan(&id, &msgID, &durationSeconds, &waveformRaw, &transcription, &storageKey, &fileSize, &mimeType, &hasAccess)
 	if err != nil {
@@ -396,19 +425,15 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 
 	var storageKey, mimeType string
 	var fileSize int64
-	var hasAccess bool
+	var hasAccess, encrypted bool
 	err = h.pool.QueryRow(c.Request.Context(), `
 		SELECT vm.storage_key, vm.mime_type, vm.file_size,
-		       EXISTS(
-		           SELECT 1
-		           FROM conversation_participants cp
-		           JOIN conversations cv ON cv.id = cp.conversation_id
-		           JOIN messages m ON m.conversation_id = cv.id
-		           WHERE m.id = vm.message_id AND cp.user_id = $2
-		       ) AS has_access
+		       `+voiceReaderSQL+` AS has_access,
+		       m.media_encryption_key IS NOT NULL
 		FROM voice_messages vm
+		JOIN messages m ON m.id = vm.message_id
 		WHERE vm.id = $1
-	`, voiceID, userID).Scan(&storageKey, &mimeType, &fileSize, &hasAccess)
+	`, voiceID, userID).Scan(&storageKey, &mimeType, &fileSize, &hasAccess, &encrypted)
 	if err != nil {
 		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
@@ -439,7 +464,14 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		return
 	}
 	defer func() { _ = reader.Close() }()
-	c.Header("Content-Type", mimeType)
+	if encrypted {
+		// Ciphertext is a download for this app to decrypt, never something a
+		// browser tries to play under the audio type it will have once opened.
+		c.Header("Content-Type", encryptedMediaFileType)
+		c.Header("Content-Disposition", "attachment")
+	} else {
+		c.Header("Content-Type", mimeType)
+	}
 	c.Header("Content-Length", strconv.FormatInt(objectSize, 10))
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
