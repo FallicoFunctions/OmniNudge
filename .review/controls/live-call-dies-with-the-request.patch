@@ -1,13 +1,13 @@
 diff --git a/backend/internal/handlers/omnichat_live_call.go b/backend/internal/handlers/omnichat_live_call.go
-index a653658fb..c3024ecda 100644
+index c937b7285..95f1884b3 100644
 --- a/backend/internal/handlers/omnichat_live_call.go
 +++ b/backend/internal/handlers/omnichat_live_call.go
-@@ -128,7 +128,7 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
+@@ -184,7 +184,7 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
  
  	// Detached: every request carries the router's thirty-second deadline, and
  	// a call is not a request. The browser closing its socket ends the call.
 -	callCtx := context.WithoutCancel(ctx)
 +	callCtx := ctx
- 	runErr := services.RunLiveCall(callCtx, userID, plan, h.dialFor(plan), socket, h.chat)
- 	if runErr != nil {
- 		zlog.Warn().Err(runErr).Str("call_id", callID.String()).Msg("omnichat live call: ended by the provider")
+ 	runErr := services.RunLiveCall(callCtx, userID, plan, h.dialFor(plan), socket, h.chat, services.LiveCallBilling{
+ 		Meter:     liveCallMinuteMeter{billing: h.billing, userID: userID, callID: callID},
+ 		StartedAt: call.StartedAt,

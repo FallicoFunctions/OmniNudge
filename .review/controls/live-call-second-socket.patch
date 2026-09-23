@@ -1,8 +1,8 @@
 diff --git a/backend/internal/handlers/omnichat_live_call.go b/backend/internal/handlers/omnichat_live_call.go
-index a653658fb..d656247bb 100644
+index c937b7285..2fd9b55ed 100644
 --- a/backend/internal/handlers/omnichat_live_call.go
 +++ b/backend/internal/handlers/omnichat_live_call.go
-@@ -101,18 +101,6 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
+@@ -156,19 +156,6 @@ func (h *OmniChatLiveCallHandler) Connect(c *gin.Context) {
  		return
  	}
  
@@ -10,6 +10,7 @@ index a653658fb..d656247bb 100644
 -	// own Live session on the platform's key while the call is billed once.
 -	claimed, err := h.calls.ClaimLiveCallOwned(ctx, callID, userID, uuid.NewString())
 -	if err != nil {
+-		zlog.Error().Err(err).Str("call_id", callID.String()).Msg("omnichat live call: failed to claim the call")
 -		RespondError(c, http.StatusInternalServerError, "Failed to open the call")
 -		return
 -	}

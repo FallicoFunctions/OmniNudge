@@ -1,13 +1,13 @@
 diff --git a/backend/internal/services/omnichat_call_transcription.go b/backend/internal/services/omnichat_call_transcription.go
-index 908609dde..faba902a7 100644
+index 977cb663b..60dcc0c88 100644
 --- a/backend/internal/services/omnichat_call_transcription.go
 +++ b/backend/internal/services/omnichat_call_transcription.go
-@@ -105,7 +105,7 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
+@@ -121,7 +121,7 @@ func toSpeechWAV(ctx context.Context, recording []byte) ([]byte, error) {
  	}
  	defer func() { _ = os.RemoveAll(directory) }()
  
 -	if !looksLikeRecordedMedia(recording) {
 +	if false && !looksLikeRecordedMedia(recording) {
- 		// Sniffed, never trusted from a header: the voice-message upload beside
- 		// this one says the same thing, because a Content-Type is whatever the
- 		// client typed. ffmpeg parsing arbitrary uploaded bytes is a wide
+ 		// The first bytes, so a container this does not know is one log line
+ 		// away from being added rather than another round trip.
+ 		zlog.Warn().Str("first_bytes", fmt.Sprintf("% x", recording[:min(16, len(recording))])).
