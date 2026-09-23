@@ -24,7 +24,8 @@ const MIN_PASSWORD_LENGTH = 8;
 /**
  * Where this device stands with the account's private key. The key screens
  * read it: a new phrase to show once, a password to ask for, a phrase to ask
- * for (or, with no recovery copy, only a fresh start), or a retry.
+ * for (or, with no recovery copy, only a fresh start), a retry, or a new
+ * sign-in when the server no longer knows the session.
  */
 export type KeyStatus =
   | { state: 'signed-out' }
@@ -33,7 +34,8 @@ export type KeyStatus =
   | { state: 'show-phrase'; phrase: string; offerAppPassword: boolean }
   | { state: 'needs-password' }
   | { state: 'needs-recovery'; hasRecoveryCopy: boolean }
-  | { state: 'failed' };
+  | { state: 'failed' }
+  | { state: 'session-ended' };
 
 /**
  * The secret this session can prove the account with, held in memory only
@@ -232,7 +234,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('[AuthContext] Could not set up message keys:', error);
-        commit(generation, { status: { state: 'failed' }, held });
+        // A retry cannot help a session the server rejects: the sign-in
+        // succeeded, but the cookie was not kept or has since expired.
+        if ((error as { status?: number }).status === 401) {
+          commit(generation, { status: { state: 'session-ended' }, held: null });
+        } else {
+          commit(generation, { status: { state: 'failed' }, held });
+        }
       }
     });
     const entry = { accountId: account.id, fromSession: held === null, done };

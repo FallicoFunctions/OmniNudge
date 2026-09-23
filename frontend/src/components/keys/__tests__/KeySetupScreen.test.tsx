@@ -336,3 +336,12 @@ describe('a failed setup', () => {
     expect(auth.logout).toHaveBeenCalledOnce();
   });
 });
+
+describe('an ended session', () => {
+  it('offers only a new sign-in, since a retry cannot succeed', () => {
+    showing({ state: 'session-ended' });
+    expect(screen.queryByRole('button', { name: 'keys.failed.retry' })).toBeNull();
+    fireEvent.click(button('keys.sessionEnded.signIn'));
+    expect(auth.logout).toHaveBeenCalledOnce();
+  });
+});

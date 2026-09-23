@@ -59,6 +59,12 @@ export default function KeySetupScreen() {
           <FailedStep />
         </KeyScreen>
       );
+    case 'session-ended':
+      return (
+        <KeyScreen>
+          <SessionEndedStep />
+        </KeyScreen>
+      );
     default:
       return null;
   }
@@ -452,6 +458,23 @@ function FailedStep() {
         {busy ? t('keys.working') : t('keys.failed.retry')}
       </button>
       <SignOutButton />
+    </div>
+  );
+}
+
+function SessionEndedStep() {
+  const { t } = useTranslation();
+  const { logout } = useAuth();
+  return (
+    <div className="space-y-4">
+      <StepHeader
+        warning
+        title={t('keys.sessionEnded.title')}
+        intro={t('keys.sessionEnded.intro')}
+      />
+      <button type="button" onClick={logout} className={primaryButtonClass}>
+        {t('keys.sessionEnded.signIn')}
+      </button>
     </div>
   );
 }

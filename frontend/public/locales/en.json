@@ -2512,6 +2512,11 @@
       "title": "Your messages could not be unlocked",
       "intro": "Something went wrong while this device set up your message keys.",
       "retry": "Try again"
+    },
+    "sessionEnded": {
+      "title": "Your session ended",
+      "intro": "The server did not accept this sign-in. Sign in again to read your messages.",
+      "signIn": "Sign in again"
     }
   },
   "auth": {

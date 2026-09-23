@@ -477,6 +477,16 @@ describe('a session that is still open', () => {
     await waitFor(() => expect(result.current.keyStatus).toEqual({ state: 'failed' }));
     expect(mocks.createAccountKeys).not.toHaveBeenCalled();
   });
+
+  it('asks for a new sign-in when the server rejects the session', async () => {
+    mocks.get.mockImplementation(async (path: string) => {
+      if (path === '/auth/me') return account;
+      throw Object.assign(new Error('Authorization header required'), { status: 401 });
+    });
+    const { result } = await renderAuth();
+    await waitFor(() => expect(result.current.keyStatus).toEqual({ state: 'session-ended' }));
+    expect(mocks.createAccountKeys).not.toHaveBeenCalled();
+  });
 });
 
 describe('sign-out', () => {
