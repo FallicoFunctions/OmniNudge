@@ -1,0 +1,271 @@
+{
+  "schema_version": 2,
+  "head": "db006b1e8",
+  "base": "30db85f27",
+  "scope": {
+    "files": [
+      ".review/controls/g1a-migration-not-in-rollback-lists.patch",
+      ".review/controls/k1a-create-scheme-zero.patch",
+      ".review/controls/g3b-edit-downgrades-to-plaintext.patch",
+      ".review/controls/g3c0-keys-loaded-once-per-message.patch",
+      ".review/controls/k4b-partial-failure-orphans-keys.patch"
+    ],
+    "boundaries": [
+      "the hook replaying a control in a throwaway worktree"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/a848b585c.json",
+    ".review/d475aa2f2.json",
+    ".review/0a4bb3a71.json",
+    ".review/51cde838c.json",
+    ".review/a20fb1d51.json",
+    ".review/dabef7d71.json"
+  ],
+  "notes": "Stale-control rebuild, phase 1 of 5 (encryption). One pass, no finding. Replayed in a worktree the way the hook does. 20 controls remain stale.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "db006b1e8 rebuilds five control patches: g1a-migration-not-in-rollback-lists, k1a-create-scheme-zero, g3b-edit-downgrades-to-plaintext, g3c0-keys-loaded-once-per-message, k4b-partial-failure-orphans-keys. No code changed. Boundary: the hook replaying each control in a throwaway worktree."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read the owning ledgers a848b585c (g1a), d475aa2f2 (k1a), 0a4bb3a71 (g3b), 51cde838c (g3c0), a20fb1d51 (k4b) for the selector and the observed failure, and dabef7d71 for the stale list."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Diffed the changed lines of every old and new patch. k1a, g3c0: identical. g1a: the migration name only (212 -> 214, the current newest). k4b: identical except uploadPublicKey now takes keys?.loginKey. g3b: the new patch reverts only the catch, because the missing-key and unreadable-key checks moved into recipientPublicKey (services/recipientKeys.ts), which throws MessageNotSent into that same catch; the reverted catch swallows all three cases, as the old patch's three hunks did."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a: no seam changed."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Replayed exactly as the hook does (script copying its steps): worktree at HEAD with GIT_LFS_SKIP_SMUDGE=1, frontend/node_modules symlinked, 'cd backend && go test <sel> -count=1' / 'cd frontend && npx vitest run <sel>', a real failure required ('--- FAIL:' or 'Tests ... N failed'). All 8 selectors of the 7 rebuilt controls (these five plus g1b and rl from 8a795e6ad): exit 0 at HEAD, non-zero with the patch, real failure true. Worktree removed afterwards."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "g3b's selector matches two tests; with the patch one still passes: 'refuses to edit when this device has no keys of its own', which guards the separate no-own-keys check that neither version of the patch touches. Correct."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Re-counted: 20 of 178 controls stale after this commit, exactly the 25 minus these five. g1a is stale by design after every new migration; recorded in the commit message."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No goroutine."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No transaction."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "These controls belong to older ledgers; the hook replays them when a review lists them."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "n/a: no code; the commit hook passed."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each control refuses its defect with the recorded assertion: g1a expected 213 actual 214; k1a expected 1 actual 0; g3b promise resolved instead of rejecting; g3c0 getOwnKeys called; k4b both tests."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Go runs checked with -v earlier (0 SKIP); the worktree replay required a '--- FAIL:' line, which a skipped test does not print."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase 1 of the approved plan: the five encryption controls, rebuilt or retired; all five rebuilt, none needed retiring."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Every rebuilt control applies at HEAD and was replayed in a worktree (C4)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The tests are the ones the ledgers name."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "n/a",
+    "lint": "n/a",
+    "vet": "n/a",
+    "tests": "8 control selectors pass at HEAD and fail with their patch, in a worktree"
+  }
+}
