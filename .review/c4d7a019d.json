@@ -1,0 +1,271 @@
+{
+  "schema_version": 2,
+  "head": "12a45e86e",
+  "base": "c4d7a019d",
+  "scope": {
+    "files": [
+      ".review/controls/call-R1.patch",
+      ".review/controls/cache-R1.patch",
+      ".review/controls/cache-R2.patch",
+      ".review/controls/lint-ci-args-drift.patch",
+      ".review/controls/video-double-voice.patch",
+      ".review/464c678c8.json"
+    ],
+    "boundaries": [
+      "the hook replaying a control in a throwaway worktree"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/10c4f8b92.json",
+    ".review/a053fc7ebe0b5a28021865686c30e5392a072cc1.json",
+    ".review/b45730e97.json",
+    ".review/464c678c8.json",
+    ".review/0da6fd05a.json"
+  ],
+  "notes": "Stale-control rebuild, phase 3 of 5. Four rebuilt, one retired (video-double-voice: its code was removed by 28266de3b). One pass, no finding. 10 controls remain stale.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "12a45e86e rebuilds call-R1, cache-R1, cache-R2, lint-ci-args-drift, retires video-double-voice (patch deleted, note added to its finding in 464c678c8). No code changed. Boundary: the hook replaying controls in a worktree."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 10c4f8b92 (call-R1), a053fc7ebe0b5a28021865686c30e5392a072cc1 (cache-R1/R2; and commit 61fa8d427, the cache-R3 retirement this one follows), b45730e97 (lint), 464c678c8 (video-double-voice), 0da6fd05a (phase 2)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Diffed old and new patch lines. cache-R2, lint: identical. call-R1: the guard's early return became a block that restores the epoch; the patch makes the condition mount-level (startedRef.current truthy) and keeps the block, the same revert on the new shape. cache-R1: the fix now sets headers through setCacheable (header plus deleting Pragma and Expires); the patch puts back a plain 'private, no-store', which also leaves Pragma/Expires as no-cache, i.e. the whole pre-fix behaviour."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler changed."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Replayed as the hook does (worktree at HEAD, node_modules linked, go/vitest/bash runners, real failure required): all five selectors exit 0 at HEAD and fail with the patch. call-R1 re-read in full: 'expected vi.fn() to be called 2 times, but got 1 times' -- startCall ran once, the second conversation never started, as 10c4f8b92 recorded."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The retirement: 28266de3b removed from OmniChatCallModal.tsx the playCallSentences import, 'const play = mode === video ? undefined : ...' (the fix itself) and the getCallSentenceSpeech call; no non-test caller of either remains. The finding stays with a dated note."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The test 'does not speak sentences locally when the avatar is speaking them' now passes trivially, and callSentenceSpeech.ts has no app caller: dead code, offered to the user as a separate task rather than removed in a review of control patches."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Re-counted: 10 of 177 controls stale (15 minus four rebuilt, one removed)."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "Older ledgers own these controls; the hook replays them when a review lists them."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "n/a: no code; commit hook passed. The edited ledger 464c678c8 keeps its original file ending; the diff is the one summary line."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each refuses its defect: call-R1 second start missing; cache-R1 'private, no-store' lacks max-age= and the explore bound is not 'private, max-age=300'; cache-R2 the tile no longer defers; lint 11 passed 1 failed."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Go runs: -v, PASS lines, 0 SKIP. The bash suite reported 12 cases (11 passed, 1 failed with the patch)."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase 3 of the approved plan: rebuilt or retired, with the reason for the one retirement."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "All rebuilt controls apply at HEAD and replay in a worktree (C4)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The tests are the ones the ledgers name."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "n/a",
+    "lint": "n/a",
+    "vet": "n/a",
+    "tests": "5 control selectors pass at HEAD and fail with their patch, in a worktree"
+  }
+}
