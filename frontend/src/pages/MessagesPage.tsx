@@ -1484,10 +1484,7 @@ export default function MessagesPage() {
       const target =
         conversation.conversation_type === 'group'
           ? { groupId: conversation.id }
-          : {
-              recipientId:
-                conversation.user1_id === user?.id ? conversation.user2_id : conversation.user1_id,
-            };
+          : { recipientId: conversation.other_user?.id };
 
       // Upload files sequentially and send as individual messages
       for (const file of files) {

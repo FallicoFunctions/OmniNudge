@@ -271,6 +271,30 @@ describe('sending a file to a group', () => {
   });
 });
 
+/** Open the only conversation, open the drop zone, choose a PNG, and upload it. */
+async function dropAFile() {
+  if (!URL.createObjectURL) {
+    Object.assign(URL, { createObjectURL: () => 'blob:preview', revokeObjectURL: () => {} });
+  }
+  const view = renderPage();
+  fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+  fireEvent.click(await screen.findByTitle(i18n.t('messages.compose.attachMultiple')));
+  const zoneInput = await waitFor(() => {
+    const found = view.container.querySelector('input[type="file"][multiple]');
+    expect(found).not.toBeNull();
+    return found as HTMLInputElement;
+  });
+  fireEvent.change(zoneInput, {
+    target: { files: [new File([ORIGINAL], 'photo.png', { type: 'image/png' })] },
+  });
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: i18n.t('mediaUploadZone.actions.upload', { count: 1 }),
+    })
+  );
+  await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
+}
+
 describe('dropping files into a group', () => {
   // Drag and drop kept its own copy of the sealing rule, which looked for a
   // single recipient and refused every group with "recipient not found".
@@ -278,27 +302,7 @@ describe('dropping files into a group', () => {
     state.conversations = [groupConversation];
     const groupKey = await newGroupKey();
     vi.mocked(groupKeyForSendingOrRefuse).mockResolvedValue({ key: groupKey, version: 4 });
-    if (!URL.createObjectURL) {
-      Object.assign(URL, { createObjectURL: () => 'blob:preview', revokeObjectURL: () => {} });
-    }
-
-    const view = renderPage();
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
-    fireEvent.click(await screen.findByTitle(i18n.t('messages.compose.attachMultiple')));
-    const zoneInput = await waitFor(() => {
-      const found = view.container.querySelector('input[type="file"][multiple]');
-      expect(found).not.toBeNull();
-      return found as HTMLInputElement;
-    });
-    fireEvent.change(zoneInput, {
-      target: { files: [new File([ORIGINAL], 'photo.png', { type: 'image/png' })] },
-    });
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: i18n.t('mediaUploadZone.actions.upload', { count: 1 }),
-      })
-    );
-    await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
+    await dropAFile();
 
     expect(alertSpy).not.toHaveBeenCalled();
     expect(state.uploaded).toHaveLength(1);
@@ -321,6 +325,35 @@ describe('dropping files into a group', () => {
       fileKey
     );
     expect(await bytesOf(opened)).toEqual(ORIGINAL);
+  });
+
+  it('into a direct message, seals the file for the recipient and the sender', async () => {
+    state.conversations = [dmConversation];
+    await dropAFile();
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    const request = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)![0];
+    // The caption goes as content, for the service to seal like any text.
+    expect(request.content).toBe(`[${i18n.t('common.media.image')}]`);
+    expect(request.encrypted_content).toBeUndefined();
+    expect(isSealedGroupEnvelope(request.media_encryption_key!)).toBe(false);
+    const uploaded = sameRealm(await bytesOf(state.uploaded[0]));
+    for (const [reader, key] of [
+      [recipient, request.media_encryption_key!],
+      [own, request.sender_media_encryption_key!],
+    ] as const) {
+      const opened = await decryptFile(
+        {
+          encryptedData: uploaded,
+          encryptedKey: key,
+          iv: request.media_encryption_iv!,
+          originalName: '',
+          mimeType: 'image/png',
+        },
+        reader.privateKey
+      );
+      expect(await bytesOf(opened)).toEqual(ORIGINAL);
+    }
   });
 });
 
