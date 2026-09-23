@@ -30,6 +30,18 @@ var _ interface {
 	IsMediaPubliclyAccessible(context.Context, int) (bool, error)
 } = (*PostgresMediaFileRepository)(nil)
 
+// CanUserAccessMedia is how the upload gateway lets an owner, a moderator or a
+// conversation member read a private file. The gateway asks for it with a type
+// assertion, so without this delegation the assertion failed silently and every
+// signed-in request was judged as anonymous: every private file answered 404.
+func (r *PostgresMediaFileRepository) CanUserAccessMedia(ctx context.Context, mediaID, userID int) (bool, error) {
+	return r.inner.CanUserAccessMedia(ctx, mediaID, userID)
+}
+
+var _ interface {
+	CanUserAccessMedia(context.Context, int, int) (bool, error)
+} = (*PostgresMediaFileRepository)(nil)
+
 // NewPostgresMediaFileRepository constructs a PostgresMediaFileRepository.
 func NewPostgresMediaFileRepository(pool *pgxpool.Pool) *PostgresMediaFileRepository {
 	return &PostgresMediaFileRepository{inner: models.NewMediaFileRepository(pool)}
