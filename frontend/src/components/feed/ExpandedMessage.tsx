@@ -7,11 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFormat } from '../../hooks/useFormat';
 import { useDecryptedMedia } from '../../hooks/useDecryptedMedia';
 import type { Conversation, Message, SendMessageRequest } from '../../types/messages';
-import { encryptMessage } from '../../utils/encryption';
-import { encryptMediaForRecipient } from '../../utils/mediaEncryption';
 import { useDecryptedContent } from '../../hooks/useDecryptedContent';
-import { getOwnKeys } from '../../services/keyManagementService';
-import { recipientPublicKey } from '../../services/recipientKeys';
+import { sealFileForConversation } from '../../services/fileSealing';
 import { messageSendErrorKey } from '../../utils/messageSendErrors';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
@@ -169,32 +166,8 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || sendMessageMutation.isPending) return;
 
-    const otherUserId = conversation.other_user?.id;
-    if (!otherUserId) {
-      alert(t('messages.errors.recipientNotFound'));
-      return;
-    }
-
     try {
-      const keys = await getOwnKeys();
-      if (!keys) {
-        alert(t('messages.errors.encryptionKeysMissing'));
-        return;
-      }
-
-      // Asked every time: the cache alone could hold a key the recipient has
-      // since replaced, and a file sealed to it can never be opened.
-      const recipientKey = await recipientPublicKey(otherUserId);
-
-      let mediaFileId: number | undefined;
-      let mediaUrl: string | undefined;
-      let mediaType: string | undefined;
-      let mediaSize: number | undefined;
-      let messageType: Message['message_type'] = 'text';
-      let mediaEncryptionKey: string | undefined;
-      let mediaEncryptionIv: string | undefined;
-      let senderMediaEncryptionKey: string | undefined;
-
+      let media: Partial<SendMessageRequest> = {};
       if (selectedFile) {
         if (selectedFile.size > MAX_UPLOAD_SIZE) {
           alert(
@@ -205,46 +178,45 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
 
         setUploadingMedia(true);
         try {
-          const sealed = await encryptMediaForRecipient(selectedFile, recipientKey, keys);
+          // The column expands groups as well as direct messages. This view used
+          // to look for a single recipient, so every send into a group stopped
+          // at "recipient not found".
+          const sealed = await sealFileForConversation(
+            selectedFile,
+            conversation.conversation_type === 'group'
+              ? { groupId: conversation.id }
+              : { recipientId: conversation.other_user?.id }
+          );
           const uploadResponse = await mediaService.uploadMedia(
             new File([sealed.encryptedData], selectedFile.name, { type: selectedFile.type }),
             { encrypted: true }
           );
-          mediaFileId = uploadResponse.id;
-          mediaUrl = uploadResponse.storage_url;
-          mediaType = selectedFile.type;
-          mediaSize = selectedFile.size;
-          messageType = inferMessageTypeFromFile(selectedFile);
-          mediaEncryptionKey = sealed.mediaEncryptionKey;
-          senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
-          mediaEncryptionIv = sealed.mediaEncryptionIv;
+          media = {
+            media_file_id: uploadResponse.id,
+            media_url: uploadResponse.storage_url,
+            media_type: selectedFile.type,
+            media_size: selectedFile.size,
+            message_type: inferMessageTypeFromFile(selectedFile),
+            media_encryption_key: sealed.mediaEncryptionKey,
+            media_encryption_iv: sealed.mediaEncryptionIv,
+            sender_media_encryption_key: sealed.senderMediaEncryptionKey,
+            group_key_version: sealed.groupKeyVersion,
+          };
         } catch (error) {
           console.error('Failed to upload media:', error);
-          alert(t('messages.media.uploadFailed'));
-          setUploadingMedia(false);
+          alert(t(messageSendErrorKey(error) ?? 'messages.media.uploadFailed'));
           return;
+        } finally {
+          setUploadingMedia(false);
         }
-        setUploadingMedia(false);
       }
 
-      const textToSend =
-        messageText.trim() || (selectedFile ? t('messages.media.fallbackText') : '');
-      const encryptedForRecipient = await encryptMessage(textToSend, recipientKey);
-      const encryptedForSelf = await encryptMessage(textToSend, keys.publicKey);
-
+      // Sent as content: the service seals text for whatever kind of
+      // conversation this is, and refuses the kinds it cannot seal for.
       await sendMessageMutation.mutateAsync({
         conversation_id: conversation.id,
-        encrypted_content: encryptedForRecipient,
-        sender_encrypted_content: encryptedForSelf,
-        encryption_version: 'v2',
-        media_file_id: mediaFileId,
-        media_url: mediaUrl,
-        media_type: mediaType,
-        media_size: mediaSize,
-        message_type: messageType,
-        media_encryption_key: mediaEncryptionKey,
-        media_encryption_iv: mediaEncryptionIv,
-        sender_media_encryption_key: senderMediaEncryptionKey,
+        content: messageText.trim() || (selectedFile ? t('messages.media.fallbackText') : ''),
+        ...media,
       });
     } catch (error) {
       console.error('Failed to send message:', error);

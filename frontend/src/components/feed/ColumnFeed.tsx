@@ -7,10 +7,8 @@ import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
 import { messagesService } from '../../services/messagesService';
 import { usersService } from '../../services/usersService';
 import { mediaService } from '../../services/mediaService';
-import { getOwnKeys } from '../../services/keyManagementService';
-import { recipientPublicKey } from '../../services/recipientKeys';
-import { encryptMediaForRecipient } from '../../utils/mediaEncryption';
-import { MessageNotSent, messageSendErrorKey } from '../../utils/messageSendErrors';
+import { sealFileForConversation } from '../../services/fileSealing';
+import { messageSendErrorKey } from '../../utils/messageSendErrors';
 import type { Message } from '../../types/messages';
 import type { CombinedFeedItem } from '../../services/feedService';
 import type { RedditApiPost } from '../../types/reddit';
@@ -375,15 +373,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         // It now encrypts exactly as the composer does, and refuses rather than
         // upload anything it could not encrypt.
         const recipient = await usersService.getProfile(pendingRecipient);
-        const ownKeys = await getOwnKeys();
-        if (!ownKeys) {
-          throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
-        }
-        const sealed = await encryptMediaForRecipient(
-          selectedFile,
-          await recipientPublicKey(recipient.id),
-          ownKeys
-        );
+        const sealed = await sealFileForConversation(selectedFile, { recipientId: recipient.id });
         mediaEncryptionKey = sealed.mediaEncryptionKey;
         mediaEncryptionIv = sealed.mediaEncryptionIv;
         senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
