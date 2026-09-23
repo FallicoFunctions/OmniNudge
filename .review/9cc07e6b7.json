@@ -1,0 +1,274 @@
+{
+  "schema_version": 2,
+  "head": "0e5c55da4",
+  "base": "9cc07e6b7",
+  "scope": {
+    "files": [
+      "backend/internal/services/group_keys.go",
+      "backend/internal/services/group_keys_test.go",
+      "backend/internal/handlers/group_keys.go",
+      "backend/cmd/server/main.go",
+      "backend/internal/integration/test_utils.go",
+      "backend/internal/integration/group_keys_integration_test.go",
+      "frontend/src/services/groupKeysService.ts",
+      "frontend/src/services/groupKeyCache.ts",
+      "frontend/src/services/__tests__/groupKeyForSending.test.ts",
+      "frontend/src/services/__tests__/groupKeysService.test.ts"
+    ],
+    "boundaries": [
+      "the history request",
+      "group_key_members rows",
+      "the key state each member reads"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/ff5386434.json",
+    ".review/f4de50ef6.json"
+  ],
+  "notes": "History a group turns on later. One pass, no finding; B3 added the HTTP test the route lacked, and G4 rebuilt one control this change made stale. Two older controls were already stale at the base and are named in G4.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "History a group turns on later: POST /groups/:id/keys/history and ShareHistory (8a8a2b733), and the send sharing missing versions when the key is current (cbd34c40a). Boundaries: the history request, the group_key_members rows, the key state each member reads."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read ff5386434 (G4b/G4c/G5; its I1 row named this exact gap as not delivered) and f4de50ef6, whose control g3c2a covers the send path this change edits."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the history request for three states in the send tests: history visible with a held version (shared), hidden (nothing sent), a refused share (logged, message unaffected). Rotation history stays as G5 left it."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No markup changed."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Nothing had sent the route real HTTP: added TestGroupKeyHistoryRouteOverHTTP (0e5c55da4). Through the router the server builds, the app's JSON -- version and member ids as object keys, arriving as strings -- binds; hidden history answers 400 group_key_history_not_allowed; shown, 204; the member's GET then returns both versions."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The stored row read back through the member's key state: key_version 1 with the shared copy, beside version 2."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The route and body match on both sides: /groups/{id}/keys/history, {history: {version: {member: copy}}} -- proven by the HTTP test sending the client's shape."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The app reads nothing from the 204; the member reads its copies through the existing key state."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "One rule for older copies (checkGroupKeyHistory) and one insert loop (insertGroupKeyHistory), used by the rotation and the share alike."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The contract with the other end was driven over HTTP (B3), not assumed from the service test."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No field added to a struct that crosses a boundary; the request is a new struct with one tagged field."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Integer map keys from JSON strings are decoded by encoding/json; the HTTP test exercises exactly that."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The HTTP test sends the body shape the app builds, not a Go-typed request."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "A version held by the sender and lacked by a member is shared."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Refused: hidden history, a non-member, a version the sender does not hold, a member who lacks nothing, a second copy of the same version, an empty body."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Empty history is refused before a transaction starts."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling is the rotation, which already carries history; the share uses its exact checks and lock."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every refusal branch is reached by the service test."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "A refused share is logged and retried on the next send; the message is never affected (tested)."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Both paths gate on history_visible, tested both ways."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The insert loop was extracted rather than copied."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other places older copies could be written: only the rotation and this route."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No goroutine or shared memory; concurrency is settled by the row lock."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "One transaction: a failed insert rolls back every copy of the share."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "A share leaves only copies that belong to current members; nothing to undo."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No finding, so no new control. g3c2a (f4de50ef6) was made stale by the new branch in groupKeyForSending and is rebuilt; it fails as it did when recorded: expected 1 call, got 2."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The share runs on every group send whose key is current; nothing to invoke."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "go build, vet, gofmt clean; golangci-lint 0 issues on services, handlers, integration, cmd/server; tsc -b 0; eslint and prettier clean."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Not run in a browser: it needs a group and a pane with a repaired key pair, neither of which exists. The server half is proven over HTTP against the real database; the device half by tests with real RSA for the rewrap (a5b85e58f)."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "The share starts beside the send and nothing waits on it."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Known-bad inputs refused, as D2 lists."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No bar or row changed."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No lazy process-wide state."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Services group key tests 10 passed; integration group key tests 4 passed; handlers group tests ok; frontend 12 files, 149 passed; nothing skipped."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Closes the limit ff5386434 recorded: history turned on later now reaches existing members, at the next send by a member who holds the versions -- not instantly, and not in a group where nobody sends."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Two devices, or two sends, sharing the same copy at once: the second waits for the conversation row lock, then finds nothing missing and is refused (tested: 'a second copy of the same version is refused')."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay changed."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Every test naming the changed modules in src and tests (groupKeyCache, groupKeysService, groupKeys): 12 files, all pass. Go: the group key service tests, the four group key HTTP tests, the handlers' group tests."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The shared test router gained the one route; the whole group key integration set ran on it."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control that patches a changed file: g1d, g2b, groupkeycache-unwrap-never-proven and it-skip-without-variable apply; g3c2a was stale and is rebuilt; g1b-key-state-open-to-non-members and rl-mod-mail-unlimited were already stale at the base 9cc07e6b7, before this change -- left as found and named here."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No resource acquired after an await."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No unmount cleanup."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The route is registered in cmd/server and in the test router the integration package builds (H5); the HTTP test runs through the latter."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ok",
+    "vet": "go vet, gofmt clean",
+    "lint": "golangci-lint 0 issues; eslint, prettier clean",
+    "types": "tsc -b 0",
+    "tests": "services 10, integration 4, handlers group ok, frontend 12 files 149"
+  }
+}

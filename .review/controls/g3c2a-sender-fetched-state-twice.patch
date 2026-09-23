@@ -1,8 +1,8 @@
 diff --git a/frontend/src/services/groupKeyCache.ts b/frontend/src/services/groupKeyCache.ts
-index 36bf5330c..0ea03b992 100644
+index ff0a41d6a..6580f79fd 100644
 --- a/frontend/src/services/groupKeyCache.ts
 +++ b/frontend/src/services/groupKeyCache.ts
-@@ -218,11 +218,8 @@ export async function groupKeyForSending(
+@@ -278,11 +278,8 @@ export async function groupKeyForSending(
    }
  
    const state = await getGroupKeyState(conversationId);
@@ -12,6 +12,6 @@ index 36bf5330c..0ea03b992 100644
    if (state.active_version > 0) {
 -    const current = opened.get(state.active_version);
 +    const current = await groupKeyForVersion(conversationId, state.active_version, keys);
-     if (current) return { key: current, version: state.active_version };
-     // The version is current and this device cannot open it, so there is
-     // nothing to seal with. Making the next one is what a sender does.
+     if (current) {
+       // Members can lack older versions with no rotation coming to carry them:
+       // a group that turned its history on after they joined. A sender who
