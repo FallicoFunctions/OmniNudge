@@ -204,6 +204,25 @@ export async function storeRecoveryCopy(privateKey: string, proof: AccountProof)
 }
 
 /**
+ * Publishes the public key a stored private key really belongs to, when the
+ * account's published key is a different one. Old builds could publish a new
+ * key without replacing the copy, and then everything sent to the account was
+ * sealed to a key no device of it could open. A failure here leaves the device
+ * correct and the published key wrong; the next sign-in tries again.
+ */
+async function republishIfItDiffers(
+  stored: { publicKey: string; matchesPublished: boolean },
+  loginKey: string | undefined
+): Promise<void> {
+  if (stored.matchesPublished) return;
+  try {
+    await encryptionService.uploadPublicKey(stored.publicKey, loginKey);
+  } catch (error) {
+    console.error('The corrected public key was not published', error);
+  }
+}
+
+/**
  * After a scheme 2 sign-in, opens the copy wrapped by the password's wrap key
  * and keeps the private key on the device. A missing copy (after a reset) or
  * one that does not open needs the recovery phrase.
@@ -213,13 +232,15 @@ export async function unlockAfterSignIn(keys: LoginKeys, publicKey: string): Pro
   if (!backup.encrypted_private_key) {
     return 'needs-recovery';
   }
+  let stored: Awaited<ReturnType<typeof storeNonExtractablePrivateKey>>;
   try {
     const privateKey = await unwrapSecret(backup.encrypted_private_key, keys.wrapKey);
-    await storeNonExtractablePrivateKey(privateKey, publicKey);
-    return 'unlocked';
+    stored = await storeNonExtractablePrivateKey(privateKey, publicKey);
   } catch {
     return 'needs-recovery';
   }
+  await republishIfItDiffers(stored, keys.loginKey);
+  return 'unlocked';
 }
 
 /**
@@ -247,7 +268,10 @@ export async function moveAccount(password: string, publicKey: string): Promise<
     ...settings,
     encrypted_private_key: await wrapSecret(privateKey, keys.wrapKey),
   });
-  await storeNonExtractablePrivateKey(privateKey, publicKey);
+  await republishIfItDiffers(
+    await storeNonExtractablePrivateKey(privateKey, publicKey),
+    keys.loginKey
+  );
   return { status: 'moved', recoveryPhrase, keys };
 }
 
@@ -284,5 +308,8 @@ export async function recoverWithPhrase(
       keys.loginKey
     );
   }
-  await storeNonExtractablePrivateKey(privateKey, publicKey);
+  await republishIfItDiffers(
+    await storeNonExtractablePrivateKey(privateKey, publicKey),
+    keys?.loginKey
+  );
 }

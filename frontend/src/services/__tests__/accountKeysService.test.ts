@@ -48,6 +48,10 @@ function serverAnswers(responses: Record<string, unknown>) {
 // not leak into the next test.
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(storeNonExtractablePrivateKey).mockResolvedValue({
+    publicKey: 'the-public-key',
+    matchesPublished: true,
+  });
 });
 
 const callOrder = (method: 'put' | 'post', path: string) => {
@@ -450,5 +454,73 @@ describe('recovery with the phrase', () => {
     );
     expect(api.put).not.toHaveBeenCalled();
     expect(storeNonExtractablePrivateKey).not.toHaveBeenCalled();
+  });
+});
+
+// Old builds could publish a new public key without replacing the copy, so the
+// copy's private key and the published key disagree. The device must keep the
+// pair the private key really belongs to, and the account must publish it.
+describe('a copy whose private key is not the pair of the published key', () => {
+  const mismatched = () =>
+    vi.mocked(storeNonExtractablePrivateKey).mockResolvedValue({
+      publicKey: 'the-real-public-key',
+      matchesPublished: false,
+    });
+
+  it('republishes the real public key after a sign-in, proved with the login key', async () => {
+    mismatched();
+    const keys = await deriveLoginKeys('correct horse', salt, FEW_ROUNDS);
+    serverAnswers({
+      '/auth/key-backup': {
+        encrypted_private_key: await wrapSecret('the-private-key', keys.wrapKey),
+      },
+    });
+    expect(await unlockAfterSignIn(keys, 'the-orphaned-public-key')).toBe('unlocked');
+    expect(bodiesSentTo('put', '/auth/public-key')).toEqual([
+      { public_key: 'the-real-public-key', login_key: keys.loginKey },
+    ]);
+  });
+
+  it('republishes after recovery with the phrase, with no proof for an account with no password', async () => {
+    mismatched();
+    const phrase = newRecoveryPhrase();
+    serverAnswers({
+      '/auth/key-backup': {
+        recovery_wrapped_private_key: await wrapSecret(
+          'the-private-key',
+          await deriveRecoveryKey(phrase)
+        ),
+      },
+    });
+    await recoverWithPhrase(phrase, null, 'the-orphaned-public-key');
+    expect(bodiesSentTo('put', '/auth/public-key')).toEqual([
+      { public_key: 'the-real-public-key' },
+    ]);
+  });
+
+  it('still unlocks when the republish fails; the device holds a correct pair', async () => {
+    mismatched();
+    const keys = await deriveLoginKeys('correct horse', salt, FEW_ROUNDS);
+    serverAnswers({
+      '/auth/key-backup': {
+        encrypted_private_key: await wrapSecret('the-private-key', keys.wrapKey),
+      },
+    });
+    vi.mocked(api.put).mockRejectedValueOnce(new Error('offline'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await unlockAfterSignIn(keys, 'the-orphaned-public-key')).toBe('unlocked');
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('publishes nothing when the published key is the right one', async () => {
+    const keys = await deriveLoginKeys('correct horse', salt, FEW_ROUNDS);
+    serverAnswers({
+      '/auth/key-backup': {
+        encrypted_private_key: await wrapSecret('the-private-key', keys.wrapKey),
+      },
+    });
+    await unlockAfterSignIn(keys, 'the-public-key');
+    expect(bodiesSentTo('put', '/auth/public-key')).toEqual([]);
   });
 });

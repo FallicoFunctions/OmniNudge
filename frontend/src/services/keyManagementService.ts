@@ -5,7 +5,12 @@
  * to prevent XSS exfiltration. Public keys remain in localStorage (not secret).
  */
 
-import { exportKeyPair, importPublicKey, type KeyPair } from '../utils/encryption';
+import {
+  arrayBufferToBase64,
+  exportKeyPair,
+  importPublicKey,
+  type KeyPair,
+} from '../utils/encryption';
 
 const PRIVATE_KEY_STORAGE_KEY = 'omninudge_private_key';
 const PUBLIC_KEY_STORAGE_KEY = 'omninudge_public_key';
@@ -121,13 +126,48 @@ export async function saveKeys(keyPair: KeyPair): Promise<void> {
 }
 
 /**
- * Store a private key (from server backup decryption) directly as non-extractable in IndexedDB.
- * Used by AuthContext after decrypting the server-side encrypted backup.
+ * The public key that belongs to a private key, as base64 SPKI.
+ *
+ * An RSA private key carries its public half, so the pair can be rebuilt from
+ * the private key alone rather than trusted from anywhere else.
+ */
+export async function publicKeyOf(privateKeyBase64: string): Promise<string> {
+  const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), (c) => c.charCodeAt(0));
+  const algorithm = { name: 'RSA-OAEP', hash: 'SHA-256' };
+  const privateKey = await window.crypto.subtle.importKey(
+    'pkcs8',
+    privateKeyBytes,
+    algorithm,
+    true,
+    ['decrypt']
+  );
+  const { n, e } = await window.crypto.subtle.exportKey('jwk', privateKey);
+  const publicKey = await window.crypto.subtle.importKey(
+    'jwk',
+    { kty: 'RSA', n, e, alg: 'RSA-OAEP-256', ext: true },
+    algorithm,
+    true,
+    ['encrypt']
+  );
+  return arrayBufferToBase64(await window.crypto.subtle.exportKey('spki', publicKey));
+}
+
+/**
+ * Store a private key opened from a copy on the server, with the public key
+ * that belongs to it.
+ *
+ * The public key is rebuilt from the private key, never taken from the server.
+ * Old builds could publish a new public key without replacing the copy, so an
+ * account's copy and its published key can disagree; storing the published one
+ * beside the copy's private key left a device that could open neither its own
+ * sender copies nor anything sent to it, with no error anywhere.
+ * matchesPublished tells the caller when the published key must be replaced.
  */
 export async function storeNonExtractablePrivateKey(
   privateKeyBase64: string,
-  publicKeyBase64: string
-): Promise<void> {
+  publishedPublicKey: string
+): Promise<{ publicKey: string; matchesPublished: boolean }> {
+  const publicKey = await publicKeyOf(privateKeyBase64);
   const privateKeyBytes = Uint8Array.from(atob(privateKeyBase64), (c) => c.charCodeAt(0));
   const privateKey = await window.crypto.subtle.importKey(
     'pkcs8',
@@ -137,8 +177,9 @@ export async function storeNonExtractablePrivateKey(
     ['decrypt']
   );
   await storePrivateKeyInIDB(privateKey);
-  localStorage.setItem(PUBLIC_KEY_STORAGE_KEY, publicKeyBase64);
+  localStorage.setItem(PUBLIC_KEY_STORAGE_KEY, publicKey);
   localStorage.removeItem(PRIVATE_KEY_STORAGE_KEY); // clean up legacy
+  return { publicKey, matchesPublished: publicKey === publishedPublicKey.replace(/\s/g, '') };
 }
 
 /**
