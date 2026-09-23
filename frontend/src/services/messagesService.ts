@@ -17,8 +17,8 @@ import { MessageNotSent } from '../utils/messageSendErrors';
 import { GROUP_ENCRYPTION_VERSION, sealGroupMessage } from '../utils/groupKeys';
 import { groupKeyForSending, NoGroupKeyToSendWith } from './groupKeyCache';
 import { GroupKeyRotationRefused } from './groupKeysService';
-import { getUserPublicKey, getOwnKeys } from '../services/keyManagementService';
-import { encryptionService } from '../services/encryptionService';
+import { getOwnKeys } from '../services/keyManagementService';
+import { recipientPublicKey } from './recipientKeys';
 
 async function fetchUserByUsername(username: string): Promise<UserProfile> {
   return api.get<UserProfile>(`/users/${username}`);
@@ -290,24 +290,10 @@ export const messagesService = {
         groupKeyVersion = version;
       } else if (data.content && recipientId) {
         try {
-          // Fetch recipient's public key
-          const publicKeys = await encryptionService.getPublicKeys([recipientId]);
-          const recipientPublicKeyBase64 = publicKeys[recipientId];
-
-          if (!recipientPublicKeyBase64) {
-            throw new MessageNotSent(
-              'recipient-key-unusable',
-              'The recipient has published no encryption key'
-            );
-          }
-          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
-          if (!recipientPublicKey) {
-            throw new MessageNotSent(
-              'recipient-key-unusable',
-              'The recipient key could not be read'
-            );
-          }
-          encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+          encryptedContent = await encryptMessage(
+            data.content,
+            await recipientPublicKey(recipientId)
+          );
           encryptionVersion = 'v2';
         } catch (error) {
           // A refusal is already the reason; anything else becomes one. Nothing
@@ -381,19 +367,10 @@ export const messagesService = {
     // that was already protected. The edit refuses instead.
     if (recipientId) {
       try {
-        const publicKeys = await encryptionService.getPublicKeys([recipientId]);
-        const recipientPublicKeyBase64 = publicKeys[recipientId];
-        if (!recipientPublicKeyBase64) {
-          throw new MessageNotSent(
-            'recipient-key-unusable',
-            'The recipient has published no encryption key'
-          );
-        }
-        const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
-        if (!recipientPublicKey) {
-          throw new MessageNotSent('recipient-key-unusable', 'The recipient key could not be read');
-        }
-        encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+        encryptedContent = await encryptMessage(
+          data.content,
+          await recipientPublicKey(recipientId)
+        );
         encryptionVersion = 'v2';
       } catch (error) {
         if (error instanceof MessageNotSent) throw error;

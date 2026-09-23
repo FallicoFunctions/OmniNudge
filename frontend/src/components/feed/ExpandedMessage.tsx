@@ -10,7 +10,9 @@ import type { Conversation, Message, SendMessageRequest } from '../../types/mess
 import { encryptMessage } from '../../utils/encryption';
 import { encryptMediaForRecipient } from '../../utils/mediaEncryption';
 import { useDecryptedContent } from '../../hooks/useDecryptedContent';
-import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
+import { getOwnKeys } from '../../services/keyManagementService';
+import { recipientPublicKey } from '../../services/recipientKeys';
+import { messageSendErrorKey } from '../../utils/messageSendErrors';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
@@ -180,11 +182,9 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         return;
       }
 
-      const recipientPublicKey = await getUserPublicKey(otherUserId);
-      if (!recipientPublicKey) {
-        alert(t('messages.errors.recipientKeyNotFound'));
-        return;
-      }
+      // Asked every time: the cache alone could hold a key the recipient has
+      // since replaced, and a file sealed to it can never be opened.
+      const recipientKey = await recipientPublicKey(otherUserId);
 
       let mediaFileId: number | undefined;
       let mediaUrl: string | undefined;
@@ -205,7 +205,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
 
         setUploadingMedia(true);
         try {
-          const sealed = await encryptMediaForRecipient(selectedFile, recipientPublicKey, keys);
+          const sealed = await encryptMediaForRecipient(selectedFile, recipientKey, keys);
           const uploadResponse = await mediaService.uploadMedia(
             new File([sealed.encryptedData], selectedFile.name, { type: selectedFile.type }),
             { encrypted: true }
@@ -229,7 +229,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
 
       const textToSend =
         messageText.trim() || (selectedFile ? t('messages.media.fallbackText') : '');
-      const encryptedForRecipient = await encryptMessage(textToSend, recipientPublicKey);
+      const encryptedForRecipient = await encryptMessage(textToSend, recipientKey);
       const encryptedForSelf = await encryptMessage(textToSend, keys.publicKey);
 
       await sendMessageMutation.mutateAsync({
@@ -248,7 +248,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
       });
     } catch (error) {
       console.error('Failed to send message:', error);
-      alert(t('messages.errors.sendFailed'));
+      alert(t(messageSendErrorKey(error) ?? 'messages.errors.sendFailed'));
     }
   };
 

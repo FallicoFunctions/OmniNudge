@@ -7,8 +7,8 @@ import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
 import { messagesService } from '../../services/messagesService';
 import { usersService } from '../../services/usersService';
 import { mediaService } from '../../services/mediaService';
-import { encryptionService } from '../../services/encryptionService';
-import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
+import { getOwnKeys } from '../../services/keyManagementService';
+import { recipientPublicKey } from '../../services/recipientKeys';
 import { encryptMediaForRecipient } from '../../utils/mediaEncryption';
 import { MessageNotSent, messageSendErrorKey } from '../../utils/messageSendErrors';
 import type { Message } from '../../types/messages';
@@ -377,18 +377,11 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         if (!ownKeys) {
           throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
         }
-        const publicKeys = await encryptionService.getPublicKeys([recipient.id]);
-        const recipientPublicKeyBase64 = publicKeys[recipient.id];
-        const recipientPublicKey = recipientPublicKeyBase64
-          ? await getUserPublicKey(recipient.id, recipientPublicKeyBase64)
-          : null;
-        if (!recipientPublicKey) {
-          throw new MessageNotSent(
-            'recipient-key-unusable',
-            'The recipient has no usable public key'
-          );
-        }
-        const sealed = await encryptMediaForRecipient(selectedFile, recipientPublicKey, ownKeys);
+        const sealed = await encryptMediaForRecipient(
+          selectedFile,
+          await recipientPublicKey(recipient.id),
+          ownKeys
+        );
         mediaEncryptionKey = sealed.mediaEncryptionKey;
         mediaEncryptionIv = sealed.mediaEncryptionIv;
         senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
