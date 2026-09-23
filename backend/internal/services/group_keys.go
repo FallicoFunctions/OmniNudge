@@ -244,7 +244,61 @@ func (s *GroupKeyService) Rotate(ctx context.Context, conversationID, userID int
 			return err
 		}
 	}
-	for version, copies := range req.History {
+	if err := insertGroupKeyHistory(ctx, tx, conversationID, req.History); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE conversations
+		SET current_encryption_version = $1, encryption_enabled = TRUE, last_key_rotation_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`, req.KeyVersion, conversationID); err != nil {
+		return fmt.Errorf("record group key version: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
+// ShareHistory stores older-version copies outside a rotation. A rotation is
+// the usual carrier, but one happens only at a join or a leave, so a group whose
+// creator turned history on later left its existing members unable to read the
+// earlier messages until somebody joined or left. The rules are the rotation's
+// own, checked under the same lock: history visible, a version the sender
+// holds, a member who lacks it. A second device sharing the same copy at the
+// same moment waits for the lock, then finds nothing missing and is refused.
+func (s *GroupKeyService) ShareHistory(ctx context.Context, conversationID, userID int, history map[int]map[int]string) error {
+	if len(history) == 0 {
+		return ErrGroupKeyHistory
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var isGroup bool
+	err = tx.QueryRow(ctx, `SELECT is_group FROM conversations WHERE id = $1 FOR UPDATE`, conversationID).Scan(&isGroup)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !isGroup) {
+		return ErrNotGroupMember
+	}
+	if err != nil {
+		return err
+	}
+	state, err := groupKeyState(ctx, tx, conversationID, userID)
+	if err != nil {
+		return err
+	}
+	if err := checkGroupKeyHistory(state, history); err != nil {
+		return err
+	}
+	if err := insertGroupKeyHistory(ctx, tx, conversationID, history); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// insertGroupKeyHistory stores older-version copies that checkGroupKeyHistory
+// has already allowed.
+func insertGroupKeyHistory(ctx context.Context, tx pgx.Tx, conversationID int, history map[int]map[int]string) error {
+	for version, copies := range history {
 		var olderID int
 		if err := tx.QueryRow(ctx, `
 			SELECT id FROM group_encryption_keys WHERE conversation_id = $1 AND key_version = $2
@@ -257,14 +311,7 @@ func (s *GroupKeyService) Rotate(ctx context.Context, conversationID, userID int
 			}
 		}
 	}
-	if _, err := tx.Exec(ctx, `
-		UPDATE conversations
-		SET current_encryption_version = $1, encryption_enabled = TRUE, last_key_rotation_at = CURRENT_TIMESTAMP
-		WHERE id = $2
-	`, req.KeyVersion, conversationID); err != nil {
-		return fmt.Errorf("record group key version: %w", err)
-	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 // Older-version copies go only to members who lack that version, only while

@@ -360,3 +360,51 @@ func TestGroupKeyHistoryNeedsAVersionTheSenderHolds(t *testing.T) {
 		History:    map[int]map[int]string{1: {latecomer.ID: "v1-wrapped-for-latecomer"}},
 	}), services.ErrGroupKeyHistory, "a member cannot hand on a version it never had")
 }
+
+// A rotation happens only at a join or a leave, and it was the only carrier of
+// older copies. So a group that turned its history on after members had joined
+// left them unable to read the earlier messages until somebody joined or left.
+func TestGroupKeyHistoryCanBeSharedWhenTheGroupShowsItLater(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	fixtures := testutil.NewFixtures(t, db)
+	svc := services.NewGroupKeyService(db.Pool)
+	ctx := context.Background()
+
+	owner := fixtures.CreateUniqueUser("gk_owner")
+	member := fixtures.CreateUniqueUser("gk_member")
+	outsider := fixtures.CreateUniqueUser("gk_outsider")
+	group := newTestGroup(t, db, owner.ID)
+	publishTestPublicKey(t, db, owner.ID, member.ID, outsider.ID)
+	setTestGroupHistory(t, db, group, false)
+	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 1, Copies: wrappedCopies(1, owner.ID),
+	}))
+	joinTestGroup(t, db, group, member.ID, "member")
+	require.NoError(t, svc.Rotate(ctx, group, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 2, Copies: wrappedCopies(2, owner.ID, member.ID),
+	}))
+	share := map[int]map[int]string{1: {member.ID: "v1-wrapped-for-member"}}
+
+	assert.ErrorIs(t, svc.ShareHistory(ctx, group, owner.ID, share), services.ErrGroupKeyHistory,
+		"not while the history is hidden")
+
+	setTestGroupHistory(t, db, group, true)
+	state, err := svc.State(ctx, group, owner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, state.ActiveVersion, "the key is current: no rotation is coming")
+	assert.Equal(t, map[int][]int{member.ID: {1}}, state.MissingHistory)
+
+	assert.ErrorIs(t, svc.ShareHistory(ctx, group, outsider.ID, share), services.ErrNotGroupMember)
+	assert.ErrorIs(t, svc.ShareHistory(ctx, group, member.ID, map[int]map[int]string{1: {owner.ID: "x"}}),
+		services.ErrGroupKeyHistory, "the owner lacks nothing, and the member does not hold version 1")
+
+	require.NoError(t, svc.ShareHistory(ctx, group, owner.ID, share))
+	state, err = svc.State(ctx, group, member.ID)
+	require.NoError(t, err)
+	require.Len(t, state.MyCopies, 2, "the member now reads what came before they joined")
+	assert.Equal(t, "v1-wrapped-for-member", state.MyCopies[0].WrappedKey)
+	assert.Empty(t, state.MissingHistory)
+
+	assert.ErrorIs(t, svc.ShareHistory(ctx, group, owner.ID, share), services.ErrGroupKeyHistory,
+		"a second copy of the same version is refused: nothing is missing any more")
+}

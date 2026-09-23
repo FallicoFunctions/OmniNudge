@@ -125,3 +125,48 @@ func (h *GroupKeyHandler) RotateGroupKey(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to store the group key")
 	}
 }
+
+// ShareGroupKeyHistory stores older key versions for members who lack them,
+// outside a rotation: the way a group that turned its history on later lets
+// the members it already had read what came before.
+// @Summary      Share older group key versions
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Param        id    path  int  true  "Group conversation ID"
+// @Success      204
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/keys/history [post]
+func (h *GroupKeyHandler) ShareGroupKeyHistory(c *gin.Context) {
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	conversationID, ok := groupKeyConversationID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		History map[int]map[int]string `json:"history"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	err := h.keys.ShareHistory(c.Request.Context(), conversationID, userID, req.History)
+	switch {
+	case err == nil:
+		c.Status(http.StatusNoContent)
+	case errors.Is(err, services.ErrNotGroupMember):
+		RespondError(c, http.StatusForbidden, "Not a member of this group")
+	case errors.Is(err, services.ErrGroupKeyHistory):
+		RespondErrorCoded(c, http.StatusBadRequest, "group_key_history_not_allowed", "Those older key copies are not allowed")
+	default:
+		slog.Error("share group key history failed", "error", err, "conversation_id", conversationID, "user_id", userID)
+		RespondError(c, http.StatusInternalServerError, "Failed to share the group key history")
+	}
+}

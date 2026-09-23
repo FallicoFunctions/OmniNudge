@@ -273,6 +273,7 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 			protected.POST("/auth/app-password", limited(authLimit, authHandler.SetAppPassword)...)
 			protected.GET("/groups/:id/keys", groupKeyHandler.GetGroupKeys)
 			protected.POST("/groups/:id/keys", groupKeyHandler.RotateGroupKey)
+			protected.POST("/groups/:id/keys/history", groupKeyHandler.ShareGroupKeyHistory)
 			protected.POST("/groups/:id/participants", groupHandler.AddGroupParticipant)
 			protected.DELETE("/groups/:id/participants/:user_id", groupHandler.RemoveGroupParticipant)
 			protected.POST("/groups/:id/leave", groupHandler.LeaveGroup)

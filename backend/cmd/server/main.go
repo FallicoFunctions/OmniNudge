@@ -1660,6 +1660,7 @@ func main() {
 			// The group's key versions: the server keeps only wrapped copies.
 			protected.GET("/groups/:id/keys", groupKeyHandler.GetGroupKeys)
 			protected.POST("/groups/:id/keys", groupKeyHandler.RotateGroupKey)
+			protected.POST("/groups/:id/keys/history", groupKeyHandler.ShareGroupKeyHistory)
 			protected.POST("/groups/:id/transfer-ownership", groupHandler.TransferOwnership)
 
 			// Group admin controls (F10)
