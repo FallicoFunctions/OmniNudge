@@ -1426,7 +1426,12 @@ func TestPinMessage_BroadcastsPinEvent(t *testing.T) {
 			assert.Equal(t, user1ID, *payload.PinnedBy)
 		}
 		assert.NotNil(t, payload.PinnedAt)
-		assert.Equal(t, "pin preview content", payload.Preview)
+		// The event goes to every member as JSON. It used to carry the stored
+		// content -- ciphertext for an encrypted message -- as a "preview".
+		wire, err := json.Marshal(payload)
+		require.NoError(t, err)
+		assert.NotContains(t, string(wire), "pin preview content")
+		assert.NotContains(t, string(wire), `"preview"`)
 		assert.Equal(t, "text", payload.MessageType)
 	}
 }
@@ -1537,7 +1542,12 @@ func TestUnpinMessage_BroadcastsUnpinEvent(t *testing.T) {
 			assert.Equal(t, user1ID, *payload.PinnedBy)
 		}
 		assert.NotNil(t, payload.PinnedAt)
-		assert.Equal(t, "unpinned preview content", payload.Preview)
+		// The event goes to every member as JSON. It used to carry the stored
+		// content -- ciphertext for an encrypted message -- as a "preview".
+		wire, err := json.Marshal(payload)
+		require.NoError(t, err)
+		assert.NotContains(t, string(wire), "unpinned preview content")
+		assert.NotContains(t, string(wire), `"preview"`)
 		assert.Equal(t, "text", payload.MessageType)
 	}
 }

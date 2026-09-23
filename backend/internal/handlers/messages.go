@@ -282,19 +282,6 @@ func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, con
 	return participants, nil
 }
 
-func buildPinnedMessagePreview(messageType, encryptedContent string) string {
-	if messageType != "text" {
-		return "[" + messageType + "]"
-	}
-
-	const maxPreviewChars = 120
-	runes := []rune(encryptedContent)
-	if len(runes) <= maxPreviewChars {
-		return encryptedContent
-	}
-	return string(runes[:maxPreviewChars]) + "..."
-}
-
 func (h *MessagesHandler) broadcastPinEvent(
 	ctx context.Context,
 	conversationID int,
@@ -303,7 +290,6 @@ func (h *MessagesHandler) broadcastPinEvent(
 	pinnedBy *int,
 	pinnedAt *time.Time,
 	messageType string,
-	encryptedContent string,
 ) {
 	if h.hub == nil {
 		return
@@ -321,7 +307,6 @@ func (h *MessagesHandler) broadcastPinEvent(
 		ConversationID: conversationID,
 		PinnedBy:       pinnedBy,
 		PinnedAt:       pinnedAt,
-		Preview:        buildPinnedMessagePreview(messageType, encryptedContent),
 		MessageType:    messageType,
 	}
 
@@ -2860,13 +2845,12 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 
 	var conversationID int
 	var isPinned bool
-	var encryptedContent string
 	var messageType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_id, pinned, encrypted_content, message_type
+		SELECT conversation_id, pinned, message_type
 		FROM messages
 		WHERE id = $1
-	`, messageID).Scan(&conversationID, &isPinned, &encryptedContent, &messageType)
+	`, messageID).Scan(&conversationID, &isPinned, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			RespondError(c, http.StatusNotFound, "Message not found")
@@ -2916,7 +2900,6 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 		&userID,
 		&pinnedAt,
 		messageType,
-		encryptedContent,
 	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message pinned"})
@@ -2950,13 +2933,12 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 	var isPinned bool
 	var pinnedBy *int
 	var pinnedAt *time.Time
-	var encryptedContent string
 	var messageType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_id, pinned, pinned_by, pinned_at, encrypted_content, message_type
+		SELECT conversation_id, pinned, pinned_by, pinned_at, message_type
 		FROM messages
 		WHERE id = $1
-	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy, &pinnedAt, &encryptedContent, &messageType)
+	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy, &pinnedAt, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			RespondError(c, http.StatusNotFound, "Message not found")
@@ -3016,7 +2998,6 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 		pinnedBy,
 		pinnedAt,
 		messageType,
-		encryptedContent,
 	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message unpinned"})

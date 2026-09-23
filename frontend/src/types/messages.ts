@@ -164,7 +164,6 @@ export interface WsMessagePinEvent {
   conversation_id: number;
   pinned_by?: number | null;
   pinned_at?: string | null;
-  preview?: string;
   message_type?: Message['message_type'];
 }
 

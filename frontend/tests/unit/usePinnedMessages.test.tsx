@@ -69,11 +69,12 @@ describe('usePinnedMessages', () => {
     expect(messagesService.getPinnedMessages).toHaveBeenCalledWith(55);
   });
 
-  // The server builds the event's preview from the stored ciphertext, cut to
-  // 120 characters. It is neither readable text nor an openable envelope, and
-  // the old handler filed it as encryption_version 'unknown', which matches no
-  // branch in the display rule -- so the bar painted it. Merging replaces an
-  // entry by id, so a correct one fetched over REST was overwritten by it.
+  // Servers before G4c built the event's preview from the stored ciphertext,
+  // cut to 120 characters. It is neither readable text nor an openable
+  // envelope, and the old handler filed it as encryption_version 'unknown',
+  // which matches no branch in the display rule -- so the bar painted it. The
+  // server sends no preview now; an older one may, mid-deploy, and it must
+  // still never become the message.
   const PREVIEW = 'v2:AAAAciphertext-cut-at-120-chars';
 
   it('pins the real message, not the ciphertext preview, when this page has it', async () => {
