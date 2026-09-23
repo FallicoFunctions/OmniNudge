@@ -41,7 +41,9 @@ export const voiceMessagesService = {
     const resp = await authenticatedFetch(
       `${API_BASE_URL}/messages/${encodeURIComponent(messageId)}/voice`
     );
-    if (!resp.ok) throw new Error(await resp.text());
+    // The status travels with the error: 404 means the recording has not been
+    // uploaded yet, which is worth waiting for; a refusal is not.
+    if (!resp.ok) throw Object.assign(new Error(await resp.text()), { status: resp.status });
     const voiceMessage: VoiceMessageResponse = await resp.json();
     // The API returns an authenticated, same-service playback route rather
     // than a storage-provider bearer URL. Keep it absolute for cross-origin

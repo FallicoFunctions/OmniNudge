@@ -7,6 +7,10 @@ import { useDecryptedMedia } from '../../hooks/useDecryptedMedia';
 import { waveformOf } from '../../utils/waveform';
 import { VoiceMessageBubble } from './VoiceMessageBubble';
 
+/** How long a new voice message waits for its recording: 20 tries, 1.5 s apart. */
+const RECORDING_WAIT_RETRIES = 20;
+const RECORDING_WAIT_DELAY_MS = 1500;
+
 /**
  * A voice message in a conversation.
  *
@@ -21,6 +25,12 @@ export function VoiceMessage({ message, isOwn }: { message: Message; isOwn: bool
     queryKey: ['voice-message', message.id],
     queryFn: () => voiceMessagesService.getVoiceMessage(message.id),
     staleTime: Infinity,
+    // The audio message is created, and broadcast, before its recording is
+    // uploaded, so the first answers are 404. Wait for it -- the app's single
+    // retry gave up while the upload was still running -- but not on a refusal.
+    retry: (failures, error) =>
+      (error as { status?: number }).status === 404 && failures < RECORDING_WAIT_RETRIES,
+    retryDelay: RECORDING_WAIT_DELAY_MS,
   });
 
   const encrypted = Boolean(message.media_encryption_key);

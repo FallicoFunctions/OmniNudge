@@ -46,11 +46,10 @@ const audioMessage = (over: Partial<Message> = {}) =>
   ({ id: 40, conversation_id: 31, sender_id: 7, message_type: 'audio', ...over }) as Message;
 const sealed = { media_encryption_key: 'SEALED', media_encryption_iv: 'IV' };
 
+// The app's own default (main.tsx): one retry, about a second later.
 const show = (message: Message) =>
   render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: 1 } } })}>
       <VoiceMessage message={message} isOwn={false} />
     </QueryClientProvider>
   );
@@ -99,5 +98,37 @@ describe('VoiceMessage', () => {
     show(audioMessage(sealed));
     expect(await screen.findByText('voice.playbackError')).toBeInTheDocument();
     expect(seen.bubble).toBeNull();
+  });
+});
+
+// The audio message exists, and is broadcast, before its recording is uploaded
+// -- sealing, the upload and the server's virus scan all come after -- so the
+// first loads of a new voice message answer 404. With the app's single retry it
+// settled on "could not play" and never asked again.
+describe('a voice message whose recording is still being uploaded', () => {
+  const notYet = () => Object.assign(new Error('Voice message not found'), { status: 404 });
+
+  it('waits for the recording instead of giving up', async () => {
+    vi.mocked(useDecryptedMedia).mockReturnValue(null);
+    vi.mocked(voiceMessagesService.getVoiceMessage)
+      .mockRejectedValueOnce(notYet())
+      .mockRejectedValueOnce(notYet())
+      .mockRejectedValueOnce(notYet())
+      .mockResolvedValue(record);
+
+    show(audioMessage());
+    expect(await screen.findByText('voice.processing')).toBeInTheDocument();
+    expect(await screen.findByText('voice bubble', {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
+  it('does not wait on a refusal that will not change', async () => {
+    vi.mocked(useDecryptedMedia).mockReturnValue(null);
+    vi.mocked(voiceMessagesService.getVoiceMessage).mockRejectedValue(
+      Object.assign(new Error('Forbidden'), { status: 403 })
+    );
+
+    show(audioMessage());
+    expect(await screen.findByText('voice.playbackError')).toBeInTheDocument();
+    expect(voiceMessagesService.getVoiceMessage).toHaveBeenCalledTimes(1);
   });
 });
