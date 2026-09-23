@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Vitest 5 cannot call a mock built on an arrow function with `new`, and the
+// runtime constructs Babylon's engines and the browser's Audio with `new`. A
+// regular function can be constructed, returns what make() returns, and the
+// mock still records every argument.
+function constructible<A extends unknown[], R>(make: (...args: A) => R) {
+  return vi.fn(function (...args: A) {
+    return make(...args);
+  });
+}
+
 function createDeferredPromise<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -120,7 +130,7 @@ describe('createRuntime', () => {
     const webgpuDispose = vi.fn();
     const webgpuInit = vi.fn().mockRejectedValue(new Error('WebGPU adapter failed'));
     const WebGPUEngineMock = Object.assign(
-      vi.fn(() => ({
+      constructible(() => ({
         dispose: webgpuDispose,
         initAsync: webgpuInit,
       })),
@@ -136,7 +146,7 @@ describe('createRuntime', () => {
       runRenderLoop: vi.fn(),
       setHardwareScalingLevel: vi.fn(),
     };
-    const EngineMock = vi.fn((_canvas: HTMLCanvasElement, _antialias: boolean, _options: Record<string, unknown>) => webglEngine);
+    const EngineMock = constructible((_canvas: HTMLCanvasElement, _antialias: boolean, _options: Record<string, unknown>) => webglEngine);
     const scene = {
       metadata: {},
       getMeshByName: () => null,
@@ -195,7 +205,7 @@ describe('createRuntime', () => {
     };
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => engine),
+      Engine: constructible(() => engine),
     }));
     vi.doMock('../../scene/createMainStageScene', () => ({
       createMainStageScene: vi.fn(async () => scene),
@@ -248,11 +258,14 @@ describe('createRuntime', () => {
       render: vi.fn(() => frameEvents.push('render')),
       textures: [],
     };
-    const now = vi.spyOn(performance, 'now');
-    now.mockReturnValueOnce(0).mockReturnValue(2_000);
+    // An explicit clock, not "0 once, then 2000": the test runner's own module
+    // loader reads performance.now during the import below, and under Vitest 5
+    // it took the single 0 meant for the controller's first reading (frame 30).
+    let clock = 0;
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock);
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => engine),
+      Engine: constructible(() => engine),
     }));
     vi.doMock('../../scene/createMainStageScene', () => ({
       createMainStageScene: vi.fn(async () => scene),
@@ -262,7 +275,13 @@ describe('createRuntime', () => {
     const runtime = await createRuntime(document.createElement('div'));
 
     expect(renderFrame).toBeTypeOf('function');
-    for (let frame = 0; frame < 60; frame += 1) {
+    // The controller reads the clock every 30 frames: low FPS first seen at 0,
+    // still low 2 s later, so the next frame must scale before it renders.
+    for (let frame = 0; frame < 30; frame += 1) {
+      renderFrame?.();
+    }
+    clock = 2_000;
+    for (let frame = 0; frame < 30; frame += 1) {
       renderFrame?.();
     }
     expect(setHardwareScalingLevel).not.toHaveBeenCalled();
@@ -295,7 +314,7 @@ describe('createRuntime', () => {
     };
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => engine),
+      Engine: constructible(() => engine),
     }));
     vi.doMock('../../scene/createMainStageScene', () => ({
       createMainStageScene: vi.fn(async () => ({
@@ -324,7 +343,7 @@ describe('createRuntime', () => {
     const engineResize = vi.fn();
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => ({
+      Engine: constructible(() => ({
         dispose: engineDispose,
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -475,7 +494,7 @@ describe('createRuntime', () => {
     };
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => ({
+      Engine: constructible(() => ({
         dispose: engineDispose,
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -577,7 +596,7 @@ describe('createRuntime', () => {
     }>();
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => ({
+      Engine: constructible(() => ({
         dispose: engineDispose,
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -633,7 +652,7 @@ describe('createRuntime', () => {
     };
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => ({
+      Engine: constructible(() => ({
         dispose: engineDispose,
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -681,7 +700,7 @@ describe('createRuntime', () => {
     const { ShaderStore } = await import('@babylonjs/core/Engines/shaderStore.js');
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
-      Engine: vi.fn(() => ({
+      Engine: constructible(() => ({
         dispose: vi.fn(),
         runRenderLoop: vi.fn(),
         resize: vi.fn(),

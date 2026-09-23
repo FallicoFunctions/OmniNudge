@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStageMediaPlayer, type StagePlayerBackend } from '../stageMediaPlayer';
 import type { ZoneMediaState } from '../../network/worldSocket';
 
+// Vitest 5 cannot call a mock built on an arrow function with `new`, and the
+// runtime constructs Babylon's engines and the browser's Audio with `new`. A
+// regular function can be constructed, returns what make() returns, and the
+// mock still records every argument.
+function constructible<A extends unknown[], R>(make: (...args: A) => R) {
+  return vi.fn(function (...args: A) {
+    return make(...args);
+  });
+}
+
 function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePlayerBackend {
   return {
     load: vi.fn(),
@@ -246,7 +256,7 @@ describe('createStageMediaPlayer', () => {
       // than take down the runtime.
       vi.stubGlobal(
         'Audio',
-        vi.fn(() => {
+        constructible(() => {
           throw new Error('audio unavailable');
         }),
       );
@@ -281,7 +291,7 @@ describe('createStageMediaPlayer', () => {
         }),
         removeAttribute: vi.fn(),
       };
-      vi.stubGlobal('Audio', vi.fn(() => fakeAudio));
+      vi.stubGlobal('Audio', constructible(() => fakeAudio));
 
       const player = createStageMediaPlayer();
       player.unlock();
