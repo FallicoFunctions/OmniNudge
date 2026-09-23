@@ -102,6 +102,26 @@ export async function wrapGroupKeyForMembers(
   return { copies, unusable };
 }
 
+/**
+ * Wraps an older group key version for another member, from this device's own
+ * copy of it. The keys this device opens are non-extractable, so the raw key is
+ * taken from the copy -- the step opening it takes anyway -- and exists only for
+ * this call. With a group's history visible, this is how a newcomer receives the
+ * versions sent before they joined.
+ */
+export async function rewrapGroupKeyCopy(
+  myWrappedKey: string,
+  privateKey: CryptoKey,
+  memberPublicKey: string
+): Promise<string> {
+  const raw = await window.crypto.subtle.decrypt(
+    { name: 'RSA-OAEP' },
+    privateKey,
+    base64ToArrayBuffer(myWrappedKey)
+  );
+  return encryptKeyWithPublicKey(raw, await importPublicKey(memberPublicKey));
+}
+
 /** Opens this device's copy of a group key with its own private key. */
 export async function unwrapGroupKey(
   wrappedKey: string,

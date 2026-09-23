@@ -23,8 +23,13 @@
  * saying the message cannot be read until it reloads.
  */
 import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from './groupKeysService';
-import type { GroupKeyState } from './groupKeysService';
-import { newGroupKey, unwrapGroupKey, wrapGroupKeyForMembers } from '../utils/groupKeys';
+import type { GroupKeyRotation, GroupKeyState } from './groupKeysService';
+import {
+  newGroupKey,
+  rewrapGroupKeyCopy,
+  unwrapGroupKey,
+  wrapGroupKeyForMembers,
+} from '../utils/groupKeys';
 import { getOwnKeys, getOwnPublicKeyBase64 } from './keyManagementService';
 import type { KeyPair } from '../utils/encryption';
 
@@ -175,6 +180,41 @@ export function forgetGroupKeys(conversationId?: number): void {
   failedAt.delete(key);
 }
 
+/**
+ * The older versions members still lack, wrapped for them, when the group's
+ * history is visible. The rotation carries them: it is the one moment a member
+ * who joined is known to need them, and the server takes older copies nowhere
+ * else. Before this the rotation sent none, so with history visible -- the
+ * default -- a newcomer still could not read a single earlier message.
+ *
+ * Only versions this device holds can be wrapped, and the server refuses any
+ * other; a version another member holds reaches the newcomer at a later
+ * rotation. A member whose key cannot be used gets nothing here, because the
+ * rotation itself refuses before this runs.
+ */
+async function wrapMissingHistory(
+  state: GroupKeyState,
+  ownKeys: KeyPair
+): Promise<GroupKeyRotation['history']> {
+  if (!state.history_visible) return undefined;
+  const mine = new Map(state.my_copies.map((copy) => [copy.key_version, copy.wrapped_key]));
+  const history: NonNullable<GroupKeyRotation['history']> = {};
+  for (const member of state.members) {
+    if (!member.public_key) continue;
+    for (const version of state.missing_history[member.user_id] ?? []) {
+      const myCopy = mine.get(version);
+      if (!myCopy) continue;
+      try {
+        const copy = await rewrapGroupKeyCopy(myCopy, ownKeys.privateKey, member.public_key);
+        (history[version] ??= {})[member.user_id] = copy;
+      } catch (error) {
+        console.warn('Could not share an older group key version:', version, error);
+      }
+    }
+  }
+  return Object.keys(history).length > 0 ? history : undefined;
+}
+
 /** Why a sender cannot get a key to seal with. */
 export type NoGroupKeyReason =
   /** This device holds no keys of its own. */
@@ -242,7 +282,11 @@ export async function groupKeyForSending(
 
   const next = state.latest_version + 1;
   try {
-    const stored = await rotateGroupKey(conversationId, { key_version: next, copies });
+    const stored = await rotateGroupKey(conversationId, {
+      key_version: next,
+      copies,
+      history: await wrapMissingHistory(state, keys),
+    });
     // The cache remembers versions this reader could not get, and the rotation
     // just granted one. Without this the sender's own new message would read as
     // unreadable until the page reloaded.

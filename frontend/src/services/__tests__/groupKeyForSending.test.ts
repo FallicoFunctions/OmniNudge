@@ -15,7 +15,12 @@ import {
   groupKeyForVersion,
 } from '../groupKeyCache';
 import { getGroupKeyState, rotateGroupKey, GroupKeyRotationRefused } from '../groupKeysService';
-import { newGroupKey, unwrapGroupKey, wrapGroupKeyForMembers } from '../../utils/groupKeys';
+import {
+  newGroupKey,
+  rewrapGroupKeyCopy,
+  unwrapGroupKey,
+  wrapGroupKeyForMembers,
+} from '../../utils/groupKeys';
 import { getOwnKeys } from '../keyManagementService';
 
 vi.mock('../groupKeysService', async (importOriginal) => {
@@ -24,6 +29,7 @@ vi.mock('../groupKeysService', async (importOriginal) => {
 });
 vi.mock('../../utils/groupKeys', () => ({
   newGroupKey: vi.fn(),
+  rewrapGroupKeyCopy: vi.fn(),
   unwrapGroupKey: vi.fn(),
   wrapGroupKeyForMembers: vi.fn(),
 }));
@@ -55,6 +61,9 @@ beforeEach(() => {
   vi.mocked(getOwnKeys).mockResolvedValue(KEYS);
   vi.mocked(newGroupKey).mockResolvedValue({ fresh: true } as never);
   vi.mocked(unwrapGroupKey).mockImplementation(async (w: string) => ({ opened: w }) as never);
+  vi.mocked(rewrapGroupKeyCopy).mockImplementation(
+    async (mine: string, _key: CryptoKey, theirs: string) => `${mine}-for-${theirs}`
+  );
   vi.mocked(wrapGroupKeyForMembers).mockResolvedValue({
     copies: { 42: 'for-42', 9: 'for-9' },
     unusable: [],
@@ -180,6 +189,59 @@ describe('groupKeyForSending', () => {
     await expect(groupKeyForSending(CONVERSATION, KEYS)).resolves.toEqual({
       key: { fresh: true },
       version: 5,
+    });
+  });
+});
+
+// With history visible -- the default -- a newcomer is meant to read what was
+// said before they joined. The rotation is the one moment the server accepts
+// older copies, and it sent none, so nobody who joined could read any of it.
+describe('the older versions a newcomer lacks', () => {
+  const joined = (over: Record<string, unknown> = {}) =>
+    state({
+      active_version: 0,
+      latest_version: 2,
+      missing_history: { 9: [1, 2] },
+      my_copies: [
+        { key_version: 1, wrapped_key: 'w1' },
+        { key_version: 2, wrapped_key: 'w2' },
+      ],
+      ...over,
+    });
+
+  it('are wrapped for them and sent with the rotation', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(joined());
+    vi.mocked(rotateGroupKey).mockResolvedValue(3);
+
+    await groupKeyForSending(CONVERSATION, KEYS);
+
+    expect(vi.mocked(rotateGroupKey).mock.calls[0][1]).toEqual({
+      key_version: 3,
+      copies: { 42: 'for-42', 9: 'for-9' },
+      history: { 1: { 9: 'w1-for-key-9' }, 2: { 9: 'w2-for-key-9' } },
+    });
+  });
+
+  it('are not sent when the group hides its history', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(joined({ history_visible: false }));
+    vi.mocked(rotateGroupKey).mockResolvedValue(3);
+
+    await groupKeyForSending(CONVERSATION, KEYS);
+
+    expect(vi.mocked(rotateGroupKey).mock.calls[0][1].history).toBeUndefined();
+    expect(rewrapGroupKeyCopy).not.toHaveBeenCalled();
+  });
+
+  it('include only the versions this device holds, which is all the server takes', async () => {
+    vi.mocked(getGroupKeyState).mockResolvedValue(
+      joined({ my_copies: [{ key_version: 2, wrapped_key: 'w2' }] })
+    );
+    vi.mocked(rotateGroupKey).mockResolvedValue(3);
+
+    await groupKeyForSending(CONVERSATION, KEYS);
+
+    expect(vi.mocked(rotateGroupKey).mock.calls[0][1].history).toEqual({
+      2: { 9: 'w2-for-key-9' },
     });
   });
 });

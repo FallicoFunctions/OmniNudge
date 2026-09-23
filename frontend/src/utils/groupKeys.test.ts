@@ -5,6 +5,7 @@ import {
   GROUP_SEAL_VERSION,
   newGroupKey,
   openGroupMessage,
+  rewrapGroupKeyCopy,
   sealGroupMessage,
   sealGroupMessageWithIv,
   sealedKeyVersion,
@@ -118,6 +119,30 @@ describe('sealing the shared vectors', () => {
       expect(sealed).toBe(vector.sealed);
     }
   );
+});
+
+describe('sharing an older version with a newcomer', () => {
+  it('rewraps this device copy so the newcomer opens the same key', async () => {
+    const groupKey = await newGroupKey();
+    const me = await generateKeyPair();
+    const newcomer = await generateKeyPair();
+    const { copies } = await wrapGroupKeyForMembers(groupKey, [
+      { userId: 1, publicKey: (await exportKeyPair(me)).publicKey },
+    ]);
+
+    const theirs = await rewrapGroupKeyCopy(
+      copies[1],
+      me.privateKey,
+      (await exportKeyPair(newcomer)).publicKey
+    );
+    expect(theirs).not.toBe(copies[1]);
+
+    const sealedBeforeTheyJoined = await sealGroupMessage('said before you came', groupKey, 1);
+    const opened = await unwrapGroupKey(theirs, newcomer.privateKey);
+    await expect(openGroupMessage(sealedBeforeTheyJoined, opened)).resolves.toBe(
+      'said before you came'
+    );
+  });
 });
 
 describe('wrapping the key for members', () => {
