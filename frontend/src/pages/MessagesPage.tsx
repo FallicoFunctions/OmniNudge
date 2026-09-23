@@ -37,7 +37,7 @@ import { GroupInvitesList } from '../components/messages/GroupInviteCard';
 import { GroupDetailsSidebar } from '../components/messages/GroupDetailsSidebar';
 import { CreateGroupModal } from '../components/messages/CreateGroupModal';
 import { VoiceRecorderButton } from '../components/messages/VoiceRecorderButton';
-import { VoiceMessageBubble } from '../components/messages/VoiceMessageBubble';
+import { VoiceMessage } from '../components/messages/VoiceMessage';
 import { voiceMessagesService } from '../services/voiceMessagesService';
 import { IncomingCallModal } from '../components/messages/IncomingCallModal';
 import { CallScreen } from '../components/messages/CallScreen';
@@ -3254,11 +3254,8 @@ export default function MessagesPage() {
                                     onCancel={cancelEdit}
                                     isOwnMessage={isOwnMessage}
                                   />
-                                ) : message.voice_message ? (
-                                  <VoiceMessageBubble
-                                    voiceMessage={message.voice_message}
-                                    isOwn={isOwnMessage}
-                                  />
+                                ) : message.message_type === 'audio' && !message.media_url ? (
+                                  <VoiceMessage message={message} isOwn={isOwnMessage} />
                                 ) : (
                                   <DecryptedMessageContent
                                     message={message}

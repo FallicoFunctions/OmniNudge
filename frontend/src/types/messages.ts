@@ -151,7 +151,6 @@ export interface Message {
   recipient_keys?: Record<number, string>;
   /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
   has_reactions?: boolean;
-  voice_message?: VoiceMessage;
   delete_at?: string | null;
 }
 
