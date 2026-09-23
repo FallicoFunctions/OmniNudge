@@ -271,6 +271,59 @@ describe('sending a file to a group', () => {
   });
 });
 
+describe('dropping files into a group', () => {
+  // Drag and drop kept its own copy of the sealing rule, which looked for a
+  // single recipient and refused every group with "recipient not found".
+  it('seals each file under the group key, the same as the composer', async () => {
+    state.conversations = [groupConversation];
+    const groupKey = await newGroupKey();
+    vi.mocked(groupKeyForSendingOrRefuse).mockResolvedValue({ key: groupKey, version: 4 });
+    if (!URL.createObjectURL) {
+      Object.assign(URL, { createObjectURL: () => 'blob:preview', revokeObjectURL: () => {} });
+    }
+
+    const view = renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    fireEvent.click(await screen.findByTitle(i18n.t('messages.compose.attachMultiple')));
+    const zoneInput = await waitFor(() => {
+      const found = view.container.querySelector('input[type="file"][multiple]');
+      expect(found).not.toBeNull();
+      return found as HTMLInputElement;
+    });
+    fireEvent.change(zoneInput, {
+      target: { files: [new File([ORIGINAL], 'photo.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: i18n.t('mediaUploadZone.actions.upload', { count: 1 }),
+      })
+    );
+    await waitFor(() => expect(messagesService.sendMessage).toHaveBeenCalled());
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(state.uploaded).toHaveLength(1);
+    const uploaded = await bytesOf(state.uploaded[0]);
+    expect(uploaded).not.toEqual(ORIGINAL);
+
+    const request = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)![0];
+    expect(isSealedGroupEnvelope(request.media_encryption_key!)).toBe(true);
+    expect(request.group_key_version).toBe(4);
+    expect(request.sender_media_encryption_key).toBeUndefined();
+    const fileKey = await importFileKey(
+      base64ToArrayBuffer(await openGroupMessage(request.media_encryption_key!, groupKey))
+    );
+    const opened = await decryptFileWithKey(
+      {
+        encryptedData: sameRealm(uploaded),
+        iv: request.media_encryption_iv!,
+        mimeType: 'image/png',
+      },
+      fileKey
+    );
+    expect(await bytesOf(opened)).toEqual(ORIGINAL);
+  });
+});
+
 describe('sending a file in a direct message', () => {
   it('uploads only ciphertext, and gives each reader a key that opens it', async () => {
     state.conversations = [dmConversation];

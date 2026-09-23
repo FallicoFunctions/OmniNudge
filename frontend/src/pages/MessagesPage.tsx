@@ -9,7 +9,9 @@ import {
   useQueries,
 } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { groupKeyForSendingOrRefuse, messagesService } from '../services/messagesService';
+import { messagesService } from '../services/messagesService';
+import { sealFileForConversation } from '../services/fileSealing';
+import { recipientPublicKey } from '../services/recipientKeys';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
@@ -64,7 +66,6 @@ import {
   encryptMessage,
   encryptForMultipleRecipients,
 } from '../utils/encryption';
-import { encryptMediaForGroup, encryptMediaForRecipient } from '../utils/mediaEncryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { decryptForDisplay, useDecryptedContent } from '../hooks/useDecryptedContent';
@@ -91,7 +92,7 @@ import {
   formatRedditSlideshowInput,
   parseRedditSlideshowInput,
 } from '../utils/redditSlideshowInput';
-import { MessageNotSent, messageSendErrorKey } from '../utils/messageSendErrors';
+import { messageSendErrorKey } from '../utils/messageSendErrors';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 const SEARCH_PAGE_SIZE = 50;
@@ -1344,9 +1345,10 @@ export default function MessagesPage() {
               t('messages.errors.forwardRecipientResolutionFailed', 'Unable to resolve recipient.')
             );
           }
-          const publicKeys = await encryptionService.getPublicKeys([recipientID]);
-          const base64PublicKey = publicKeys[recipientID];
-          if (!base64PublicKey) {
+          let recipientKey: CryptoKey;
+          try {
+            recipientKey = await recipientPublicKey(recipientID);
+          } catch {
             throw new Error(
               t(
                 'messages.errors.forwardRecipientKeyFetchFailed',
@@ -1354,17 +1356,8 @@ export default function MessagesPage() {
               )
             );
           }
-          const recipientPublicKey = await getUserPublicKey(recipientID, base64PublicKey);
-          if (!recipientPublicKey) {
-            throw new Error(
-              t(
-                'messages.errors.forwardRecipientKeyImportFailed',
-                'Failed to import recipient key for encrypted forward.'
-              )
-            );
-          }
 
-          encryptedContent = await encryptMessage(plaintext, recipientPublicKey);
+          encryptedContent = await encryptMessage(plaintext, recipientKey);
           senderEncryptedContent = await encryptMessage(plaintext, ownKeys.publicKey);
           encryptionVersion = 'v2';
           isMultiRecipient = false;
@@ -1483,68 +1476,45 @@ export default function MessagesPage() {
     setShowMultiUpload(false);
 
     try {
-      // Get recipient's ID for encryption
       const conversation = conversations?.find((c) => c.id === selectedConversationId);
       if (!conversation) {
         alert(t('messages.errors.conversationNotFound'));
         return;
       }
-
-      const recipientId =
-        conversation.user1_id === user?.id ? conversation.user2_id : conversation.user1_id;
-      if (!recipientId) {
-        alert(t('messages.errors.recipientNotFound'));
-        return;
-      }
-
-      // Get recipient's public key
-      const recipientPublicKey = await getUserPublicKey(recipientId);
-      if (!recipientPublicKey) {
-        throw new Error(t('messages.errors.recipientKeyNotFound'));
-      }
-
-      // Get own keys
-      const ownKeys = await getOwnKeys();
-      if (!ownKeys?.publicKey || !ownKeys?.privateKey) {
-        throw new Error(t('messages.errors.encryptionKeysMissing'));
-      }
+      const target =
+        conversation.conversation_type === 'group'
+          ? { groupId: conversation.id }
+          : {
+              recipientId:
+                conversation.user1_id === user?.id ? conversation.user2_id : conversation.user1_id,
+            };
 
       // Upload files sequentially and send as individual messages
       for (const file of files) {
         try {
           const messageType = inferMessageTypeFromFile(file);
-
-          // Encrypt the file and wrap its key for both readers
-          const sealed = await encryptMediaForRecipient(file, recipientPublicKey, ownKeys);
-
-          // Upload encrypted file
+          const sealed = await sealFileForConversation(file, target);
           const uploadResponse = await mediaService.uploadMedia(
             new File([sealed.encryptedData], file.name, { type: file.type }),
             { encrypted: true }
           );
-          const recipientEncryptedKey = sealed.mediaEncryptionKey;
-          const senderEncryptedKey = sealed.senderMediaEncryptionKey;
 
-          // Create auto-generated caption
+          // The caption goes as content, so the send seals it the way it seals
+          // any text: for the group, or for the recipient and the sender.
           const captionText = `[${messageType === 'image' ? t('common.media.image') : t('common.media.video')}]`;
-          const encryptedCaption = await encryptMessage(captionText, recipientPublicKey);
-          const senderEncryptedCaption = await encryptMessage(captionText, ownKeys.publicKey);
-
-          // Send message
           await messagesService.sendMessage(
             {
               conversation_id: selectedConversationId,
-              encrypted_content: encryptedCaption,
-              sender_encrypted_content: senderEncryptedCaption,
+              content: captionText,
               media_file_id: uploadResponse.id,
               media_url: uploadResponse.storage_url,
               media_type: file.type,
               media_size: file.size,
               message_type: messageType,
-              media_encryption_key: recipientEncryptedKey,
+              media_encryption_key: sealed.mediaEncryptionKey,
               media_encryption_iv: sealed.mediaEncryptionIv,
-              sender_media_encryption_key: senderEncryptedKey,
-              encryption_version: 'v2',
+              sender_media_encryption_key: sealed.senderMediaEncryptionKey,
+              group_key_version: sealed.groupKeyVersion,
             },
             { onWaitingForMediaCheck: () => setCheckingMedia(true) }
           );
@@ -1646,51 +1616,19 @@ export default function MessagesPage() {
         // sent to a group, because a group has no single recipient to wrap for, so
         // recipientId was always undefined there. Each is now a refusal, thrown
         // before a byte leaves the device and shown by the catch below.
-        const ownKeys = await getOwnKeys();
-        let encryptedData: ArrayBuffer;
-        if (
+        const sealed = await sealFileForConversation(
+          selectedFile,
           !isCreatingChat &&
-          selectedConversationId &&
-          selectedConversation?.conversation_type === 'group'
-        ) {
-          // One envelope for the whole group, sealed under the group key. The same
-          // refusals as group text, from the same mapping.
-          const { key, version } = await groupKeyForSendingOrRefuse(
-            selectedConversationId,
-            ownKeys
-          );
-          const sealed = await encryptMediaForGroup(selectedFile, key, version);
-          encryptedData = sealed.encryptedData;
-          mediaEncryptionKey = sealed.mediaEncryptionKey;
-          mediaEncryptionIv = sealed.mediaEncryptionIv;
-          groupKeyVersion = sealed.groupKeyVersion;
-        } else {
-          if (!recipientId) {
-            throw new MessageNotSent(
-              'recipient-key-unusable',
-              'This conversation has nobody to encrypt the file for'
-            );
-          }
-          if (!ownKeys) {
-            throw new MessageNotSent('no-own-keys', 'This device has no encryption keys');
-          }
-          const publicKeys = await encryptionService.getPublicKeys([recipientId]);
-          const recipientPublicKeyBase64 = publicKeys[recipientId];
-          const recipientPublicKey = recipientPublicKeyBase64
-            ? await getUserPublicKey(recipientId, recipientPublicKeyBase64)
-            : null;
-          if (!recipientPublicKey) {
-            throw new MessageNotSent(
-              'recipient-key-unusable',
-              'The recipient has no usable public key'
-            );
-          }
-          const sealed = await encryptMediaForRecipient(selectedFile, recipientPublicKey, ownKeys);
-          encryptedData = sealed.encryptedData;
-          mediaEncryptionKey = sealed.mediaEncryptionKey;
-          mediaEncryptionIv = sealed.mediaEncryptionIv;
-          senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
-        }
+            selectedConversationId &&
+            selectedConversation?.conversation_type === 'group'
+            ? { groupId: selectedConversationId }
+            : { recipientId }
+        );
+        const encryptedData = sealed.encryptedData;
+        mediaEncryptionKey = sealed.mediaEncryptionKey;
+        mediaEncryptionIv = sealed.mediaEncryptionIv;
+        senderMediaEncryptionKey = sealed.senderMediaEncryptionKey;
+        groupKeyVersion = sealed.groupKeyVersion;
         // Uploaded as octet-stream, as this path always has been: the stored
         // bytes are ciphertext, and the reader takes the type from the file name.
         const fileToUpload = new File([encryptedData], selectedFile.name, {
