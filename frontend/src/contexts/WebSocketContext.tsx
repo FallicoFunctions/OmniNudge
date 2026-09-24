@@ -253,18 +253,25 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               };
             });
 
-            // Update conversation unread count
-            const updateConversations = (key: (string | number)[]) => {
-              queryClient.setQueryData<Conversation[] | undefined>(key, (prev) => {
+            // The conversation list is an infinite query, one page per fetch.
+            // Reading it as a plain array threw on every read receipt, so the
+            // unread count was never cleared from here.
+            for (const tab of ['all', 'archived']) {
+              queryClient.setQueryData<
+                InfiniteData<{ conversations: Conversation[]; next_cursor?: string }> | undefined
+              >(['conversations', tab], (prev) => {
                 if (!prev) return prev;
-                return prev.map((conv) =>
-                  conv.id === conversation_id ? { ...conv, unread_count: 0 } : conv
-                );
+                return {
+                  ...prev,
+                  pages: prev.pages.map((page) => ({
+                    ...page,
+                    conversations: page.conversations.map((conv) =>
+                      conv.id === conversation_id ? { ...conv, unread_count: 0 } : conv
+                    ),
+                  })),
+                };
               });
-            };
-
-            updateConversations(['conversations']);
-            updateConversations(['conversations', 'all']);
+            }
             break;
           }
 

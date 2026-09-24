@@ -90,3 +90,51 @@ describe('WebSocketProvider connection lifecycle', () => {
     expect(MockWebSocket.instances[0].url).toContain('active-effect-token');
   });
 });
+
+describe('WebSocketProvider read receipts', () => {
+  beforeEach(() => {
+    mocks.post.mockReset();
+    MockWebSocket.instances = [];
+    vi.stubGlobal('WebSocket', MockWebSocket);
+  });
+
+  // The conversation list is an infinite query. Read as a plain array, every
+  // read receipt threw 'prev.map is not a function' and the count stayed.
+  it('clears the unread count in the paged conversation list', async () => {
+    mocks.post.mockResolvedValue({ ws_token: 'token' });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = (ids: number[]) => ({
+      conversations: ids.map((id) => ({ id, unread_count: 3 })),
+      next_cursor: undefined,
+    });
+    queryClient.setQueryData(['conversations', 'all'], {
+      pages: [page([47, 48])],
+      pageParams: [undefined],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WebSocketProvider>
+          <div>app</div>
+        </WebSocketProvider>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+    act(() => {
+      socket.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'conversation_read', payload: { conversation_id: 47 } }),
+        })
+      );
+    });
+
+    const list = queryClient.getQueryData<{
+      pages: Array<{ conversations: Array<{ id: number; unread_count: number }> }>;
+    }>(['conversations', 'all']);
+    expect(list?.pages[0].conversations.map((c) => [c.id, c.unread_count])).toEqual([
+      [47, 0],
+      [48, 3],
+    ]);
+  });
+});
