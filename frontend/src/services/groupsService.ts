@@ -14,25 +14,25 @@ import type {
 export const groupsService = {
   /** Create a new group conversation */
   async createGroup(data: CreateGroupRequest): Promise<Conversation> {
-    return api.post<Conversation>('/conversations/groups', data);
+    return api.post<Conversation>('/groups', data);
   },
 
   /** Get all participants of a group */
   async getParticipants(conversationId: number): Promise<GroupParticipant[]> {
     const res = await api.get<{ participants: GroupParticipant[] }>(
-      `/conversations/${conversationId}/participants`
+      `/groups/${conversationId}/participants`
     );
     return res.participants;
   },
 
   /** Add a participant to a group */
   async addParticipant(conversationId: number, userId: number): Promise<void> {
-    await api.post(`/conversations/${conversationId}/participants`, { user_id: userId });
+    await api.post(`/groups/${conversationId}/participants`, { user_id: userId });
   },
 
   /** Remove a participant from a group */
   async removeParticipant(conversationId: number, userId: number): Promise<void> {
-    await api.delete(`/conversations/${conversationId}/participants/${userId}`);
+    await api.delete(`/groups/${conversationId}/participants/${userId}`);
   },
 
   /** Change a participant's role */
@@ -41,17 +41,17 @@ export const groupsService = {
     userId: number,
     data: UpdateParticipantRoleRequest
   ): Promise<void> {
-    await api.patch(`/conversations/${conversationId}/participants/${userId}`, data);
+    await api.patch(`/groups/${conversationId}/participants/${userId}/role`, data);
   },
 
   /** Update group name/avatar/description */
   async updateGroup(conversationId: number, data: UpdateGroupRequest): Promise<Conversation> {
-    return api.patch<Conversation>(`/conversations/${conversationId}/group`, data);
+    return api.put<Conversation>(`/groups/${conversationId}`, data);
   },
 
   /** Get group settings */
   async getSettings(conversationId: number): Promise<GroupSettings> {
-    return api.get<GroupSettings>(`/conversations/${conversationId}/settings`);
+    return api.get<GroupSettings>(`/groups/${conversationId}/settings`);
   },
 
   /** Update group settings */
@@ -59,12 +59,12 @@ export const groupsService = {
     conversationId: number,
     data: Partial<GroupSettings>
   ): Promise<GroupSettings> {
-    return api.patch<GroupSettings>(`/conversations/${conversationId}/settings`, data);
+    return api.put<GroupSettings>(`/groups/${conversationId}/settings`, data);
   },
 
   /** Send a group invite */
   async createInvite(conversationId: number, data: CreateGroupInviteRequest): Promise<GroupInvite> {
-    return api.post<GroupInvite>(`/conversations/${conversationId}/invites`, data);
+    return api.post<GroupInvite>(`/groups/${conversationId}/invites`, data);
   },
 
   /** Accept a group invite */
@@ -85,12 +85,12 @@ export const groupsService = {
 
   /** Leave a group */
   async leaveGroup(conversationId: number): Promise<void> {
-    await api.post(`/conversations/${conversationId}/leave`, {});
+    await api.post(`/groups/${conversationId}/leave`, {});
   },
 
   /** Transfer group ownership */
   async transferOwnership(conversationId: number, data: TransferOwnershipRequest): Promise<void> {
-    await api.post(`/conversations/${conversationId}/transfer-ownership`, data);
+    await api.post(`/groups/${conversationId}/transfer-ownership`, data);
   },
 
   /** Discover public groups */
@@ -105,7 +105,7 @@ export const groupsService = {
     if (params?.cursor) p.set('cursor', params.cursor);
     const qs = p.toString();
     return api.get<{ groups: Conversation[]; next_cursor?: string }>(
-      `/groups/discover${qs ? `?${qs}` : ''}`
+      `/groups${qs ? `?${qs}` : ''}`
     );
   },
 };
