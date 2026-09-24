@@ -1,0 +1,276 @@
+{
+  "schema_version": 2,
+  "head": "a33d23d12",
+  "base": "1df41fd40",
+  "scope": {
+    "files": [
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/pages/__tests__/MessagesPage.mediaSend.test.tsx",
+      "frontend/src/hooks/useVoicePlayer.ts",
+      "frontend/src/hooks/__tests__/useVoicePlayer.test.ts",
+      "frontend/src/components/messages/VoiceMessageBubble.tsx",
+      "frontend/src/components/messages/WaveformVisualizer.tsx",
+      "frontend/src/components/messages/__tests__/WaveformVisualizer.test.tsx"
+    ],
+    "boundaries": [
+      "the rendered voice bubble",
+      "the audio element's metadata",
+      "the query cache"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/9cc07e6b7.json",
+    ".review/c0c83c19b.json"
+  ],
+  "notes": "Voice and file in a group, checked in a real browser. One pass, no finding in the review; the four fixes came from running it. A sealed voice message now decrypts and plays in a real browser, the check open since G4b.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "1df41fd40..a33d23d12: aec8f4f3b (the sender's chat refreshes after a voice message), a33d23d12 (the voice player's known length, the waveform's colour on one's own bubble, the bubble's width). Found by running the group checks in the browser. Boundaries: the rendered voice bubble, the audio element's metadata, the query cache."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 9cc07e6b7 (G4b: the voice waveform drawn by the reader, the 404 wait, owned blob URLs) and c0c83c19b (the group chat review, waveform width fix)."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered in the pane as DERRF in the group: after the fixes the voice bubble reads 0:00 / 0:09 before play and 0:04 / 0:09 during it, the white bars fill with progress, and the bubble's edge lines up with the others at the pane's phone width. Before: 0:02 / 0:00 during play, no visible bars, and the bubble past the edge."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The recording and the image were sent for real: POST /messages 201 then POST /messages/:id/voice 201; the image upload answered 423 during the scan and 201 after; the stored file is 868 bytes of ciphertext served as octet-stream, with the wrapped media key, IV and group key version 1 on the message."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The player takes duration_seconds from the voice message record the server returns."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The audio element's contract: duration is Infinity for a webm without a length; the player now treats only a finite duration as known."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The test gives the fake audio Infinity, which is what a MediaRecorder webm reports, and a finite 4 for a file that knows its length."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Duration Infinity and finite; waveform with a colour and without."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The other waveform caller (the recorder in the composer) does not sit on a primary background; the other voice bubble (someone else's) is surface-coloured and keeps the theme colour."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every direct caller of messagesService.sendMessage: the multi-file loop, the feed column and the send mutation all refresh the chat afterwards; the voice path was the only one that did not."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No finding in the review; the three fixes were found by the browser check, and each new test fails without its fix (length 9 expected, colour #ffffff expected, a messages refetch expected)."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint and prettier clean."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Played for real: a test tone replaced getUserMedia in the pane, the real recorder, sealing, upload, decrypt and playback ran, and the audio played with the time advancing."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "The bubble checked at the pane's phone width (the pane is narrower than 768 px); 240 px capped at 100% of the message."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Vitest counts read."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The group checks the user asked for: a file and a voice message in a group, both sealed and working; the history check waits for another account."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The media-send, voice message, voice player and waveform test files: 31 tests."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a: nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No control patches these files at the changed lines."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The blob URLs the player makes and the caller owns are unchanged (the 9cc07e6b7 finding's tests still pass)."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The real hook and components."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "The 31 tests pass in 5 shuffled orders."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "tsc -b 0",
+    "lint": "eslint, prettier",
+    "vet": "n/a",
+    "tests": "31 tests in 4 files, 5 shuffled orders"
+  }
+}
