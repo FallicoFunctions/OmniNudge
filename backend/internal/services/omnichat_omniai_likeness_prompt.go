@@ -136,7 +136,10 @@ func BuildOmniAILikenessPrompt(
 	profile models.OmniChatMediaIdentityProfile, brief OmniAICandidateBrief,
 ) string {
 	p := pronounsFor(profile.Subject)
-	subject := strings.TrimSpace(profile.Appearance)
+	// Its own sentence, so it gets a capital the way the setting does. The
+	// creation flow always writes one, but a description written any other way
+	// arrived as "...and nobody else. a woman with dark curly hair."
+	subject := startsASentence(profile.Appearance)
 	if subject == "" {
 		subject = omniAILikenessFallbackSubject
 	}

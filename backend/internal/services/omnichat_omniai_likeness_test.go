@@ -372,6 +372,30 @@ func TestASplicedPhraseReadsAsPartOfItsSentence(t *testing.T) {
 	require.Contains(t, prompt, "A rocky beach at dawn.")
 }
 
+// The appearance is a sentence of its own and opens with a capital, whatever
+// case it was stored in. The joiner already supplies a missing full stop, so
+// both are checked on the assembled prompt rather than on the helper.
+func TestTheAppearanceOpensItsOwnSentence(t *testing.T) {
+	brief := OmniAICandidateBrief{Outfit: "A navy jumper and dark jeans", Setting: "A rocky beach at dawn"}
+	tests := []struct {
+		name       string
+		appearance string
+		want       string
+	}{
+		{"lowercase without a full stop", "a woman with dark curly hair", "nobody else. A woman with dark curly hair. She is wearing"},
+		{"capitalised with a full stop", "A woman with dark curly hair.", "nobody else. A woman with dark curly hair. She is wearing"},
+		{"a leading age, as written by hand", "41-year-old woman, tan skin", "nobody else. 41-year-old woman, tan skin. She is wearing"},
+		{"nothing stored", "", "nobody else. An adult. She is wearing"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := BuildOmniAILikenessPrompt(models.OmniChatMediaIdentityProfile{Appearance: tt.appearance}, brief)
+			t.Log(prompt)
+			require.Contains(t, prompt, tt.want)
+		})
+	}
+}
+
 // Only a determiner is lowered. A blind lowercase would turn "Doc Martens" into
 // "doc Martens" -- a worse error than the one being fixed, and one that nothing
 // downstream would ever flag.
