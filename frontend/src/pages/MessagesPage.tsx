@@ -708,6 +708,12 @@ export default function MessagesPage() {
     if (!hubName) return t('messages.hubFallback');
     return hubTitleByName.get(hubName) ?? hubName;
   };
+  const conversationTitle = (conversation: Conversation) =>
+    conversation.conversation_type === 'mod_mail'
+      ? `${getHubDisplayTitle(conversation.hub_name)} - ${t('messages.modMail')} - ${conversation.subject || t('messages.untitled')}`
+      : conversation.conversation_type === 'group'
+        ? conversation.group_name || t('groups.groupConversation')
+        : conversation.other_user?.username || t('messages.unknown');
 
   // Filter conversations based on active tab
   const unfilteredConversations = useMemo(() => {
@@ -2534,21 +2540,20 @@ export default function MessagesPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             <span
-                              className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
+                              className={`truncate font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
                             >
-                              {conversation.conversation_type === 'mod_mail'
-                                ? `${getHubDisplayTitle(conversation.hub_name)} - ${t('messages.modMail')} - ${conversation.subject || t('messages.untitled')}`
-                                : conversation.conversation_type === 'group'
-                                  ? conversation.group_name || t('groups.groupConversation')
-                                  : conversation.other_user?.username || t('messages.unknown')}
+                              {conversationTitle(conversation)}
                             </span>
                             {conversation.other_user?.id && (
-                              <OnlineStatusIndicator userId={conversation.other_user.id} />
+                              <OnlineStatusIndicator
+                                userId={conversation.other_user.id}
+                                className="flex-shrink-0"
+                              />
                             )}
                             {(conversation.is_archived ?? conversation.archived_at !== null) && (
-                              <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                              <span className="flex-shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                                 {t('messages.badges.archived')}
                               </span>
                             )}
@@ -2597,6 +2602,9 @@ export default function MessagesPage() {
                           }}
                           onTouchStart={(e) => e.stopPropagation()}
                           onTouchEnd={(e) => e.stopPropagation()}
+                          aria-label={t('messages.conversationOptions.ariaLabel', {
+                            name: conversationTitle(conversation),
+                          })}
                           className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
                         >
                           ...
@@ -2762,11 +2770,9 @@ export default function MessagesPage() {
                     <h3 className="min-w-0 font-semibold text-[var(--color-text-primary)] truncate">
                       {isCreatingChat
                         ? t('messages.newConversation')
-                        : selectedConversation?.conversation_type === 'mod_mail'
-                          ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - ${t('messages.modMail')} - ${selectedConversation?.subject || t('messages.untitled')}`
-                          : selectedConversation?.conversation_type === 'group'
-                            ? selectedConversation?.group_name || t('groups.groupConversation')
-                            : selectedConversation?.other_user?.username || t('messages.unknown')}
+                        : selectedConversation
+                          ? conversationTitle(selectedConversation)
+                          : t('messages.unknown')}
                     </h3>
                     {!isCreatingChat &&
                       selectedConversation?.conversation_type === 'group' &&

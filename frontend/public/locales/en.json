@@ -1650,6 +1650,9 @@
     "messageOptions": {
       "ariaLabel": "Message options"
     },
+    "conversationOptions": {
+      "ariaLabel": "Options for {{name}}"
+    },
     "reactions": {
       "addReaction": "Add reaction",
       "updateFailed": "Failed to update reaction",
