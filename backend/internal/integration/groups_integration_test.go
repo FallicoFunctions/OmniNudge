@@ -439,9 +439,10 @@ func TestGroupMessagesComeNewestFirst(t *testing.T) {
 
 // liveGroup makes a group of three and connects its two members' sockets.
 type liveGroup struct {
-	id         int
-	ownerToken string
-	members    []*gorillaws.Conn
+	id           int
+	ownerToken   string
+	memberTokens []string
+	members      []*gorillaws.Conn
 }
 
 func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liveGroup {
@@ -469,7 +470,14 @@ func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liv
 		readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
 		return conn
 	}
-	return liveGroup{id: group.ID, ownerToken: ownerToken, members: []*gorillaws.Conn{dial(m1), dial(m2)}}
+	m1Token, _ := deps.AuthService.GenerateJWT(m1.ID, m1.Username, m1.Role)
+	m2Token, _ := deps.AuthService.GenerateJWT(m2.ID, m2.Username, m2.Role)
+	return liveGroup{
+		id:           group.ID,
+		ownerToken:   ownerToken,
+		memberTokens: []string{m1Token, m2Token},
+		members:      []*gorillaws.Conn{dial(m1), dial(m2)},
+	}
 }
 
 func (g liveGroup) send(t *testing.T, deps *groupTestDeps, text string) int {
@@ -520,4 +528,22 @@ func TestGroupPinReachesTheOtherMembers(t *testing.T) {
 		payload, _ := evt["payload"].(map[string]interface{})
 		assert.EqualValues(t, messageID, payload["message_id"])
 	}
+}
+
+// TestGroupReadReceiptReachesTheOtherMembers: conversation_read went to every
+// participant only for mod mail; a group took the direct-message branch, found
+// no other user, and told nobody it had been read.
+func TestGroupReadReceiptReachesTheOtherMembers(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "read")
+	g.send(t, deps, "read me")
+	r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/conversations/%d/read", g.id), g.memberTokens[0], nil)
+	require.Equal(t, http.StatusOK, r.Code, "read: %s", r.Body.String())
+	evt := readWebSocketEvent(t, g.members[1], 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "conversation_read" })
+	payload, _ := evt["payload"].(map[string]interface{})
+	assert.EqualValues(t, g.id, payload["conversation_id"])
 }

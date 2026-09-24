@@ -2620,9 +2620,11 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			})
 		}
 
-		// Notify other participants based on conversation type
-		if conversationType == "mod_mail" {
-			// For mod mail, notify all participants except the reader (concurrent broadcasts)
+		// Notify other participants based on conversation type. A group, like
+		// mod mail, has its members in conversation_participants; read as a
+		// direct message it had no other user, so nobody heard it was read.
+		if conversationType == "mod_mail" || conversationType == "group" {
+			// Notify all participants except the reader (concurrent broadcasts)
 			rows, err := h.pool.Query(c.Request.Context(), `
 				SELECT user_id FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id != $2
