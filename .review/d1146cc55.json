@@ -1,0 +1,533 @@
+{
+  "schema_version": 2,
+  "head": "462e88241",
+  "base": "d1146cc55",
+  "scope": {
+    "files": [
+      ".review/controls/style-R1-spliced-capital.patch",
+      ".review/controls/style-R5-note-outranks.patch",
+      ".review/controls/style-R7-glasses-not-refused.patch",
+      ".review/controls/style-R8-style-bounded-on-read.patch",
+      ".review/controls/wardrobe-R1-reference-standard.patch",
+      "backend/internal/services/omnichat_omniai_likeness_prompt.go",
+      "backend/internal/services/omnichat_omniai_likeness_test.go",
+      "backend/internal/services/omnichat_omniai_reference_set.go",
+      "backend/internal/services/omnichat_omniai_reference_set_test.go"
+    ],
+    "boundaries": [
+      "the prompt text sent to the image model"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/390b0e4cbd0254bacacc4d85b16290120a74c839.json",
+    ".review/58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    ".review/d60e3bee1.json"
+  ],
+  "notes": "Phase 4 controls and the appearance capital. Two passes, one finding (the reference prompt had the same missing capital). B5 not rendered: prompts for every real dev character are byte-identical before and after.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "d1146cc55..b147c14c0: 111e72b3e (phase 4 of the stale-control rebuild: style-R1/R5/R7/R8, wardrobe-R1) and b147c14c0 (the likeness prompt's appearance sentence gets a capital). Boundary: the prompt text sent to the image model."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 390b0e4cbd02 (style-R1, the spliced-capital finding this one mirrors), 58dafd573022 (wardrobe), d60e3bee1 (H6)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled likeness prompt for four appearances (lowercase no stop, capitalised with stop, age-first as written by hand, empty) and, after the finding, the reference prompt for four (full body lowercase, portrait lowercase face description, portrait capitalised, empty) with a male subject: each opens with a capital, a missing stop is supplied by the joiner, the reference prompt is gender-neutral throughout. Phase 4 patches diffed old vs new: R5, R7, R8, W1 identical (stale by context only); R1 differs only by the pronoun rewrite (p.Subj/p.is)."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The image worker receives the prompt as text; the scene path is separate and tag-style (infra/runpod/omnichat_worker/generators.py builds comma-separated clauses from subject_appearance), where case does not matter."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Test appearances include the dev database's real hand-written shape (age first, no stop)."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real data: read the dev database read-only through config.Load (no values printed): 2 characters with an appearance, 0 lowercase, 1 without a final stop (159 runes, hand-written)."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The 160-rune read bound truncates without a stop; the joiner supplies one, shown by the age-first case."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The sibling builder: BuildOmniAIReferencePrompt opens with the same appearance sentence (and a face description for portraits) and had no capital either. Finding reference-description-lowercase."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The rule is the existing startsASentence in both builders, not a copy."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every writer of Appearance (creation flow via RenderOmniAIAppearance, always 'A'/'An' and a stop) and every reader that builds a prompt: the likeness prompt, the reference prompt, the scene snapshot (tag-style worker). Every caller of joinOmniAIPromptSentences: the same two builders."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control reference-description-lowercase: with the reference fix reverted, the two lowercase cases fail ('does not contain one person. A man with a short beard.'); at HEAD all four pass."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go build ./..., go vet, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by E1/E6 (a sibling builder with the same opening); already rows."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "NOT verified by rendering. No image was generated for either prompt change. For both real characters in the dev database the likeness and reference prompts are byte-identical before and after (one appearance starts with a capital, the other with a digit), so no existing character's picture can change; a render would compare invented lowercase inputs only. Recorded as an unverified model-input change and told to the user."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All 41 likeness-file tests by name: 41 PASS, 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The task: find whether lowercase or unterminated appearances are real, fix the capital, add a printing test, render or say plainly; done, not rendered."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Every test function in the likeness and reference test files (65)."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Controls on the two changed prompt files: proactive-R1-coverage-garment, style-R7-glasses-not-refused, style-R1-spliced-capital replayed in a worktree -- pass at HEAD, fail with their patch. wardrobe-R3 and wardrobe-R6 were stale before this range (phase 5)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The prompt builders are the production functions."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "The 65 likeness and reference tests pass with go test -shuffle 1, 2, 3."
+        }
+      ],
+      "findings": [
+        {
+          "id": "reference-description-lowercase",
+          "summary": "BuildOmniAIReferencePrompt put the stored appearance, or the face description for a portrait, in as its own sentence without a capital, the same fault just fixed in the likeness prompt: a lowercase description read 'Reference image of one person. a man with a short beard.'",
+          "found_by": "E1",
+          "fix_commit": "462e88241",
+          "control": {
+            "patch": ".review/controls/reference-description-lowercase.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/services/ -run '^TestAReferenceOpensItsDescriptionWithACapital$'"
+            ],
+            "observed": "With the fix reverted: the full-body lowercase and portrait lowercase-face cases fail; the capitalised and empty cases pass."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over the same range plus 462e88241 (reference prompt capital)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 390b0e4cbd02 (style-R1, the spliced-capital finding this one mirrors), 58dafd573022 (wardrobe), d60e3bee1 (H6)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the assembled likeness prompt for four appearances (lowercase no stop, capitalised with stop, age-first as written by hand, empty) and, after the finding, the reference prompt for four (full body lowercase, portrait lowercase face description, portrait capitalised, empty) with a male subject: each opens with a capital, a missing stop is supplied by the joiner, the reference prompt is gender-neutral throughout. Phase 4 patches diffed old vs new: R5, R7, R8, W1 identical (stale by context only); R1 differs only by the pronoun rewrite (p.Subj/p.is)."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "The image worker receives the prompt as text; the scene path is separate and tag-style (infra/runpod/omnichat_worker/generators.py builds comma-separated clauses from subject_appearance), where case does not matter."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Test appearances include the dev database's real hand-written shape (age first, no stop)."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Real data: read the dev database read-only through config.Load (no values printed): 2 characters with an appearance, 0 lowercase, 1 without a final stop (159 runes, hand-written)."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The 160-rune read bound truncates without a stop; the joiner supplies one, shown by the age-first case."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "After the fix: no third builder opens with the stored description; both joiner callers now capitalise it."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The rule is the existing startsASentence in both builders, not a copy."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every writer of Appearance (creation flow via RenderOmniAIAppearance, always 'A'/'An' and a stop) and every reader that builds a prompt: the likeness prompt, the reference prompt, the scene snapshot (tag-style worker). Every caller of joinOmniAIPromptSentences: the same two builders."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No new finding."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go build ./..., go vet, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "NOT verified by rendering. No image was generated for either prompt change. For both real characters in the dev database the likeness and reference prompts are byte-identical before and after (one appearance starts with a capital, the other with a digit), so no existing character's picture can change; a render would compare invented lowercase inputs only. Recorded as an unverified model-input change and told to the user."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "All 41 likeness-file tests by name: 41 PASS, 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The task: find whether lowercase or unterminated appearances are real, fix the capital, add a printing test, render or say plainly; done, not rendered."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Every test function in the likeness and reference test files (65)."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Replayed reference-description-lowercase in a worktree with the others: passes at HEAD, fails with its patch."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The prompt builders are the production functions."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "The 65 likeness and reference tests pass with go test -shuffle 1, 2, 3."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./...",
+    "types": "n/a",
+    "lint": "gofmt, golangci-lint 0",
+    "vet": "go vet ok",
+    "tests": "likeness + reference 65 tests, shuffled x3"
+  }
+}

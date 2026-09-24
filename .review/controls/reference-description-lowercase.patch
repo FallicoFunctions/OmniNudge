@@ -1,0 +1,18 @@
+diff --git a/backend/internal/services/omnichat_omniai_reference_set.go b/backend/internal/services/omnichat_omniai_reference_set.go
+index ea7bea95a..a57c2107f 100644
+--- a/backend/internal/services/omnichat_omniai_reference_set.go
++++ b/backend/internal/services/omnichat_omniai_reference_set.go
+@@ -211,11 +211,10 @@ func BuildOmniAIReferencePrompt(
+ 		return ""
+ 	}
+ 
+-	// Its own sentence, capitalised for the reason the likeness prompt's is.
+-	subject := startsASentence(profile.Appearance)
++	subject := strings.TrimSpace(profile.Appearance)
+ 	// A portrait is cropped at the chest, so it is described from the chest up.
+ 	if variant.Aspect == omniAIReferencePortraitAspect && strings.TrimSpace(faceAppearance) != "" {
+-		subject = startsASentence(faceAppearance)
++		subject = strings.TrimSpace(faceAppearance)
+ 	}
+ 	if subject == "" {
+ 		subject = omniAILikenessFallbackSubject
