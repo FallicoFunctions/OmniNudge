@@ -49,7 +49,24 @@ async function openMessages(page: Page, width: number) {
     } else if (path === '/auth/key-backup') {
       await json(LOGIN_KEY_ACCOUNT_BACKUP);
     } else if (path === '/conversations') {
-      await json({ conversations: [conversation(7, 'TestUser'), conversation(9, LONG_NAME)] });
+      await json({
+        conversations: [
+          conversation(7, 'TestUser'),
+          conversation(9, LONG_NAME),
+          {
+            id: 11,
+            conversation_type: 'group',
+            is_group: true,
+            group_name: 'Weekend plans',
+            participant_count: 3,
+            created_at: now,
+            last_message_at: now,
+            unread_count: 0,
+            is_archived: false,
+            archived_at: null,
+          },
+        ],
+      });
     } else {
       // A 404 opens nothing. A real server would answer 401 for an account it
       // does not know, and the API client opens the sign-in dialog on a 401.
@@ -90,4 +107,12 @@ test('a long name stops before the row menu on a phone', async ({ page }) => {
     .getByRole('button', { name: `Options for ${LONG_NAME}` })
     .boundingBox();
   expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(menuBox!.x);
+});
+
+// A group row looked exactly like a direct message, with nothing to say it was
+// a group.
+test('a group row shows how many members it has', async ({ page }) => {
+  await openMessages(page, 390);
+  const row = page.getByRole('button').filter({ hasText: 'Weekend plans' }).first();
+  await expect(row).toContainText('3 members');
 });

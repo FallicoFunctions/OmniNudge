@@ -50,9 +50,11 @@ import { useMessageEdit, isEditable } from '../hooks/useMessageEdit';
 import { useGroupAdmin } from '../hooks/useGroupAdmin';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { groupsService } from '../services/groupsService';
 import type {
   Conversation,
   ConversationFolder,
+  GroupParticipant,
   Message,
   PinnedMessagesResponse,
   SendMessageRequest,
@@ -1006,6 +1008,15 @@ export default function MessagesPage() {
       return response.json();
     },
     enabled: !!selectedConversationId && selectedConversation?.conversation_type === 'mod_mail',
+  });
+
+  // The same query, under the same key, as the group sidebar's, so the two
+  // share one fetch. A group bubble names its sender from it.
+  const { data: groupParticipants } = useQuery<GroupParticipant[]>({
+    queryKey: ['group-participants', selectedConversationId],
+    queryFn: () => groupsService.getParticipants(selectedConversationId!),
+    enabled: !!selectedConversationId && selectedConversation?.conversation_type === 'group',
+    staleTime: 60_000,
   });
 
   const uploadMediaMutation = useMutation({
@@ -2546,6 +2557,14 @@ export default function MessagesPage() {
                             >
                               {conversationTitle(conversation)}
                             </span>
+                            {conversation.conversation_type === 'group' &&
+                              conversation.participant_count != null && (
+                                <span className="flex-shrink-0 text-xs text-[var(--color-text-muted)]">
+                                  {t('groups.participantCount', {
+                                    count: conversation.participant_count,
+                                  })}
+                                </span>
+                              )}
                             {conversation.other_user?.id && (
                               <OnlineStatusIndicator
                                 userId={conversation.other_user.id}
@@ -3170,13 +3189,18 @@ export default function MessagesPage() {
 
                       // For mod_mail, get sender info from participants
                       const isModMail = selectedConversation?.conversation_type === 'mod_mail';
+                      const isGroup = selectedConversation?.conversation_type === 'group';
                       const participant = isModMail
                         ? modMailConversation?.participants?.find(
                             (p) => p.user_id === message.sender_id
                           )
                         : null;
+                      const groupSender = isGroup
+                        ? groupParticipants?.find((p) => p.user_id === message.sender_id)
+                        : undefined;
                       const senderUsername =
                         participant?.username ||
+                        groupSender?.username ||
                         (isOwnMessage ? t('messages.you') : t('messages.user'));
                       const isModerator = participant?.is_moderator || false;
                       const parentMessage = message.reply_to
@@ -3235,6 +3259,11 @@ export default function MessagesPage() {
                                   : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
                               }`}
                             >
+                              {isGroup && !isOwnMessage && (
+                                <p className="mb-0.5 truncate text-xs font-semibold text-[var(--color-primary)]">
+                                  {senderUsername}
+                                </p>
+                              )}
                               {message.reply_to && (
                                 <ReplyIndicator
                                   parentUsername={parentUsername}
@@ -3501,6 +3530,15 @@ export default function MessagesPage() {
                                 </div>
                               )}
                             </div>
+                            {message.id > 0 && !!user && (
+                              <QuickReactButton
+                                messageId={message.id}
+                                conversationId={selectedConversationId!}
+                                isOwnMessage={isOwnMessage}
+                                currentUserId={user.id}
+                                currentUsername={user.username}
+                              />
+                            )}
                           </div>
                           {!message.reply_to && (message.reply_count ?? 0) > 0 && (
                             <ThreadPreview
@@ -3508,27 +3546,16 @@ export default function MessagesPage() {
                               onOpenThread={() => setThreadRootMessageId(message.id)}
                             />
                           )}
-                          {message.id > 0 && (
+                          {message.id > 0 && message.has_reactions && (
                             <div
                               className={`mt-1 flex items-center gap-1 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
                             >
-                              {!!user && (
-                                <QuickReactButton
-                                  messageId={message.id}
-                                  conversationId={selectedConversationId!}
-                                  isOwnMessage={isOwnMessage}
-                                  currentUserId={user.id}
-                                  currentUsername={user.username}
-                                />
-                              )}
-                              {message.has_reactions && (
-                                <MessageReactions
-                                  messageId={message.id}
-                                  isOwnMessage={isOwnMessage}
-                                  currentUserId={user?.id ?? 0}
-                                  currentUsername={user?.username}
-                                />
-                              )}
+                              <MessageReactions
+                                messageId={message.id}
+                                isOwnMessage={isOwnMessage}
+                                currentUserId={user?.id ?? 0}
+                                currentUsername={user?.username}
+                              />
                             </div>
                           )}
                         </div>
