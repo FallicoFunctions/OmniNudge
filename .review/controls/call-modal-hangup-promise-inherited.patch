@@ -1,0 +1,32 @@
+diff --git a/frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx b/frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx
+index e6f2adeed..9b0815606 100644
+--- a/frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx
++++ b/frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx
+@@ -130,15 +130,6 @@ const call: OmniChatCallSession = {
+ };
+ 
+ describe('OmniChatCallModal', () => {
+-  beforeEach(() => {
+-    // Configured here rather than inherited. The modal hangs up and records
+-    // turns with .catch(), so a mock left without a promise throws on unmount,
+-    // and a test passed only when something earlier in the file had set one --
+-    // which a shuffled run showed for the video tests.
+-    vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+-    vi.mocked(omnichatService.recordCallTurn).mockResolvedValue(undefined);
+-  });
+-
+   afterEach(() => {
+     vi.useRealTimers();
+     vi.clearAllMocks();
+@@ -545,6 +536,11 @@ describe('OmniChatCallModal', () => {
+       live.handlers = null;
+       live.onChunk = null;
+       live.onPlaying = null;
++      // Configured here rather than inherited. Without it these tests pass
++      // only when something earlier in the file has set it, which is a test
++      // that proves nothing on its own -- and a control built on one proves
++      // less than nothing.
++      vi.mocked(omnichatService.endCall).mockResolvedValue(undefined);
+       getUserMedia.mockResolvedValue({
+         getTracks: () => [{ stop: vi.fn() }],
+         getAudioTracks: () => [

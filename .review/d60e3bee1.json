@@ -1,0 +1,536 @@
+{
+  "schema_version": 2,
+  "head": "bfc2ac52b",
+  "base": "d60e3bee1",
+  "scope": {
+    "files": [
+      "frontend/src/components/omnichat/callSentenceSpeech.ts",
+      "frontend/src/components/omnichat/__tests__/callSentenceSpeech.test.ts",
+      "frontend/src/components/omnichat/__tests__/OmniChatCallModal.test.tsx",
+      "frontend/src/contexts/WebSocketContext.tsx",
+      "frontend/src/services/omnichatService.ts",
+      "backend/cmd/server/main.go",
+      "backend/internal/api/middleware/redis_rate_limit.go",
+      "backend/internal/handlers/omnichat_voice.go",
+      "backend/internal/handlers/omnichat_voice_test.go",
+      "backend/internal/services/omnichat_voice.go"
+    ],
+    "boundaries": [
+      "the browser bundle",
+      "the WebSocket messages the server still sends",
+      "the HTTP route table"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/464c678c8.json",
+    ".review/10c4f8b92.json",
+    ".review/c4d7a019d.json"
+  ],
+  "notes": "Dead call-sentence code, frontend and the backend route (phase A). Two passes, one finding, found by shuffling the test order, now instrument H6. dropped-notice-stall retired (its code deleted); 464c678c8 left unedited at the user's request. These commits must not ship before phase B: the server still sends sentence events the frontend now logs as unknown.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "d60e3bee1..3e023ccb6: a8a5bf396 (meter test closes its call), de41b9a42 (remove callSentenceSpeech.ts, its test, getCallSentenceSpeech, the two WebSocket cases, the trivial call-screen test), 3e023ccb6 (remove the call-speech route, GetCallSentenceSpeech, its rate limiter, SetCallSentences, SpeakSentence). Boundaries: the browser bundle, the WebSocket messages the server still sends, the HTTP route table."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 464c678c8 (video-double-voice, dropped-notice-stall: both findings in the removed code), 10c4f8b92 (call-R1 pass 2: a test that inherited endCall's resolved value -- the same shape found again here), c4d7a019d (phase 3)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Built the production bundle (vite build to a scratch dir) and searched it: 'call-speech' 0 files, 'omnichat_call_sentence' 0, 'playCallSentences' 0; the live call route still present."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No rendered component changed; the call screen lost only a test."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The route table: the call-speech GET and its limiter are gone from cmd/server/main.go, the live-call route beside it unchanged; go build ./... and go vet pass. No other client in the repository (git grep: omnirave-web, omnirave-babylon, shared, k6, docs) names the route or the events."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The server still sends omnichat_call_sentence / omnichat_call_sentences_done until phase B; the frontend has no case for them and falls to default: console.log('[WebSocket] Unknown message type'). Harmless, but one log line per sentence of a video-call reply: these commits must not ship without phase B (told to the user)."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a: no shape changed on a live seam."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a: no provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every removed symbol searched for calls, types, string literals, dynamic imports, re-exports and mocks before removal; none left (grep and tsc -b)."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "GetConversationVoiceOwned (models/omnichat_voice.go and the handler interface) has no caller now; left for phase B2, told to the user."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Same shape as the meter leak (a test that leaves async work for the next): listed every call-screen test that opens a call without unmounting; all video. Ran the file shuffled (H6) to test them empirically -- which found the finding."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control call-modal-hangup-promise-inherited: with the file-level endCall/recordCallTurn defaults reverted, seed 9 fails ('Cannot read properties of undefined (reading catch)'); at HEAD it passes."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint and prettier clean, go build, go vet, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by running the file in shuffled order, which no instrument named. Added as H6."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "handlers Voice|Speech|Call: 69 PASS, 0 SKIP with -v."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The task: remove the dead frontend, verify, report the backend; phase A (route) approved and done; phase B awaits approval."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "24 test files that import or mock omnichatService, WebSocketContext or OmniChatCallModal: 273 passed, 1 skipped (pre-existing)."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a: nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Controls on the touched files still apply: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, poster-R5, voice-R1 (replayed in pass 2). dropped-notice-stall no longer applies: it patched callSentenceSpeech.ts, which de41b9a42 deleted, so it cannot be rebuilt and is retired here. Its finding lives in 464c678c8, which the user asked not to edit, so its note is this line and the patch file is left as it was."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "The meter test now unmounts after its live socket opens, as the other hands-free tests do."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "Ran OmniChatCallModal.test.tsx with --sequence.shuffle: seeds 1-8 passed, but checking the shuffle first (meter fix removed: seeds 4 and 8 failed) showed it could catch a leak, and 16 more seeds with the fix found 4 failures (seeds 9, 12, 14, 17): video tests reading endCall(...).catch on a mock with no promise. Finding call-modal-hangup-promise-inherited."
+        }
+      ],
+      "findings": [
+        {
+          "id": "call-modal-hangup-promise-inherited",
+          "summary": "The video tests in OmniChatCallModal.test.tsx that unmount a call passed only when an earlier test had left a promise on omnichatService.endCall: endCall had a default only inside the hands-free group, and the modal hangs up with endCall(...).catch(). In shuffled order 4 of 16 seeds failed.",
+          "found_by": "H6",
+          "fix_commit": "bfc2ac52b",
+          "control": {
+            "patch": ".review/controls/call-modal-hangup-promise-inherited.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/components/omnichat/__tests__/OmniChatCallModal.test.tsx --sequence.shuffle --sequence.seed=9"
+            ],
+            "observed": "With the file-level defaults reverted: 1 failed, 'Cannot read properties of undefined (reading catch)' in 'connects to a private LiveKit room'. At HEAD: 28 passed."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over the same range plus bfc2ac52b (file-level endCall/recordCallTurn defaults; the hands-free copy removed)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 464c678c8 (video-double-voice, dropped-notice-stall: both findings in the removed code), 10c4f8b92 (call-R1 pass 2: a test that inherited endCall's resolved value -- the same shape found again here), c4d7a019d (phase 3)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Built the production bundle (vite build to a scratch dir) and searched it: 'call-speech' 0 files, 'omnichat_call_sentence' 0, 'playCallSentences' 0; the live call route still present."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "No rendered component changed; the call screen lost only a test."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "The route table: the call-speech GET and its limiter are gone from cmd/server/main.go, the live-call route beside it unchanged; go build ./... and go vet pass. No other client in the repository (git grep: omnirave-web, omnirave-babylon, shared, k6, docs) names the route or the events."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The server still sends omnichat_call_sentence / omnichat_call_sentences_done until phase B; the frontend has no case for them and falls to default: console.log('[WebSocket] Unknown message type'). Harmless, but one log line per sentence of a video-call reply: these commits must not ship without phase B (told to the user)."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a: no shape changed on a live seam."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a: no provider."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No fixture."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every removed symbol searched for calls, types, string literals, dynamic imports, re-exports and mocks before removal; none left (grep and tsc -b)."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "GetConversationVoiceOwned (models/omnichat_voice.go and the handler interface) has no caller now; left for phase B2, told to the user."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "No other instance: 30 shuffled seeds clean."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No new finding."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint and prettier clean, go build, go vet, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "handlers Voice|Speech|Call: 69 PASS, 0 SKIP with -v."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The task: remove the dead frontend, verify, report the backend; phase A (route) approved and done; phase B awaits approval."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "24 test files that import or mock omnichatService, WebSocketContext or OmniChatCallModal: 273 passed, 1 skipped (pre-existing)."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a: nothing covers the screen."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Replayed in a worktree as the hook does: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, poster-R5, voice-R1 and the new control all pass at HEAD and fail with their patch. dropped-notice-stall retired as in pass 1."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "applied",
+          "evidence": "The meter test now unmounts after its live socket opens, as the other hands-free tests do."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "30 of 30 shuffled seeds pass after bfc2ac52b, including 9, 12, 14, 17. Backend handler voice tests pass with go test -shuffle 1, 2, 3."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./..., vite build",
+    "types": "tsc -b 0",
+    "lint": "eslint, prettier, gofmt, golangci-lint 0",
+    "vet": "go vet ok",
+    "tests": "frontend 24 files 273 passed; OmniChatCallModal 30/30 shuffled; handlers voice 69 PASS"
+  }
+}

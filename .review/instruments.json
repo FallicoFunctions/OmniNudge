@@ -277,6 +277,12 @@
       "name": "Build it on the implementation production wires",
       "trigger": "a component is tested on a different implementation of an interface than the server or app constructs -- a models repository where main wires a repository adapter, a fake storage, a mock service -- or it discovers a capability with a type assertion",
       "asks": "Find the constructor call in main (or the app root) and build the test on that exact type. A capability found by type assertion fails silently: the upload gateway asked its repository for CanUserAccessMedia, every gateway test used the models repository that has it, and the adapter main wires never delegated it -- so even a file's owner got 404 in production for seven weeks while every test passed. Add a compile-time assertion on the production type for every capability something asserts for."
+    },
+    {
+      "id": "H6",
+      "name": "Run the test file in shuffled order",
+      "trigger": "a test is added, removed or reordered in a file whose tests share module-level mocks, fakes or globals",
+      "asks": "Do the tests pass in any order, or only in the one they are written in? Run the file with vitest --sequence.shuffle --sequence.seed=N over many seeds (go: -shuffle=on). A test that relies on a mock value, a stray socket or a timer left by the test before it passes in file order and fails in some other order -- and it starts failing for real the day somebody removes or moves the neighbour it leaned on. Check the shuffle can catch one first: remove a known fix and require some seed to fail. Two leaks in OmniChatCallModal.test.tsx surfaced this way: a meter test that left its live socket to close in the next test, and video tests that inherited endCall's promise (bfc2ac52b)."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
