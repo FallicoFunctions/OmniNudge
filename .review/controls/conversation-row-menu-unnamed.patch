@@ -1,0 +1,14 @@
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index a9a351023..f10759770 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -2602,9 +2602,6 @@ export default function MessagesPage() {
+                           }}
+                           onTouchStart={(e) => e.stopPropagation()}
+                           onTouchEnd={(e) => e.stopPropagation()}
+-                          aria-label={t('messages.conversationOptions.ariaLabel', {
+-                            name: conversationTitle(conversation),
+-                          })}
+                           className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
+                         >
+                           ...

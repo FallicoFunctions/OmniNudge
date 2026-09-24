@@ -1,0 +1,540 @@
+{
+  "schema_version": 2,
+  "head": "d88f35ea9",
+  "base": "4de5bf23f",
+  "scope": {
+    "files": [
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/public/locales/en.json",
+      "frontend/tests/e2e/messages-layout.spec.ts"
+    ],
+    "boundaries": [
+      "the rendered messages page at phone and desktop widths",
+      "what a screen reader gets"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/cf1edd9dc.json"
+  ],
+  "notes": "Mobile messages list. Two passes, two findings, both from rendering the real page with real-length content. The fix and the findings are covered by a new E2E spec.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "a53e0cf2b: the conversation list panel is w-full when isMobile, w-[20rem] on desktop (was w-[20rem] flex-shrink-0 at every width since b93cbb7f1). Boundary: the rendered page at phone and desktop widths."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 587693fe2's ledger line (Send button at phone widths, cf1edd9dc) and the B6 history: phone layouts were measured in a real browser before."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered the page (Playwright, mocked signed-in user, two conversations, one with a 50-character name, a folder). The row menu button had no accessible name: a screen reader heard three dots. Finding conversation-row-menu-unnamed."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The label key messages.conversationOptions.ariaLabel exists in en.json (i18n:check OK)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Conversation fields the row reads (other_user.username, is_archived, archived_at) match models/conversation.go."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The title rule existed twice (row and chat header); both now use conversationTitle."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Username length is 3..50 (services/auth.go:422), so the test name is the real maximum."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The 50-character maximum username."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The chat header title already had min-w-0 and truncate; the row did not."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Title rule duplicated in the row and the header, merged into conversationTitle (the header keeps 'unknown' for no selection)."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other titles in MessagesPage: the chat header h3 is truncated; the mod mail and group titles go through the same helper and row."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Controls built on tests/e2e/messages-layout.spec.ts ('long name'): truncation reverted -> 'Expected <= 313, Received 419'; label removed -> the button cannot be found, 1 failed. Both pass at HEAD."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new spec runs in CI E2E (testDir ./tests)."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint and prettier clean, i18n:check OK."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by B2 and B6; already rows."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each control makes it fail."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Measured at 360, 375, 390 and 1280: rows 359/374/389 px and 320 px on desktop, document never wider than the viewport, no control past the right edge, the chat view full width on phones. The 50-character name ran under the row menu button (the name had no truncate, its flex parent no min-w-0). Finding conversation-row-long-name-overlaps-menu. A first render showed ARCHIVED on an active row: the mock omitted archived_at, which the server always sends (explicit null), so not a defect."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Playwright counts read: 4 passed in the new spec; 12 passed, 2 skipped (pre-existing) with messaging and navigation."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user reported the messages page broken on mobile; the list now fills the screen."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The 2 vitest files that import MessagesPage: 21 passed, 1 skipped."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Ran messaging and navigation E2E: messaging.spec.ts:26 failed once with parallel workers (10 s URL wait); with CI settings it passes at HEAD twice and at base, and all 12 pass together. Environmental, not this change."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No existing control patches MessagesPage.tsx, en.json or the new spec at the changed lines."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The real page in a real browser."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "n/a: Playwright has no shuffle, and each test opens its own page with its own routes."
+        }
+      ],
+      "findings": [
+        {
+          "id": "conversation-row-long-name-overlaps-menu",
+          "summary": "A username of the allowed 50 characters ran under the conversation row's menu button: the name span had no truncate and its flex parent no min-w-0.",
+          "found_by": "B6",
+          "fix_commit": "d88f35ea9",
+          "control": {
+            "patch": ".review/controls/conversation-row-long-name-overlaps-menu.patch",
+            "runner": "bash",
+            "tests": [
+              "cd frontend && CI=1 npx playwright test tests/e2e/messages-layout.spec.ts -g 'long name' --project=chromium --reporter=line --retries=0"
+            ],
+            "observed": "With truncate/min-w-0/flex-shrink-0 reverted: 1 failed, 'Expected: <= 313.09375, Received: 419.5625' (the name's right edge past the menu). At HEAD: 1 passed."
+          }
+        },
+        {
+          "id": "conversation-row-menu-unnamed",
+          "summary": "The conversation row's menu button had no accessible name; a screen reader announced three dots, and a test could not address it.",
+          "found_by": "B2",
+          "fix_commit": "d88f35ea9",
+          "control": {
+            "patch": ".review/controls/conversation-row-menu-unnamed.patch",
+            "runner": "bash",
+            "tests": [
+              "cd frontend && CI=1 npx playwright test tests/e2e/messages-layout.spec.ts -g 'long name' --project=chromium --reporter=line --retries=0"
+            ],
+            "observed": "With the aria-label removed: 1 failed, the button named 'Options for <name>' cannot be found. At HEAD: 1 passed."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over a53e0cf2b and d88f35ea9 (truncate, row menu label, conversationTitle, the layout spec)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 587693fe2's ledger line (Send button at phone widths, cf1edd9dc) and the B6 history: phone layouts were measured in a real browser before."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No payload."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Re-rendered after the fix: the long name ends in an ellipsis before the menu, the menu button is 'Options for <name>'."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The label key messages.conversationOptions.ariaLabel exists in en.json (i18n:check OK)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Conversation fields the row reads (other_user.username, is_archived, archived_at) match models/conversation.go."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The title rule existed twice (row and chat header); both now use conversationTitle."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Username length is 3..50 (services/auth.go:422), so the test name is the real maximum."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "The 50-character maximum username."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The chat header title already had min-w-0 and truncate; the row did not."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Title rule duplicated in the row and the header, merged into conversationTitle (the header keeps 'unknown' for no selection)."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other titles in MessagesPage: the chat header h3 is truncated; the mod mail and group titles go through the same helper and row."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No new finding."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The new spec runs in CI E2E (testDir ./tests)."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b 0, eslint and prettier clean, i18n:check OK."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each control makes it fail."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Re-measured after the fix: all four widths as in pass 1, no overlap."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Playwright counts read: 4 passed in the new spec; 12 passed, 2 skipped (pre-existing) with messaging and navigation."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user reported the messages page broken on mobile; the list now fills the screen."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The 2 vitest files that import MessagesPage: 21 passed, 1 skipped."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "Ran messaging and navigation E2E: messaging.spec.ts:26 failed once with parallel workers (10 s URL wait); with CI settings it passes at HEAD twice and at base, and all 12 pass together. Environmental, not this change."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "No existing control patches MessagesPage.tsx, en.json or the new spec at the changed lines."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The real page in a real browser."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "n/a: Playwright has no shuffle, and each test opens its own page with its own routes."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "tsc -b 0",
+    "lint": "eslint, prettier clean",
+    "vet": "n/a",
+    "tests": "layout spec 4 passed; messaging + navigation 12 passed 2 skipped; MessagesPage vitest 21 passed"
+  }
+}

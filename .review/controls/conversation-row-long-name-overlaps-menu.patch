@@ -1,0 +1,28 @@
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index a9a351023..ea004475b 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -2540,20 +2540,19 @@ export default function MessagesPage() {
+                     <div className="flex items-start justify-between gap-2">
+                       <div className="flex-1 min-w-0">
+                         <div className="flex items-center justify-between gap-2">
+-                          <div className="flex min-w-0 items-center gap-2">
++                          <div className="flex items-center gap-2">
+                             <span
+-                              className={`truncate font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
++                              className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
+                             >
+                               {conversationTitle(conversation)}
+                             </span>
+                             {conversation.other_user?.id && (
+                               <OnlineStatusIndicator
+                                 userId={conversation.other_user.id}
+-                                className="flex-shrink-0"
+                               />
+                             )}
+                             {(conversation.is_archived ?? conversation.archived_at !== null) && (
+-                              <span className="flex-shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
++                              <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                                 {t('messages.badges.archived')}
+                               </span>
+                             )}
