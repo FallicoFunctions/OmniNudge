@@ -1,0 +1,531 @@
+{
+  "schema_version": 2,
+  "head": "084cef52e",
+  "base": "d7dc11f53",
+  "scope": {
+    "files": [
+      ".review/controls/wardrobe-R3-setting-capitalised.patch",
+      ".review/controls/wardrobe-R4-appearance-warning.patch",
+      ".review/controls/wardrobe-R6-portrait-clothing.patch",
+      ".review/controls/refs-R1-guard-wired.patch",
+      ".review/controls/slice2-R1-artifact-guard.patch",
+      ".review/9803e5f57.json"
+    ],
+    "boundaries": [
+      "the hook replaying a control in a throwaway worktree"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/58dafd573022d9949ed5e4d55a80044da4a4ee29.json",
+    ".review/418a22c2a793fe582ae6a797feb68b8add89edda.json",
+    ".review/edde601874009e0149098edc0309d556a163ddbf.json",
+    ".review/9803e5f57.json"
+  ],
+  "notes": "Stale-control rebuild, phase 5 of 5. Two passes, one finding: a blind selector found by running every control selector in the repository at HEAD. After this, 176 of 179 controls apply and every selector runs a test; the three stale ones are retired in 464c678c8. The Go sweep overlapped another Go suite at its start, told to the user.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "6f1babfce rebuilds the last five stale controls: wardrobe-R3-setting-capitalised, wardrobe-R4-appearance-warning, wardrobe-R6-portrait-clothing, refs-R1-guard-wired, slice2-R1-artifact-guard. No code changed. Boundary: the hook replaying a control in a throwaway worktree."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 58dafd573022 (wardrobe), 418a22c2a793 (refs), edde60187400 (slice2), 9803e5f57 (fe-silent-429), and every earlier stale-control ledger this session."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Diffed old and new patch lines. wardrobe-R3, R6, refs-R1: identical. wardrobe-R4: indentation only (the check moved into omniAIAppearanceFacts). slice2: the old patch also rewrote two comments by accident and named /zz_model_compare; the new one removes /omninudge, /backend/bin/ and the /zz_* pattern that replaced the name, nothing else."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Replayed the five in a worktree as the hook does: all pass at HEAD and fail with their patch (wardrobe-R4 'does not contain her appearance answers could not be read'; refs-R1 '6 passed, 1 failed'; slice2 the zz_ binaries not ignored)."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "n/a: no code path."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The shape poster-R5 showed (a control that applies but names a test that no longer matches), checked for every control in every ledger. Static pass: 191 selectors against the test files. Then every selector run for real at HEAD: 91 vitest, 80 go (-v, PASS counted), 14 bash/pytest. Excluding the four retired (dropped-notice-stall, no-is-a-sentence, sentence-boundary, video-double-voice), one ran no test: fe-silent-429."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control fe-silent-429 with the corrected selector: passes at HEAD (1 passed), fails with its patch ('expected undefined to be messages.errors.sendingTooFast')."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The hook replays a ledger's controls when a review lists them."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "n/a: no code; commit hook passed."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by H2 (an empty run that reports success) applied to every control selector; already a row."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each rebuilt control refuses its defect (C4)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "fe-silent-429 selected -t 'maps 429' while the test is it.each '(maps status %s to %s)': the run reported 8 skipped and exit 0 with and without the patch -- a control that could not fail. Finding."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase 5, the last of the approved rebuild: rebuilt all five."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Every control in the repository applies at HEAD except the three retired in 464c678c8 (their code was deleted on purpose)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The tests are the ones the ledgers name."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "n/a: no test changed."
+        }
+      ],
+      "findings": [
+        {
+          "id": "fe-silent-429-selector-blind",
+          "summary": "The fe-silent-429 control selected -t 'maps 429', which matches no test since the cases became it.each('maps status %s to %s'): every run reported 8 skipped and passed, with the fix present or reverted.",
+          "found_by": "H2",
+          "fix_commit": "084cef52e",
+          "control": {
+            "patch": ".review/controls/fe-silent-429.patch",
+            "runner": "vitest",
+            "tests": [
+              "src/utils/__tests__/messageSendErrors.test.ts -t 'maps status 429'"
+            ],
+            "observed": "At HEAD: 1 passed, 7 skipped. With the patch: 1 failed, 'expected undefined to be messages.errors.sendingTooFast'."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over 6f1babfce plus the fe-silent-429 selector repoint in 9803e5f57."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 58dafd573022 (wardrobe), 418a22c2a793 (refs), edde60187400 (slice2), 9803e5f57 (fe-silent-429), and every earlier stale-control ledger this session."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Diffed old and new patch lines. wardrobe-R3, R6, refs-R1: identical. wardrobe-R4: indentation only (the check moved into omniAIAppearanceFacts). slice2: the old patch also rewrote two comments by accident and named /zz_model_compare; the new one removes /omninudge, /backend/bin/ and the /zz_* pattern that replaced the name, nothing else."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No handler."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Replayed the five in a worktree as the hook does: all pass at HEAD and fail with their patch (wardrobe-R4 'does not contain her appearance answers could not be read'; refs-R1 '6 passed, 1 failed'; slice2 the zz_ binaries not ignored)."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "na",
+          "why": "n/a: no code path."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "The runtime sweep after the repoint: every vitest selector runs at least one test; the static parser still lists fe-silent-429 because it cannot expand it.each titles, which is why the run, not the parse, is the check."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No new finding."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The hook replays a ledger's controls when a review lists them."
+        },
+        {
+          "id": "H1",
+          "status": "na",
+          "why": "n/a: no code; commit hook passed."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "Each rebuilt control refuses its defect (C4)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "fe-silent-429 now runs 1 test and fails with its patch."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase 5, the last of the approved rebuild: rebuilt all five."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Every control in the repository applies at HEAD except the three retired in 464c678c8 (their code was deleted on purpose)."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The tests are the ones the ledgers name."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "n/a: no test changed."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "n/a",
+    "types": "n/a",
+    "lint": "n/a",
+    "vet": "n/a",
+    "tests": "185 control selectors run at HEAD: all run a test and pass"
+  }
+}
