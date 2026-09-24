@@ -211,10 +211,11 @@ func BuildOmniAIReferencePrompt(
 		return ""
 	}
 
-	subject := strings.TrimSpace(profile.Appearance)
+	// Its own sentence, capitalised for the reason the likeness prompt's is.
+	subject := startsASentence(profile.Appearance)
 	// A portrait is cropped at the chest, so it is described from the chest up.
 	if variant.Aspect == omniAIReferencePortraitAspect && strings.TrimSpace(faceAppearance) != "" {
-		subject = strings.TrimSpace(faceAppearance)
+		subject = startsASentence(faceAppearance)
 	}
 	if subject == "" {
 		subject = omniAILikenessFallbackSubject

@@ -408,3 +408,27 @@ func TestEveryReferenceVariantSaysWhatSheIsWearing(t *testing.T) {
 			models.OmniChatMediaIdentityProfile{Appearance: "a woman"}, key, ""), "Wearing", key)
 	}
 }
+
+// Both descriptions a reference can open with are a sentence of their own, so
+// both start with a capital however they were stored.
+func TestAReferenceOpensItsDescriptionWithACapital(t *testing.T) {
+	tests := []struct {
+		name           string
+		variant        string
+		appearance     string
+		faceAppearance string
+		want           string
+	}{
+		{"full body, lowercase appearance", "full_body_relaxed", "a man with a short beard", "", "one person. A man with a short beard."},
+		{"portrait, lowercase face description", "portrait_neutral", "a man with a short beard", "a man with grey eyes", "one person. A man with grey eyes."},
+		{"portrait, capitalised appearance", "portrait_neutral", "A woman with dark curly hair.", "", "one person. A woman with dark curly hair."},
+		{"nothing stored", "full_body_relaxed", "", "", "one person. An adult."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := BuildOmniAIReferencePrompt(models.OmniChatMediaIdentityProfile{Appearance: tt.appearance, Subject: "man"}, tt.variant, tt.faceAppearance)
+			t.Log(prompt)
+			require.Contains(t, prompt, tt.want)
+		})
+	}
+}
