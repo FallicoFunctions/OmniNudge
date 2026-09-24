@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,6 +52,11 @@ func newGroupTestDeps(t *testing.T) *groupTestDeps {
 		protected.GET("/groups/:id/participants", groupHandler.GetGroupParticipants)
 		protected.PATCH("/groups/:id/participants/:user_id/role", groupHandler.UpdateParticipantRole)
 		protected.GET("/groups/:id/settings", groupHandler.GetGroupSettings)
+		// The paths main.go registers, parameter names included: the handler
+		// reads the invite id by the name the route gives it.
+		protected.POST("/groups/:id/invites", groupHandler.CreateGroupInvite)
+		protected.POST("/groups/invites/:invite_id/accept", groupHandler.AcceptGroupInvite)
+		protected.POST("/groups/invites/:invite_id/decline", groupHandler.DeclineGroupInvite)
 	}
 
 	return &groupTestDeps{
@@ -546,4 +553,106 @@ func TestGroupReadReceiptReachesTheOtherMembers(t *testing.T) {
 	evt := readWebSocketEvent(t, g.members[1], 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "conversation_read" })
 	payload, _ := evt["payload"].(map[string]interface{})
 	assert.EqualValues(t, g.id, payload["conversation_id"])
+}
+
+// Accept and decline both answered 400 "Invalid invite ID" for every invite,
+// so nobody could join a group by invitation.
+func TestGroupInviteCanBeAnswered(t *testing.T) {
+	for _, tc := range []struct {
+		answer string
+		status int
+		joins  bool
+	}{
+		{"accept", http.StatusOK, true},
+		{"decline", http.StatusNoContent, false},
+	} {
+		t.Run(tc.answer, func(t *testing.T) {
+			deps := newGroupTestDeps(t)
+			defer deps.DB.Close()
+
+			owner := createUser(t, deps.UserRepo, uniqueGrpUsername("inv_owner"), "user")
+			m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("inv_m1"), "user")
+			m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("inv_m2"), "user")
+			guest := createUser(t, deps.UserRepo, uniqueGrpUsername("inv_guest"), "user")
+			ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+			guestToken, _ := deps.AuthService.GenerateJWT(guest.ID, guest.Username, guest.Role)
+
+			w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+				createGroupBody("Invites", []int{m1.ID, m2.ID}))
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			var group struct {
+				ID int `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+
+			w = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+				fmt.Sprintf("/api/v1/groups/%d/invites", group.ID), ownerToken,
+				[]byte(fmt.Sprintf(`{"user_id":%d}`, guest.ID)))
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			var invite struct {
+				ID int `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invite))
+
+			w = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+				fmt.Sprintf("/api/v1/groups/invites/%d/%s", invite.ID, tc.answer), guestToken, []byte(`{}`))
+			require.Equal(t, tc.status, w.Code, w.Body.String())
+
+			var joined bool
+			require.NoError(t, deps.DB.Pool.QueryRow(context.Background(), `
+				SELECT EXISTS (SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2)
+			`, group.ID, guest.ID).Scan(&joined))
+			assert.Equal(t, tc.joins, joined)
+		})
+	}
+}
+
+// An invite carries the older key versions the inviter wrapped, and accepting
+// it hands them over: the newcomer reads the group's past on joining.
+func TestGroupInviteBringsTheHistory(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ctx := context.Background()
+
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("hist_owner"), "user")
+	m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("hist_m1"), "user")
+	m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("hist_m2"), "user")
+	guest := createUser(t, deps.UserRepo, uniqueGrpUsername("hist_guest"), "user")
+	for _, u := range []*models.User{owner, m1, m2, guest} {
+		_, err := deps.DB.Pool.Exec(ctx, `UPDATE users SET public_key = $1 WHERE id = $2`, fmt.Sprintf("pk-%d", u.ID), u.ID)
+		require.NoError(t, err)
+	}
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	guestToken, _ := deps.AuthService.GenerateJWT(guest.ID, guest.Username, guest.Role)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+		createGroupBody("History", []int{m1.ID, m2.ID}))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var group struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+	keys := services.NewGroupKeyService(deps.DB.Pool)
+	require.NoError(t, keys.Rotate(ctx, group.ID, owner.ID, &services.GroupKeyRotation{
+		KeyVersion: 1,
+		Copies:     map[int]string{owner.ID: "v1-owner", m1.ID: "v1-m1", m2.ID: "v1-m2"},
+	}))
+
+	w = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+		fmt.Sprintf("/api/v1/groups/%d/invites", group.ID), ownerToken,
+		[]byte(fmt.Sprintf(`{"user_id":%d,"history":{"1":"v1-guest"}}`, guest.ID)))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var invite struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invite))
+
+	w = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+		fmt.Sprintf("/api/v1/groups/invites/%d/accept", invite.ID), guestToken, []byte(`{}`))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	state, err := keys.State(ctx, group.ID, guest.ID)
+	require.NoError(t, err)
+	require.Len(t, state.MyCopies, 1, "the newcomer reads the history before anyone sends")
+	assert.Equal(t, "v1-guest", state.MyCopies[0].WrappedKey)
 }

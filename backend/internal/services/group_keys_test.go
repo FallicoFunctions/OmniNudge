@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -407,4 +408,140 @@ func TestGroupKeyHistoryCanBeSharedWhenTheGroupShowsItLater(t *testing.T) {
 
 	assert.ErrorIs(t, svc.ShareHistory(ctx, group, owner.ID, share), services.ErrGroupKeyHistory,
 		"a second copy of the same version is refused: nothing is missing any more")
+}
+
+// inTx runs one step of a membership change in its own transaction, as the
+// handlers do.
+func inTx(t *testing.T, db *testutil.TestDatabase, step func(tx pgx.Tx) error) error {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := db.Pool.Begin(ctx)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := step(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func newTestInvite(t *testing.T, db *testutil.TestDatabase, conversationID, invitedID, inviterID int) int {
+	t.Helper()
+	var id int
+	require.NoError(t, db.Pool.QueryRow(context.Background(), `
+		INSERT INTO group_invites (conversation_id, invited_user_id, invited_by) VALUES ($1, $2, $3) RETURNING id
+	`, conversationID, invitedID, inviterID).Scan(&id))
+	return id
+}
+
+// A group with one key version, and someone outside it with a public key.
+func groupWithHistory(t *testing.T, db *testutil.TestDatabase) (svc *services.GroupKeyService, group, owner, newcomer int) {
+	t.Helper()
+	fixtures := testutil.NewFixtures(t, db)
+	svc = services.NewGroupKeyService(db.Pool)
+	o := fixtures.CreateUniqueUser("gk_owner")
+	m := fixtures.CreateUniqueUser("gk_member")
+	n := fixtures.CreateUniqueUser("gk_newcomer")
+	group = newTestGroup(t, db, o.ID, m.ID)
+	publishTestPublicKey(t, db, o.ID, m.ID, n.ID)
+	require.NoError(t, svc.Rotate(context.Background(), group, o.ID, &services.GroupKeyRotation{
+		KeyVersion: 1, Copies: wrappedCopies(1, o.ID, m.ID),
+	}))
+	return svc, group, o.ID, n.ID
+}
+
+// A newcomer read nothing of the past until some older member happened to send
+// a message after they joined.
+func TestGroupKeyHistoryArrivesWithTheInvite(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	ctx := context.Background()
+	svc, group, owner, newcomer := groupWithHistory(t, db)
+
+	invite := newTestInvite(t, db, group, newcomer, owner)
+	require.NoError(t, inTx(t, db, func(tx pgx.Tx) error {
+		return services.StoreInviteHistory(ctx, tx, group, owner, invite, services.NewcomerHistory{1: "v1-for-newcomer"})
+	}))
+	require.NoError(t, inTx(t, db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO conversation_participants (conversation_id, user_id, role) VALUES ($1, $2, 'member')
+		`, group, newcomer); err != nil {
+			return err
+		}
+		return services.GrantInviteHistory(ctx, tx, group, invite, newcomer)
+	}))
+
+	state, err := svc.State(ctx, group, newcomer)
+	require.NoError(t, err)
+	require.Len(t, state.MyCopies, 1, "the newcomer reads the history on joining, before anyone sends")
+	assert.Equal(t, 1, state.MyCopies[0].KeyVersion)
+	assert.Equal(t, "v1-for-newcomer", state.MyCopies[0].WrappedKey)
+	assert.Empty(t, state.MissingHistory)
+
+	var left int
+	require.NoError(t, db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM group_invite_key_copies WHERE invite_id = $1`, invite).Scan(&left))
+	assert.Zero(t, left, "an answered invite keeps no copies")
+}
+
+func TestGroupKeyHistoryFromAnInviteStaysShutIfTheGroupHidesItFirst(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	ctx := context.Background()
+	svc, group, owner, newcomer := groupWithHistory(t, db)
+
+	invite := newTestInvite(t, db, group, newcomer, owner)
+	require.NoError(t, inTx(t, db, func(tx pgx.Tx) error {
+		return services.StoreInviteHistory(ctx, tx, group, owner, invite, services.NewcomerHistory{1: "v1-for-newcomer"})
+	}))
+	setTestGroupHistory(t, db, group, false)
+	joinTestGroup(t, db, group, newcomer, "member")
+	require.NoError(t, inTx(t, db, func(tx pgx.Tx) error {
+		return services.GrantInviteHistory(ctx, tx, group, invite, newcomer)
+	}))
+
+	state, err := svc.State(ctx, group, newcomer)
+	require.NoError(t, err)
+	assert.Empty(t, state.MyCopies)
+}
+
+func TestGroupKeyHistoryForANewcomerFollowsTheRules(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	ctx := context.Background()
+	_, group, owner, newcomer := groupWithHistory(t, db)
+	invite := newTestInvite(t, db, group, newcomer, owner)
+
+	for name, history := range map[string]services.NewcomerHistory{
+		"a version the inviter does not hold": {2: "v2-for-newcomer"},
+		"an empty copy":                       {1: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := inTx(t, db, func(tx pgx.Tx) error {
+				return services.StoreInviteHistory(ctx, tx, group, owner, invite, history)
+			})
+			assert.ErrorIs(t, err, services.ErrGroupKeyHistory)
+		})
+	}
+
+	setTestGroupHistory(t, db, group, false)
+	err := inTx(t, db, func(tx pgx.Tx) error {
+		return services.StoreInviteHistory(ctx, tx, group, owner, invite, services.NewcomerHistory{1: "v1-for-newcomer"})
+	})
+	assert.ErrorIs(t, err, services.ErrGroupKeyHistory, "a group that hides its history sends none")
+}
+
+func TestGroupKeyHistoryArrivesWithADirectAdd(t *testing.T) {
+	db := testutil.NewTestDatabase(t)
+	ctx := context.Background()
+	svc, group, owner, newcomer := groupWithHistory(t, db)
+
+	require.NoError(t, inTx(t, db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO conversation_participants (conversation_id, user_id, role) VALUES ($1, $2, 'member')
+		`, group, newcomer); err != nil {
+			return err
+		}
+		return services.GrantAddedMemberHistory(ctx, tx, group, owner, newcomer, services.NewcomerHistory{1: "v1-for-newcomer"})
+	}))
+
+	state, err := svc.State(ctx, group, newcomer)
+	require.NoError(t, err)
+	require.Len(t, state.MyCopies, 1)
+	assert.Equal(t, "v1-for-newcomer", state.MyCopies[0].WrappedKey)
 }

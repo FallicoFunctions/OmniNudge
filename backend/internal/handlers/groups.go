@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -53,7 +55,8 @@ type UpdateGroupSettingsRequest struct {
 }
 
 type AddParticipantRequest struct {
-	UserID int `json:"user_id" binding:"required"`
+	UserID  int                      `json:"user_id" binding:"required"`
+	History services.NewcomerHistory `json:"history"`
 }
 
 type UpdateParticipantRoleRequest struct {
@@ -65,7 +68,8 @@ type TransferOwnershipRequest struct {
 }
 
 type CreateGroupInviteRequest struct {
-	UserID int `json:"user_id" binding:"required"`
+	UserID  int                      `json:"user_id" binding:"required"`
+	History services.NewcomerHistory `json:"history"`
 }
 
 type GroupConversationResponse struct {
@@ -167,6 +171,21 @@ func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return conversationID, true
+}
+
+// grantNewcomerHistory answers for a refused history grant and reports whether
+// the request may go on.
+func (h *GroupHandler) grantNewcomerHistory(c *gin.Context, err error) bool {
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, services.ErrGroupKeyHistory):
+		RespondErrorCoded(c, http.StatusBadRequest, "group_key_history_not_allowed", "Those older key copies are not allowed")
+	default:
+		slog.Error("store newcomer group key history failed", "error", err)
+		RespondError(c, http.StatusInternalServerError, "Failed to share the group history")
+	}
+	return false
 }
 
 func (h *GroupHandler) hasBlockingRelationship(ctx *gin.Context, userA, userB int) (bool, error) {
@@ -529,7 +548,14 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		return
 	}
 
-	_, err = h.pool.Exec(ctx, `
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, `
 		INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at, invited_by)
 		VALUES ($1, $2, 'member', CURRENT_TIMESTAMP, $3)
 	`, conversationID, req.UserID, userID)
@@ -537,10 +563,17 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to add participant")
 		return
 	}
+	if !h.grantNewcomerHistory(c, services.GrantAddedMemberHistory(ctx, tx, conversationID, userID, req.UserID, req.History)) {
+		return
+	}
 	// The members changed, so the active key version no longer fits them: the
 	// next member who sends makes the next version for exactly this group.
-	if err := services.MarkGroupKeyStale(ctx, h.pool, conversationID); err != nil {
+	if err := services.MarkGroupKeyStale(ctx, tx, conversationID); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to add participant")
 		return
 	}
 
@@ -931,16 +964,32 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 		return
 	}
 
+	ctx := c.Request.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var invite GroupInviteResponse
-	err = h.pool.QueryRow(c.Request.Context(), `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO group_invites (conversation_id, invited_user_id, invited_by, status, expires_at)
 		VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP + INTERVAL '7 days')
 		ON CONFLICT (conversation_id, invited_user_id) DO UPDATE
-		SET status = 'pending', expires_at = CURRENT_TIMESTAMP + INTERVAL '7 days', updated_at = CURRENT_TIMESTAMP
+		SET status = 'pending', invited_by = EXCLUDED.invited_by,
+		    expires_at = CURRENT_TIMESTAMP + INTERVAL '7 days', updated_at = CURRENT_TIMESTAMP
 		RETURNING id, conversation_id, status, expires_at, created_at
 	`, conversationID, req.UserID, userID).
 		Scan(&invite.ID, &invite.ConversationID, &invite.Status, &invite.ExpiresAt, &invite.CreatedAt)
 	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to create invite")
+		return
+	}
+	if !h.grantNewcomerHistory(c, services.StoreInviteHistory(ctx, tx, conversationID, userID, invite.ID, req.History)) {
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create invite")
 		return
 	}
@@ -967,7 +1016,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		return
 	}
 
-	inviteID, err := strconv.Atoi(c.Param("id"))
+	inviteID, err := strconv.Atoi(c.Param("invite_id"))
 	if err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid invite ID")
 		return
@@ -1049,6 +1098,10 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to update invite")
 		return
 	}
+	if err := services.GrantInviteHistory(ctx, tx, conversationID, inviteID, userID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to join group")
+		return
+	}
 
 	// In the same transaction as the join: the join and the end of the key
 	// version stand or fall together.
@@ -1084,7 +1137,7 @@ func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 		return
 	}
 
-	inviteID, err := strconv.Atoi(c.Param("id"))
+	inviteID, err := strconv.Atoi(c.Param("invite_id"))
 	if err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid invite ID")
 		return
@@ -1101,6 +1154,10 @@ func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 	}
 	if result.RowsAffected() == 0 {
 		RespondError(c, http.StatusNotFound, "Invite not found or already processed")
+		return
+	}
+	if err := services.DropInviteHistory(c.Request.Context(), h.pool, inviteID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to decline invite")
 		return
 	}
 

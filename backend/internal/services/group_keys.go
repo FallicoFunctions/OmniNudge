@@ -15,8 +15,10 @@ import (
 // wrapped with that member's public key, and decides only who gets a copy. A
 // join or a leave marks the active version out of date (MarkGroupKeyStale);
 // the next member who sends makes the next version and wraps it for exactly
-// the current members. With the group's history setting on, that member also
-// wraps every older version a member lacks, so a newcomer reads the history.
+// the current members. With the group's history setting on, the member who
+// invites or adds a newcomer wraps every older version for them at that moment
+// (NewcomerHistory), so the newcomer reads the history on joining; a sender
+// also wraps any older version a member still lacks.
 
 var (
 	// ErrNotGroupMember is returned to anyone who is not in the group now.
@@ -335,6 +337,101 @@ func checkGroupKeyHistory(state *GroupKeyState, history map[int]map[int]string) 
 			if !containsInt(state.MissingHistory[member], version) || !validGroupKeyCopy(wrapped) {
 				return ErrGroupKeyHistory
 			}
+		}
+	}
+	return nil
+}
+
+// NewcomerHistory is what someone joining the group needs to read its past:
+// older key versions, keyed by version, each wrapped for the newcomer by the
+// member letting them in. Only that member's device holds the keys, so it is
+// the one moment these copies can be made without anyone else online.
+type NewcomerHistory map[int]string
+
+// checkNewcomerHistory allows the copies only while the group shows its
+// history, and only for versions the giver itself holds.
+func checkNewcomerHistory(ctx context.Context, tx pgx.Tx, conversationID, giverID int, history NewcomerHistory) error {
+	if len(history) == 0 {
+		return nil
+	}
+	state, err := groupKeyState(ctx, tx, conversationID, giverID)
+	if err != nil {
+		return err
+	}
+	if !state.HistoryVisible {
+		return ErrGroupKeyHistory
+	}
+	held := map[int]bool{}
+	for _, c := range state.MyCopies {
+		held[c.KeyVersion] = true
+	}
+	for version, wrapped := range history {
+		if !held[version] || !validGroupKeyCopy(wrapped) {
+			return ErrGroupKeyHistory
+		}
+	}
+	return nil
+}
+
+// StoreInviteHistory keeps the copies an invite carries until it is answered.
+// A second invite to the same person replaces them.
+func StoreInviteHistory(ctx context.Context, tx pgx.Tx, conversationID, inviterID, inviteID int, history NewcomerHistory) error {
+	if err := checkNewcomerHistory(ctx, tx, conversationID, inviterID, history); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM group_invite_key_copies WHERE invite_id = $1`, inviteID); err != nil {
+		return fmt.Errorf("clear invite key copies: %w", err)
+	}
+	for version, wrapped := range history {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO group_invite_key_copies (invite_id, key_version, wrapped_key)
+			VALUES ($1, $2, $3)
+		`, inviteID, version, wrapped); err != nil {
+			return fmt.Errorf("store invite key copy: %w", err)
+		}
+	}
+	return nil
+}
+
+// GrantInviteHistory gives a member who has just accepted the copies their
+// invite carried, unless the group has hidden its history since. The copies go
+// either way: an answered invite has no use for them.
+func GrantInviteHistory(ctx context.Context, tx pgx.Tx, conversationID, inviteID, userID int) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO group_key_members (group_key_id, user_id, encrypted_key_for_user)
+		SELECT k.id, $3, c.wrapped_key
+		FROM group_invite_key_copies c
+		JOIN group_encryption_keys k ON k.conversation_id = $1 AND k.key_version = c.key_version
+		WHERE c.invite_id = $2
+		  AND COALESCE((SELECT message_history_visible FROM group_settings WHERE conversation_id = $1), TRUE)
+		ON CONFLICT (group_key_id, user_id) DO NOTHING
+	`, conversationID, inviteID, userID); err != nil {
+		return fmt.Errorf("grant invite key copies: %w", err)
+	}
+	return DropInviteHistory(ctx, tx, inviteID)
+}
+
+// DropInviteHistory removes the copies of an invite that was declined.
+func DropInviteHistory(ctx context.Context, tx GroupKeyExecer, inviteID int) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM group_invite_key_copies WHERE invite_id = $1`, inviteID); err != nil {
+		return fmt.Errorf("drop invite key copies: %w", err)
+	}
+	return nil
+}
+
+// GrantAddedMemberHistory gives a member added directly the copies the member
+// who added them wrapped, in the transaction that adds them.
+func GrantAddedMemberHistory(ctx context.Context, tx pgx.Tx, conversationID, adderID, newcomerID int, history NewcomerHistory) error {
+	if err := checkNewcomerHistory(ctx, tx, conversationID, adderID, history); err != nil {
+		return err
+	}
+	for version, wrapped := range history {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO group_key_members (group_key_id, user_id, encrypted_key_for_user)
+			SELECT id, $3, $4 FROM group_encryption_keys WHERE conversation_id = $1 AND key_version = $2
+			ON CONFLICT (group_key_id, user_id) DO NOTHING
+		`, conversationID, version, newcomerID, wrapped); err != nil {
+			return fmt.Errorf("store added member key copy: %w", err)
 		}
 	}
 	return nil
