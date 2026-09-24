@@ -80,4 +80,23 @@ describe('useVoicePlayer', () => {
 
     expect(revoked).toContain('blob:made-by-the-player');
   });
+
+  // MediaRecorder writes webm with no length in its header, so the browser
+  // reports Infinity. The time read 0:00 and the waveform never filled.
+  it.each([
+    ['a recording with no length in it', Infinity, 9],
+    ['a recording that knows its length', 4, 4],
+  ])('uses a usable length for %s', async (_name, mediaDuration, expected) => {
+    const { result } = renderHook(() => useVoicePlayer(9));
+    act(() => result.current.play('blob:decrypted-owned-by-the-caller'));
+    await waitFor(() => expect(FakeAudio.made).toHaveLength(1));
+    const audio = FakeAudio.made[0];
+    audio.duration = mediaDuration;
+
+    act(() => audio.emit('loadedmetadata'));
+    expect(result.current.duration).toBe(expected);
+
+    act(() => result.current.seek(0.5));
+    expect(audio.currentTime).toBe(expected / 2);
+  });
 });

@@ -22,10 +22,14 @@ export interface UseVoicePlayerReturn {
   setPlaybackRate: (rate: number) => void;
 }
 
-export function useVoicePlayer(): UseVoicePlayerReturn {
+// knownDuration is the length the server recorded. A browser recording
+// (MediaRecorder's webm) carries no length in its header, so audio.duration is
+// Infinity: the time read 0:00 and progress and seeking stopped working.
+export function useVoicePlayer(knownDuration = 0): UseVoicePlayerReturn {
   const [state, setState] = useState<PlaybackState>('idle');
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [mediaDuration, setDuration] = useState(0);
+  const duration = mediaDuration > 0 ? mediaDuration : knownDuration;
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +132,7 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
         audio.playbackRate = playbackRate;
 
         audio.addEventListener('loadedmetadata', () => {
-          if (mountedRef.current) setDuration(audio.duration);
+          if (mountedRef.current && Number.isFinite(audio.duration)) setDuration(audio.duration);
         });
 
         audio.addEventListener('timeupdate', () => {
@@ -149,7 +153,7 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
         audio.addEventListener('ended', () => {
           if (mountedRef.current) {
             setState('ended');
-            setCurrentTime(audio.duration);
+            setCurrentTime(Number.isFinite(audio.duration) ? audio.duration : audio.currentTime);
           }
           globalAudioRef.stopCallback = null;
           releaseAudio(audio);
@@ -178,13 +182,17 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
     audioRef.current?.pause();
   }, []);
 
-  const seek = useCallback((progress: number) => {
-    const audio = audioRef.current;
-    if (audio && audio.duration) {
-      audio.currentTime = progress * audio.duration;
-      if (mountedRef.current) setCurrentTime(audio.currentTime);
-    }
-  }, []);
+  const seek = useCallback(
+    (progress: number) => {
+      const audio = audioRef.current;
+      const length = audio && Number.isFinite(audio.duration) ? audio.duration : duration;
+      if (audio && length > 0) {
+        audio.currentTime = progress * length;
+        if (mountedRef.current) setCurrentTime(audio.currentTime);
+      }
+    },
+    [duration]
+  );
 
   const setPlaybackRate = useCallback((rate: number) => {
     setPlaybackRateState(rate);

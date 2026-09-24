@@ -31,7 +31,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
     pause,
     seek,
     setPlaybackRate,
-  } = useVoicePlayer();
+  } = useVoicePlayer(voiceMessage.duration_seconds);
   const [transcriptionOpen, setTranscriptionOpen] = useState(false);
 
   const isPlaying = state === 'playing';
@@ -45,14 +45,15 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
     }
   }, [isPlaying, pause, play, voiceMessage.signed_url]);
 
-  const totalDuration = duration > 0 ? duration : voiceMessage.duration_seconds;
-
   return (
     <div
       className="flex flex-col gap-1 rounded-2xl px-3 py-2"
       style={{
-        minWidth: '240px',
-        maxWidth: '320px',
+        // 240 px where there is room, and never wider than the message it sits
+        // in: a fixed minimum pushed the bubble past a phone's edge, and a
+        // percentage minimum collapsed it, since the message sizes to it.
+        width: '240px',
+        maxWidth: '100%',
         background: isOwn ? 'var(--color-primary)' : 'var(--color-surface-alt)',
         color: isOwn ? '#fff' : 'var(--color-text-primary)',
       }}
@@ -81,6 +82,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
             data={voiceMessage.waveform_data ?? []}
             progress={progress}
             onSeek={seek}
+            color={isOwn ? '#ffffff' : undefined}
           />
         </div>
 
@@ -92,7 +94,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
             color: isOwn ? '#fff' : 'var(--color-text-secondary)',
           }}
         >
-          {formatTime(currentTime)} / {formatTime(totalDuration)}
+          {formatTime(currentTime)} / {formatTime(duration)}
         </span>
       </div>
 

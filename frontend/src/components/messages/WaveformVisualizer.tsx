@@ -6,6 +6,8 @@ interface WaveformVisualizerProps {
   onSeek?: (progress: number) => void;
   isLive?: boolean;
   liveLevel?: number;
+  /** A hex colour for the bars. The primary colour vanishes on a bubble that is itself primary. */
+  color?: string;
 }
 
 const NUM_BARS = 80;
@@ -49,6 +51,7 @@ export function WaveformVisualizer({
   onSeek,
   isLive = false,
   liveLevel = 0,
+  color,
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -57,13 +60,14 @@ export function WaveformVisualizer({
   const colorsRef = useRef<{ primary: string; faded: string } | null>(null);
 
   const getColors = useCallback(() => {
+    if (color) return { primary: color, faded: color + '4D' }; // ~30% opacity
     if (!colorsRef.current) {
       const style = getComputedStyle(document.documentElement);
       const primary = style.getPropertyValue('--color-primary').trim() || '#3b82f6';
       colorsRef.current = { primary, faded: primary + '4D' }; // ~30% opacity
     }
     return colorsRef.current;
-  }, []);
+  }, [color]);
 
   // Invalidate color cache when theme changes (theme toggle adds/removes class on <html>)
   useEffect(() => {
