@@ -1,0 +1,13 @@
+diff --git a/backend/internal/handlers/messages.go b/backend/internal/handlers/messages.go
+index 0e6c8d1a4..bdb37e536 100644
+--- a/backend/internal/handlers/messages.go
++++ b/backend/internal/handlers/messages.go
+@@ -245,7 +245,7 @@ func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, con
+ 	// A group, like mod mail, has no user1 or user2: its members are rows here.
+ 	// Read as a direct message, a group had no participants, so edits, pins
+ 	// and thread replies reached none of its members.
+-	if conversationType == "mod_mail" || conversationType == "group" {
++	if conversationType == "mod_mail" {
+ 		rows, err := h.pool.Query(ctx, `
+ 			SELECT user_id
+ 			FROM conversation_participants

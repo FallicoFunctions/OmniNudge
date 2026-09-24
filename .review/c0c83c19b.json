@@ -1,0 +1,556 @@
+{
+  "schema_version": 2,
+  "head": "0d9071b04",
+  "base": "c0c83c19b",
+  "scope": {
+    "files": [
+      "frontend/src/components/messages/WaveformVisualizer.tsx",
+      "frontend/src/services/groupsService.ts",
+      "frontend/src/contexts/WebSocketContext.tsx",
+      "frontend/src/pages/MessagesPage.tsx",
+      "frontend/src/components/messages/QuickReactButton.tsx",
+      "frontend/public/locales/en.json",
+      "frontend/tests/e2e/messages-layout.spec.ts",
+      "backend/internal/handlers/conversations.go",
+      "backend/internal/handlers/messages.go",
+      "backend/internal/models/message.go",
+      "backend/internal/ports/message_repository.go",
+      "backend/internal/repository/message_postgres.go",
+      "backend/internal/integration/groups_integration_test.go",
+      "backend/internal/integration/test_utils.go"
+    ],
+    "boundaries": [
+      "frontend service to server routes",
+      "WebSocket events a group sends",
+      "message list order",
+      "the rendered chat"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/4de5bf23f.json",
+    ".review/464c678c8.json",
+    ".review/d60e3bee1.json",
+    ".review/9cc07e6b7.json"
+  ],
+  "notes": "Group chat made to work end to end in a real browser, plus the waveform crash and presentation changes. Two passes, two findings (group events and read receipts reached nobody). Known and not fixed: delete-for-me in a group (needs per-member deletion state), and mod mail's send handler uses the same sender-as-recipient pattern -- both told to the user.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "c0c83c19b..f96610842: fff569fdf (waveform fits a narrow bubble), e4631903a (groups service routes), c6ba12318 (read receipt in the paged list), 4a100dedf (group readable by members, newest first, new-message broadcast), f96610842 (member count, group sender names, one-button quick reactions). Boundaries: HTTP routes between the groups service and the server, the WebSocket events a group sends, the message list order, the rendered chat."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 4de5bf23f (mobile list), 464c678c8 and d60e3bee1 (the call and group work), 9cc07e6b7 (G5)."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered in the browser pane signed in as DERRF: group rows read 'Test 3 members'; group bubbles name the sender (TestUser, seed_user_1) and own bubbles do not; the quick reactions are one smiley beside the menu, hidden until the message is hovered, the recent emojis opening above it -- and below on the first message, which the list's edge had clipped. A direct message with a voice message opened at 390 px without the error boundary the waveform used to trip."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed the real message list for the group through the API: newest first after the fix; the sealed message is group-v1, key version 1, 75 characters of ciphertext."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The ordering change is in SQL: ORDER BY sent_at, id DESC for groups, ASC for mod mail; the cursor comparison follows the order."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "groupsService.routes.test.ts reads cmd/server/main.go and requires every call to match a registered method and path."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Group messages carry sender_id; the page maps it through the group's participants (the sidebar's query key)."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The participant rule for a group now lives in getConversationParticipantIDs; the new-message broadcast uses it rather than its own copy."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Integration tests create real groups through POST /groups and real sockets through /ws."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Waveform widths 20, 100, 400 and 0."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings of the new-message broadcast, looked for after it was fixed: edits, pins and thread replies go through getConversationParticipantIDs, which treated a group as a direct message and found nobody -- finding group-events-reach-no-member. The read receipt had its own mod-mail-only branch -- finding group-read-receipt-reaches-nobody. Reactions read conversation_participants first and were right."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Broadcast failures are logged; the send still succeeds."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The duplicated member query in broadcastToOtherGroupMembers was folded into the helper."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every IsParticipant/GetOtherUserID use in the handlers listed. Group-reachable and fixed: MarkAsRead (finding), the participant helper (finding). Group-reachable and not fixed here: DeleteMessage checks message.IsParticipant, which knows only a sender and a recipient -- for a group message both are the sender, so another member cannot hide a message for themselves. That needs per-member deletion state the schema does not have; told to the user. Others (slideshow, folders, conversation archive) are DM features or guarded elsewhere."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Controls: group-events-reach-no-member (helper back to mod mail only: the pin test times out waiting for message_pinned); group-read-receipt-reaches-nobody (branch back to mod mail only: conversation_read never arrives). Both pass at HEAD."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt, go build, go vet, golangci-lint 0; tsc -b 0, eslint, prettier, i18n:verify."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Found by E1 and E6; already rows."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The groups were exercised for real: a group created, messages sealed and sent from DERRF, received live in TestUser's Firefox, read receipts and order checked in the pane."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Group rows and bubbles checked at 390 px in the pane; the layout spec covers 360/390/1280."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Go tests with -v: PASS lines, no SKIP; vitest counts read."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user's reports: group creation, sending, order, live delivery, member count, sender names, hover-only reactions, the first message's clipped bubble -- each fixed and seen in the browser."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "applied",
+          "evidence": "The recent-emoji bubble is absolute with z-20 inside the message list; it opens below when the list has no room above."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Integration: every group, forward, mod mail, pin and read test; handlers, models, repository packages; frontend tests that import the touched modules."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "The signed-in layout spec (5 tests) with CI settings."
+        },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The shared integration router gained GET /conversations/:id, as main.go has it; the whole integration package still builds and the group tests pass."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The two new controls patch messages.go at lines no older control touches; the first draft of one patch changed a second, unrelated condition with the same text and was rebuilt from the helper's lines only."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The production handlers and router, real Postgres."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "Group integration tests with -shuffle 1-3; the new frontend tests with 5 shuffled seeds."
+        }
+      ],
+      "findings": [
+        {
+          "id": "group-events-reach-no-member",
+          "summary": "getConversationParticipantIDs read conversation_participants only for mod mail and user1/user2 for everything else, so a group had no participants: edits, pins and thread replies were broadcast to nobody, and encrypted forwarding compared two empty member lists.",
+          "found_by": "E1",
+          "fix_commit": "43cc4172b",
+          "control": {
+            "patch": ".review/controls/group-events-reach-no-member.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/integration/ -tags=integration -run '^TestGroupPinReachesTheOtherMembers$'"
+            ],
+            "observed": "With the helper back to mod mail only: FAIL, no message_pinned reaches either member within 3 s. At HEAD: PASS."
+          }
+        },
+        {
+          "id": "group-read-receipt-reaches-nobody",
+          "summary": "MarkAsRead sent conversation_read to every participant only for mod mail; a group took the direct-message branch, where GetOtherUserID finds nobody, so no member heard the group had been read.",
+          "found_by": "E6",
+          "fix_commit": "0d9071b04",
+          "control": {
+            "patch": ".review/controls/group-read-receipt-reaches-nobody.patch",
+            "runner": "go",
+            "tests": [
+              "./internal/integration/ -tags=integration -run '^TestGroupReadReceiptReachesTheOtherMembers$'"
+            ],
+            "observed": "With the branch back to mod mail only: FAIL, conversation_read never reaches the other member. At HEAD: PASS."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 over the range plus 43cc4172b (group events via the participant helper) and 0d9071b04 (group read receipt)."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 4de5bf23f (mobile list), 464c678c8 and d60e3bee1 (the call and group work), 9cc07e6b7 (G5)."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Rendered in the browser pane signed in as DERRF: group rows read 'Test 3 members'; group bubbles name the sender (TestUser, seed_user_1) and own bubbles do not; the quick reactions are one smiley beside the menu, hidden until the message is hovered, the recent emojis opening above it -- and below on the first message, which the list's edge had clipped. A direct message with a voice message opened at 390 px without the error boundary the waveform used to trip."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed the real message list for the group through the API: newest first after the fix; the sealed message is group-v1, key version 1, 75 characters of ciphertext."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "The ordering change is in SQL: ORDER BY sent_at, id DESC for groups, ASC for mod mail; the cursor comparison follows the order."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "groupsService.routes.test.ts reads cmd/server/main.go and requires every call to match a registered method and path."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Group messages carry sender_id; the page maps it through the group's participants (the sidebar's query key)."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The participant rule for a group now lives in getConversationParticipantIDs; the new-message broadcast uses it rather than its own copy."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "Integration tests create real groups through POST /groups and real sockets through /ws."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Waveform widths 20, 100, 400 and 0."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "After both fixes: no other broadcast in messages.go picks its audience from user1/user2 for a group."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "Broadcast failures are logged; the send still succeeds."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "The duplicated member query in broadcastToOtherGroupMembers was folded into the helper."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Every IsParticipant/GetOtherUserID use in the handlers listed. Group-reachable and fixed: MarkAsRead (finding), the participant helper (finding). Group-reachable and not fixed here: DeleteMessage checks message.IsParticipant, which knows only a sender and a recipient -- for a group message both are the sender, so another member cannot hide a message for themselves. That needs per-member deletion state the schema does not have; told to the user. Others (slideshow, folders, conversation archive) are DM features or guarded elsewhere."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "No new finding."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt, go build, go vet, golangci-lint 0; tsc -b 0, eslint, prettier, i18n:verify."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Pass 2 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "The groups were exercised for real: a group created, messages sealed and sent from DERRF, received live in TestUser's Firefox, read receipts and order checked in the pane."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "Group rows and bubbles checked at 390 px in the pane; the layout spec covers 360/390/1280."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "Go tests with -v: PASS lines, no SKIP; vitest counts read."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user's reports: group creation, sending, order, live delivery, member count, sender names, hover-only reactions, the first message's clipped bubble -- each fixed and seen in the browser."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "applied",
+          "evidence": "The recent-emoji bubble is absolute with z-20 inside the message list; it opens below when the list has no room above."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Integration: every group, forward, mod mail, pin and read test; handlers, models, repository packages; frontend tests that import the touched modules."
+        },
+        {
+          "id": "H4",
+          "status": "applied",
+          "evidence": "The signed-in layout spec (5 tests) with CI settings."
+        },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The shared integration router gained GET /conversations/:id, as main.go has it; the whole integration package still builds and the group tests pass."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "The two new controls replayed in a worktree as the hook does: each passes at HEAD and fails with its patch."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The production handlers and router, real Postgres."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "Group integration tests with -shuffle 1-3; the new frontend tests with 5 shuffled seeds."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./...",
+    "types": "tsc -b 0",
+    "lint": "golangci-lint 0, eslint, prettier",
+    "vet": "go vet ok",
+    "tests": "integration group/forward/modmail/pin/read, handlers, models, repository; frontend touched tests; layout spec 5"
+  }
+}

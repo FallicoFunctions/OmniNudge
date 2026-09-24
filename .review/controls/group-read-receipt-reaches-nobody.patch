@@ -1,0 +1,13 @@
+diff --git a/backend/internal/handlers/messages.go b/backend/internal/handlers/messages.go
+index ab4c74831..ea4f5b42a 100644
+--- a/backend/internal/handlers/messages.go
++++ b/backend/internal/handlers/messages.go
+@@ -2623,7 +2623,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
+ 		// Notify other participants based on conversation type. A group, like
+ 		// mod mail, has its members in conversation_participants; read as a
+ 		// direct message it had no other user, so nobody heard it was read.
+-		if conversationType == "mod_mail" || conversationType == "group" {
++		if conversationType == "mod_mail" {
+ 			// Notify all participants except the reader (concurrent broadcasts)
+ 			rows, err := h.pool.Query(c.Request.Context(), `
+ 				SELECT user_id FROM conversation_participants
