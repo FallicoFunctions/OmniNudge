@@ -1,11 +1,11 @@
 diff --git a/backend/internal/services/omnichat_omniai_likeness_prompt.go b/backend/internal/services/omnichat_omniai_likeness_prompt.go
-index 1a55336ea..884bb8d66 100644
+index b347a0c38..2230027c6 100644
 --- a/backend/internal/services/omnichat_omniai_likeness_prompt.go
 +++ b/backend/internal/services/omnichat_omniai_likeness_prompt.go
-@@ -135,7 +135,7 @@ func BuildOmniAILikenessPrompt(
- 		"She is wearing "+strings.TrimSpace(brief.Outfit),
- 		omniAILikenessCoverage,
- 		holdingSentence(brief.Holding),
+@@ -165,7 +165,7 @@ func BuildOmniAILikenessPrompt(
+ 		fmt.Sprintf(omniAILikenessCoverageTemplate, p.poss, p.Poss, p.subj, p.has),
+ 		signatureSentence(p, brief.Signature),
+ 		holdingSentence(p, brief.Holding),
 -		startsASentence(brief.Setting),
 +		strings.TrimSpace(brief.Setting),
  		omniAILikenessFraming,
