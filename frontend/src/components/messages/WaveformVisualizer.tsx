@@ -11,6 +11,7 @@ interface WaveformVisualizerProps {
 const NUM_BARS = 80;
 const BAR_GAP = 2;
 const MIN_BAR_HEIGHT = 3;
+const MIN_BAR_WIDTH = 1;
 
 /** Polyfill for ctx.roundRect — not available on iOS Safari < 15.4 */
 function fillRoundRect(
@@ -21,11 +22,13 @@ function fillRoundRect(
   h: number,
   r: number
 ) {
+  // A negative radius throws in every browser, and throwing here takes the
+  // whole message list down with it.
+  const radius = Math.max(0, Math.min(r, w / 2, h / 2));
   if (typeof ctx.roundRect === 'function') {
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
+    ctx.roundRect(x, y, w, h, radius);
   } else {
-    const radius = Math.min(r, w / 2, h / 2);
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
     ctx.lineTo(x + w - radius, y);
@@ -82,21 +85,29 @@ export function WaveformVisualizer({
 
     const { width, height } = canvas;
     ctx.clearRect(0, 0, width, height);
+    if (width <= 0 || height <= 0) return;
 
+    // As many bars as fit. Eighty bars and their gaps need 238 px; a voice
+    // bubble on a phone is narrower than that, and a fixed count there gave
+    // every bar a negative width.
+    const barCount = Math.max(
+      1,
+      Math.min(NUM_BARS, Math.floor((width + BAR_GAP) / (MIN_BAR_WIDTH + BAR_GAP)))
+    );
     const { primary, faded } = getColors();
-    const barWidth = (width - BAR_GAP * (NUM_BARS - 1)) / NUM_BARS;
-    const playedCount = Math.round(progress * NUM_BARS);
+    const barWidth = (width - BAR_GAP * (barCount - 1)) / barCount;
+    const playedCount = Math.round(progress * barCount);
 
     let bars: number[];
     if (isLive) {
       const buf = liveBufferRef.current;
       buf.shift();
       buf.push(liveLevel);
-      bars = buf;
+      bars = buf.slice(-barCount);
     } else {
-      bars = Array.from({ length: NUM_BARS }, (_, i) => {
+      bars = Array.from({ length: barCount }, (_, i) => {
         if (!data || data.length === 0) return 0.1;
-        const idx = Math.floor((i / NUM_BARS) * data.length);
+        const idx = Math.floor((i / barCount) * data.length);
         return data[idx] ?? 0;
       });
     }
