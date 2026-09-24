@@ -112,6 +112,7 @@ func (w *RetentionWorker) runAllJobs(ctx context.Context) {
 	w.cleanupExpiredExports(ctx)
 	w.cleanupExpiredAuthSessions(ctx)
 	w.cleanupExpiredAuthTokens(ctx)
+	w.cleanupExpiredGroupInviteKeyCopies(ctx)
 	w.cleanupExpiredDirectUploads(ctx)
 	w.cleanupDeletedUserMedia(ctx)
 	w.cleanupDeletedOmniChatMedia(ctx)
@@ -548,6 +549,22 @@ func (w *RetentionWorker) cleanupExpiredAuthTokens(ctx context.Context) {
 		WHERE expires_at < NOW() - INTERVAL '7 days'
 	`); err != nil && !isUndefinedTableError(err) {
 		log.Printf("[RETENTION] Failed to clean expired password reset tokens: %v", err)
+	}
+}
+
+// cleanupExpiredGroupInviteKeyCopies drops the group key copies an invite
+// carried once the invite can no longer be accepted. Answering an invite drops
+// them already; an invite nobody answers only expires.
+func (w *RetentionWorker) cleanupExpiredGroupInviteKeyCopies(ctx context.Context) {
+	if w.db == nil || w.cfg.DryRun {
+		return
+	}
+	if _, err := w.db.Exec(ctx, `
+		DELETE FROM group_invite_key_copies c
+		USING group_invites i
+		WHERE c.invite_id = i.id AND i.expires_at < NOW()
+	`); err != nil && !isUndefinedTableError(err) {
+		log.Printf("[RETENTION] Failed to clean expired group invite key copies: %v", err)
 	}
 }
 
