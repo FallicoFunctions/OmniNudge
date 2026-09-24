@@ -75,7 +75,6 @@ func publicOmniChatVoiceProfile(voice *models.OmniChatPersonaVoice) *models.Omni
 type OmniChatVoiceData interface {
 	GetPersonaVoice(ctx context.Context, personaID int) (*models.OmniChatPersonaVoice, error)
 	GetPersonaVoiceAccessible(ctx context.Context, personaID, viewerUserID int) (*models.OmniChatPersonaVoice, error)
-	GetConversationVoiceOwned(ctx context.Context, userID, conversationID int) (*models.OmniChatPersonaVoice, error)
 	UpsertPersonaVoiceAuthorized(ctx context.Context, userID int, voice *models.OmniChatPersonaVoice) (bool, error)
 	StartCallOwned(ctx context.Context, userID, conversationID int, mode string) (*models.OmniChatCallSession, error)
 	EndCallOwned(ctx context.Context, id uuid.UUID, userID int) (bool, error)

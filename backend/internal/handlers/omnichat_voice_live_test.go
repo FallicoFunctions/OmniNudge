@@ -19,22 +19,21 @@ import (
 )
 
 type liveCallVoiceData struct {
-	notActive           bool
-	attachedProvider    string
-	attachedSession     string
-	startResult         *models.OmniChatCallSession
-	activeProviders     []models.OmniChatCallProviderSession
-	activeProvider      string
-	activeSession       string
-	endCalls            int
-	startCalls          int
-	startNotFound       bool
-	attachResult        *bool
-	cancelOnAttach      context.CancelFunc
-	endContextErr       error
-	voiceConversationID int
-	voicePersonaID      int
-	upsertCalls         int
+	notActive        bool
+	attachedProvider string
+	attachedSession  string
+	startResult      *models.OmniChatCallSession
+	activeProviders  []models.OmniChatCallProviderSession
+	activeProvider   string
+	activeSession    string
+	endCalls         int
+	startCalls       int
+	startNotFound    bool
+	attachResult     *bool
+	cancelOnAttach   context.CancelFunc
+	endContextErr    error
+	voicePersonaID   int
+	upsertCalls      int
 }
 
 type liveCallBilling struct {
@@ -98,11 +97,6 @@ func (d *liveCallVoiceData) GetPersonaVoice(context.Context, int) (*models.OmniC
 func (d *liveCallVoiceData) GetPersonaVoiceAccessible(_ context.Context, personaID, _ int) (*models.OmniChatPersonaVoice, error) {
 	d.voicePersonaID = personaID
 	return liveCallVoice(personaID), nil
-}
-
-func (d *liveCallVoiceData) GetConversationVoiceOwned(_ context.Context, _, conversationID int) (*models.OmniChatPersonaVoice, error) {
-	d.voiceConversationID = conversationID
-	return liveCallVoice(d.voicePersonaID), nil
 }
 
 func liveCallVoice(personaID int) *models.OmniChatPersonaVoice {
