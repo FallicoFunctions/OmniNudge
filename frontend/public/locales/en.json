@@ -3957,6 +3957,7 @@
     "addMembers": "Add Members",
     "inviteSent": "Invite sent",
     "inviteFailed": "Failed to send invite",
+    "answerInviteFailed": "Could not answer the invite. Please try again.",
     "admin": {
       "mute": "Mute",
       "unmute": "Unmute",

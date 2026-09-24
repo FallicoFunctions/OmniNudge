@@ -101,6 +101,17 @@ const SEARCH_PAGE_SIZE = 50;
 
 type MessageSearchDateRange = 'all' | '24h' | '7d' | '30d';
 
+async function searchUsers(query: string) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&limit=10`
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    users?: { id: number; username: string; avatar_url?: string }[];
+  };
+  return data.users ?? [];
+}
+
 function inferMessageTypeFromFile(file: File): Message['message_type'] {
   if (file.type.startsWith('video/')) {
     return 'video';
@@ -4483,16 +4494,7 @@ export default function MessagesPage() {
             setShowCreateGroupModal(false);
             setSelectedConversationId(conversation.id);
           }}
-          searchUsers={async (query) => {
-            const res = await authenticatedFetch(
-              `${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&limit=10`
-            );
-            if (!res.ok) return [];
-            const data = (await res.json()) as {
-              users?: { id: number; username: string; avatar_url?: string }[];
-            };
-            return data.users ?? [];
-          }}
+          searchUsers={searchUsers}
         />
       )}
 
@@ -4508,6 +4510,7 @@ export default function MessagesPage() {
               conversation={selectedConversation}
               currentUserId={user.id}
               onClose={() => setShowGroupSidebar(false)}
+              searchUsers={searchUsers}
             />
           </div>
         </div>

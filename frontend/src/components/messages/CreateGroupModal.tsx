@@ -14,10 +14,12 @@ interface User {
   avatar_url?: string | null;
 }
 
+export type SearchUsers = (query: string) => Promise<User[]>;
+
 interface CreateGroupModalProps {
   onClose: () => void;
   onCreated: (conversation: Conversation) => void;
-  searchUsers: (query: string) => Promise<User[]>;
+  searchUsers: SearchUsers;
 }
 
 type Step = 1 | 2 | 3;

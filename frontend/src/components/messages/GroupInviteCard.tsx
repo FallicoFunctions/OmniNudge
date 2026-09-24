@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGroupInvites } from '../../hooks/useGroupConversation';
 import { GroupAvatar } from './GroupAvatar';
@@ -68,6 +69,16 @@ export function GroupInvitesList({ onConversationOpened }: GroupInvitesListProps
   const { t } = useTranslation();
   const { invites, isLoading, acceptInvite, declineInvite, isAccepting, isDeclining } =
     useGroupInvites();
+  const [error, setError] = useState('');
+
+  const answer = async (send: () => Promise<unknown>) => {
+    setError('');
+    try {
+      await send();
+    } catch {
+      setError(t('groups.answerInviteFailed'));
+    }
+  };
 
   const pending = invites.filter((i) => i.status === 'pending');
 
@@ -78,16 +89,23 @@ export function GroupInvitesList({ onConversationOpened }: GroupInvitesListProps
       <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
         {t('groups.pendingInvites')} ({pending.length})
       </h3>
+      {error && (
+        <p role="alert" className="mb-3 text-xs text-[var(--color-error)]">
+          {error}
+        </p>
+      )}
       <div className="space-y-3">
         {pending.map((invite) => (
           <GroupInviteCard
             key={invite.id}
             invite={invite}
-            onAccept={async (id) => {
-              await acceptInvite(id);
-              onConversationOpened?.(invite.conversation_id);
-            }}
-            onDecline={declineInvite}
+            onAccept={(id) =>
+              answer(async () => {
+                await acceptInvite(id);
+                onConversationOpened?.(invite.conversation_id);
+              })
+            }
+            onDecline={(id) => answer(() => declineInvite(id))}
             isAccepting={isAccepting}
             isDeclining={isDeclining}
           />

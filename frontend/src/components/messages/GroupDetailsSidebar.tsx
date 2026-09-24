@@ -6,6 +6,8 @@ import { MuteUserModal } from './MuteUserModal';
 import { BanUserModal } from './BanUserModal';
 import { SlowModeControl } from './SlowModeControl';
 import { GroupAuditLog } from './GroupAuditLog';
+import { GroupInviteMembers } from './GroupInviteMembers';
+import type { SearchUsers } from './CreateGroupModal';
 import { adminGroupsService } from '../../services/adminGroupsService';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Conversation, GroupParticipant, GroupRole } from '../../types/messages';
@@ -14,6 +16,7 @@ interface GroupDetailsSidebarProps {
   conversation: Conversation;
   currentUserId: number;
   onClose: () => void;
+  searchUsers: SearchUsers;
 }
 
 type SidebarTab = 'members' | 'settings' | 'audit';
@@ -173,6 +176,7 @@ export function GroupDetailsSidebar({
   conversation,
   currentUserId,
   onClose,
+  searchUsers,
 }: GroupDetailsSidebarProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -276,6 +280,7 @@ export function GroupDetailsSidebar({
   ];
 
   const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
+  const canInvite = isAdmin || (currentUserRole === 'member' && !!settings?.anyone_can_invite);
 
   return (
     <div className="flex h-full flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -395,6 +400,13 @@ export function GroupDetailsSidebar({
         {/* Members tab */}
         {activeTab === 'members' && (
           <div className="py-2">
+            {canInvite && (
+              <GroupInviteMembers
+                conversationId={conversation.id}
+                memberIds={participants.map((p) => p.user_id)}
+                searchUsers={searchUsers}
+              />
+            )}
             {loadingParticipants ? (
               <p className="px-4 text-sm text-[var(--color-text-muted)]">{t('common.loading')}</p>
             ) : (
