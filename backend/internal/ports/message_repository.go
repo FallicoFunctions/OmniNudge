@@ -12,8 +12,8 @@ type MessageRepository interface {
 	GetByID(ctx context.Context, id int) (*domain.Message, error)
 	GetByConversationID(ctx context.Context, conversationID int, userID int, limit int, offset int) ([]*domain.Message, error)
 	GetByConversationIDWithCursor(ctx context.Context, conversationID int, userID int, limit int, cursor *domain.TimeCursor) ([]*domain.Message, error)
-	GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int) ([]*domain.Message, error)
-	GetByConversationIDForAllWithCursor(ctx context.Context, conversationID int, viewerID int, limit int, cursor *domain.TimeCursor) ([]*domain.Message, error)
+	GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int, newestFirst bool) ([]*domain.Message, error)
+	GetByConversationIDForAllWithCursor(ctx context.Context, conversationID int, viewerID int, limit int, cursor *domain.TimeCursor, newestFirst bool) ([]*domain.Message, error)
 	MarkAsDelivered(ctx context.Context, messageID int) error
 	MarkUndeliveredAsDelivered(ctx context.Context, conversationID int, recipientID int) ([]domain.DeliveredMessage, error)
 	MarkAsRead(ctx context.Context, messageID int) error

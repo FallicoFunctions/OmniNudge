@@ -281,6 +281,7 @@ func buildTestDeps(t *testing.T, rateLimited bool) *TestDeps {
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
+			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
 			protected.POST("/conversations/archive-batch", conversationsHandler.ArchiveConversationBatch)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.GET("/messages/:id/thread", messagesHandler.GetThread)

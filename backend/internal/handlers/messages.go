@@ -926,6 +926,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 	}
 
+	// A group has no single recipient: recipientID is the sender, so the
+	// broadcast below told only the person who sent it, and every other member
+	// saw the message only after a reload. Each current member is told instead.
+	if conversationType == "group" {
+		if h.hub != nil {
+			h.broadcastToOtherGroupMembers(c, req.ConversationID, userID, message)
+		}
+		c.JSON(http.StatusCreated, message)
+		return
+	}
+
 	// Broadcast message to recipient via WebSocket if they're online OR send push notification if offline
 	if h.hub != nil {
 		if h.hub.IsUserOnline(recipientID) {
@@ -964,6 +975,34 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, message)
+}
+
+// broadcastToOtherGroupMembers sends a new group message to every member but
+// its sender. A failed member lookup is logged and the send still succeeds:
+// the message is stored, and members see it when they next load the group.
+func (h *MessagesHandler) broadcastToOtherGroupMembers(c *gin.Context, conversationID, senderID int, message *models.Message) {
+	rows, err := h.pool.Query(c.Request.Context(), `
+		SELECT user_id FROM conversation_participants
+		WHERE conversation_id = $1 AND user_id <> $2
+	`, conversationID, senderID)
+	if err != nil {
+		log.Printf("[SendMessage] Failed to list group members: conversation_id=%d err=%v", conversationID, err)
+		return
+	}
+	defer rows.Close()
+	var members []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err == nil {
+			members = append(members, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("[SendMessage] Failed to read group members: conversation_id=%d err=%v", conversationID, err)
+	}
+	for _, member := range members {
+		h.hub.Broadcast(&websocket.Message{RecipientID: member, Type: "new_message", Payload: message})
+	}
 }
 
 // ForwardMessage forwards a message to another conversation.
@@ -2009,6 +2048,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				userID,
 				limitArg,
 				payload,
+				conversationType == "group",
 			)
 		} else {
 			messages, err = h.messageRepo.GetByConversationIDForAll(
@@ -2017,6 +2057,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				userID,
 				limitArg,
 				offset,
+				conversationType == "group",
 			)
 		}
 	} else {

@@ -436,8 +436,18 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 	return messages, rows.Err()
 }
 
-// GetByConversationIDForAll retrieves messages for mod mail conversations (visible to all participants)
-func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int) ([]*Message, error) {
+// GetByConversationIDForAll retrieves messages every participant can see: mod
+// mail and groups.
+//
+// newestFirst is the order a direct message list uses, and the one the chat
+// view reverses for display. A group read oldest first came out upside down,
+// and with a limit it returned a long group's first messages rather than its
+// latest. Mod mail is displayed as returned, so it keeps oldest first.
+func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int, newestFirst bool) ([]*Message, error) {
+	order := "ASC"
+	if newestFirst {
+		order = "DESC"
+	}
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
 		       m.sender_encrypted_content,
@@ -465,7 +475,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		    WHERE bu.blocker_id = $2
 		      AND bu.blocked_id = m.sender_id
 		  )
-		ORDER BY m.sent_at ASC
+		ORDER BY m.sent_at ` + order + `, m.id ` + order + `
 		LIMIT $3 OFFSET $4
 	`
 
@@ -522,13 +532,16 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 	return messages, rows.Err()
 }
 
-// GetByConversationIDForAllWithCursor retrieves mod mail messages using cursor pagination (asc).
+// GetByConversationIDForAllWithCursor is GetByConversationIDForAll with cursor
+// pagination. Newest first, the cursor moves to older messages, as a direct
+// message list's does; oldest first, it moves to newer ones.
 func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 	ctx context.Context,
 	conversationID int,
 	viewerID int,
 	limit int,
 	cursor *TimeCursor,
+	newestFirst bool,
 ) ([]*Message, error) {
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
@@ -561,11 +574,19 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 	args := []interface{}{conversationID, viewerID}
 	paramIdx := 3
 	if cursor != nil {
-		query += fmt.Sprintf(" AND (m.sent_at, m.id) > ($%d, $%d)", paramIdx, paramIdx+1)
+		comparison := ">"
+		if newestFirst {
+			comparison = "<"
+		}
+		query += fmt.Sprintf(" AND (m.sent_at, m.id) %s ($%d, $%d)", comparison, paramIdx, paramIdx+1)
 		args = append(args, cursor.Timestamp, cursor.ID)
 		paramIdx += 2
 	}
-	query += fmt.Sprintf(" ORDER BY m.sent_at ASC, m.id ASC LIMIT $%d", paramIdx)
+	order := "ASC"
+	if newestFirst {
+		order = "DESC"
+	}
+	query += fmt.Sprintf(" ORDER BY m.sent_at %s, m.id %s LIMIT $%d", order, order, paramIdx)
 	args = append(args, limit)
 
 	rows, err := r.pool.Query(ctx, query, args...)

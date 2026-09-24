@@ -453,17 +453,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 			ConversationType: "dm", // Assume DM if we're creating it this way
 		}
 		details := &ConversationWithDetails{Conversation: conv}
-
-		// Latest message
-		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID, userID)
-		if latestMsg != nil {
-			details.LatestMessage = latestMsg
-		}
-		// Unread count
-		if unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversationID, userID); err == nil {
-			details.UnreadCount = unreadCount
-		}
-
+		h.addMessageSummary(c, details, userID)
 		c.JSON(http.StatusOK, details)
 		return
 	}
@@ -476,6 +466,30 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 
 	if conversation == nil {
 		RespondError(c, http.StatusNotFound, "Conversation not found")
+		return
+	}
+
+	// A group has no user1 or user2, so IsParticipant refused every member and
+	// sending to a group failed before it started. Its members are rows in
+	// conversation_participants, and there is no other user to describe.
+	if conversation.ConversationType == "group" {
+		var isMember bool
+		if err := h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isMember); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
+			return
+		}
+		if !isMember {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
+			return
+		}
+		details := &ConversationWithDetails{Conversation: conversation}
+		h.addMessageSummary(c, details, userID)
+		c.JSON(http.StatusOK, details)
 		return
 	}
 
@@ -506,19 +520,20 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 		}
 	}
 
-	// Get latest message
-	latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conversation.ID, userID)
-	if err == nil && latestMsg != nil {
-		details.LatestMessage = latestMsg
-	}
-
-	// Get unread count
-	unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversation.ID, userID)
-	if err == nil {
-		details.UnreadCount = unreadCount
-	}
-
+	h.addMessageSummary(c, details, userID)
 	c.JSON(http.StatusOK, details)
+}
+
+// addMessageSummary fills the latest message and the unread count. Both are
+// best effort: a conversation still loads if either read fails.
+func (h *ConversationsHandler) addMessageSummary(c *gin.Context, details *ConversationWithDetails, userID int) {
+	ctx := c.Request.Context()
+	if latest, err := h.messageRepo.GetLatestMessage(ctx, details.ID, userID); err == nil && latest != nil {
+		details.LatestMessage = latest
+	}
+	if unread, err := h.messageRepo.GetUnreadCount(ctx, details.ID, userID); err == nil {
+		details.UnreadCount = unread
+	}
 }
 
 // DeleteConversation deletes a conversation.

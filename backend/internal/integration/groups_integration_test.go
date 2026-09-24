@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	gorillaws "github.com/gorilla/websocket"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
@@ -335,4 +336,150 @@ func TestGroupConversationLimit(t *testing.T) {
 	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken, body)
 	assert.Equal(t, http.StatusBadRequest, w.Code,
 		"groups with 251+ participants should be rejected with 400; body: %s", w.Body.String())
+}
+
+// TestGroupConversationReadByItsMembers covers GET /conversations/:id for a
+// group. A group has no user1 or user2, and the handler checked only those, so
+// every member got 403 -- and the app reads this route to learn a conversation
+// is a group before it seals a message for it, so nothing could be sent.
+func TestGroupConversationReadByItsMembers(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("readowner"), "user")
+	member1 := createUser(t, deps.UserRepo, uniqueGrpUsername("readm1"), "user")
+	member2 := createUser(t, deps.UserRepo, uniqueGrpUsername("readm2"), "user")
+	outsider := createUser(t, deps.UserRepo, uniqueGrpUsername("readout"), "user")
+
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	m1Token, _ := deps.AuthService.GenerateJWT(member1.ID, member1.Username, member1.Role)
+	outsiderToken, _ := deps.AuthService.GenerateJWT(outsider.ID, outsider.Username, outsider.Role)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+		createGroupBody("Readable Group", []int{member1.ID, member2.ID}))
+	require.Equal(t, http.StatusCreated, w.Code, "group creation: %s", w.Body.String())
+	var group struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+	path := fmt.Sprintf("/api/v1/conversations/%d", group.ID)
+
+	for _, token := range []string{ownerToken, m1Token} {
+		r := doGroupRequest(t, deps.GroupRouter, http.MethodGet, path, token, nil)
+		require.Equal(t, http.StatusOK, r.Code, "a member reads the group; body: %s", r.Body.String())
+		var got struct {
+			ID               int             `json:"id"`
+			ConversationType string          `json:"conversation_type"`
+			OtherUser        json.RawMessage `json:"other_user"`
+		}
+		require.NoError(t, json.Unmarshal(r.Body.Bytes(), &got))
+		assert.Equal(t, group.ID, got.ID)
+		assert.Equal(t, "group", got.ConversationType)
+		assert.Empty(t, got.OtherUser, "a group has no other user")
+	}
+
+	r := doGroupRequest(t, deps.GroupRouter, http.MethodGet, path, outsiderToken, nil)
+	assert.Equal(t, http.StatusForbidden, r.Code, "someone outside the group is refused")
+}
+
+// TestGroupMessagesComeNewestFirst: the chat view reverses the list it is
+// given, as it does for a direct message. A group read oldest first showed its
+// newest message at the top, and with a limit returned a long group's first
+// messages instead of its latest.
+func TestGroupMessagesComeNewestFirst(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("ordowner"), "user")
+	m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("ordm1"), "user")
+	m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("ordm2"), "user")
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+		createGroupBody("Ordered Group", []int{m1.ID, m2.ID}))
+	require.Equal(t, http.StatusCreated, w.Code, "group creation: %s", w.Body.String())
+	var group struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+
+	var sent []int
+	for _, text := range []string{"first", "second", "third"} {
+		body := fmt.Sprintf(`{"conversation_id":%d,"encrypted_content":%q,"message_type":"text","encryption_version":"v1"}`, group.ID, text)
+		r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/messages", ownerToken, []byte(body))
+		require.Equal(t, http.StatusCreated, r.Code, "send: %s", r.Body.String())
+		var msg struct {
+			ID int `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(r.Body.Bytes(), &msg))
+		sent = append(sent, msg.ID)
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	ids := func(path string) []int {
+		r := doGroupRequest(t, deps.GroupRouter, http.MethodGet, path, ownerToken, nil)
+		require.Equal(t, http.StatusOK, r.Code, "list: %s", r.Body.String())
+		var page struct {
+			Messages []struct {
+				ID int `json:"id"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(r.Body.Bytes(), &page))
+		out := make([]int, 0, len(page.Messages))
+		for _, m := range page.Messages {
+			out = append(out, m.ID)
+		}
+		return out
+	}
+
+	base := fmt.Sprintf("/api/v1/conversations/%d/messages", group.ID)
+	assert.Equal(t, []int{sent[2], sent[1], sent[0]}, ids(base+"?limit=50&offset=0"))
+	assert.Equal(t, []int{sent[2], sent[1]}, ids(base+"?limit=2&offset=0"), "a limit keeps the latest, not the first")
+}
+
+// TestGroupMessageReachesTheOtherMembers: the new_message broadcast went to
+// recipientID, which for a group is the sender, so no other member saw a
+// message until they reloaded.
+func TestGroupMessageReachesTheOtherMembers(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("wsowner"), "user")
+	m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("wsm1"), "user")
+	m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("wsm2"), "user")
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+		createGroupBody("Live Group", []int{m1.ID, m2.ID}))
+	require.Equal(t, http.StatusCreated, w.Code, "group creation: %s", w.Body.String())
+	var group struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+
+	dial := func(user *models.User) *gorillaws.Conn {
+		token, _ := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
+		h := http.Header{}
+		h.Set("Origin", "http://localhost:8080")
+		conn, _, err := gorillaws.DefaultDialer.Dial("ws"+ts.URL[len("http"):]+"/api/v1/ws?token="+token, h)
+		require.NoError(t, err)
+		return conn
+	}
+	conns := []*gorillaws.Conn{dial(m1), dial(m2)}
+	for _, conn := range conns {
+		defer func(c *gorillaws.Conn) { _ = c.Close() }(conn)
+		readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
+	}
+
+	body := fmt.Sprintf(`{"conversation_id":%d,"encrypted_content":"live","message_type":"text","encryption_version":"v1"}`, group.ID)
+	r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/messages", ownerToken, []byte(body))
+	require.Equal(t, http.StatusCreated, r.Code, "send: %s", r.Body.String())
+
+	for _, conn := range conns {
+		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "new_message" })
+		payload, _ := evt["payload"].(map[string]interface{})
+		assert.EqualValues(t, group.ID, payload["conversation_id"])
+	}
 }

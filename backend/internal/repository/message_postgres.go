@@ -37,12 +37,12 @@ func (r *PostgresMessageRepository) GetByConversationIDWithCursor(ctx context.Co
 	return r.inner.GetByConversationIDWithCursor(ctx, conversationID, userID, limit, cursor)
 }
 
-func (r *PostgresMessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int) ([]*domain.Message, error) {
-	return r.inner.GetByConversationIDForAll(ctx, conversationID, viewerID, limit, offset)
+func (r *PostgresMessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int, newestFirst bool) ([]*domain.Message, error) {
+	return r.inner.GetByConversationIDForAll(ctx, conversationID, viewerID, limit, offset, newestFirst)
 }
 
-func (r *PostgresMessageRepository) GetByConversationIDForAllWithCursor(ctx context.Context, conversationID int, viewerID int, limit int, cursor *domain.TimeCursor) ([]*domain.Message, error) {
-	return r.inner.GetByConversationIDForAllWithCursor(ctx, conversationID, viewerID, limit, cursor)
+func (r *PostgresMessageRepository) GetByConversationIDForAllWithCursor(ctx context.Context, conversationID int, viewerID int, limit int, cursor *domain.TimeCursor, newestFirst bool) ([]*domain.Message, error) {
+	return r.inner.GetByConversationIDForAllWithCursor(ctx, conversationID, viewerID, limit, cursor, newestFirst)
 }
 
 func (r *PostgresMessageRepository) MarkAsDelivered(ctx context.Context, messageID int) error {
