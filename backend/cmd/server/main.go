@@ -758,10 +758,6 @@ func main() {
 			openrouter.NewClient(cfg.OpenRouter.APIKey, standardSceneModel),
 		),
 	)
-	// Each sentence of a call reply is offered to the caller as it is written,
-	// so she starts talking while the rest is still being generated.
-	omniChatCallSpeech := services.NewOmniChatCallSpeech(cache, hub)
-
 	chatbotService := services.NewChatbotService(
 		db.Pool,
 		botPersonaRepo,
@@ -776,8 +772,7 @@ func main() {
 		SetCharacterTraits(models.NewOmniChatCharacterTraitRepository(db.Pool)).
 		// On a call she is speaking, not writing. Without this the reply comes
 		// back as prose with stage directions in it, and the voice reads them.
-		SetCallState(omniChatVoiceRepo).
-		SetCallSpeech(omniChatCallSpeech)
+		SetCallState(omniChatVoiceRepo)
 	// A nil queue means no worker will ever extract, so the persona recalls what
 	// it already knows and learns nothing new. That degrades cleanly rather than
 	// moving a 20-second model call onto the send path.
