@@ -437,22 +437,22 @@ func TestGroupMessagesComeNewestFirst(t *testing.T) {
 	assert.Equal(t, []int{sent[2], sent[1]}, ids(base+"?limit=2&offset=0"), "a limit keeps the latest, not the first")
 }
 
-// TestGroupMessageReachesTheOtherMembers: the new_message broadcast went to
-// recipientID, which for a group is the sender, so no other member saw a
-// message until they reloaded.
-func TestGroupMessageReachesTheOtherMembers(t *testing.T) {
-	deps := newGroupTestDeps(t)
-	defer deps.DB.Close()
-	ts := httptest.NewServer(deps.GroupRouter)
-	defer ts.Close()
+// liveGroup makes a group of three and connects its two members' sockets.
+type liveGroup struct {
+	id         int
+	ownerToken string
+	members    []*gorillaws.Conn
+}
 
-	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("wsowner"), "user")
-	m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("wsm1"), "user")
-	m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("wsm2"), "user")
+func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liveGroup {
+	t.Helper()
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername(name+"owner"), "user")
+	m1 := createUser(t, deps.UserRepo, uniqueGrpUsername(name+"m1"), "user")
+	m2 := createUser(t, deps.UserRepo, uniqueGrpUsername(name+"m2"), "user")
 	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
 
 	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
-		createGroupBody("Live Group", []int{m1.ID, m2.ID}))
+		createGroupBody("Live Group "+name, []int{m1.ID, m2.ID}))
 	require.Equal(t, http.StatusCreated, w.Code, "group creation: %s", w.Body.String())
 	var group struct {
 		ID int `json:"id"`
@@ -463,23 +463,61 @@ func TestGroupMessageReachesTheOtherMembers(t *testing.T) {
 		token, _ := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
 		h := http.Header{}
 		h.Set("Origin", "http://localhost:8080")
-		conn, _, err := gorillaws.DefaultDialer.Dial("ws"+ts.URL[len("http"):]+"/api/v1/ws?token="+token, h)
+		conn, _, err := gorillaws.DefaultDialer.Dial("ws"+serverURL[len("http"):]+"/api/v1/ws?token="+token, h)
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = conn.Close() })
+		readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
 		return conn
 	}
-	conns := []*gorillaws.Conn{dial(m1), dial(m2)}
-	for _, conn := range conns {
-		defer func(c *gorillaws.Conn) { _ = c.Close() }(conn)
-		readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
-	}
+	return liveGroup{id: group.ID, ownerToken: ownerToken, members: []*gorillaws.Conn{dial(m1), dial(m2)}}
+}
 
-	body := fmt.Sprintf(`{"conversation_id":%d,"encrypted_content":"live","message_type":"text","encryption_version":"v1"}`, group.ID)
-	r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/messages", ownerToken, []byte(body))
+func (g liveGroup) send(t *testing.T, deps *groupTestDeps, text string) int {
+	t.Helper()
+	body := fmt.Sprintf(`{"conversation_id":%d,"encrypted_content":%q,"message_type":"text","encryption_version":"v1"}`, g.id, text)
+	r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/messages", g.ownerToken, []byte(body))
 	require.Equal(t, http.StatusCreated, r.Code, "send: %s", r.Body.String())
+	var msg struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(r.Body.Bytes(), &msg))
+	return msg.ID
+}
 
-	for _, conn := range conns {
+// TestGroupMessageReachesTheOtherMembers: the new_message broadcast went to
+// recipientID, which for a group is the sender, so no other member saw a
+// message until they reloaded.
+func TestGroupMessageReachesTheOtherMembers(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "live")
+	g.send(t, deps, "live")
+	for _, conn := range g.members {
 		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "new_message" })
 		payload, _ := evt["payload"].(map[string]interface{})
-		assert.EqualValues(t, group.ID, payload["conversation_id"])
+		assert.EqualValues(t, g.id, payload["conversation_id"])
+	}
+}
+
+// TestGroupPinReachesTheOtherMembers: edits, pins and thread replies find their
+// audience through getConversationParticipantIDs, which read a group as a
+// direct message and found nobody in it.
+func TestGroupPinReachesTheOtherMembers(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "pin")
+	messageID := g.send(t, deps, "pin me")
+	r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/messages/%d/pin", messageID), g.ownerToken, nil)
+	require.Equal(t, http.StatusOK, r.Code, "pin: %s", r.Body.String())
+	for _, conn := range g.members {
+		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "message_pinned" })
+		payload, _ := evt["payload"].(map[string]interface{})
+		assert.EqualValues(t, messageID, payload["message_id"])
 	}
 }

@@ -242,7 +242,10 @@ func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, con
 		return nil, err
 	}
 
-	if conversationType == "mod_mail" {
+	// A group, like mod mail, has no user1 or user2: its members are rows here.
+	// Read as a direct message, a group had no participants, so edits, pins
+	// and thread replies reached none of its members.
+	if conversationType == "mod_mail" || conversationType == "group" {
 		rows, err := h.pool.Query(ctx, `
 			SELECT user_id
 			FROM conversation_participants
@@ -981,26 +984,15 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 // its sender. A failed member lookup is logged and the send still succeeds:
 // the message is stored, and members see it when they next load the group.
 func (h *MessagesHandler) broadcastToOtherGroupMembers(c *gin.Context, conversationID, senderID int, message *models.Message) {
-	rows, err := h.pool.Query(c.Request.Context(), `
-		SELECT user_id FROM conversation_participants
-		WHERE conversation_id = $1 AND user_id <> $2
-	`, conversationID, senderID)
+	members, err := h.getConversationParticipantIDs(c.Request.Context(), conversationID)
 	if err != nil {
 		log.Printf("[SendMessage] Failed to list group members: conversation_id=%d err=%v", conversationID, err)
 		return
 	}
-	defer rows.Close()
-	var members []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err == nil {
-			members = append(members, id)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		log.Printf("[SendMessage] Failed to read group members: conversation_id=%d err=%v", conversationID, err)
-	}
 	for _, member := range members {
+		if member == senderID {
+			continue
+		}
 		h.hub.Broadcast(&websocket.Message{RecipientID: member, Type: "new_message", Payload: message})
 	}
 }
