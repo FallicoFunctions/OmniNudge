@@ -1,0 +1,12 @@
+diff --git a/backend/internal/database/omnichat_expansion_migration_test.go b/backend/internal/database/omnichat_expansion_migration_test.go
+index 423c1bd1e..6033f519b 100644
+--- a/backend/internal/database/omnichat_expansion_migration_test.go
++++ b/backend/internal/database/omnichat_expansion_migration_test.go
+@@ -27,7 +27,6 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
+ 		// the loop asserts it is what schema_migrations reports before
+ 		// rolling it back, so adding a migration without adding it here
+ 		// fails on the first iteration.
+-		"220_group_invite_key_copies",
+ 		"214_message_group_key_version",
+ 		"213_drop_export_session_keys",
+ 		"212_group_key_versions",

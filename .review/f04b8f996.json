@@ -1,0 +1,555 @@
+{
+ "schema_version": 2,
+ "head": "b66c82264",
+ "base": "f04b8f996",
+ "scope": {
+  "files": [
+   "frontend/src/components/messages/GroupInviteMembers.tsx",
+   "frontend/src/components/messages/GroupDetailsSidebar.tsx",
+   "frontend/src/components/messages/GroupInviteCard.tsx",
+   "frontend/src/components/messages/CreateGroupModal.tsx",
+   "frontend/src/pages/MessagesPage.tsx",
+   "frontend/public/locales/en.json",
+   "backend/internal/handlers/groups.go",
+   "backend/internal/services/group_keys.go",
+   "backend/internal/database/migrations/220_group_invite_key_copies.up.sql",
+   "backend/internal/database/migrations/220_group_invite_key_copies.down.sql",
+   "backend/internal/workers/retention_worker.go"
+  ],
+  "boundaries": [
+   "the invite and add HTTP bodies",
+   "the group_invite_key_copies rows",
+   "group_key_members",
+   "the retention worker",
+   "the rendered group panel"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/800d8e003.json",
+  ".review/a848b585c.json",
+  ".review/da9ed20de.json",
+  ".review/2fa98568a.json",
+  ".review/b28df65f3.json"
+ ],
+ "notes": "Invites from the group panel, the accept/decline parameter fix, and phase 1 of history on joining: the inviter's device wraps the older key versions with the invite.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "f04b8f996..b66c82264. 68ca76247 (Add Members in the group panel, the invite card's error), 167151d53 (accept/decline read :invite_id; an invite carries the older key versions wrapped for the invitee and accept grants them in the join's transaction; a direct add carries them the same way), 6111950d4 and b66c82264 (review fixes). Boundaries: the invite and add HTTP bodies, the group_invite_key_copies rows, group_key_members, the retention worker, the rendered group panel."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read the findings of every ledger that names invites or group keys: 800d8e003 (key routes closed to non-members), a848b585c (a new migration missing from the rollback lists -- it recurred here, finding 1), da9ed20de (unwrap never proven; the forget-after-rotation rule), 2fa98568a (refusals told by code, not prose -- the new refusal reuses group_key_history_not_allowed), b28df65f3 (copy size bound -- the new path reuses validGroupKeyCopy)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in the pane as DERRF earlier: the Members tab shows an Add Members button; typing seed_user lists seed_user_2 only (seed_user_1 is a member); a click shows 'Invite sent: seed_user_2'. The card's failure message is asserted by role=alert in GroupInviteCard.test."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "A throwaway integration test printed the real bodies: invite without history 201; with a held v1 201; with an unheld v5 400 {code: group_key_history_not_allowed}; with a non-integer version 400 bad_request; re-invite 201 with the same id; decline 204; direct add with a bad version 400; with a held version 201 {message: Participant added}."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Same run printed the rows: after a re-invite with no history the invite's copies are gone (replace, as designed); after decline 0 copies; a refused add leaves the user not a member (the transaction rolled back); after a good add the newcomer's state shows my_copies [{1 v1-g3}] with active version 0."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The refusal code group_key_history_not_allowed is the one ShareGroupKeyHistory already sends and the client already maps. The JSON field is history on both invite and add; versions are JSON object keys decoded into map[int]string."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The invite response shape is unchanged (id, conversation_id, status, expires_at, created_at); the client reads id only in tests. The frontend does not send history yet (phase 2)."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One rule, in checkNewcomerHistory, used by both the invite and the add."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "NewcomerHistory is decoded by gin's JSON binding (encoding/json, tag-driven); B3 proved a history body reaches the rows."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The HTTP test sends history exactly as a client will: a JSON object keyed by the version as a string, the value a wrapped copy."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A held version with a real-length copy is accepted (B3)."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "An unheld version, an empty copy, a group that hides its history, and a non-integer version are all refused (service test and B3)."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Empty history is allowed and stores nothing; a copy over the size bound is refused by validGroupKeyCopy, the same bound rotation uses."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The sibling ShareHistory path checks history visible, the version held, and the copy valid; checkNewcomerHistory checks the same three. The add now shares the invite's transaction discipline, which it lacked."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Every branch of grantNewcomerHistory is reachable: nil, ErrGroupKeyHistory (B3), and a database error."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "Errors from StoreInviteHistory, GrantInviteHistory and DropInviteHistory all answer 500 and are logged; the card now shows a failed answer instead of an unhandled rejection."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "GrantInviteHistory is gated on message_history_visible read at accept time, so a group that hides its history after the invite grants nothing (service test)."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Nothing duplicated: both paths share checkNewcomerHistory."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Finding 1's shape (a list whose head must be the newest migration): grep found only the two lists in omnichat_expansion_migration_test.go. Finding 2's shape (stored state tied to an invite with no expiry path): group_invite_key_copies is the only table keyed to group_invites besides cascade on delete."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared memory changed."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Invite + copies, accept + grant + stale mark, and add + grant + stale mark are each one transaction; B4 showed a refused add leaves no member."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "Migration 220 has an up and a down; the rollback lists did not name it (finding 1, fixed in 6111950d4); both migration tests pass."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Undo paths: decline drops the copies (B4); accept drops them after granting; a re-invite replaces them; an invite that only expires kept them forever (finding 2, fixed in b66c82264 by the retention run)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both fixes controlled: inv-r1-migration-not-in-rollback-lists fails 'expected 214_message_group_key_version, actual 220_group_invite_key_copies'; inv-r1-expired-invite-keeps-keys fails 'Should be zero, but was 1 -- an expired invite keeps no keys'. The phase's own test TestGroupInviteBringsTheHistory also failed with the grant removed ('should have 1 item(s), but has 0')."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "cleanupExpiredGroupInviteKeyCopies is called from runAllJobs; the retention worker is constructed and started in cmd/server/main.go:542-545."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./... and go vet (handlers, services, workers, integration with -tags=integration) clean; gofmt clean; tsc -b and eslint clean; the commit hooks passed on every commit."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Both findings came from listed instruments: A2 (a prior ledger named the rollback-list rule) and I1 (the approved plan said an expired invite deletes the copies)."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or external system output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "Nothing in a shared bar; the button sits in the group panel's own Members tab."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Every Go run used -v with TEST_DATABASE_URL set; counted PASS and no SKIP in the services, integration, database and workers runs."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Checked each promise of the plan: invite carries copies (yes), accept grants them in the join's transaction (yes), hidden history grants nothing (yes), decline deletes (yes), 'an expired invite deletes the copies' -- not kept (finding 2), direct add works the same way in one transaction (yes), re-invite replaces and records the new inviter (yes)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect: the invite handler stores, the accept handler grants."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test that imports or mocks a changed module: CreateGroupModal, GroupInviteCard, GroupInviteMembers, ExpandedMessage.send, MediaUploadZone, ModMailConversationPage, MessagesPage, MessagesPage.mediaSend, groupsService.routes -- 60 passed, 1 skipped (MessagesPage.test.tsx:275, an it.skip since c6bb54bc3)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "Nothing that can take over the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "newGroupTestDeps gained three routes; every test that calls it builds all of them, and TestGroupInviteCanBeAnswered, TestGroupInviteBringsTheHistory and the throwaway print test built it with no duplicate-route panic."
+    },
+    {
+     "id": "G4",
+     "status": "na",
+     "why": "No earlier control targets these files."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource acquired after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The HTTP test runs the real GroupHandler and GroupKeyService on the real database, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled the two new frontend files (seed 7): 4 passed."
+    }
+   ],
+   "findings": [
+    {
+     "id": "inv-r1-migration-not-in-rollback-lists",
+     "summary": "Migration 220 was missing from the two rollback lists whose head must be the newest migration, so both migration tests failed on their first step -- the same defect a848b585c recorded for 212.",
+     "found_by": "A2",
+     "fix_commit": "6111950d4",
+     "control": {
+      "patch": ".review/controls/inv-r1-migration-not-in-rollback-lists.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/database/ -run TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly"
+      ],
+      "observed": "FAIL: expected 214_message_group_key_version, actual 220_group_invite_key_copies"
+     }
+    },
+    {
+     "id": "inv-r1-expired-invite-keeps-keys",
+     "summary": "An invite's wrapped key copies were dropped on accept and decline only; an invite that simply expired kept them stored forever, against the plan's promise that an expired invite deletes them.",
+     "found_by": "I1",
+     "fix_commit": "b66c82264",
+     "control": {
+      "patch": ".review/controls/inv-r1-expired-invite-keeps-keys.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/workers/ -run TestRetentionWorkerDropsTheKeysOfAnExpiredGroupInvite"
+      ],
+      "observed": "FAIL: Should be zero, but was 1 -- an expired invite keeps no keys"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the review-time code -- 6111950d4 (220 at the head of both rollback lists) and b66c82264 (cleanupExpiredGroupInviteKeyCopies in runAllJobs, and its test)."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Pass 1's reading stands; no prior ledger covers the retention worker's group tables."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Rendered in the pane as DERRF earlier: the Members tab shows an Add Members button; typing seed_user lists seed_user_2 only (seed_user_1 is a member); a click shows 'Invite sent: seed_user_2'. The card's failure message is asserted by role=alert in GroupInviteCard.test."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: A throwaway integration test printed the real bodies: invite without history 201; with a held v1 201; with an unheld v5 400 {code: group_key_history_not_allowed}; with a non-integer version 400 bad_request; re-invite 201 with the same id; decline 204; direct add with a bad version 400; with a held v"
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The retention test inserts one expired and one open invite, each with a copy, runs the step, and reads back 0 and 1 copies."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The DELETE compares expires_at < NOW(), the same boundary the accept handler refuses at (expiresAt.Before(time.Now()), groups.go:1047), so no invite that can still be accepted loses its copies."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: The invite response shape is unchanged (id, conversation_id, status, expires_at, created_at); the client reads id only in tests. The frontend does not send history yet (phase 2)."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One rule, in checkNewcomerHistory, used by both the invite and the add."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: NewcomerHistory is decoded by gin's JSON binding (encoding/json, tag-driven); B3 proved a history body reaches the rows."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The test builds invites through the columns the handler writes (conversation_id, invited_user_id, invited_by, expires_at) and copies through the migration's columns."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: A held version with a real-length copy is accepted (B3)."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: An unheld version, an empty copy, a group that hides its history, and a non-integer version are all refused (service test and B3)."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Boundary: an invite one hour past expiry is swept; one six days from expiry is kept."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The step follows its siblings: returns on a nil db and on DryRun, and ignores an undefined table, as the 14 other steps do."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Every branch of grantNewcomerHistory is reachable: nil, ErrGroupKeyHistory (B3), and a database error."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed DELETE is logged with [RETENTION], as the siblings log."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: GrantInviteHistory is gated on message_history_visible read at accept time, so a group that hides its history after the invite grants nothing (service test)."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Nothing duplicated: both paths share checkNewcomerHistory."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "No other list names the newest migration; no other table hangs stored state on group_invites."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared memory changed."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Invite + copies, accept + grant + stale mark, and add + grant + stale mark are each one transaction; B4 showed a refused add leaves no member."
+    },
+    {
+     "id": "F3",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Migration 220 has an up and a down; the rollback lists did not name it (finding 1, fixed in 6111950d4); both migration tests pass."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Accept, decline, re-invite and expiry now each leave no copies behind."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls re-run by hand after the fixes: each fails with a real assertion, as recorded in pass 1."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "runAllJobs calls the step; main.go:542-545 starts the worker."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go vet ./internal/workers/ clean, gofmt clean, commit hooks passed."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or external system output."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "Nothing in a shared bar; the button sits in the group panel's own Members tab."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "All 17 TestRetention tests in internal/workers ran with -v and TEST_DATABASE_URL: 17 PASS, 0 SKIP, 0 FAIL."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The plan's promise 'an expired invite deletes the copies' now holds; the others held in pass 1."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect: the invite handler stores, the accept handler grants."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Ran every test that imports or mocks a changed module: CreateGroupModal, GroupInviteCard, GroupInviteMembers, ExpandedMessage.send, MediaUploadZone, ModMailConversationPage, MessagesPage, MessagesPage.mediaSend, groupsService.routes -- 60 passed, 1 skipped (MessagesPage.test.tsx:275, an it.skip sinc"
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "Nothing that can take over the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "No shared fixture changed in pass 2; no test calls runAllJobs, and the full TestRetention set passes."
+    },
+    {
+     "id": "G4",
+     "status": "na",
+     "why": "No earlier control targets these files."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource acquired after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: The HTTP test runs the real GroupHandler and GroupKeyService on the real database, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Re-applied to the pass 2 code; nothing new: Shuffled the two new frontend files (seed 7): 4 passed."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet on handlers, services, workers, integration (-tags=integration) clean",
+  "lint": "eslint clean on the changed frontend files; gofmt clean",
+  "types": "tsc -b clean",
+  "tests": "Narrow runs only, per the build-report-test rule: group key and invite Go tests 24 PASS 0 SKIP; migration rollback tests PASS; 17 TestRetention PASS; 9 frontend files touching the changed modules 60 passed, 1 pre-existing skip."
+ }
+}

@@ -1,0 +1,18 @@
+diff --git a/backend/internal/workers/retention_worker.go b/backend/internal/workers/retention_worker.go
+index 3f21f382a..ebcbbdcd5 100644
+--- a/backend/internal/workers/retention_worker.go
++++ b/backend/internal/workers/retention_worker.go
+@@ -559,13 +559,6 @@ func (w *RetentionWorker) cleanupExpiredGroupInviteKeyCopies(ctx context.Context
+ 	if w.db == nil || w.cfg.DryRun {
+ 		return
+ 	}
+-	if _, err := w.db.Exec(ctx, `
+-		DELETE FROM group_invite_key_copies c
+-		USING group_invites i
+-		WHERE c.invite_id = i.id AND i.expires_at < NOW()
+-	`); err != nil && !isUndefinedTableError(err) {
+-		log.Printf("[RETENTION] Failed to clean expired group invite key copies: %v", err)
+-	}
+ }
+ 
+ func (w *RetentionWorker) cleanupExpiredAuthSessions(ctx context.Context) {
