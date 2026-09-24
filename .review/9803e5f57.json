@@ -236,7 +236,7 @@
             "patch": ".review/controls/fe-silent-429.patch",
             "runner": "vitest",
             "tests": [
-              "src/utils/__tests__/messageSendErrors.test.ts -t 'maps 429'"
+              "src/utils/__tests__/messageSendErrors.test.ts -t 'maps status 429'"
             ],
             "observed": "With the patch: FAIL, maps 429 to messages.errors.sendingTooFast received undefined. Without: 5 passed."
           }
