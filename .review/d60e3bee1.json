@@ -13,7 +13,9 @@
       "backend/internal/api/middleware/redis_rate_limit.go",
       "backend/internal/handlers/omnichat_voice.go",
       "backend/internal/handlers/omnichat_voice_test.go",
-      "backend/internal/services/omnichat_voice.go"
+      "backend/internal/services/omnichat_voice.go",
+      ".review/a053fc7ebe0b5a28021865686c30e5392a072cc1.json",
+      ".review/68b74a58aa486af4662388aa3852a694eda0a5e7.json"
     ],
     "boundaries": [
       "the browser bundle",
@@ -26,7 +28,7 @@
     ".review/10c4f8b92.json",
     ".review/c4d7a019d.json"
   ],
-  "notes": "Dead call-sentence code, frontend and the backend route (phase A). Two passes, one finding, found by shuffling the test order, now instrument H6. dropped-notice-stall retired (its code deleted); 464c678c8 left unedited at the user's request. These commits must not ship before phase B: the server still sends sentence events the frontend now logs as unknown.",
+  "notes": "Dead call-sentence code, frontend and the backend route (phase A). Two passes, one finding, found by shuffling the test order, now instrument H6. dropped-notice-stall retired (its code deleted); 464c678c8 left unedited at the user's request. These commits must not ship before phase B: the server still sends sentence events the frontend now logs as unknown. G4 repointed poster-R5's selector in its two ledgers (the guard test had been renamed).",
   "passes": [
     {
       "pass": 1,
@@ -244,7 +246,7 @@
         {
           "id": "G4",
           "status": "applied",
-          "evidence": "Controls on the touched files still apply: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, poster-R5, voice-R1 (replayed in pass 2). dropped-notice-stall no longer applies: it patched callSentenceSpeech.ts, which de41b9a42 deleted, so it cannot be rebuilt and is retired here. Its finding lives in 464c678c8, which the user asked not to edit, so its note is this line and the patch file is left as it was."
+          "evidence": "Controls on the touched files: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, poster-R5, voice-R1 still apply. dropped-notice-stall no longer applies: it patched callSentenceSpeech.ts, which de41b9a42 deleted, so it cannot be rebuilt and is retired here. Its finding lives in 464c678c8, which the user asked not to edit, so its note is this line and the patch file is left as it was."
         },
         {
           "id": "F6",
@@ -500,7 +502,7 @@
         {
           "id": "G4",
           "status": "applied",
-          "evidence": "Replayed in a worktree as the hook does: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, poster-R5, voice-R1 and the new control all pass at HEAD and fail with their patch. dropped-notice-stall retired as in pass 1."
+          "evidence": "Replayed in a worktree as the hook does: call-R2, credits-end-call-ambiguous, rl-mod-mail-unlimited, voice-R1 and call-modal-hangup-promise-inherited pass at HEAD and fail with their patch. poster-R5 first replayed BAD (passed with the patch): both ledgers that name it (a053fc7eb..., 68b74a58...) selected tests that no longer exist or do not cover mediaAssetThumbnailUrl -- 'resolves same-origin media against the API' passes with the patch, and 'fetches a published clip thumbnail from the route the asset names' matches nothing. The guard itself is intact under a new name, 'resolves a published thumbnail against the route the asset names', which fails with the patch; both ledgers now select it (one line each) and the replay passes. Stale since before this change: this range touched neither the test file nor mediaAssetThumbnailUrl. dropped-notice-stall retired as in pass 1."
         },
         {
           "id": "F6",

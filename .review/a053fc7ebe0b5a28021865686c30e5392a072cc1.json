@@ -896,7 +896,7 @@
       "patch": ".review/controls/poster-R5.patch",
       "runner": "vitest",
       "tests": [
-       "src/services/__tests__/omnichatService.test.ts -t 'resolves same-origin media against the API'"
+       "src/services/__tests__/omnichatService.test.ts -t 'resolves a published thumbnail against the route the asset names'"
       ],
       "observed": "FAIL with 'expected no-store not to be no-store'"
      },

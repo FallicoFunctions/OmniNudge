@@ -278,7 +278,7 @@
       "patch": ".review/controls/poster-R5.patch",
       "runner": "vitest",
       "tests": [
-       "src/services/__tests__/omnichatService.test.ts -t 'fetches a published clip thumbnail from the route the asset names'"
+       "src/services/__tests__/omnichatService.test.ts -t 'resolves a published thumbnail against the route the asset names'"
       ],
       "observed": "FAIL with 'expected vi.fn() to be called with arguments'; the call went to /omnichat/media/asset-1/poster instead of the explore route the asset named"
      }
