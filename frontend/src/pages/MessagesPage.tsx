@@ -1592,6 +1592,11 @@ export default function MessagesPage() {
         await messagesService.deleteMessage(msg.id, { deleteFor: 'both' }).catch(() => undefined);
         throw uploadError;
       }
+      // Sent outside the send mutation, so its cache refresh never ran: the
+      // server tells only the other people, and the sender did not see their
+      // own voice message until a reload.
+      queryClient.invalidateQueries({ queryKey: ['messages', msg.conversation_id] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
     } catch (err) {
       console.error('Failed to send voice message:', err);
       alert(t(messageSendErrorKey(err) ?? 'messages.errors.sendFailed'));

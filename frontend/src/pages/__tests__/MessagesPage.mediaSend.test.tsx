@@ -561,4 +561,34 @@ describe('sending a voice message', () => {
     expect(state.recordings).toHaveLength(0);
     expect(messagesService.sendMessage).not.toHaveBeenCalled();
   });
+
+  // A voice message is sent outside the send mutation, so the chat was never
+  // refreshed: the other people were told, and the sender did not see their
+  // own voice message until a reload.
+  it('shows the sender their own voice message once the recording is up', async () => {
+    state.conversations = [dmConversation];
+    vi.mocked(messagesService.sendMessage).mockResolvedValueOnce({
+      id: 9101,
+      conversation_id: dmConversation.id,
+      sender_id: 7,
+      encrypted_content: '',
+      message_type: 'audio',
+      sent_at: new Date().toISOString(),
+    } as Awaited<ReturnType<typeof messagesService.sendMessage>>);
+
+    renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    await waitFor(() => expect(messagesService.getMessagesPage).toHaveBeenCalled());
+    const record = await screen.findByRole('button', { name: 'Record a voice message' });
+    const fetchesBefore = vi.mocked(messagesService.getMessagesPage).mock.calls.length;
+
+    fireEvent.click(record);
+    await waitFor(() => expect(state.recordings).toHaveLength(1));
+    await waitFor(() =>
+      expect(vi.mocked(messagesService.getMessagesPage).mock.calls.length).toBeGreaterThan(
+        fetchesBefore
+      )
+    );
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
 });
