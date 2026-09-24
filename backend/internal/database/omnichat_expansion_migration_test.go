@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"220_group_invite_key_copies",
 		"214_message_group_key_version",
 		"213_drop_export_session_keys",
 		"212_group_key_versions",
@@ -270,6 +271,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"220_group_invite_key_copies",
 		"214_message_group_key_version",
 		"213_drop_export_session_keys",
 		"212_group_key_versions",
