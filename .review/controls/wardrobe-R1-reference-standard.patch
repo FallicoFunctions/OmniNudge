@@ -1,8 +1,8 @@
 diff --git a/backend/internal/queue/omnichat_generation_handler.go b/backend/internal/queue/omnichat_generation_handler.go
-index 908f0b69d..73bfe7ab0 100644
+index e9bd2b152..2da72a262 100644
 --- a/backend/internal/queue/omnichat_generation_handler.go
 +++ b/backend/internal/queue/omnichat_generation_handler.go
-@@ -662,11 +662,7 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
+@@ -776,11 +776,7 @@ func (h *OmniChatGenerationHandler) refuseExplicitRender(ctx context.Context, jo
  	case models.OmniChatGenerationModeLikeness:
  		standard = services.OmniChatImageStandardPortrait
  	case models.OmniChatGenerationModeLikenessReference:
@@ -13,5 +13,5 @@ index 908f0b69d..73bfe7ab0 100644
 -		standard = services.OmniChatImageStandardReference
 +		standard = services.OmniChatImageStandardPortrait
  	}
- 	explicit, err := h.imageReview.ReviewRenderedImageAgainst(ctx, path, contentType, standard)
+ 	explicit, err := h.reviewWithRetry(ctx, path, contentType, standard)
  	if err != nil {
