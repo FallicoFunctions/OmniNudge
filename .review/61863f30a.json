@@ -1,0 +1,277 @@
+{
+  "schema_version": 2,
+  "head": "a732b483b",
+  "base": "61863f30a",
+  "scope": {
+    "files": [
+      "backend/cmd/server/main.go",
+      "backend/internal/services/chatbot_service.go",
+      "backend/internal/services/omnichat_call_sentences.go",
+      "backend/internal/services/omnichat_call_sentences_test.go",
+      "backend/internal/services/omnichat_call_speech.go",
+      "backend/internal/models/omnichat_voice.go",
+      "backend/internal/handlers/omnichat_voice.go",
+      "backend/internal/handlers/omnichat_voice_live_test.go"
+    ],
+    "boundaries": [
+      "the WebSocket messages a turn sends",
+      "the chat service's token callback",
+      "Redis"
+    ]
+  },
+  "prior_ledgers_read": [
+    ".review/464c678c8.json",
+    ".review/d60e3bee1.json"
+  ],
+  "notes": "Phase B of the dead call-sentence cleanup. One pass, no finding. A real turn's WebSocket messages compared at base and HEAD: only the two sentence events are gone. no-is-a-sentence and sentence-boundary retired (their code deleted). One overlap with another Go suite during the first base probe, told to the user.",
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "61863f30a..a732b483b: 6f90939f9 removes the call sentence stream (omnichat_call_sentences.go and test), the Redis sentence store (omnichat_call_speech.go), the chat service's callSpeech wiring and main.go's; a732b483b removes GetConversationVoiceOwned (repository, handler interface, test fake). Boundaries: the WebSocket messages a turn sends, the chat service's token callback, Redis."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read 464c678c8 (the sentence findings: no-is-a-sentence, sentence-boundary, dropped-notice-stall), d60e3bee1 (phase A review: C1 required phase B before shipping)."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the WebSocket messages of a real turn (throwaway test: test database, stub model, a captured hub client), two inputs, at HEAD and at base 61863f30a with the sentence store wired as main.go wired it (NewMemoryCache). Not on a call: base and HEAD both [initial_state, omnichat_token x1, omnichat_message_complete]. On a call: base [initial_state, omnichat_call_sentence x2, omnichat_call_sentences_done, omnichat_message_complete, omnichat_token x2]; HEAD the same minus both sentence events. A first base run without the store wired showed no sentence events and proved nothing; the second, wired run is the comparison."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No component."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No route changed in this range (the route went in phase A)."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "No SQL written; the only query removed is the conversation voice lookup, which nothing calls."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Phase A's C1 said the frontend would log every sentence event as unknown until the server stopped sending them; B1 shows HEAD sends none."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "omnichat_token and omnichat_message_complete, which the frontend reads, are unchanged in both inputs."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No field."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No accessor."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Every call site of the token callback checks nil in production code (openrouter client, deliverBufferedConversation, bakeoff), so the separate-messages callback became nil instead of a function that only fed the stream. Test fakes call it unchecked; the whole services package passes (1345 PASS, 1 opt-in live SKIP)."
+        },
+        {
+          "id": "E2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Searched code and Markdown for comments or docs still describing the pipeline (sentence by sentence, call-speech, SpeakSentence, call_sentence, callSpeech): none."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "Redis keys omnichat:call_sentence:* are no longer written; existing ones expire on their own three-minute TTL."
+        },
+        {
+          "id": "G1",
+          "status": "na",
+          "why": "No finding."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "gofmt clean, go build ./..., go vet, golangci-lint 0 issues."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 1 found nothing."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "n/a: no model output."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "services package: 1345 PASS, 1 SKIP (TestLiveCommitmentResolution, opt-in live quota); handlers voice: 69 PASS, 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "Phase B of the approved plan: sentence stream and store (B1), the dead voice lookup (B2)."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "The whole services package, and the handler voice tests."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Replayed in a worktree the applicable controls on the touched files: call-R2, call-prompt-says-texting, call-prompt-demands-narration, call-prompt-asks-for-action, rl-mod-mail-unlimited -- all pass at HEAD and fail with their patch. no-is-a-sentence and sentence-boundary no longer apply: both patched omnichat_call_sentences.go, which 6f90939f9 deleted, so they cannot be rebuilt and are retired here. Their findings live in 464c678c8, left unedited at the user's request; the patch files stay as they were."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "n/a."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The probe built the real ChatbotService with the real hub."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "services (Chatbot|Call|Separate|Deliver|Spoken|Mirror|Group) and handlers (Voice|Speech|Call) pass with go test -shuffle 1 and 2."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "go build ./...",
+    "types": "n/a",
+    "lint": "gofmt, golangci-lint 0",
+    "vet": "go vet ok",
+    "tests": "services 1345 PASS 1 opt-in SKIP; handlers voice 69 PASS; shuffled x2"
+  }
+}
