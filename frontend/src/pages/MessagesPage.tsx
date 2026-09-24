@@ -2310,7 +2310,13 @@ export default function MessagesPage() {
           )}
 
           {/* Conversation list panel */}
-          <div className="flex w-[20rem] flex-shrink-0 flex-col overflow-hidden">
+          <div
+            className={
+              isMobile
+                ? 'flex w-full flex-col overflow-hidden'
+                : 'flex w-[20rem] flex-shrink-0 flex-col overflow-hidden'
+            }
+          >
             <div className="border-b border-[var(--color-border)] p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
