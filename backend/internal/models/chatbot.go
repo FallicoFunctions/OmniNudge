@@ -404,27 +404,65 @@ var ErrRoleplayLimitReached = errors.New("bot persona: this account is at its ch
 // first and inserting after lets two requests arriving together both pass a
 // check that was true when each of them read it.
 func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, persona *BotPersona, limit int) (*BotPersona, error) {
+	created, _, err := r.createOwned(ctx, userID, persona, limit, uuid.Nil)
+	return created, err
+}
+
+var ErrRoleplayRequestAlreadyDeleted = errors.New("roleplay request already created a deleted character")
+
+// CreateOwnedWithClaim commits the character and its replay response together.
+// A stale claim can also recover a character written by an older server that
+// committed the insert before closing the claim.
+func (r *BotPersonaRepository) CreateOwnedWithClaim(ctx context.Context, userID int, persona *BotPersona, limit int, requestID uuid.UUID) (*BotPersona, bool, error) {
+	if requestID == uuid.Nil {
+		return nil, false, errors.New("roleplay creation requires a request ID")
+	}
+	return r.createOwned(ctx, userID, persona, limit, requestID)
+}
+
+func (r *BotPersonaRepository) createOwned(ctx context.Context, userID int, persona *BotPersona, limit int, requestID uuid.UUID) (*BotPersona, bool, error) {
 	if err := r.validatePersonaMediaURLs(ctx, userID, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("bot persona: begin: %w", err)
+		return nil, false, fmt.Errorf("bot persona: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('omnichat_persona_create'), $1)`, userID); err != nil {
-		return nil, fmt.Errorf("bot persona: serialise creation: %w", err)
+		return nil, false, fmt.Errorf("bot persona: serialise creation: %w", err)
+	}
+	if requestID != uuid.Nil {
+		existing, lookupErr := scanBotPersona(tx.QueryRow(ctx, `
+			SELECT `+botPersonaSelectColumns+` FROM bot_personas
+			WHERE owner_user_id=$1 AND slug=$2
+		`, userID, persona.Slug))
+		switch {
+		case lookupErr == nil:
+			if !existing.IsActive {
+				return nil, false, ErrRoleplayRequestAlreadyDeleted
+			}
+			if err := completeOmniChatRequestInTx(ctx, tx, OmniChatRequestCompletion{UserID: userID, RequestID: requestID}, existing); err != nil {
+				return nil, false, err
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return nil, false, fmt.Errorf("bot persona: commit recovered claim: %w", err)
+			}
+			return existing, false, nil
+		case !errors.Is(lookupErr, pgx.ErrNoRows):
+			return nil, false, fmt.Errorf("bot persona: recover prior creation: %w", lookupErr)
+		}
 	}
 	var owned int
 	if err := tx.QueryRow(ctx, `
 		SELECT COUNT(*) FROM bot_personas
-		WHERE owner_user_id = $1 AND response_style_profile <> $2
+		WHERE owner_user_id = $1 AND response_style_profile <> $2 AND is_active
 	`, userID, ResponseStyleProfileDirectMessage).Scan(&owned); err != nil {
-		return nil, fmt.Errorf("bot persona: count owned: %w", err)
+		return nil, false, fmt.Errorf("bot persona: count owned: %w", err)
 	}
 	if owned >= limit {
-		return nil, ErrRoleplayLimitReached
+		return nil, false, ErrRoleplayLimitReached
 	}
 	query := `
 		INSERT INTO bot_personas (
@@ -452,12 +490,17 @@ func (r *BotPersonaRepository) CreateOwned(ctx context.Context, userID int, pers
 		persona.ImportSourceFilename, persona.AvatarURL, persona.PreviewVideoURL, persona.GalleryURLs, persona.IsNSFW,
 	))
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	if requestID != uuid.Nil {
+		if err := completeOmniChatRequestInTx(ctx, tx, OmniChatRequestCompletion{UserID: userID, RequestID: requestID}, created); err != nil {
+			return nil, false, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("bot persona: commit: %w", err)
+		return nil, false, fmt.Errorf("bot persona: commit: %w", err)
 	}
-	return created, nil
+	return created, true, nil
 }
 
 // UpdateOwned updates an existing user-owned persona.

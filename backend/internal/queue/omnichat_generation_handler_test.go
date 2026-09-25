@@ -389,8 +389,9 @@ func newGenerationClaimTestHandler(store *generationClaimStoreFake, provider *su
 
 func omniChatMediaTestConfig() config.OmniChatMediaConfig {
 	return config.OmniChatMediaConfig{
-		RunPodImageEndpointID: "endpoint-image",
-		RunPodVideoEndpointID: "endpoint-video",
+		RunPodImageEndpointID:      "endpoint-image",
+		RunPodAnimeImageEndpointID: "endpoint-anime",
+		RunPodVideoEndpointID:      "endpoint-video",
 	}
 }
 
@@ -825,6 +826,7 @@ func TestAnAnimeCharacterIsNotRenderedAsAPhotograph(t *testing.T) {
 	anime, err := BuildImageSpec(omniChatMediaTestConfig(), job(models.OmniChatRenderStyleAnime),
 		[]string{"https://cdn.example.test/nadia.png"})
 	require.NoError(t, err)
+	require.Equal(t, "endpoint-anime", anime.EndpointID)
 	require.Contains(t, anime.Input["prompt"], "anime artwork")
 	require.NotContains(t, anime.Input["prompt"], "photorealistically")
 
@@ -833,8 +835,26 @@ func TestAnAnimeCharacterIsNotRenderedAsAPhotograph(t *testing.T) {
 	realistic, err := BuildImageSpec(omniChatMediaTestConfig(), job(""),
 		[]string{"https://cdn.example.test/sadie.png"})
 	require.NoError(t, err)
+	require.Equal(t, "endpoint-image", realistic.EndpointID)
 	require.Contains(t, realistic.Input["prompt"], "photorealistically")
 	require.NotContains(t, realistic.Input["prompt"], "anime")
+}
+
+func TestAnimeImageSpecFailsWithoutAnimeEndpoint(t *testing.T) {
+	job :=
+		&models.OmniChatGenerationJob{
+			Kind: models.OmniChatMediaKindImage, Mode: models.OmniChatGenerationModeLikeness,
+			EffectivePrompt: "Render as anime artwork", IdentityProfile: models.OmniChatMediaIdentityProfile{
+				RenderStyle: models.OmniChatRenderStyleAnime,
+			},
+		}
+	for _, cfg := range []config.OmniChatMediaConfig{
+		{RunPodImageEndpointID: "endpoint-image"},
+		{RunPodImageEndpointID: "endpoint-image", RunPodAnimeImageEndpointID: "endpoint-image"},
+	} {
+		_, err := BuildImageSpec(cfg, job, nil)
+		require.ErrorIs(t, err, runpod.ErrEndpointNotConfigured)
+	}
 }
 
 func TestThePromptNeverContradictsItselfAboutTheMedium(t *testing.T) {

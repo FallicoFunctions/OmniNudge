@@ -545,3 +545,13 @@ func TestSomebodyElsesCharacterCannotBeRedrawn(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, response.Code)
 	require.Zero(t, reroller.calls, "nothing is drawn for a character they cannot reach")
 }
+
+func TestAccessibleButNotOwnedCharacterCannotBeRedrawn(t *testing.T) {
+	otherOwner := 17
+	reroller := &rerollerFake{}
+	reader := &likenessPersonaReaderFake{persona: &models.BotPersona{ID: 31, OwnerUserID: &otherOwner}}
+	response := callLikeness(newRerollRouter(reader, reroller),
+		http.MethodPost, "/api/v1/omnichat/omniai/31/likeness/reroll")
+	require.Equal(t, http.StatusNotFound, response.Code)
+	require.Zero(t, reroller.calls)
+}

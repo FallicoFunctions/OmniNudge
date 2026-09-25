@@ -88,8 +88,8 @@ func TestAPartialSetIsKeptRatherThanThrownAway(t *testing.T) {
 	require.Equal(t, 2, queue.enqueued)
 }
 
-func TestOnlyAnOmniAIIsDrawnFromHerAnswers(t *testing.T) {
-	// A roleplay card's picture is whatever its author uploaded.
+func TestOnlyGuidedCharactersAreDrawnFromTheirAnswers(t *testing.T) {
+	// A legacy roleplay card has no trusted appearance profile.
 	owner := 9
 	card := &models.BotPersona{
 		ID: 32, Name: "Card", OwnerUserID: &owner,
@@ -101,6 +101,44 @@ func TestOnlyAnOmniAIIsDrawnFromHerAnswers(t *testing.T) {
 	require.Error(t, err)
 	require.Empty(t, jobs.requests)
 	require.Zero(t, queue.enqueued)
+}
+
+func TestGuidedRoleplayReceivesGeneratedPortraitChoices(t *testing.T) {
+	first := roleplayAnswers()
+	second := first
+	second.RoleID = "college_student"
+	second.GoalID = "study_finals"
+	second.RegionID = "idaho_town"
+	second.VenueID = "public_library"
+	second.UserRoleID = "classmate"
+	second.RelationshipID = "classmates"
+	second.RenderStyle = "anime"
+	var prompts []string
+	for _, answers := range []RoleplayCreationAnswers{first, second} {
+		persona, err := BuildRoleplayPersona(answers)
+		require.NoError(t, err)
+		owner := 9
+		persona.ID = 32
+		persona.OwnerUserID = &owner
+		jobs, queue := &recordingJobStore{}, &recordingEnqueuer{}
+		started, err := NewOmniChatOmniAILikenessService(jobs, queue, "runpod").
+			Start(context.Background(), persona)
+		require.NoError(t, err)
+		require.Len(t, started, OmniChatOmniAILikenessCandidates)
+		require.Equal(t, OmniChatOmniAILikenessCandidates, queue.enqueued)
+		for _, request := range jobs.requests {
+			require.Contains(t, request.Prompt, "dark brown hair")
+			require.Contains(t, request.Prompt, "Smart casual clothes")
+			require.NotNil(t, request.BillingRequired)
+			require.False(t, *request.BillingRequired)
+		}
+		prompts = append(prompts, jobs.requests[0].Prompt)
+	}
+	require.Contains(t, prompts[0], "New York City")
+	require.Contains(t, prompts[0], "photorealistically")
+	require.Contains(t, prompts[1], "A small town in Idaho")
+	require.Contains(t, prompts[1], "anime artwork")
+	require.NotEqual(t, prompts[0], prompts[1])
 }
 
 func TestAnUnconfiguredLikenessSaysSoRatherThanPanicking(t *testing.T) {

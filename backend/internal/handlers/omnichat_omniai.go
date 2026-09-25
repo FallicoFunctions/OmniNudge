@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -113,6 +114,16 @@ type OmniAIOptions struct {
 // GetOmniAIOptions answers what the creation flow may show.
 func (h *OmniChatHandler) GetOmniAIOptions(c *gin.Context) {
 	appearance := services.OmniAIAppearanceOptions()
+	if !h.animeImageEndpointConfigured {
+		styles := appearance["style"]
+		available := make([]string, 0, len(styles))
+		for _, style := range styles {
+			if style != models.OmniChatRenderStyleAnime {
+				available = append(available, style)
+			}
+		}
+		appearance["style"] = available
+	}
 
 	eyes := make(map[string][]string, len(appearance["style"]))
 	hairStyles := make(map[string]map[string]map[string][]string, len(appearance["style"]))
@@ -195,6 +206,11 @@ func (h *OmniChatHandler) CreateOmniAI(c *gin.Context) {
 	var request OmniChatCreateOmniAIRequest
 	if err := decodeStrictJSON(c, &request); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid character creation request")
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(request.Appearance.Style), models.OmniChatRenderStyleAnime) &&
+		!h.animeImageEndpointConfigured {
+		RespondError(c, http.StatusServiceUnavailable, "Anime portraits are unavailable right now")
 		return
 	}
 	if len(request.Temperaments) > omniChatOmniAIMaxPicks || len(request.Interests) > omniChatOmniAIMaxPicks {

@@ -308,6 +308,29 @@ func TestARoleplayShelfStopsAtThePlansLimit(t *testing.T) {
 	require.Equal(t, 2, owned, "two roleplay characters, and the refused third was not written")
 }
 
+func TestDeletedRoleplayFreesAPlanSlot(t *testing.T) {
+	pool, cleanup := setupMemoryTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	repo := NewBotPersonaRepository(pool)
+	ownerID := omniAICreator(t, pool, "roleplay_deleted_slot_owner")
+
+	first, err := repo.CreateOwned(ctx, ownerID, roleplayFixture("rp-first"), 1)
+	require.NoError(t, err)
+	_, err = repo.CreateOwned(ctx, ownerID, roleplayFixture("rp-blocked"), 1)
+	require.ErrorIs(t, err, ErrRoleplayLimitReached)
+	deleted, err := repo.DeleteOwned(ctx, ownerID, first.ID)
+	require.NoError(t, err)
+	require.True(t, deleted)
+	second, err := repo.CreateOwned(ctx, ownerID, roleplayFixture("rp-second"), 1)
+	require.NoError(t, err)
+	require.NotEqual(t, first.ID, second.ID)
+	var active int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM bot_personas WHERE owner_user_id = $1 AND is_active`, ownerID).Scan(&active))
+	require.Equal(t, 1, active)
+}
+
 func TestCreationRefusesRatherThanWritingHalfACharacter(t *testing.T) {
 	pool, cleanup := setupMemoryTestDB(t)
 	defer cleanup()

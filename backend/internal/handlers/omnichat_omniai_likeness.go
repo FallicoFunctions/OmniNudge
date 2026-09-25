@@ -309,7 +309,7 @@ func (h *OmniChatLikenessHandler) Reroll(c *gin.Context) {
 	}
 
 	persona, err := h.personas.GetAccessibleByID(c.Request.Context(), personaID, &ownerUserID)
-	if err != nil || persona == nil {
+	if err != nil || persona == nil || persona.OwnerUserID == nil || *persona.OwnerUserID != ownerUserID {
 		RespondError(c, http.StatusNotFound, "That character could not be found")
 		return
 	}

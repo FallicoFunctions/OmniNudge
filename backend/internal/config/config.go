@@ -127,6 +127,9 @@ type OmniChatMediaConfig struct {
 	RunPodAPIKey          string
 	RunPodBaseURL         string
 	RunPodImageEndpointID string
+	// Anime renders need an anime-trained checkpoint; the photorealistic image
+	// endpoint does not honor an anime prompt reliably.
+	RunPodAnimeImageEndpointID string
 	// RunPodNSFWImageEndpointID serves accounts entitled to explicit content.
 	// Every explicit pixel is produced by the image phase -- a video is only an
 	// animation of a still that already exists -- so this one split covers both
@@ -207,6 +210,14 @@ type OmniChatMediaConfig struct {
 	// is still a failure a user sees.
 	VideoResolution  string
 	VideoAspectRatio string
+}
+
+// Anime requires a separate worker checkpoint, not another name for the
+// photorealistic endpoint.
+func (c OmniChatMediaConfig) AnimeImageEndpointAvailable() bool {
+	anime := strings.TrimSpace(c.RunPodAnimeImageEndpointID)
+	return anime != "" && anime != strings.TrimSpace(c.RunPodImageEndpointID) &&
+		anime != strings.TrimSpace(c.RunPodNSFWImageEndpointID)
 }
 
 type OmniChatVoiceConfig struct {
@@ -500,6 +511,7 @@ func Load() (*Config, error) {
 			ExplicitContentEnabled:      getEnvAsBool("OMNICHAT_EXPLICIT_CONTENT_ENABLED", false),
 			RunPodBaseURL:               getEnv("RUNPOD_BASE_URL", "https://api.runpod.ai/v2"),
 			RunPodImageEndpointID:       getEnv("RUNPOD_IMAGE_ENDPOINT_ID", ""),
+			RunPodAnimeImageEndpointID:  getEnv("RUNPOD_IMAGE_ENDPOINT_ID_ANIME", ""),
 			RunPodNSFWImageEndpointID:   getEnv("RUNPOD_IMAGE_ENDPOINT_ID_NSFW", ""),
 			RunPodVideoEndpointID:       getEnv("RUNPOD_VIDEO_ENDPOINT_ID", ""),
 			KlingAPIKey:                 getEnv("KLING_API_KEY", ""),

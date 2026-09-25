@@ -1486,7 +1486,12 @@ func BuildImageSpec(cfg config.OmniChatMediaConfig, job *models.OmniChatGenerati
 	// The image phase is where every explicit pixel is produced, so it is also
 	// the only place the content entitlement changes anything.
 	endpointID := strings.TrimSpace(cfg.RunPodImageEndpointID)
-	if job.AllowNSFW {
+	if profile.RenderStyle == models.OmniChatRenderStyleAnime {
+		if !cfg.AnimeImageEndpointAvailable() {
+			return nil, fmt.Errorf("%w: anime image generation endpoint", runpod.ErrEndpointNotConfigured)
+		}
+		endpointID = strings.TrimSpace(cfg.RunPodAnimeImageEndpointID)
+	} else if job.AllowNSFW {
 		if nsfwEndpointID := strings.TrimSpace(cfg.RunPodNSFWImageEndpointID); nsfwEndpointID != "" {
 			endpointID = nsfwEndpointID
 		}

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,14 +21,13 @@ import (
 )
 
 const (
-	maxPersonaNameRunes                    = 100
-	maxPersonaDescriptionRunes             = 4000
-	maxPersonaPromptFieldRunes             = 12000
-	maxPersonaAlternateGreetings           = 12
-	maxPersonaTags                         = 32
-	maxPersonaAlternateGreetingRunes       = 4000
-	maxPersonaTagRunes                     = 100
-	maxPersonaImportBytes            int64 = 16 << 20
+	maxPersonaNameRunes              = 100
+	maxPersonaDescriptionRunes       = 4000
+	maxPersonaPromptFieldRunes       = 12000
+	maxPersonaAlternateGreetings     = 12
+	maxPersonaTags                   = 32
+	maxPersonaAlternateGreetingRunes = 4000
+	maxPersonaTagRunes               = 100
 )
 
 var personaSlugUnsafePattern = regexp.MustCompile(`[^a-z0-9]+`)
@@ -131,42 +130,6 @@ func (h *OmniChatHandler) GetPersonaDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"persona": buildPersonaDefinitionResponse(persona)})
 }
 
-func (h *OmniChatHandler) CreatePersona(c *gin.Context) {
-	userID, ok := middleware.GetAuthenticatedUserID(c)
-	if !ok {
-		return
-	}
-
-	var req personaDefinitionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, http.StatusBadRequest, "Invalid request body")
-		return
-	}
-
-	persona, err := normalizePersonaDefinitionRequest(userID, nil, &req, "native", nil)
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	limit := h.roleplayLimit(c.Request.Context(), userID)
-	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona, limit)
-	if err != nil {
-		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
-			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
-			return
-		}
-		if errors.Is(err, models.ErrRoleplayLimitReached) {
-			respondRoleplayLimit(c, limit)
-			return
-		}
-		RespondError(c, http.StatusInternalServerError, "Failed to create persona")
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"persona": buildPersonaDefinitionResponse(created)})
-}
-
 func (h *OmniChatHandler) UpdatePersona(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -188,10 +151,24 @@ func (h *OmniChatHandler) UpdatePersona(c *gin.Context) {
 		RespondError(c, http.StatusNotFound, "Persona not found")
 		return
 	}
+	// The legacy editor accepts arbitrary character instructions. Keep it for
+	// admins only until edits can use the same curated choices as creation.
+	if c.GetString("role") != "admin" {
+		RespondError(c, http.StatusForbidden, "Character editing requires guided choices")
+		return
+	}
 
 	var req personaDefinitionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if req.IsNSFW && c.GetString("role") != "admin" {
+		RespondError(c, http.StatusForbidden, "Only admins can edit 18+ characters")
+		return
+	}
+	if req.Category == models.PersonaCategoryRomance && existing.Category != models.PersonaCategoryRomance && c.GetString("role") != "admin" {
+		RespondError(c, http.StatusForbidden, "Only admins can assign the romance category")
 		return
 	}
 
@@ -200,6 +177,20 @@ func (h *OmniChatHandler) UpdatePersona(c *gin.Context) {
 		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Character art is chosen from server-generated candidates. Existing art
+	// stays attached, but an owner may not replace it with an uploaded file or
+	// smuggle private reference URLs through the extension blob.
+	if (req.AvatarURL != nil && derefString(req.AvatarURL) != derefString(existing.AvatarURL)) ||
+		(req.PreviewVideoURL != nil && derefString(req.PreviewVideoURL) != derefString(existing.PreviewVideoURL)) ||
+		(req.GalleryURLs != nil && !slices.Equal(req.GalleryURLs, existing.GalleryURLs)) ||
+		(len(req.ExtensionsJSON) > 0 && !samePersonaJSON(req.ExtensionsJSON, existing.ExtensionsJSON)) {
+		RespondError(c, http.StatusBadRequest, "Character media cannot be uploaded or changed")
+		return
+	}
+	persona.AvatarURL = existing.AvatarURL
+	persona.PreviewVideoURL = existing.PreviewVideoURL
+	persona.GalleryURLs = existing.GalleryURLs
+	persona.ExtensionsJSON = existing.ExtensionsJSON
 
 	updated, err := h.personaRepo.UpdateOwned(c.Request.Context(), userID, personaID, persona)
 	if err != nil {
@@ -257,90 +248,6 @@ func (h *OmniChatHandler) DeletePersona(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "persona deleted"})
-}
-
-func (h *OmniChatHandler) ImportPersona(c *gin.Context) {
-	userID, ok := middleware.GetAuthenticatedUserID(c)
-	if !ok {
-		return
-	}
-
-	if err := c.Request.ParseMultipartForm(maxPersonaImportBytes); err != nil {
-		RespondError(c, http.StatusBadRequest, "Failed to parse upload")
-		return
-	}
-
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, "Character card file is required")
-		return
-	}
-	defer func() { _ = file.Close() }()
-
-	raw, err := io.ReadAll(io.LimitReader(file, maxPersonaImportBytes+1))
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, "Failed to read upload")
-		return
-	}
-	if int64(len(raw)) > maxPersonaImportBytes {
-		RespondError(c, http.StatusRequestEntityTooLarge, "Character card file is too large")
-		return
-	}
-
-	card, err := charactercard.Parse(header.Filename, header.Header.Get("Content-Type"), raw)
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, "Unsupported character card file")
-		return
-	}
-
-	req := personaDefinitionRequest{
-		Name:                    card.Name,
-		Description:             card.Description,
-		Category:                inferPersonaCategory(card),
-		Visibility:              "private",
-		SystemPrompt:            card.SystemPrompt,
-		Personality:             card.Personality,
-		Scenario:                card.Scenario,
-		FirstMessage:            card.FirstMessage,
-		ExampleDialogue:         card.ExampleDialogue,
-		ResponseStyleProfile:    models.ResponseStyleProfileCharacterOnly,
-		PostHistoryInstructions: card.PostHistoryInstructions,
-		AlternateGreetings:      card.AlternateGreetings,
-		CreatorNotes:            card.CreatorNotes,
-		Tags:                    card.Tags,
-		CreatorName:             card.Creator,
-		CharacterVersion:        card.CharacterVersion,
-		IsNSFW:                  c.PostForm("is_nsfw") == "true",
-		CharacterBookJSON:       cloneJSON(card.CharacterBook),
-		ExtensionsJSON:          cloneJSON(card.Extensions),
-	}
-	if avatar := strings.TrimSpace(c.PostForm("avatar_url")); avatar != "" {
-		req.AvatarURL = &avatar
-	}
-
-	persona, err := normalizePersonaDefinitionRequest(userID, nil, &req, card.Spec, &header.Filename)
-	if err != nil {
-		RespondError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	persona.RawCardJSON = append(json.RawMessage(nil), bytes.TrimSpace(card.Raw)...)
-
-	limit := h.roleplayLimit(c.Request.Context(), userID)
-	created, err := h.personaRepo.CreateOwned(c.Request.Context(), userID, persona, limit)
-	if err != nil {
-		if errors.Is(err, models.ErrPersonaMediaNotOwnedOrAllowed) {
-			RespondError(c, http.StatusBadRequest, "Persona media must be your own pending or verified upload")
-			return
-		}
-		if errors.Is(err, models.ErrRoleplayLimitReached) {
-			respondRoleplayLimit(c, limit)
-			return
-		}
-		RespondError(c, http.StatusInternalServerError, "Failed to import persona")
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"persona": buildPersonaDefinitionResponse(created)})
 }
 
 func (h *OmniChatHandler) ExportPersonaJSON(c *gin.Context) {
@@ -698,28 +605,28 @@ func isValidPersonaCategory(category string) bool {
 	}
 }
 
-func inferPersonaCategory(card *charactercard.Card) string {
-	searchBlob := strings.ToLower(strings.Join(append([]string{card.Description, card.Personality, card.Scenario}, card.Tags...), " "))
-	switch {
-	case strings.Contains(searchBlob, "romance"), strings.Contains(searchBlob, "boyfriend"), strings.Contains(searchBlob, "girlfriend"):
-		return models.PersonaCategoryRomance
-	case strings.Contains(searchBlob, "anime"), strings.Contains(searchBlob, "game"), strings.Contains(searchBlob, "rpg"):
-		return models.PersonaCategoryAnimeGame
-	case strings.Contains(searchBlob, "assistant"), strings.Contains(searchBlob, "helper"), strings.Contains(searchBlob, "coach"):
-		return models.PersonaCategoryHelper
-	case strings.Contains(searchBlob, "fiction"), strings.Contains(searchBlob, "movie"), strings.Contains(searchBlob, "book"):
-		return models.PersonaCategoryFictionMedia
-	default:
-		return models.PersonaCategoryOriginal
-	}
-}
-
 func cloneJSON(raw json.RawMessage) json.RawMessage {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
 		return nil
 	}
 	return append(json.RawMessage(nil), trimmed...)
+}
+
+func samePersonaJSON(left, right json.RawMessage) bool {
+	var leftValue, rightValue any
+	if len(bytes.TrimSpace(left)) == 0 {
+		left = json.RawMessage(`{}`)
+	}
+	if len(bytes.TrimSpace(right)) == 0 {
+		right = json.RawMessage(`{}`)
+	}
+	if json.Unmarshal(left, &leftValue) != nil || json.Unmarshal(right, &rightValue) != nil {
+		return false
+	}
+	leftCanonical, _ := json.Marshal(leftValue)
+	rightCanonical, _ := json.Marshal(rightValue)
+	return bytes.Equal(leftCanonical, rightCanonical)
 }
 
 func ensureJSONObject(raw json.RawMessage) json.RawMessage {

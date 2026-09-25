@@ -76,6 +76,22 @@ func (s *OmniChatOmniAILikenessService) SetCandidateBriefWriter(
 func (s *OmniChatOmniAILikenessService) candidateBriefs(
 	ctx context.Context, persona *models.BotPersona, count int,
 ) []OmniAICandidateBrief {
+	if IsGeneratedRoleplay(persona) {
+		profile := ResolveOmniChatMediaIdentityProfile(persona)
+		outfit := strings.TrimSpace(profile.Style.Note)
+		if outfit == "" {
+			outfit = "clothes fitting the character's role and world"
+		}
+		setting := strings.TrimSpace(strings.TrimPrefix(strings.SplitN(persona.Scenario, "\n", 2)[0], "Setting:"))
+		if setting == "" {
+			setting = OmniAIFallbackCandidateBrief.Setting
+		}
+		briefs := make([]OmniAICandidateBrief, count)
+		for i := range briefs {
+			briefs[i] = OmniAICandidateBrief{Outfit: outfit, Setting: setting}.Trimmed()
+		}
+		return briefs
+	}
 	fallback := make([]OmniAICandidateBrief, count)
 	for i := range fallback {
 		fallback[i] = OmniAIFallbackCandidateBrief
@@ -126,10 +142,8 @@ func (s *OmniChatOmniAILikenessService) Start(ctx context.Context, persona *mode
 	if persona == nil || persona.OwnerUserID == nil {
 		return nil, errors.New("omnichat likeness: an owned persona is required")
 	}
-	if models.PersonaPerformsAScene(persona) {
-		// Only OmniAIs are drawn from their answers. A roleplay
-		// card's picture is whatever its author uploaded.
-		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
+	if models.PersonaPerformsAScene(persona) && !IsGeneratedRoleplay(persona) {
+		return nil, errors.New("omnichat likeness: this roleplay character has no generated appearance")
 	}
 
 	profile := ResolveOmniChatMediaIdentityProfile(persona)
@@ -191,8 +205,8 @@ func (s *OmniChatOmniAILikenessService) StartReferences(
 	if persona == nil || persona.OwnerUserID == nil {
 		return nil, errors.New("omnichat likeness: an owned persona is required")
 	}
-	if models.PersonaPerformsAScene(persona) {
-		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
+	if models.PersonaPerformsAScene(persona) && !IsGeneratedRoleplay(persona) {
+		return nil, errors.New("omnichat likeness: this roleplay character has no generated appearance")
 	}
 	// Her description from the chest up, for the portrait variants. Read from
 	// the answers she was made with rather than from the stored sentence,
@@ -263,8 +277,8 @@ func (s *OmniChatOmniAILikenessService) Reroll(
 	if persona == nil || persona.OwnerUserID == nil {
 		return nil, errors.New("omnichat likeness: an owned persona is required")
 	}
-	if models.PersonaPerformsAScene(persona) {
-		return nil, errors.New("omnichat likeness: only an OmniAI is drawn from her answers")
+	if models.PersonaPerformsAScene(persona) && !IsGeneratedRoleplay(persona) {
+		return nil, errors.New("omnichat likeness: this roleplay character has no generated appearance")
 	}
 	ownerUserID := *persona.OwnerUserID
 

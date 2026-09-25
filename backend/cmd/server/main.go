@@ -799,7 +799,8 @@ func main() {
 		SetRequestIdempotency(omniChatRequestIdempotencyRepo).
 		SetReplyScheduler(omniChatReplyScheduler).
 		SetOmniAICreator(newOmniAICreator(cfg, botPersonaRepo, userRepo)).
-		SetCreationLimits(services.NewOmniChatCreationLimits(userRepo))
+		SetCreationLimits(services.NewOmniChatCreationLimits(userRepo)).
+		SetAnimeImageEndpointConfigured(cfg.OmniChatMedia.AnimeImageEndpointAvailable())
 	omniChatMemoryHandler := handlers.NewOmniChatMemoryHandler(omniChatMemoryRepo)
 	omniChatResponseFeedbackHandler := handlers.NewOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
 	adminOmniChatResponseFeedbackHandler := handlers.NewAdminOmniChatResponseFeedbackHandler(omniChatResponseFeedbackRepo)
@@ -1496,7 +1497,8 @@ func main() {
 
 			// OmniChat: AI chat bot personas and conversations
 			protected.GET("/omnichat/my-personas", omniChatHandler.ListMyPersonas)
-			protected.POST("/omnichat/personas", omniChatHandler.CreatePersona)
+			protected.POST("/omnichat/personas", omniChatHandler.CreateRoleplay)
+			protected.GET("/omnichat/personas/creation-options", omniChatHandler.GetRoleplayCreationOptions)
 			// Separate from the line above on purpose. §13: these are two
 			// different kinds of thing, and the writer under this one has no
 			// column to put an instruction in.
@@ -1516,7 +1518,6 @@ func main() {
 			protected.GET("/omnichat/omniai/:id/likeness/:candidate_id/content", omniChatLikenessHandler.Content)
 			protected.POST("/omnichat/omniai/:id/likeness/:candidate_id", omniChatLikenessHandler.Pick)
 			protected.POST("/omnichat/omniai/:id/likeness/reroll", omniChatLikenessHandler.Reroll)
-			protected.POST("/omnichat/personas/import", omniChatHandler.ImportPersona)
 			protected.GET(omniChatPersonaPath, omniChatHandler.GetPersonaDefinition)
 			protected.PUT(omniChatPersonaPath, omniChatHandler.UpdatePersona)
 			protected.DELETE(omniChatPersonaPath, omniChatHandler.DeletePersona)

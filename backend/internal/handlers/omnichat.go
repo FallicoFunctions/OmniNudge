@@ -20,17 +20,23 @@ import (
 
 // OmniChatHandler handles HTTP requests for OmniChat bot personas and conversations.
 type OmniChatHandler struct {
-	personaRepo    *models.BotPersonaRepository
-	convRepo       *models.BotConversationRepository
-	messageRepo    *models.BotMessageRepository
-	chatbotService *services.ChatbotService
-	modelSelection *services.OmniChatModelSelectionService
-	allowance      *services.OmniChatAllowance
-	idempotency    OmniChatRequestIdempotencyStore
-	replies        *services.OmniChatReplyScheduler
-	omniAICreator  OmniChatOmniAIMaker
-	creationLimits *services.OmniChatCreationLimits
-	likeness       OmniChatLikenessStarter
+	personaRepo                  *models.BotPersonaRepository
+	convRepo                     *models.BotConversationRepository
+	messageRepo                  *models.BotMessageRepository
+	chatbotService               *services.ChatbotService
+	modelSelection               *services.OmniChatModelSelectionService
+	allowance                    *services.OmniChatAllowance
+	idempotency                  OmniChatRequestIdempotencyStore
+	replies                      *services.OmniChatReplyScheduler
+	omniAICreator                OmniChatOmniAIMaker
+	creationLimits               *services.OmniChatCreationLimits
+	likeness                     OmniChatLikenessStarter
+	animeImageEndpointConfigured bool
+}
+
+func (h *OmniChatHandler) SetAnimeImageEndpointConfigured(available bool) *OmniChatHandler {
+	h.animeImageEndpointConfigured = available
+	return h
 }
 
 // omniChatLikenessStartTimeout bounds the background start so a stalled queue

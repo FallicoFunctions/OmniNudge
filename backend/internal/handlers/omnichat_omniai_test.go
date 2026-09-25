@@ -114,8 +114,14 @@ func newOmniAITestRouter(maker OmniChatOmniAIMaker, claims OmniChatRequestIdempo
 
 func newOmniAITestRouterWithLikeness(maker OmniChatOmniAIMaker, claims OmniChatRequestIdempotencyStore,
 	likeness OmniChatLikenessStarter) *gin.Engine {
+	return newOmniAITestRouterWithAnime(maker, claims, likeness, true)
+}
+
+func newOmniAITestRouterWithAnime(maker OmniChatOmniAIMaker, claims OmniChatRequestIdempotencyStore,
+	likeness OmniChatLikenessStarter, animeAvailable bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	handler := (&OmniChatHandler{}).SetRequestIdempotency(claims).SetOmniAICreator(maker)
+	handler := (&OmniChatHandler{}).SetRequestIdempotency(claims).SetOmniAICreator(maker).
+		SetAnimeImageEndpointConfigured(animeAvailable)
 	if likeness != nil {
 		handler = handler.SetLikenessStarter(likeness)
 	}
@@ -143,7 +149,7 @@ func TestTheFormIsToldWhatTheServerWillAccept(t *testing.T) {
 	// person gets a blanker character than the one they chose.
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/omnichat/omniai/options", (&OmniChatHandler{}).GetOmniAIOptions)
+	router.GET("/omnichat/omniai/options", (&OmniChatHandler{}).SetAnimeImageEndpointConfigured(true).GetOmniAIOptions)
 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/omniai/options", nil))
@@ -213,6 +219,28 @@ func TestTheFormIsToldWhatTheServerWillAccept(t *testing.T) {
 	require.Contains(t, body, `"temperaments":["warm"`)
 	require.Contains(t, body, `"appearance":{`)
 	require.NotContains(t, body, "null", "an empty list renders as [] or the form has nothing to draw")
+}
+
+func TestOmniAIOptionsHideAnimeWithoutItsImageEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/omnichat/omniai/options", (&OmniChatHandler{}).GetOmniAIOptions)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/omnichat/omniai/options", nil))
+	require.Equal(t, http.StatusOK, response.Code)
+	var options OmniAIOptions
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &options))
+	require.Equal(t, []string{"realistic"}, options.Appearance["style"])
+	_, hasAnimeEyes := options.Eyes["anime"]
+	require.False(t, hasAnimeEyes)
+}
+
+func TestOmniAICreationRejectsAnimeWithoutItsImageEndpoint(t *testing.T) {
+	maker := &omniAIMakerFake{persona: &models.BotPersona{ID: 1}}
+	router := newOmniAITestRouterWithAnime(maker, &omniChatRequestIdempotencyFake{}, nil, false)
+	response := postOmniAI(t, router, `{"request_id":"`+uuid.NewString()+`","name":"Sam", "appearance":{"style":"anime"}}`)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.Zero(t, maker.calls)
 }
 
 func TestTheFormIsToldWhenTheCallerMayCreateAnOmniAI(t *testing.T) {

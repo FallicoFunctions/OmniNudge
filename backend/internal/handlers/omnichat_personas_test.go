@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"mime/multipart"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -38,6 +38,7 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 	// production and would otherwise make these tests fail for a reason that
 	// has nothing to do with what they check.
 	handler := NewOmniChatHandler(personaRepo, nil, nil, &services.ChatbotService{}, nil).
+		SetRequestIdempotency(models.NewOmniChatRequestIdempotencyRepository(db.Pool)).
 		SetCreationLimits(services.NewOmniChatCreationLimits(models.NewUserRepository(db.Pool)))
 
 	router := gin.New()
@@ -45,6 +46,11 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 		if userID := c.GetHeader("X-Test-User-ID"); userID != "" {
 			if id, err := strconv.Atoi(userID); err == nil {
 				c.Set("user_id", id)
+				role := c.GetHeader("X-Test-Role")
+				if role == "" {
+					role = "user"
+				}
+				c.Set("role", role)
 			}
 		}
 		c.Next()
@@ -54,8 +60,8 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 	{
 		omnichat.GET("/personas", handler.ListPersonas)
 		omnichat.GET("/my-personas", handler.ListMyPersonas)
-		omnichat.POST("/personas", handler.CreatePersona)
-		omnichat.POST("/personas/import", handler.ImportPersona)
+		omnichat.POST("/personas", handler.CreateRoleplay)
+		omnichat.GET("/personas/creation-options", handler.GetRoleplayCreationOptions)
 		omnichat.GET("/personas/:id", handler.GetPersonaDefinition)
 		omnichat.PUT("/personas/:id", handler.UpdatePersona)
 		omnichat.DELETE("/personas/:id", handler.DeletePersona)
@@ -67,6 +73,29 @@ func setupOmniChatPersonaTestEnv(t *testing.T) (*gin.Engine, *models.UserReposit
 	}
 
 	return router, userRepo, personaRepo, db.Pool, cleanup
+}
+
+func guidedRoleplayBody(name string) []byte {
+	firstName := "Maya"
+	if name == "Different Guide" {
+		firstName = "Nadia"
+	}
+	data, _ := json.Marshal(struct {
+		RequestID string                           `json:"request_id"`
+		Answers   services.RoleplayCreationAnswers `json:"answers"`
+	}{
+		RequestID: "123e4567-e89b-42d3-a456-426614174000",
+		Answers: services.RoleplayCreationAnswers{
+			RoleID: "private_investigator", GoalID: "missing_person", RegionID: "new_york_city", VenueID: "local_restaurant",
+			Gender: "woman", FirstName: firstName, LastName: "Hart", Age: 27, RenderStyle: "realistic",
+			HairColorID: "dark_brown", HairStyleID: "long_wavy", EyeColorID: "brown", BuildID: "athletic",
+			WardrobeID: "smart_casual", PrimaryTraitID: "curious", SecondTraitID: "methodical",
+			SpeechStyleID: "dry_concise", BackstoryID: "returned", UserRoleID: "client",
+			RelationshipID: "professional_partners", OpeningBeatID: "planned_meeting",
+			ResponseStyle: models.ResponseStyleProfileNaturalDialogue,
+		},
+	})
+	return data
 }
 
 // createOmniChatPersonaTestUser makes somebody who is allowed to write a
@@ -158,50 +187,19 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 	other := createOmniChatPersonaTestUser(t, userRepo, "persona_other")
 	seedPublicOmniChatPersona(t, pool, models.NewBotPersonaRepository(pool), "public-guide", "Public Guide")
 
-	body := []byte(`{
-		"name":"Owner Bot",
-		"description":"Private bot",
-		"category":"original",
-		"visibility":"public",
-		"system_prompt":"Be concise.",
-		"personality":"Calm",
-		"scenario":"A quiet room",
-		"first_message":"Hello.",
-		"example_dialogue":"",
-		"post_history_instructions":"",
-		"alternate_greetings":["Hi again."],
-		"creator_notes":"",
-		"tags":["test"],
-		"creator_name":"Owner",
-		"character_version":"1.0",
-		"gallery_urls":[],
-		"is_nsfw":false,
-		"extensions_json":{},
-		"character_book_json":{}
-	}`)
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	setOmniChatPersonaTestUser(req, owner.ID)
-
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(guidedRoleplayBody("Owner Bot")))
+	request.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(request, owner.ID)
 	createW := httptest.NewRecorder()
-	router.ServeHTTP(createW, req)
-	require.Equal(t, http.StatusCreated, createW.Code)
-
-	var createdResp struct {
-		Persona struct {
-			ID                   int    `json:"id"`
-			OwnerUserID          *int   `json:"owner_user_id"`
-			Visibility           string `json:"visibility"`
-			Name                 string `json:"name"`
-			ResponseStyleProfile string `json:"response_style_profile"`
-		} `json:"persona"`
-	}
+	router.ServeHTTP(createW, request)
+	require.Equal(t, http.StatusCreated, createW.Code, createW.Body.String())
+	var createdResp models.BotPersona
 	require.NoError(t, json.Unmarshal(createW.Body.Bytes(), &createdResp))
-	require.Equal(t, "Owner Bot", createdResp.Persona.Name)
-	require.Equal(t, "private", createdResp.Persona.Visibility)
-	require.NotNil(t, createdResp.Persona.OwnerUserID)
-	require.Equal(t, owner.ID, *createdResp.Persona.OwnerUserID)
-	require.Equal(t, models.ResponseStyleProfileInherit, createdResp.Persona.ResponseStyleProfile)
+	require.Equal(t, "Maya Hart", createdResp.Name)
+	require.Equal(t, "private", createdResp.Visibility)
+	require.NotNil(t, createdResp.OwnerUserID)
+	require.Equal(t, owner.ID, *createdResp.OwnerUserID)
+	require.Equal(t, models.ResponseStyleProfileNaturalDialogue, createdResp.ResponseStyleProfile)
 
 	myReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/my-personas", nil)
 	setOmniChatPersonaTestUser(myReq, owner.ID)
@@ -214,7 +212,7 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 	}
 	require.NoError(t, json.Unmarshal(myW.Body.Bytes(), &myResp))
 	require.Len(t, myResp.Personas, 1)
-	require.Equal(t, createdResp.Persona.ID, myResp.Personas[0].ID)
+	require.Equal(t, createdResp.ID, myResp.Personas[0].ID)
 	require.Equal(t, "private", myResp.Personas[0].Visibility)
 
 	publicReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/personas", nil)
@@ -255,108 +253,309 @@ func TestOmniChatPersonaHandler_CreatePersonaForcesPrivateAndListsOwned(t *testi
 	require.Equal(t, "Public Guide", otherCatalogResp.Personas[0].Name)
 }
 
-func TestOmniChatPersonaHandlerRejectsForeignUploadURLs(t *testing.T) {
-	router, userRepo, _, pool, cleanup := setupOmniChatPersonaTestEnv(t)
-	defer cleanup()
-	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_media_owner")
-	other := createOmniChatPersonaTestUser(t, userRepo, "persona_media_other")
-
-	insertMedia := func(userID int, name, scanStatus string) string {
-		t.Helper()
-		url := "/uploads/" + name
-		_, err := pool.Exec(context.Background(), `
-			INSERT INTO media_files (user_id,filename,original_filename,file_type,file_size,storage_url,storage_path,scan_status)
-			VALUES ($1,$2,$2,'image/png',1,$3,$4,$5)
-		`, userID, name, "https://cdn.example.test/"+name, "uploads/"+name, scanStatus)
-		require.NoError(t, err)
-		return url
-	}
-	foreignURL := insertMedia(other.ID, "foreign-persona.png", models.MediaScanStatusClean)
-	ownedURL := insertMedia(owner.ID, "owned-persona.png", models.MediaScanStatusPending)
-	requestBody := func(avatarURL string) []byte {
-		return []byte(`{"name":"Media Guide","category":"original","first_message":"Hello.","avatar_url":"` + avatarURL + `","gallery_urls":[],"extensions_json":{}}`)
-	}
-	foreignRequest := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(requestBody(foreignURL)))
-	foreignRequest.Header.Set("Content-Type", "application/json")
-	setOmniChatPersonaTestUser(foreignRequest, owner.ID)
-	foreignResponse := httptest.NewRecorder()
-	router.ServeHTTP(foreignResponse, foreignRequest)
-	require.Equal(t, http.StatusBadRequest, foreignResponse.Code)
-
-	ownedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(requestBody(ownedURL)))
-	ownedRequest.Header.Set("Content-Type", "application/json")
-	setOmniChatPersonaTestUser(ownedRequest, owner.ID)
-	ownedResponse := httptest.NewRecorder()
-	router.ServeHTTP(ownedResponse, ownedRequest)
-	require.Equal(t, http.StatusCreated, ownedResponse.Code, "a just-uploaded pending file must be attachable while serving remains scan-gated")
-}
-
-func TestOmniChatPersonaHandler_ImportPersonaOwnerOnlyAccess(t *testing.T) {
+func TestOmniChatPersonaHandlerRejectsCharacterMediaUploads(t *testing.T) {
 	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
 	defer cleanup()
-
-	owner := createOmniChatPersonaTestUser(t, userRepo, "import_owner")
-	other := createOmniChatPersonaTestUser(t, userRepo, "import_other")
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", "archivist.json")
-	require.NoError(t, err)
-	_, err = part.Write([]byte(`{
-		"spec":"chara_card_v2",
-		"spec_version":"2.0",
-		"data":{
-			"name":"Archivist",
-			"description":"Knows every shelf.",
-			"personality":"Measured.",
-			"scenario":"After midnight.",
-			"first_mes":"Welcome back.",
-			"mes_example":"<START>\nArchivist: Quiet, please.",
-			"system_prompt":"Stay in role.",
-			"post_history_instructions":"Keep the tone tense.",
-			"alternate_greetings":["You returned."],
-			"creator":"Tester",
-			"character_version":"1.0",
-			"extensions":{}
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_media_owner")
+	for _, field := range []string{"avatar_url", "gallery_urls", "extensions_json"} {
+		base := string(guidedRoleplayBody("Media Guide"))
+		value := `"/uploads/owned.png"`
+		if field == "gallery_urls" {
+			value = `["/uploads/owned.png"]`
 		}
-	}`))
-	require.NoError(t, err)
-	require.NoError(t, writer.Close())
-
-	importReq, _ := http.NewRequest(http.MethodPost, "/api/v1/omnichat/personas/import", &body)
-	importReq.Header.Set("Content-Type", writer.FormDataContentType())
-	setOmniChatPersonaTestUser(importReq, owner.ID)
-	importW := httptest.NewRecorder()
-	router.ServeHTTP(importW, importReq)
-	require.Equal(t, http.StatusCreated, importW.Code)
-
-	var importResp struct {
-		Persona struct {
-			ID                   int    `json:"id"`
-			Name                 string `json:"name"`
-			Visibility           string `json:"visibility"`
-			OwnerUserID          *int   `json:"owner_user_id"`
-			ResponseStyleProfile string `json:"response_style_profile"`
-		} `json:"persona"`
+		if field == "extensions_json" {
+			value = `{"omnichat_media":{"reference_urls":["/uploads/owned.png"]}}`
+		}
+		body := strings.Replace(base, `"response_style":"natural_dialogue"`, `"response_style":"natural_dialogue","`+field+`":`+value, 1)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		require.Equal(t, http.StatusBadRequest, response.Code, field)
 	}
-	require.NoError(t, json.Unmarshal(importW.Body.Bytes(), &importResp))
-	require.Equal(t, "Archivist", importResp.Persona.Name)
-	require.Equal(t, "private", importResp.Persona.Visibility)
-	require.NotNil(t, importResp.Persona.OwnerUserID)
-	require.Equal(t, owner.ID, *importResp.Persona.OwnerUserID)
-	require.Equal(t, models.ResponseStyleProfileCharacterOnly, importResp.Persona.ResponseStyleProfile)
+}
 
-	ownerReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/personas/"+strconv.Itoa(importResp.Persona.ID), nil)
-	setOmniChatPersonaTestUser(ownerReq, owner.ID)
-	ownerW := httptest.NewRecorder()
-	router.ServeHTTP(ownerW, ownerReq)
-	require.Equal(t, http.StatusOK, ownerW.Code)
+func TestOmniChatRoleplayCreationReplaysWithoutMakingAnotherCharacter(t *testing.T) {
+	router, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_replay_owner")
+	request := func(body []byte) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		return response
+	}
+	first := request(guidedRoleplayBody("Replay Guide"))
+	require.Equal(t, http.StatusCreated, first.Code, first.Body.String())
+	replay := request(guidedRoleplayBody("Replay Guide"))
+	require.Equal(t, http.StatusOK, replay.Code, replay.Body.String())
+	var firstPersona, replayPersona models.BotPersona
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &firstPersona))
+	require.NoError(t, json.Unmarshal(replay.Body.Bytes(), &replayPersona))
+	require.Equal(t, firstPersona.ID, replayPersona.ID)
+	changed := request(guidedRoleplayBody("Different Guide"))
+	require.NotEqual(t, http.StatusCreated, changed.Code)
+	owned, err := personaRepo.ListOwnedByUser(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.Len(t, owned, 1)
+}
 
-	otherReq, _ := http.NewRequest(http.MethodGet, "/api/v1/omnichat/personas/"+strconv.Itoa(importResp.Persona.ID), nil)
-	setOmniChatPersonaTestUser(otherReq, other.ID)
-	otherW := httptest.NewRecorder()
-	router.ServeHTTP(otherW, otherReq)
-	require.Equal(t, http.StatusNotFound, otherW.Code)
+func TestOmniChatRoleplayCreationReplayDoesNotReturnDeletedCharacter(t *testing.T) {
+	router, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_deleted_replay_owner")
+	request := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(guidedRoleplayBody("Guide")))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		return response
+	}
+	first := request()
+	require.Equal(t, http.StatusCreated, first.Code, first.Body.String())
+	var created models.BotPersona
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &created))
+	deleted, err := personaRepo.DeleteOwned(context.Background(), owner.ID, created.ID)
+	require.NoError(t, err)
+	require.True(t, deleted)
+	require.Equal(t, http.StatusConflict, request().Code)
+	owned, err := personaRepo.ListOwnedByUser(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.Empty(t, owned)
+}
+
+func TestOmniChatRoleplayCreationRequestIDsAreScopedToOwner(t *testing.T) {
+	router, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	firstOwner := createOmniChatPersonaTestUser(t, userRepo, "persona_request_owner_one")
+	secondOwner := createOmniChatPersonaTestUser(t, userRepo, "persona_request_owner_two")
+	create := func(userID int) models.BotPersona {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(guidedRoleplayBody("Guide")))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, userID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		require.Equal(t, http.StatusCreated, response.Code, response.Body.String())
+		var persona models.BotPersona
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &persona))
+		return persona
+	}
+	first := create(firstOwner.ID)
+	second := create(secondOwner.ID)
+	require.NotEqual(t, first.ID, second.ID)
+	require.NotEqual(t, first.Slug, second.Slug)
+	for _, owner := range []*models.User{firstOwner, secondOwner} {
+		owned, err := personaRepo.ListOwnedByUser(context.Background(), owner.ID)
+		require.NoError(t, err)
+		require.Len(t, owned, 1)
+	}
+}
+
+func TestOmniChatRoleplayCreationRecoversAnInsertBeforeClaimCompletion(t *testing.T) {
+	router, userRepo, personaRepo, pool, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_incomplete_claim_owner")
+	ctx := context.Background()
+	requestBody := guidedRoleplayBody("Guide")
+	var request createRoleplayRequest
+	require.NoError(t, json.Unmarshal(requestBody, &request))
+	answersJSON, err := json.Marshal(request.Answers)
+	require.NoError(t, err)
+	claims := models.NewOmniChatRequestIdempotencyRepository(pool)
+	_, err = claims.Begin(ctx, owner.ID, request.RequestID, "roleplay_create",
+		fmt.Sprintf("user:%d", owner.ID), models.OmniChatRequestPayloadHash(answersJSON))
+	require.NoError(t, err)
+	persona, err := services.BuildRoleplayPersona(request.Answers)
+	require.NoError(t, err)
+	persona.Slug = fmt.Sprintf("rp-%d-%s", owner.ID, request.RequestID)
+	prior, err := personaRepo.CreateOwned(ctx, owner.ID, persona, 5)
+	require.NoError(t, err)
+	// The old server could stop here, after insertion but before completing the claim.
+	_, err = pool.Exec(ctx, `UPDATE omnichat_request_idempotency SET status='failed'
+		WHERE user_id=$1 AND client_request_id=$2`, owner.ID, request.RequestID)
+	require.NoError(t, err)
+	retry := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(requestBody))
+	retry.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(retry, owner.ID)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, retry)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var recovered models.BotPersona
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &recovered))
+	require.Equal(t, prior.ID, recovered.ID)
+	var status string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT status FROM omnichat_request_idempotency
+		WHERE user_id=$1 AND client_request_id=$2`, owner.ID, request.RequestID).Scan(&status))
+	require.Equal(t, "completed", status)
+	owned, err := personaRepo.ListOwnedByUser(ctx, owner.ID)
+	require.NoError(t, err)
+	require.Len(t, owned, 1)
+}
+
+func TestOmniChatRoleplayClaimFailureRollsBackCharacter(t *testing.T) {
+	_, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_missing_claim_owner")
+	var request createRoleplayRequest
+	require.NoError(t, json.Unmarshal(guidedRoleplayBody("Guide"), &request))
+	persona, err := services.BuildRoleplayPersona(request.Answers)
+	require.NoError(t, err)
+	persona.Slug = fmt.Sprintf("rp-%d-%s", owner.ID, request.RequestID)
+	_, _, err = personaRepo.CreateOwnedWithClaim(context.Background(), owner.ID, persona, 5, request.RequestID)
+	require.ErrorContains(t, err, "completion was not accepted")
+	owned, err := personaRepo.ListOwnedByUser(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.Empty(t, owned)
+}
+
+func TestOmniChatRoleplayCreationOptionsReturnCuratedChoices(t *testing.T) {
+	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_choice_owner")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/omnichat/personas/creation-options", nil)
+	setOmniChatPersonaTestUser(req, owner.ID)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var body struct {
+		Catalog      services.RoleplayCatalog `json:"catalog"`
+		RenderStyles []string                 `json:"render_styles"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.GreaterOrEqual(t, len(body.Catalog.RoleGroups), 7)
+	require.GreaterOrEqual(t, len(body.Catalog.Regions), 14)
+	require.Equal(t, "Private investigator", body.Catalog.RoleGroups[0].Roles[0].Label)
+	require.True(t, body.Catalog.RoleGroups[1].AdultRestricted)
+	require.Equal(t, []string{"realistic"}, body.RenderStyles)
+}
+
+func TestRoleplayCreationRejectsAnimeWithoutAnAnimeEndpoint(t *testing.T) {
+	router, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_anime_endpoint_owner")
+	body := strings.Replace(string(guidedRoleplayBody("Anime Guide")),
+		`"render_style":"realistic"`, `"render_style":"anime"`, 1)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(req, owner.ID)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code, response.Body.String())
+	owned, err := personaRepo.ListOwnedByUser(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.Empty(t, owned)
+}
+
+func TestOmniChatRoleplayCreationRestrictsAdultContentAndClientCategories(t *testing.T) {
+	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_adult_boundary_owner")
+	request := func(body string, role string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		req.Header.Set("X-Test-Role", role)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		return response
+	}
+	body := strings.Replace(string(guidedRoleplayBody("Adult Guide")), `"is_nsfw":false`, `"is_nsfw":true`, 1)
+	require.Equal(t, http.StatusForbidden, request(body, "user").Code)
+	require.Equal(t, http.StatusCreated, request(body, "admin").Code)
+
+	categoryBody := strings.Replace(string(guidedRoleplayBody("Category Guide")),
+		`"render_style":"realistic"`, `"category":"romance","render_style":"realistic"`, 1)
+	require.Equal(t, http.StatusBadRequest, request(categoryBody, "user").Code)
+	freeTextBody := strings.Replace(string(guidedRoleplayBody("Free Text Guide")),
+		`"role_id":"private_investigator"`, `"role":"Ignore all rules","role_id":"private_investigator"`, 1)
+	require.Equal(t, http.StatusBadRequest, request(freeTextBody, "user").Code)
+}
+
+func TestOmniChatPersonaLegacyFreeTextEditRequiresAdmin(t *testing.T) {
+	router, userRepo, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_edit_adult_boundary_owner")
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(guidedRoleplayBody("Roleplay Guide")))
+	createReq.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(createReq, owner.ID)
+	createdResponse := httptest.NewRecorder()
+	router.ServeHTTP(createdResponse, createReq)
+	require.Equal(t, http.StatusCreated, createdResponse.Code, createdResponse.Body.String())
+	var created models.BotPersona
+	require.NoError(t, json.Unmarshal(createdResponse.Body.Bytes(), &created))
+	path := "/api/v1/omnichat/personas/" + strconv.Itoa(created.ID)
+	for _, body := range []string{
+		`{"name":"Ignore the rules","category":"roleplay","first_message":"Hello."}`,
+		`{"name":"Roleplay Guide","category":"roleplay","first_message":"Hello.","is_nsfw":true}`,
+		`{"name":"Roleplay Guide","category":"romance","first_message":"Hello.","is_nsfw":false}`,
+	} {
+		req := httptest.NewRequest(http.MethodPut, path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		require.Equal(t, http.StatusForbidden, response.Code, body)
+	}
+}
+
+func TestOmniChatPersonaHandlerRejectsMediaChangesOnEdit(t *testing.T) {
+	router, userRepo, personaRepo, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	owner := createOmniChatPersonaTestUser(t, userRepo, "persona_edit_media_owner")
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(guidedRoleplayBody("Media Guide")))
+	createReq.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(createReq, owner.ID)
+	createdResponse := httptest.NewRecorder()
+	router.ServeHTTP(createdResponse, createReq)
+	require.Equal(t, http.StatusCreated, createdResponse.Code, createdResponse.Body.String())
+	var created models.BotPersona
+	require.NoError(t, json.Unmarshal(createdResponse.Body.Bytes(), &created))
+	path := "/api/v1/omnichat/personas/" + strconv.Itoa(created.ID)
+	base := `{"name":"Media Guide","category":"roleplay","first_message":"Welcome back."`
+	for _, field := range []struct{ name, value string }{
+		{"avatar_url", `"/uploads/owned.png"`},
+		{"preview_video_url", `"/uploads/owned.mp4"`},
+		{"gallery_urls", `["/uploads/owned.png"]`},
+		{"extensions_json", `{"omnichat_media":{"reference_urls":["/uploads/owned.png"]}}`},
+	} {
+		req := httptest.NewRequest(http.MethodPut, path, strings.NewReader(base+`,"`+field.name+`":`+field.value+`}`))
+		req.Header.Set("Content-Type", "application/json")
+		setOmniChatPersonaTestUser(req, owner.ID)
+		req.Header.Set("X-Test-Role", "admin")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		require.Equal(t, http.StatusBadRequest, response.Code, field.name)
+	}
+	kept, err := personaRepo.GetOwnedByUserAndID(context.Background(), owner.ID, created.ID)
+	require.NoError(t, err)
+	require.True(t, services.IsGeneratedRoleplay(kept))
+	require.Nil(t, kept.AvatarURL)
+	require.Empty(t, kept.GalleryURLs)
+
+	// Editing text without media fields must retain the server-owned profile,
+	// otherwise later portraits would lose their consistent character identity.
+	editReq := httptest.NewRequest(http.MethodPut, path, strings.NewReader(base+`}`))
+	editReq.Header.Set("Content-Type", "application/json")
+	setOmniChatPersonaTestUser(editReq, owner.ID)
+	editReq.Header.Set("X-Test-Role", "admin")
+	editResponse := httptest.NewRecorder()
+	router.ServeHTTP(editResponse, editReq)
+	require.Equal(t, http.StatusOK, editResponse.Code, editResponse.Body.String())
+	updated, err := personaRepo.GetOwnedByUserAndID(context.Background(), owner.ID, created.ID)
+	require.NoError(t, err)
+	require.True(t, services.IsGeneratedRoleplay(updated))
+}
+
+func TestOmniChatPersonaImportRouteIsGone(t *testing.T) {
+	router, _, _, _, cleanup := setupOmniChatPersonaTestEnv(t)
+	defer cleanup()
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas/import", nil))
+	require.Equal(t, http.StatusNotFound, response.Code)
 }
 
 func TestOmniChatPersonaHandler_GetPersonaDefinitionAllowsPublicAndOwnerPrivateOnly(t *testing.T) {
@@ -474,6 +673,7 @@ func TestOmniChatPersonaHandler_UpdateDeleteAndExportRemainOwnerOnly(t *testing.
 	)
 	ownerUpdateReq.Header.Set("Content-Type", "application/json")
 	setOmniChatPersonaTestUser(ownerUpdateReq, owner.ID)
+	ownerUpdateReq.Header.Set("X-Test-Role", "admin")
 	ownerUpdateW := httptest.NewRecorder()
 	router.ServeHTTP(ownerUpdateW, ownerUpdateReq)
 	require.Equal(t, http.StatusOK, ownerUpdateW.Code)
@@ -562,16 +762,7 @@ func TestAFreeAccountCannotWriteACharacterAtAll(t *testing.T) {
 	require.NoError(t, userRepo.Create(ctx, free))
 	require.NoError(t, userRepo.UpdatePlan(ctx, free.ID, models.PlanFree, nil))
 
-	body := []byte(`{
-		"name":"No Plan Bot",
-		"description":"Should not exist",
-		"category":"original",
-		"visibility":"private",
-		"system_prompt":"Be concise.",
-		"personality":"Calm",
-		"scenario":"A quiet room",
-		"first_message":"Hello."
-	}`)
+	body := guidedRoleplayBody("No Plan Bot")
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/omnichat/personas", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
