@@ -1,0 +1,572 @@
+{
+ "schema_version": 2,
+ "head": "2cf5a4929",
+ "base": "de7bcbe8b",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/group_admin.go",
+   "backend/internal/handlers/groups.go",
+   "frontend/src/components/messages/GroupDetailsSidebar.tsx",
+   "frontend/src/components/messages/GroupInviteMembers.tsx",
+   "frontend/src/components/messages/GroupAuditLog.tsx",
+   "frontend/src/components/messages/BanUserModal.tsx",
+   "frontend/src/components/messages/MuteUserModal.tsx",
+   "frontend/src/contexts/WebSocketContext.tsx",
+   "frontend/src/hooks/useGroupAdmin.ts",
+   "frontend/src/hooks/useToast.ts",
+   "frontend/src/services/adminGroupsService.ts",
+   "frontend/public/locales/en.json"
+  ],
+  "boundaries": [
+   "the ban, mute and invite requests",
+   "the ban event payloads",
+   "the restriction and audit rows",
+   "ws-group-event",
+   "the member menu",
+   "the audit log",
+   "the toast"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/04a7c4b7d.json",
+  ".review/e619a6d8c.json",
+  ".review/b3df29afc.json"
+ ],
+ "notes": "Group admin controls: Add Members fix, ban reason for the banned user alone, readable audit log, live admin events, no mute reason, the ban rule on the way back, Unmute with a timer.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "de7bcbe8b..2cf5a4929: 4795ff233 (Add Members keeps past invitees findable and invites on Enter; banned-invite message; ban notice for the banned user; ban window hint; readable audit log with a raw toggle; mute without a reason; Unmute with a minute timer; admin events forwarded as ws-group-event), 26374adfc (ban reason to the banned user alone after commit; mute keeps no reason; ban rule on invite, add and accept with an audited lift), 2cf5a4929 (review: the ban window hint's test). Only my four en.json hunks were committed; Codex's stay unstaged. Boundaries: the ban, mute and invite requests, the group_you_were_banned and group_member_banned payloads, the restriction and audit rows, ws-group-event, the member menu, the audit log, the toast."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read 04a7c4b7d (membership events; H7), e619a6d8c (socket event handling), b3df29afc (broadcastToGroup)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered: the ban window with its hint (pane, then Cancel -- nobody banned); the Audit Log tab with its raw toggle (pane; the user confirmed the toggle works); the member menu in tests (Unmute with '2h 5m left', then '2h 4m left'); the user confirmed Add Members and the ban notice with its reason in real browsers."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket payloads read in Go tests for two inputs: the banned user's group_you_were_banned {conversation_id, group_name 'Live Group ban', reason 'spam'}; the remaining member's group_member_banned with no reason key. The client test covers a ban with a reason and one without (no description line)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Rows: after a mute sent with a reason, group_member_restrictions.reason is NULL and the audit details hold only duration_minutes; after an owner's invite or add of a banned user, the ban row is gone and an unban_member row holds via invite or via add; after a member's attempt, the ban row remains."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Error code group_user_banned is the same string on the server and in GroupInviteMembers; event names group_you_were_banned, group_member_banned and the four admin events match; the restrictions query key ['group-restrictions', id] is the one useGroupAdmin and the sidebar invalidate."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.group_name and payload.reason from group_you_were_banned, and expires_at from the restrictions list, the fields the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One ban rule (admitBanned) behind invite and add; the accept check is a separate refusal by design."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads and bodies; MuteGroupMemberRequest lost its field, so an extra 'reason' is simply ignored (B4)."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The error code is read from response.data.code; the test rejects with that exact shape, and a generic error still shows the old message."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The banned-invite test rejects with the shape an AxiosError carries ({response: {data: {code}}}), per the project note that the code lives in the response body."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "An owner's and an admin-level invite of a banned user are accepted and lift the ban."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A member's invite or add of a banned user is refused; a banned user's accept of an older invite is refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Mute time-left boundaries: 12m, exactly 60 (1h 0m), 125 (2h 5m), 3 days 4 hours; a permanent mute shows Permanent; an expired mute shows Mute again."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings: the existing UnbanGroupMember logs unban_member with no details; the automatic lift logs the same action with via, so the audit filter still groups them."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "admitBanned's member branch and admin branch are each reached (member refused, owner lifts); the accept check is reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed ban-list read answers 500 and rolls back; a failed group-name read leaves the notice with an empty name rather than failing the ban."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path beyond anyone_can_invite, which the member test sets on."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Nothing duplicated: one helper for the ban rule, one for time left."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every way back into a group: invite, direct add, accept -- all apply the rule (no self-join route exists). Every place a ban reason went: both ban events and the audit log -- now the banned user's event and the log only. Every place a mute reason went: the request, the restriction row, the audit log and the mute event -- all removed."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The ban lift runs inside the invite's or add's transaction, so a failed invite leaves the ban in place; both ban events wait for the commit, so nobody hears of a ban that failed (the old code told the banned user first)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Declining an owner's invite leaves the user unbanned but outside the group; a new invite is needed to join. Said to the user."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "adm-r1-ban-hint-untested: with the hint removed, the ban window test fails 'Unable to find ... Only the banned user sees this reason'; tsc -b clean with the patch."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet (handlers, integration) and gofmt clean; tsc -b, eslint and the i18n check clean."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "The finding came from C10, already a row."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran Add Members, the ban reason notice and the raw toggle in real browsers and reported them working. The ban rule on re-invite and the Unmute timer are not yet run in a browser; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The ban handler used to notify the banned user before the transaction; both events now go out after the commit."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "The Unmute item puts the time left beside the label with justify-between in the 12rem menu; the longest value, '30d 23h left', fits beside 'Unmute'."
+    },
+    {
+     "id": "E8",
+     "status": "applied",
+     "evidence": "The toast store is module state; addToast is now exported for the socket handler, and every change still notifies the listeners."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: the ban rule, ban reason, invite, join and membership tests PASS; the handler group, ban and mute tests PASS; 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user's requests: the banned user sees the reason and the ban window says so (yes); the reason goes to nobody else (yes); readable audit log with a raw toggle in the same panel (yes); live admin updates (yes); no mute reason (yes); a member cannot bring a banned user back, an admin's add lifts the ban and logs it (yes); Unmute with a timer to the minute (yes)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "The ban notice is a toast in the existing container; no new layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks GroupDetailsSidebar, GroupInviteMembers, GroupAuditLog, adminGroupsService, MessagesPage or MuteUserModal: 9 files, 59 passed, 1 old skip; the WebSocketContext tests (14); and the Go handler tests for groups, bans and mutes."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls: grpact-r1-* target groups.go's announceLeave and MessagesPage/WebSocketContext lines, still present and applying; re-checked with git apply --check."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "applied",
+     "evidence": "useMinuteClock clears its interval on unmount and when the mute has no end time."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The Go tests run the real handlers and hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled the changed frontend test files in earlier runs; the new files hold no shared mutable state beyond per-test mocks."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_you_were_banned: BanGroupMember only. Of the restrictions the menu reads: mute and unmute, which invalidate the same key, and the forwarded admin events."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Found the finding: removed each added line on both sides. Backend -- the ban rule on invite and on add, the accept check, both unban audit entries, the reason on each ban event, the mute reason in the log -- each fails its test. Frontend -- forwarding of muted and slow mode, the ban toast, the banned-invite message, the audit via text, the Unmute click -- each fails a test; the ban window hint did not."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "The new tests' absence checks run after a positive settled sign (the readable entry found, the restrictions fetched, the menu opened)."
+    }
+   ],
+   "findings": [
+    {
+     "id": "adm-r1-ban-hint-untested",
+     "summary": "The ban window's line saying only the banned user sees the reason, which the user asked for, had no test: removing it left every test green.",
+     "found_by": "C10",
+     "fix_commit": "2cf5a4929",
+     "control": {
+      "patch": ".review/controls/adm-r1-ban-hint-untested.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/components/messages/__tests__/BanUserModal.test.tsx"
+      ],
+      "observed": "FAIL: Unable to find 'Only the banned user sees this reason. It is also kept in the audit log.'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the new ban window test (2cf5a4929) and its control."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read 04a7c4b7d (membership events; H7), e619a6d8c (socket event handling), b3df29afc (broadcastToGroup)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered: the ban window with its hint (pane, then Cancel -- nobody banned); the Audit Log tab with its raw toggle (pane; the user confirmed the toggle works); the member menu in tests (Unmute with '2h 5m left', then '2h 4m left'); the user confirmed Add Members and the ban notice with its reason in real browsers."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket payloads read in Go tests for two inputs: the banned user's group_you_were_banned {conversation_id, group_name 'Live Group ban', reason 'spam'}; the remaining member's group_member_banned with no reason key. The client test covers a ban with a reason and one without (no description line)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "Rows: after a mute sent with a reason, group_member_restrictions.reason is NULL and the audit details hold only duration_minutes; after an owner's invite or add of a banned user, the ban row is gone and an unban_member row holds via invite or via add; after a member's attempt, the ban row remains."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Error code group_user_banned is the same string on the server and in GroupInviteMembers; event names group_you_were_banned, group_member_banned and the four admin events match; the restrictions query key ['group-restrictions', id] is the one useGroupAdmin and the sidebar invalidate."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.group_name and payload.reason from group_you_were_banned, and expires_at from the restrictions list, the fields the server sets."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One ban rule (admitBanned) behind invite and add; the accept check is a separate refusal by design."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads and bodies; MuteGroupMemberRequest lost its field, so an extra 'reason' is simply ignored (B4)."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The error code is read from response.data.code; the test rejects with that exact shape, and a generic error still shows the old message."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The banned-invite test rejects with the shape an AxiosError carries ({response: {data: {code}}}), per the project note that the code lives in the response body."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "An owner's and an admin-level invite of a banned user are accepted and lift the ban."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A member's invite or add of a banned user is refused; a banned user's accept of an older invite is refused."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Mute time-left boundaries: 12m, exactly 60 (1h 0m), 125 (2h 5m), 3 days 4 hours; a permanent mute shows Permanent; an expired mute shows Mute again."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings: the existing UnbanGroupMember logs unban_member with no details; the automatic lift logs the same action with via, so the audit filter still groups them."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "admitBanned's member branch and admin branch are each reached (member refused, owner lifts); the accept check is reached."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed ban-list read answers 500 and rolls back; a failed group-name read leaves the notice with an empty name rather than failing the ban."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path beyond anyone_can_invite, which the member test sets on."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Nothing duplicated: one helper for the ban rule, one for time left."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every way back into a group: invite, direct add, accept -- all apply the rule (no self-join route exists). Every place a ban reason went: both ban events and the audit log -- now the banned user's event and the log only. Every place a mute reason went: the request, the restriction row, the audit log and the mute event -- all removed."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "The ban lift runs inside the invite's or add's transaction, so a failed invite leaves the ban in place; both ban events wait for the commit, so nobody hears of a ban that failed (the old code told the banned user first)."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Declining an owner's invite leaves the user unbanned but outside the group; a new invite is needed to join. Said to the user."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The control re-run by hand: the ban window test fails; the file restored from HEAD."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet (handlers, integration) and gofmt clean; tsc -b, eslint and the i18n check clean."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran Add Members, the ban reason notice and the raw toggle in real browsers and reported them working. The ban rule on re-invite and the Unmute timer are not yet run in a browser; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The ban handler used to notify the banned user before the transaction; both events now go out after the commit."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "The Unmute item puts the time left beside the label with justify-between in the 12rem menu; the longest value, '30d 23h left', fits beside 'Unmute'."
+    },
+    {
+     "id": "E8",
+     "status": "applied",
+     "evidence": "The toast store is module state; addToast is now exported for the socket handler, and every change still notifies the listeners."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: the ban rule, ban reason, invite, join and membership tests PASS; the handler group, ban and mute tests PASS; 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user's requests: the banned user sees the reason and the ban window says so (yes); the reason goes to nobody else (yes); readable audit log with a raw toggle in the same panel (yes); live admin updates (yes); no mute reason (yes); a member cannot bring a banned user back, an admin's add lifts the ban and logs it (yes); Unmute with a timer to the minute (yes)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "The ban notice is a toast in the existing container; no new layer."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks GroupDetailsSidebar, GroupInviteMembers, GroupAuditLog, adminGroupsService, MessagesPage or MuteUserModal: 9 files, 59 passed, 1 old skip; the WebSocketContext tests (14); and the Go handler tests for groups, bans and mutes."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls: grpact-r1-* target groups.go's announceLeave and MessagesPage/WebSocketContext lines, still present and applying; re-checked with git apply --check."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "applied",
+     "evidence": "useMinuteClock clears its interval on unmount and when the mute has no end time."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The Go tests run the real handlers and hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled the changed frontend test files in earlier runs; the new files hold no shared mutable state beyond per-test mocks."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_you_were_banned: BanGroupMember only. Of the restrictions the menu reads: mute and unmute, which invalidate the same key, and the forwarded admin events."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Re-ran the frontend removals with the new test in the set: the ban window hint is now caught, and the other six still are."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "The new tests' absence checks run after a positive settled sign (the readable entry found, the restrictions fetched, the menu opened)."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet handlers and integration clean",
+  "lint": "eslint clean on every changed file; i18n check OK",
+  "types": "tsc -b clean",
+  "tests": "Go ban rule, ban reason, invite, join, membership, and handler group/ban/mute tests PASS, 0 SKIP; frontend 9 files 59 passed + WebSocketContext 14 + BanUserModal 1."
+ }
+}
