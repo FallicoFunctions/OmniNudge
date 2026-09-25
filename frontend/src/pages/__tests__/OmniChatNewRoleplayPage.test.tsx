@@ -291,6 +291,12 @@ describe('guided roleplay creation', () => {
     expect(screen.queryByText('18+')).not.toBeInTheDocument();
     continueStep();
     expect(screen.getByText('Maya Hart, 27 · Private investigator')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Edit Personality:/ }));
+    expect(screen.getByRole('heading', { name: 'Personality' })).toBeInTheDocument();
+    continueStep();
+    continueStep();
+    continueStep();
+    expect(screen.getByText('Maya Hart, 27 · Private investigator')).toBeInTheDocument();
     expect(document.querySelector('input:not([type="range"]), textarea')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Create character' }));
 

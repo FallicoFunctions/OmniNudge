@@ -734,35 +734,50 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                           [
                             'Character',
                             `${a.first_name} ${a.last_name}, ${a.age} · ${role?.label ?? '—'}`,
+                            1,
                           ],
-                          ['Current goal', findLabel(catalog.goals, a.goal_id)],
+                          ['Current goal', findLabel(catalog.goals, a.goal_id), 0],
                           [
                             'Setting',
                             `${region?.label ?? '—'} · ${findLabel(catalog.venues, a.venue_id)}`,
+                            0,
                           ],
                           [
                             'Appearance',
                             `${a.render_style} · ${findLabel(catalog.hair_colors, a.hair_color_id)} hair · ${findLabel(catalog.eye_colors, a.eye_color_id)} eyes`,
+                            1,
                           ],
                           [
                             'Personality',
                             `${findLabel(catalog.traits, a.primary_trait_id)} and ${findLabel(catalog.traits, a.second_trait_id)}`,
+                            2,
                           ],
-                          ['Speaking style', findLabel(catalog.speech_styles, a.speech_style_id)],
-                          ['You play', findLabel(catalog.user_roles, a.user_role_id)],
-                          ['Relationship', findLabel(catalog.relationships, a.relationship_id)],
-                          ['Opening', findLabel(catalog.opening_beats, a.opening_beat_id)],
+                          [
+                            'Speaking style',
+                            findLabel(catalog.speech_styles, a.speech_style_id),
+                            2,
+                          ],
+                          ['You play', findLabel(catalog.user_roles, a.user_role_id), 3],
+                          ['Relationship', findLabel(catalog.relationships, a.relationship_id), 3],
+                          ['Opening', findLabel(catalog.opening_beats, a.opening_beat_id), 4],
                         ] as const
-                      ).map(([label, value]) => (
-                        <div
+                      ).map(([label, value, targetStep]) => (
+                        <button
                           key={label}
-                          className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
+                          type="button"
+                          aria-label={`Edit ${label}: ${value}`}
+                          disabled={make.isPending}
+                          onClick={() => {
+                            setProblem('');
+                            setDraft((current) => ({ ...current, step: targetStep }));
+                          }}
+                          className="w-full cursor-pointer rounded-xl border border-white/10 bg-white/[0.03] p-4 text-left transition-colors hover:border-blue-400/60 hover:bg-[#243a60] focus-visible:bg-[#243a60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <p className="text-xs font-semibold uppercase tracking-wider text-blue-300">
                             {label}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-white/80">{value}</p>
-                        </div>
+                        </button>
                       ))}
                     </>
                   )}
