@@ -107,8 +107,9 @@ const catalog = {
         'Replies include what the character says, what they do, and details of the setting.',
     },
     {
-      ...option('character_only', 'No set format'),
-      description: 'The character chooses how much to talk or describe in each reply.',
+      ...option('character_only', 'No descriptions'),
+      description:
+        "Only the character's words. No narrated actions, expressions, or scene details.",
     },
   ],
 };
@@ -269,10 +270,13 @@ describe('guided roleplay creation', () => {
 
     expect(screen.getByText('Mostly conversation')).toBeInTheDocument();
     expect(screen.getByText('More scene description')).toBeInTheDocument();
-    expect(screen.getByText('No set format')).toBeInTheDocument();
+    expect(screen.getByText('No descriptions')).toBeInTheDocument();
     expect(
-      screen.getByText('The character chooses how much to talk or describe in each reply.')
+      screen.getByText(
+        "Only the character's words. No narrated actions, expressions, or scene details."
+      )
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /No descriptions/ }));
     choose('Main personality trait', 'curious');
     choose('Another personality trait', 'methodical');
     choose('How do they speak?', 'dry_concise');
@@ -301,6 +305,7 @@ describe('guided roleplay creation', () => {
       first_name: 'Maya',
       user_role_id: 'client',
       opening_beat_id: 'planned_meeting',
+      response_style: 'character_only',
       is_nsfw: false,
     });
     for (const forbidden of [

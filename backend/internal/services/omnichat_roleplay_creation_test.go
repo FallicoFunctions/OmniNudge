@@ -42,6 +42,17 @@ func TestBuildRoleplayPersonaCompilesOnlyCatalogChoices(t *testing.T) {
 	require.Contains(t, extensions, "roleplay_choices_v2")
 }
 
+func TestGuidedRoleplayNoDescriptionsUsesDialogueFromFirstMessageThroughCalls(t *testing.T) {
+	answers := roleplayAnswers()
+	answers.ResponseStyle = models.ResponseStyleProfileCharacterOnly
+	persona, err := BuildRoleplayPersona(answers)
+	require.NoError(t, err)
+	require.Equal(t, "Someone has disappeared, and I need help finding out where they went.", persona.FirstMessage)
+	require.NotContains(t, persona.FirstMessage, "*")
+	require.Contains(t, buildConversationSystemPrompt(persona, nil, nil), guidedRoleplayDialogueOnlyV1)
+	require.Contains(t, appendResponseStyleInstructions("base", persona, true), guidedRoleplayDialogueOnlyV1)
+}
+
 func TestBuildRoleplayPersonaRejectsInvalidOrMismatchedSelections(t *testing.T) {
 	for _, mutate := range []func(*RoleplayCreationAnswers){
 		func(a *RoleplayCreationAnswers) { a.RoleID = "unknown_role" },

@@ -244,6 +244,6 @@
   "response_styles":[
     {"id":"natural_dialogue","label":"Mostly conversation","description":"The character talks directly to you, with occasional brief descriptions of their actions."},
     {"id":"lean_narrative","label":"More scene description","description":"Replies include what the character says, what they do, and details of the setting."},
-    {"id":"character_only","label":"No set format","description":"The character chooses how much to talk or describe in each reply."}
+    {"id":"character_only","label":"No descriptions","description":"Only the character's words. No narrated actions, expressions, or scene details."}
   ]
 }

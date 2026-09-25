@@ -326,6 +326,10 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 		"Opening moment: " + beat.Scene,
 	}, "\n")
 	firstMessage := openingFromChoices(beat.ID, name, venue.Scene, region.Label, goal.Opening)
+	if a.ResponseStyle == models.ResponseStyleProfileCharacterOnly {
+		// The first message must obey the same dialogue-only choice as later replies.
+		firstMessage = goal.Opening
+	}
 	return &models.BotPersona{
 		Name: name, Description: &description, Category: models.PersonaCategoryRoleplay,
 		Visibility: "private", SourceFormat: "native",

@@ -136,6 +136,7 @@ func TestBuildConversationSystemPromptCharacterOnlySkipsPlatformStyle(t *testing
 
 	require.NotContains(t, prompt, "[Platform Response Style:")
 	require.NotContains(t, prompt, naturalDialogueEndingV1)
+	require.NotContains(t, prompt, guidedRoleplayDialogueOnlyV1)
 	require.Contains(t, prompt, "[Example Dialogue]")
 	require.Contains(t, prompt, "{{Char}}: Already packed.")
 }

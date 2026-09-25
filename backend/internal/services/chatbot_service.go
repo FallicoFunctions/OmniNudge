@@ -145,6 +145,9 @@ For an ordinary companion reply, default to zero questions. Ask at most one ques
 
 const leanNarrativeEndingV1 = `Keep narration concise, concrete, and committed to a clear outcome. End each turn with a playable opening: an immediate situation, meaningful decision, or direct question the user can act on. Vary how that opening is phrased. During play, do not append suggested actions, answer menus, or an A-or-B choice; leave the user's response open-ended.`
 
+const guidedRoleplayDialogueOnlyV1 = `[Guided Roleplay: Dialogue Only]
+Reply only with words this character would say aloud. Do not include narration, stage directions, action beats, body language, facial expressions, internal thoughts, or scene-setting text. Do not write the user's words or actions. If asked about an action or the surroundings, answer in spoken dialogue instead of narrating. Do not use asterisks or brackets to describe actions. Follow this style in text, voice, and video calls.`
+
 const professionalDialogueEndingV1 = `Stay warm but precise. Reflect the user's point only when doing so adds insight, and do not default to agreement. Ask a focused question only when it genuinely advances the conversation; a question is not required at the end of every reply.`
 
 const professionalQuestionBudgetV1 = `[Professional Question Budget]
@@ -1202,6 +1205,11 @@ func appendResponseStyleInstructions(base string, persona *models.BotPersona, on
 
 	base += "\n\n" + actorAndStateContinuityV1
 	if profile == models.ResponseStyleProfileCharacterOnly {
+		// Imported cards keep their author-defined style. In the guided creator,
+		// this same selectable profile means the user explicitly chose no narration.
+		if IsGeneratedRoleplay(persona) {
+			return base + "\n\n" + guidedRoleplayDialogueOnlyV1
+		}
 		return base
 	}
 	if profile == models.ResponseStyleProfileInherit {
