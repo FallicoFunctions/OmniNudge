@@ -1,0 +1,71 @@
+diff --git a/frontend/src/components/messages/PinnedMessagesBar.tsx b/frontend/src/components/messages/PinnedMessagesBar.tsx
+index 97df1036b..a6ce3571b 100644
+--- a/frontend/src/components/messages/PinnedMessagesBar.tsx
++++ b/frontend/src/components/messages/PinnedMessagesBar.tsx
+@@ -1,10 +1,6 @@
+ import { useEffect, useMemo, useState } from 'react';
+ import { useTranslation } from 'react-i18next';
+-import {
+-  decryptForDisplay,
+-  needsDecryption,
+-  useGroupKeysGeneration,
+-} from '../../hooks/useDecryptedContent';
++import { decryptForDisplay, needsDecryption } from '../../hooks/useDecryptedContent';
+ import { getOwnKeys } from '../../services/keyManagementService';
+ import type { Message } from '../../types/messages';
+ 
+@@ -27,7 +23,6 @@ const COLLAPSED_VISIBLE_COUNT = 3;
+  */
+ function useDecryptedPreviews(messages: Message[], currentUserId?: number): Map<number, string> {
+   const [texts, setTexts] = useState<Map<number, string>>(new Map());
+-  const keysGeneration = useGroupKeysGeneration();
+ 
+   const pending = useMemo(
+     () =>
+@@ -60,7 +55,7 @@ function useDecryptedPreviews(messages: Message[], currentUserId?: number): Map<
+     return () => {
+       cancelled = true;
+     };
+-  }, [pending, currentUserId, keysGeneration]);
++  }, [pending, currentUserId]);
+ 
+   return texts;
+ }
+diff --git a/frontend/src/hooks/useDecryptedMedia.ts b/frontend/src/hooks/useDecryptedMedia.ts
+index da5e8b338..9079145cf 100644
+--- a/frontend/src/hooks/useDecryptedMedia.ts
++++ b/frontend/src/hooks/useDecryptedMedia.ts
+@@ -11,7 +11,6 @@
+  * changing it is a decision for the phase that makes group media refuse.
+  */
+ import { useEffect, useState } from 'react';
+-import { useGroupKeysGeneration } from './useDecryptedContent';
+ import {
+   base64ToArrayBuffer,
+   decryptFile,
+@@ -57,7 +56,6 @@ export function useDecryptedMedia(
+ ): string | null {
+   const mimeTypeOverride = options.mimeType;
+   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+-  const keysGeneration = useGroupKeysGeneration();
+   const {
+     conversation_id,
+     media_url,
+@@ -65,9 +63,6 @@ export function useDecryptedMedia(
+     media_encryption_key,
+     sender_media_encryption_key,
+   } = message;
+-  // Only a file sealed under a group key waits on a key granted later.
+-  const groupKeysSeen =
+-    media_encryption_key && isSealedGroupEnvelope(media_encryption_key) ? keysGeneration : 0;
+ 
+   useEffect(() => {
+     let isMounted = true;
+@@ -196,7 +191,6 @@ export function useDecryptedMedia(
+     sender_media_encryption_key,
+     isOwnMessage,
+     mimeTypeOverride,
+-    groupKeysSeen,
+   ]);
+ 
+   return mediaSrc;

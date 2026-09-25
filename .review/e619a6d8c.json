@@ -1,0 +1,554 @@
+{
+ "schema_version": 2,
+ "head": "151f2866a",
+ "base": "e619a6d8c",
+ "scope": {
+  "files": [
+   "frontend/src/services/groupKeyCache.ts",
+   "frontend/src/hooks/useDecryptedContent.ts",
+   "frontend/src/hooks/useDecryptedMedia.ts",
+   "frontend/src/components/messages/PinnedMessagesBar.tsx",
+   "frontend/src/contexts/WebSocketContext.tsx",
+   "backend/internal/handlers/groups.go"
+  ],
+  "boundaries": [
+   "the two socket events",
+   "the history share request",
+   "the decrypt effects",
+   "the member list query"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/b3df29afc.json",
+  ".review/7cf2b679d.json",
+  ".review/da9ed20de.json"
+ ],
+ "notes": "Phase 3b: the app passes on missing history on a join and on reading, and every group decrypt retries when keys arrive. Adds C10.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "e619a6d8c..151f2866a: 3b16b581e (the joiner also gets group_keys_shared), 6f2f4301d (the app passes on missing versions on a join and on every read of a group; the key cache keeps a generation that rises on every forget; text, media and pinned decrypts re-run on it; the socket context handles group_member_joined and group_keys_shared), 151f2866a (review: media and pinned retry tests). Boundaries: the two socket events, the history share request, the decrypt effects, the member list query."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read b3df29afc (3a: the events and who receives them; it said 3b must drop the joiner's missing record), 7cf2b679d (C9, sender names), da9ed20de (the cache's forget rule: whoever grants a version must forget, or readers keep it missing -- the generation now makes the forget visible to the bubbles)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The history share request body, built with real RSA keys: {1: {99: copy}} when the newcomer lacks version 1 and this member holds it; nothing sent when missing_history is empty (groupKeyShareOnJoin.test, two inputs). The copy opens a message sealed before the join with the newcomer's private key."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in the pane as DERRF after the restart: 'Test' opens with every message and name, one GET /groups/47/keys and no history POST, since nobody lacks a version now. The retry is asserted on the rendered bubble text, the media hook's blob, and the pinned bar's text."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket frames read in the Go tests: group_member_joined to members and group_keys_shared to the joiner, for a direct add and an accepted invite."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names match: the Go handlers send group_member_joined and group_keys_shared; WebSocketContext switches on the same strings; payload key conversation_id on both."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.conversation_id, the field both events carry."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One share routine (shareMissingHistory) behind all three callers: the send path, the read path and the join event."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads decoded by JSON.parse."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor beyond the payload cast, which the socket tests exercise."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket test sends the frames the Go tests read from the real hub: {type, payload: {conversation_id, user_id}}."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the join share: groupKeyForSending already shared missing history on send; the read path and the join event now call the same routine."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The group branches of the three decrypt sites and both socket cases are each reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A refused or failed share is logged and does not throw (shareMissingHistory catches); a second member sharing the same versions a moment later is refused by the server, which is logged noise, not a failure. The invite path remains the main one."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The retry dependency is one hook, useGroupKeysGeneration, used by all three sites."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Other one-shot group decrypts: the page's search map (decrypts only while a message search runs, and again when it changes), SearchResultsPage, the feed cards and mod mail. None holds a bubble a newcomer is looking at while keys arrive; they decrypt again on their next load."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory; the counter is single-threaded JS."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted by the app."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "p3b-r1-media-and-pinned-retry-untested: with the media hook and pinned bar at their pre-3b state (a full revert, so tsc -b stays clean), both new tests fail waiting for the key-arrived result."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b and eslint clean on every changed file; go build, go vet (handlers, integration) and gofmt clean."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Finding 1's technique was not a row: remove each added line and require a test to notice. Added as C10."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "The full flow needs two signed-in accounts, which I cannot sign into; the user tests invite, accept and reading. Unverified in a real browser until then, said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The read path starts the share while it opens this device's copies; the share decides by itself whether anything is missing and returns without a request when nothing is."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "applied",
+     "evidence": "The generation is module state; only forgetGroupKeys changes it, and every change notifies the listeners."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: join, keys-shared and invite socket tests and 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "3b's promises: online members pass on missing versions on a join (yes); members who open the group later do it then (yes, read path); the newcomer's app drops its missing record and the old messages open without a reload (yes, via group_keys_shared to the joiner and the generation)."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "Three entry points can run the share: the send path, the read path, the join event. Two can overlap in one app (a join while the group is being read); the server serializes on the conversation row and refuses the second as already given, so no copy is written twice."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test that imports or mocks groupKeyCache, useDecryptedContent, useDecryptedMedia, PinnedMessagesBar or WebSocketContext: 16 files, 174 passed, 1 old skip. Two mocks of groupKeyCache became partial mocks for the new exports."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls target message.go, MessagesPage.tsx, groups.go (the accept announcement line, unchanged here) and the blocking test; re-ran p3-r1-accept-join-untested's test after 3b16b581e: it still fails with the patch, since the invited case now also waits for the joiner's event."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await; the listener set is cleared by unsubscribe."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "useSyncExternalStore unsubscribes on unmount."
+    },
+    {
+     "id": "C8",
+     "status": "na",
+     "why": "Frontend tests; the socket side is tested on the real hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled the four changed test files (seed 23): 58 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_keys_shared: rotation with history, ShareHistory, and a join (to the joiner). Producers of group_member_joined: add and accept. The client consumes both."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Found finding 1: removed each added line in turn. The share on read, the generation rise, the text retry, and the three socket-handler lines each failed a test; the media and pinned retries did not."
+    }
+   ],
+   "findings": [
+    {
+     "id": "p3b-r1-media-and-pinned-retry-untested",
+     "summary": "The key-generation retry was added to three decrypt sites and tested on one; removing it from the media hook or the pinned bar left every test green.",
+     "found_by": "C10",
+     "fix_commit": "151f2866a",
+     "control": {
+      "patch": ".review/controls/p3b-r1-media-and-pinned-retry-untested.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/hooks/__tests__/useDecryptedMedia.test.tsx -t \"once the cache is told a key has arrived\"",
+       "src/components/messages/__tests__/PinnedMessagesBar.test.tsx"
+      ],
+      "observed": "FAIL: both tests time out waiting for the decrypted blob and the pinned text"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the two new tests (151f2866a), the control, and C10 applied to the server line added in 3b16b581e."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read b3df29afc (3a: the events and who receives them; it said 3b must drop the joiner's missing record), 7cf2b679d (C9, sender names), da9ed20de (the cache's forget rule: whoever grants a version must forget, or readers keep it missing -- the generation now makes the forget visible to the bubbles)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The history share request body, built with real RSA keys: {1: {99: copy}} when the newcomer lacks version 1 and this member holds it; nothing sent when missing_history is empty (groupKeyShareOnJoin.test, two inputs). The copy opens a message sealed before the join with the newcomer's private key."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in the pane as DERRF after the restart: 'Test' opens with every message and name, one GET /groups/47/keys and no history POST, since nobody lacks a version now. The retry is asserted on the rendered bubble text, the media hook's blob, and the pinned bar's text."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket frames read in the Go tests: group_member_joined to members and group_keys_shared to the joiner, for a direct add and an accepted invite."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names match: the Go handlers send group_member_joined and group_keys_shared; WebSocketContext switches on the same strings; payload key conversation_id on both."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.conversation_id, the field both events carry."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One share routine (shareMissingHistory) behind all three callers: the send path, the read path and the join event."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads decoded by JSON.parse."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor beyond the payload cast, which the socket tests exercise."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket test sends the frames the Go tests read from the real hub: {type, payload: {conversation_id, user_id}}."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the join share: groupKeyForSending already shared missing history on send; the read path and the join event now call the same routine."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The group branches of the three decrypt sites and both socket cases are each reached by a test."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A refused or failed share is logged and does not throw (shareMissingHistory catches); a second member sharing the same versions a moment later is refused by the server, which is logged noise, not a failure. The invite path remains the main one."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The retry dependency is one hook, useGroupKeysGeneration, used by all three sites."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Other one-shot group decrypts: the page's search map (decrypts only while a message search runs, and again when it changes), SearchResultsPage, the feed cards and mod mail. None holds a bubble a newcomer is looking at while keys arrive; they decrypt again on their next load."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory; the counter is single-threaded JS."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted by the app."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "The control re-run by hand: both tests fail, tsc -b clean."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b and eslint clean on every changed file; go build, go vet (handlers, integration) and gofmt clean."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "The full flow needs two signed-in accounts, which I cannot sign into; the user tests invite, accept and reading. Unverified in a real browser until then, said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The read path starts the share while it opens this device's copies; the share decides by itself whether anything is missing and returns without a request when nothing is."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "applied",
+     "evidence": "The generation is module state; only forgetGroupKeys changes it, and every change notifies the listeners."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: join, keys-shared and invite socket tests and 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "3b's promises: online members pass on missing versions on a join (yes); members who open the group later do it then (yes, read path); the newcomer's app drops its missing record and the old messages open without a reload (yes, via group_keys_shared to the joiner and the generation)."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "Three entry points can run the share: the send path, the read path, the join event. Two can overlap in one app (a join while the group is being read); the server serializes on the conversation row and refuses the second as already given, so no copy is written twice."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test that imports or mocks groupKeyCache, useDecryptedContent, useDecryptedMedia, PinnedMessagesBar or WebSocketContext: 16 files, 174 passed, 1 old skip. Two mocks of groupKeyCache became partial mocks for the new exports."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls target message.go, MessagesPage.tsx, groups.go (the accept announcement line, unchanged here) and the blocking test; re-ran p3-r1-accept-join-untested's test after 3b16b581e: it still fails with the patch, since the invited case now also waits for the joiner's event."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await; the listener set is cleared by unsubscribe."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "useSyncExternalStore unsubscribes on unmount."
+    },
+    {
+     "id": "C8",
+     "status": "na",
+     "why": "Frontend tests; the socket side is tested on the real hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled the four changed test files (seed 23): 58 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_keys_shared: rotation with history, ShareHistory, and a join (to the joiner). Producers of group_member_joined: add and accept. The client consumes both."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed the joiner's group_keys_shared from announceJoin: both TestGroupJoinIsAnnounced subtests fail. Re-ran the frontend removals after the new tests: all six still caught, and the media and pinned retries now fail their tests."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet handlers and integration clean",
+  "lint": "eslint clean on every changed file",
+  "types": "tsc -b clean",
+  "tests": "16 frontend files touching the changed modules, 174 passed + the 2 new retry tests; shuffled 58 passed; Go join, keys-shared, invite and 33 handler group tests PASS, 0 SKIP."
+ }
+}

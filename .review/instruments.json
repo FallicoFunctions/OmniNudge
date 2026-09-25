@@ -289,6 +289,12 @@
       "name": "Every producer of the value the consumer receives",
       "trigger": "a field is added to a type that reaches the client by more than one path -- a list read, a single read, a send answer, a live socket push, a forward, a reload",
       "asks": "List every producer the consumer can receive the type from, and check each one sets the field. Grep the handlers for every hub broadcast and every response of that type, not only the query that was changed. A name added to the group message reads never reached a message pushed live, which went through the single read; the reader named it from a stale member list, and a user saw 'User' in the browser after the fix had passed its tests."
+    },
+    {
+      "id": "C10",
+      "name": "Remove each line the change adds",
+      "trigger": "a change adds the same small line at several sites -- a dependency, a guard, a notify call -- or adds lines whose effect no test reads directly",
+      "asks": "Delete each added line on its own, run the tests that should notice, and require a failure. A line no test notices is untested, however obvious it looks. Phase 3b added a key-generation dependency to three decrypt sites and tested one: removing it from the media hook and the pinned bar left all 46 of their tests green."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
