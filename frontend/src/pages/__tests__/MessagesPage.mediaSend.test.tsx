@@ -592,3 +592,33 @@ describe('sending a voice message', () => {
     expect(alertSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('a group message from someone who has left', () => {
+  // Names came only from the current member list, so everything a removed
+  // member wrote, and every reply to it, was signed "User".
+  it('keeps its sender name, on the message and on a reply to it', async () => {
+    state.conversations = [groupConversation];
+    const sent = { conversation_id: groupConversation.id, encrypted_content: '', sent_at: now };
+    vi.mocked(messagesService.getMessagesPage).mockResolvedValue({
+      messages: [
+        {
+          ...sent,
+          id: 9201,
+          sender_id: 78,
+          sender_username: 'still_here',
+          message_type: 'text',
+          reply_to: 9200,
+        },
+        { ...sent, id: 9200, sender_id: 77, sender_username: 'gone_member', message_type: 'text' },
+      ],
+      next_cursor: undefined,
+    } as unknown as Awaited<ReturnType<typeof messagesService.getMessagesPage>>);
+
+    renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+
+    expect(await screen.findByText('gone_member')).toBeInTheDocument();
+    expect(screen.getByText('still_here')).toBeInTheDocument();
+    expect(screen.getByText('Replying to @gone_member:')).toBeInTheDocument();
+  });
+});

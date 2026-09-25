@@ -151,6 +151,8 @@ export interface Message {
   recipient_keys?: Record<number, string>;
   /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
   has_reactions?: boolean;
+  /** Set for group and mod mail messages; outlives the sender's membership. */
+  sender_username?: string;
   delete_at?: string | null;
 }
 
@@ -292,6 +294,6 @@ export interface TransferOwnershipRequest {
 
 export interface CreateGroupInviteRequest {
   user_id: number;
-}
   /** key version -> that version wrapped for the invitee, handed over on accept. */
   history?: Record<number, string>;
+}

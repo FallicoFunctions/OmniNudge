@@ -3216,6 +3216,7 @@ export default function MessagesPage() {
                         : undefined;
                       const senderUsername =
                         participant?.username ||
+                        message.sender_username ||
                         groupSender?.username ||
                         (isOwnMessage ? t('messages.you') : t('messages.user'));
                       const isModerator = participant?.is_moderator || false;
@@ -3232,7 +3233,13 @@ export default function MessagesPage() {
                           ? t('messages.you')
                           : isModMail
                             ? (parentParticipant?.username ?? t('messages.user'))
-                            : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                            : isGroup
+                              ? parentMessage.sender_username ||
+                                groupParticipants?.find(
+                                  (p) => p.user_id === parentMessage.sender_id
+                                )?.username ||
+                                t('messages.user')
+                              : (selectedConversation?.other_user?.username ?? t('messages.user'))
                         : undefined;
                       const parentDeleted =
                         !!message.reply_to &&

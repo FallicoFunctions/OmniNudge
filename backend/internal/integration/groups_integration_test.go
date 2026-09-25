@@ -656,3 +656,57 @@ func TestGroupInviteBringsTheHistory(t *testing.T) {
 	require.Len(t, state.MyCopies, 1, "the newcomer reads the history before anyone sends")
 	assert.Equal(t, "v1-guest", state.MyCopies[0].WrappedKey)
 }
+
+// Names came from the current member list, so a member who was removed left
+// every message they wrote signed "User". The message carries its sender now.
+func TestGroupMessageKeepsItsSenderAfterTheyLeave(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, uniqueGrpUsername("nameowner"), "user")
+	leaver := createUser(t, deps.UserRepo, uniqueGrpUsername("nameleaver"), "user")
+	stayer := createUser(t, deps.UserRepo, uniqueGrpUsername("namestayer"), "user")
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+	leaverToken, _ := deps.AuthService.GenerateJWT(leaver.ID, leaver.Username, leaver.Role)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken,
+		createGroupBody("Names", []int{leaver.ID, stayer.ID}))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var group struct {
+		ID int `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+
+	for _, from := range []string{leaverToken, ownerToken} {
+		body := fmt.Sprintf(`{"conversation_id":%d,"encrypted_content":"hi","message_type":"text","encryption_version":"v1"}`, group.ID)
+		r := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/messages", from, []byte(body))
+		require.Equal(t, http.StatusCreated, r.Code, r.Body.String())
+		time.Sleep(5 * time.Millisecond)
+	}
+	w = doGroupRequest(t, deps.GroupRouter, http.MethodDelete,
+		fmt.Sprintf("/api/v1/groups/%d/participants/%d", group.ID, leaver.ID), ownerToken, nil)
+	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+
+	senders := func(query string) map[int]string {
+		r := doGroupRequest(t, deps.GroupRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/conversations/%d/messages?%s", group.ID, query), ownerToken, nil)
+		require.Equal(t, http.StatusOK, r.Code, r.Body.String())
+		var page struct {
+			Messages []struct {
+				SenderID       int    `json:"sender_id"`
+				SenderUsername string `json:"sender_username"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(r.Body.Bytes(), &page))
+		out := map[int]string{}
+		for _, m := range page.Messages {
+			out[m.SenderID] = m.SenderUsername
+		}
+		return out
+	}
+
+	// The first page reads through the cursor query, a later one through the
+	// offset query; both must sign the message.
+	assert.Equal(t, map[int]string{leaver.ID: leaver.Username, owner.ID: owner.Username}, senders("limit=50"))
+	assert.Equal(t, map[int]string{leaver.ID: leaver.Username}, senders("limit=1&offset=1"))
+}

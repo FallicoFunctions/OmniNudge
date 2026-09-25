@@ -51,6 +51,10 @@ type Message struct {
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
 	DeleteAt                 *time.Time     `json:"delete_at,omitempty"`            // Auto-delete timestamp; NULL means never
+	// SenderUsername is set by the reads of a conversation with more than two
+	// people (a group, mod mail). A sender who has since left is no longer in
+	// the member list, and their messages must still say who wrote them.
+	SenderUsername string `json:"sender_username,omitempty"`
 }
 
 // ExpiredMessage is a lightweight projection used by the auto-delete cron sweep.
@@ -465,9 +469,11 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
 		       m.shared_encryption_iv,
-		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions,
+		       COALESCE(su.username, '') AS sender_username
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		LEFT JOIN users su ON su.id = m.sender_id
 		WHERE m.conversation_id = $1
 		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
 		  AND NOT EXISTS (
@@ -516,6 +522,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
 			&message.HasReactions,
+			&message.SenderUsername,
 		)
 		if err != nil {
 			return nil, err
@@ -560,9 +567,11 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
 		       m.shared_encryption_iv,
-		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions,
+		       COALESCE(su.username, '') AS sender_username
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		LEFT JOIN users su ON su.id = m.sender_id
 		WHERE m.conversation_id = $1
 		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
 		  AND NOT EXISTS (
@@ -626,6 +635,7 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
 			&message.HasReactions,
+			&message.SenderUsername,
 		)
 		if err != nil {
 			return nil, err
