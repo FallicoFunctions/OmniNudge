@@ -16,6 +16,8 @@ interface GroupDetailsSidebarProps {
   conversation: Conversation;
   currentUserId: number;
   onClose: () => void;
+  /** After this user leaves: the group is no longer theirs to show. */
+  onLeft: () => void;
   searchUsers: SearchUsers;
 }
 
@@ -176,6 +178,7 @@ export function GroupDetailsSidebar({
   conversation,
   currentUserId,
   onClose,
+  onLeft,
   searchUsers,
 }: GroupDetailsSidebarProps) {
   const { t } = useTranslation();
@@ -264,6 +267,7 @@ export function GroupDetailsSidebar({
   const handleLeave = async () => {
     try {
       await leaveGroup();
+      onLeft();
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';

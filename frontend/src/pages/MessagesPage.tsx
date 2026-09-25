@@ -4524,6 +4524,7 @@ export default function MessagesPage() {
               conversation={selectedConversation}
               currentUserId={user.id}
               onClose={() => setShowGroupSidebar(false)}
+              onLeft={() => setSelectedConversationId(null)}
               searchUsers={searchUsers}
             />
           </div>

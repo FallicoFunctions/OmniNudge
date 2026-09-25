@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { groupsService } from '../services/groupsService';
 import type {
-  Conversation,
   GroupInvite,
   GroupParticipant,
   GroupRole,
@@ -71,11 +70,10 @@ export function useGroupConversation({
 
   const updateGroupMutation = useMutation({
     mutationFn: (data: UpdateGroupRequest) => groupsService.updateGroup(conversationId!, data),
-    onSuccess: (updated: Conversation) => {
-      queryClient.setQueryData<Conversation[]>(['conversations'], (prev) =>
-        prev?.map((c) => (c.id === conversationId ? { ...c, ...updated } : c))
-      );
-    },
+    // The conversation lists live under ['conversations', ...]; a write to
+    // ['conversations'] itself reached no list, so a new name showed only
+    // after a refresh.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['conversations'] }),
   });
 
   const updateSettingsMutation = useMutation({
@@ -87,11 +85,8 @@ export function useGroupConversation({
 
   const leaveGroupMutation = useMutation({
     mutationFn: () => groupsService.leaveGroup(conversationId!),
-    onSuccess: () => {
-      queryClient.setQueryData<Conversation[]>(['conversations'], (prev) =>
-        prev?.filter((c) => c.id !== conversationId)
-      );
-    },
+    // Returned, so leaving resolves once the lists no longer hold the group.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['conversations'] }),
   });
 
   const transferOwnershipMutation = useMutation({
@@ -170,20 +165,24 @@ export function useGroupInvites({ enabled = true }: { enabled?: boolean } = {}) 
   const {
     data: invites = [],
     isLoading,
-    enabled,
     refetch,
   } = useQuery<GroupInvite[]>({
     queryKey: ['group-invites'],
     queryFn: () => groupsService.getMyInvites(),
     staleTime: 30_000,
+    enabled,
   });
 
   const acceptMutation = useMutation({
     mutationFn: (inviteId: number) => groupsService.acceptInvite(inviteId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group-invites'] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    },
+    // Returned, so accepting resolves only once the conversation list holds
+    // the group. The caller opens it next, and a selection missing from the
+    // list is replaced by the first conversation, so the chat never opened.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-invites'] }),
+        queryClient.invalidateQueries({ queryKey: ['conversations'] }),
+      ]),
   });
 
   const declineMutation = useMutation({
