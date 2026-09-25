@@ -7,7 +7,7 @@
  * the extension is all there is to go on -- and the fallbacks, which hand the
  * browser the stored URL whenever the file cannot be opened.
  */
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDecryptedMedia } from '../useDecryptedMedia';
 import {
@@ -17,7 +17,7 @@ import {
   importFileKey,
 } from '../../utils/encryption';
 import { newGroupKey, sealGroupMessage } from '../../utils/groupKeys';
-import { groupKeyForVersion } from '../../services/groupKeyCache';
+import { forgetGroupKeys, groupKeyForVersion } from '../../services/groupKeyCache';
 import { getOwnKeys } from '../../services/keyManagementService';
 import { authenticatedFetch } from '../../services/authSession';
 import type { Message } from '../../types/messages';
@@ -36,7 +36,10 @@ vi.mock('../../services/groupKeyCache', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../services/groupKeyCache')>()),
   groupKeyForVersion: vi.fn(),
 }));
-vi.mock('../../services/keyManagementService', () => ({ getOwnKeys: vi.fn() }));
+vi.mock('../../services/keyManagementService', () => ({
+  getOwnKeys: vi.fn(),
+  getOwnPublicKeyBase64: vi.fn(),
+}));
 vi.mock('../../services/authSession', () => ({ authenticatedFetch: vi.fn() }));
 
 const KEYS = { privateKey: {}, publicKey: {} } as never;
@@ -112,6 +115,28 @@ describe('group media', () => {
     });
     // The RSA path is for direct messages and must not run for a group file.
     expect(decryptFile).not.toHaveBeenCalled();
+  });
+
+  // A newcomer's image stayed blank after the key reached them: nothing about
+  // the message changes when a version is granted later, so nothing re-ran.
+  it('opens the file once the cache is told a key has arrived', async () => {
+    const { groupKey, sealed } = await sealedFileKey(3);
+    vi.mocked(groupKeyForVersion).mockResolvedValue(null);
+    const { result } = render(
+      message({
+        conversation_id: 55,
+        media_url: '/u/a.png',
+        media_encryption_key: sealed,
+        media_encryption_iv: 'IV',
+      })
+    );
+    await waitFor(() => expect(groupKeyForVersion).toHaveBeenCalled());
+    expect(result.current).toBeNull();
+
+    vi.mocked(groupKeyForVersion).mockResolvedValue(groupKey);
+    act(() => forgetGroupKeys(55));
+
+    await waitFor(() => expect(result.current).toBe('blob:decrypted'));
   });
 
   it('shows nothing, not the stored ciphertext, when the version cannot be opened', async () => {
