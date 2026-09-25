@@ -450,6 +450,7 @@ type liveGroup struct {
 	id           int
 	ownerName    string
 	ownerToken   string
+	memberIDs    []int
 	memberTokens []string
 	members      []*gorillaws.Conn
 }
@@ -489,6 +490,7 @@ func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liv
 		id:           group.ID,
 		ownerName:    owner.Username,
 		ownerToken:   ownerToken,
+		memberIDs:    []int{m1.ID, m2.ID},
 		memberTokens: []string{m1Token, m2Token},
 		members:      []*gorillaws.Conn{dial(m1), dial(m2)},
 	}
@@ -863,4 +865,38 @@ func TestGroupInviteReachesTheInvitee(t *testing.T) {
 	evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_invite_received" })
 	payload, _ := evt["payload"].(map[string]interface{})
 	assert.EqualValues(t, g.id, payload["conversation_id"])
+}
+
+// A leave or a removal reached nobody: the member list, and for the one who
+// went the group itself, stayed on screen until a refresh.
+func TestGroupLeaveIsAnnounced(t *testing.T) {
+	for _, how := range []string{"left", "removed"} {
+		t.Run(how, func(t *testing.T) {
+			deps := newGroupTestDeps(t)
+			defer deps.DB.Close()
+			ts := httptest.NewServer(deps.GroupRouter)
+			defer ts.Close()
+
+			g := newLiveGroup(t, deps, ts.URL, "leave"+how)
+			// The first member goes; both sockets must hear it, the second
+			// member's so their list updates, the first's so the group closes.
+			goneID := g.memberIDs[0]
+			var r *httptest.ResponseRecorder
+			if how == "left" {
+				r = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+					fmt.Sprintf("/api/v1/groups/%d/leave", g.id), g.memberTokens[0], []byte(`{}`))
+			} else {
+				r = doGroupRequest(t, deps.GroupRouter, http.MethodDelete,
+					fmt.Sprintf("/api/v1/groups/%d/participants/%d", g.id, goneID), g.ownerToken, nil)
+			}
+			require.Less(t, r.Code, 300, r.Body.String())
+
+			for i, conn := range g.members {
+				evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_member_left" })
+				payload, _ := evt["payload"].(map[string]interface{})
+				assert.EqualValues(t, g.id, payload["conversation_id"], "member %d", i)
+				assert.EqualValues(t, goneID, payload["user_id"], "member %d", i)
+			}
+		})
+	}
 }

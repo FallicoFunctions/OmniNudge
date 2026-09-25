@@ -198,6 +198,18 @@ func (h *GroupHandler) announceJoin(ctx context.Context, conversationID, userID 
 	})
 }
 
+// announceLeave tells the remaining members someone left or was removed, and
+// tells that person too: their app drops the group from its list and closes
+// it, instead of showing it until a refresh.
+func (h *GroupHandler) announceLeave(ctx context.Context, conversationID, userID int) {
+	if h.hub == nil {
+		return
+	}
+	payload := gin.H{"conversation_id": conversationID, "user_id": userID}
+	broadcastToGroup(ctx, h.pool, h.hub, conversationID, "group_member_left", payload)
+	h.hub.Broadcast(&websocket.Message{RecipientID: userID, Type: "group_member_left", Payload: payload})
+}
+
 // grantNewcomerHistory answers for a refused history grant and reports whether
 // the request may go on.
 func (h *GroupHandler) grantNewcomerHistory(c *gin.Context, err error) bool {
@@ -676,6 +688,7 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
 		return
 	}
+	h.announceLeave(c.Request.Context(), conversationID, targetID)
 
 	c.JSON(http.StatusNoContent, nil)
 }
@@ -1299,6 +1312,7 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 		return
 	}
 
+	h.announceLeave(c.Request.Context(), conversationID, userID)
 	c.Status(http.StatusNoContent)
 }
 
