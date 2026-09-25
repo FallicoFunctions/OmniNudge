@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/websocket"
 )
 
 // GroupHandler handles group conversation HTTP endpoints.
@@ -186,6 +187,14 @@ func (h *GroupHandler) announceJoin(ctx context.Context, conversationID, userID 
 	broadcastToGroup(ctx, h.pool, h.hub, conversationID, "group_member_joined", gin.H{
 		"conversation_id": conversationID,
 		"user_id":         userID,
+	})
+	// The join handed the newcomer the older versions their invite or their
+	// adder carried. Their app may have recorded those as missing -- someone
+	// removed and let back in within one page -- and this tells it to look again.
+	h.hub.Broadcast(&websocket.Message{
+		RecipientID: userID,
+		Type:        "group_keys_shared",
+		Payload:     gin.H{"conversation_id": conversationID},
 	})
 }
 

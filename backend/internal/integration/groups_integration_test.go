@@ -748,6 +748,7 @@ func TestGroupJoinIsAnnounced(t *testing.T) {
 
 			g := newLiveGroup(t, deps, ts.URL, "joined"+how)
 			newcomer := createUser(t, deps.UserRepo, uniqueGrpUsername("joinednew"), "user")
+			newcomerConn := dialGroupSocket(t, deps, ts.URL, newcomer)
 			if how == "added" {
 				w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
 					fmt.Sprintf("/api/v1/groups/%d/participants", g.id), g.ownerToken,
@@ -774,6 +775,11 @@ func TestGroupJoinIsAnnounced(t *testing.T) {
 				assert.EqualValues(t, g.id, payload["conversation_id"])
 				assert.EqualValues(t, newcomer.ID, payload["user_id"])
 			}
+			// The join brought the newcomer whatever history it carried; their
+			// app must look again at what it had recorded as missing.
+			evt := readWebSocketEvent(t, newcomerConn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_keys_shared" })
+			payload, _ := evt["payload"].(map[string]interface{})
+			assert.EqualValues(t, g.id, payload["conversation_id"])
 		})
 	}
 }
