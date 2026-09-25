@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18n from 'i18next';
 import MessagesPage from '../MessagesPage';
@@ -620,5 +620,59 @@ describe('a group message from someone who has left', () => {
     expect(await screen.findByText('gone_member')).toBeInTheDocument();
     expect(screen.getByText('still_here')).toBeInTheDocument();
     expect(screen.getByText('Replying to @gone_member:')).toBeInTheDocument();
+  });
+});
+
+describe('who wrote a message, wherever it is named', () => {
+  const oneMessage = (conversation: Conversation, senderId: number, senderUsername?: string) => {
+    state.conversations = [conversation];
+    vi.mocked(messagesService.getMessagesPage).mockResolvedValue({
+      messages: [
+        {
+          id: 9300,
+          conversation_id: conversation.id,
+          sender_id: senderId,
+          sender_username: senderUsername,
+          encrypted_content: '',
+          message_type: 'text',
+          sent_at: now,
+        },
+      ],
+      next_cursor: undefined,
+    } as unknown as Awaited<ReturnType<typeof messagesService.getMessagesPage>>);
+  };
+
+  // The reply bar above the composer took the direct-message partner's name,
+  // which a group does not have: "Replying to @User".
+  it('names the group member in the reply being written', async () => {
+    oneMessage(groupConversation, 77, 'gone_member');
+    renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Message options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+    expect(await screen.findByText('Replying to @gone_member:')).toBeInTheDocument();
+  });
+
+  // In a direct message the page never named the partner, so View Profile
+  // opened /users/User.
+  it("opens the direct-message partner's own profile", async () => {
+    oneMessage(dmConversation, 42);
+    const Profile = () => <p>profile of {useParams().name}</p>;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Routes>
+            <Route path="/" element={<MessagesPage />} />
+            <Route path="/users/:name" element={<Profile />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Message options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View Profile' }));
+
+    expect(await screen.findByText('profile of alice')).toBeInTheDocument();
   });
 });

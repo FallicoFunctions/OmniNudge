@@ -1921,6 +1921,31 @@ export default function MessagesPage() {
     user?.id,
   ]);
 
+  // Who wrote a message, wherever it is named: the bubble, a reply, the reply
+  // being written, the profile link. Undefined when nobody on hand knows, so a
+  // caller can show a fallback word without linking to a profile of that word.
+  // A group message carries its sender's name, since a member who has left is
+  // on no list.
+  const conversationType = selectedConversation?.conversation_type;
+  const otherUserId = selectedConversation?.other_user?.id;
+  const otherUsername = selectedConversation?.other_user?.username;
+  const senderNameOf = (message: Message): string | undefined => {
+    switch (conversationType) {
+      case 'mod_mail':
+        return (
+          modMailConversation?.participants?.find((p) => p.user_id === message.sender_id)
+            ?.username || message.sender_username
+        );
+      case 'group':
+        return (
+          message.sender_username ||
+          groupParticipants?.find((p) => p.user_id === message.sender_id)?.username
+        );
+      default:
+        return message.sender_id === otherUserId ? otherUsername : undefined;
+    }
+  };
+
   const hasActiveMessageSearch =
     Boolean(debouncedMessageSearch.trim()) ||
     messageSearchSenderFilter !== 'all' ||
@@ -3211,35 +3236,17 @@ export default function MessagesPage() {
                             (p) => p.user_id === message.sender_id
                           )
                         : null;
-                      const groupSender = isGroup
-                        ? groupParticipants?.find((p) => p.user_id === message.sender_id)
-                        : undefined;
+                      const senderName = senderNameOf(message);
                       const senderUsername =
-                        participant?.username ||
-                        message.sender_username ||
-                        groupSender?.username ||
-                        (isOwnMessage ? t('messages.you') : t('messages.user'));
+                        senderName ?? (isOwnMessage ? t('messages.you') : t('messages.user'));
                       const isModerator = participant?.is_moderator || false;
                       const parentMessage = message.reply_to
                         ? orderedMessagesById.get(message.reply_to)
                         : undefined;
-                      const parentParticipant = isModMail
-                        ? modMailConversation?.participants?.find(
-                            (p) => p.user_id === parentMessage?.sender_id
-                          )
-                        : null;
                       const parentUsername = parentMessage
                         ? parentMessage.sender_id === user?.id
                           ? t('messages.you')
-                          : isModMail
-                            ? (parentParticipant?.username ?? t('messages.user'))
-                            : isGroup
-                              ? parentMessage.sender_username ||
-                                groupParticipants?.find(
-                                  (p) => p.user_id === parentMessage.sender_id
-                                )?.username ||
-                                t('messages.user')
-                              : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                          : (senderNameOf(parentMessage) ?? t('messages.user'))
                         : undefined;
                       const parentDeleted =
                         !!message.reply_to &&
@@ -3443,9 +3450,9 @@ export default function MessagesPage() {
                                       type="button"
                                       className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                       onClick={() => {
-                                        if (!senderUsername) return;
+                                        if (!senderName) return;
                                         setMessageMenuOpen(null);
-                                        navigate(`/users/${encodeURIComponent(senderUsername)}`);
+                                        navigate(`/users/${encodeURIComponent(senderName)}`);
                                       }}
                                     >
                                       {t('messages.actions.viewProfile')}
@@ -3707,7 +3714,7 @@ export default function MessagesPage() {
                       parentUsername={
                         replyTargetMessage.sender_id === user?.id
                           ? t('messages.you')
-                          : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                          : (senderNameOf(replyTargetMessage) ?? t('messages.user'))
                       }
                       parentPreview={
                         replyTargetMessage.message_type !== 'text'
