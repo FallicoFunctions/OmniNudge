@@ -1,0 +1,560 @@
+{
+ "schema_version": 2,
+ "head": "c5f483781",
+ "base": "7cf2b679d",
+ "scope": {
+  "files": [
+   "frontend/src/services/newcomerHistory.ts",
+   "frontend/src/components/messages/GroupInviteMembers.tsx",
+   "frontend/src/types/messages.ts",
+   "frontend/src/contexts/AuthContext.tsx",
+   "frontend/src/components/mobile/TabBarItem.tsx",
+   "frontend/src/pages/MessagesPage.tsx",
+   "backend/internal/models/message.go"
+  ],
+  "boundaries": [
+   "the invite request body",
+   "the message JSON from the list read",
+   "the single read and the socket push",
+   "the query cache",
+   "the rendered bubble, reply bar and tab bar"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/f04b8f996.json",
+  ".review/da9ed20de.json",
+  ".review/c0c83c19b.json",
+  ".review/1df41fd40.json"
+ ],
+ "notes": "Phase 2 of history on joining, sign-out clearing the cache, the Messages 0, and sender names that outlive membership. The user found the live-path miss in the browser; C9 now names the technique.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "7cf2b679d..c5f483781: 742def759 (the invite carries the older key versions, wrapped by historyForNewcomer), 0603bbd48 (sign-out clears the query cache), 68728e23e (no 0 on the Messages tab), 3c9a3aba2 (group and mod mail reads carry sender_username), and the review's fixes bd8552488, e4dcaa0be, c5f483781. Boundaries: the invite request body, the message JSON from the list read, the single read and the socket push, the query cache, the rendered bubble, reply bar and tab bar. Codex's uncommitted work shares the tree; every commit named its files, and every control was diffed from one file."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read f04b8f996 (phase 1: invites carry history; rollback lists; expired invites), da9ed20de (the group key cache is keyed by the device key because logout keeps keys -- the query cache clear does not touch it), c0c83c19b and 1df41fd40 (group sender names first came from the participant query)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The invite body: newcomerHistory.test builds it with real RSA keys for a group that shows its history ({1: copy}) and one that hides it (undefined); the copy for version 1 opens with the invitee's private key and decrypts a message sealed before the join."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in the pane as DERRF after the fixes: in 'Test', both of seed_user_2's messages ('welcome seed_user_2', 'test') are headed seed_user_2; seed_user_1 and TestUser keep their names. The tab bar reads 'Messages' with no number when nothing is unread. The reply bar and profile link are asserted in MessagesPage.mediaSend."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "GET /conversations/47/messages as DERRF returned sender_username on all six latest messages (seed_user_2 twice, DERRF, seed_user_1, TestUser). The socket push is read in TestGroupMessageArrivesWithItsSenderName: payload.sender_username equals the sender's name."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The group reads and GetByID join users su; B3's rows show the joined name. A removed member's messages still read their name (TestGroupMessageKeepsItsSenderAfterTheyLeave, through both the cursor and the offset query)."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The field is sender_username on both sides (Go tag and TS Message type); history keys are key versions serialised as JSON object keys, as phase 1's HTTP test sends."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The page reads message.sender_username, the field the Go struct tags; the socket handler stores the payload unchanged, and message_edited merges into the stored message, so the name survives both."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One rule after the fix: senderNameOf is the only place a sender is named."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "sender_username is scanned by hand: each query that sets it has the column, the join and a Scan target (GetByID, both ForAll reads); B3 and the integration tests prove it arrives."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The control for finding 1 breaks the reader (GetByID's scan and join) and the socket test fails with <nil>."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket test reads the payload the real hub sends to a real dialled connection, not a hand-built message."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Badge boundaries: 0 and undefined show nothing, 3 shows 3 (TabBarItem.test)."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the sign-out clear: the key cache (module state keyed by device key, deliberately kept) and localStorage feed state (cleared already). Siblings of the name: DM reads name the partner through other_user, now inside senderNameOf."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "senderNameOf's three branches are each reached: mod mail, group, and direct message (the new DM profile test)."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "historyForNewcomer logs and returns undefined on failure, by design: the invite must never fail for its history. Phase 3 (online members fill gaps) is not built yet, so such a failure leaves the history locked until then; said to the user."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Found the naming rule written three ways (finding 2); now one helper."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Finding 2: after the bubble's fix, grepped every place that names a sender -- the reply header, the reply bar above the composer, and View Profile. The reply bar and View Profile were still wrong. Sign-out: only logout sets the user to null (setUser(null) in clearAuthState); session-ended keeps the user and asks to sign in again. Badge: grepped every render condition that starts with a number; none but TabBarItem."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared memory changed."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Sign-out now leaves no cached answers behind for the next account (AuthContext.test)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls fail as tests with the patch applied: grp-r1-live-message-unnamed ('expected namedowner..., actual <nil>'); grp-r1-sender-named-three-ways (both new page tests fail, and tsc -b stays clean with the patch). A first attempt at the finding-1 control reverted Create and passed -- the send reloads through GetByID -- so the Create change was removed as a duplicate (c5f483781) and the control targets GetByID."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./..., go vet (models, integration) clean; tsc -b and eslint clean on every changed file; gofmt clean. The whole-frontend lint the Stop hook runs fails only in Codex's uncommitted LikenessPicker.tsx."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Finding 1's technique was not a row: follow a new field down every path the consumer receives the type by. Added as C9."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran the phase 2 flow in real browsers: removed seed_user_2, invited them again, accepted, and reported that it worked; the old messages opened on accept. The same run showed a live message from seed_user_2 headed 'User' -- finding 1."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No shared bar gained content; the tab badge only lost a stray 0."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs used -v with TEST_DATABASE_URL: the socket and name tests PASS, 124 message tests in models, repository and handlers PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The plan's phase 2: the inviter's device wraps the old versions and sends them with the invite; nothing when history is hidden; the invite never fails for it. All three hold."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks MessagesPage, AuthContext, TabBarItem, MobileTabBar, GroupInviteMembers, newcomerHistory or groupKeysService: 57 files, 426 passed, 1 skipped (the old it.skip in MessagesPage.test.tsx)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "Nothing that can take over the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "newGroupTestDeps unchanged; the liveGroup helper gained ownerName, and every live test that builds it passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "The prior ledger's controls target retention_worker.go and the migration test, neither changed here."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource acquired after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The socket test runs the real handler, repository and hub, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled MessagesPage.mediaSend and TabBarItem (seed 11): 20 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Found finding 1: the producers of a message the client receives are the list reads, GetByID (the send answer, the live push, forward, delivery reload, edit reload) and the auto-delete system notice. After the fix every one sets sender_username except the system notice, which the page shows with no sender."
+    }
+   ],
+   "findings": [
+    {
+     "id": "grp-r1-live-message-unnamed",
+     "summary": "The sender's name was added to the group list reads only; a message that arrived over the socket went through GetByID and carried none, so the reader named it from a member list fetched before the sender joined -- 'User'. Seen by the user in the browser after the first fix had passed its tests.",
+     "found_by": "C9",
+     "fix_commit": "bd8552488",
+     "control": {
+      "patch": ".review/controls/grp-r1-live-message-unnamed.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -tags=integration -run TestGroupMessageArrivesWithItsSenderName"
+      ],
+      "observed": "FAIL: expected the owner's username, actual <nil>"
+     }
+    },
+    {
+     "id": "grp-r1-sender-named-three-ways",
+     "summary": "Each place that named a sender chose the name its own way: the reply bar above the composer used a direct-message partner's name in a group ('Replying to @User'), and View Profile in a direct message opened /users/User.",
+     "found_by": "E6",
+     "fix_commit": "e4dcaa0be",
+     "control": {
+      "patch": ".review/controls/grp-r1-sender-named-three-ways.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/pages/__tests__/MessagesPage.mediaSend.test.tsx -t \"wherever it is named\""
+      ],
+      "observed": "FAIL: Unable to find 'Replying to @gone_member:' and 'profile of alice'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the review-time code -- senderNameOf and its callers (e4dcaa0be), GetByID's join (bd8552488), the removal of the Create duplicate (c5f483781), the new page and socket tests, and instrument C9."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read f04b8f996 (phase 1: invites carry history; rollback lists; expired invites), da9ed20de (the group key cache is keyed by the device key because logout keeps keys -- the query cache clear does not touch it), c0c83c19b and 1df41fd40 (group sender names first came from the participant query)."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "The invite body: newcomerHistory.test builds it with real RSA keys for a group that shows its history ({1: copy}) and one that hides it (undefined); the copy for version 1 opens with the invitee's private key and decrypts a message sealed before the join."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Pass 1's render stands; the helper moved below the memos for the React compiler, and the pane showed the names after that move."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "GET /conversations/47/messages as DERRF returned sender_username on all six latest messages (seed_user_2 twice, DERRF, seed_user_1, TestUser). The socket push is read in TestGroupMessageArrivesWithItsSenderName: payload.sender_username equals the sender's name."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "The group reads and GetByID join users su; B3's rows show the joined name. A removed member's messages still read their name (TestGroupMessageKeepsItsSenderAfterTheyLeave, through both the cursor and the offset query)."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "The field is sender_username on both sides (Go tag and TS Message type); history keys are key versions serialised as JSON object keys, as phase 1's HTTP test sends."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The page reads message.sender_username, the field the Go struct tags; the socket handler stores the payload unchanged, and message_edited merges into the stored message, so the name survives both."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One rule after the fix: senderNameOf is the only place a sender is named."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "sender_username is scanned by hand: each query that sets it has the column, the join and a Scan target (GetByID, both ForAll reads); B3 and the integration tests prove it arrives."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "The control for finding 1 breaks the reader (GetByID's scan and join) and the socket test fails with <nil>."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket test reads the payload the real hub sends to a real dialled connection, not a hand-built message."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Badge boundaries: 0 and undefined show nothing, 3 shows 3 (TabBarItem.test)."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the sign-out clear: the key cache (module state keyed by device key, deliberately kept) and localStorage feed state (cleared already). Siblings of the name: DM reads name the partner through other_user, now inside senderNameOf."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "senderNameOf's three branches are each reached: mod mail, group, and direct message (the new DM profile test)."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "historyForNewcomer logs and returns undefined on failure, by design: the invite must never fail for its history. Phase 3 (online members fill gaps) is not built yet, so such a failure leaves the history locked until then; said to the user."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Found the naming rule written three ways (finding 2); now one helper."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Grepped senderUsername, other_user?.username and senderName in MessagesPage after the helper: every naming site goes through senderNameOf or its result."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared memory changed."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction changed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "Sign-out now leaves no cached answers behind for the next account (AuthContext.test)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls re-run by hand after c5f483781; each fails as recorded in pass 1."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./..., go vet (models, integration) clean; tsc -b and eslint clean on every changed file; gofmt clean. The whole-frontend lint the Stop hook runs fails only in Codex's uncommitted LikenessPicker.tsx."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran the phase 2 flow in real browsers: removed seed_user_2, invited them again, accepted, and reported that it worked; the old messages opened on accept. The same run showed a live message from seed_user_2 headed 'User' -- finding 1."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No shared bar gained content; the tab badge only lost a stray 0."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs used -v with TEST_DATABASE_URL: the socket and name tests PASS, 124 message tests in models, repository and handlers PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The plan's phase 2: the inviter's device wraps the old versions and sends them with the invite; nothing when history is hidden; the invite never fails for it. All three hold."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks MessagesPage, AuthContext, TabBarItem, MobileTabBar, GroupInviteMembers, newcomerHistory or groupKeysService: 57 files, 426 passed, 1 skipped (the old it.skip in MessagesPage.test.tsx)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "Nothing that can take over the screen."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "newGroupTestDeps unchanged; the liveGroup helper gained ownerName, and every live test that builds it passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "The prior ledger's controls target retention_worker.go and the migration test, neither changed here."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource acquired after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The socket test runs the real handler, repository and hub, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled MessagesPage.mediaSend and TabBarItem (seed 11): 20 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Re-listed the producers after c5f483781: the send reloads through GetByID before it answers and broadcasts, so removing the Create change loses no path; the socket test still passes."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet on models and integration (-tags=integration) clean",
+  "lint": "eslint clean on every changed file; the whole-frontend run fails only in Codex's uncommitted LikenessPicker.tsx",
+  "types": "tsc -b clean",
+  "tests": "Narrow runs: socket and name Go tests PASS; 124 message tests PASS 0 SKIP; 57 frontend files touching the changed modules, 426 passed, 1 pre-existing skip; the whole frontend suite passed earlier in this session (1370)."
+ }
+}

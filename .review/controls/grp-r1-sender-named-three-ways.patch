@@ -1,0 +1,22 @@
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index 8e1908839..708859644 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -1942,7 +1942,7 @@ export default function MessagesPage() {
+           groupParticipants?.find((p) => p.user_id === message.sender_id)?.username
+         );
+       default:
+-        return message.sender_id === otherUserId ? otherUsername : undefined;
++        return message.sender_id === otherUserId ? undefined : otherUsername;
+     }
+   };
+ 
+@@ -3714,7 +3714,7 @@ export default function MessagesPage() {
+                       parentUsername={
+                         replyTargetMessage.sender_id === user?.id
+                           ? t('messages.you')
+-                          : (senderNameOf(replyTargetMessage) ?? t('messages.user'))
++                          : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                       }
+                       parentPreview={
+                         replyTargetMessage.message_type !== 'text'

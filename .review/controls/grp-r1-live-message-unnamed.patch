@@ -1,0 +1,25 @@
+diff --git a/backend/internal/models/message.go b/backend/internal/models/message.go
+index 65846b5f6..9896b28c0 100644
+--- a/backend/internal/models/message.go
++++ b/backend/internal/models/message.go
+@@ -197,11 +197,9 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
+ 		       m.media_encryption_iv,
+ 		       m.sender_media_encryption_key,
+ 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+-		       m.shared_encryption_iv,
+-		       COALESCE(su.username, '') AS sender_username
++		       m.shared_encryption_iv
+ 		FROM messages m
+ 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+-		LEFT JOIN users su ON su.id = m.sender_id
+ 		WHERE m.id = $1
+ 	`
+ 
+@@ -234,7 +232,6 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
+ 		&message.SenderMediaEncryptionKey,
+ 		&message.IsMultiRecipient,
+ 		&message.SharedEncryptionIV,
+-		&message.SenderUsername,
+ 	)
+ 
+ 	if err == pgx.ErrNoRows {

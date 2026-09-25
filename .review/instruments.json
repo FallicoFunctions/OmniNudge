@@ -283,6 +283,12 @@
       "name": "Run the test file in shuffled order",
       "trigger": "a test is added, removed or reordered in a file whose tests share module-level mocks, fakes or globals",
       "asks": "Do the tests pass in any order, or only in the one they are written in? Run the file with vitest --sequence.shuffle --sequence.seed=N over many seeds (go: -shuffle=on). A test that relies on a mock value, a stray socket or a timer left by the test before it passes in file order and fails in some other order -- and it starts failing for real the day somebody removes or moves the neighbour it leaned on. Check the shuffle can catch one first: remove a known fix and require some seed to fail. Two leaks in OmniChatCallModal.test.tsx surfaced this way: a meter test that left its live socket to close in the next test, and video tests that inherited endCall's promise (bfc2ac52b)."
+    },
+    {
+      "id": "C9",
+      "name": "Every producer of the value the consumer receives",
+      "trigger": "a field is added to a type that reaches the client by more than one path -- a list read, a single read, a send answer, a live socket push, a forward, a reload",
+      "asks": "List every producer the consumer can receive the type from, and check each one sets the field. Grep the handlers for every hub broadcast and every response of that type, not only the query that was changed. A name added to the group message reads never reached a message pushed live, which went through the single read; the reader named it from a stale member list, and a user saw 'User' in the browser after the fix had passed its tests."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."
