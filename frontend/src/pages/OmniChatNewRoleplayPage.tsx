@@ -115,12 +115,21 @@ function Choice({
             aria-pressed={value === option.id}
             onClick={() => onChange(option.id)}
             className={`rounded-xl border px-4 py-2.5 text-sm transition disabled:opacity-40 ${
+              option.description ? 'min-w-[220px] flex-1 text-left' : ''
+            } ${
               value === option.id
                 ? 'border-blue-400 bg-blue-500/20 text-white'
                 : 'border-white/15 bg-white/[0.03] text-white/65 hover:border-white/35'
             }`}
           >
-            {option.label}
+            {option.description ? (
+              <span className="block space-y-1">
+                <span className="block font-medium">{option.label}</span>
+                <span className="block text-xs leading-5 text-white/60">{option.description}</span>
+              </span>
+            ) : (
+              option.label
+            )}
           </button>
         ))}
       </div>

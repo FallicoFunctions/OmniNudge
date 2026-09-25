@@ -241,5 +241,9 @@
   ],
   "relationships":[{"id":"new_acquaintances","label":"Just met"},{"id":"friends","label":"Friends"},{"id":"old_friends","label":"Old friends reconnecting"},{"id":"colleagues","label":"Colleagues"},{"id":"professional_partners","label":"Working together"},{"id":"neighbors","label":"Neighbors"},{"id":"family","label":"Family"},{"id":"classmates","label":"Classmates"},{"id":"teammates","label":"Teammates"},{"id":"mentor_student","label":"Mentor and student"},{"id":"coach_player","label":"Coach and player"},{"id":"rivals","label":"Friendly rivals"}],
   "opening_beats":[{"id":"planned_meeting","label":"A planned meeting","scene":"They had arranged to meet."},{"id":"chance_encounter","label":"A chance encounter","scene":"Neither expected to meet here."},{"id":"busy_day","label":"A busy day","scene":"The day is already in motion."},{"id":"urgent_news","label":"Urgent news","scene":"Something new has just happened."},{"id":"quiet_moment","label":"A quiet moment","scene":"There is a brief pause before the day continues."},{"id":"first_assignment","label":"A new assignment","scene":"They are about to begin working together."}],
-  "response_styles":[{"id":"natural_dialogue","label":"Dialogue and action"},{"id":"lean_narrative","label":"Brief narration"},{"id":"character_only","label":"Character only"}]
+  "response_styles":[
+    {"id":"natural_dialogue","label":"Mostly conversation","description":"The character talks directly to you, with occasional brief descriptions of their actions."},
+    {"id":"lean_narrative","label":"Narrated roleplay","description":"The character briefly describes the scene and leaves you a clear opening to respond."},
+    {"id":"character_only","label":"Follow the character's style","description":"The character's personality and situation guide each reply, without a preset format."}
+  ]
 }

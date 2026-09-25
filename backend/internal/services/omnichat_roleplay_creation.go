@@ -18,6 +18,7 @@ var roleplayChoicesJSON []byte
 type RoleplayChoice struct {
 	ID              string   `json:"id"`
 	Label           string   `json:"label"`
+	Description     string   `json:"description,omitempty"`
 	AdultRestricted bool     `json:"adult_restricted,omitempty"`
 	Opening         string   `json:"opening,omitempty"`
 	Scene           string   `json:"scene,omitempty"`

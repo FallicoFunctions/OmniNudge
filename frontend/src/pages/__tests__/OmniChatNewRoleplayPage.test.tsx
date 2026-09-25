@@ -96,7 +96,20 @@ const catalog = {
     option('classmates', 'Classmates'),
   ],
   opening_beats: [option('planned_meeting', 'A planned meeting')],
-  response_styles: [option('natural_dialogue', 'Dialogue and action')],
+  response_styles: [
+    {
+      ...option('natural_dialogue', 'Mostly conversation'),
+      description: 'The character talks directly to you, with occasional brief actions.',
+    },
+    {
+      ...option('lean_narrative', 'Narrated roleplay'),
+      description: 'The character describes the scene and leaves you an opening to respond.',
+    },
+    {
+      ...option('character_only', "Follow the character's style"),
+      description: 'No preset format.',
+    },
+  ],
 };
 
 function page() {
@@ -253,6 +266,10 @@ describe('guided roleplay creation', () => {
     choose('Usual clothes or signature style', 'smart_casual');
     continueStep();
 
+    expect(screen.getByText('Mostly conversation')).toBeInTheDocument();
+    expect(screen.getByText('Narrated roleplay')).toBeInTheDocument();
+    expect(screen.getByText("Follow the character's style")).toBeInTheDocument();
+    expect(screen.getByText('No preset format.')).toBeInTheDocument();
     choose('Main personality trait', 'curious');
     choose('Another personality trait', 'methodical');
     choose('How do they speak?', 'dry_concise');

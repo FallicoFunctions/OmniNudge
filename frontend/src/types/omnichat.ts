@@ -113,6 +113,7 @@ export interface RoleplayCreationAnswers {
 export interface RoleplayChoice {
   id: string;
   label: string;
+  description?: string;
   adult_restricted?: boolean;
   opening?: string;
   scene?: string;

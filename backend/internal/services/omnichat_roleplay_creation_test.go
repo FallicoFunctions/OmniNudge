@@ -86,6 +86,11 @@ func TestRoleplayCatalogOffersDependentVariety(t *testing.T) {
 	require.Len(t, catalog.FirstNames, 2)
 	require.Contains(t, catalog.FirstNames, "woman")
 	require.Contains(t, catalog.FirstNames, "man")
+	require.Len(t, catalog.ResponseStyles, 3)
+	for _, style := range catalog.ResponseStyles {
+		require.NotEmpty(t, style.Label)
+		require.NotEmpty(t, style.Description)
+	}
 	roleCount := 0
 	for _, group := range catalog.RoleGroups {
 		roleCount += len(group.Roles)
