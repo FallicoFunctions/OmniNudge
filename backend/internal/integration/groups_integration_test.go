@@ -447,6 +447,7 @@ func TestGroupMessagesComeNewestFirst(t *testing.T) {
 // liveGroup makes a group of three and connects its two members' sockets.
 type liveGroup struct {
 	id           int
+	ownerName    string
 	ownerToken   string
 	memberTokens []string
 	members      []*gorillaws.Conn
@@ -481,6 +482,7 @@ func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liv
 	m2Token, _ := deps.AuthService.GenerateJWT(m2.ID, m2.Username, m2.Role)
 	return liveGroup{
 		id:           group.ID,
+		ownerName:    owner.Username,
 		ownerToken:   ownerToken,
 		memberTokens: []string{m1Token, m2Token},
 		members:      []*gorillaws.Conn{dial(m1), dial(m2)},
@@ -514,6 +516,24 @@ func TestGroupMessageReachesTheOtherMembers(t *testing.T) {
 		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "new_message" })
 		payload, _ := evt["payload"].(map[string]interface{})
 		assert.EqualValues(t, g.id, payload["conversation_id"])
+	}
+}
+
+// The name was added to the reads only, so a message that arrived live was
+// named from the reader's cached member list -- "User" for anyone who joined
+// after it was fetched. The broadcast carries the name itself.
+func TestGroupMessageArrivesWithItsSenderName(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "named")
+	g.send(t, deps, "who sent this")
+	for _, conn := range g.members {
+		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "new_message" })
+		payload, _ := evt["payload"].(map[string]interface{})
+		assert.Equal(t, g.ownerName, payload["sender_username"])
 	}
 }
 

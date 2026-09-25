@@ -51,9 +51,11 @@ type Message struct {
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
 	DeleteAt                 *time.Time     `json:"delete_at,omitempty"`            // Auto-delete timestamp; NULL means never
-	// SenderUsername is set by the reads of a conversation with more than two
-	// people (a group, mod mail). A sender who has since left is no longer in
-	// the member list, and their messages must still say who wrote them.
+	// SenderUsername is the sender's name, from the users table: set when a
+	// message is created, read alone, or read with its group or mod mail
+	// conversation -- every path a message with more than two readers takes,
+	// the live broadcast included. A member list cannot name someone who left
+	// or joined after it was fetched.
 	SenderUsername string `json:"sender_username,omitempty"`
 }
 
@@ -97,7 +99,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 			is_multi_recipient, shared_encryption_iv, delete_at, group_key_version
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-		RETURNING id, sent_at
+		RETURNING id, sent_at, COALESCE((SELECT username FROM users WHERE id = sender_id), '')
 	`
 
 	err = tx.QueryRow(
@@ -122,7 +124,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.SharedEncryptionIV,
 		message.DeleteAt,
 		message.GroupKeyVersion,
-	).Scan(&message.ID, &message.SentAt)
+	).Scan(&message.ID, &message.SentAt, &message.SenderUsername)
 
 	if err != nil {
 		return err
@@ -194,9 +196,11 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       COALESCE(su.username, '') AS sender_username
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		LEFT JOIN users su ON su.id = m.sender_id
 		WHERE m.id = $1
 	`
 
@@ -229,6 +233,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.SenderMediaEncryptionKey,
 		&message.IsMultiRecipient,
 		&message.SharedEncryptionIV,
+		&message.SenderUsername,
 	)
 
 	if err == pgx.ErrNoRows {
