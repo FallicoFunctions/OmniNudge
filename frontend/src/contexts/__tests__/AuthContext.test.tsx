@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../AuthContext';
 
@@ -83,7 +84,13 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
+let queryClient = new QueryClient();
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>{children}</AuthProvider>
+  </QueryClientProvider>
+);
 
 async function renderAuth() {
   const hook = renderHook(() => useAuth(), { wrapper });
@@ -95,6 +102,7 @@ const postBody = (path: string) =>
   mocks.post.mock.calls.find(([p]) => p === path)?.[1] as Record<string, unknown>;
 
 beforeEach(() => {
+  queryClient = new QueryClient();
   vi.resetAllMocks();
   mocks.request.mockResolvedValue(undefined);
 });
@@ -556,5 +564,19 @@ describe('sign-out', () => {
       await move.promise;
     });
     expect(result.current.keyStatus).toEqual({ state: 'signed-out' });
+  });
+});
+
+describe('sign-out and the query cache', () => {
+  // The conversation list outlived the account: the Messages tab kept its
+  // unread badge after sign-out.
+  it('forgets every answer the account that left was given', async () => {
+    server({});
+    const { result } = await renderAuth();
+    queryClient.setQueryData(['conversations', 'active'], [{ id: 1, unread_count: 1 }]);
+
+    act(() => result.current.logout());
+
+    expect(queryClient.getQueryData(['conversations', 'active'])).toBeUndefined();
   });
 });

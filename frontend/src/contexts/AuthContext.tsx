@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse, KeyBackup } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
@@ -170,6 +171,7 @@ async function resolveKeyStatus(account: User, held: HeldSecret | null): Promise
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [keyStatus, setKeyStatus] = useState<KeyStatus>({ state: 'signed-out' });
@@ -197,6 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     heldRef.current = null;
     setKeyStatus({ state: 'signed-out' });
     setUser(null);
+    // Every cached answer belonged to the account that just left: its
+    // conversations kept the unread badge lit after sign-out, and would have
+    // shown to the next account signed in on this page.
+    queryClient.clear();
   };
 
   const commit = (generation: number, outcome: KeyOutcome): boolean => {

@@ -44,6 +44,7 @@ vi.mock('../../src/services/analyticsService', () => ({
 // ---------------------------------------------------------------------------
 // Imports
 // ---------------------------------------------------------------------------
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../../src/contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -62,8 +63,12 @@ const makeUser = (overrides: Record<string, unknown> = {}) => ({
 
 const loginKeys = { loginKey: 'the-login-key', wrapKey: {} };
 
+let queryClient = new QueryClient();
+
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <AuthProvider>{children}</AuthProvider>
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>{children}</AuthProvider>
+  </QueryClientProvider>
 );
 
 async function renderAuth() {
@@ -77,6 +82,7 @@ async function renderAuth() {
 // ---------------------------------------------------------------------------
 describe('Auth flows', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
