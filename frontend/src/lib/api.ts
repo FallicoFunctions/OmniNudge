@@ -3,11 +3,36 @@ import { authenticatedFetch } from '../services/authSession';
 // API client configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
-interface ApiError {
+export interface ApiError {
   code?: string;
   error: string;
   message?: string;
   request_id?: string;
+  [field: string]: unknown;
+}
+
+/**
+ * What every failed request throws: an Error whose message is the server's,
+ * with the status, the server's code, and the whole body on it. The body keeps
+ * whatever else a handler answered with -- a private hub's access_required --
+ * which a message, a status and a code alone had no room for.
+ */
+export type ApiRequestError = Error & {
+  status: number;
+  code?: string;
+  body: ApiError;
+};
+
+export function apiRequestError(status: number, body: ApiError): ApiRequestError {
+  const err = new Error(body.message || body.error) as ApiRequestError;
+  err.status = status;
+  // The code as well as the status. A handler that answers 409 with
+  // "character_limit_reached" is telling the interface to offer a delete
+  // rather than an upgrade, and that distinction was being dropped here --
+  // every coded refusal arrived as an anonymous message.
+  err.code = body.code;
+  err.body = body;
+  return err;
 }
 
 class ApiClient {
@@ -56,15 +81,7 @@ class ApiClient {
         localStorage.removeItem('user');
       }
 
-      const err = new Error(error.message || error.error);
-      const typed = err as Error & { status?: number; code?: string };
-      typed.status = response.status;
-      // The code as well as the status. A handler that answers 409 with
-      // "character_limit_reached" is telling the interface to offer a delete
-      // rather than an upgrade, and that distinction was being dropped here --
-      // every coded refusal arrived as an anonymous message.
-      typed.code = error.code;
-      throw err;
+      throw apiRequestError(response.status, error);
     }
 
     if (response.status === 204) {
@@ -136,7 +153,7 @@ class ApiClient {
         error: 'Upload failed',
         message: 'Upload failed',
       }));
-      throw new Error(error.message || error.error);
+      throw apiRequestError(response.status, error);
     }
 
     return response.json();
