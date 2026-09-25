@@ -1,0 +1,13 @@
+diff --git a/backend/internal/handlers/groups_blocking_test.go b/backend/internal/handlers/groups_blocking_test.go
+index c4105a3b3..83f9ddc8e 100644
+--- a/backend/internal/handlers/groups_blocking_test.go
++++ b/backend/internal/handlers/groups_blocking_test.go
+@@ -196,7 +196,7 @@ func TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
+ 	require.NoError(t, err)
+ 
+ 	router := gin.Default()
+-	router.POST("/groups/invites/:invite_id/accept", func(c *gin.Context) {
++	router.POST("/groups/invites/:id/accept", func(c *gin.Context) {
+ 		c.Set("user_id", targetID)
+ 		handler.AcceptGroupInvite(c)
+ 	})

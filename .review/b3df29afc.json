@@ -1,0 +1,555 @@
+{
+ "schema_version": 2,
+ "head": "b138f5565",
+ "base": "b3df29afc",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/groups.go",
+   "backend/internal/handlers/group_keys.go",
+   "backend/cmd/server/main.go",
+   "backend/internal/integration/test_utils.go",
+   "backend/internal/integration/groups_integration_test.go",
+   "backend/internal/handlers/groups_blocking_test.go"
+  ],
+  "boundaries": [
+   "the socket events to members and to the newcomer",
+   "the constructor wiring in main.go and the test fixtures"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/7cf2b679d.json",
+  ".review/f04b8f996.json",
+  ".review/1df41fd40.json"
+ ],
+ "notes": "Phase 3a: the server announces joins and shared keys. 3b (the app acting on them) is not built yet.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "b3df29afc..b138f5565: c6285866d (GroupHandler and GroupKeyHandler take the hub; a join broadcasts group_member_joined; a share or a rotation with history sends group_keys_shared to each member given a copy; the stale accept route in groups_blocking_test), b138f5565 (review: accept path's join tested). Boundaries: the socket events to members and to the newcomer, the constructor wiring in main.go and the test fixtures. Only my main.go hunk was committed; Codex's other main.go hunks stay unstaged, and HEAD builds and vets alone in a clean worktree."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read 7cf2b679d (sender names; C9 added), f04b8f996 (phase 1: invite history; its review ran only the integration tests, which is how the stale handler-test route survived -- finding 2) and 1df41fd40 (group events reach members through the participant list)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No frontend change in phase 3a; the app side is 3b."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The socket payloads, read from real dialled connections: group_member_joined {conversation_id, user_id} for a direct add and for an accepted invite (two inputs; the accept path had no test -- finding 1); group_keys_shared {conversation_id} to the newcomer after a share and after a rotation that carries history."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names are group_member_joined and group_keys_shared; 3b must use these exact strings. broadcastToGroup already sends group_member_muted and friends the same way."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Payload fields conversation_id and user_id, as the tests read them."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One broadcast helper per event."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "gin.H payloads, no hand-written decoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor on the server side."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The tests drive the real routes (add, invite + accept, share, rotate) and read the real hub's frames, as a client receives them."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling membership events: mute and ban already broadcast through broadcastToGroup; removal and leave do not need a key event (the next sender rotates)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "announceJoin and announceShared return early on a nil hub (the handler unit tests pass nil); every other branch is reached by the socket tests."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "broadcastToGroup logs a failed participant query; the join itself has already committed, so a missed announcement costs only the backup path, and the read-side share in 3b covers it."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "announceJoin reuses broadcastToGroup rather than a second member loop."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every INSERT INTO conversation_participants for a group: CreateGroup (the first members, no history yet), AddGroupParticipant and AcceptGroupInvite -- both announce. The rest are mod mail. Every writer of older-version copies: Rotate with history and ShareHistory announce group_keys_shared; GrantInviteHistory and GrantAddedMemberHistory give copies to the joiner, who is told through group_member_joined, which reaches every member including the joiner -- 3b must drop the joiner's own remembered-missing versions on that event."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "The two new socket tests pass under -race."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Both announcements run after the transaction commits, so a rolled-back join announces nothing."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "p3-r1-accept-join-untested: without the accept call, the invited subtest fails waiting for the event. p3-r1-stale-accept-route-in-handler-test: with the old :id route, the test fails 'expected 404, actual 400'."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./... and go vet (handlers, integration with -tags=integration) clean, gofmt clean, at HEAD in a clean worktree as well."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Both findings came from listed instruments (B3, H3)."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or external system."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "All Go runs used -v with TEST_DATABASE_URL: group socket and invite tests PASS, 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "3a's promises: members hear of a join (both join paths, after this review); a newcomer given keys hears of it (share and rotation)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per event."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test in the handlers package that builds GroupHandler (group_admin, groups, groups_blocking: 33) and every group integration test. The handlers package had not been run after phase 1's :invite_id fix, so its accept test still named :id and failed -- finding 2."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "test_utils' shared router now builds both handlers with the hub; the package vets whole, and every group test that builds newTestDeps or newGroupTestDeps passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls target retention_worker.go, the migration test, message.go and MessagesPage.tsx; none changed here."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The socket tests run the real handlers and hub, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "na",
+     "why": "Go tests; no shared module mocks."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of each event listed under E6; every join path and every copy writer is covered, the joiner through group_member_joined."
+    }
+   ],
+   "findings": [
+    {
+     "id": "p3-r1-accept-join-untested",
+     "summary": "The join announcement was tested only through a direct add; the accept path's announcement could be removed and no test failed.",
+     "found_by": "B3",
+     "fix_commit": "b138f5565",
+     "control": {
+      "patch": ".review/controls/p3-r1-accept-join-untested.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -tags=integration -run '^TestGroupJoinIsAnnounced$'"
+      ],
+      "observed": "FAIL: TestGroupJoinIsAnnounced/invited -- no group_member_joined before the timeout"
+     }
+    },
+    {
+     "id": "p3-r1-stale-accept-route-in-handler-test",
+     "summary": "Phase 1 made the accept handler read :invite_id, but the handler unit test still registered its route with :id, so it answered 400 instead of 404; phase 1's review ran only the integration package.",
+     "found_by": "H3",
+     "fix_commit": "c6285866d",
+     "control": {
+      "patch": ".review/controls/p3-r1-stale-accept-route-in-handler-test.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/handlers/ -run '^TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden$'"
+      ],
+      "observed": "FAIL: expected 404, actual 400"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the review-time test (b138f5565) and the two controls."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read 7cf2b679d (sender names; C9 added), f04b8f996 (phase 1: invite history; its review ran only the integration tests, which is how the stale handler-test route survived -- finding 2) and 1df41fd40 (group events reach members through the participant list)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "No frontend change in phase 3a; the app side is 3b."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Re-read both join payloads from the new subtests: same fields for add and accept."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names are group_member_joined and group_keys_shared; 3b must use these exact strings. broadcastToGroup already sends group_member_muted and friends the same way."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "Payload fields conversation_id and user_id, as the tests read them."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One broadcast helper per event."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "gin.H payloads, no hand-written decoder."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor on the server side."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The tests drive the real routes (add, invite + accept, share, rotate) and read the real hub's frames, as a client receives them."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation added."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling membership events: mute and ban already broadcast through broadcastToGroup; removal and leave do not need a key event (the next sender rotates)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "announceJoin and announceShared return early on a nil hub (the handler unit tests pass nil); every other branch is reached by the socket tests."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "broadcastToGroup logs a failed participant query; the join itself has already committed, so a missed announcement costs only the backup path, and the read-side share in 3b covers it."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "announceJoin reuses broadcastToGroup rather than a second member loop."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every INSERT INTO conversation_participants for a group: CreateGroup (the first members, no history yet), AddGroupParticipant and AcceptGroupInvite -- both announce. The rest are mod mail. Every writer of older-version copies: Rotate with history and ShareHistory announce group_keys_shared; GrantInviteHistory and GrantAddedMemberHistory give copies to the joiner, who is told through group_member_joined, which reaches every member including the joiner -- 3b must drop the joiner's own remembered-missing versions on that event."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "The two new socket tests pass under -race."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Both announcements run after the transaction commits, so a rolled-back join announces nothing."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls re-run by hand; each fails as a test, as recorded in pass 1."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build ./... and go vet (handlers, integration with -tags=integration) clean, gofmt clean, at HEAD in a clean worktree as well."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "na",
+     "why": "No model or external system."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "All Go runs used -v with TEST_DATABASE_URL: group socket and invite tests PASS, 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "3a's promises: members hear of a join (both join paths, after this review); a newcomer given keys hears of it (share and rotation)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per event."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Re-ran TestGroupJoinIsAnnounced (both subtests) and TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden: PASS."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "test_utils' shared router now builds both handlers with the hub; the package vets whole, and every group test that builds newTestDeps or newGroupTestDeps passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls target retention_worker.go, the migration test, message.go and MessagesPage.tsx; none changed here."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The socket tests run the real handlers and hub, as main wires them."
+    },
+    {
+     "id": "H6",
+     "status": "na",
+     "why": "Go tests; no shared module mocks."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of each event listed under E6; every join path and every copy writer is covered, the joiner through group_member_joined."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean, also at HEAD in a clean worktree",
+  "vet": "go vet on handlers and integration (-tags=integration) clean",
+  "lint": "gofmt clean; no frontend change",
+  "types": "n/a (Go only)",
+  "tests": "Group socket and invite integration tests PASS (also under -race for the new ones); 33 handler group tests PASS; 0 SKIP."
+ }
+}

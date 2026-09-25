@@ -1,0 +1,12 @@
+diff --git a/backend/internal/handlers/groups.go b/backend/internal/handlers/groups.go
+index 384037ff6..ca0527eb5 100644
+--- a/backend/internal/handlers/groups.go
++++ b/backend/internal/handlers/groups.go
+@@ -1132,7 +1132,6 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
+ 		return
+ 	}
+ 
+-	h.announceJoin(ctx, conversationID, userID)
+ 	c.JSON(http.StatusOK, gin.H{"message": "Joined group"})
+ }
+ 
