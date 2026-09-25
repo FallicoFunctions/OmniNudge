@@ -1,0 +1,287 @@
+{
+ "schema_version": 2,
+ "head": "4639f55b3",
+ "base": "c892778e1",
+ "scope": {
+  "files": [
+   "frontend/src/lib/api.ts",
+   "frontend/src/pages/HubPage.tsx",
+   "frontend/src/components/modmail/ModMailModal.tsx"
+  ],
+  "boundaries": [
+   "the 403 body the fetch client parses",
+   "the error every lib/api caller receives",
+   "the hub page's redirect and retry"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/c8b7746de.json",
+  ".review/de7bcbe8b.json"
+ ],
+ "notes": "The fetch client keeps the whole body; the hub page reads a private hub from it. One pass, no finding; one redundant condition removed.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "c892778e1..(this ledger): 3b1422f7b (lib/api throws apiRequestError from one builder for request and upload, with the parsed body on it), 43e507d18 (HubPage decides a private hub with isPrivateHubRefusal for both the redirect and the retry; message matching, dead Axios reads and a debug log gone), 9f8ff2a14 (ModMailModal's dead Axios read gone), and the review's simplification to access_required alone. Boundaries: the 403 body the fetch client parses, the error every lib/api caller receives, the hub page's redirect and retry."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read c8b7746de (the two pages fixed for lib/api's error shape; it named HubPage's dead reads as out of scope) and de7bcbe8b (the C7 miss that started this: a hand-built Axios error in a test)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "The private hub screen is rendered in tests from an error built by the client's own builder; not rendered in the pane, because DERRF is a site admin and opens every hub, and signing the pane out would end the user's session."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Printed the server's real answer in the pane: GET /hubs/privatetest/posts without the session cookie answers 403 {access_required: true, error: 'This hub is private and you do not have access', hub_name, hub_title, privacy_type: 'private'} -- no message and no code field; the client's message falls back to error. With the session (an admin) every one of the 47 hubs answers 200."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "access_required is the same key on the server (hubs.go) and in isPrivateHubRefusal."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The page reads status and body.access_required, the fields apiRequestError sets from the real response."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One rule after the change."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "ApiError gained an index signature, so the parsed body's extra fields are typed as unknown and read explicitly."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "C10 below breaks the reader (the access_required check, the retry rule) and the tests fail."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The hub page test builds its error with apiRequestError, the builder the client itself uses; the client test runs the real client on the server's real body shape (B3)."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A private hub's 403 opens the private hub screen whatever the message says."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A 403 without access_required does not redirect unless the hub's settings say private (the unchanged fallback)."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No input parsing added."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Sibling throw site: uploadFile built its own error without status or code; it now uses the same builder."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "isPrivateHubRefusal's true and false outcomes are both reached (the private tests and every other hub test)."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The retry no longer hides a private hub's answer for three attempts."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "Two throw sites became one builder; two private-hub checks (retry and redirect) became one rule; the review removed a second, redundant condition inside it."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every reader of access_required or of a private hub's message in the frontend: only HubPage (grep). Every Axios-shape read left: refusals.ts and hubAIDesignerService, both on the axios client, which is right for them."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "No finding; the fixes were each run against their pre-fix code (the hub page test fails on the old page)."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b and eslint clean on every changed file."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "No finding."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The server's real answer was printed (B3). The redirect was not seen in a browser: the only account signed in is a site admin that opens every hub; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "na",
+     "why": "No Go test in this change."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user asked me to look at the Axios-shape reads in HubPage: the page now reads the server's signal, and the client keeps it."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks lib/api, uploadFile, BugReportModal or HubPage: 32 files, 253 passed; the mod mail tests pass."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture changed."
+    },
+    {
+     "id": "G4",
+     "status": "na",
+     "why": "No earlier control targets lib/api.ts, HubPage.tsx or ModMailModal.tsx."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The client test runs the real client with only the transport faked."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "The new tests share no mutable state; HubPage.test's private cases clear the posts mock first."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of the error the page reads: lib/api's one builder, for both request and upload. Producer of access_required: one handler."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each new line: the access_required check, the retry rule, the body on the error, the upload builder -- each fails a test. Found one line no test could notice (privacy_type as a second signal the real body always pairs with access_required) and removed it rather than test a body the server never sends."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "The private hub tests wait for the private screen before counting requests."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "n/a (frontend only)",
+  "vet": "n/a",
+  "lint": "eslint clean on the changed files",
+  "types": "tsc -b clean",
+  "tests": "32 files using lib/api, 253 passed; HubPage 7; client errors 2; mod mail 2."
+ }
+}
