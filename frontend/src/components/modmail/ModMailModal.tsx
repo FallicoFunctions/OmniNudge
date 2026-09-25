@@ -126,9 +126,8 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       }, 1500);
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } }; message?: string };
-      const friendlyMessage =
-        error?.response?.data?.error || error?.message || t('modMailModal.errors.sendFailed');
+      // modMailService uses lib/api, whose Error carries the server's message.
+      const friendlyMessage = (err as Error)?.message || t('modMailModal.errors.sendFailed');
       setError(friendlyMessage);
     },
   });
