@@ -572,6 +572,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                       </div>
                       <AnswerSlider
                         label="Age"
+                        labelClassName="text-sm font-medium text-white/85"
                         value={a.age}
                         min={role?.min_age ?? 18}
                         max={100}

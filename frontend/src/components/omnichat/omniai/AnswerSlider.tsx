@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export interface AnswerSliderProps {
   label: string;
+  labelClassName?: string;
   value: number;
   min: number;
   max: number;
@@ -24,6 +25,7 @@ export interface AnswerSliderProps {
 
 export default function AnswerSlider({
   label,
+  labelClassName = 'text-xs font-bold uppercase tracking-[0.14em] text-white/40',
   value,
   min,
   max,
@@ -54,7 +56,7 @@ export default function AnswerSlider({
   return (
     <div className="flex max-w-[620px] flex-col gap-3 rounded-[18px] border border-white/10 bg-white/[0.035] p-5">
       <div className="flex items-baseline justify-between gap-4">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/40">{label}</p>
+        <p className={labelClassName}>{label}</p>
         <p className="text-3xl font-semibold tracking-tight tabular-nums text-white">
           {format(Math.round(position))}
         </p>
