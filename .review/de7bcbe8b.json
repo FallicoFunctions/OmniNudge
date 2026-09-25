@@ -205,7 +205,7 @@
     {
      "id": "B6",
      "status": "applied",
-     "evidence": "The Unmute item puts the time left beside the label with justify-between in the 12rem menu; the longest value, '30d 23h left', fits beside 'Unmute'."
+     "evidence": "Estimated, not measured: the Unmute item puts the time left beside the label with justify-between in the w-48 (192px) menu; 'Unmute' plus the longest value, '30d 0h left' (mutes cap at 30 days), is about 160px at text-sm and text-xs with the item's padding."
     },
     {
      "id": "E8",
@@ -476,7 +476,7 @@
     {
      "id": "B6",
      "status": "applied",
-     "evidence": "The Unmute item puts the time left beside the label with justify-between in the 12rem menu; the longest value, '30d 23h left', fits beside 'Unmute'."
+     "evidence": "Estimated, not measured: the Unmute item puts the time left beside the label with justify-between in the w-48 (192px) menu; 'Unmute' plus the longest value, '30d 0h left' (mutes cap at 30 days), is about 160px at text-sm and text-xs with the item's padding."
     },
     {
      "id": "E8",
