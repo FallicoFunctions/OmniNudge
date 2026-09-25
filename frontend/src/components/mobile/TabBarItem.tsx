@@ -103,7 +103,7 @@ export function TabBarItem({
         <Icon size={MOBILE_SIZES.ICON_SIZE} strokeWidth={2} />
 
         {/* Badge - only rendered when count > 0 */}
-        {badge && badge > 0 && (
+        {badge !== undefined && badge > 0 && (
           <span
             className={`absolute -top-1 -right-1 flex items-center justify-center px-1 text-[10px] font-semibold text-white bg-[var(--color-error)] rounded-full ${shouldAnimate ? 'animate-scale-in' : ''}`}
             style={{
