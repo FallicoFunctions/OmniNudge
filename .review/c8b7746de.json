@@ -1,0 +1,288 @@
+{
+ "schema_version": 2,
+ "head": "9f3c84563",
+ "base": "c8b7746de",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/groups.go",
+   "frontend/src/contexts/WebSocketContext.tsx",
+   "frontend/src/components/messages/GroupInviteMembers.tsx",
+   "frontend/src/pages/ResetPasswordPage.tsx"
+  ],
+  "boundaries": [
+   "the group_updated frame",
+   "the error bodies the fetch client parses",
+   "the rendered error text"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/de7bcbe8b.json",
+  ".review/04a7c4b7d.json"
+ ],
+ "notes": "group_updated, and two pages reading lib/api's error the right way. One pass, no finding; HubPage's dead Axios-shape reads were told to the user.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "c8b7746de..9f3c84563: 24c52c93f (settings, rename, role and ownership changes send group_updated; the app reads settings, members and conversations again), 7a5ebc121 (the invite control reads the server's code and message from lib/api's plain Error, not response.data), 9f3c84563 (the reset page does the same). The first two were pushed before this review; this review covers them. Boundaries: the group_updated frame, the 403 and 400 bodies the fetch client parses, the rendered error text."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read de7bcbe8b (the admin controls; its banned-invite test used a hand-built Axios error -- the defect 7a5ebc121 fixed) and 04a7c4b7d (membership events)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered through the real client: the invite control shows 'This user is banned from the group. Only an owner or admin can invite them back.' for the server's 403 body, and the server's own text for another refusal; the reset page shows 'Invalid or expired reset token' for the server's 400 and the general text for a network failure. The user confirmed the banned message in a real browser."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "The server's bodies were printed from a throwaway integration test in this session: a member inviting a banned user gets 403 {error, code: group_user_banned, message} in both the plain and the history-carrying request; the reset refusal body is the handler's RespondError 400 'Invalid or expired reset token'. group_updated {conversation_id} is read from a member's socket for all four changes."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or migration."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "group_updated is the same string on both sides; group_user_banned matches the server's code; the four query keys invalidated match the ones the panels read."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads error.code, error.message and error.status, the three fields lib/api sets on the Error (lib/api.ts 58-67)."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One reading rule per call site."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No struct field added."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Both new real-client tests break the reader: with the old response.data read, the invite test and the reset test each fail."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The defect this pair fixed was exactly a C7 miss: the earlier test built an Axios-shaped error lib/api never throws. The new tests run the real lib/api client with authenticatedFetch faked to return the server's real JSON body."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "A server refusal with a message shows that message."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A network failure (TypeError, no status) does not show its raw text ('Failed to fetch'); the general message stays."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "An empty or whitespace message falls back to the general text (message?.trim())."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of the group change announcements: membership (join, leave, removal, ban) and admin actions already announce; unban through UnbanGroupMember does not, and no screen shows the ban list, so nothing is stale on screen."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Each new branch is reached: banned code, other server refusal, network failure, on both pages."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "The two pages no longer swallow the server's reason."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "No flag-gated path."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Two call sites read the same three fields; a shared helper would serve two lines."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Every remaining Axios-shape read in the app: hubAIDesignerService uses the axios client, so its read is right; ModMailModal falls through to error.message, so it works; HubPage reads access_required and privacy_type from response.data through hubsService, a lib/api client, so those two reads never match -- it still detects a private hub from the message text and the hub settings. That is outside this change and was told to the user, not changed here."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Each announcement runs after its change is saved."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted by the fixes."
+    },
+    {
+     "id": "G1",
+     "status": "na",
+     "why": "No finding in this review; the two fixes were each run against their pre-fix code before commit (the invite and reset real-client tests fail on the old reads)."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build and vet clean; tsc -b and eslint clean on every changed file."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "No finding."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran the banned invite in a real browser after 7a5ebc121 and reported it working. The reset page and the rename, role and ownership announcements are not yet run in a browser; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "No layout change."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with TEST_DATABASE_URL: TestGroupChangesAreAnnounced's four cases PASS; group handler tests PASS; 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user's requests: an invite refusal names the ban (yes, confirmed); 'anyone can invite' reaches the other member at once (yes, with rename, role and owner); the reset task's own spec -- show the server's message when the error has a status, keep the general text otherwise, test through the real client, confirm it failed first (all yes)."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "One entry point per side effect."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks WebSocketContext, GroupInviteMembers or ResetPasswordPage: 8 files, 66 passed, 1 old skip."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "newGroupTestDeps gained three routes with main.go's paths; every group test that builds it passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls on groups.go (announceLeave, the accept announcement) and GroupInviteMembers.tsx still apply: git apply --check passes for each."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The real-client tests run lib/api as the app does; the Go test runs the real handlers and hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled GroupInviteMembers.test (7 passed) and the reset real-client test (2 passed)."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_updated: the four handlers, each covered. Producers of the errors the two pages read: lib/api's single throw site."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each of the four announceUpdate calls in turn: the matching case of TestGroupChangesAreAnnounced fails each time. Removed the group_updated client case: the socket test fails."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "The new absence checks run after the settled sign (the alert role found)."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet handlers and integration clean",
+  "lint": "eslint clean on the changed files",
+  "types": "tsc -b clean",
+  "tests": "TestGroupChangesAreAnnounced 4 cases PASS; group handler tests PASS; 8 frontend files 66 passed, 1 old skip; shuffled runs pass."
+ }
+}
