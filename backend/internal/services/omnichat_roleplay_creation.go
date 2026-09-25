@@ -22,6 +22,7 @@ type RoleplayChoice struct {
 	AdultRestricted bool     `json:"adult_restricted,omitempty"`
 	Opening         string   `json:"opening,omitempty"`
 	Scene           string   `json:"scene,omitempty"`
+	SettingKinds    []string `json:"setting_kinds,omitempty"`
 	Relationships   []string `json:"relationships,omitempty"`
 }
 
@@ -101,6 +102,16 @@ func mustLoadRoleplayCatalog() RoleplayCatalog {
 	for _, userRole := range catalog.UserRoles {
 		for _, relationshipID := range userRole.Relationships {
 			mustHaveChoice(catalog.Relationships, relationshipID)
+		}
+	}
+	for _, beat := range catalog.OpeningBeats {
+		if len(beat.SettingKinds) == 0 {
+			panic("roleplay opening moment has no setting kinds: " + beat.ID)
+		}
+		for _, kind := range beat.SettingKinds {
+			if kind != "real" && kind != "online" && kind != "fantasy" && kind != "scifi" {
+				panic("unknown roleplay opening setting kind: " + kind)
+			}
 		}
 	}
 	return catalog
@@ -200,8 +211,9 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 			break
 		}
 	}
-	if region == nil || (len(role.SettingKinds) == 0 && region.Kind != "real") ||
-		(len(role.SettingKinds) > 0 && !selectedString(role.SettingKinds, region.Kind)) {
+	if region == nil || (region.Kind != "online" &&
+		((len(role.SettingKinds) == 0 && region.Kind != "real") ||
+			(len(role.SettingKinds) > 0 && !selectedString(role.SettingKinds, region.Kind)))) {
 		return nil, fmt.Errorf("%w: choose a setting that fits the character", ErrRoleplayCreationAnswers)
 	}
 	if !selectedString(region.Venues, a.VenueID) {
@@ -286,6 +298,9 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 	if err != nil {
 		return nil, err
 	}
+	if !selectedString(beat.SettingKinds, region.Kind) {
+		return nil, fmt.Errorf("%w: this opening does not fit the setting", ErrRoleplayCreationAnswers)
+	}
 	if _, err := selectChoice(catalog.ResponseStyles, a.ResponseStyle, "response style"); err != nil {
 		return nil, err
 	}
@@ -326,14 +341,21 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 		"Opening moment: " + beat.Scene,
 	}, "\n")
 	firstMessage := openingFromChoices(beat.ID, name, venue.Scene, region.Label, goal.Opening)
+	if region.Kind == "online" {
+		firstMessage = onlineOpeningFromChoices(beat.ID, name, venue.Scene, goal.Opening)
+	}
 	if a.ResponseStyle == models.ResponseStyleProfileCharacterOnly {
 		// The first message must obey the same dialogue-only choice as later replies.
 		firstMessage = goal.Opening
 	}
+	systemPrompt := "{{original}}\nTreat the current roleplay scene and relationship as established facts. Follow direction from the user when it fits the scene and the character's agency. Never reset the scene because the conversation moves to voice or video. Use live call and camera state supplied by the call, rather than assuming physical co-location."
+	if region.Kind == "online" {
+		systemPrompt += "\nThe story begins as remote communication through " + strings.ToLower(venue.Label) + ". The character and user are not physically together. Do not assume shared surroundings or physical contact unless the user explicitly changes the scene. If they move to a live voice or video call, acknowledge that channel and its actual camera state."
+	}
 	return &models.BotPersona{
 		Name: name, Description: &description, Category: models.PersonaCategoryRoleplay,
 		Visibility: "private", SourceFormat: "native",
-		SystemPrompt: "{{original}}\nTreat the current roleplay scene and relationship as established facts. Follow direction from the user when it fits the scene and the character's agency. Never reset the scene because the conversation moves to voice or video. Use live call and camera state supplied by the call, rather than assuming physical co-location.",
+		SystemPrompt: systemPrompt,
 		Personality:  personality, Scenario: scenario, FirstMessage: firstMessage,
 		ResponseStyleProfile:    a.ResponseStyle,
 		PostHistoryInstructions: "Maintain the established scene, relationship, and character voice across turns. Continue from the most recent conversation state instead of repeating the opening.",
@@ -341,6 +363,21 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 		CharacterVersion: "2.0", ExtensionsJSON: extensions, CharacterBookJSON: json.RawMessage(`{}`),
 		GalleryURLs: []string{}, IsNSFW: a.IsNSFW,
 	}, nil
+}
+
+func onlineOpeningFromChoices(beatID, name, venue, goalOpening string) string {
+	var moment string
+	switch beatID {
+	case "planned_online_chat":
+		moment = fmt.Sprintf("At the agreed time, %s sends a message in %s.", name, venue)
+	case "unexpected_online_message":
+		moment = fmt.Sprintf("%s sends you an unexpected message in %s.", name, venue)
+	case "reconnecting_online":
+		moment = fmt.Sprintf("%s picks up your earlier conversation in %s.", name, venue)
+	default:
+		moment = fmt.Sprintf("A new message from %s appears in %s.", name, venue)
+	}
+	return "*" + moment + "* \"" + goalOpening + "\""
 }
 
 func openingFromChoices(beatID, name, venue, region, goalOpening string) string {

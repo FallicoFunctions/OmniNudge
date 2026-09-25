@@ -92,6 +92,44 @@ func TestBuildRoleplayPersonaOpeningLowercasesIndefiniteSettingArticle(t *testin
 	require.NotContains(t, persona.FirstMessage, "in A small town in Idaho")
 }
 
+func TestBuildRoleplayPersonaOnlineSceneUsesMessagingOpenings(t *testing.T) {
+	answers := roleplayAnswers()
+	answers.RegionID = "online"
+	answers.VenueID = "text_messages"
+	answers.OpeningBeatID = "first_online_message"
+	persona, err := BuildRoleplayPersona(answers)
+	require.NoError(t, err)
+	require.Contains(t, persona.Scenario, "Setting: Online")
+	require.Contains(t, persona.Scenario, "Specific place: Text messages")
+	require.Contains(t, persona.FirstMessage, "A new message from Maya Hart appears in your text messages.")
+	require.NotContains(t, persona.FirstMessage, "waiting for your planned meeting")
+	require.Contains(t, persona.SystemPrompt, "The character and user are not physically together")
+
+	answers.OpeningBeatID = "chance_encounter"
+	_, err = BuildRoleplayPersona(answers)
+	require.ErrorIs(t, err, ErrRoleplayCreationAnswers)
+
+	answers.OpeningBeatID = "first_online_message"
+	answers.VenueID = "local_restaurant"
+	_, err = BuildRoleplayPersona(answers)
+	require.ErrorIs(t, err, ErrRoleplayCreationAnswers)
+
+	answers.RegionID = "new_york_city"
+	answers.VenueID = "local_restaurant"
+	_, err = BuildRoleplayPersona(answers)
+	require.ErrorIs(t, err, ErrRoleplayCreationAnswers)
+
+	answers.RoleID = "wizard"
+	answers.GoalID = "find_relic"
+	answers.RegionID = "online"
+	answers.VenueID = "private_messages"
+	answers.OpeningBeatID = "planned_online_chat"
+	answers.UserRoleID = "friend"
+	answers.RelationshipID = "friends"
+	_, err = BuildRoleplayPersona(answers)
+	require.NoError(t, err)
+}
+
 func TestRoleplayCatalogOffersDependentVariety(t *testing.T) {
 	catalog := RoleplayCreationCatalog()
 	require.Len(t, catalog.FirstNames, 2)

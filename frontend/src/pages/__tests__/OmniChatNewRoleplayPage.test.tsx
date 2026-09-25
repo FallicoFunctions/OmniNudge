@@ -67,6 +67,12 @@ const catalog = {
   regions: [
     { id: 'new_york_city', label: 'New York City', kind: 'real', venues: ['local_restaurant'] },
     {
+      id: 'online',
+      label: 'Online',
+      kind: 'online',
+      venues: ['private_messages', 'text_messages'],
+    },
+    {
       id: 'idaho_town',
       label: 'A small town in Idaho',
       kind: 'real',
@@ -76,6 +82,8 @@ const catalog = {
   venues: [
     option('local_restaurant', 'Local restaurant'),
     option('neighborhood_diner', 'Neighborhood diner'),
+    option('private_messages', 'Private messages'),
+    option('text_messages', 'Text messages'),
   ],
   first_names: { woman: ['Maya'], man: ['Adrian'] },
   last_names: ['Hart'],
@@ -95,7 +103,12 @@ const catalog = {
     option('professional_partners', 'Working together'),
     option('classmates', 'Classmates'),
   ],
-  opening_beats: [option('planned_meeting', 'A planned meeting')],
+  opening_beats: [
+    { ...option('planned_meeting', 'A planned meeting'), setting_kinds: ['real'] },
+    { ...option('chance_encounter', 'A chance encounter'), setting_kinds: ['real'] },
+    { ...option('first_online_message', 'A first message'), setting_kinds: ['online'] },
+    { ...option('planned_online_chat', 'A planned chat'), setting_kinds: ['online'] },
+  ],
   response_styles: [
     {
       ...option('natural_dialogue', 'Mostly conversation'),
@@ -326,6 +339,46 @@ describe('guided roleplay creation', () => {
       expect(sent).not.toHaveProperty(forbidden);
     }
     expect(await screen.findByText('Portrait picker')).toBeInTheDocument();
+  });
+
+  it('offers online messaging places and only online opening moments', async () => {
+    page();
+    await screen.findByText('Who is this character?');
+    fireEvent.click(screen.getByRole('button', { name: 'Private investigator' }));
+    choose('Where is the story set?', 'online');
+    const venue = screen.getByLabelText('Where does this scene begin?') as HTMLSelectElement;
+    expect(Array.from(venue.options).map((option) => option.textContent)).toEqual([
+      'Choose an option',
+      'Private messages',
+      'Text messages',
+    ]);
+  });
+
+  it('rejects a physical opening moment in an online story', async () => {
+    sessionStorage.setItem(
+      'omnichat-roleplay-draft-7',
+      JSON.stringify({
+        version: 2,
+        step: 4,
+        requestId: '123e4567-e89b-42d3-a456-426614174000',
+        answers: {
+          role_id: 'private_investigator',
+          goal_id: 'missing_person',
+          region_id: 'online',
+          venue_id: 'text_messages',
+          opening_beat_id: 'chance_encounter',
+        },
+      })
+    );
+    page();
+    await screen.findByRole('button', { name: 'A first message' });
+    expect(screen.getByRole('button', { name: 'A planned chat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'A chance encounter' })).not.toBeInTheDocument();
+    continueStep();
+    expect(screen.getByRole('alert')).toHaveTextContent('Please choose an option');
+    fireEvent.click(screen.getByRole('button', { name: 'A first message' }));
+    continueStep();
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
   });
 
   it('offers 18+ only to admins', async () => {

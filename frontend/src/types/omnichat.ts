@@ -117,6 +117,7 @@ export interface RoleplayChoice {
   adult_restricted?: boolean;
   opening?: string;
   scene?: string;
+  setting_kinds?: string[];
   relationships?: string[];
 }
 

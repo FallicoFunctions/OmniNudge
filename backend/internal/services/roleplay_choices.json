@@ -147,6 +147,7 @@
     {"id":"repair_ship","label":"Repair a ship before departure","opening":"We cannot leave until the ship is ready. Help me find the fault."}
   ],
   "regions": [
+    {"id":"online","label":"Online","kind":"online","venues":["private_messages","text_messages","group_chat","online_forum","game_chat"]},
     {"id":"new_york_city","label":"New York City","kind":"real","venues":["local_restaurant","jazz_club","university_library","office","police_station","city_park","sports_arena","film_studio","bookstore","hospital","recording_studio","community_center"]},
     {"id":"los_angeles","label":"Los Angeles","kind":"real","venues":["local_restaurant","film_studio","office","city_park","sports_arena","recording_studio","bookstore","hospital","community_center","police_station"]},
     {"id":"chicago","label":"Chicago","kind":"real","venues":["local_restaurant","jazz_club","university_library","office","police_station","city_park","sports_arena","bookstore","hospital","community_center"]},
@@ -175,6 +176,11 @@
     {"id":"deep_space_ship","label":"A deep-space ship","kind":"scifi","venues":["spaceship_bridge","observation_deck","research_lab","station_cafe","engineering_bay"]}
   ],
   "venues": [
+    {"id":"private_messages","label":"Private messages","scene":"your private messages"},
+    {"id":"text_messages","label":"Text messages","scene":"your text messages"},
+    {"id":"group_chat","label":"Group chat","scene":"the group chat"},
+    {"id":"online_forum","label":"Online forum","scene":"an online forum thread"},
+    {"id":"game_chat","label":"Game chat","scene":"the game chat"},
     {"id":"local_restaurant","label":"Local restaurant","scene":"a local restaurant"},
     {"id":"jazz_club","label":"Jazz club","scene":"a jazz club"},
     {"id":"university_library","label":"University library","scene":"the university library"},
@@ -240,7 +246,18 @@
     {"id":"traveler","label":"A fellow traveler","relationships":["new_acquaintances","teammates","friends"]}
   ],
   "relationships":[{"id":"new_acquaintances","label":"Just met"},{"id":"friends","label":"Friends"},{"id":"old_friends","label":"Old friends reconnecting"},{"id":"colleagues","label":"Colleagues"},{"id":"professional_partners","label":"Working together"},{"id":"neighbors","label":"Neighbors"},{"id":"family","label":"Family"},{"id":"classmates","label":"Classmates"},{"id":"teammates","label":"Teammates"},{"id":"mentor_student","label":"Mentor and student"},{"id":"coach_player","label":"Coach and player"},{"id":"rivals","label":"Friendly rivals"}],
-  "opening_beats":[{"id":"planned_meeting","label":"A planned meeting","scene":"They had arranged to meet."},{"id":"chance_encounter","label":"A chance encounter","scene":"Neither expected to meet here."},{"id":"busy_day","label":"A busy day","scene":"The day is already in motion."},{"id":"urgent_news","label":"Urgent news","scene":"Something new has just happened."},{"id":"quiet_moment","label":"A quiet moment","scene":"There is a brief pause before the day continues."},{"id":"first_assignment","label":"A new assignment","scene":"They are about to begin working together."}],
+  "opening_beats":[
+    {"id":"planned_meeting","label":"A planned meeting","scene":"They had arranged to meet.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"chance_encounter","label":"A chance encounter","scene":"Neither expected to meet here.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"busy_day","label":"A busy day","scene":"The day is already in motion.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"urgent_news","label":"Urgent news","scene":"Something new has just happened.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"quiet_moment","label":"A quiet moment","scene":"There is a brief pause before the day continues.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"first_assignment","label":"A new assignment","scene":"They are about to begin working together.","setting_kinds":["real","fantasy","scifi"]},
+    {"id":"first_online_message","label":"A first message","scene":"The character sends the first message.","setting_kinds":["online"]},
+    {"id":"planned_online_chat","label":"A planned chat","scene":"They agreed to talk online at this time.","setting_kinds":["online"]},
+    {"id":"unexpected_online_message","label":"An unexpected message","scene":"The character sends an unplanned message.","setting_kinds":["online"]},
+    {"id":"reconnecting_online","label":"Picking up an earlier chat","scene":"The character resumes an earlier online conversation.","setting_kinds":["online"]}
+  ],
   "response_styles":[
     {"id":"natural_dialogue","label":"Mostly conversation","description":"The character talks directly to you, with occasional brief descriptions of their actions."},
     {"id":"lean_narrative","label":"More scene description","description":"Replies include what the character says, what they do, and details of the setting."},

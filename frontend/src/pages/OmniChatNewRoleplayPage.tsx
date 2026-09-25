@@ -174,12 +174,20 @@ const named = (items: string[]) => items.map((name) => ({ id: name, label: name 
 const findLabel = (items: RoleplayChoice[], id: string) =>
   items.find((item) => item.id === id)?.label ?? '—';
 
-function ready(step: number, a: RoleplayCreationAnswers): boolean {
+function ready(
+  step: number,
+  a: RoleplayCreationAnswers,
+  venues: RoleplayChoice[],
+  openingBeats: RoleplayChoice[]
+): boolean {
   const present = (value: string) => value.length > 0;
   switch (step) {
     case 0:
       return (
-        present(a.role_id) && present(a.goal_id) && present(a.region_id) && present(a.venue_id)
+        present(a.role_id) &&
+        present(a.goal_id) &&
+        present(a.region_id) &&
+        venues.some((venue) => venue.id === a.venue_id)
       );
     case 1:
       return (
@@ -204,7 +212,7 @@ function ready(step: number, a: RoleplayCreationAnswers): boolean {
     case 3:
       return present(a.user_role_id) && present(a.relationship_id);
     case 4:
-      return present(a.opening_beat_id);
+      return openingBeats.some((beat) => beat.id === a.opening_beat_id);
     default:
       return true;
   }
@@ -326,6 +334,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
         goal_id: '',
         region_id: '',
         venue_id: '',
+        opening_beat_id: '',
         user_role_id: '',
         relationship_id: '',
         is_nsfw: false,
@@ -349,6 +358,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
           goal_id: '',
           region_id: '',
           venue_id: '',
+          opening_beat_id: '',
           user_role_id: '',
           relationship_id: '',
           is_nsfw: false,
@@ -360,7 +370,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
   const selectRegion = (regionId: string) => {
     setDraft((current) => ({
       ...current,
-      answers: { ...current.answers, region_id: regionId, venue_id: '' },
+      answers: { ...current.answers, region_id: regionId, venue_id: '', opening_beat_id: '' },
     }));
     setProblem('');
   };
@@ -394,28 +404,32 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
     }));
     setProblem('');
   };
+  const gate = options.data;
+  const blocked = gate && gate.owned >= gate.limit;
+  const regionChoices =
+    catalog?.regions.filter(
+      (item) =>
+        role &&
+        (item.kind === 'online' ||
+          (role.setting_kinds?.includes(item.kind) ?? item.kind === 'real'))
+    ) ?? [];
+  const goalChoices = catalog?.goals.filter((item) => role?.goals.includes(item.id)) ?? [];
+  const venueChoices = catalog?.venues.filter((item) => region?.venues.includes(item.id)) ?? [];
+  const openingBeatChoices =
+    catalog?.opening_beats.filter((beat) => beat.setting_kinds?.includes(region?.kind ?? '')) ?? [];
+  const userRoleChoices =
+    catalog?.user_roles.filter((item) => selectedGroup?.user_roles.includes(item.id)) ?? [];
+  const relationshipChoices =
+    catalog?.relationships.filter((item) => selectedUserRole?.relationships?.includes(item.id)) ??
+    [];
   const next = () => {
-    if (!ready(step, a)) {
+    if (!ready(step, a, venueChoices, openingBeatChoices)) {
       setProblem('Please choose an option for each question before continuing.');
       return;
     }
     if (step < STEPS.length - 1) setDraft((current) => ({ ...current, step: current.step + 1 }));
     else make.mutate();
   };
-
-  const gate = options.data;
-  const blocked = gate && gate.owned >= gate.limit;
-  const regionChoices =
-    catalog?.regions.filter(
-      (item) => role && (role.setting_kinds?.includes(item.kind) ?? item.kind === 'real')
-    ) ?? [];
-  const goalChoices = catalog?.goals.filter((item) => role?.goals.includes(item.id)) ?? [];
-  const venueChoices = catalog?.venues.filter((item) => region?.venues.includes(item.id)) ?? [];
-  const userRoleChoices =
-    catalog?.user_roles.filter((item) => selectedGroup?.user_roles.includes(item.id)) ?? [];
-  const relationshipChoices =
-    catalog?.relationships.filter((item) => selectedUserRole?.relationships?.includes(item.id)) ??
-    [];
 
   return (
     <OmniChatShell activeTab="characters" onTabChange={onTabChange}>
@@ -708,7 +722,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                         label="How does the story open?"
                         value={a.opening_beat_id}
                         onChange={(value) => set('opening_beat_id', value)}
-                        options={catalog.opening_beats}
+                        options={openingBeatChoices}
                       />
                       {adultAllowed && (
                         <Choice
