@@ -49,7 +49,7 @@ func setupGroupAdminHandlerTest(t *testing.T) (*GroupAdminHandler, *GroupHandler
 	hub := &mockHub{}
 	cache := services.NoopCache{}
 	adminHandler := NewGroupAdminHandler(db.Pool, hub, cache)
-	groupHandler := NewGroupHandler(db.Pool)
+	groupHandler := NewGroupHandler(db.Pool, nil)
 
 	cleanup := func() { db.Close() }
 	return adminHandler, groupHandler, db, userIDs, cleanup

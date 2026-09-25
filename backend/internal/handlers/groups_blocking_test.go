@@ -68,7 +68,7 @@ func setupGroupHandlerTestUsers(t *testing.T) (*GroupHandler, *database.Database
 	`, conversationID)
 	require.NoError(t, err)
 
-	handler := NewGroupHandler(db.Pool)
+	handler := NewGroupHandler(db.Pool, nil)
 	cleanup := func() { db.Close() }
 	return handler, db, conversationID, owner.ID, inviter.ID, target.ID, cleanup
 }
@@ -196,12 +196,12 @@ func TestAcceptGroupInvite_BlockedAgainstExistingMemberForbidden(t *testing.T) {
 	require.NoError(t, err)
 
 	router := gin.Default()
-	router.POST("/group-invites/:id/accept", func(c *gin.Context) {
+	router.POST("/groups/invites/:invite_id/accept", func(c *gin.Context) {
 		c.Set("user_id", targetID)
 		handler.AcceptGroupInvite(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/group-invites/%d/accept", inviteID), nil)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/groups/invites/%d/accept", inviteID), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -232,7 +232,7 @@ func TestCreateGroup_PairwiseBlockingForbidden(t *testing.T) {
 	`, u2.ID, u3.ID)
 	require.NoError(t, err)
 
-	handler := NewGroupHandler(db.Pool)
+	handler := NewGroupHandler(db.Pool, nil)
 	router := gin.Default()
 	router.POST("/conversations/groups", func(c *gin.Context) {
 		c.Set("user_id", owner.ID)

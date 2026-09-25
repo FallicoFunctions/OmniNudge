@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/websocket"
 )
 
 // GroupKeyHandler serves a group's key versions. The server stores only the
@@ -16,10 +17,33 @@ import (
 // the group and to nobody else.
 type GroupKeyHandler struct {
 	keys *services.GroupKeyService
+	hub  HubInterface
 }
 
-func NewGroupKeyHandler(keys *services.GroupKeyService) *GroupKeyHandler {
-	return &GroupKeyHandler{keys: keys}
+func NewGroupKeyHandler(keys *services.GroupKeyService, hub HubInterface) *GroupKeyHandler {
+	return &GroupKeyHandler{keys: keys, hub: hub}
+}
+
+// announceShared tells each member who was just given older key versions. Their
+// app remembered those versions as missing, and without this would keep
+// showing the old messages as unreadable until the page reloaded.
+func (h *GroupKeyHandler) announceShared(conversationID int, history map[int]map[int]string) {
+	if h.hub == nil {
+		return
+	}
+	given := map[int]bool{}
+	for _, copies := range history {
+		for member := range copies {
+			given[member] = true
+		}
+	}
+	for member := range given {
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: member,
+			Type:        "group_keys_shared",
+			Payload:     gin.H{"conversation_id": conversationID},
+		})
+	}
 }
 
 func groupKeyConversationID(c *gin.Context) (int, bool) {
@@ -100,6 +124,7 @@ func (h *GroupKeyHandler) RotateGroupKey(c *gin.Context) {
 	err := h.keys.Rotate(c.Request.Context(), conversationID, userID, &req)
 	switch {
 	case err == nil:
+		h.announceShared(conversationID, req.History)
 		c.JSON(http.StatusCreated, gin.H{"key_version": req.KeyVersion})
 	case errors.Is(err, services.ErrNotGroupMember):
 		RespondError(c, http.StatusForbidden, "Not a member of this group")
@@ -160,6 +185,7 @@ func (h *GroupKeyHandler) ShareGroupKeyHistory(c *gin.Context) {
 	err := h.keys.ShareHistory(c.Request.Context(), conversationID, userID, req.History)
 	switch {
 	case err == nil:
+		h.announceShared(conversationID, req.History)
 		c.Status(http.StatusNoContent)
 	case errors.Is(err, services.ErrNotGroupMember):
 		RespondError(c, http.StatusForbidden, "Not a member of this group")

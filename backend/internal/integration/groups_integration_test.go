@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,7 +42,7 @@ func newGroupTestDeps(t *testing.T) *groupTestDeps {
 	t.Helper()
 	base := newTestDeps(t)
 
-	groupHandler := handlers.NewGroupHandler(base.DB.Pool)
+	groupHandler := handlers.NewGroupHandler(base.DB.Pool, base.Hub)
 
 	protected := base.Router.Group("/api/v1")
 	protected.Use(middleware.AuthRequired(base.AuthService))
@@ -453,6 +454,19 @@ type liveGroup struct {
 	members      []*gorillaws.Conn
 }
 
+// dialGroupSocket connects a user's socket and waits for its first event.
+func dialGroupSocket(t *testing.T, deps *groupTestDeps, serverURL string, user *models.User) *gorillaws.Conn {
+	t.Helper()
+	token, _ := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
+	h := http.Header{}
+	h.Set("Origin", "http://localhost:8080")
+	conn, _, err := gorillaws.DefaultDialer.Dial("ws"+serverURL[len("http"):]+"/api/v1/ws?token="+token, h)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
+	return conn
+}
+
 func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liveGroup {
 	t.Helper()
 	owner := createUser(t, deps.UserRepo, uniqueGrpUsername(name+"owner"), "user")
@@ -468,16 +482,7 @@ func newLiveGroup(t *testing.T, deps *groupTestDeps, serverURL, name string) liv
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
 
-	dial := func(user *models.User) *gorillaws.Conn {
-		token, _ := deps.AuthService.GenerateWebSocketJWT(user.ID, user.Username, user.Role, user.TokenVersion)
-		h := http.Header{}
-		h.Set("Origin", "http://localhost:8080")
-		conn, _, err := gorillaws.DefaultDialer.Dial("ws"+serverURL[len("http"):]+"/api/v1/ws?token="+token, h)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = conn.Close() })
-		readWebSocketEvent(t, conn, 2*time.Second, func(e map[string]interface{}) bool { return e["type"] == "initial_state" })
-		return conn
-	}
+	dial := func(user *models.User) *gorillaws.Conn { return dialGroupSocket(t, deps, serverURL, user) }
 	m1Token, _ := deps.AuthService.GenerateJWT(m1.ID, m1.Username, m1.Role)
 	m2Token, _ := deps.AuthService.GenerateJWT(m2.ID, m2.Username, m2.Role)
 	return liveGroup{
@@ -729,4 +734,86 @@ func TestGroupMessageKeepsItsSenderAfterTheyLeave(t *testing.T) {
 	// offset query; both must sign the message.
 	assert.Equal(t, map[int]string{leaver.ID: leaver.Username, owner.ID: owner.Username}, senders("limit=50"))
 	assert.Equal(t, map[int]string{leaver.ID: leaver.Username}, senders("limit=1&offset=1"))
+}
+
+// A join is announced to the members, so an app holding older key versions
+// the newcomer lacks can pass them on without anyone sending a message.
+func TestGroupJoinIsAnnounced(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "joined")
+	newcomer := createUser(t, deps.UserRepo, uniqueGrpUsername("joinednew"), "user")
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+		fmt.Sprintf("/api/v1/groups/%d/participants", g.id), g.ownerToken,
+		[]byte(fmt.Sprintf(`{"user_id":%d}`, newcomer.ID)))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	for _, conn := range g.members {
+		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_member_joined" })
+		payload, _ := evt["payload"].(map[string]interface{})
+		assert.EqualValues(t, g.id, payload["conversation_id"])
+		assert.EqualValues(t, newcomer.ID, payload["user_id"])
+	}
+}
+
+// A member given older key versions is told, so their app drops what it
+// remembered as missing and opens the old messages without a reload.
+func TestGroupKeysSharedReachTheNewcomer(t *testing.T) {
+	for _, how := range []string{"shared", "rotated"} {
+		t.Run(how, func(t *testing.T) {
+			deps := newGroupTestDeps(t)
+			defer deps.DB.Close()
+			ts := httptest.NewServer(deps.GroupRouter)
+			defer ts.Close()
+			ctx := context.Background()
+
+			g := newLiveGroup(t, deps, ts.URL, "keys"+how)
+			newcomer := createUser(t, deps.UserRepo, uniqueGrpUsername("keysnew"), "user")
+			_, err := deps.DB.Pool.Exec(ctx, `UPDATE users SET public_key = 'pk-' || id::text WHERE id IN (
+				SELECT user_id FROM conversation_participants WHERE conversation_id = $1) OR id = $2`, g.id, newcomer.ID)
+			require.NoError(t, err)
+			var members []int
+			rows, err := deps.DB.Pool.Query(ctx, `SELECT user_id FROM conversation_participants WHERE conversation_id = $1`, g.id)
+			require.NoError(t, err)
+			for rows.Next() {
+				var id int
+				require.NoError(t, rows.Scan(&id))
+				members = append(members, id)
+			}
+			rows.Close()
+			copies := func(version int, ids []int) string {
+				parts := make([]string, 0, len(ids))
+				for _, id := range ids {
+					parts = append(parts, fmt.Sprintf(`"%d":"v%d-%d"`, id, version, id))
+				}
+				return "{" + strings.Join(parts, ",") + "}"
+			}
+			w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/keys", g.id), g.ownerToken,
+				[]byte(fmt.Sprintf(`{"key_version":1,"copies":%s}`, copies(1, members))))
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+			conn := dialGroupSocket(t, deps, ts.URL, newcomer)
+			w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/participants", g.id), g.ownerToken,
+				[]byte(fmt.Sprintf(`{"user_id":%d}`, newcomer.ID)))
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+			history := fmt.Sprintf(`{"1":{"%d":"v1-for-newcomer"}}`, newcomer.ID)
+			if how == "shared" {
+				w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/keys/history", g.id), g.ownerToken,
+					[]byte(fmt.Sprintf(`{"history":%s}`, history)))
+				require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+			} else {
+				w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/keys", g.id), g.ownerToken,
+					[]byte(fmt.Sprintf(`{"key_version":2,"copies":%s,"history":%s}`, copies(2, append(members, newcomer.ID)), history)))
+				require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			}
+
+			evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_keys_shared" })
+			payload, _ := evt["payload"].(map[string]interface{})
+			assert.EqualValues(t, g.id, payload["conversation_id"])
+		})
+	}
 }

@@ -45,7 +45,7 @@ func setupGroupsHandlerTest(t *testing.T) (*GroupHandler, *database.Database, []
 		userIDs[i] = u.ID
 	}
 
-	handler := NewGroupHandler(db.Pool)
+	handler := NewGroupHandler(db.Pool, nil)
 	cleanup := func() { db.Close() }
 	return handler, db, userIDs, cleanup
 }

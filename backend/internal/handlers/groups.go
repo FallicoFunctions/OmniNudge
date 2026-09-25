@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/omninudge/backend/internal/api/middleware"
@@ -18,11 +19,12 @@ import (
 // GroupHandler handles group conversation HTTP endpoints.
 type GroupHandler struct {
 	pool *pgxpool.Pool
+	hub  HubInterface
 }
 
 // NewGroupHandler creates a new GroupHandler.
-func NewGroupHandler(pool *pgxpool.Pool) *GroupHandler {
-	return &GroupHandler{pool: pool}
+func NewGroupHandler(pool *pgxpool.Pool, hub HubInterface) *GroupHandler {
+	return &GroupHandler{pool: pool, hub: hub}
 }
 
 // ─── Request / Response Types ─────────────────────────────────────────────────
@@ -171,6 +173,20 @@ func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return conversationID, true
+}
+
+// announceJoin tells the members someone joined. A member's app that holds
+// older key versions the newcomer still lacks passes them on: the invite
+// carries what its sender held, and a key made between the invite and the
+// accept reaches the newcomer this way, with nobody having to send a message.
+func (h *GroupHandler) announceJoin(ctx context.Context, conversationID, userID int) {
+	if h.hub == nil {
+		return
+	}
+	broadcastToGroup(ctx, h.pool, h.hub, conversationID, "group_member_joined", gin.H{
+		"conversation_id": conversationID,
+		"user_id":         userID,
+	})
 }
 
 // grantNewcomerHistory answers for a refused history grant and reports whether
@@ -577,6 +593,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		return
 	}
 
+	h.announceJoin(ctx, conversationID, req.UserID)
 	c.JSON(http.StatusCreated, gin.H{"message": "Participant added"})
 }
 
@@ -1115,6 +1132,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		return
 	}
 
+	h.announceJoin(ctx, conversationID, userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Joined group"})
 }
 
