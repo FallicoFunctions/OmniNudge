@@ -164,12 +164,13 @@ export function useGroupConversation({
 
 // ── Group Invites hook ────────────────────────────────────────────────────────
 
-export function useGroupInvites() {
+export function useGroupInvites({ enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
 
   const {
     data: invites = [],
     isLoading,
+    enabled,
     refetch,
   } = useQuery<GroupInvite[]>({
     queryKey: ['group-invites'],

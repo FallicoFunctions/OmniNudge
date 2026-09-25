@@ -842,3 +842,25 @@ func TestGroupKeysSharedReachTheNewcomer(t *testing.T) {
 		})
 	}
 }
+
+// A pending invite counts on the invitee's Messages badge, and it appeared
+// there only after their app next fetched its invites.
+func TestGroupInviteReachesTheInvitee(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "invitee")
+	invitee := createUser(t, deps.UserRepo, uniqueGrpUsername("invitee"), "user")
+	conn := dialGroupSocket(t, deps, ts.URL, invitee)
+
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+		fmt.Sprintf("/api/v1/groups/%d/invites", g.id), g.ownerToken,
+		[]byte(fmt.Sprintf(`{"user_id":%d}`, invitee.ID)))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_invite_received" })
+	payload, _ := evt["payload"].(map[string]interface{})
+	assert.EqualValues(t, g.id, payload["conversation_id"])
+}

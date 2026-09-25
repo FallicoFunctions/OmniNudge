@@ -244,6 +244,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          // An invite to a group: it counts on the Messages badge and shows in
+          // the invite list, so both read the list again.
+          case 'group_invite_received': {
+            queryClient.invalidateQueries({ queryKey: ['group-invites'] });
+            break;
+          }
+
           // This reader was given older key versions -- by another member, or
           // by joining: drop what was recorded as missing, and the old
           // messages open without a reload.

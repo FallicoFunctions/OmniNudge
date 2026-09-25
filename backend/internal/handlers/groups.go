@@ -1019,6 +1019,15 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 		RespondError(c, http.StatusInternalServerError, "Failed to create invite")
 		return
 	}
+	// The invite counts on the invitee's Messages badge; without this it
+	// appeared only after their app next fetched its invites.
+	if h.hub != nil {
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: req.UserID,
+			Type:        "group_invite_received",
+			Payload:     gin.H{"conversation_id": conversationID, "invite_id": invite.ID},
+		})
+	}
 
 	c.JSON(http.StatusCreated, invite)
 }

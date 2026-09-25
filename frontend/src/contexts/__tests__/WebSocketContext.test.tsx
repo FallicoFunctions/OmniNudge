@@ -158,6 +158,7 @@ describe('WebSocketProvider group keys', () => {
   async function receive(type: string, payload: object) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(['group-participants', 47], []);
+    queryClient.setQueryData(['group-invites'], []);
     render(
       <QueryClientProvider client={queryClient}>
         <WebSocketProvider>
@@ -180,6 +181,16 @@ describe('WebSocketProvider group keys', () => {
     const queryClient = await receive('group_member_joined', { conversation_id: 47, user_id: 99 });
     expect(mocks.shareMissingGroupHistory).toHaveBeenCalledWith(47);
     expect(queryClient.getQueryState(['group-participants', 47])?.isInvalidated).toBe(true);
+  });
+
+  // The invite counts on the Messages badge; it appeared only after the app
+  // next fetched its invites.
+  it('reads the invite list again when an invite arrives', async () => {
+    const queryClient = await receive('group_invite_received', {
+      conversation_id: 47,
+      invite_id: 5,
+    });
+    expect(queryClient.getQueryState(['group-invites'])?.isInvalidated).toBe(true);
   });
 
   // Without this the newcomer's app kept the old versions recorded as missing,

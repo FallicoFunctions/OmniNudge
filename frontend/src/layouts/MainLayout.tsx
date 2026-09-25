@@ -8,6 +8,7 @@ import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
+import { useGroupInvites } from '../hooks/useGroupConversation';
 import type { UserProfile } from '../types/users';
 import AuthModal from '../pages/AuthModal';
 import BugReportModal from '../components/bugReports/BugReportModal';
@@ -125,6 +126,10 @@ export default function MainLayout() {
       }, 0) ?? 0,
     [conversations, notifyArchivedMessages, activeConversationId]
   );
+  // A pending group invite waits on the user as an unread message does, so
+  // the Messages badge counts both.
+  const { pendingCount: pendingInvites } = useGroupInvites({ enabled: !!user });
+  const messagesBadge = unreadTotal + pendingInvites;
 
   // Reset iOS Safari scroll state on every route change.
   // When navigating away from a fixed-height overflow-hidden page (e.g. MessagesPage),
@@ -261,9 +266,9 @@ export default function MainLayout() {
                       className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
                       {t('nav.messages')}
-                      {unreadTotal > 0 && (
+                      {messagesBadge > 0 && (
                         <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
-                          {unreadTotal}
+                          {messagesBadge}
                         </span>
                       )}
                     </button>
@@ -329,7 +334,7 @@ export default function MainLayout() {
                         {
                           label: t('nav.messages'),
                           to: '/messages',
-                          badge: unreadTotal,
+                          badge: messagesBadge,
                         },
                         {
                           label: t('menu.hubs'),
@@ -544,7 +549,7 @@ export default function MainLayout() {
             </div>
           }
         >
-          <MobileTabBar unreadCount={unreadTotal} />
+          <MobileTabBar unreadCount={messagesBadge} />
         </ErrorBoundary>
       )}
 

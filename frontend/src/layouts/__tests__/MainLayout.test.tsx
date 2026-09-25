@@ -5,8 +5,19 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MainLayout from '../MainLayout';
 
+const auth = vi.hoisted(() => ({ user: null as null | { id: number; username: string } }));
+
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, logout: vi.fn() }),
+  useAuth: () => ({ user: auth.user, logout: vi.fn() }),
+}));
+
+vi.mock('../../services/groupsService', () => ({
+  groupsService: {
+    getMyInvites: vi.fn().mockResolvedValue([
+      { id: 5, conversation_id: 47, status: 'pending' },
+      { id: 6, conversation_id: 48, status: 'pending' },
+    ]),
+  },
 }));
 
 vi.mock('../../contexts/SettingsContext', () => ({
@@ -26,7 +37,9 @@ vi.mock('../../services/usersService', () => ({
 }));
 
 vi.mock('../../services/messagesService', () => ({
-  messagesService: { getConversations: vi.fn().mockResolvedValue([]) },
+  messagesService: {
+    getConversations: vi.fn().mockResolvedValue([{ id: 1, unread_count: 1, is_archived: false }]),
+  },
 }));
 
 vi.mock('../../services/subscriptionService', () => ({
@@ -75,7 +88,9 @@ vi.mock('../../components/error', () => ({
 }));
 
 vi.mock('../../components/mobile/MobileTabBar', () => ({
-  MobileTabBar: () => <div data-testid="mobile-tab-bar" />,
+  MobileTabBar: ({ unreadCount }: { unreadCount?: number }) => (
+    <div data-testid="mobile-tab-bar">{unreadCount}</div>
+  ),
 }));
 
 vi.mock('../../components/bugReports/BugReportModal', () => ({
@@ -150,5 +165,25 @@ describe('MainLayout about modal', () => {
     await waitFor(() => {
       expect(localStorage.getItem('omninudge_about_modal_dismissed')).toBe('true');
     });
+  });
+});
+
+describe('MainLayout Messages badge', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    window.scrollTo = vi.fn();
+  });
+
+  // A group invite waits on the user as an unread message does, and the badge
+  // left it out: the invite sat in the list with nothing on the tab.
+  it('counts pending group invites with unread messages', async () => {
+    auth.user = { id: 47, username: 'seed_user_2' };
+    try {
+      renderMainLayout();
+      const messages = await screen.findByRole('button', { name: /nav\.messages/ });
+      await waitFor(() => expect(messages).toHaveTextContent('3'));
+    } finally {
+      auth.user = null;
+    }
   });
 });
