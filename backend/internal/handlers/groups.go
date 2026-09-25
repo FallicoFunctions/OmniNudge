@@ -176,6 +176,40 @@ func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 	return conversationID, true
 }
 
+// admitBanned applies the ban rule when someone is invited or added. A banned
+// user comes back only through an owner or an admin, and coming back that way
+// lifts the ban -- the caller logs it as that admin's unban once the
+// transaction commits. A plain member cannot bring them back, even in a group
+// where anyone may invite.
+func (h *GroupHandler) admitBanned(c *gin.Context, tx pgx.Tx, conversationID, userID int, callerRole string) (lifted, ok bool) {
+	ctx := c.Request.Context()
+	if callerRole == "member" {
+		var banned bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM group_member_restrictions
+			               WHERE conversation_id = $1 AND user_id = $2 AND restriction_type = 'ban')
+		`, conversationID, userID).Scan(&banned); err != nil {
+			RespondError(c, http.StatusInternalServerError, "Failed to check the ban list")
+			return false, false
+		}
+		if banned {
+			RespondErrorCoded(c, http.StatusForbidden, "group_user_banned",
+				"This user is banned from the group. Only an owner or admin can bring them back.")
+			return false, false
+		}
+		return false, true
+	}
+	tag, err := tx.Exec(ctx, `
+		DELETE FROM group_member_restrictions
+		WHERE conversation_id = $1 AND user_id = $2 AND restriction_type = 'ban'
+	`, conversationID, userID)
+	if err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to lift the ban")
+		return false, false
+	}
+	return tag.RowsAffected() > 0, true
+}
+
 // announceJoin tells the members someone joined. A member's app that holds
 // older key versions the newcomer still lacks passes them on: the invite
 // carries what its sender held, and a key made between the invite and the
@@ -603,6 +637,10 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 	if !h.grantNewcomerHistory(c, services.GrantAddedMemberHistory(ctx, tx, conversationID, userID, req.UserID, req.History)) {
 		return
 	}
+	liftedBan, ok := h.admitBanned(c, tx, conversationID, req.UserID, role)
+	if !ok {
+		return
+	}
 	// The members changed, so the active key version no longer fits them: the
 	// next member who sends makes the next version for exactly this group.
 	if err := services.MarkGroupKeyStale(ctx, tx, conversationID); err != nil {
@@ -614,6 +652,9 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		return
 	}
 
+	if liftedBan {
+		logAuditAction(ctx, h.pool, conversationID, userID, "unban_member", &req.UserID, map[string]any{"via": "add"})
+	}
 	h.announceJoin(ctx, conversationID, req.UserID)
 	c.JSON(http.StatusCreated, gin.H{"message": "Participant added"})
 }
@@ -1028,9 +1069,16 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 	if !h.grantNewcomerHistory(c, services.StoreInviteHistory(ctx, tx, conversationID, userID, invite.ID, req.History)) {
 		return
 	}
+	liftedBan, ok := h.admitBanned(c, tx, conversationID, req.UserID, role)
+	if !ok {
+		return
+	}
 	if err := tx.Commit(ctx); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to create invite")
 		return
+	}
+	if liftedBan {
+		logAuditAction(ctx, h.pool, conversationID, userID, "unban_member", &req.UserID, map[string]any{"via": "invite"})
 	}
 	// The invite counts on the invitee's Messages badge; without this it
 	// appeared only after their app next fetched its invites.
@@ -1094,6 +1142,21 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 	}
 	if expiresAt.Before(time.Now()) {
 		RespondError(c, http.StatusGone, "Invite has expired")
+		return
+	}
+	// An invite a member sent before the ban, or one sent and then followed by
+	// a ban, must not bring a banned user back. An owner's or admin's invite
+	// lifted the ban when it was sent.
+	var banned bool
+	if err := h.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM group_member_restrictions
+		               WHERE conversation_id = $1 AND user_id = $2 AND restriction_type = 'ban')
+	`, conversationID, userID).Scan(&banned); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to check the ban list")
+		return
+	}
+	if banned {
+		RespondErrorCoded(c, http.StatusForbidden, "group_user_banned", "You are banned from this group")
 		return
 	}
 	blocked, err := h.hasBlockingRelationship(c, userID, invitedBy)

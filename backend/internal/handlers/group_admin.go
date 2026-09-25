@@ -89,9 +89,9 @@ func broadcastToGroup(ctx context.Context, pool *pgxpool.Pool, hub HubInterface,
 
 // ─── Request / Response Types ─────────────────────────────────────────────────
 
+// A mute takes no reason: nobody is shown one, so none is asked for or kept.
 type MuteGroupMemberRequest struct {
-	DurationMinutes int    `json:"duration_minutes"`
-	Reason          string `json:"reason"`
+	DurationMinutes int `json:"duration_minutes"`
 }
 
 type BanGroupMemberRequest struct {
@@ -247,13 +247,13 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 
 	_, err = h.pool.Exec(ctx, `
 		INSERT INTO group_member_restrictions (conversation_id, user_id, restricted_by, restriction_type, reason, expires_at)
-		VALUES ($1, $2, $3, 'mute', $4, $5)
+		VALUES ($1, $2, $3, 'mute', NULL, $4)
 		ON CONFLICT (conversation_id, user_id, restriction_type) DO UPDATE
 		  SET restricted_by = EXCLUDED.restricted_by,
-		      reason        = EXCLUDED.reason,
+		      reason        = NULL,
 		      expires_at    = EXCLUDED.expires_at,
 		      created_at    = NOW()
-	`, convID, targetUserID, callerID, req.Reason, expiresAt)
+	`, convID, targetUserID, callerID, expiresAt)
 	if err != nil {
 		log.Printf("[GroupAdmin] MuteGroupMember: err=%v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to mute member")
@@ -261,7 +261,6 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 	}
 
 	logAuditAction(ctx, h.pool, convID, callerID, "mute_member", &targetUserID, map[string]any{
-		"reason":           req.Reason,
 		"duration_minutes": req.DurationMinutes,
 	})
 
@@ -269,7 +268,6 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 		"conversation_id": convID,
 		"user_id":         targetUserID,
 		"expires_at":      expiresAt,
-		"reason":          req.Reason,
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member muted"})
@@ -385,17 +383,6 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		return
 	}
 
-	// Notify the banned user before removing them so their client can react.
-	h.hub.Broadcast(&websocket.Message{
-		RecipientID: targetUserID,
-		Type:        "group_member_banned",
-		Payload: gin.H{
-			"conversation_id": convID,
-			"user_id":         targetUserID,
-			"reason":          req.Reason,
-		},
-	})
-
 	// Use a transaction: ban record + optional message wipe + participant removal are atomic.
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
@@ -455,11 +442,23 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		"delete_messages": req.DeleteMessages,
 	})
 
-	// Broadcast to remaining group members (banned user already notified above).
+	// The reason is for the banned user alone. The rest of the group learns
+	// only who went; the reason stays in the audit log for the admins. Both
+	// events wait for the commit, so nobody hears of a ban that failed.
 	broadcastToGroup(ctx, h.pool, h.hub, convID, "group_member_banned", gin.H{
 		"conversation_id": convID,
 		"user_id":         targetUserID,
-		"reason":          req.Reason,
+	})
+	var groupName string
+	_ = h.pool.QueryRow(ctx, `SELECT COALESCE(group_name, '') FROM conversations WHERE id = $1`, convID).Scan(&groupName)
+	h.hub.Broadcast(&websocket.Message{
+		RecipientID: targetUserID,
+		Type:        "group_you_were_banned",
+		Payload: gin.H{
+			"conversation_id": convID,
+			"group_name":      groupName,
+			"reason":          req.Reason,
+		},
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member banned"})

@@ -326,6 +326,8 @@ func TestMuteGroupMember(t *testing.T) {
 			adminHandler.MuteGroupMember(c)
 		})
 
+		// An older app may still send a reason. A mute takes none: nobody is
+		// shown one, so the server keeps none, in the restriction or the log.
 		body := map[string]interface{}{
 			"duration_minutes": 60,
 			"reason":           "Spamming",
@@ -339,6 +341,19 @@ func TestMuteGroupMember(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		var reason *string
+		require.NoError(t, db.Pool.QueryRow(context.Background(), `
+			SELECT reason FROM group_member_restrictions
+			WHERE conversation_id = $1 AND user_id = $2 AND restriction_type = 'mute'
+		`, convID, memberID).Scan(&reason))
+		assert.Nil(t, reason)
+		var details string
+		require.NoError(t, db.Pool.QueryRow(context.Background(), `
+			SELECT COALESCE(details::text, '') FROM group_audit_log
+			WHERE conversation_id = $1 AND action_type = 'mute_member'
+		`, convID).Scan(&details))
+		assert.NotContains(t, details, "Spamming")
+		assert.NotContains(t, details, "reason")
 	})
 
 	t.Run("non-admin cannot mute members", func(t *testing.T) {

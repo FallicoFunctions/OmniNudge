@@ -900,3 +900,117 @@ func TestGroupLeaveIsAnnounced(t *testing.T) {
 		})
 	}
 }
+
+// The ban reason went to every member's app, where nobody saw it, and to the
+// banned user before the ban was saved. It now goes to the banned user alone,
+// once the ban has committed; the group hears only who went.
+func TestGroupBanReasonReachesOnlyTheBannedUser(t *testing.T) {
+	deps := newGroupTestDeps(t)
+	defer deps.DB.Close()
+	ts := httptest.NewServer(deps.GroupRouter)
+	defer ts.Close()
+
+	g := newLiveGroup(t, deps, ts.URL, "ban")
+	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+		fmt.Sprintf("/api/v1/groups/%d/members/%d/ban", g.id, g.memberIDs[0]), g.ownerToken,
+		[]byte(`{"reason":"spam","delete_messages":false}`))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	evt := readWebSocketEvent(t, g.members[0], 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_you_were_banned" })
+	payload, _ := evt["payload"].(map[string]interface{})
+	assert.EqualValues(t, g.id, payload["conversation_id"])
+	assert.Equal(t, "spam", payload["reason"])
+	assert.Equal(t, "Live Group ban", payload["group_name"])
+
+	evt = readWebSocketEvent(t, g.members[1], 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_member_banned" })
+	payload, _ = evt["payload"].(map[string]interface{})
+	assert.EqualValues(t, g.memberIDs[0], payload["user_id"])
+	assert.NotContains(t, payload, "reason", "the rest of the group does not get the reason")
+}
+
+// A ban only removed the user: anyone who could invite could bring them back.
+// Now only an owner or admin can, and doing so lifts the ban on the record.
+func TestGroupBanRuleOnTheWayBack(t *testing.T) {
+	ctx := context.Background()
+	setup := func(t *testing.T, name string) (*groupTestDeps, liveGroup, string) {
+		deps := newGroupTestDeps(t)
+		t.Cleanup(deps.DB.Close)
+		ts := httptest.NewServer(deps.GroupRouter)
+		t.Cleanup(ts.Close)
+		g := newLiveGroup(t, deps, ts.URL, name)
+		w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+			fmt.Sprintf("/api/v1/groups/%d/members/%d/ban", g.id, g.memberIDs[0]), g.ownerToken,
+			[]byte(`{"reason":"spam","delete_messages":false}`))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		_, err := deps.DB.Pool.Exec(ctx, `
+			INSERT INTO group_settings (conversation_id, anyone_can_invite) VALUES ($1, TRUE)
+			ON CONFLICT (conversation_id) DO UPDATE SET anyone_can_invite = TRUE`, g.id)
+		require.NoError(t, err)
+		return deps, g, fmt.Sprintf(`{"user_id":%d}`, g.memberIDs[0])
+	}
+	banned := func(t *testing.T, deps *groupTestDeps, g liveGroup) bool {
+		var b bool
+		require.NoError(t, deps.DB.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM group_member_restrictions
+			WHERE conversation_id = $1 AND user_id = $2 AND restriction_type = 'ban')`, g.id, g.memberIDs[0]).Scan(&b))
+		return b
+	}
+	unbanLogged := func(t *testing.T, deps *groupTestDeps, g liveGroup) string {
+		var details string
+		require.NoError(t, deps.DB.Pool.QueryRow(ctx, `SELECT COALESCE(details::text, '') FROM group_audit_log
+			WHERE conversation_id = $1 AND action_type = 'unban_member' AND target_user_id = $2`, g.id, g.memberIDs[0]).Scan(&details))
+		return details
+	}
+
+	t.Run("a member cannot invite them back", func(t *testing.T) {
+		deps, g, body := setup(t, "banmember")
+		w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/invites", g.id), g.memberTokens[1], []byte(body))
+		require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+		assert.Contains(t, w.Body.String(), "group_user_banned")
+		assert.True(t, banned(t, deps, g))
+	})
+
+	for _, how := range []string{"invite", "add"} {
+		t.Run("an owner's "+how+" lifts the ban and logs it", func(t *testing.T) {
+			deps, g, body := setup(t, "ban"+how)
+			path := fmt.Sprintf("/api/v1/groups/%d/invites", g.id)
+			if how == "add" {
+				path = fmt.Sprintf("/api/v1/groups/%d/participants", g.id)
+			}
+			w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, path, g.ownerToken, []byte(body))
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			assert.False(t, banned(t, deps, g))
+			assert.Contains(t, unbanLogged(t, deps, g), how)
+		})
+	}
+
+	t.Run("a banned user cannot accept an invite sent before the ban", func(t *testing.T) {
+		deps := newGroupTestDeps(t)
+		t.Cleanup(deps.DB.Close)
+		owner := createUser(t, deps.UserRepo, uniqueGrpUsername("banacc_owner"), "user")
+		m1 := createUser(t, deps.UserRepo, uniqueGrpUsername("banacc_m1"), "user")
+		m2 := createUser(t, deps.UserRepo, uniqueGrpUsername("banacc_m2"), "user")
+		guest := createUser(t, deps.UserRepo, uniqueGrpUsername("banacc_guest"), "user")
+		ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, owner.Username, owner.Role)
+		guestToken, _ := deps.AuthService.GenerateJWT(guest.ID, guest.Username, guest.Role)
+		w := doGroupRequest(t, deps.GroupRouter, http.MethodPost, "/api/v1/groups", ownerToken, createGroupBody("BanAccept", []int{m1.ID, m2.ID}))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+		var group struct {
+			ID int `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &group))
+		w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/%d/invites", group.ID), ownerToken,
+			[]byte(fmt.Sprintf(`{"user_id":%d}`, guest.ID)))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+		var invite struct {
+			ID int `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invite))
+		_, err := deps.DB.Pool.Exec(ctx, `INSERT INTO group_member_restrictions (conversation_id, user_id, restricted_by, restriction_type)
+			VALUES ($1, $2, $3, 'ban')`, group.ID, guest.ID, owner.ID)
+		require.NoError(t, err)
+
+		w = doGroupRequest(t, deps.GroupRouter, http.MethodPost, fmt.Sprintf("/api/v1/groups/invites/%d/accept", invite.ID), guestToken, []byte(`{}`))
+		require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+		assert.Contains(t, w.Body.String(), "group_user_banned")
+	})
+}
