@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { groupsService } from '../../services/groupsService';
+import { historyForNewcomer } from '../../services/newcomerHistory';
 import type { SearchUsers } from './CreateGroupModal';
 
 type FoundUser = Awaited<ReturnType<SearchUsers>>[number];
@@ -40,8 +41,11 @@ export function GroupInviteMembers({
   }, [query, searchUsers]);
 
   const invite = useMutation({
-    mutationFn: (user: FoundUser) =>
-      groupsService.createInvite(conversationId, { user_id: user.id }),
+    mutationFn: async (user: FoundUser) =>
+      groupsService.createInvite(conversationId, {
+        user_id: user.id,
+        history: await historyForNewcomer(conversationId, user.id),
+      }),
     onSuccess: (_invite, user) => {
       setInvitedIds((ids) => [...ids, user.id]);
       setStatus({ ok: true, text: `${t('groups.inviteSent')}: ${user.username}` });

@@ -293,3 +293,5 @@ export interface TransferOwnershipRequest {
 export interface CreateGroupInviteRequest {
   user_id: number;
 }
+  /** key version -> that version wrapped for the invitee, handed over on accept. */
+  history?: Record<number, string>;

@@ -4,12 +4,19 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupInviteMembers } from '../GroupInviteMembers';
 
-const { mockCreateInvite } = vi.hoisted(() => ({ mockCreateInvite: vi.fn() }));
+const { mockCreateInvite, mockHistory } = vi.hoisted(() => ({
+  mockCreateInvite: vi.fn(),
+  mockHistory: vi.fn(),
+}));
 
 vi.mock('../../../services/groupsService', () => ({
   groupsService: {
     createInvite: (...args: unknown[]) => mockCreateInvite(...args),
   },
+}));
+
+vi.mock('../../../services/newcomerHistory', () => ({
+  historyForNewcomer: (...args: unknown[]) => mockHistory(...args),
 }));
 
 const found = [
@@ -29,6 +36,7 @@ function renderControl() {
 
 beforeEach(() => {
   mockCreateInvite.mockReset();
+  mockHistory.mockReset().mockResolvedValue({ 1: 'v1-for-47' });
 });
 
 describe('GroupInviteMembers', () => {
@@ -38,12 +46,13 @@ describe('GroupInviteMembers', () => {
     expect(screen.queryByRole('button', { name: /already_in/ })).not.toBeInTheDocument();
   });
 
-  it('invites the person picked, to this group, and says so', async () => {
+  it('invites the person picked, to this group, with its history, and says so', async () => {
     mockCreateInvite.mockResolvedValue({ id: 5 });
     renderControl();
     fireEvent.click(await screen.findByRole('button', { name: /seed_user_2/ }));
     expect(await screen.findByRole('status')).toHaveTextContent('seed_user_2');
-    expect(mockCreateInvite).toHaveBeenCalledWith(9, { user_id: 47 });
+    expect(mockHistory).toHaveBeenCalledWith(9, 47);
+    expect(mockCreateInvite).toHaveBeenCalledWith(9, { user_id: 47, history: { 1: 'v1-for-47' } });
   });
 
   it('says so when the invite fails', async () => {
