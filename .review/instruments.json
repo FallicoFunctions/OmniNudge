@@ -295,6 +295,12 @@
       "name": "Remove each line the change adds",
       "trigger": "a change adds the same small line at several sites -- a dependency, a guard, a notify call -- or adds lines whose effect no test reads directly",
       "asks": "Delete each added line on its own, run the tests that should notice, and require a failure. A line no test notices is untested, however obvious it looks. Phase 3b added a key-generation dependency to three decrypt sites and tested one: removing it from the media hook and the pinned bar left all 46 of their tests green."
+    },
+    {
+      "id": "H7",
+      "name": "Does a 'goes away' assertion wait for the screen to settle?",
+      "trigger": "a test asserts that something disappears -- inside waitFor, or right after a refetch or a state change",
+      "asks": "A negative check inside waitFor passes at the first moment the element is missing, and a reloading screen is briefly empty whether or not the change worked. Wait first for a positive sign that the new state has settled (the reloaded list, the new row), then assert the absence once. Remove the fix and require the test to fail. The phone test for a group that drops out passed with its close step removed, because the chat header vanished for one frame during the list refetch."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

@@ -1,0 +1,20 @@
+diff --git a/backend/internal/handlers/groups.go b/backend/internal/handlers/groups.go
+index c6afd7093..bf1f63e6d 100644
+--- a/backend/internal/handlers/groups.go
++++ b/backend/internal/handlers/groups.go
+@@ -688,7 +688,6 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
+ 		RespondError(c, http.StatusInternalServerError, "Failed to end the group key version")
+ 		return
+ 	}
+-	h.announceLeave(c.Request.Context(), conversationID, targetID)
+ 
+ 	c.JSON(http.StatusNoContent, nil)
+ }
+@@ -1312,7 +1311,6 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
+ 		return
+ 	}
+ 
+-	h.announceLeave(c.Request.Context(), conversationID, userID)
+ 	c.Status(http.StatusNoContent)
+ }
+ 

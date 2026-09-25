@@ -1,0 +1,578 @@
+{
+ "schema_version": 2,
+ "head": "a2d2e91ba",
+ "base": "04a7c4b7d",
+ "scope": {
+  "files": [
+   "backend/internal/handlers/groups.go",
+   "frontend/src/layouts/MainLayout.tsx",
+   "frontend/src/hooks/useGroupConversation.ts",
+   "frontend/src/contexts/WebSocketContext.tsx",
+   "frontend/src/pages/MessagesPage.tsx",
+   "frontend/src/components/messages/GroupDetailsSidebar.tsx"
+  ],
+  "boundaries": [
+   "three socket events",
+   "the conversation and invite queries",
+   "the Messages badge",
+   "the selected chat on desktop and phone"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/e619a6d8c.json",
+  ".review/b3df29afc.json",
+  ".review/7cf2b679d.json"
+ ],
+ "notes": "Invite badge, accept opens the group, leave and rename without a refresh; the review extended leave to removal and ban. Adds H7.",
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "04a7c4b7d..a2d2e91ba: aec6f8b0d (pending invites count on the Messages badge; group_invite_received to the invitee), 7e3a42d8f (accept resolves after the list reloads, so the page opens the group; leave and rename reload the real lists instead of writing ['conversations']), and the review's 9ab7af8c3 (leave and removal announced as group_member_left) and a2d2e91ba (the app handles group_member_left and group_member_banned, and a group that drops out of the list closes). Boundaries: three socket events, the conversation and invite queries, the Messages badge, the selected chat on desktop and phone."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read e619a6d8c (phase 3b: the socket events and the generation), b3df29afc (3a: announceJoin and broadcastToGroup), 7cf2b679d (C9)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in tests: the desktop Messages button reads 3 for one unread message and two invites; at phone width, a group that drops out of the list takes the chat panel (its Back button) with it. The user confirmed in the browser that accept now opens the group and the badge counts invites."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket frames from the real hub: group_invite_received {conversation_id, invite_id} to the invitee; group_member_left {conversation_id, user_id} to the remaining member and to the one who went, for a leave and for a removal (two inputs)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "GetMyGroupInvites reads pending and unexpired invites only (gi.status = 'pending' AND gi.expires_at > now), so the badge cannot count an expired invite."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names match on both sides: group_invite_received, group_member_left, group_member_banned (already sent by the ban handler, now handled)."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.conversation_id from each event, the field all three carry."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One badge value and one close rule."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor beyond the payload cast, which the socket tests exercise."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket tests send the frames the Go tests read from the real hub."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of join: leave, removal and ban are the other membership changes; only ban sent anything, and the app handled none of them (finding 1 and 2)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both cases of the leave test and both socket events are reached; the close rule is reached by the phone test and by the user's own leave."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed announcement is logged by broadcastToGroup; the change itself has committed, and the app catches up on its next fetch."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The close rule acts only on a selection that was seen in the full list, so a conversation opened by link before its page loads is not closed."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The panel's onLeft callback, added for leave, did what the close rule now does for every way of leaving; removed."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Found both findings: after the user reported leave, listed every other membership change -- removal sent nothing, ban's event was ignored by the app, and a leave told the other members nothing. Also grepped every setQueryData on a conversations key: only the group hook wrote the unread ['conversations'] key; useArchive writes ['conversations', 'active'], which MainLayout reads."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Every announcement runs after the change is committed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A leave or removal leaves no stale group on the leaver's screen and no stale member in the others' lists."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "grpact-r1-leave-not-announced: without both announceLeave calls, both TestGroupLeaveIsAnnounced subtests fail waiting for the event. grpact-r1-vanished-group-stays-open: with the events unhandled and the close step removed, three tests fail (the two socket cases and the phone test); tsc -b stays clean with the patch."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet (handlers, integration) and gofmt clean; tsc -b and eslint clean on every changed frontend file."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Both findings came from E6. The flaw in the new phone test (a vanishing check that passed on a transient frame) was found by C10 before commit; the technique is now H7."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran the badge and accept flow in real browsers and reported both working. The leave, removal and ban flows are not yet run in a browser; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "The badge already existed; only its number changed."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: leave, join, invite and membership tests PASS, 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user's requests: a pending invite counts on the badge (yes, live); accept opens the group (yes, confirmed by the user); leave takes effect without a refresh (yes, and removal and ban with it)."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "A user's own leave closes the group through two paths at once -- the leave hook's awaited list reload and the group_member_left event's reload; both only reload, and the close rule is idempotent."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks MessagesPage, WebSocketContext, GroupDetailsSidebar, useGroupConversation or MainLayout: 9 files, 65 passed, 1 old skip; and the handler group tests."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "liveGroup gained memberIDs; every live test that builds it passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls on groups.go target the accept announcement line and the joiner's keys event; re-ran TestGroupJoinIsAnnounced after these changes: PASS, and the accept control patch still applies."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup added."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The Go tests run the real handlers and hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled useGroupConversation.test (seed 5): 3 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_member_left: LeaveGroup and RemoveGroupParticipant; of group_member_banned: BanGroupMember (to the banned user before the removal, to the rest after). Producers of a pending invite: CreateGroupInvite, which now announces it."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each added line: the two announceLeave calls (both leave subtests fail), the left/banned invalidations and the banned case (socket tests fail), the badge sum (layout test fails), the accept wait (hook test fails), the close step (phone test fails -- after the test was made to wait, see H7)."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "Found the flaw in the new phone test: its absence check ran inside waitFor and passed during the refetch. It now waits for the reloaded list, then asserts once; with the close step removed it fails."
+    }
+   ],
+   "findings": [
+    {
+     "id": "grpact-r1-leave-not-announced",
+     "summary": "A leave or a removal sent no event, so the other members' lists and the removed member's screen kept the old state until a refresh.",
+     "found_by": "E6",
+     "fix_commit": "9ab7af8c3",
+     "control": {
+      "patch": ".review/controls/grpact-r1-leave-not-announced.patch",
+      "runner": "go",
+      "tests": [
+       "./internal/integration/ -tags=integration -run '^TestGroupLeaveIsAnnounced$'"
+      ],
+      "observed": "FAIL: both subtests time out waiting for group_member_left"
+     }
+    },
+    {
+     "id": "grpact-r1-vanished-group-stays-open",
+     "summary": "The app ignored group_member_banned and had no leave event to hear, and on a phone nothing closed a group that dropped out of the list.",
+     "found_by": "E6",
+     "fix_commit": "a2d2e91ba",
+     "control": {
+      "patch": ".review/controls/grpact-r1-vanished-group-stays-open.patch",
+      "runner": "vitest",
+      "tests": [
+       "src/contexts/__tests__/WebSocketContext.test.tsx",
+       "src/pages/__tests__/MessagesPage.mediaSend.test.tsx -t \"no longer in\""
+      ],
+      "observed": "FAIL: the two socket cases see nothing invalidated; the phone test still shows 'Back to conversations'"
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Pass 2 scope: the review-time code (9ab7af8c3, a2d2e91ba), the two controls and instrument H7."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read e619a6d8c (phase 3b: the socket events and the generation), b3df29afc (3a: announceJoin and broadcastToGroup), 7cf2b679d (C9)."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "No prompt or model payload."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Rendered in tests: the desktop Messages button reads 3 for one unread message and two invites; at phone width, a group that drops out of the list takes the chat panel (its Back button) with it. The user confirmed in the browser that accept now opens the group and the badge counts invites."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "Socket frames from the real hub: group_invite_received {conversation_id, invite_id} to the invitee; group_member_left {conversation_id, user_id} to the remaining member and to the one who went, for a leave and for a removal (two inputs)."
+    },
+    {
+     "id": "B4",
+     "status": "applied",
+     "evidence": "GetMyGroupInvites reads pending and unexpired invites only (gi.status = 'pending' AND gi.expires_at > now), so the badge cannot count an expired invite."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Event names match on both sides: group_invite_received, group_member_left, group_member_banned (already sent by the ban handler, now handled)."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The client reads payload.conversation_id from each event, the field all three carry."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "One badge value and one close rule."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "JSON payloads."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No untyped accessor beyond the payload cast, which the socket tests exercise."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The socket tests send the frames the Go tests read from the real hub."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "No validation."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Siblings of join: leave, removal and ban are the other membership changes; only ban sent anything, and the app handled none of them (finding 1 and 2)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "Both cases of the leave test and both socket events are reached; the close rule is reached by the phone test and by the user's own leave."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A failed announcement is logged by broadcastToGroup; the change itself has committed, and the app catches up on its next fetch."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The close rule acts only on a selection that was seen in the full list, so a conversation opened by link before its page loads is not closed."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The panel's onLeft callback, added for leave, did what the close rule now does for every way of leaving; removed."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Re-listed membership changes after the fixes: join, leave, removal, ban -- each now reaches both the remaining members and the one affected, and the app handles each."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No shared memory."
+    },
+    {
+     "id": "F2",
+     "status": "applied",
+     "evidence": "Every announcement runs after the change is committed."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A leave or removal leaves no stale group on the leaver's screen and no stale member in the others' lists."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both controls re-run by hand: each fails as recorded in pass 1."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "go build, go vet (handlers, integration) and gofmt clean; tsc -b and eslint clean on every changed frontend file."
+    },
+    {
+     "id": "Z1",
+     "status": "na",
+     "why": "Pass 2 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "The user ran the badge and accept flow in real browsers and reported both working. The leave, removal and ban flows are not yet run in a browser; said to the user."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Nothing starts before the decision that governs it."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "The badge already existed; only its number changed."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "Go runs with -v and TEST_DATABASE_URL: leave, join, invite and membership tests PASS, 33 handler group tests PASS, 0 SKIP."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The user's requests: a pending invite counts on the badge (yes, live); accept opens the group (yes, confirmed by the user); leave takes effect without a refresh (yes, and removal and ban with it)."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "A user's own leave closes the group through two paths at once -- the leave hook's awaited list reload and the group_member_left event's reload; both only reload, and the close rule is idempotent."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "No overlay."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test file that imports or mocks MessagesPage, WebSocketContext, GroupDetailsSidebar, useGroupConversation or MainLayout: 9 files, 65 passed, 1 old skip; and the handler group tests."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen takeover."
+    },
+    {
+     "id": "H5",
+     "status": "applied",
+     "evidence": "liveGroup gained memberIDs; every live test that builds it passes."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Earlier controls on groups.go target the accept announcement line and the joiner's keys event; re-ran TestGroupJoinIsAnnounced after these changes: PASS, and the accept control patch still applies."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "No resource after an await."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No unmount cleanup added."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The Go tests run the real handlers and hub."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "Shuffled useGroupConversation.test (seed 5): 3 passed."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of group_member_left: LeaveGroup and RemoveGroupParticipant; of group_member_banned: BanGroupMember (to the banned user before the removal, to the rest after). Producers of a pending invite: CreateGroupInvite, which now announces it."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each added line: the two announceLeave calls (both leave subtests fail), the left/banned invalidations and the banned case (socket tests fail), the badge sum (layout test fails), the accept wait (hook test fails), the close step (phone test fails -- after the test was made to wait, see H7)."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "Found the flaw in the new phone test: its absence check ran inside waitFor and passed during the refetch. It now waits for the reloaded list, then asserts once; with the close step removed it fails."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "go build ./... clean",
+  "vet": "go vet handlers and integration clean",
+  "lint": "eslint clean on every changed file",
+  "types": "tsc -b clean",
+  "tests": "Go leave, join, invite and membership tests and 33 handler group tests PASS, 0 SKIP; 9 frontend files touching the changed modules, 65 passed, 1 old skip."
+ }
+}

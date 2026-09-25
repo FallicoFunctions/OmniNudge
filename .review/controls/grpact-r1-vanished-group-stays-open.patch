@@ -1,0 +1,27 @@
+diff --git a/frontend/src/contexts/WebSocketContext.tsx b/frontend/src/contexts/WebSocketContext.tsx
+index b6a5a8280..eabd8b2d1 100644
+--- a/frontend/src/contexts/WebSocketContext.tsx
++++ b/frontend/src/contexts/WebSocketContext.tsx
+@@ -248,8 +248,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
+           // user. Every member reads the member list and the conversation list
+           // again; for the one who left, the group drops out of the list and
+           // the page closes it.
+-          case 'group_member_left':
+-          case 'group_member_banned': {
++          case 'group_member_left_unhandled':
++          case 'group_member_banned_unhandled': {
+             const { conversation_id } = data.payload as { conversation_id: number };
+             queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
+             queryClient.invalidateQueries({ queryKey: ['conversations'] });
+diff --git a/frontend/src/pages/MessagesPage.tsx b/frontend/src/pages/MessagesPage.tsx
+index fd8ba1365..7f6e3d3c2 100644
+--- a/frontend/src/pages/MessagesPage.tsx
++++ b/frontend/src/pages/MessagesPage.tsx
+@@ -854,7 +854,6 @@ export default function MessagesPage() {
+       selectedConversationId !== null &&
+       selectionSeenInListRef.current === selectedConversationId
+     ) {
+-      setSelectedConversationId(null);
+     }
+     selectionSeenInListRef.current = inList ? selectedConversationId : null;
+   }, [allConversations, selectedConversationId]);
