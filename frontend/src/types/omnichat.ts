@@ -78,6 +78,88 @@ export interface PersonaDefinitionPayload {
   extensions_json?: Record<string, unknown>;
 }
 
+export type PersonaEditPayload = Omit<
+  PersonaDefinitionPayload,
+  'avatar_url' | 'preview_video_url' | 'gallery_urls' | 'extensions_json'
+>;
+
+/** Answers to the guided roleplay creator. Prompt and media fields are built on the server. */
+export interface RoleplayCreationAnswers {
+  role_id: string;
+  goal_id: string;
+  region_id: string;
+  venue_id: string;
+  gender: 'woman' | 'man' | 'nonbinary' | '';
+  first_name: string;
+  last_name: string;
+  age: number;
+  render_style: 'realistic' | 'anime';
+  hair_color_id: string;
+  hair_style_id: string;
+  eye_color_id: string;
+  build_id: string;
+  wardrobe_id: string;
+  primary_trait_id: string;
+  second_trait_id: string;
+  speech_style_id: string;
+  backstory_id: string;
+  user_role_id: string;
+  relationship_id: string;
+  opening_beat_id: string;
+  response_style: 'natural_dialogue' | 'lean_narrative' | 'character_only';
+  is_nsfw: boolean;
+}
+
+export interface RoleplayChoice {
+  id: string;
+  label: string;
+  adult_restricted?: boolean;
+  opening?: string;
+  scene?: string;
+  relationships?: string[];
+}
+
+export interface RoleplayRole extends RoleplayChoice {
+  goals: string[];
+  min_age: number;
+  genders?: string[];
+  setting_kinds?: string[];
+}
+
+export interface RoleplayCatalog {
+  role_groups: Array<{
+    id: string;
+    label: string;
+    adult_restricted?: boolean;
+    user_roles: string[];
+    roles: RoleplayRole[];
+  }>;
+  goals: RoleplayChoice[];
+  regions: Array<{ id: string; label: string; kind: string; venues: string[] }>;
+  venues: RoleplayChoice[];
+  first_names: Record<string, string[]>;
+  last_names: string[];
+  hair_colors: RoleplayChoice[];
+  hair_styles: RoleplayChoice[];
+  eye_colors: RoleplayChoice[];
+  builds: RoleplayChoice[];
+  wardrobes: RoleplayChoice[];
+  traits: RoleplayChoice[];
+  speech_styles: RoleplayChoice[];
+  backstories: RoleplayChoice[];
+  user_roles: RoleplayChoice[];
+  relationships: RoleplayChoice[];
+  opening_beats: RoleplayChoice[];
+  response_styles: RoleplayChoice[];
+}
+
+export interface RoleplayCreationOptions {
+  limit: number;
+  owned: number;
+  catalog: RoleplayCatalog;
+  render_styles: Array<'realistic' | 'anime'>;
+}
+
 export interface ConversationSettings {
   user_name: string;
   user_age: string;

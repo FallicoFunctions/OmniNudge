@@ -297,6 +297,18 @@ export default function OmniChatDiscoverPage() {
     );
   }, [isAuthenticated, navigate]);
 
+  const handleOpenRoleplayCreator = useCallback(() => {
+    if (isAuthenticated) {
+      navigate('/omnichat/new-roleplay');
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent('open-auth-modal', {
+        detail: { mode: 'login', redirectTo: '/omnichat/new-roleplay' },
+      })
+    );
+  }, [isAuthenticated, navigate]);
+
   const handleSidebarTabChange = useCallback(
     (tab: SidebarTab) => {
       if (tab === 'search') {
@@ -511,16 +523,15 @@ export default function OmniChatDiscoverPage() {
   // Defined once because it has to appear whether or not there are featured
   // personas. It used to live only inside the featured section, so an empty
   // catalogue -- a new install, or a catalogue that simply failed to load --
-  // left the page with no way to create a character at all: the other route
-  // into the studio is itself behind "you already own a persona".
-  const createOrImportButton = (
+  // left the page with no way to create a character at all.
+  const createRoleplayButton = (
     <button
       type="button"
-      onClick={handleOpenStudio}
+      onClick={handleOpenRoleplayCreator}
       className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-blue-300/30 hover:bg-blue-400/10 hover:text-white"
     >
       <Plus size={16} className="transition-transform group-hover:rotate-90" />
-      {t('omnichat.discover.createOrImport')}
+      Create Roleplay AI
     </button>
   );
 
@@ -681,7 +692,7 @@ export default function OmniChatDiscoverPage() {
           )}
 
           {featured.length === 0 && (
-            <section className="mb-10 flex justify-end">{createOrImportButton}</section>
+            <section className="mb-10 flex justify-end">{createRoleplayButton}</section>
           )}
 
           {featured.length > 0 && (
@@ -695,7 +706,7 @@ export default function OmniChatDiscoverPage() {
                     {t('omnichat.discover.featuredTitle')}
                   </h2>
                 </div>
-                {createOrImportButton}
+                {createRoleplayButton}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {featured.map((persona) => (

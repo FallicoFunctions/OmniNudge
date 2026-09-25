@@ -12,8 +12,6 @@ const {
   mockUpdatePersona,
   mockDeletePersona,
   mockCreateConversation,
-  mockImportPersona,
-  mockUploadMedia,
   mockListVoicePresets,
   mockGetPersonaVoice,
   mockUpdatePersonaVoice,
@@ -25,8 +23,6 @@ const {
   mockUpdatePersona: vi.fn(),
   mockDeletePersona: vi.fn(),
   mockCreateConversation: vi.fn(),
-  mockImportPersona: vi.fn(),
-  mockUploadMedia: vi.fn(),
   mockListVoicePresets: vi.fn(),
   mockGetPersonaVoice: vi.fn(),
   mockUpdatePersonaVoice: vi.fn(),
@@ -35,9 +31,14 @@ const {
 
 let mockIsAuthenticated = true;
 let mockIsLoading = false;
+let mockRole: 'admin' | 'user' = 'admin';
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: mockIsAuthenticated, isLoading: mockIsLoading }),
+  useAuth: () => ({
+    user: { id: 7, role: mockRole },
+    isAuthenticated: mockIsAuthenticated,
+    isLoading: mockIsLoading,
+  }),
 }));
 
 vi.mock('../../components/omnichat/OmniChatShell', () => ({
@@ -68,22 +69,14 @@ vi.mock('../../services/omnichatService', () => ({
   omnichatService: {
     listMyPersonas: (...args: unknown[]) => mockListMyPersonas(...args),
     getPersonaDefinition: (...args: unknown[]) => mockGetPersonaDefinition(...args),
-    createPersona: (...args: unknown[]) => mockCreatePersona(...args),
     updatePersona: (...args: unknown[]) => mockUpdatePersona(...args),
     deletePersona: (...args: unknown[]) => mockDeletePersona(...args),
     createConversation: (...args: unknown[]) => mockCreateConversation(...args),
-    importPersona: (...args: unknown[]) => mockImportPersona(...args),
     exportPersona: vi.fn(),
     listVoicePresets: (...args: unknown[]) => mockListVoicePresets(...args),
     getPersonaVoice: (...args: unknown[]) => mockGetPersonaVoice(...args),
     updatePersonaVoice: (...args: unknown[]) => mockUpdatePersonaVoice(...args),
     previewVoicePreset: (...args: unknown[]) => mockPreviewVoicePreset(...args),
-  },
-}));
-
-vi.mock('../../services/mediaService', () => ({
-  mediaService: {
-    uploadMedia: (...args: unknown[]) => mockUploadMedia(...args),
   },
 }));
 
@@ -108,6 +101,7 @@ function renderPage() {
       <MemoryRouter initialEntries={['/omnichat/studio']}>
         <Routes>
           <Route path="/omnichat/studio" element={<OmniChatStudioPage />} />
+          <Route path="/omnichat/new-roleplay" element={<LocationProbe />} />
           <Route path="/omnichat" element={<LocationProbe />} />
           <Route path="/omnichat/c/:conversationId" element={<LocationProbe />} />
         </Routes>
@@ -121,6 +115,7 @@ describe('OmniChatStudioPage', () => {
     vi.clearAllMocks();
     mockIsAuthenticated = true;
     mockIsLoading = false;
+    mockRole = 'admin';
     mockListMyPersonas.mockResolvedValue([]);
     mockGetPersonaDefinition.mockResolvedValue(null);
     mockCreatePersona.mockResolvedValue({
@@ -170,42 +165,6 @@ describe('OmniChatStudioPage', () => {
     );
     mockDeletePersona.mockResolvedValue(undefined);
     mockCreateConversation.mockResolvedValue({ id: 88 });
-    mockImportPersona.mockResolvedValue({
-      id: 91,
-      slug: 'u7-imported-wizard',
-      name: 'Imported Wizard',
-      description: 'Imported from PNG.',
-      category: 'roleplay',
-      owner_user_id: 7,
-      visibility: 'private',
-      source_format: 'chara_card_v2',
-      system_prompt: '',
-      personality: '',
-      scenario: '',
-      first_message: 'Welcome back.',
-      example_dialogue: '',
-      response_style_profile: 'character_only',
-      post_history_instructions: '',
-      alternate_greetings: [],
-      creator_notes: '',
-      tags: ['imported'],
-      creator_name: 'Importer',
-      character_version: '1.0',
-      avatar_url: '/uploads/imported-avatar.png',
-      preview_video_url: '',
-      gallery_urls: [],
-      is_nsfw: false,
-      is_active: true,
-      character_book_json: {},
-      extensions_json: {},
-      import_source_filename: 'card.png',
-      created_at: '2026-07-11T00:00:00Z',
-      updated_at: '2026-07-11T00:00:00Z',
-    });
-    mockUploadMedia.mockResolvedValue({
-      storage_url: '/uploads/imported-avatar.png',
-      storage_path: 'uploads/imported-avatar.png',
-    });
     mockListVoicePresets.mockResolvedValue({
       voicebox_available: true,
       voice_cloning_enabled: false,
@@ -269,58 +228,38 @@ describe('OmniChatStudioPage', () => {
     window.removeEventListener('open-auth-modal', authEventListener);
   });
 
-  it('creates a character from the editor form', async () => {
+  it('opens guided creation without showing the raw character form or import', async () => {
     renderPage();
+    expect(await screen.findByText('You have no roleplay characters yet.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(screen.queryByText('Upload .png or .json')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Roleplay AI' }));
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent('/omnichat/new-roleplay');
+  });
 
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Launch Wizard' } });
-    fireEvent.change(screen.getByLabelText('Description'), {
-      target: { value: 'Helps with launch readiness.' },
-    });
-    fireEvent.change(screen.getByLabelText('Personality'), {
-      target: { value: 'Calm' },
-    });
-    fireEvent.change(screen.getByLabelText('Opening Message'), {
-      target: { value: 'Hello there.' },
-    });
-    fireEvent.change(screen.getByLabelText('Creator Name'), {
-      target: { value: 'Owner' },
-    });
-    fireEvent.change(screen.getByLabelText('Character Version'), {
-      target: { value: '1.0' },
-    });
-    fireEvent.change(screen.getByLabelText('Tags'), {
-      target: { value: 'launch, helper, launch' },
-    });
-    fireEvent.change(screen.getByLabelText('Response Style'), {
-      target: { value: 'professional' },
-    });
-    fireEvent.change(screen.getByLabelText('Example Dialogue'), {
-      target: { value: '<START>\n{{User}}: Help me launch.\n{{Char}}: Show me the checklist.' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-
-    await waitFor(() => {
-      expect(mockCreatePersona).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Launch Wizard',
-          description: 'Helps with launch readiness.',
-          personality: 'Calm',
-          creator_name: 'Owner',
-          character_version: '1.0',
-          tags: ['launch', 'helper', 'launch'],
-          response_style_profile: 'professional',
-          example_dialogue: '<START>\n{{User}}: Help me launch.\n{{Char}}: Show me the checklist.',
-        })
-      );
-    });
-    expect(mockUpdatePersonaVoice).toHaveBeenCalledWith(
-      77,
-      expect.objectContaining({ provider: 'voicebox', voice_id: 'af_heart', voice_name: 'Heart' })
-    );
+  it('keeps raw character instructions hidden from members while allowing voice selection', async () => {
+    mockRole = 'user';
+    const persona = await mockCreatePersona();
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
+    renderPage();
+    expect(
+      await screen.findByText(/Free-text character editing is unavailable/)
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(document.querySelector('textarea')).toBeNull();
+    const voiceSelect = screen.getByLabelText('Character voice');
+    await waitFor(() => expect(voiceSelect).toHaveValue('af_heart'));
+    fireEvent.change(voiceSelect, { target: { value: 'af_bella' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save voice' }));
+    await waitFor(() => expect(mockUpdatePersonaVoice).toHaveBeenCalledTimes(1));
+    expect(mockUpdatePersona).not.toHaveBeenCalled();
   });
 
   it('offers six female and six male server voices while keeping cloning gated', async () => {
+    const persona = await mockCreatePersona();
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
     renderPage();
 
     const voiceSelect = await screen.findByLabelText('Character voice');
@@ -377,27 +316,24 @@ describe('OmniChatStudioPage', () => {
   });
 
   it('persists the browser fallback when no local preset is selected', async () => {
+    const persona = await mockCreatePersona();
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
     renderPage();
-
-    fireEvent.change(await screen.findByLabelText('Character voice'), {
-      target: { value: '' },
-    });
+    const voice = await screen.findByLabelText('Character voice');
+    await waitFor(() => expect(voice).toHaveValue('af_heart'));
+    fireEvent.change(voice, { target: { value: '' } });
+    expect(voice).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Opening Message'), {
       target: { value: 'Hello from the browser voice.' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-
-    await waitFor(() => {
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() =>
       expect(mockUpdatePersonaVoice).toHaveBeenCalledWith(
         77,
-        expect.objectContaining({
-          provider: 'browser',
-          voice_id: 'browser-77',
-          voice_name: 'Character voice',
-          model_id: 'browser-native',
-        })
-      );
-    });
+        expect.objectContaining({ provider: 'browser', voice_id: 'browser-77' })
+      )
+    );
   });
 
   it('releases preview audio when browser playback fails', async () => {
@@ -412,6 +348,9 @@ describe('OmniChatStudioPage', () => {
     vi.stubGlobal('Audio', RejectedAudio);
 
     try {
+      const persona = await mockCreatePersona();
+      mockListMyPersonas.mockResolvedValue([persona]);
+      mockGetPersonaDefinition.mockResolvedValue(persona);
       renderPage();
       await waitFor(() => expect(screen.getByLabelText('Character voice')).toHaveValue('af_heart'));
       fireEvent.click(await screen.findByRole('button', { name: 'Preview voice' }));
@@ -427,57 +366,37 @@ describe('OmniChatStudioPage', () => {
     }
   });
 
-  it('retries a failed voice assignment without creating a duplicate persona', async () => {
+  it('retries a failed voice assignment on the same character', async () => {
+    const persona = await mockCreatePersona();
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
     mockUpdatePersonaVoice
       .mockRejectedValueOnce(new Error('Voice service unavailable'))
       .mockResolvedValueOnce(undefined);
     renderPage();
-
+    await screen.findByDisplayValue('Hello there.');
+    await waitFor(() => expect(screen.getByLabelText('Character voice')).toHaveValue('af_heart'));
     fireEvent.change(screen.getByLabelText('Opening Message'), {
       target: { value: 'Retry this character.' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(await screen.findByText('Voice service unavailable')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: 'Save Changes' }));
-
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     await waitFor(() => expect(mockUpdatePersonaVoice).toHaveBeenCalledTimes(2));
-    expect(mockCreatePersona).toHaveBeenCalledTimes(1);
-    expect(mockUpdatePersona).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePersona).toHaveBeenCalledTimes(2);
   });
 
-  it('requires a prepared opening before creating a character', async () => {
+  it('requires a prepared opening when editing a character', async () => {
+    const persona = { ...(await mockCreatePersona()), first_message: '', alternate_greetings: [] };
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
     renderPage();
-
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Silent Guide' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-
+    await screen.findByDisplayValue('Launch Wizard');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(
       await screen.findByText('Add an opening message or at least one alternate greeting.')
     ).toBeInTheDocument();
-    expect(mockCreatePersona).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Opening Message')).toHaveFocus();
-  });
-
-  it('imports a PNG card by uploading the avatar and forwarding the uploaded media URL', async () => {
-    renderPage();
-
-    const importLabel = screen.getByText('Upload .png or .json').closest('label');
-    const importInput = importLabel?.querySelector('input[type="file"]') as HTMLInputElement | null;
-
-    expect(importInput).not.toBeNull();
-
-    const pngFile = new File([new Uint8Array([137, 80, 78, 71])], 'card.png', {
-      type: 'image/png',
-    });
-    fireEvent.change(importInput!, { target: { files: [pngFile] } });
-
-    await waitFor(() => {
-      expect(mockUploadMedia).toHaveBeenCalledWith(pngFile);
-      expect(mockImportPersona).toHaveBeenCalledWith(pngFile, {
-        avatarUrl: '/uploads/imported-avatar.png',
-      });
-    });
+    expect(mockUpdatePersona).not.toHaveBeenCalled();
   });
 
   it('opens a chat for the selected persona and navigates to the conversation page', async () => {
@@ -602,176 +521,28 @@ describe('OmniChatStudioPage', () => {
     expect(await screen.findByText('Changes saved.')).toBeInTheDocument();
   });
 
-  it('uploads avatar, preview video, and gallery images into the save payload', async () => {
-    mockListMyPersonas.mockResolvedValue([
-      {
-        id: 77,
-        slug: 'u7-launch-wizard',
-        name: 'Launch Wizard',
-        description: 'Helps with launch readiness.',
-        category: 'helper',
-        visibility: 'private',
-        owner_user_id: 7,
-        is_nsfw: false,
-        is_active: true,
-        created_at: '2026-07-11T00:00:00Z',
-        updated_at: '2026-07-11T00:00:00Z',
-      },
-    ]);
-    mockGetPersonaDefinition.mockResolvedValue({
-      id: 77,
-      slug: 'u7-launch-wizard',
-      name: 'Launch Wizard',
-      description: 'Helps with launch readiness.',
-      category: 'helper',
-      owner_user_id: 7,
-      visibility: 'private',
-      source_format: 'native',
-      system_prompt: '',
-      personality: '',
-      scenario: '',
-      first_message: 'Ready when you are.',
-      example_dialogue: '',
-      post_history_instructions: '',
-      alternate_greetings: [],
-      creator_notes: '',
-      tags: [],
-      creator_name: '',
-      character_version: '',
-      avatar_url: '',
-      preview_video_url: '',
-      gallery_urls: [],
-      is_nsfw: false,
-      is_active: true,
-      character_book_json: {},
-      extensions_json: {},
-      created_at: '2026-07-11T00:00:00Z',
-      updated_at: '2026-07-11T00:00:00Z',
-    });
-    mockUploadMedia
-      .mockResolvedValueOnce({
-        storage_url: '/uploads/avatar.png',
-        storage_path: 'uploads/avatar.png',
-      })
-      .mockResolvedValueOnce({
-        storage_url: '/uploads/preview.mp4',
-        storage_path: 'uploads/preview.mp4',
-      })
-      .mockResolvedValueOnce({
-        storage_url: '/uploads/gallery.png',
-        storage_path: 'uploads/gallery.png',
-      });
-
+  it('does not offer character media uploads or send media fields on edit', async () => {
+    const persona = {
+      ...(await mockCreatePersona()),
+      avatar_url: '/uploads/existing-avatar.png',
+      preview_video_url: '/uploads/existing-video.mp4',
+      gallery_urls: ['/uploads/existing-gallery.png'],
+    };
+    mockListMyPersonas.mockResolvedValue([persona]);
+    mockGetPersonaDefinition.mockResolvedValue(persona);
     renderPage();
-
-    await screen.findByDisplayValue('Ready when you are.');
-    await screen.findByRole('button', { name: 'Save Changes' });
-
-    const avatarInput = document.getElementById('omnichat-studio-avatar-file') as HTMLInputElement;
-    const videoInput = document.getElementById(
-      'omnichat-studio-preview-video-file'
-    ) as HTMLInputElement;
-    const galleryInput = document.getElementById(
-      'omnichat-studio-gallery-file'
-    ) as HTMLInputElement;
-
-    fireEvent.change(avatarInput, {
-      target: { files: [new File(['avatar'], 'avatar.png', { type: 'image/png' })] },
+    await screen.findByDisplayValue('Hello there.');
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Edited description' },
     });
-    fireEvent.change(videoInput, {
-      target: { files: [new File(['video'], 'preview.mp4', { type: 'video/mp4' })] },
-    });
-    fireEvent.change(galleryInput, {
-      target: { files: [new File(['gallery'], 'gallery.png', { type: 'image/png' })] },
-    });
-
-    await waitFor(() => {
-      expect(mockUploadMedia).toHaveBeenCalledTimes(3);
-    });
-
     fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
-
-    await waitFor(() => {
-      expect(mockUpdatePersona).toHaveBeenCalledWith(
-        77,
-        expect.objectContaining({
-          avatar_url: '/uploads/avatar.png',
-          preview_video_url: '/uploads/preview.mp4',
-          gallery_urls: ['/uploads/gallery.png'],
-        })
-      );
-    });
-  });
-
-  it('removes uploaded media before saving', async () => {
-    mockListMyPersonas.mockResolvedValue([
-      {
-        id: 77,
-        slug: 'u7-launch-wizard',
-        name: 'Launch Wizard',
-        description: 'Helps with launch readiness.',
-        category: 'helper',
-        visibility: 'private',
-        owner_user_id: 7,
-        is_nsfw: false,
-        is_active: true,
-        created_at: '2026-07-11T00:00:00Z',
-        updated_at: '2026-07-11T00:00:00Z',
-      },
-    ]);
-    mockGetPersonaDefinition.mockResolvedValue({
-      id: 77,
-      slug: 'u7-launch-wizard',
-      name: 'Launch Wizard',
-      description: 'Helps with launch readiness.',
-      category: 'helper',
-      owner_user_id: 7,
-      visibility: 'private',
-      source_format: 'native',
-      system_prompt: '',
-      personality: '',
-      scenario: '',
-      first_message: 'Ready when you are.',
-      example_dialogue: '',
-      post_history_instructions: '',
-      alternate_greetings: [],
-      creator_notes: '',
-      tags: [],
-      creator_name: '',
-      character_version: '',
-      avatar_url: '/uploads/avatar.png',
-      preview_video_url: '/uploads/preview.mp4',
-      gallery_urls: ['/uploads/gallery.png'],
-      is_nsfw: false,
-      is_active: true,
-      character_book_json: {},
-      extensions_json: {},
-      created_at: '2026-07-11T00:00:00Z',
-      updated_at: '2026-07-11T00:00:00Z',
-    });
-
-    renderPage();
-
-    await screen.findByDisplayValue('Ready when you are.');
-    await screen.findByRole('button', { name: 'Save Changes' });
-    await screen.findByAltText('Avatar Image');
-    await screen.findByAltText('Gallery image 1');
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove image' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove video' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
-
-    await waitFor(() => {
-      expect(mockUpdatePersona).toHaveBeenCalledWith(
-        77,
-        expect.objectContaining({
-          avatar_url: undefined,
-          preview_video_url: undefined,
-          gallery_urls: [],
-        })
-      );
-    });
+    await waitFor(() => expect(mockUpdatePersona).toHaveBeenCalled());
+    const payload = mockUpdatePersona.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('avatar_url');
+    expect(payload).not.toHaveProperty('preview_video_url');
+    expect(payload).not.toHaveProperty('gallery_urls');
+    expect(payload).not.toHaveProperty('extensions_json');
   });
 
   it('shows the delete actions when a persona is selected', async () => {

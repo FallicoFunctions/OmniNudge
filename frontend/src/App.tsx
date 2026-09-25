@@ -43,6 +43,7 @@ const OmniChatPage = lazy(() => import('./pages/OmniChatPage'));
 const OmniChatStudioPage = lazy(() => import('./pages/OmniChatStudioPage'));
 const OmniChatCreatePage = lazy(() => import('./pages/OmniChatCreatePage'));
 const OmniChatNewOmniAIPage = lazy(() => import('./pages/OmniChatNewOmniAIPage'));
+const OmniChatNewRoleplayPage = lazy(() => import('./pages/OmniChatNewRoleplayPage'));
 const OmniChatExplorePage = lazy(() => import('./pages/OmniChatExplorePage'));
 const OmniChatPublicationPage = lazy(() =>
   import('./pages/OmniChatExplorePage').then((module) => ({
@@ -274,6 +275,14 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <OmniChatNewOmniAIPage />
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/omnichat/new-roleplay"
+                                element={
+                                  <ProtectedRoute>
+                                    <OmniChatNewRoleplayPage />
                                   </ProtectedRoute>
                                 }
                               />

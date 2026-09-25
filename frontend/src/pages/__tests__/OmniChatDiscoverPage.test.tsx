@@ -126,7 +126,7 @@ describe('OmniChatDiscoverPage', () => {
     window.removeEventListener('open-auth-modal', authEventListener);
   });
 
-  it('opens auth when guests click the main create or import character button', async () => {
+  it('opens auth when guests click the roleplay creator button', async () => {
     const authEventListener = vi.fn();
     window.addEventListener('open-auth-modal', authEventListener);
 
@@ -146,7 +146,7 @@ describe('OmniChatDiscoverPage', () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: /create or import character/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /create roleplay ai/i }));
 
     expect(authEventListener).toHaveBeenCalledTimes(1);
 

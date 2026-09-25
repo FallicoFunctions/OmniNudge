@@ -10,7 +10,9 @@ import type {
   BotPersona,
   BotPersonaDefinition,
   ConversationSettings,
-  PersonaDefinitionPayload,
+  PersonaEditPayload,
+  RoleplayCreationAnswers,
+  RoleplayCreationOptions,
   OmniAIOptions,
   CreateOmniAIRequest,
   PersonaCategory,
@@ -123,6 +125,13 @@ function resolveApiMediaUrl(fallback: URL, suppliedUrl?: string): string {
  */
 export function mediaAssetContentUrl(assetId: string, publicContentUrl?: string): string {
   return resolveApiMediaContentUrl(assetId, publicContentUrl);
+}
+
+/** Candidate portraits use a private, owner-scoped API route. */
+export function likenessCandidateContentUrl(personaId: number, candidateId: number): string {
+  return getApiUrl(
+    `/omnichat/omniai/${encodeURIComponent(personaId)}/likeness/${encodeURIComponent(candidateId)}/content`
+  ).toString();
 }
 
 /** The URL to put in an img src for an asset's tile image. */
@@ -444,14 +453,17 @@ export const omnichatService = {
     return api.post<{ started: number }>(`/omnichat/omniai/${personaId}/likeness/reroll`, {});
   },
 
-  async createPersona(payload: PersonaDefinitionPayload): Promise<BotPersonaDefinition> {
-    const res = await api.post<{ persona: BotPersonaDefinition }>('/omnichat/personas', payload);
-    return res.persona;
+  async getRoleplayCreationOptions(): Promise<RoleplayCreationOptions> {
+    return api.get<RoleplayCreationOptions>('/omnichat/personas/creation-options');
+  },
+
+  async createRoleplay(requestId: string, answers: RoleplayCreationAnswers): Promise<BotPersona> {
+    return api.post<BotPersona>('/omnichat/personas', { request_id: requestId, answers });
   },
 
   async updatePersona(
     personaId: number,
-    payload: PersonaDefinitionPayload
+    payload: PersonaEditPayload
   ): Promise<BotPersonaDefinition> {
     const res = await api.put<{ persona: BotPersonaDefinition }>(
       `/omnichat/personas/${personaId}`,
@@ -462,35 +474,6 @@ export const omnichatService = {
 
   async deletePersona(personaId: number): Promise<void> {
     await api.delete(`/omnichat/personas/${personaId}`);
-  },
-
-  async importPersona(
-    file: File,
-    options?: { avatarUrl?: string; isNsfw?: boolean }
-  ): Promise<BotPersonaDefinition> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (options?.avatarUrl) {
-      formData.append('avatar_url', options.avatarUrl);
-    }
-    if (options?.isNsfw) {
-      formData.append('is_nsfw', 'true');
-    }
-
-    const response = await authenticatedFetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/import`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
-
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error((body && (body.message || body.error)) || 'Import failed');
-    }
-
-    return body.persona as BotPersonaDefinition;
   },
 
   async exportPersona(personaId: number): Promise<Blob> {

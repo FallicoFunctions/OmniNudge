@@ -1,8 +1,13 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { omnichatQueryKeys, omnichatService } from '../../../services/omnichatService';
+import {
+  likenessCandidateContentUrl,
+  omnichatQueryKeys,
+  omnichatService,
+} from '../../../services/omnichatService';
 import { translate } from './labels';
 import { serverErrorFrom } from './refusals';
 import { pronounsFor } from './pronouns';
@@ -11,7 +16,7 @@ import { pronounsFor } from './pronouns';
  * How many faces a set is.
  *
  * The server's OmniChatOmniAILikenessCandidates is the source of truth. This
- * mirrors it only to price the button, and the copy either side of it says
+ * mirrors it only to price the button, and the button says
  * "four" in words anyway -- so a change there is a copy change, not a silent
  * one. The per-image price is deliberately not mirrored: that is configured,
  * and the server publishes it.
@@ -33,13 +38,29 @@ const LIKENESS_CANDIDATES = 4;
 export default function LikenessPicker({
   personaId,
   gender,
+  expectGeneration = false,
 }: {
   personaId: number;
   gender: string;
+  expectGeneration?: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const p = pronounsFor(gender);
+  const [waitState, setWaitState] = useState({ personaId, attempt: 0, expired: false });
+  const waitExpired = waitState.personaId === personaId && waitState.expired;
+
+  useEffect(() => {
+    if (!expectGeneration) return;
+    const timer = window.setTimeout(() => {
+      setWaitState((current) =>
+        current.personaId === personaId
+          ? { ...current, expired: true }
+          : { personaId, attempt: current.attempt, expired: true }
+      );
+    }, 60_000);
+    return () => window.clearTimeout(timer);
+  }, [expectGeneration, personaId, waitState.attempt]);
 
   const choice = useQuery({
     queryKey: omnichatQueryKeys.omniAILikeness(personaId),
@@ -50,9 +71,12 @@ export default function LikenessPicker({
     // changing.
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data) return 4000;
+      if (!data) return expectGeneration && waitExpired ? false : 4000;
       const waiting = data.pending > 0 || data.candidates.some((one) => !one.ready);
-      return waiting ? 4000 : false;
+      if (waiting) return 4000;
+      // Creation returns before its background queue starts. An empty first
+      // response is not proof that no portraits are coming.
+      return expectGeneration && data.candidates.length === 0 && !waitExpired ? 4000 : false;
     },
   });
 
@@ -101,10 +125,35 @@ export default function LikenessPicker({
   const settled = pick.isPending || pick.isSuccess;
 
   const data = choice.data;
-  // Nothing to choose and nothing coming: she was made before this existed, or
-  // every render failed. Either way there is no choice to put in front of
-  // somebody, and an empty panel would be worse than none.
-  if (!data || (data.candidates.length === 0 && data.pending === 0)) {
+  const empty = !data || (data.candidates.length === 0 && data.pending === 0);
+  if (empty && expectGeneration) {
+    const waiting = !choice.isError && !waitExpired;
+    return (
+      <div
+        role="status"
+        className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/65"
+      >
+        {waiting ? 'Generating character portraits…' : 'Portraits are unavailable right now.'}
+        {!waiting && (
+          <button
+            type="button"
+            onClick={() => {
+              setWaitState((current) => ({
+                personaId,
+                attempt: current.attempt + 1,
+                expired: false,
+              }));
+              void choice.refetch();
+            }}
+            className="ml-3 rounded-lg border border-white/20 px-3 py-1.5 text-white"
+          >
+            Check again
+          </button>
+        )}
+      </div>
+    );
+  }
+  if (empty || !data) {
     return null;
   }
 
@@ -116,13 +165,13 @@ export default function LikenessPicker({
       className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
     >
       <h3 id="omnichat-likeness-title" className="text-[15px] font-semibold text-white/90">
-        {translate(t, 'omnichat.omniai.likeness.title', `Choose how ${p.subj} looks`)}
+        {translate(t, 'omnichat.omniai.likeness.title', `Choose how ${p.subj} look${p.s}`)}
       </h3>
       <p className="mt-1 text-[13px] leading-5 text-white/50">
         {translate(
           t,
           'omnichat.omniai.likeness.subtitle',
-          `This is the one you keep. It becomes ${p.poss} picture everywhere ${p.subj} appears.`
+          `This is the one you keep. It becomes ${p.poss} picture everywhere ${p.subj} appear${p.s}.`
         )}
       </p>
 
@@ -150,8 +199,9 @@ export default function LikenessPicker({
           >
             {candidate.ready ? (
               <img
-                src={candidate.content_url}
+                src={likenessCandidateContentUrl(personaId, candidate.id)}
                 alt=""
+                crossOrigin="use-credentials"
                 className="h-full w-full object-cover transition group-hover:scale-[1.03]"
               />
             ) : (
@@ -175,7 +225,7 @@ export default function LikenessPicker({
         ))}
       </div>
 
-      {/* Drawing another set replaces these four rather than adding to them, and
+      {/* Drawing another set replaces the current pictures rather than adding to them, and
           costs credits, so the button says both before it is pressed. It is gone
           the moment a choice is made: after that the answer is not another set,
           it is that she already has a face. */}
@@ -184,9 +234,9 @@ export default function LikenessPicker({
           <button
             type="button"
             onClick={() => reroll.mutate()}
-            disabled={reroll.isPending || waitingFor > 0}
+            disabled={reroll.isPending || waitingFor > 0 || setCost === undefined}
             // Otherwise the button announces its price and not its consequence:
-            // the note beside it is the only thing that says these four go, and
+            // the note beside it is the only thing that says the current pictures go, and
             // a screen reader has no reason to read a neighbouring span.
             aria-describedby="omniai-reroll-replaces"
             className="omnichat-touch-target rounded-xl border border-white/12 bg-white/[0.035] px-4 py-2 text-[13px] font-semibold text-white/75 transition hover:border-[#5d8fff]/60 disabled:cursor-not-allowed disabled:opacity-40"
@@ -194,8 +244,7 @@ export default function LikenessPicker({
             {reroll.isPending
               ? translate(t, 'omnichat.omniai.likeness.rerolling', 'Drawing four more...')
               : setCost === undefined
-                ? // The price has not arrived. Better to say nothing about cost
-                  // than to name one that may not be what is charged.
+                ? // Keep the paid action unavailable until its price is known.
                   translate(t, 'omnichat.omniai.likeness.rerollPlain', 'Draw four more')
                 : translate(
                     t,
@@ -204,7 +253,11 @@ export default function LikenessPicker({
                   )}
           </button>
           <span id="omniai-reroll-replaces" className="text-[12px] text-white/35">
-            {translate(t, 'omnichat.omniai.likeness.rerollReplaces', 'These four are replaced.')}
+            {translate(
+              t,
+              'omnichat.omniai.likeness.rerollReplaces',
+              'Your current pictures are replaced.'
+            )}
           </span>
         </div>
       ) : null}

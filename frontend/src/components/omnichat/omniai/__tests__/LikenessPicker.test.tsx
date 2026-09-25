@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
@@ -18,11 +18,20 @@ vi.mock('../../../../services/omnichatService', async (importOriginal) => ({
   },
 }));
 
-function renderPicker() {
+function renderPicker(expectGeneration = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <LikenessPicker personaId={31} gender="woman" />
+      <LikenessPicker personaId={31} gender="woman" expectGeneration={expectGeneration} />
+    </QueryClientProvider>
+  );
+}
+
+function renderNeutralPicker() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <LikenessPicker personaId={31} gender="nonbinary" />
     </QueryClientProvider>
   );
 }
@@ -60,6 +69,36 @@ function pictureButtons() {
 }
 
 describe('choosing her face', () => {
+  it('shows a waiting state when a new character returns before portrait jobs are queued', async () => {
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue({
+      candidates: [],
+      pending: 0,
+    });
+    renderPicker(true);
+    expect(await screen.findByText('Generating character portraits…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Draw four more/ })).not.toBeInTheDocument();
+  });
+
+  it('ends the initial wait after one minute and lets the user check again', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue({
+        candidates: [],
+        pending: 0,
+      });
+      renderPicker(true);
+      expect(screen.getByText('Generating character portraits…')).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(screen.getByText('Portraits are unavailable right now.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      expect(screen.getByText('Generating character portraits…')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows nothing when there is nothing to choose and nothing coming', async () => {
     // She was made before this existed, or every render failed. An empty panel
     // is worse than no panel.
@@ -83,6 +122,15 @@ describe('choosing her face', () => {
     expect(await screen.findByText('Choose how she looks')).toBeInTheDocument();
     expect(
       screen.getByText(/This is the one you keep. It becomes her picture everywhere she appears./)
+    ).toBeInTheDocument();
+  });
+
+  it('uses plural verb agreement when the character gender is unknown', async () => {
+    vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
+    renderNeutralPicker();
+    expect(await screen.findByText('Choose how they look')).toBeInTheDocument();
+    expect(
+      screen.getByText('This is the one you keep. It becomes their picture everywhere they appear.')
     ).toBeInTheDocument();
   });
 
@@ -136,8 +184,9 @@ describe('choosing her face', () => {
     expect(images).toHaveLength(2);
     images.forEach((image) => {
       expect(image.getAttribute('src')).toMatch(
-        /^\/api\/v1\/omnichat\/omniai\/31\/likeness\/\d+\/content$/
+        /^http:\/\/localhost:8080\/api\/v1\/omnichat\/omniai\/31\/likeness\/\d+\/content$/
       );
+      expect(image.getAttribute('crossorigin')).toBe('use-credentials');
     });
   });
 
@@ -206,7 +255,9 @@ describe('drawing another set', () => {
     expect(
       await screen.findByRole('button', { name: /Draw four more \(40 credits\)/ })
     ).toBeEnabled();
-    expect(screen.getByText('These four are replaced.')).toBeInTheDocument();
+    // One or more of the first four may fail review, leaving a partial set.
+    expect(pictureButtons()).toHaveLength(2);
+    expect(screen.getByText('Your current pictures are replaced.')).toBeInTheDocument();
   });
 
   it('follows the server when the image price changes', async () => {
@@ -226,16 +277,14 @@ describe('drawing another set', () => {
     ).toBeEnabled();
   });
 
-  it('names no price at all when it does not know one', async () => {
-    // Better to say nothing about cost than to name one nobody promised to
-    // charge. The button still works; it just does not claim a number.
+  it('does not allow a paid reroll when its price is unknown', async () => {
     vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());
     vi.mocked(omnichatService.getBillingUsage).mockRejectedValue(new Error('offline'));
     renderPicker();
 
     await screen.findByText('Choose how she looks');
     const button = await screen.findByRole('button', { name: /^Draw four more$/ });
-    expect(button).toBeEnabled();
+    expect(button).toBeDisabled();
     expect(screen.queryByText(/credits\)/)).toBeNull();
   });
 
@@ -295,8 +344,8 @@ describe('drawing another set', () => {
 });
 
 describe('what the button tells somebody who cannot see it', () => {
-  it('announces that these four are replaced, not just the price', async () => {
-    // The note beside the button is the only thing that says the current four
+  it('announces that the current pictures are replaced, not just the price', async () => {
+    // The note beside the button is the only thing that says the current pictures
     // go. A screen reader has no reason to read a neighbouring span, so the
     // button has to point at it.
     vi.mocked(omnichatService.getLikenessCandidates).mockResolvedValue(choice());

@@ -2537,17 +2537,18 @@ export default function OmniChatChatPage() {
                     isShared={personaIsSharedWithOthers(activePersona)}
                   />
                 )}
-              {/* Her pictures arrive after she does, so the choice is made here
-                  rather than at the end of the creation flow. Anyone who is not
-                  her owner gets an empty choice from the server and sees
-                  nothing, so this needs no ownership check of its own. */}
+              {/* Guided characters may still be waiting for their generated
+                  portraits when their first chat opens. The picker endpoint
+                  scopes candidates to their owner. */}
               {!isLoadingConversation &&
-                personaShowsIntroNotice(activePersona) &&
-                activePersona && (
+                activePersona &&
+                (personaShowsIntroNotice(activePersona) ||
+                  (activePersona.owner_user_id != null && !activePersona.avatar_url)) && (
                   <div className="pb-4">
                     <LikenessPicker
                       personaId={activePersona.id}
-                      gender={activePersona.omniai_appearance?.gender ?? ''}
+                      gender={activePersona.omniai_appearance?.gender ?? 'nonbinary'}
+                      expectGeneration={!activePersona.avatar_url}
                     />
                   </div>
                 )}
