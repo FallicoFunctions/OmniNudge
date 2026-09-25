@@ -89,7 +89,7 @@ export interface RoleplayCreationAnswers {
   goal_id: string;
   region_id: string;
   venue_id: string;
-  gender: 'woman' | 'man' | 'nonbinary' | '';
+  gender: 'woman' | 'man' | '';
   first_name: string;
   last_name: string;
   age: number;

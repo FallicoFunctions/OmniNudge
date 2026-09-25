@@ -120,7 +120,7 @@ func TestNoPromptContradictsItsOwnSubject(t *testing.T) {
 			switch strings.ToLower(c.subject) {
 			case "man", "he":
 				expected = "he"
-			case "they", "nonbinary", "non-binary":
+			case "they":
 				expected = "they"
 			}
 

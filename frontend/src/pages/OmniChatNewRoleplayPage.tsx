@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import OmniChatShell from '../components/omnichat/OmniChatShell';
+import AnswerSlider from '../components/omnichat/omniai/AnswerSlider';
 import LikenessPicker from '../components/omnichat/omniai/LikenessPicker';
 import { useOmniChatNavigation } from '../components/omnichat/useOmniChatNavigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,7 +25,7 @@ const EMPTY: RoleplayCreationAnswers = {
   gender: '',
   first_name: '',
   last_name: '',
-  age: 0,
+  age: 27,
   render_style: 'realistic',
   hair_color_id: '',
   hair_style_id: '',
@@ -61,9 +62,20 @@ function readDraft(key: string, isAdmin: boolean): Draft {
             parsed.answers[key] ?? EMPTY[key],
           ])
         ) as unknown as RoleplayCreationAnswers;
+        const gender =
+          restored.gender === 'woman' || restored.gender === 'man' ? restored.gender : '';
         return {
           ...parsed,
-          answers: { ...restored, is_nsfw: isAdmin && restored.is_nsfw === true },
+          answers: {
+            ...restored,
+            gender,
+            first_name: gender ? restored.first_name : '',
+            age:
+              Number.isInteger(restored.age) && restored.age >= 18 && restored.age <= 100
+                ? restored.age
+                : 27,
+            is_nsfw: isAdmin && restored.is_nsfw === true,
+          },
           step: Math.min(Math.max(parsed.step, 0), STEPS.length - 1),
         };
       }
@@ -162,7 +174,7 @@ function ready(step: number, a: RoleplayCreationAnswers): boolean {
       );
     case 1:
       return (
-        present(a.gender) &&
+        (a.gender === 'woman' || a.gender === 'man') &&
         present(a.first_name) &&
         present(a.last_name) &&
         a.age >= 18 &&
@@ -229,6 +241,14 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
     selectedGroup ??
     catalog?.role_groups[0];
   const role = selectedGroup?.roles.find((item) => item.id === a.role_id);
+  useEffect(() => {
+    if (role && a.age < role.min_age) {
+      setDraft((current) => ({
+        ...current,
+        answers: { ...current.answers, age: role.min_age },
+      }));
+    }
+  }, [role, a.age]);
   const selectedGoal = catalog?.goals.find((item) => item.id === a.goal_id);
   const region = catalog?.regions.find((item) => item.id === a.region_id);
   const selectedUserRole = catalog?.user_roles.find((item) => item.id === a.user_role_id);
@@ -304,7 +324,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
         first_name: picked?.genders?.includes(current.answers.gender)
           ? current.answers.first_name
           : '',
-        age: current.answers.age >= (picked?.min_age ?? 18) ? current.answers.age : 0,
+        age: Math.max(picked?.min_age ?? 18, current.answers.age),
       },
     }));
     setProblem('');
@@ -533,7 +553,6 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                         options={[
                           { id: 'woman', label: 'Woman' },
                           { id: 'man', label: 'Man' },
-                          { id: 'nonbinary', label: 'Nonbinary' },
                         ].filter((choice) => !role?.genders || role.genders.includes(choice.id))}
                       />
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -551,24 +570,14 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                           options={named(catalog.last_names)}
                         />
                       </div>
-                      <label className="block space-y-2">
-                        <span className="text-sm font-medium text-white/85">Age</span>
-                        <select
-                          value={a.age || ''}
-                          onChange={(event) => set('age', Number(event.target.value))}
-                          className="w-full rounded-xl border border-white/15 bg-[#171b27] px-4 py-3 text-sm text-white outline-none focus:border-blue-400"
-                        >
-                          <option value="">Choose an age</option>
-                          {Array.from(
-                            { length: 101 - (role?.min_age ?? 18) },
-                            (_, index) => index + (role?.min_age ?? 18)
-                          ).map((age) => (
-                            <option key={age} value={age}>
-                              {age}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <AnswerSlider
+                        label="Age"
+                        value={a.age}
+                        min={role?.min_age ?? 18}
+                        max={100}
+                        format={String}
+                        onChange={(value) => set('age', value)}
+                      />
                       <Choice
                         label="Visual style"
                         value={a.render_style}

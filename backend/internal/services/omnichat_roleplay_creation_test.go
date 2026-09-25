@@ -48,6 +48,7 @@ func TestBuildRoleplayPersonaRejectsInvalidOrMismatchedSelections(t *testing.T) 
 		func(a *RoleplayCreationAnswers) { a.GoalID = "study_finals" },
 		func(a *RoleplayCreationAnswers) { a.VenueID = "spaceship_bridge" },
 		func(a *RoleplayCreationAnswers) { a.RegionID = "orbital_colony" },
+		func(a *RoleplayCreationAnswers) { a.Gender = "nonbinary" },
 		func(a *RoleplayCreationAnswers) { a.FirstName = "An arbitrary prompt" },
 		func(a *RoleplayCreationAnswers) { a.Age = 17 },
 		func(a *RoleplayCreationAnswers) { a.HairColorID = "arbitrary text" },
@@ -82,6 +83,9 @@ func TestBuildRoleplayPersonaOpeningLowercasesIndefiniteSettingArticle(t *testin
 
 func TestRoleplayCatalogOffersDependentVariety(t *testing.T) {
 	catalog := RoleplayCreationCatalog()
+	require.Len(t, catalog.FirstNames, 2)
+	require.Contains(t, catalog.FirstNames, "woman")
+	require.Contains(t, catalog.FirstNames, "man")
 	roleCount := 0
 	for _, group := range catalog.RoleGroups {
 		roleCount += len(group.Roles)

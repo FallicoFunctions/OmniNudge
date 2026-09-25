@@ -2547,7 +2547,7 @@ export default function OmniChatChatPage() {
                   <div className="pb-4">
                     <LikenessPicker
                       personaId={activePersona.id}
-                      gender={activePersona.omniai_appearance?.gender ?? 'nonbinary'}
+                      gender={activePersona.omniai_appearance?.gender ?? ''}
                       expectGeneration={!activePersona.avatar_url}
                     />
                   </div>

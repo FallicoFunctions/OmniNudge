@@ -31,7 +31,7 @@ function renderNeutralPicker() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <LikenessPicker personaId={31} gender="nonbinary" />
+      <LikenessPicker personaId={31} gender="" />
     </QueryClientProvider>
   );
 }

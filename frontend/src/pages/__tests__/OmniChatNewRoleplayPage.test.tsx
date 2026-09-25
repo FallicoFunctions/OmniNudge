@@ -77,7 +77,7 @@ const catalog = {
     option('local_restaurant', 'Local restaurant'),
     option('neighborhood_diner', 'Neighborhood diner'),
   ],
-  first_names: { woman: ['Maya'], man: ['Adrian'], nonbinary: ['Alex'] },
+  first_names: { woman: ['Maya'], man: ['Adrian'] },
   last_names: ['Hart'],
   hair_colors: [option('dark_brown', 'Dark brown')],
   hair_styles: [option('long_wavy', 'Long and wavy')],
@@ -206,6 +206,29 @@ describe('guided roleplay creation', () => {
     continueStep();
     expect(screen.getByRole('button', { name: 'Realistic' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Anime' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Woman' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Man' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nonbinary' })).not.toBeInTheDocument();
+  });
+
+  it('clears a saved gender choice that is no longer offered', async () => {
+    sessionStorage.setItem(
+      'omnichat-roleplay-draft-7',
+      JSON.stringify({
+        version: 2,
+        step: 1,
+        requestId: '123e4567-e89b-42d3-a456-426614174000',
+        answers: { role_id: 'private_investigator', gender: 'nonbinary', first_name: 'Alex' },
+      })
+    );
+    page();
+    await screen.findByRole('button', { name: 'Woman' });
+    expect(screen.queryByRole('button', { name: 'Nonbinary' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      const saved = JSON.parse(sessionStorage.getItem('omnichat-roleplay-draft-7') || '{}');
+      expect(saved.answers.gender).toBe('');
+      expect(saved.answers.first_name).toBe('');
+    });
   });
 
   it('creates a character using selections only', async () => {
@@ -218,6 +241,8 @@ describe('guided roleplay creation', () => {
     continueStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Woman' }));
+    expect(screen.getByRole('slider', { name: 'Age' })).toHaveAttribute('min', '21');
+    expect(screen.getByRole('slider', { name: 'Age' })).toHaveAttribute('step', 'any');
     choose('First name', 'Maya');
     choose('Last name', 'Hart');
     choose('Age', '27');
@@ -242,7 +267,7 @@ describe('guided roleplay creation', () => {
     expect(screen.queryByText('18+')).not.toBeInTheDocument();
     continueStep();
     expect(screen.getByText('Maya Hart, 27 · Private investigator')).toBeInTheDocument();
-    expect(document.querySelector('input, textarea')).toBeNull();
+    expect(document.querySelector('input:not([type="range"]), textarea')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Create character' }));
 
     await waitFor(() => expect(createRoleplay).toHaveBeenCalledTimes(1));

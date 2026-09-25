@@ -209,8 +209,7 @@
   ],
   "first_names": {
     "woman":["Aaliyah","Amelia","Amina","Avery","Camila","Clara","Elena","Emma","Grace","Hana","Isabella","Jasmine","Layla","Maya","Nadia","Olivia","Sadie","Sofia","Tara","Zoe"],
-    "man":["Adrian","Alex","Andre","Benjamin","Caleb","Daniel","Elias","Ethan","Isaac","James","Jonah","Kai","Leo","Liam","Marcus","Mateo","Noah","Owen","Rafael","Theo"],
-    "nonbinary":["Alex","Ari","Ash","Avery","Blair","Casey","Dakota","Eden","Emery","Finley","Harper","Jules","Kai","Morgan","Parker","Quinn","Reese","River","Rowan","Sage"]
+    "man":["Adrian","Alex","Andre","Benjamin","Caleb","Daniel","Elias","Ethan","Isaac","James","Jonah","Kai","Leo","Liam","Marcus","Mateo","Noah","Owen","Rafael","Theo"]
   },
   "last_names":["Bennett","Brooks","Chen","Diaz","Ellis","Foster","Garcia","Hart","Hayes","Ibrahim","Kim","Lopez","Morgan","Nguyen","Patel","Price","Reed","Rivera","Shaw","Walker"],
   "hair_colors":[{"id":"black","label":"Black"},{"id":"dark_brown","label":"Dark brown"},{"id":"light_brown","label":"Light brown"},{"id":"blonde","label":"Blonde"},{"id":"red","label":"Red"},{"id":"auburn","label":"Auburn"},{"id":"silver","label":"Silver"},{"id":"white","label":"White"},{"id":"blue","label":"Blue"},{"id":"pink","label":"Pink"}],

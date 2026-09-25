@@ -210,7 +210,7 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 	if err != nil {
 		return nil, err
 	}
-	if a.Gender != "woman" && a.Gender != "man" && a.Gender != "nonbinary" {
+	if a.Gender != "woman" && a.Gender != "man" {
 		return nil, fmt.Errorf("%w: choose a gender", ErrRoleplayCreationAnswers)
 	}
 	if len(role.Genders) > 0 && !selectedString(role.Genders, a.Gender) {
@@ -290,8 +290,8 @@ func BuildRoleplayPersona(a RoleplayCreationAnswers) (*models.BotPersona, error)
 	}
 
 	name := a.FirstName + " " + a.LastName
-	genderPhrase := map[string]string{"woman": "woman", "man": "man", "nonbinary": "nonbinary person"}[a.Gender]
-	subject := map[string]string{"woman": "she", "man": "he", "nonbinary": "they"}[a.Gender]
+	genderPhrase := map[string]string{"woman": "woman", "man": "man"}[a.Gender]
+	subject := map[string]string{"woman": "she", "man": "he"}[a.Gender]
 	buildLabel := strings.ToLower(build.Label)
 	buildArticle := "a"
 	if strings.ContainsRune("aeiou", rune(buildLabel[0])) {

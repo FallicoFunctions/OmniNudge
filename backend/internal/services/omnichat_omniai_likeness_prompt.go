@@ -198,7 +198,7 @@ func pronounsFor(subject string) omniAIPronouns {
 	switch strings.ToLower(strings.TrimSpace(subject)) {
 	case "he", "man", "male":
 		return omniAIPronouns{"he", "He", "his", "His", "is", "has"}
-	case "they", "nonbinary", "non-binary":
+	case "they":
 		return omniAIPronouns{"they", "They", "their", "Their", "are", "have"}
 	default:
 		return omniAIPronouns{"she", "She", "her", "Her", "is", "has"}
