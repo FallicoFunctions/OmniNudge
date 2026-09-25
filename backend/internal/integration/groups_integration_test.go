@@ -739,23 +739,42 @@ func TestGroupMessageKeepsItsSenderAfterTheyLeave(t *testing.T) {
 // A join is announced to the members, so an app holding older key versions
 // the newcomer lacks can pass them on without anyone sending a message.
 func TestGroupJoinIsAnnounced(t *testing.T) {
-	deps := newGroupTestDeps(t)
-	defer deps.DB.Close()
-	ts := httptest.NewServer(deps.GroupRouter)
-	defer ts.Close()
+	for _, how := range []string{"added", "invited"} {
+		t.Run(how, func(t *testing.T) {
+			deps := newGroupTestDeps(t)
+			defer deps.DB.Close()
+			ts := httptest.NewServer(deps.GroupRouter)
+			defer ts.Close()
 
-	g := newLiveGroup(t, deps, ts.URL, "joined")
-	newcomer := createUser(t, deps.UserRepo, uniqueGrpUsername("joinednew"), "user")
-	w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
-		fmt.Sprintf("/api/v1/groups/%d/participants", g.id), g.ownerToken,
-		[]byte(fmt.Sprintf(`{"user_id":%d}`, newcomer.ID)))
-	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			g := newLiveGroup(t, deps, ts.URL, "joined"+how)
+			newcomer := createUser(t, deps.UserRepo, uniqueGrpUsername("joinednew"), "user")
+			if how == "added" {
+				w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+					fmt.Sprintf("/api/v1/groups/%d/participants", g.id), g.ownerToken,
+					[]byte(fmt.Sprintf(`{"user_id":%d}`, newcomer.ID)))
+				require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			} else {
+				w := doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+					fmt.Sprintf("/api/v1/groups/%d/invites", g.id), g.ownerToken,
+					[]byte(fmt.Sprintf(`{"user_id":%d}`, newcomer.ID)))
+				require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+				var invite struct {
+					ID int `json:"id"`
+				}
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invite))
+				newcomerToken, _ := deps.AuthService.GenerateJWT(newcomer.ID, newcomer.Username, newcomer.Role)
+				w = doGroupRequest(t, deps.GroupRouter, http.MethodPost,
+					fmt.Sprintf("/api/v1/groups/invites/%d/accept", invite.ID), newcomerToken, []byte(`{}`))
+				require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			}
 
-	for _, conn := range g.members {
-		evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_member_joined" })
-		payload, _ := evt["payload"].(map[string]interface{})
-		assert.EqualValues(t, g.id, payload["conversation_id"])
-		assert.EqualValues(t, newcomer.ID, payload["user_id"])
+			for _, conn := range g.members {
+				evt := readWebSocketEvent(t, conn, 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_member_joined" })
+				payload, _ := evt["payload"].(map[string]interface{})
+				assert.EqualValues(t, g.id, payload["conversation_id"])
+				assert.EqualValues(t, newcomer.ID, payload["user_id"])
+			}
+		})
 	}
 }
 
