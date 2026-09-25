@@ -56,6 +56,7 @@ import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 import { searchPlatformPosts } from '../services/platformSearchService';
+import type { ApiRequestError } from '../lib/api';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { requiresModerator } from '../utils/permissions';
@@ -68,6 +69,18 @@ import { useActiveHubAIDesign } from '../hooks/useActiveHubAIDesign';
 import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
+
+/**
+ * A private hub answers 403 with access_required and its privacy type.
+ * hubsService uses the fetch client, which keeps the answer's body on the
+ * error. This page used to read an Axios-style response.data that the client
+ * never builds, and found a private hub only by matching the English words of
+ * the message.
+ */
+function isPrivateHubRefusal(error: unknown): boolean {
+  const { status, body } = (error ?? {}) as Partial<ApiRequestError>;
+  return status === 403 && (body?.access_required === true || body?.privacy_type === 'private');
+}
 
 export default function HubsPage() {
   const { t } = useTranslation();
@@ -402,22 +415,9 @@ export default function HubsPage() {
       !useInfiniteScrollHubs,
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
-    retry: (failureCount, error) => {
-      const response = (
-        error as { response?: { status?: number; data?: { access_required?: boolean } } }
-      )?.response;
-      if (response?.status === 403 && response?.data?.access_required) {
-        return false;
-      }
-      if (
-        error instanceof Error &&
-        error.message.includes('private') &&
-        error.message.includes('do not have access')
-      ) {
-        return false;
-      }
-      return failureCount < 3;
-    },
+    // Asking a private hub again gives the same answer; retrying only delayed
+    // the private hub screen.
+    retry: (failureCount, error) => !isPrivateHubRefusal(error) && failureCount < 3,
   });
   const {
     data: infiniteData,
@@ -1059,40 +1059,10 @@ export default function HubsPage() {
   }
 
   if (error) {
-    const errorMessage = error instanceof Error ? error.message : '';
-    const tanstackError = error as {
-      response?: {
-        status?: number;
-        data?: {
-          error?: string;
-          access_required?: boolean;
-          privacy_type?: string;
-        };
-      };
-      status?: number;
-    };
-    const errorStatus = tanstackError.status || tanstackError.response?.status;
-    const isForbidden = errorStatus === 403 || errorMessage.includes('status code 403');
-    const is403Error = errorStatus === 403;
-    const accessRequired = tanstackError.response?.data?.access_required === true;
-    const hasPrivateMessage =
-      errorMessage.includes('private') && errorMessage.includes('do not have access');
-    const isPrivateHubSetting =
-      hubSettings?.privacy_type === 'private' ||
-      tanstackError.response?.data?.privacy_type === 'private';
     const isPrivateHubError =
-      hasPrivateMessage || accessRequired || ((is403Error || isForbidden) && isPrivateHubSetting);
-
-    console.log('HubPage error detected:', {
-      errorMessage,
-      errorStatus,
-      is403Error,
-      accessRequired,
-      hasPrivateMessage,
-      isPrivateHubError,
-      hubname,
-      showHubSidebar,
-    });
+      isPrivateHubRefusal(error) ||
+      ((error as Partial<ApiRequestError>).status === 403 &&
+        hubSettings?.privacy_type === 'private');
 
     if (isPrivateHubError && hubname && hubname !== 'popular' && hubname !== 'all') {
       return <Navigate to={`/h/${hubname}/private`} replace state={{ from: location.pathname }} />;

@@ -136,6 +136,8 @@ vi.mock('../../contexts/SettingsContext', () => ({
 }));
 
 import HubPage from '../HubPage';
+import { hubsService } from '../../services/hubsService';
+import { apiRequestError } from '../../lib/api';
 import { hubAIDesignerService } from '../../services/hubAIDesignerService';
 
 const createWrapper = () => {
@@ -256,5 +258,35 @@ describe('HubPage', () => {
       expect(screen.getByTestId('hub-ai-layout')).toBeInTheDocument();
       expect(screen.getByTestId('hub-feed-slot-content')).toBeInTheDocument();
     });
+  });
+});
+
+describe('HubPage for a private hub', () => {
+  // A private hub answers 403 with access_required. The page read it from an
+  // Axios-style response.data that the fetch client never builds, and found a
+  // private hub only by matching the English words of the message.
+  it.each([
+    ['the words of the message', 'This hub is private and you do not have access'],
+    ['a message that says nothing of privacy', 'Forbidden'],
+  ])('opens the private hub screen whatever %s', async (_label, message) => {
+    vi.mocked(hubsService.getHubPosts).mockClear();
+    vi.mocked(hubsService.getHubPosts).mockRejectedValue(
+      apiRequestError(403, { error: message, access_required: true, privacy_type: 'private' })
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/h/secret']}>
+          <Routes>
+            <Route path="/h/:hubname" element={<HubPage />} />
+            <Route path="/h/:hubname/private" element={<p>PRIVATE_HUB_SCREEN</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('PRIVATE_HUB_SCREEN')).toBeInTheDocument();
+    // Asked once: a private hub's answer does not change on a retry.
+    expect(hubsService.getHubPosts).toHaveBeenCalledTimes(1);
   });
 });
