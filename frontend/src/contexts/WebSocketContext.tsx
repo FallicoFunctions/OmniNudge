@@ -25,6 +25,8 @@ import type {
 import type { BotConversationDetail, BotMessage, OmniChatGroupMessage } from '../types/omnichat';
 import { friendsQueryKeys } from '../services/friendsService';
 import { forgetGroupKeys, shareMissingGroupHistory } from '../services/groupKeyCache';
+import { addToast } from '../hooks/useToast';
+import i18n from 'i18next';
 
 interface WebSocketMessage {
   type: string;
@@ -253,6 +255,51 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             const { conversation_id } = data.payload as { conversation_id: number };
             queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
             queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            if (data.type === 'group_member_banned') {
+              window.dispatchEvent(
+                new CustomEvent('ws-group-event', {
+                  detail: { type: data.type, payload: data.payload },
+                })
+              );
+            }
+            break;
+          }
+
+          // This user was banned from a group. The reason is sent to them
+          // alone, and it is the only place it is shown; the group drops out of
+          // their list like any group they have left.
+          case 'group_you_were_banned': {
+            const { conversation_id, group_name, reason } = data.payload as {
+              conversation_id: number;
+              group_name: string;
+              reason?: string;
+            };
+            queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            addToast({
+              type: 'warning',
+              message: i18n.t('groups.admin.youWereBanned', { name: group_name }),
+              description: reason?.trim()
+                ? i18n.t('groups.admin.youWereBannedReason', { reason: reason.trim() })
+                : undefined,
+              duration: 0,
+            });
+            break;
+          }
+
+          // Admin actions in a group -- mute, unmute, a deleted message, slow
+          // mode. The open group applies them (useGroupAdmin, through
+          // MessagesPage); nothing sent them there, so they showed only after
+          // a refresh.
+          case 'group_member_muted':
+          case 'group_member_unmuted':
+          case 'group_message_deleted_by_admin':
+          case 'group_slow_mode_updated': {
+            window.dispatchEvent(
+              new CustomEvent('ws-group-event', {
+                detail: { type: data.type, payload: data.payload },
+              })
+            );
             break;
           }
 

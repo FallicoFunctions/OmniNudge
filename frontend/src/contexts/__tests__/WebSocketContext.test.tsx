@@ -8,7 +8,10 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
   forgetGroupKeys: vi.fn(),
   shareMissingGroupHistory: vi.fn(),
+  addToast: vi.fn(),
 }));
+
+vi.mock('../../hooks/useToast', () => ({ addToast: mocks.addToast }));
 
 vi.mock('../../services/groupKeyCache', () => ({
   forgetGroupKeys: mocks.forgetGroupKeys,
@@ -194,6 +197,54 @@ describe('WebSocketProvider group keys', () => {
       expect(queryClient.getQueryState(['conversations', 'all'])?.isInvalidated).toBe(true);
     }
   );
+
+  // The ban reason reached every member's app and was shown to nobody. It is
+  // now sent to the banned user alone, and shown to them.
+  it('tells the banned user why, and drops the group from their list', async () => {
+    mocks.addToast.mockReset();
+    const queryClient = await receive('group_you_were_banned', {
+      conversation_id: 47,
+      group_name: 'Test',
+      reason: 'spam',
+    });
+    expect(mocks.addToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'warning',
+        message: 'You were banned from Test',
+        description: 'Reason: spam',
+        duration: 0,
+      })
+    );
+    expect(queryClient.getQueryState(['conversations', 'all'])?.isInvalidated).toBe(true);
+  });
+
+  it('says only that the user was banned when no reason was given', async () => {
+    mocks.addToast.mockReset();
+    await receive('group_you_were_banned', { conversation_id: 47, group_name: 'Test', reason: '' });
+    expect(mocks.addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'You were banned from Test', description: undefined })
+    );
+  });
+
+  // The open group applies admin actions from 'ws-group-event', which nothing
+  // sent: a mute, a deleted message or slow mode showed only after a refresh.
+  it.each([
+    'group_member_muted',
+    'group_member_unmuted',
+    'group_member_banned',
+    'group_message_deleted_by_admin',
+    'group_slow_mode_updated',
+  ])('passes %s to the open group', async (type) => {
+    const seen: Array<{ type: string; payload: unknown }> = [];
+    const listener = (event: Event) => seen.push((event as CustomEvent).detail);
+    window.addEventListener('ws-group-event', listener);
+    try {
+      await receive(type, { conversation_id: 47, user_id: 99 });
+      expect(seen).toEqual([{ type, payload: { conversation_id: 47, user_id: 99 } }]);
+    } finally {
+      window.removeEventListener('ws-group-event', listener);
+    }
+  });
 
   // The invite counts on the Messages badge; it appeared only after the app
   // next fetched its invites.

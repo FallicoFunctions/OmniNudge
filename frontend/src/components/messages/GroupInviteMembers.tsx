@@ -22,7 +22,6 @@ export function GroupInviteMembers({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoundUser[]>([]);
-  const [invitedIds, setInvitedIds] = useState<number[]>([]);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -47,14 +46,22 @@ export function GroupInviteMembers({
         history: await historyForNewcomer(conversationId, user.id),
       }),
     onSuccess: (_invite, user) => {
-      setInvitedIds((ids) => [...ids, user.id]);
       setStatus({ ok: true, text: `${t('groups.inviteSent')}: ${user.username}` });
       setQuery('');
     },
-    onError: () => setStatus({ ok: false, text: t('groups.inviteFailed') }),
+    // The server's reason arrives in the response body, not on the error.
+    onError: (error) => {
+      const code = (error as { response?: { data?: { code?: string } } }).response?.data?.code;
+      setStatus({
+        ok: false,
+        text: code === 'group_user_banned' ? t('groups.inviteBanned') : t('groups.inviteFailed'),
+      });
+    },
   });
 
-  const candidates = results.filter((u) => !memberIds.includes(u.id) && !invitedIds.includes(u.id));
+  // Only members are left out. Someone invited before stays findable: they may
+  // have been removed since, and inviting again only renews the invite.
+  const candidates = results.filter((u) => !memberIds.includes(u.id));
 
   if (!isOpen) {
     return (
@@ -79,6 +86,10 @@ export function GroupInviteMembers({
         }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') setIsOpen(false);
+          if (e.key === 'Enter' && candidates.length > 0 && !invite.isPending) {
+            e.preventDefault();
+            invite.mutate(candidates[0]);
+          }
         }}
         placeholder={t('groups.searchUsersPlaceholder')}
         aria-label={t('groups.addMembers')}

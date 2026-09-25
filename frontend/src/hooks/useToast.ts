@@ -22,7 +22,8 @@ function emitChange() {
   toastListeners.forEach((listener) => listener(toasts));
 }
 
-function addToast(options: ToastOptions): string {
+/** Shows a toast from outside a component, such as a socket handler. */
+export function addToast(options: ToastOptions): string {
   const id = `toast-${++toastId}`;
   const toast: Toast = { ...options, id };
 

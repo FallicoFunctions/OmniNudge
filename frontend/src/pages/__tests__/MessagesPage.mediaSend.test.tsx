@@ -710,3 +710,30 @@ describe('a group this user is no longer in', () => {
     expect(screen.queryByRole('button', { name: 'Back to conversations' })).not.toBeInTheDocument();
   });
 });
+
+describe('an admin action in the open group', () => {
+  // The page applied admin actions from 'ws-group-event', and nothing sent one,
+  // so a message an admin deleted stayed on everyone's screen until a refresh.
+  it('reloads the messages when an admin deletes one', async () => {
+    state.conversations = [groupConversation];
+    renderPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    await waitFor(() => expect(messagesService.getMessagesPage).toHaveBeenCalled());
+    const before = vi.mocked(messagesService.getMessagesPage).mock.calls.length;
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('ws-group-event', {
+          detail: {
+            type: 'group_message_deleted_by_admin',
+            payload: { conversation_id: groupConversation.id, message_id: 1 },
+          },
+        })
+      );
+    });
+
+    await waitFor(() =>
+      expect(vi.mocked(messagesService.getMessagesPage).mock.calls.length).toBeGreaterThan(before)
+    );
+  });
+});

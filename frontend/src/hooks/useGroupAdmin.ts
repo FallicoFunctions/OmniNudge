@@ -55,19 +55,8 @@ export function useGroupAdmin({
 
   // Mutations
   const muteUser = useMutation({
-    mutationFn: ({
-      userId,
-      durationMinutes,
-      reason,
-    }: {
-      userId: number;
-      durationMinutes: number;
-      reason?: string;
-    }) =>
-      adminGroupsService.muteUser(conversationId, userId, {
-        duration_minutes: durationMinutes,
-        reason,
-      }),
+    mutationFn: ({ userId, durationMinutes }: { userId: number; durationMinutes: number }) =>
+      adminGroupsService.muteUser(conversationId, userId, { duration_minutes: durationMinutes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversationId] });
     },

@@ -27,7 +27,6 @@ export interface AuditLogEntry {
 
 export interface MuteRequest {
   duration_minutes: number;
-  reason?: string;
 }
 
 export interface BanRequest {

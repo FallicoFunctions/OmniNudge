@@ -35,6 +35,9 @@ export function BanUserModal({ username, onConfirm, onCancel, isLoading }: BanUs
             rows={3}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none resize-none"
           />
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {t('groups.admin.banReasonGoesToBannedUser')}
+          </p>
         </div>
 
         <label className="flex items-center gap-2 mb-6 cursor-pointer">

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 interface MuteUserModalProps {
   username: string;
-  onConfirm: (durationMinutes: number, reason: string) => void;
+  onConfirm: (durationMinutes: number) => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
@@ -18,10 +18,9 @@ const DURATION_OPTIONS: { labelKey: string; value: number }[] = [
 export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: MuteUserModalProps) {
   const { t } = useTranslation();
   const [duration, setDuration] = useState<number>(60);
-  const [reason, setReason] = useState('');
 
   const handleConfirm = () => {
-    onConfirm(duration, reason);
+    onConfirm(duration);
   };
 
   return (
@@ -32,7 +31,7 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
           <span className="text-[var(--color-primary)]">{username}</span>
         </h3>
 
-        <div className="mb-4">
+        <div className="mb-6">
           <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
             {t('groups.admin.duration')}
           </label>
@@ -52,20 +51,6 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-            {t('groups.admin.reason')}{' '}
-            <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t('groups.admin.reasonPlaceholder')}
-            rows={3}
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none resize-none"
-          />
         </div>
 
         <div className="flex gap-2">

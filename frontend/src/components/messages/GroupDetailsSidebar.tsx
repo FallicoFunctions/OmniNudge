@@ -9,7 +9,7 @@ import { GroupAuditLog } from './GroupAuditLog';
 import { GroupInviteMembers } from './GroupInviteMembers';
 import type { SearchUsers } from './CreateGroupModal';
 import { adminGroupsService } from '../../services/adminGroupsService';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Conversation, GroupParticipant, GroupRole } from '../../types/messages';
 
 interface GroupDetailsSidebarProps {
@@ -37,25 +37,55 @@ function RoleBadge({ role }: { role: GroupRole }) {
   );
 }
 
+/** Time left on a mute, to the minute: "3d 4h", "2h 5m", "12m". */
+export function muteTimeLeft(endsAt: string, now: number): string {
+  const minutes = Math.max(1, Math.ceil((new Date(endsAt).getTime() - now) / 60_000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+/** The current time, updated each minute while the caller needs it. */
+function useMinuteClock(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
 function ParticipantRow({
   participant,
   currentUserRole,
   currentUserId,
+  muteEndsAt,
   onRemove,
   onChangeRole,
   onMute,
+  onUnmute,
   onBan,
 }: {
   participant: GroupParticipant;
   currentUserRole: GroupRole | null;
   currentUserId: number;
+  /** Undefined when not muted; null for a permanent mute. */
+  muteEndsAt: string | null | undefined;
   onRemove: (userId: number) => void;
   onChangeRole: (userId: number, role: 'admin' | 'member') => void;
   onMute: (participant: GroupParticipant) => void;
+  onUnmute: (userId: number) => void;
   onBan: (participant: GroupParticipant) => void;
 }) {
   const { t } = useTranslation();
   const [showMenu, setShowMenu] = useState(false);
+  const now = useMinuteClock(typeof muteEndsAt === 'string');
+  const isMuted =
+    muteEndsAt === null || (typeof muteEndsAt === 'string' && new Date(muteEndsAt).getTime() > now);
   const menuRef = useRef<HTMLDivElement>(null);
   const isCurrentUser = participant.user_id === currentUserId;
 
@@ -133,16 +163,34 @@ function ParticipantRow({
                   {t('groups.removeAdmin')}
                 </button>
               )}
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
-                onClick={() => {
-                  onMute(participant);
-                  setShowMenu(false);
-                }}
-              >
-                {t('groups.admin.mute')}
-              </button>
+              {isMuted ? (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
+                  onClick={() => {
+                    onUnmute(participant.user_id);
+                    setShowMenu(false);
+                  }}
+                >
+                  <span>{t('groups.admin.unmute')}</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    {muteEndsAt
+                      ? t('groups.admin.muteLeft', { time: muteTimeLeft(muteEndsAt, now) })
+                      : t('groups.admin.durationPermanent')}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
+                  onClick={() => {
+                    onMute(participant);
+                    setShowMenu(false);
+                  }}
+                >
+                  {t('groups.admin.mute')}
+                </button>
+              )}
               <button
                 type="button"
                 className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
@@ -206,23 +254,31 @@ export function GroupDetailsSidebar({
   } = useGroupConversation({ conversationId: conversation.id, currentUserId });
 
   const muteMutation = useMutation({
-    mutationFn: ({
-      userId,
-      durationMinutes,
-      reason,
-    }: {
-      userId: number;
-      durationMinutes: number;
-      reason: string;
-    }) =>
-      adminGroupsService.muteUser(conversation.id, userId, {
-        duration_minutes: durationMinutes,
-        reason,
-      }),
+    mutationFn: ({ userId, durationMinutes }: { userId: number; durationMinutes: number }) =>
+      adminGroupsService.muteUser(conversation.id, userId, { duration_minutes: durationMinutes }),
     onSuccess: () => {
       setMuteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] });
     },
+  });
+
+  // Who is muted, and until when -- the menu offers Unmute with the time left.
+  // Admins only: the list is an admin's, and so is the menu that reads it.
+  const { data: restrictions = [] } = useQuery({
+    queryKey: ['group-restrictions', conversation.id],
+    queryFn: () => adminGroupsService.getRestrictions(conversation.id),
+    enabled: isAdmin,
+  });
+  const mutes = new Map(
+    restrictions
+      .filter((r) => r.restriction_type === 'mute')
+      .map((r) => [r.user_id, r.expires_at] as const)
+  );
+
+  const unmuteMutation = useMutation({
+    mutationFn: (userId: number) => adminGroupsService.unmuteUser(conversation.id, userId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] }),
   });
 
   const banMutation = useMutation({
@@ -418,7 +474,9 @@ export function GroupDetailsSidebar({
                   currentUserId={currentUserId}
                   onRemove={removeParticipant}
                   onChangeRole={changeRole}
+                  muteEndsAt={mutes.get(p.user_id)}
                   onMute={setMuteTarget}
+                  onUnmute={(userId) => unmuteMutation.mutate(userId)}
                   onBan={setBanTarget}
                 />
               ))
@@ -516,8 +574,8 @@ export function GroupDetailsSidebar({
       {muteTarget && (
         <MuteUserModal
           username={muteTarget.username}
-          onConfirm={(durationMinutes, reason) =>
-            muteMutation.mutate({ userId: muteTarget.user_id, durationMinutes, reason })
+          onConfirm={(durationMinutes) =>
+            muteMutation.mutate({ userId: muteTarget.user_id, durationMinutes })
           }
           onCancel={() => setMuteTarget(null)}
           isLoading={muteMutation.isPending}
