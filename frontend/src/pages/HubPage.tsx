@@ -71,7 +71,8 @@ import { splitAIDesignHTML } from '../utils/splitAIDesignHTML';
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
 /**
- * A private hub answers 403 with access_required and its privacy type.
+ * A private hub answers 403 with access_required (and its privacy type,
+ * which says the same thing -- access_required is the one read).
  * hubsService uses the fetch client, which keeps the answer's body on the
  * error. This page used to read an Axios-style response.data that the client
  * never builds, and found a private hub only by matching the English words of
@@ -79,7 +80,7 @@ const EMPTY_POSTS: LocalSubredditPost[] = [];
  */
 function isPrivateHubRefusal(error: unknown): boolean {
   const { status, body } = (error ?? {}) as Partial<ApiRequestError>;
-  return status === 403 && (body?.access_required === true || body?.privacy_type === 'private');
+  return status === 403 && body?.access_required === true;
 }
 
 export default function HubsPage() {
