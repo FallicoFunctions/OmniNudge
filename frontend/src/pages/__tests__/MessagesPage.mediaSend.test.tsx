@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18n from 'i18next';
@@ -674,5 +674,39 @@ describe('who wrote a message, wherever it is named', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View Profile' }));
 
     expect(await screen.findByText('profile of alice')).toBeInTheDocument();
+  });
+});
+
+describe('a group this user is no longer in', () => {
+  // Leaving, or being removed or banned, took the group out of the list, but
+  // on a phone nothing closed the chat: it stayed open until a refresh.
+  it('closes once the conversation list no longer holds it', async () => {
+    state.conversations = [groupConversation, dmConversation];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MessagesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+    expect(
+      await screen.findByRole('button', { name: 'Back to conversations' })
+    ).toBeInTheDocument();
+
+    state.conversations = [dmConversation];
+    await act(() => queryClient.invalidateQueries({ queryKey: ['conversations'] }));
+
+    // Settled first: while the list reloads the header is briefly absent, and
+    // a check made then passes whether or not the chat closed.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Open conversation' })).toHaveLength(1)
+    );
+    // The message box goes with the conversation either way; the chat panel,
+    // with its way back, stayed slid in until the selection was cleared.
+    expect(screen.queryByRole('button', { name: 'Back to conversations' })).not.toBeInTheDocument();
   });
 });

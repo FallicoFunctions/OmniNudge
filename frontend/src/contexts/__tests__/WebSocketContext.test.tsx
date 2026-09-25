@@ -159,6 +159,7 @@ describe('WebSocketProvider group keys', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(['group-participants', 47], []);
     queryClient.setQueryData(['group-invites'], []);
+    queryClient.setQueryData(['conversations', 'all'], { pages: [], pageParams: [] });
     render(
       <QueryClientProvider client={queryClient}>
         <WebSocketProvider>
@@ -182,6 +183,17 @@ describe('WebSocketProvider group keys', () => {
     expect(mocks.shareMissingGroupHistory).toHaveBeenCalledWith(47);
     expect(queryClient.getQueryState(['group-participants', 47])?.isInvalidated).toBe(true);
   });
+
+  // A leave, a removal or a ban reached no app, so the member list, and for the
+  // one who went the group itself, stayed on screen until a refresh.
+  it.each(['group_member_left', 'group_member_banned'])(
+    'reads the members and the conversations again on %s',
+    async (type) => {
+      const queryClient = await receive(type, { conversation_id: 47, user_id: 99 });
+      expect(queryClient.getQueryState(['group-participants', 47])?.isInvalidated).toBe(true);
+      expect(queryClient.getQueryState(['conversations', 'all'])?.isInvalidated).toBe(true);
+    }
+  );
 
   // The invite counts on the Messages badge; it appeared only after the app
   // next fetched its invites.

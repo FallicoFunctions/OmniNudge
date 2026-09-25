@@ -244,6 +244,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          // Someone left a group, was removed or was banned -- possibly this
+          // user. Every member reads the member list and the conversation list
+          // again; for the one who left, the group drops out of the list and
+          // the page closes it.
+          case 'group_member_left':
+          case 'group_member_banned': {
+            const { conversation_id } = data.payload as { conversation_id: number };
+            queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            break;
+          }
+
           // An invite to a group: it counts on the Messages badge and shows in
           // the invite list, so both read the list again.
           case 'group_invite_received': {

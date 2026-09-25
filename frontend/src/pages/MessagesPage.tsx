@@ -840,6 +840,25 @@ export default function MessagesPage() {
     }
   }, [conversations, isCreatingChat, selectedConversationId, isMobile, smartFolder]);
 
+  // A conversation that was in the list and then left it -- the user left the
+  // group, or was removed or banned from it -- closes. Only one seen in the
+  // list: a conversation opened by link may simply not be loaded yet. On a
+  // phone nothing else closes it, and the group stayed open until a refresh.
+  const selectionSeenInListRef = useRef<number | null>(null);
+  useEffect(() => {
+    const inList =
+      selectedConversationId !== null &&
+      allConversations.some((c) => c.id === selectedConversationId);
+    if (
+      !inList &&
+      selectedConversationId !== null &&
+      selectionSeenInListRef.current === selectedConversationId
+    ) {
+      setSelectedConversationId(null);
+    }
+    selectionSeenInListRef.current = inList ? selectedConversationId : null;
+  }, [allConversations, selectedConversationId]);
+
   useEffect(() => {
     setThreadRootMessageId(null);
     setReplyTargetMessage(null);
@@ -4524,7 +4543,6 @@ export default function MessagesPage() {
               conversation={selectedConversation}
               currentUserId={user.id}
               onClose={() => setShowGroupSidebar(false)}
-              onLeft={() => setSelectedConversationId(null)}
               searchUsers={searchUsers}
             />
           </div>
