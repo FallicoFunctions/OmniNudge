@@ -24,6 +24,7 @@ import type {
 } from '../types/reactions';
 import type { BotConversationDetail, BotMessage, OmniChatGroupMessage } from '../types/omnichat';
 import { friendsQueryKeys } from '../services/friendsService';
+import { forgetGroupKeys, shareMissingGroupHistory } from '../services/groupKeyCache';
 
 interface WebSocketMessage {
   type: string;
@@ -229,6 +230,26 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                 })),
               };
             });
+            break;
+          }
+
+          // Someone joined a group. The member list is out of date, and the
+          // newcomer may lack older key versions this device holds: passing
+          // them on here is what lets the newcomer read the group's past
+          // without anyone sending a message.
+          case 'group_member_joined': {
+            const { conversation_id } = data.payload as { conversation_id: number };
+            queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
+            void shareMissingGroupHistory(conversation_id);
+            break;
+          }
+
+          // This reader was given older key versions -- by another member, or
+          // by joining: drop what was recorded as missing, and the old
+          // messages open without a reload.
+          case 'group_keys_shared': {
+            const { conversation_id } = data.payload as { conversation_id: number };
+            forgetGroupKeys(conversation_id);
             break;
           }
 

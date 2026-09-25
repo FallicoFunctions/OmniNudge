@@ -77,9 +77,16 @@ async function unwrapCopies(state: GroupKeyState, ownKeys: KeyPair): Promise<Ver
   return versions;
 }
 
-/** Every version of this group's key that this device can open. */
+/**
+ * Every version of this group's key that this device can open. Reading a
+ * group is also when this device passes on older versions a member still
+ * lacks: a member who was offline when someone joined does it here, the next
+ * time they open the group, and nobody has to send a message for it.
+ */
 async function openMyCopies(conversationId: number, ownKeys: KeyPair): Promise<VersionMap> {
-  return unwrapCopies(await getGroupKeyState(conversationId), ownKeys);
+  const state = await getGroupKeyState(conversationId);
+  void shareMissingHistory(conversationId, state, ownKeys);
+  return unwrapCopies(state, ownKeys);
 }
 
 /**
@@ -169,6 +176,23 @@ export async function groupKeyForVersion(
   return null;
 }
 
+let generation = 0;
+const listeners = new Set<() => void>();
+
+/**
+ * Rises each time held keys are dropped. A message that could not be opened
+ * decrypts only when its own fields change, and a version granted later
+ * changes none of them, so readers watch this to try again.
+ */
+export function groupKeysGeneration(): number {
+  return generation;
+}
+
+export function subscribeGroupKeys(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 /** Drops what is held, so a rotation made in this page is picked up. */
 export function forgetGroupKeys(conversationId?: number): void {
   const key = conversationId === undefined ? null : bucket(conversationId);
@@ -177,12 +201,14 @@ export function forgetGroupKeys(conversationId?: number): void {
     knownMissing.clear();
     inFlight.clear();
     failedAt.clear();
-    return;
+  } else {
+    held.delete(key);
+    knownMissing.delete(key);
+    inFlight.delete(key);
+    failedAt.delete(key);
   }
-  held.delete(key);
-  knownMissing.delete(key);
-  inFlight.delete(key);
-  failedAt.delete(key);
+  generation += 1;
+  listeners.forEach((listener) => listener());
 }
 
 /**
@@ -232,6 +258,21 @@ async function shareMissingHistory(
     // Another member may have shared the same versions a moment earlier; the
     // next send asks again for whatever is still missing.
     console.warn('Could not share older group key versions:', conversationId, error);
+  }
+}
+
+/**
+ * Passes on older versions a member of this group still lacks, when this
+ * device holds them. Called when someone joins; does nothing when nothing is
+ * missing or this device holds none of it.
+ */
+export async function shareMissingGroupHistory(conversationId: number): Promise<void> {
+  try {
+    const keys = await getOwnKeys();
+    if (!keys) return;
+    await shareMissingHistory(conversationId, await getGroupKeyState(conversationId), keys);
+  } catch (error) {
+    console.warn('Could not read the group key state to share history:', conversationId, error);
   }
 }
 

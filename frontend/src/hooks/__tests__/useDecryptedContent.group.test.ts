@@ -9,16 +9,24 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import i18n from 'i18next';
 import { decryptForDisplay, needsDecryption, useDecryptedContent } from '../useDecryptedContent';
-import { groupKeyForVersion } from '../../services/groupKeyCache';
+import { forgetGroupKeys, groupKeyForVersion } from '../../services/groupKeyCache';
 import { getOwnKeys } from '../../services/keyManagementService';
 import { GROUP_ENCRYPTION_VERSION } from '../../utils/groupKeys';
 import type { Message } from '../../types/messages';
 
-vi.mock('../../services/groupKeyCache', () => ({ groupKeyForVersion: vi.fn() }));
-vi.mock('../../services/keyManagementService', () => ({ getOwnKeys: vi.fn() }));
+// The real counter and forgetGroupKeys, so a test can grant a key the way a
+// socket event does; only the key lookup is faked.
+vi.mock('../../services/groupKeyCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/groupKeyCache')>()),
+  groupKeyForVersion: vi.fn(),
+}));
+vi.mock('../../services/keyManagementService', () => ({
+  getOwnKeys: vi.fn(),
+  getOwnPublicKeyBase64: vi.fn(),
+}));
 
 interface Vectors {
   groupKeyHex: string;
@@ -196,6 +204,22 @@ describe('what the bubble shows when the key is missing', () => {
     vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
 
     const { result } = renderHook(() => useDecryptedContent(groupMessage(), false, 9));
+
+    await waitFor(() => expect(result.current).toBe(vector.plaintext));
+  });
+});
+
+// A newcomer's app recorded the old versions as missing, and a version granted
+// later changes nothing about the message, so the bubble never tried again:
+// the old messages stayed locked until the page reloaded.
+describe('a key granted after the message was shown', () => {
+  it('opens the message when the cache is told to look again', async () => {
+    vi.mocked(groupKeyForVersion).mockResolvedValue(null);
+    const { result } = renderHook(() => useDecryptedContent(groupMessage(), false, 9));
+    await waitFor(() => expect(result.current).toBe(i18n.t('messages.encrypted')));
+
+    vi.mocked(groupKeyForVersion).mockResolvedValue(await vectorKey());
+    act(() => forgetGroupKeys(77));
 
     await waitFor(() => expect(result.current).toBe(vector.plaintext));
   });

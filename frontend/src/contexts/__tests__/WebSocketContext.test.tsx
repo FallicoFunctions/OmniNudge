@@ -6,6 +6,13 @@ import { WebSocketProvider } from '../WebSocketContext';
 
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
+  forgetGroupKeys: vi.fn(),
+  shareMissingGroupHistory: vi.fn(),
+}));
+
+vi.mock('../../services/groupKeyCache', () => ({
+  forgetGroupKeys: mocks.forgetGroupKeys,
+  shareMissingGroupHistory: mocks.shareMissingGroupHistory,
 }));
 
 vi.mock('../AuthContext', () => ({
@@ -136,5 +143,49 @@ describe('WebSocketProvider read receipts', () => {
       [47, 0],
       [48, 3],
     ]);
+  });
+});
+
+describe('WebSocketProvider group keys', () => {
+  beforeEach(() => {
+    mocks.post.mockReset().mockResolvedValue({ ws_token: 'token' });
+    mocks.forgetGroupKeys.mockReset();
+    mocks.shareMissingGroupHistory.mockReset().mockResolvedValue(undefined);
+    MockWebSocket.instances = [];
+    vi.stubGlobal('WebSocket', MockWebSocket);
+  });
+
+  async function receive(type: string, payload: object) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['group-participants', 47], []);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WebSocketProvider>
+          <div>app</div>
+        </WebSocketProvider>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    act(() => {
+      MockWebSocket.instances[0].onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ type, payload }) })
+      );
+    });
+    return queryClient;
+  }
+
+  // A newcomer read none of the group's past until some older member sent a
+  // message. Hearing of the join is when this app passes on what it holds.
+  it('passes on older keys, and refreshes the members, when someone joins', async () => {
+    const queryClient = await receive('group_member_joined', { conversation_id: 47, user_id: 99 });
+    expect(mocks.shareMissingGroupHistory).toHaveBeenCalledWith(47);
+    expect(queryClient.getQueryState(['group-participants', 47])?.isInvalidated).toBe(true);
+  });
+
+  // Without this the newcomer's app kept the old versions recorded as missing,
+  // and the old messages stayed locked until the page reloaded.
+  it('looks again at the keys when it is given older ones', async () => {
+    await receive('group_keys_shared', { conversation_id: 47 });
+    expect(mocks.forgetGroupKeys).toHaveBeenCalledWith(47);
   });
 });

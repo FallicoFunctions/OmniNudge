@@ -11,6 +11,7 @@
  * changing it is a decision for the phase that makes group media refuse.
  */
 import { useEffect, useState } from 'react';
+import { useGroupKeysGeneration } from './useDecryptedContent';
 import {
   base64ToArrayBuffer,
   decryptFile,
@@ -56,6 +57,7 @@ export function useDecryptedMedia(
 ): string | null {
   const mimeTypeOverride = options.mimeType;
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+  const keysGeneration = useGroupKeysGeneration();
   const {
     conversation_id,
     media_url,
@@ -63,6 +65,9 @@ export function useDecryptedMedia(
     media_encryption_key,
     sender_media_encryption_key,
   } = message;
+  // Only a file sealed under a group key waits on a key granted later.
+  const groupKeysSeen =
+    media_encryption_key && isSealedGroupEnvelope(media_encryption_key) ? keysGeneration : 0;
 
   useEffect(() => {
     let isMounted = true;
@@ -191,6 +196,7 @@ export function useDecryptedMedia(
     sender_media_encryption_key,
     isOwnMessage,
     mimeTypeOverride,
+    groupKeysSeen,
   ]);
 
   return mediaSrc;

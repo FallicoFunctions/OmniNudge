@@ -17,12 +17,16 @@
  * "this device has no keys" into "decryption failed" would be enough to change
  * what conversation search puts on the screen.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import i18n from 'i18next';
 import { decryptMessage, decryptMultiRecipientContent } from '../utils/encryption';
 import type { KeyPair } from '../utils/encryption';
 import { GROUP_ENCRYPTION_VERSION, openGroupMessage, sealedKeyVersion } from '../utils/groupKeys';
-import { groupKeyForVersion } from '../services/groupKeyCache';
+import {
+  groupKeyForVersion,
+  groupKeysGeneration,
+  subscribeGroupKeys,
+} from '../services/groupKeyCache';
 import { getOwnKeys } from '../services/keyManagementService';
 import type { Message } from '../types/messages';
 
@@ -202,12 +206,22 @@ export async function decryptForDisplay(
 }
 
 /** The same rule as state, for a component that renders one message. */
+/**
+ * Changes whenever the group key cache drops what it holds -- after a version
+ * is granted to this reader, for one. A decrypt effect lists it so a group
+ * message that could not be opened is tried again.
+ */
+export function useGroupKeysGeneration(): number {
+  return useSyncExternalStore(subscribeGroupKeys, groupKeysGeneration);
+}
+
 export function useDecryptedContent(
   message: Message,
   isOwnMessage: boolean,
   currentUserId?: number
 ): string {
   const [decryptedContent, setDecryptedContent] = useState<string>('');
+  const keysGeneration = useGroupKeysGeneration();
   const {
     conversation_id,
     encrypted_content,
@@ -217,6 +231,8 @@ export function useDecryptedContent(
     shared_encryption_iv,
     recipient_keys,
   } = message;
+  // Only a group message waits on a key this reader may be granted later.
+  const groupKeysSeen = encryption_version === GROUP_ENCRYPTION_VERSION ? keysGeneration : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -258,6 +274,7 @@ export function useDecryptedContent(
     recipient_keys,
     isOwnMessage,
     currentUserId,
+    groupKeysSeen,
   ]);
 
   return decryptedContent;

@@ -32,7 +32,10 @@ vi.mock('../../utils/encryption', async (importOriginal) => ({
   decryptFileWithKey: vi.fn(),
   importFileKey: vi.fn(),
 }));
-vi.mock('../../services/groupKeyCache', () => ({ groupKeyForVersion: vi.fn() }));
+vi.mock('../../services/groupKeyCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/groupKeyCache')>()),
+  groupKeyForVersion: vi.fn(),
+}));
 vi.mock('../../services/keyManagementService', () => ({ getOwnKeys: vi.fn() }));
 vi.mock('../../services/authSession', () => ({ authenticatedFetch: vi.fn() }));
 

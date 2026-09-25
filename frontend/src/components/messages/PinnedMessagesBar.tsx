@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { decryptForDisplay, needsDecryption } from '../../hooks/useDecryptedContent';
+import {
+  decryptForDisplay,
+  needsDecryption,
+  useGroupKeysGeneration,
+} from '../../hooks/useDecryptedContent';
 import { getOwnKeys } from '../../services/keyManagementService';
 import type { Message } from '../../types/messages';
 
@@ -23,6 +27,7 @@ const COLLAPSED_VISIBLE_COUNT = 3;
  */
 function useDecryptedPreviews(messages: Message[], currentUserId?: number): Map<number, string> {
   const [texts, setTexts] = useState<Map<number, string>>(new Map());
+  const keysGeneration = useGroupKeysGeneration();
 
   const pending = useMemo(
     () =>
@@ -55,7 +60,7 @@ function useDecryptedPreviews(messages: Message[], currentUserId?: number): Map<
     return () => {
       cancelled = true;
     };
-  }, [pending, currentUserId]);
+  }, [pending, currentUserId, keysGeneration]);
 
   return texts;
 }
