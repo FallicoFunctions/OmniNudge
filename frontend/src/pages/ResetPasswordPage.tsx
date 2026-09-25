@@ -93,10 +93,13 @@ export default function ResetPasswordPage() {
         navigate('/', { replace: true });
       }, 3000);
     } catch (err: unknown) {
-      const apiError = err as { response?: { data?: { error?: string } } };
+      // lib/api throws a plain Error with the server's message on it, and only
+      // a server answer has a status. Reading an Axios-style response.data
+      // found nothing, so an expired link said only "try again".
+      const { message, status } = err as Error & { status?: number };
       setError({
         message:
-          apiError.response?.data?.error || t('auth.resetPasswordPage.errors.resetFailedTryAgain'),
+          (status && message?.trim()) || t('auth.resetPasswordPage.errors.resetFailedTryAgain'),
       });
     } finally {
       setIsSubmitting(false);
