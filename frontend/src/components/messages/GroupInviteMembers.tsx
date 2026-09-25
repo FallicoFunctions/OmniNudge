@@ -49,12 +49,19 @@ export function GroupInviteMembers({
       setStatus({ ok: true, text: `${t('groups.inviteSent')}: ${user.username}` });
       setQuery('');
     },
-    // The server's reason arrives in the response body, not on the error.
+    // lib/api throws a plain Error carrying the server's code and message on
+    // the error itself. Reading an Axios-style response.data found nothing, so
+    // every refusal said only "Failed to send invite".
     onError: (error) => {
-      const code = (error as { response?: { data?: { code?: string } } }).response?.data?.code;
+      // Only a server's answer carries a status; a network failure's message
+      // ("Failed to fetch") is not one to show.
+      const { code, message, status } = error as Error & { code?: string; status?: number };
       setStatus({
         ok: false,
-        text: code === 'group_user_banned' ? t('groups.inviteBanned') : t('groups.inviteFailed'),
+        text:
+          code === 'group_user_banned'
+            ? t('groups.inviteBanned')
+            : (status && message?.trim()) || t('groups.inviteFailed'),
       });
     },
   });

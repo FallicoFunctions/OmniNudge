@@ -87,11 +87,26 @@ describe('GroupInviteMembers', () => {
   });
 
   it('says why when the user is banned', async () => {
-    mockCreateInvite.mockRejectedValue({ response: { data: { code: 'group_user_banned' } } });
+    // What lib/api throws: an Error with the server's code and message on it.
+    mockCreateInvite.mockRejectedValue(
+      Object.assign(new Error('This user is banned from the group.'), {
+        status: 403,
+        code: 'group_user_banned',
+      })
+    );
     renderControl();
     fireEvent.click(await screen.findByRole('button', { name: /seed_user_2/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This user is banned from the group. Only an owner or admin can invite them back.'
     );
+  });
+
+  it("shows the server's reason for any other refusal", async () => {
+    mockCreateInvite.mockRejectedValue(
+      Object.assign(new Error('Only admins can send invites'), { status: 403, code: 'forbidden' })
+    );
+    renderControl();
+    fireEvent.click(await screen.findByRole('button', { name: /seed_user_2/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only admins can send invites');
   });
 });
