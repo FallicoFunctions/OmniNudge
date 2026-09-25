@@ -161,6 +161,7 @@ describe('WebSocketProvider group keys', () => {
   async function receive(type: string, payload: object) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(['group-participants', 47], []);
+    queryClient.setQueryData(['group-settings', 47], {});
     queryClient.setQueryData(['group-invites'], []);
     queryClient.setQueryData(['conversations', 'all'], { pages: [], pageParams: [] });
     render(
@@ -197,6 +198,15 @@ describe('WebSocketProvider group keys', () => {
       expect(queryClient.getQueryState(['conversations', 'all'])?.isInvalidated).toBe(true);
     }
   );
+
+  // 'Anyone can invite' turned on, a rename, a new admin: no other member saw
+  // it until a refresh.
+  it('reads the settings, members and conversations again when the group changes', async () => {
+    const queryClient = await receive('group_updated', { conversation_id: 47 });
+    expect(queryClient.getQueryState(['group-settings', 47])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['group-participants', 47])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(['conversations', 'all'])?.isInvalidated).toBe(true);
+  });
 
   // The ban reason reached every member's app and was shown to nobody. It is
   // now sent to the banned user alone, and shown to them.

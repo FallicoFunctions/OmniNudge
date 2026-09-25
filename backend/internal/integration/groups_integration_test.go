@@ -53,6 +53,9 @@ func newGroupTestDeps(t *testing.T) *groupTestDeps {
 		protected.GET("/groups/:id/participants", groupHandler.GetGroupParticipants)
 		protected.PATCH("/groups/:id/participants/:user_id/role", groupHandler.UpdateParticipantRole)
 		protected.GET("/groups/:id/settings", groupHandler.GetGroupSettings)
+		protected.PUT("/groups/:id/settings", groupHandler.UpdateGroupSettings)
+		protected.PUT("/groups/:id", groupHandler.UpdateGroup)
+		protected.POST("/groups/:id/transfer-ownership", groupHandler.TransferOwnership)
 		// The paths main.go registers, parameter names included: the handler
 		// reads the invite id by the name the route gives it.
 		protected.POST("/groups/:id/invites", groupHandler.CreateGroupInvite)
@@ -1013,4 +1016,35 @@ func TestGroupBanRuleOnTheWayBack(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
 		assert.Contains(t, w.Body.String(), "group_user_banned")
 	})
+}
+
+// A change to the group reached no other member: 'anyone can invite' turned
+// on, a rename, a new admin or a new owner showed only after a refresh.
+func TestGroupChangesAreAnnounced(t *testing.T) {
+	for _, change := range []struct {
+		name, method, path, body string
+	}{
+		{"settings", http.MethodPut, "/api/v1/groups/%d/settings", `{"anyone_can_invite":true}`},
+		{"rename", http.MethodPut, "/api/v1/groups/%d", `{"name":"Renamed"}`},
+		{"role", http.MethodPatch, "/api/v1/groups/%d/participants/{member}/role", `{"role":"admin"}`},
+		{"owner", http.MethodPost, "/api/v1/groups/%d/transfer-ownership", `{"new_owner_user_id":{member}}`},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			deps := newGroupTestDeps(t)
+			defer deps.DB.Close()
+			ts := httptest.NewServer(deps.GroupRouter)
+			defer ts.Close()
+
+			g := newLiveGroup(t, deps, ts.URL, "upd"+change.name)
+			member := fmt.Sprint(g.memberIDs[0])
+			path := strings.ReplaceAll(fmt.Sprintf(change.path, g.id), "{member}", member)
+			body := strings.ReplaceAll(change.body, "{member}", member)
+			w := doGroupRequest(t, deps.GroupRouter, change.method, path, g.ownerToken, []byte(body))
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			evt := readWebSocketEvent(t, g.members[1], 3*time.Second, func(e map[string]interface{}) bool { return e["type"] == "group_updated" })
+			payload, _ := evt["payload"].(map[string]interface{})
+			assert.EqualValues(t, g.id, payload["conversation_id"])
+		})
+	}
 }

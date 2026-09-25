@@ -265,6 +265,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             break;
           }
 
+          // The group changed: its settings, name, a member's role or its owner.
+          // Each reads the parts that could show it again -- 'anyone can
+          // invite' decides whether a member sees Add Members, and a role
+          // decides what the menus offer.
+          case 'group_updated': {
+            const { conversation_id } = data.payload as { conversation_id: number };
+            queryClient.invalidateQueries({ queryKey: ['group-settings', conversation_id] });
+            queryClient.invalidateQueries({ queryKey: ['group-participants', conversation_id] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            break;
+          }
+
           // This user was banned from a group. The reason is sent to them
           // alone, and it is the only place it is shown; the group drops out of
           // their list like any group they have left.

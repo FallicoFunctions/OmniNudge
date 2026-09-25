@@ -210,6 +210,17 @@ func (h *GroupHandler) admitBanned(c *gin.Context, tx pgx.Tx, conversationID, us
 	return tag.RowsAffected() > 0, true
 }
 
+// announceUpdate tells the members the group changed -- its settings, its
+// name or picture, a member's role, its owner. Without it every other member
+// kept the old state until a refresh: 'anyone can invite' turned on, and their
+// Add Members button stayed hidden.
+func (h *GroupHandler) announceUpdate(ctx context.Context, conversationID int) {
+	if h.hub == nil {
+		return
+	}
+	broadcastToGroup(ctx, h.pool, h.hub, conversationID, "group_updated", gin.H{"conversation_id": conversationID})
+}
+
 // announceJoin tells the members someone joined. A member's app that holds
 // older key versions the newcomer still lacks passes them on: the invite
 // carries what its sender held, and a key made between the invite and the
@@ -803,6 +814,7 @@ func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 		return
 	}
 
+	h.announceUpdate(c.Request.Context(), conversationID)
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated"})
 }
 
@@ -866,6 +878,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
+	h.announceUpdate(c.Request.Context(), conversationID)
 	c.JSON(http.StatusOK, conv)
 }
 
@@ -971,6 +984,7 @@ func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 		return
 	}
 
+	h.announceUpdate(c.Request.Context(), conversationID)
 	c.JSON(http.StatusOK, s)
 }
 
@@ -1461,6 +1475,7 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		return
 	}
 
+	h.announceUpdate(c.Request.Context(), conversationID)
 	c.JSON(http.StatusOK, gin.H{"message": "Ownership transferred"})
 }
 
