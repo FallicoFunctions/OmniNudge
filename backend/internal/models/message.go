@@ -52,10 +52,11 @@ type Message struct {
 	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
 	DeleteAt                 *time.Time     `json:"delete_at,omitempty"`            // Auto-delete timestamp; NULL means never
 	// SenderUsername is the sender's name, from the users table: set when a
-	// message is created, read alone, or read with its group or mod mail
-	// conversation -- every path a message with more than two readers takes,
-	// the live broadcast included. A member list cannot name someone who left
-	// or joined after it was fetched.
+	// message is read alone or with its group or mod mail conversation. Every
+	// path a message with more than two readers takes goes through one of
+	// those -- the send reloads the new message before it is answered and
+	// broadcast. A member list cannot name someone who left or joined after it
+	// was fetched.
 	SenderUsername string `json:"sender_username,omitempty"`
 }
 
@@ -99,7 +100,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 			is_multi_recipient, shared_encryption_iv, delete_at, group_key_version
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-		RETURNING id, sent_at, COALESCE((SELECT username FROM users WHERE id = sender_id), '')
+		RETURNING id, sent_at
 	`
 
 	err = tx.QueryRow(
@@ -124,7 +125,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.SharedEncryptionIV,
 		message.DeleteAt,
 		message.GroupKeyVersion,
-	).Scan(&message.ID, &message.SentAt, &message.SenderUsername)
+	).Scan(&message.ID, &message.SentAt)
 
 	if err != nil {
 		return err
