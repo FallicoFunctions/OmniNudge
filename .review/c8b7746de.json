@@ -47,7 +47,7 @@
     {
      "id": "B3",
      "status": "applied",
-     "evidence": "The server's bodies were printed from a throwaway integration test in this session: a member inviting a banned user gets 403 {error, code: group_user_banned, message} in both the plain and the history-carrying request; the reset refusal body is the handler's RespondError 400 'Invalid or expired reset token'. group_updated {conversation_id} is read from a member's socket for all four changes."
+     "evidence": "The banned-invite body was printed from a throwaway integration test in this session: 403 {error, code: group_user_banned, message}, for the plain and the history-carrying request. The reset refusal body was read from the handler (auth.go: RespondError 400 'Invalid or expired reset token'), not printed. group_updated {conversation_id} is read from a member's socket for all four changes."
     },
     {
      "id": "B4",
@@ -237,7 +237,7 @@
     {
      "id": "G4",
      "status": "applied",
-     "evidence": "Earlier controls on groups.go (announceLeave, the accept announcement) and GroupInviteMembers.tsx still apply: git apply --check passes for each."
+     "evidence": "Earlier controls on groups.go (announceLeave, the accept announcement) and on BanUserModal still apply: git apply --check passes for grpact-r1-leave-not-announced, p3-r1-accept-join-untested and adm-r1-ban-hint-untested. No earlier control targets GroupInviteMembers.tsx or ResetPasswordPage.tsx."
     },
     {
      "id": "F6",
