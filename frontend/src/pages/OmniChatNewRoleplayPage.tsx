@@ -676,7 +676,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                         options={catalog.backstories}
                       />
                       <Choice
-                        label="Response style"
+                        label="How should the character reply?"
                         value={a.response_style}
                         onChange={(value) =>
                           set('response_style', value as RoleplayCreationAnswers['response_style'])

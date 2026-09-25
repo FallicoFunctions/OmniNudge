@@ -243,7 +243,7 @@
   "opening_beats":[{"id":"planned_meeting","label":"A planned meeting","scene":"They had arranged to meet."},{"id":"chance_encounter","label":"A chance encounter","scene":"Neither expected to meet here."},{"id":"busy_day","label":"A busy day","scene":"The day is already in motion."},{"id":"urgent_news","label":"Urgent news","scene":"Something new has just happened."},{"id":"quiet_moment","label":"A quiet moment","scene":"There is a brief pause before the day continues."},{"id":"first_assignment","label":"A new assignment","scene":"They are about to begin working together."}],
   "response_styles":[
     {"id":"natural_dialogue","label":"Mostly conversation","description":"The character talks directly to you, with occasional brief descriptions of their actions."},
-    {"id":"lean_narrative","label":"Narrated roleplay","description":"The character briefly describes the scene and leaves you a clear opening to respond."},
-    {"id":"character_only","label":"Follow the character's style","description":"The character's personality and situation guide each reply, without a preset format."}
+    {"id":"lean_narrative","label":"More scene description","description":"Replies include what the character says, what they do, and details of the setting."},
+    {"id":"character_only","label":"No set format","description":"The character chooses how much to talk or describe in each reply."}
   ]
 }

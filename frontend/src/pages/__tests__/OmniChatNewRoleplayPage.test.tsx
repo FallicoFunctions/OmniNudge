@@ -102,12 +102,13 @@ const catalog = {
       description: 'The character talks directly to you, with occasional brief actions.',
     },
     {
-      ...option('lean_narrative', 'Narrated roleplay'),
-      description: 'The character describes the scene and leaves you an opening to respond.',
+      ...option('lean_narrative', 'More scene description'),
+      description:
+        'Replies include what the character says, what they do, and details of the setting.',
     },
     {
-      ...option('character_only', "Follow the character's style"),
-      description: 'No preset format.',
+      ...option('character_only', 'No set format'),
+      description: 'The character chooses how much to talk or describe in each reply.',
     },
   ],
 };
@@ -267,9 +268,11 @@ describe('guided roleplay creation', () => {
     continueStep();
 
     expect(screen.getByText('Mostly conversation')).toBeInTheDocument();
-    expect(screen.getByText('Narrated roleplay')).toBeInTheDocument();
-    expect(screen.getByText("Follow the character's style")).toBeInTheDocument();
-    expect(screen.getByText('No preset format.')).toBeInTheDocument();
+    expect(screen.getByText('More scene description')).toBeInTheDocument();
+    expect(screen.getByText('No set format')).toBeInTheDocument();
+    expect(
+      screen.getByText('The character chooses how much to talk or describe in each reply.')
+    ).toBeInTheDocument();
     choose('Main personality trait', 'curious');
     choose('Another personality trait', 'methodical');
     choose('How do they speak?', 'dry_concise');
