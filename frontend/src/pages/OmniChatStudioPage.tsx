@@ -129,7 +129,7 @@ export default function OmniChatStudioPage() {
                       <button
                         type="button"
                         onClick={() => startChatMutation.mutate(persona.id)}
-                        disabled={startChatMutation.isPending}
+                        disabled={startChatMutation.isPending || deleteMutation.isPending}
                         className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-3 py-2.5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-60"
                       >
                         <MessageSquare size={16} />
@@ -146,7 +146,7 @@ export default function OmniChatStudioPage() {
                           deleteMutation.reset();
                           setDeleteTarget(persona);
                         }}
-                        disabled={deleteMutation.isPending}
+                        disabled={deleteMutation.isPending || startChatMutation.isPending}
                         className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/25 px-3 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:opacity-60"
                       >
                         <Trash2 size={16} />

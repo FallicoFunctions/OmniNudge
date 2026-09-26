@@ -157,6 +157,25 @@ describe('My Characters', () => {
     expect(await screen.findByTestId('location-probe')).toHaveTextContent('/omnichat/c/88');
   });
 
+  it('does not let deletion race a pending chat request', async () => {
+    let finishChat!: (conversation: { id: number }) => void;
+    mockCreateConversation.mockImplementationOnce(
+      () =>
+        new Promise<{ id: number }>((resolve) => {
+          finishChat = resolve;
+        })
+    );
+    renderPage();
+    const card = await screen.findByRole('article', { name: 'Maya Hart' });
+    fireEvent.click(within(card).getByRole('button', { name: 'Open Chat' }));
+    await waitFor(() => expect(mockCreateConversation).toHaveBeenCalledWith(77, undefined, true));
+    fireEvent.click(within(card).getByRole('button', { name: 'Delete Maya Hart' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mockDeletePersona).not.toHaveBeenCalled();
+    finishChat({ id: 88 });
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent('/omnichat/c/88');
+  });
+
   it('allows another attempt when opening a chat fails', async () => {
     mockCreateConversation.mockRejectedValueOnce(new Error('Network failed'));
     renderPage();
@@ -182,6 +201,35 @@ describe('My Characters', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByRole('article', { name: 'Jonas Reed' })).not.toBeInTheDocument();
     expect(screen.getByRole('article', { name: 'Maya Hart' })).toBeInTheDocument();
+  });
+
+  it('blocks competing actions and closing until deletion finishes', async () => {
+    let finishDeletion!: () => void;
+    mockDeletePersona.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDeletion = resolve;
+        })
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Jonas Reed' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Character' }));
+    await waitFor(() => expect(mockDeletePersona).toHaveBeenCalledWith(78));
+    for (const button of screen.getAllByRole('button', { name: 'Open Chat' })) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Character' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+    expect(mockDeletePersona).toHaveBeenCalledTimes(1);
+    mockListMyPersonas.mockResolvedValue([characters[0]]);
+    finishDeletion();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Open Chat' })).toBeEnabled();
   });
 
   it('cancels deletion without removing a character', async () => {
