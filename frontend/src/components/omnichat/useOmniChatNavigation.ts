@@ -23,6 +23,7 @@ export const OMNICHAT_TAB_ROUTES: Record<SidebarTab, string> = {
   characters: '/omnichat/studio',
   search: '/omnichat?search=open',
   newOmniAI: '/omnichat/new-omniai',
+  newRoleplayAI: '/omnichat/new-roleplay',
 };
 
 export function useOmniChatNavigation() {

@@ -15,7 +15,15 @@ import {
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type SidebarTab =
-  'discover' | 'search' | 'chat' | 'groups' | 'create' | 'explore' | 'characters' | 'newOmniAI';
+  | 'discover'
+  | 'search'
+  | 'chat'
+  | 'groups'
+  | 'create'
+  | 'explore'
+  | 'characters'
+  | 'newOmniAI'
+  | 'newRoleplayAI';
 
 interface OmniChatSidebarProps {
   activeTab: SidebarTab;
@@ -56,6 +64,12 @@ const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLa
     icon: UserPlus,
     labelKey: 'omnichat.sidebar.newOmniAI',
     fallbackLabel: 'New OmniAI',
+  },
+  {
+    id: 'newRoleplayAI',
+    icon: UserPlus,
+    labelKey: 'omnichat.sidebar.newRoleplayAI',
+    fallbackLabel: 'New Roleplay AI',
   },
 ];
 

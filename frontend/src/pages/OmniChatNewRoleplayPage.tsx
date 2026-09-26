@@ -432,7 +432,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
   };
 
   return (
-    <OmniChatShell activeTab="characters" onTabChange={onTabChange}>
+    <OmniChatShell activeTab="newRoleplayAI" onTabChange={onTabChange}>
       <div className="min-h-[calc(100dvh-72px)] bg-[#0a0c13] px-4 py-8 text-white sm:px-6">
         <div className="mx-auto max-w-3xl">
           <button

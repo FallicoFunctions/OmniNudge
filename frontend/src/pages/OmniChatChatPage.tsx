@@ -2137,6 +2137,7 @@ export default function OmniChatChatPage() {
         if (tab === 'create') navigate('/omnichat/create');
         if (tab === 'explore') navigate('/omnichat/explore');
         if (tab === 'newOmniAI') navigate(OMNICHAT_TAB_ROUTES.newOmniAI);
+        if (tab === 'newRoleplayAI') navigate(OMNICHAT_TAB_ROUTES.newRoleplayAI);
       }}
     >
       <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overflow-hidden bg-[#111114]">
