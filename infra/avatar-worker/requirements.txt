@@ -1,4 +1,4 @@
-livekit==1.1.18
+livekit==1.1.19
 kokoro==0.9.4
 Pillow==12.3.0
 numpy==2.5.3
