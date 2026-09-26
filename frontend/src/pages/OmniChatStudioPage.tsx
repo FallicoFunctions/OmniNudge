@@ -113,7 +113,7 @@ export default function OmniChatStudioPage() {
                 >
                   <PersonaAvatar
                     persona={persona}
-                    className="aspect-[4/5] w-full !rounded-none"
+                    className="aspect-[4/5] w-full !rounded-none [&_img]:object-top"
                     hideOverlay
                   />
                   <div className="p-4">

@@ -248,6 +248,45 @@ func TestUploadsHandler_ServeUpload_ProxiesAuthorizedRemoteMediaWithoutRedirect(
 	require.Equal(t, "private, no-store", w.Header().Get("Cache-Control"))
 }
 
+func TestUploadsHandler_ServeUpload_CloudKeyWithoutUploadsPrefix(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+	owner := &models.User{Username: "cloud_portrait_owner", PasswordHash: "hash"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, owner))
+	otherUser := &models.User{Username: "cloud_portrait_other", PasswordHash: "hash"}
+	require.NoError(t, models.NewUserRepository(db.Pool).Create(ctx, otherUser))
+	const key = "omnichat/generated/portrait.png"
+	const body = "portrait"
+	mediaRepo := models.NewMediaFileRepository(db.Pool)
+	media := &models.MediaFile{
+		UserID: owner.ID, Filename: "portrait.png", OriginalFilename: "portrait.png",
+		FileType: "image/png", FileSize: int64(len(body)), StorageURL: "/uploads/" + key,
+		StoragePath: key, StorageObjectKey: key,
+	}
+	require.NoError(t, mediaRepo.Create(ctx, media))
+	require.NoError(t, mediaRepo.MarkScanClean(ctx, media.ID))
+	storage := &remoteUploadStorageFake{objects: map[string][]byte{key: []byte(body)}}
+	handler := NewUploadsHandler(mediaRepo, t.TempDir(), storage)
+	for _, viewerID := range []int{0, otherUser.ID, owner.ID} {
+		router := gin.New()
+		serveUploadsAs(router, handler, viewerID)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/uploads/"+key, nil))
+		if viewerID != owner.ID {
+			require.Equal(t, http.StatusNotFound, response.Code)
+		} else {
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			require.Equal(t, body, response.Body.String())
+			require.Equal(t, "private, no-store", response.Header().Get("Cache-Control"))
+		}
+	}
+}
+
 func TestUploadsHandler_ServeUpload_FailsClosedWhenRemoteStorageIsUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db, err := database.NewTest()

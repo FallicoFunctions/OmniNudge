@@ -81,6 +81,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	// browser as an image. It must be a download the app decrypts, never
 	// something the browser tries to render.
 	encryptedFile := false
+	var trackedMedia *models.MediaFile
 
 	if h.mediaRepo != nil {
 		media, err := h.mediaRepo.GetByPublicURL(c.Request.Context(), publicURL)
@@ -130,6 +131,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 				c.Status(http.StatusNotFound)
 				return
 			}
+			trackedMedia = media
 			encryptedFile = media.FileType == encryptedMediaFileType
 			switch media.ScanStatus {
 			case models.MediaScanStatusClean:
@@ -168,18 +170,12 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 
 	info, err := os.Stat(absFile)
 	if err != nil || info.IsDir() {
-		if h.mediaRepo != nil {
-			media, lookupErr := h.mediaRepo.FindByStoragePath(c.Request.Context(), storagePath)
-			if lookupErr != nil {
-				RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
-				return
-			}
-			if media != nil && media.ScanStatus == models.MediaScanStatusClean {
-				if h.serveRemoteTrackedMedia(c, media) {
-					return
-				}
-				return
-			}
+		// Keep the record already authorized above. Cloud objects can store a
+		// key without the legacy "uploads/" prefix in storage_path, so looking
+		// it up again by the local path can incorrectly turn a valid image into 404.
+		if trackedMedia != nil && trackedMedia.ScanStatus == models.MediaScanStatusClean {
+			h.serveRemoteTrackedMedia(c, trackedMedia)
+			return
 		}
 		c.Status(http.StatusNotFound)
 		return
