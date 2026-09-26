@@ -106,22 +106,12 @@ describe('i18n usage', () => {
   // A key built at runtime is invisible to the check above: no literal ever
   // appears in the source. That is how two of these shipped.
   //
-  // 'direct_message' went into ResponseStyleProfile for OmniAIs
-  // and the studio rendered the key at anyone who opened one. 'chat' is the
-  // commonest usage kind the backend writes -- every message debit -- and the
-  // credits panel had no label for it, so the usage list read
+  // 'chat' is the commonest usage kind the backend writes -- every message
+  // debit -- and the credits panel had no label for it, so the usage list read
   // "omnichat.commerce.usage.chat" down the page.
   //
   // A union member is a key. Widen a union, widen its table here.
   const UNION_KEYS: { file: string; type: string; keyOf: (member: string) => string[] }[] = [
-    {
-      file: 'src/types/omnichat.ts',
-      type: 'ResponseStyleProfile',
-      keyOf: (member) => [
-        `omnichat.studio.responseStyles.${member}.label`,
-        `omnichat.studio.responseStyles.${member}.description`,
-      ],
-    },
     {
       file: 'src/types/omnichatCommerce.ts',
       type: 'OmniChatCreditUsageKind',

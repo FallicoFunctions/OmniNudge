@@ -53,36 +53,6 @@ export interface BotPersonaDefinition extends BotPersona {
   import_source_filename?: string;
 }
 
-export interface PersonaDefinitionPayload {
-  name: string;
-  description: string;
-  category: PersonaCategory;
-  visibility: 'public' | 'private' | 'unlisted';
-  system_prompt: string;
-  personality: string;
-  scenario: string;
-  first_message: string;
-  example_dialogue: string;
-  response_style_profile: ResponseStyleProfile;
-  post_history_instructions: string;
-  alternate_greetings: string[];
-  creator_notes: string;
-  tags: string[];
-  creator_name: string;
-  character_version: string;
-  avatar_url?: string;
-  preview_video_url?: string;
-  gallery_urls: string[];
-  is_nsfw: boolean;
-  character_book_json?: Record<string, unknown>;
-  extensions_json?: Record<string, unknown>;
-}
-
-export type PersonaEditPayload = Omit<
-  PersonaDefinitionPayload,
-  'avatar_url' | 'preview_video_url' | 'gallery_urls' | 'extensions_json'
->;
-
 /** Answers to the guided roleplay creator. Prompt and media fields are built on the server. */
 export interface RoleplayCreationAnswers {
   role_id: string;

@@ -440,7 +440,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
             onClick={() => navigate('/omnichat/studio')}
             className="mb-6 inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"
           >
-            <ArrowLeft size={16} /> My characters
+            <ArrowLeft size={16} /> My Characters
           </button>
           <div className="rounded-3xl border border-white/10 bg-[#11141d] p-5 shadow-2xl sm:p-8">
             {created ? (

@@ -10,7 +10,6 @@ import type {
   BotPersona,
   BotPersonaDefinition,
   ConversationSettings,
-  PersonaEditPayload,
   RoleplayCreationAnswers,
   RoleplayCreationOptions,
   OmniAIOptions,
@@ -461,32 +460,8 @@ export const omnichatService = {
     return api.post<BotPersona>('/omnichat/personas', { request_id: requestId, answers });
   },
 
-  async updatePersona(
-    personaId: number,
-    payload: PersonaEditPayload
-  ): Promise<BotPersonaDefinition> {
-    const res = await api.put<{ persona: BotPersonaDefinition }>(
-      `/omnichat/personas/${personaId}`,
-      payload
-    );
-    return res.persona;
-  },
-
   async deletePersona(personaId: number): Promise<void> {
     await api.delete(`/omnichat/personas/${personaId}`);
-  },
-
-  async exportPersona(personaId: number): Promise<Blob> {
-    const response = await authenticatedFetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/omnichat/personas/${personaId}/export`
-    );
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error((body && (body.message || body.error)) || 'Export failed');
-    }
-
-    return response.blob();
   },
 
   async createGeneration(request: OmniChatGenerationRequest): Promise<OmniChatGenerationJob> {

@@ -49,7 +49,7 @@ const TABS: { id: SidebarTab; icon: typeof Compass; labelKey: string; fallbackLa
     id: 'characters',
     icon: UsersRound,
     labelKey: 'omnichat.sidebar.characters',
-    fallbackLabel: 'Characters',
+    fallbackLabel: 'My Characters',
   },
   {
     id: 'newOmniAI',
