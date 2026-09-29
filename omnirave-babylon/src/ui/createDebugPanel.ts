@@ -10,6 +10,7 @@ export function createDebugPanel(host: HTMLElement) {
   panel.innerHTML = `
     <output data-debug-readout="mesh-pick">Pick: --</output>
     <output data-debug-readout="player-state">Player: --</output>
+    <output data-debug-readout="remote-avatars">Remote avatars: --</output>
   `;
   host.appendChild(panel);
   return panel;

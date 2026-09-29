@@ -63,4 +63,29 @@ describe('createAvatarEditor', () => {
     expect(editor.element.querySelector('[data-avatar-option="ice"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(editor.element.querySelector<HTMLSelectElement>('select[data-avatar-field="shoes"]')?.value).toBe('work-boots');
   });
+
+  it('marks catalog entries without fitted meshes as coming soon', () => {
+    const editor = createAvatarEditor({
+      availableOptions: {
+        accessories: ['none', 'gold-hoops'],
+        bottoms: ['none', 'tech-joggers', 'cargo-pants', 'mesh-shorts'],
+        hair: ['none', 'textured-crop'],
+        jacket: ['none', 'bomber', 'utility-vest', 'cropped-puffer'],
+        shoes: ['none', 'high-tops'],
+        top: ['none', 'graphic-tee', 'ribbed-tank', 'mesh-crop'],
+      },
+      definition: DEFAULT_AVATAR_DEFINITION,
+    });
+    document.body.appendChild(editor.element);
+
+    const halter = editor.element.querySelector<HTMLOptionElement>(
+      'select[data-avatar-field="top"] option[value="halter"]',
+    );
+    const graphicTee = editor.element.querySelector<HTMLOptionElement>(
+      'select[data-avatar-field="top"] option[value="graphic-tee"]',
+    );
+    expect(halter?.disabled).toBe(true);
+    expect(halter?.textContent).toContain('coming soon');
+    expect(graphicTee?.disabled).toBe(false);
+  });
 });

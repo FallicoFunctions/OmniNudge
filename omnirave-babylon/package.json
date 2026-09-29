@@ -4,8 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "avatar:optimize": "node scripts/avatar-modular-v1/optimize_modular_avatar.mjs",
+    "avatar:validate": "node scripts/omniavatar-v2/validate-avatar-glb.mjs",
+    "avatar:validate:test": "vitest run scripts/omniavatar-v2/avatar-contract-validator.test.mjs",
     "dev": "vite --host 127.0.0.1 --port 4175",
-    "build": "tsc --project tsconfig.json && vite build",
+    "avatar:hair-storage:check": "python3 scripts/launch-body-proof/prune_hair_pass_snapshots.py --check-max-gib 4 --check-lfs-max-gib 4",
+    "prebuild": "npm run avatar:hair-storage:check",
+    "build": "node scripts/launch-body-proof/compress_complete_downloads.mjs && tsc --project tsconfig.json && vite build",
     "test": "vitest"
   },
   "dependencies": {
@@ -13,6 +18,7 @@
     "@babylonjs/loaders": "^8.1.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
     "@gltf-transform/cli": "^4.4.1",
     "@types/node": "^24.10.1",
     "jsdom": "^27.0.1",

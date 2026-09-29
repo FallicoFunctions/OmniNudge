@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Soundbooth controls review</title>
+  <style>
+    html,body,#show-review{margin:0;width:100%;height:100%;overflow:hidden;background:#050911}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+    .review-label{position:absolute;top:18px;left:20px;color:#b4c7d5;font:12px/1.5 system-ui;pointer-events:none;max-width:370px}
+    .review-label strong{font-size:18px;color:#f1e3bf}
+    .review-label a{pointer-events:auto;color:#b4e9f1}
+    #review-entry{position:absolute;inset:0;z-index:50;display:grid;place-items:center;background:#050911ed;color:#e8edef;font:16px/1.6 system-ui;padding:24px}
+    #review-entry[hidden]{display:none}
+    .review-entry-card{max-width:420px;padding:32px;border:1px solid #344959;border-radius:16px;background:#0a131e}
+    .review-entry-card h1{margin:0 0 12px;color:#f1e3bf;font-size:26px;line-height:1.2}
+    .review-entry-card p{color:#b4c7d5;margin:0 0 24px}
+    .review-entry-card a{display:inline-block;border-radius:8px;background:#f1cf83;color:#101820;padding:10px 18px;text-decoration:none;font-weight:650}
+  </style>
+</head>
+<body>
+  <main id="show-review">
+    <canvas id="show-canvas" aria-label="Live soundbooth and sky"></canvas>
+    <div class="review-label">
+      <strong>Soundbooth · live controls</strong><br>
+      Existing booth, fireworks and drone rig.<br>
+      Join a queue on the right. WASD to move; drag the sky to look.<br>
+      <span id="review-connection">Choose a player to enter the booth.</span><br>
+      <a href="/fireworks-review.html" target="_blank" rel="noopener">Individual fireworks reviewer</a>
+    </div>
+    <section id="review-entry" aria-labelledby="review-entry-title">
+      <div class="review-entry-card">
+        <h1 id="review-entry-title">Enter the soundbooth</h1>
+        <p id="review-entry-message">Choose a player on the playtest page, then open their booth view to join the fireworks or drone queue.</p>
+        <a id="review-entry-link" href="http://127.0.0.1:4176/review">Choose a player</a>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/review/showControlEntry.ts"></script>
+</body>
+</html>

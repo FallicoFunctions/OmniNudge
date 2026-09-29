@@ -64,7 +64,7 @@ export function createStaminaBar(host: HTMLElement): StaminaBar {
     if (fill.style.width !== widthText) {
       fill.style.width = widthText;
     }
-    container.setAttribute('aria-valuenow', String(percent));
+    if (container.getAttribute('aria-valuenow') !== String(percent)) container.setAttribute('aria-valuenow', String(percent));
 
     if (container.classList.contains('stamina-bar--unusable') !== unusable) {
       container.classList.toggle('stamina-bar--unusable', unusable);
