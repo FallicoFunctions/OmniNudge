@@ -1,0 +1,18 @@
+[
+  {
+    "glb": "public/assets/avatars/omniavatar-v2/male-luxury-festival-v1.glb",
+    "manifest": "assets-src/avatars/omniavatar-v2/OA_male_luxury_v1.manifest.json",
+    "character": "male-luxury-festival",
+    "sourceBlend": "assets-src/avatars/omniavatar-v2/OA_male_luxury_v1.blend",
+    "exportDate": "2026-09-03",
+    "buildPass": "v2-pass6-morph-differentiated"
+  },
+  {
+    "glb": "public/assets/avatars/omniavatar-v2/female-plurr-warehouse-v1.glb",
+    "manifest": "assets-src/avatars/omniavatar-v2/OA_female_plurr_v1.manifest.json",
+    "character": "female-plurr-warehouse",
+    "sourceBlend": "assets-src/avatars/omniavatar-v2/OA_female_plurr_v1.blend",
+    "exportDate": "2026-09-03",
+    "buildPass": "v2-pass6-morph-differentiated"
+  }
+]
