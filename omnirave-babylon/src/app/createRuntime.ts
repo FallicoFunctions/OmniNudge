@@ -268,6 +268,9 @@ export async function createRuntime(host: HTMLElement) {
   let fireworksPreviewTimer: number | undefined;
   let fireworksAudioUnlocked = false;
   let soundHint: import('../ui/createSoundHint').SoundHint | undefined;
+  // Set by the first click, tap or key press; after it the hint never returns.
+  let audioGestureSeen = false;
+  let silentHudTicks = 0;
   let stopAudioGestureListeners: (() => void) | undefined;
   // Player-facing "Now Playing" / venue block. Never gated behind ?debug=1, and
   // owned DOM like the overlays above, so it is torn down in cleanup too.
@@ -848,9 +851,9 @@ export async function createRuntime(host: HTMLElement) {
       // player's first click, tap or key press anywhere (walking counts).
       const activeStageMediaPlayer = stageMediaPlayer;
       activeStageMediaPlayer.unlock();
-      soundHint = createSoundHint(host);
       const gestureEvents = ['pointerdown', 'keydown', 'touchend'] as const;
       const unlockAudioOnGesture = () => {
+        audioGestureSeen = true;
         stopAudioGestureListeners?.();
         activeStageMediaPlayer.unlock();
         fireworksAudioUnlocked = true;
@@ -888,10 +891,17 @@ export async function createRuntime(host: HTMLElement) {
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
-        // The browser allowed sound without a gesture: the note is moot.
-        if (soundHint && hudMediaPlayer?.isAudible()) {
-          soundHint.dispose();
-          soundHint = undefined;
+        // Ask for a gesture only when the browser actually held the track
+        // back: a track is due but has stayed silent for two ticks. Where the
+        // Play click carried over (Chrome, Firefox) the note never shows.
+        if (!audioGestureSeen && hudMediaPlayer && activeZoneMedia) {
+          if (hudMediaPlayer.isAudible()) {
+            silentHudTicks = 0;
+            soundHint?.dispose();
+            soundHint = undefined;
+          } else if (++silentHudTicks >= 2 && !soundHint) {
+            soundHint = createSoundHint(host);
+          }
         }
         const counts = activePlayers ? resolvePlayerCounts(activePlayers, activeZoneId) : null;
         playerHud?.update({
