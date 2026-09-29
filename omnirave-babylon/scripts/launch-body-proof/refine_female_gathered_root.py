@@ -1,0 +1,55 @@
+"""Recess the exposed pony connector inside the gathered hair.
+
+Connection map: six existing connector rings span the scalp-to-carrier join.
+Their centerline and both endpoint centers stay fixed; only radial thickness
+shrinks to 35%. The original centerline penetration at both ends is retained.
+Carrier positions, the tie and every hair-card root stay exact. The carrier's
+upper UV rows sample farther into its existing alpha fade; its root ring and
+lower UV rows stay fixed. Origins, weights, topology, materials and relative
+shapes stay exact. Thin hair overlap follows the measured existing join.
+"""
+import bpy
+import numpy as np
+from mathutils import Vector
+from assemble_complete_pair import array
+from complete_pair_geometry import Surface,smooth
+
+NAME = 'PLURR gathered pony root'
+CARRIER = 'PLURR gathered pony bundle'
+
+
+def recess_connector(mapping, report, apply):
+    ob = bpy.data.objects[NAME]; p = array(ob); assert p.shape == (96, 3)
+    rings = p.reshape(6, 16, 3); centers = rings.mean(1)
+    q = (centers[:, None, :] + (rings - centers[:, None, :]) * .35).reshape(-1, 3)
+    apply(ob, q, mapping, report)
+    revised = array(ob).reshape(6, 16, 3)
+    drift = float(np.linalg.norm(revised.mean(1) - centers, axis=1).max())
+    assert drift < 1e-7
+    rig = bpy.data.objects['AvatarSkeleton']; ends = {}
+    for index, name in [(0, 'Complete scalp'), (5, 'PLURR gathered pony bundle')]:
+        tree = Surface(rig, bpy.data.objects[name]).tree
+        hit, normal, _, distance = tree.find_nearest(Vector(centers[index]))
+        ends[name] = {'endpointCenter': centers[index].tolist(), 'surfaceDistanceMm': distance * 1000,
+                      'nearestPlaneSignedDistanceMm': (Vector(centers[index]) - hit).dot(normal) * 1000}
+    report['gatheredRoot'] = {'mesh': NAME, 'vertices': len(p), 'radialScale': .35,
+        'maximumCenterlineDriftMm': drift * 1000, 'unchangedEndpointCenters': True,
+        'originalRadiusMm': [float(np.linalg.norm(r - c, axis=1).max() * 1000) for r, c in zip(rings, centers)],
+        'revisedRadiusMm': [float(np.linalg.norm(r - c, axis=1).max() * 1000) for r, c in zip(revised, centers)],
+        'endpointSurfaceMeasurements': ends, 'addedGeometry': 0, 'relativeSecondaryShapesRetained': True}
+    carrier = bpy.data.objects[CARRIER]; layer = carrier.data.uv_layers.active.data
+    uv = np.array([v.uv[:] for v in layer]); revised_uv = uv.copy(); v = uv[:, 1]
+    revised_uv[:, 1] += .16 * smooth(v / .07) * (1 - smooth((v - .10) / .20))
+    assert np.array_equal(revised_uv[v == 0], uv[v == 0])
+    assert np.array_equal(revised_uv[v >= .30], uv[v >= .30])
+    assert np.all((revised_uv >= 0) & (revised_uv <= 1))
+    mapped = np.zeros((len(carrier.data.vertices), 2))
+    for loop in carrier.data.loops:
+        layer[loop.index].uv = revised_uv[loop.index]
+        u, v = layer[loop.index].uv; mapped[loop.vertex_index] = [u, 1 - v]
+    mapping[CARRIER]['addedUv'] = mapped.tolist()
+    report['gatheredRoot']['carrierFade'] = {'mesh': CARRIER,
+        'changedUvLoops': int(np.count_nonzero(np.max(abs(revised_uv - uv), axis=1) > 1e-7)),
+        'maximumVOffset': float(np.max(revised_uv[:, 1] - uv[:, 1])),
+        'retainedRootRing': True, 'retainedLowerUvFrom': .30,
+        'allCarrierGeometryAndTextureBytesRetained': True}
