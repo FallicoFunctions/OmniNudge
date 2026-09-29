@@ -240,7 +240,7 @@ export default function MainLayout() {
       >
         <div className="mx-auto max-w-7xl px-4 h-full">
           <div className={`flex ${navHeight} items-center justify-between h-full`}>
-            <div className="flex items-center gap-6">
+            <div className="flex min-w-0 items-center gap-6">
               {/* Logo */}
               <Link
                 to="/"
@@ -301,17 +301,21 @@ export default function MainLayout() {
                   </div>
 
                   {/* Divider */}
-                  <div className="hidden md:block h-6 w-px bg-[var(--color-border)]" />
+                  <div className="hidden lg:block h-6 w-px bg-[var(--color-border)]" />
                 </>
               )}
 
-              {/* View Mode Toggle - hidden on mobile */}
-              <div className="hidden md:block">
+              {/* View Mode Toggle. The full header has no room for it next to the
+                  sign-in buttons until lg; the slim header does, and there it is
+                  the only way back to Standard. */}
+              <div className={`hidden ${isSlimMode ? 'md:block' : 'lg:block'}`}>
                 <ViewModeToggle />
               </div>
             </div>
 
-            <div className={`hidden md:flex items-center ${isSlimMode ? 'gap-2' : 'gap-4'}`}>
+            <div
+              className={`hidden md:flex shrink-0 items-center ${isSlimMode ? 'gap-2' : 'gap-4'}`}
+            >
               {user ? (
                 <>
                   {!isSlimMode && (
