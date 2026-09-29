@@ -52,8 +52,9 @@ const (
 // *websocket.Conn concurrently, which can happen here because every
 // connection's read loop can trigger a broadcast to all connections.
 type clientConn struct {
-	conn    *websocket.Conn
-	writeMu sync.Mutex
+	conn      *websocket.Conn
+	writeMu   sync.Mutex
+	snapshots snapshotDelivery
 }
 
 func (c *clientConn) writeJSON(v any) error {
@@ -73,7 +74,11 @@ type WSHandler struct {
 	upgrader websocket.Upgrader
 	mu       sync.Mutex
 	conns    map[string]*clientConn
-	schedule world.EventSchedule
+	movement *movementSnapshots
+	// Serialize snapshot requests, preserving the common event instant while
+	// each connection drains its latest pending state independently.
+	broadcastMu sync.Mutex
+	schedule    world.EventSchedule
 	// announceMu guards lastAnnounceMinute, the dedupe latch for the Main
 	// Stage 5-minute/1-minute global chat announcements (sec 5.1.1). It is
 	// separate from nowMu/mu because it is only ever touched from the single
@@ -115,6 +120,7 @@ func NewWSHandler(worldState *world.World, mediaState *world.MediaState, authSer
 	handler.upgrader = websocket.Upgrader{
 		CheckOrigin: handler.isAllowedOrigin,
 	}
+	handler.movement = newMovementSnapshots(handler.broadcastSnapshots)
 	return handler
 }
 
@@ -135,6 +141,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cc := &clientConn{conn: conn}
 	h.registerConn(clientSession.PlayerID, cc)
 	defer func() {
+		cc.snapshots.close()
 		h.unregisterConn(clientSession.PlayerID, cc)
 		h.world.RemovePlayer(clientSession.PlayerID, player)
 		h.broadcastSnapshots()
@@ -152,17 +159,34 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !limiter.Allow() {
+			// Show controls wait for an acknowledgement. A silent drop would
+			// leave Launch Together pending for the rest of the turn.
+			if event.Type == "show_control" && event.Show != nil && len(event.Show.RequestID) > 0 && len(event.Show.RequestID) <= 64 {
+				result := world.ShowResult{RequestID: event.Show.RequestID, Message: "Too many controls. Try again in a moment."}
+				if err := cc.writeJSON(map[string]any{"type": "show_result", "result": result}); err != nil {
+					return
+				}
+			}
 			continue
 		}
 
 		switch event.Type {
+		case "show_control":
+			if event.Show == nil {
+				continue
+			}
+			result := h.world.ApplyShowCommand(clientSession.PlayerID, player, *event.Show, h.currentTime())
+			if err := cc.writeJSON(map[string]any{"type": "show_result", "result": result}); err != nil {
+				return
+			}
+			h.broadcastSnapshots()
 		case "move":
 			if event.MoveTo == nil {
 				continue
 			}
 
-			h.world.ApplyInput(clientSession.PlayerID, world.InputFrame{MoveTo: *event.MoveTo})
-			h.broadcastSnapshots()
+			h.world.ApplyInput(clientSession.PlayerID, world.InputFrame{MoveTo: *event.MoveTo, Crouched: event.Crouched})
+			h.movement.request()
 		case "respawn":
 			h.world.RespawnPlayer(clientSession.PlayerID)
 			h.broadcastSnapshots()
@@ -317,6 +341,7 @@ func (h *WSHandler) writeSnapshot(cc *clientConn, playerID string, zoneMedia []w
 		"zoneEvents":      snapshot.ZoneEvents,
 		"currentPlayerId": snapshot.CurrentPlayerID,
 		"activeZone":      snapshot.ActiveZone,
+		"showControl":     snapshot.ShowControl,
 	})
 }
 
@@ -333,14 +358,19 @@ func (h *WSHandler) writeSnapshot(cc *clientConn, playerID string, zoneMedia []w
 // setNow-driven assertions.
 func (h *WSHandler) StartScheduler(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(scheduleTickInterval)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		lastBroadcast := time.Time{}
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				h.broadcastSnapshots()
+				now := h.currentTime()
+				if h.world.AdvanceShows(now) || now.Sub(lastBroadcast) >= scheduleTickInterval {
+					h.broadcastSnapshots()
+					lastBroadcast = now
+				}
 				h.maybeAnnounceFireworks()
 			}
 		}
@@ -390,6 +420,8 @@ func (h *WSHandler) maybeAnnounceFireworks() {
 // player A's session just because A's goroutine happened to trigger this
 // broadcast.
 func (h *WSHandler) broadcastSnapshots() {
+	h.broadcastMu.Lock()
+	defer h.broadcastMu.Unlock()
 	h.mu.Lock()
 	conns := make(map[string]*clientConn, len(h.conns))
 	for playerID, cc := range h.conns {
@@ -398,13 +430,16 @@ func (h *WSHandler) broadcastSnapshots() {
 	h.mu.Unlock()
 
 	now := h.currentTime()
+	h.world.AdvanceShows(now)
 	zoneMedia := currentZoneMedia(h.media, now)
 	zoneEvents := h.currentZoneEvents(now)
 
 	for playerID, cc := range conns {
-		if err := h.writeSnapshot(cc, playerID, zoneMedia, zoneEvents); err != nil {
-			h.disconnectConn(playerID, cc)
-		}
+		cc.snapshots.enqueue(func() {
+			if err := h.writeSnapshot(cc, playerID, zoneMedia, zoneEvents); err != nil {
+				h.disconnectConn(playerID, cc)
+			}
+		})
 	}
 }
 
@@ -434,6 +469,7 @@ func (h *WSHandler) broadcastChatMessage(message world.ChatMessage) {
 // broadcast write. It only affects that connection's own session - the
 // connection's read loop will observe the close and run its own cleanup.
 func (h *WSHandler) disconnectConn(playerID string, cc *clientConn) {
+	cc.snapshots.close()
 	h.unregisterConn(playerID, cc)
 	_ = cc.conn.Close()
 }

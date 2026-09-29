@@ -45,6 +45,9 @@ func TestWSHandler_LoadoutEventPublishesAvatarToOtherConnections(t *testing.T) {
 			"bb": "f",
 			"ht": "68",
 			"tp": "mesh-neon",
+			"cv": "1",
+			"cp": "female",
+			"cw": "010111",
 		},
 	}))
 
@@ -57,10 +60,13 @@ func TestWSHandler_LoadoutEventPublishesAvatarToOtherConnections(t *testing.T) {
 		"bb": "f",
 		"ht": "68",
 		"tp": "mesh-neon",
+		"cv": "1",
+		"cp": "female",
+		"cw": "010111",
 	}, playerLoadoutForID(t, broadcast, "guest-1"))
 
 	// The sender's own world state carries the same avatar it published.
-	require.Equal(t, world.Loadout{"av": "1", "bb": "f", "ht": "68", "tp": "mesh-neon"}, worldState.Player("guest-1").Loadout)
+	require.Equal(t, world.Loadout{"av": "1", "bb": "f", "ht": "68", "tp": "mesh-neon", "cv": "1", "cp": "female", "cw": "010111"}, worldState.Player("guest-1").Loadout)
 }
 
 // Rejected payloads must be ignored outright: the player keeps whatever

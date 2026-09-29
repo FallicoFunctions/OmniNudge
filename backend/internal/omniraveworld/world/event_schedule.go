@@ -42,7 +42,7 @@ func NewEventSchedule() EventSchedule {
 				eventName:        "fireworks",
 				activeStart:      0,
 				leadInDuration:   10,
-				activeDuration:   int64((3 * time.Minute) / time.Second),
+				activeDuration:   int64((5 * time.Minute) / time.Second),
 				recoveryDuration: 5,
 			},
 			ZoneUnderground: {

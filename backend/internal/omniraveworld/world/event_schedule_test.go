@@ -15,8 +15,8 @@ func TestEventSchedule_MainStageLeadInAndActive(t *testing.T) {
 	leadIn := time.Date(2026, 6, 4, 14, 59, 52, 0, time.UTC)
 	activeStart := time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC)
 	active := time.Date(2026, 6, 4, 15, 1, 0, 0, time.UTC)
-	activeEnd := time.Date(2026, 6, 4, 15, 3, 0, 0, time.UTC)
-	recoveryEnd := time.Date(2026, 6, 4, 15, 3, 5, 0, time.UTC)
+	activeEnd := time.Date(2026, 6, 4, 15, 5, 0, 0, time.UTC)
+	recoveryEnd := time.Date(2026, 6, 4, 15, 5, 5, 0, time.UTC)
 
 	mainBeforeLead := schedule.StateFor(ZoneMainStage, beforeLeadIn)
 	mainLeadStart := schedule.StateFor(ZoneMainStage, leadInStart)

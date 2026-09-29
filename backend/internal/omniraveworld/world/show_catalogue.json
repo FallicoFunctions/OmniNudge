@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "turnMs": 150000,
+  "preparationMs": 10000,
+  "repeatMs": 3600000,
+  "maxCost": 0,
+  "maxOpeningCost": 0,
+  "bankTurnaroundMs": 700,
+  "fireworks": [
+    {
+      "id": "F01",
+      "cooldownMs": 4000,
+      "cost": 2,
+      "durationMs": 7548
+    },
+    {
+      "id": "F02",
+      "cooldownMs": 7000,
+      "cost": 2,
+      "durationMs": 9568
+    },
+    {
+      "id": "F03",
+      "cooldownMs": 5000,
+      "cost": 2,
+      "durationMs": 8911
+    },
+    {
+      "id": "F04",
+      "cooldownMs": 8000,
+      "cost": 2,
+      "durationMs": 9974
+    },
+    {
+      "id": "F05",
+      "cooldownMs": 11000,
+      "cost": 4,
+      "durationMs": 12911
+    },
+    {
+      "id": "F06",
+      "cooldownMs": 15000,
+      "cost": 4,
+      "durationMs": 16283
+    },
+    {
+      "id": "F07",
+      "cooldownMs": 7000,
+      "cost": 3,
+      "durationMs": 12056
+    },
+    {
+      "id": "F08",
+      "cooldownMs": 7000,
+      "cost": 3,
+      "durationMs": 11186
+    },
+    {
+      "id": "F09",
+      "cooldownMs": 6000,
+      "cost": 2,
+      "durationMs": 9161
+    },
+    {
+      "id": "F10",
+      "cooldownMs": 14000,
+      "cost": 4,
+      "durationMs": 14793
+    },
+    {
+      "id": "F11",
+      "cooldownMs": 6000,
+      "cost": 2,
+      "durationMs": 9931
+    },
+    {
+      "id": "F12",
+      "cooldownMs": 8000,
+      "cost": 3,
+      "durationMs": 11463
+    },
+    {
+      "id": "F13",
+      "cooldownMs": 10000,
+      "cost": 3,
+      "durationMs": 9418
+    },
+    {
+      "id": "F14",
+      "cooldownMs": 15000,
+      "cost": 4,
+      "durationMs": 13566
+    },
+    {
+      "id": "F15",
+      "cooldownMs": 10000,
+      "cost": 2,
+      "durationMs": 11226
+    },
+    {
+      "id": "F16",
+      "cooldownMs": 9000,
+      "cost": 2,
+      "durationMs": 10780
+    },
+    {
+      "id": "F17",
+      "cooldownMs": 8000,
+      "cost": 2,
+      "durationMs": 7580
+    },
+    {
+      "id": "F18",
+      "cooldownMs": 7000,
+      "cost": 2,
+      "durationMs": 8542
+    },
+    {
+      "id": "F19",
+      "cooldownMs": 6000,
+      "cost": 2,
+      "durationMs": 7500
+    },
+    {
+      "id": "F20",
+      "cooldownMs": 10000,
+      "cost": 3,
+      "durationMs": 11372
+    },
+    {
+      "id": "F21",
+      "cooldownMs": 12000,
+      "cost": 4,
+      "durationMs": 14400
+    },
+    {
+      "id": "F22",
+      "cooldownMs": 5000,
+      "cost": 2,
+      "durationMs": 8232
+    },
+    {
+      "id": "F23",
+      "cooldownMs": 8000,
+      "cost": 2,
+      "durationMs": 8624
+    },
+    {
+      "id": "F24",
+      "cooldownMs": 9000,
+      "cost": 3,
+      "durationMs": 10010
+    },
+    {
+      "id": "F25",
+      "cooldownMs": 8000,
+      "cost": 3,
+      "durationMs": 9732
+    }
+  ],
+  "banks": [
+    {
+      "id": "0",
+      "label": "L3",
+      "x": -42,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "1",
+      "label": "L2",
+      "x": -28,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "2",
+      "label": "L1",
+      "x": -14,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "3",
+      "label": "C",
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "4",
+      "label": "R1",
+      "x": 14,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "5",
+      "label": "R2",
+      "x": 28,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    },
+    {
+      "id": "6",
+      "label": "R3",
+      "x": 42,
+      "y": 8,
+      "z": 0,
+      "scale": 1.65
+    }
+  ],
+  "drones": [
+    {
+      "id": "cylinder",
+      "durationMs": 14000
+    },
+    {
+      "id": "sphere",
+      "durationMs": 16000
+    },
+    {
+      "id": "helix",
+      "durationMs": 18000
+    },
+    {
+      "id": "wave",
+      "durationMs": 14000
+    },
+    {
+      "id": "cube",
+      "durationMs": 14000
+    },
+    {
+      "id": "orbit",
+      "durationMs": 18000
+    },
+    {
+      "id": "crown",
+      "durationMs": 16000
+    },
+    {
+      "id": "wordmark",
+      "durationMs": 18000
+    }
+  ]
+}
