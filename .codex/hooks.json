@@ -1,0 +1,26 @@
+{
+  "description": "Cheap edit checks, truncation awareness, destructive-command protection, and affected-project completion gates.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|shell|exec_command)$",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/guards/codex_guard.py\" pre-shell", "timeout": 5}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/guards/codex_guard.py\" post-edit", "timeout": 45}]
+      },
+      {
+        "matcher": "^(Bash|shell|exec_command|Grep|grep|search)$",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/guards/codex_guard.py\" post-output", "timeout": 5}]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/guards/codex_guard.py\" stop", "timeout": 900}]
+      }
+    ]
+  }
+}

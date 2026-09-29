@@ -99,13 +99,27 @@ backend/dump.rdb
 frontend/storybook-static/
 
 # Local generated / non-product artifacts
+.codex/cache/
 .git-lfs/
 .superpowers/
 .opencode/
 opencode.json
+.tooling/
 TMP_MAIN_STAGE_TEST.glb
 docs/superpowers/plans/
 frontend/playwright-report/
 frontend/test-results/
 __pycache__/
 *.py[cod]
+
+# Keep untracked avatar binaries out of routine Git scans: passing them through
+# the LFS filter repeatedly filled this worktree's local cache. Tracked assets
+# still work normally; stage a new approved binary explicitly with git add -f.
+/omnirave-babylon/**/*.blend
+/omnirave-babylon/**/*.glb
+
+# Local compiler output.
+/backend/bin/
+/omninudge
+/omnirave-babylon/tsconfig.tsbuildinfo
+/Test
