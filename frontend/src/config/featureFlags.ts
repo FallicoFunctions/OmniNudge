@@ -32,3 +32,10 @@ export const FEATURE_FLAGS = {
   IMPROVED_CACHING: 'improved_caching',
   ENHANCED_NOTIFICATIONS: 'enhanced_notifications',
 } as const;
+
+/**
+ * Build-time switch for OmniChat. Production builds set
+ * VITE_OMNICHAT_ENABLED=false until OmniChat launches; every other build
+ * keeps it on.
+ */
+export const OMNICHAT_ENABLED = import.meta.env.VITE_OMNICHAT_ENABLED !== 'false';

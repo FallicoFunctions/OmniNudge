@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	omnigameapi "github.com/omninudge/backend/internal/omnigame/api"
@@ -63,7 +64,7 @@ func main() {
 	// them, which would leave the world believing a character remembers
 	// something it does not.
 	var characterMemory *services.OmniChatMemoryService
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+	if databaseURL := config.DatabaseURLFromEnv(); databaseURL != "" {
 		db, err := database.New(databaseURL)
 		if err != nil {
 			log.Fatal(err)

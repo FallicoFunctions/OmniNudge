@@ -27,6 +27,7 @@ import { ToastContainer } from '../components/error';
 import { dismissToast, useToasts } from '../hooks/useToast';
 import { UpgradeModal } from '../components/payments/UpgradeModal';
 import { getSafeInternalPath } from '../utils/navigation';
+import { OMNICHAT_ENABLED } from '../config/featureFlags';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -287,14 +288,16 @@ export default function MainLayout() {
                     >
                       {t('nav.games')}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/omnichat')}
-                      onMouseEnter={() => prefetchRoutes.omnichat()}
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      {t('nav.omnichat')}
-                    </button>
+                    {OMNICHAT_ENABLED && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/omnichat')}
+                        onMouseEnter={() => prefetchRoutes.omnichat()}
+                        className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      >
+                        {t('nav.omnichat')}
+                      </button>
+                    )}
                   </div>
 
                   {/* Divider */}
@@ -340,10 +343,14 @@ export default function MainLayout() {
                           label: t('menu.hubs'),
                           to: '/hubs',
                         },
-                        {
-                          label: t('nav.omnichat'),
-                          to: '/omnichat',
-                        },
+                        ...(OMNICHAT_ENABLED
+                          ? [
+                              {
+                                label: t('nav.omnichat'),
+                                to: '/omnichat',
+                              },
+                            ]
+                          : []),
                         {
                           label: t('menu.about'),
                           to: '/about',

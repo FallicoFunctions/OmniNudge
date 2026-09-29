@@ -84,26 +84,23 @@ What the script does:
 
 If a production-changing step fails after backup creation, the script prints the raw error and asks whether to roll back immediately.
 
-OmniRave deployment wiring is available as an opt-in path. A production rollout still depends on these host-level prerequisites:
+OmniRave deploys with every run of the script (`ENABLE_OMNIRAVE_DEPLOY=1` is the default; set it to `0` to skip). The runtime is served from its own origin, `https://play.omninudge.com`, because it loads `/assets/...` and `/audio/...` from its site root:
 
-1. `ENABLE_OMNIRAVE_DEPLOY=1` to activate the extra build/upload/restart path in `scripts/deploy-on.sh`
-2. a remote runtime artifact directory such as `/var/www/omninudge/omnirave-babylon/dist`
-3. systemd units for `omnigame-api` and `omnirave-world`
-4. reverse-proxy routes for the dedicated runtime and world socket
-5. production `DATABASE_URL` / migration execution for OmniRave profile and sanction tables
-6. production `DATABASE_URL` / migration execution for OmniRave curated stage setlist tables
+| On `play.omninudge.com` | Served by |
+|---|---|
+| `/` | `/var/www/omninudge/omnirave-babylon/dist` (uploaded by the deploy script) |
+| `/audio/` | `/var/www/omnirave-audio/` (uploaded by hand, see below) |
+| `/api/v1/` | `omnigame-api` on `127.0.0.1:8091` |
+| `/ws` | `omnirave-world` on `127.0.0.1:8092` |
 
-Recommended OmniRave deploy environment:
+The deploy script builds the frontend with `VITE_OMNICHAT_ENABLED=false`, and production sets `OMNICHAT_ENABLED=false` for the backend. OmniChat routes, navigation, and `/api/v1/omnichat` endpoints do not exist in production until both are switched on.
+
+Both game services read the backend's environment file through `EnvironmentFile=`. They build their database URL from the `DB_*` values when `DATABASE_URL` is not set.
+
+Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`:
 
 ```bash
-ENABLE_OMNIRAVE_DEPLOY=1
-OMNIRAVE_RUNTIME_REMOTE_PATH=/var/www/omninudge/omnirave-babylon
-OMNIGAME_API_SERVICE_NAME=omnigame-api
-OMNIRAVE_WORLD_SERVICE_NAME=omnirave-world
-OMNIGAME_API_HEALTH_URL=http://127.0.0.1:8091/health
-OMNIRAVE_WORLD_HEALTH_URL=http://127.0.0.1:8092/health
-OMNIGAME_TRUSTED_PROXIES=127.0.0.1/32,::1/128
-bash scripts/deploy-on.sh
+rsync -avP omnirave-babylon/public/audio/<trackId>.mp3 root@77.42.47.79:/var/www/omnirave-audio/
 ```
 
 For guest moderation to be durable across fresh guest bootstraps, `OMNIGAME_TRUSTED_PROXIES` must include only the real proxy hop CIDRs in front of `omnigame-api`. Do not trust public client ranges. The intended production shape is Cloudflare -> nginx -> `omnigame-api`, with nginx/loopback as the trusted hop and external forwarding headers stripped/rewritten before the request reaches Gin.

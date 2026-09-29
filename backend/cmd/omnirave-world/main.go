@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/omniraveworld/repository"
@@ -69,7 +70,7 @@ func requireEnv(key string) string {
 }
 
 func buildMediaState(ctx context.Context) (*world.MediaState, func(), *models.UserRepository, error) {
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+	if databaseURL := config.DatabaseURLFromEnv(); databaseURL != "" {
 		db, err := database.New(databaseURL)
 		if err != nil {
 			return nil, nil, nil, err

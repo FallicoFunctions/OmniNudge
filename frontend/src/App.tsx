@@ -15,6 +15,7 @@ import { LoadingMessage } from './components/common/StatusMessage';
 import { usePageTracking } from './hooks/useAnalytics';
 import { analyticsService } from './services/analyticsService';
 import './App.css';
+import { OMNICHAT_ENABLED } from './config/featureFlags';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ThemesPage = lazy(() => import('./pages/ThemesPage'));
@@ -244,62 +245,64 @@ function App() {
                                 </ProtectedRoute>
                               }
                             />
-                            <Route element={<OmniChatCallLayout />}>
-                              <Route path="/omnichat" element={<OmniChatDiscoverPage />} />
-                              <Route
-                                path="/omnichat/chat"
-                                element={<OmniChatConversationsPage />}
-                              />
-                              <Route
-                                path="/omnichat/c/:conversationId"
-                                element={<OmniChatPage />}
-                              />
-                              <Route
-                                path="/omnichat/studio"
-                                element={
-                                  <ProtectedRoute>
-                                    <OmniChatStudioPage />
-                                  </ProtectedRoute>
-                                }
-                              />
-                              <Route
-                                path="/omnichat/create"
-                                element={
-                                  <ProtectedRoute>
-                                    <OmniChatCreatePage />
-                                  </ProtectedRoute>
-                                }
-                              />
-                              <Route
-                                path="/omnichat/new-omniai"
-                                element={
-                                  <ProtectedRoute>
-                                    <OmniChatNewOmniAIPage />
-                                  </ProtectedRoute>
-                                }
-                              />
-                              <Route
-                                path="/omnichat/new-roleplay"
-                                element={
-                                  <ProtectedRoute>
-                                    <OmniChatNewRoleplayPage />
-                                  </ProtectedRoute>
-                                }
-                              />
-                              <Route path="/omnichat/explore" element={<OmniChatExplorePage />} />
-                              <Route
-                                path="/omnichat/explore/:publicationId"
-                                element={<OmniChatPublicationPage />}
-                              />
-                              <Route
-                                path="/omnichat/groups"
-                                element={
-                                  <ProtectedRoute>
-                                    <OmniChatGroupsPage />
-                                  </ProtectedRoute>
-                                }
-                              />
-                            </Route>
+                            {OMNICHAT_ENABLED && (
+                              <Route element={<OmniChatCallLayout />}>
+                                <Route path="/omnichat" element={<OmniChatDiscoverPage />} />
+                                <Route
+                                  path="/omnichat/chat"
+                                  element={<OmniChatConversationsPage />}
+                                />
+                                <Route
+                                  path="/omnichat/c/:conversationId"
+                                  element={<OmniChatPage />}
+                                />
+                                <Route
+                                  path="/omnichat/studio"
+                                  element={
+                                    <ProtectedRoute>
+                                      <OmniChatStudioPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/omnichat/create"
+                                  element={
+                                    <ProtectedRoute>
+                                      <OmniChatCreatePage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/omnichat/new-omniai"
+                                  element={
+                                    <ProtectedRoute>
+                                      <OmniChatNewOmniAIPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/omnichat/new-roleplay"
+                                  element={
+                                    <ProtectedRoute>
+                                      <OmniChatNewRoleplayPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route path="/omnichat/explore" element={<OmniChatExplorePage />} />
+                                <Route
+                                  path="/omnichat/explore/:publicationId"
+                                  element={<OmniChatPublicationPage />}
+                                />
+                                <Route
+                                  path="/omnichat/groups"
+                                  element={
+                                    <ProtectedRoute>
+                                      <OmniChatGroupsPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                              </Route>
+                            )}
                             <Route
                               path="/settings"
                               element={

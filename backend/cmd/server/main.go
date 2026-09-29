@@ -1113,6 +1113,16 @@ func main() {
 	// Apply a 1 MB body-size cap on all API routes.  Upload endpoints override
 	// this with a more generous 10 MB limit registered at the route level.
 	api.Use(middleware.RequestSizeLimiter(1 << 20))
+	if !cfg.OmniChatEnabled {
+		// OmniChat has not launched: its endpoints do not exist yet.
+		api.Use(func(c *gin.Context) {
+			if strings.HasPrefix(c.Request.URL.Path, "/api/v1/omnichat") {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			c.Next()
+		})
+	}
 	{
 		// Ping endpoint (no auth required)
 		api.GET("/ping", func(c *gin.Context) {

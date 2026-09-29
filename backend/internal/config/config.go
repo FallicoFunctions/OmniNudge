@@ -37,9 +37,12 @@ type Config struct {
 	OmniChatVoice             OmniChatVoiceConfig
 	LiveKit                   LiveKitConfig
 	OmniChatBillingOffersJSON string
-	Tripo                     TripoConfig
-	Crypto                    CryptoConfig
-	OAuth                     OAuthConfig
+	// OmniChatEnabled is false in production until OmniChat launches. When
+	// false, every /api/v1/omnichat endpoint answers 404.
+	OmniChatEnabled bool // OMNICHAT_ENABLED
+	Tripo           TripoConfig
+	Crypto          CryptoConfig
+	OAuth           OAuthConfig
 }
 
 // OAuthConfig holds client credentials for social login providers.
@@ -571,6 +574,7 @@ func Load() (*Config, error) {
 			TokenTTLSecond: getEnvAsPositiveInt("LIVEKIT_TOKEN_TTL_SECONDS", 600),
 		},
 		OmniChatBillingOffersJSON: getEnv("OMNICHAT_BILLING_OFFERS_JSON", ""),
+		OmniChatEnabled:           getEnvAsBool("OMNICHAT_ENABLED", true),
 		OAuth: OAuthConfig{
 			GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
 			GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
@@ -652,6 +656,27 @@ func (c *DatabaseConfig) DatabaseURL() string {
 		c.DBName,
 		c.SSLMode,
 	)
+}
+
+// DatabaseURLFromEnv returns DATABASE_URL. When only the DB_* variables are
+// set, as in the production environment file the main API reads, it builds
+// the same URL the main API connects with. It returns "" when neither is set.
+func DatabaseURLFromEnv() string {
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		return databaseURL
+	}
+	if os.Getenv("DB_USER") == "" {
+		return ""
+	}
+	db := DatabaseConfig{
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnvAsInt("DB_PORT", 5432),
+		User:     os.Getenv("DB_USER"),
+		Password: getEnv("DB_PASSWORD", ""),
+		DBName:   getEnv("DB_NAME", "omninudge_dev"),
+		SSLMode:  getEnv("DB_SSLMODE", "disable"),
+	}
+	return db.DatabaseURL()
 }
 
 // requireEnv returns the value of the environment variable named by key.
