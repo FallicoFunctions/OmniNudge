@@ -1,0 +1,32 @@
+{
+  "male.glb": {
+    "bytes": 84753624,
+    "gzipBytes": 20956359,
+    "sha256": "9039d4b815ac261df4cc218d268ba278a3179d3d60abb1f0d3fdbfeae3e8e73a"
+  },
+  "male-lod1.glb": {
+    "bytes": 32700176,
+    "gzipBytes": 8960073,
+    "sha256": "7c04772f6b6c32df4f0f5a76688102cd360e5c5e20645db2304e9cf33a9c2f95"
+  },
+  "male-lod2.glb": {
+    "bytes": 21717408,
+    "gzipBytes": 4025016,
+    "sha256": "d8964aa49eb1f3fd5fd2d836542a0fc359fa2dd29c80f124644eec56b4dc4b09"
+  },
+  "female.glb": {
+    "bytes": 77067720,
+    "gzipBytes": 18249723,
+    "sha256": "0ba2859ef3e02eff982c8079965a436ec698e49e9afd7aedd6a18fff93d8a7b3"
+  },
+  "female-lod1.glb": {
+    "bytes": 30509500,
+    "gzipBytes": 8787896,
+    "sha256": "573bb65d0d0c6e5cec5ae959b01a81ef9e9aa249fb2f384cc26dfb726e9f164e"
+  },
+  "female-lod2.glb": {
+    "bytes": 23395748,
+    "gzipBytes": 5133569,
+    "sha256": "067a1fd89f159ce9b59c5a0e3074ff5a6acece80c848a5c2ba8a1caec4972502"
+  }
+}

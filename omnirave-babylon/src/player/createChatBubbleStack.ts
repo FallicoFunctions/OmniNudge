@@ -150,10 +150,11 @@ export function createChatBubbleStack(
   scene: Scene,
   id: string,
   parent: TransformNode,
+  parentEyeHeightMeters = 0,
 ): ChatBubbleStack {
   const root = new TransformNode(`chat-bubbles-${id}`, scene);
   root.parent = parent;
-  root.position.y = STACK_ANCHOR_Y;
+  root.position.y = STACK_ANCHOR_Y - parentEyeHeightMeters;
 
   const bubbles: Bubble[] = [];
   let sequence = 0;

@@ -62,6 +62,8 @@ export interface PlayerController {
   /** True while attached to a ladder (sec 7.7) and climbing instead of walking. */
   onLadder: boolean;
   jump: () => void;
+  setOperatingPosition: (position:Vector3|null) => void;
+  operating: boolean;
   /**
    * Sec 8.2/8.3: starts a no-collision grace period against solids and other
    * players, active until the player has moved GHOST_CLEAR_DISTANCE_METERS
@@ -140,6 +142,7 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
   const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
   const cameraForward = new Vector3();
   let jumpQueued = false;
+  let operatingPosition:Vector3|null=null;
   const staminaState: StaminaState = createStaminaState();
   let ghostActive = false;
   const ghostOrigin = new Vector3();
@@ -148,6 +151,12 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
 
   const controller: PlayerController = {
     animationState: 'idle',
+    operating:false,
+    setOperatingPosition(position){
+      operatingPosition=position?.clone()??null;controller.operating=!!position;jumpQueued=false;
+      controller.verticalVelocityMetersPerSecond=0;onLadder=false;activeLadder=null;
+      if(position){options.playerRig.setCrouched(false);options.playerRig.root.position.copyFrom(position);}
+    },
     currentSpeedMetersPerSecond: 0,
     grounded: false,
     ghosting: false,
@@ -163,6 +172,11 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       ghostOrigin.copyFrom(options.playerRig.root.position);
     },
     step(deltaSeconds: number) {
+      if(operatingPosition){
+        options.playerRig.root.position.copyFrom(operatingPosition);options.avatarRoot.rotation.y=0;
+        controller.animationState='idle';controller.currentSpeedMetersPerSecond=0;
+        controller.verticalVelocityMetersPerSecond=0;controller.grounded=true;controller.onLadder=false;jumpQueued=false;return;
+      }
       const position = options.playerRig.root.position;
       const ladders = options.ladders ?? [];
       const remotePlayers = options.getRemotePlayerCollisionTargets?.() ?? [];

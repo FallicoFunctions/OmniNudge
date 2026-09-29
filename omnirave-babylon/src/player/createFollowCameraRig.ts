@@ -47,6 +47,7 @@ export type CameraFollowMode = 'follow' | 'free';
 export interface FollowCameraRig {
   applyCheckpointView: (view: ReviewCheckpointCamera) => ReturnType<typeof resolveZoomState>;
   camera: ArcRotateCamera;
+  setOperatorView: (enabled:boolean) => void;
   followMode: () => CameraFollowMode;
   setFollowMode: (mode: CameraFollowMode) => void;
   orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
@@ -98,6 +99,8 @@ export function createFollowCameraRig(
   const activeFocusOffset = new Vector3(0, 0, 0);
   const activePositionOffset = new Vector3(0, 0, 0);
   let hasActivePositionOffset = false;
+  let operator=false,operatorYaw=0,operatorPitch=.70;
+  let savedView:{alpha:number;beta:number;radius:number;focus:Vector3;offset:Vector3;hasOffset:boolean}|null=null;
 
   // Camera-collision scratch (sec 7.2). Preallocated: this is read every
   // frame from syncZoomState, so nothing here may allocate in the hot path.
@@ -299,11 +302,19 @@ export function createFollowCameraRig(
   return {
     applyCheckpointView,
     camera,
+    setOperatorView(enabled){
+      if(enabled===operator)return;
+      if(enabled){savedView={alpha:camera.alpha,beta:camera.beta,radius:camera.radius,focus:activeFocusOffset.clone(),offset:activeTargetToCameraOffset.clone(),hasOffset:hasActivePositionOffset};operatorYaw=0;operatorPitch=.70;}
+      else if(savedView){camera.alpha=savedView.alpha;camera.beta=savedView.beta;camera.radius=savedView.radius;
+        activeFocusOffset.copyFrom(savedView.focus);activeTargetToCameraOffset.copyFrom(savedView.offset);hasActivePositionOffset=savedView.hasOffset;savedView=null;}
+      operator=enabled;
+    },
     followMode: () => followMode,
     setFollowMode(mode) {
       followMode = mode;
     },
     orbit(deltaYaw, deltaPitch) {
+      if(operator){operatorYaw+=deltaYaw;operatorPitch=Math.max(-.6,Math.min(1.3,operatorPitch+deltaPitch));return this.syncZoomState();}
       applyOrbitDelta(deltaYaw, deltaPitch);
       return this.syncZoomState();
     },
@@ -321,6 +332,12 @@ export function createFollowCameraRig(
       }
     },
     syncZoomState(deltaSeconds) {
+      if(operator){
+        followWorldPosition.copyFrom(target.position);
+        followWorldTarget.set(Math.sin(operatorYaw)*Math.cos(operatorPitch),Math.sin(operatorPitch),Math.cos(operatorYaw)*Math.cos(operatorPitch)).addInPlace(followWorldPosition);
+        targetAnchor.position.copyFrom(followWorldTarget);targetAnchor.computeWorldMatrix(true);applyPositionOffsetCamera(followWorldPosition,followWorldTarget);
+        return resolveZoomState(MIN_ZOOM_DISTANCE);
+      }
       const resolvedDeltaSeconds = deltaSeconds ?? scene.getEngine().getDeltaTime() / 1000;
       // Both modes re-anchor to the player's live position every frame so
       // WASD movement keeps the camera attached instead of leaving it
@@ -358,6 +375,7 @@ export function createFollowCameraRig(
     },
     targetAnchor,
     zoom(deltaDistance) {
+      if(operator)return this.syncZoomState();
       applyZoomDelta(deltaDistance);
       return this.syncZoomState();
     },

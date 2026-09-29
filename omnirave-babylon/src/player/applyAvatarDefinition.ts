@@ -1,11 +1,14 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
-import type { Material } from '@babylonjs/core/Materials/material.js';
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { Material } from '@babylonjs/core/Materials/material.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { MultiMaterial } from '@babylonjs/core/Materials/multiMaterial.js';
 
 import {
+  FEMALE_V2_PREVIEW_DEFINITION,
+  MALE_V2_PREVIEW_DEFINITION,
   normalizeAvatarDefinition,
   resolveAvatarHeightScale,
   resolveAvatarOption,
@@ -16,7 +19,18 @@ import {
   type AvatarShoesSilhouette,
   type AvatarTopSilhouette,
 } from './avatarDefinition';
-import type { AvatarMeshMetadata, AvatarPartRole, ReviewAvatar } from './createReviewAvatar';
+import {
+  applyModularProfileBoneScales,
+  type AvatarMeshMetadata,
+  type AvatarPartRole,
+  type ReviewAvatar,
+} from './createReviewAvatar';
+import {
+  MODULAR_AVATAR_BODY_MORPHS,
+  MODULAR_AVATAR_SLOTS,
+  MODULAR_AVATAR_STARTER_OPTIONS,
+  type ModularAvatarSlot,
+} from './modularAvatarContract';
 
 // Applies an AvatarDefinition (sec 6.4) to the procedural avatar, and the
 // height effects of sec 6.5 that live on the body (scale). The capsule/eye
@@ -32,13 +46,17 @@ import type { AvatarMeshMetadata, AvatarPartRole, ReviewAvatar } from './createR
 // part role), so the cache cannot grow without limit.
 
 interface AvatarMaterialMetadata {
+  avatarAssetKind?: 'body' | 'detail' | 'slot';
   avatarBaseMaterial?: Material;
   avatarColorwayMaterials?: Record<string, Material>;
   avatarPartRole?: AvatarPartRole;
   avatarBodyBase?: 'female' | 'male';
   avatarBodySurface?: 'skin' | 'undergarment';
   avatarFallbackAnatomy?: boolean;
+  avatarModularMorph?: boolean;
+  avatarOptionId?: string;
   avatarPreserveMaterial?: boolean;
+  avatarSlot?: ModularAvatarSlot;
 }
 
 /** Roles rendered as glowing rave-tech dressing rather than cloth or skin. */
@@ -121,10 +139,65 @@ export function applyAvatarDefinition(
   definition: AvatarDefinition,
 ): AvatarDefinition {
   const safe = normalizeAvatarDefinition(definition);
+  // A complete-look preview owns its fitted proportions and outfit. Legacy
+  // editor catalog selections must not recolor or reshape that fixed asset.
+  const completeCharacter = avatar.root.metadata?.avatarCompleteCharacter;
+  if (completeCharacter === 'male' || completeCharacter === 'female') {
+    // The returned height also drives the player capsule and eye position.
+    const complete = { ...(completeCharacter === 'male' ? MALE_V2_PREVIEW_DEFINITION : FEMALE_V2_PREVIEW_DEFINITION) };
+    avatar.root.metadata.avatarDefinition = complete;
+    return complete;
+  }
   const palette = resolveAvatarPalette(safe);
 
+  const selectedBySlot: Readonly<Record<ModularAvatarSlot, string>> = {
+    hair: safe.hairStyle,
+    top: safe.top,
+    jacket: safe.jacket,
+    bottoms: safe.bottoms,
+    shoes: safe.shoes,
+    accessories: safe.accessories,
+  };
+  for (const slot of MODULAR_AVATAR_SLOTS) {
+    const options = avatar.slotOptions?.get(slot);
+    if (!options) continue;
+    // The editor already exposes the full planned wardrobe catalog. Until an
+    // authored mesh exists for every entry, retain the fitted starter instead
+    // of silently undressing the avatar. Explicit `none` selections still win.
+    const selected = options.get(selectedBySlot[slot])
+      ?? options.get(MODULAR_AVATAR_STARTER_OPTIONS[slot])
+      ?? options.get('none');
+    for (const optionRoot of options.values()) {
+      optionRoot.setEnabled(optionRoot === selected);
+    }
+  }
   for (const mesh of avatar.meshes) {
     const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+    if (metadata.avatarModularMorph && mesh instanceof Mesh && mesh.morphTargetManager) {
+      for (let index = 0; index < mesh.morphTargetManager.numTargets; index += 1) {
+        const target = mesh.morphTargetManager.getTarget(index);
+        if (MODULAR_AVATAR_BODY_MORPHS.includes(
+          target.name as (typeof MODULAR_AVATAR_BODY_MORPHS)[number],
+        )) {
+          target.influence = target.name === safe.bodyBase ? 1 : 0;
+        } else if (target.name === 'lean') {
+          target.influence = avatar.root.metadata?.avatarLeanMorphActive === true ? 1 : 0;
+        }
+      }
+    }
+    if (metadata.avatarAssetKind) {
+      if (!metadata.avatarPreserveMaterial && metadata.avatarPartRole) {
+        const hex = hexForRole(metadata.avatarPartRole, palette);
+        if (hex !== null) {
+          if (metadata.avatarPartRole === 'skin') {
+            applyAuthoredBodyMaterial(mesh, hex);
+          } else {
+            applyPartMaterial(mesh, metadata.avatarPartRole, hex);
+          }
+        }
+      }
+      continue;
+    }
     if (metadata.avatarBodyBase) {
       mesh.setEnabled(metadata.avatarBodyBase === safe.bodyBase);
       if (metadata.avatarPreserveMaterial) {
@@ -143,6 +216,10 @@ export function applyAvatarDefinition(
     if (hex === null) continue;
     applyPartMaterial(mesh, role!, hex);
   }
+
+  // Keep one shared skeleton while letting the male/female body morphs carry
+  // their own restrained contour rhythm on lean/editorial profiles.
+  applyModularProfileBoneScales(avatar, safe.bodyBase);
 
   applySilhouettes(avatar, safe);
   applyAvatarHeightScale(avatar, safe.heightInches);
@@ -229,16 +306,37 @@ function paintPartMaterial(material: Material, role: AvatarPartRole, hex: string
   // a future authored mesh that ships one) still recolours instead of silently
   // keeping its base colour.
   if (material instanceof PBRMaterial) {
-    material.albedoColor = color;
-    material.reflectivityColor = color.scale(role === 'shoes' ? 0.3 : 0.16);
-    material.emissiveColor = emissive ? color : color.scale(0.06);
-    material.emissiveIntensity = emissive ? 1.2 : 0.2;
-    material.roughness = role === 'skin' || role === 'arm' || role === 'leg' ? 0.62 : 0.48;
-    material.metallic = 0.08;
+    // MPFB skin carries a photographed base-color texture. The selected skin
+    // tone multiplies that map, while the preview's isolated light rig keeps
+    // the result from clipping under the venue's architectural key lights.
+    // Hair and footwear carry authored color textures. Use the editor color
+    // as a restrained grade so strands, laces, panels, and soles survive.
+    material.albedoColor = (role === 'hair' || role === 'shoes') && material.albedoTexture
+      ? Color3.White().scale(0.58).add(color.scale(0.42))
+      : color;
+    material.reflectivityColor = color.scale(role === 'shoes' ? 0.3 : role === 'skin' ? 0.06 : 0.16);
+    material.emissiveColor = emissive ? color : Color3.Black();
+    material.emissiveIntensity = emissive ? 1.2 : 0;
+    material.roughness = role === 'skin' || role === 'arm' || role === 'leg'
+      ? 0.72
+      : role === 'hair'
+      ? 0.56
+      : role === 'shoes'
+      ? 0.38
+      : 0.62;
+    material.metallic = role === 'skin' || role === 'hair' ? 0 : role === 'shoes' ? 0.04 : 0.02;
+    if (role === 'shoes') {
+      // MPFB footwear arrives marked BLEND because the source atlas carries
+      // an alpha channel, even though these fitted shoe meshes are closed.
+      // Treating that atlas alpha as opacity erases most uppers in Babylon.
+      material.alpha = 1;
+      material.transparencyMode = Material.MATERIAL_OPAQUE;
+      material.useAlphaFromAlbedoTexture = false;
+    }
   } else if (material instanceof StandardMaterial) {
     material.diffuseColor = color;
     material.specularColor = color.scale(0.24);
-    material.emissiveColor = emissive ? color : color.scale(0.06);
+    material.emissiveColor = emissive ? color : Color3.Black();
   }
 }
 
@@ -304,6 +402,7 @@ function applySilhouettes(avatar: ReviewAvatar, definition: AvatarDefinition) {
     && authoredCharacterBases.includes(definition.bodyBase);
   for (const mesh of avatar.meshes) {
     const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+    if (metadata.avatarAssetKind) continue;
     if (metadata.avatarBodyBase) continue;
     if (hasAuthoredCharacter) {
       // The procedural capsule/box rig is an emergency fallback only. Once a

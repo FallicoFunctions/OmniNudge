@@ -25,6 +25,10 @@ const KEY_BINDINGS: Record<string, keyof MovementInput> = {
   KeyD: 'right',
   KeyS: 'backward',
   KeyW: 'forward',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowDown: 'backward',
+  ArrowUp: 'forward',
   ShiftLeft: 'sprint',
   ShiftRight: 'sprint',
   Space: 'jump',
@@ -47,10 +51,12 @@ export function createInputMap(target: Window): InputMap {
     down: false,
     crouch: false,
   };
+  const heldCodes = new Set<string>();
   let crouchMode: CrouchInputMode = 'hold';
   let textEntryActive = false;
 
   const resetState = () => {
+    heldCodes.clear();
     for (const key of Object.keys(state) as Array<keyof MovementInput>) {
       state[key] = false;
     }
@@ -59,11 +65,14 @@ export function createInputMap(target: Window): InputMap {
   const handleKeyDown = (event: KeyboardEvent) => {
     // Chat typing owns the keyboard (sec 10.3). Bail before any binding lookup
     // or preventDefault so Space/WASD reach the text field untouched.
-    if (textEntryActive) {
+    if (textEntryActive || (event.target instanceof Element
+      && event.target.closest('input, textarea, select, [contenteditable="true"]'))) {
       return;
     }
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
+      heldCodes.add(event.code);
+      if (event.code.startsWith('Arrow')) event.preventDefault();
       if (event.code === 'Space') {
         event.preventDefault();
         if (event.repeat) {
@@ -89,6 +98,8 @@ export function createInputMap(target: Window): InputMap {
     }
     const binding = KEY_BINDINGS[event.code];
     if (binding) {
+      heldCodes.delete(event.code);
+      if (event.code.startsWith('Arrow')) event.preventDefault();
       if (event.code === 'Space') {
         event.preventDefault();
         return;
@@ -96,11 +107,11 @@ export function createInputMap(target: Window): InputMap {
       if (binding === 'crouch') {
         // Toggle mode latches: only a fresh press changes it.
         if (crouchMode === 'hold') {
-          state.crouch = false;
+          state.crouch = [...heldCodes].some(code => KEY_BINDINGS[code] === 'crouch');
         }
         return;
       }
-      state[binding] = false;
+      state[binding] = [...heldCodes].some(code => KEY_BINDINGS[code] === binding);
     }
   };
 

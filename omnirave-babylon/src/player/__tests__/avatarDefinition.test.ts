@@ -290,8 +290,8 @@ describe('allocation-free loadout change detection', () => {
     expect(avatarLoadoutDiffers(undefined, fingerprint)).toBe(true);
   });
 
-  it('tracks exactly the ten avatar keys', () => {
-    expect(AVATAR_LOADOUT_KEY_LIST.length).toBe(10);
-    expect(new Set(AVATAR_LOADOUT_KEY_LIST).size).toBe(10);
+  it('tracks exactly the eleven avatar keys', () => {
+    expect(AVATAR_LOADOUT_KEY_LIST.length).toBe(11);
+    expect(new Set(AVATAR_LOADOUT_KEY_LIST).size).toBe(11);
   });
 });

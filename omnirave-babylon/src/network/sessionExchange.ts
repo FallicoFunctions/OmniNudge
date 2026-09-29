@@ -21,6 +21,8 @@ export interface ExchangedSession {
   playerName: string;
   worldSocketUrl: string;
   worldSessionToken: string;
+  /** Account profile credential, retained only in runtime memory. */
+  sessionToken?: string;
   activeZone: string;
   // 'account' when the handoff came from an already-authenticated
   // omninudge.com session (see GameDetailPage.tsx's handleLaunch('account')),
@@ -92,6 +94,8 @@ export async function exchangeLaunchSession(
       playerName: data.playerName,
       worldSocketUrl: data.worldSocketUrl,
       worldSessionToken: data.worldSessionToken,
+      ...(data.mode === 'account' && typeof data.sessionToken === 'string' && data.sessionToken
+        ? { sessionToken: data.sessionToken } : {}),
       activeZone: data.activeZone,
       // Falls back to the mode this exchange was requested with (the `mode`
       // param GameDetailPage.tsx's handoff URL already carries) if the

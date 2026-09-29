@@ -45,6 +45,7 @@ export interface AvatarOption {
 }
 
 export interface AvatarDefinition {
+  accessories: string;
   bodyBase: AvatarBodyBase;
   heightInches: number;
   hairStyle: string;
@@ -191,7 +192,13 @@ export const AVATAR_SHOES: readonly AvatarOption[] = [
   { id: 'flip-flops', label: 'Flip Flops', colorHex: '#2f6f5f', coding: 'boy', silhouette: 'flat' },
 ] as const;
 
+export const AVATAR_ACCESSORIES: readonly AvatarOption[] = [
+  { id: 'none', label: 'No Accessories', colorHex: '#d8b26a' },
+  { id: 'gold-hoops', label: 'Gold Hoops', colorHex: '#d8b26a' },
+] as const;
+
 export type AvatarCategoryId =
+  | 'accessories'
   | 'bottoms'
   | 'hairColor'
   | 'hairStyle'
@@ -201,6 +208,7 @@ export type AvatarCategoryId =
   | 'top';
 
 export const AVATAR_OPTION_POOLS: Readonly<Record<AvatarCategoryId, readonly AvatarOption[]>> = {
+  accessories: AVATAR_ACCESSORIES,
   hairStyle: AVATAR_HAIR_STYLES,
   hairColor: AVATAR_HAIR_COLORS,
   skinTone: AVATAR_SKIN_TONES,
@@ -283,6 +291,7 @@ export function generateAvatarDefinition(rng: AvatarRng = Math.random): AvatarDe
   const coding = codingForBodyBase(bodyBase);
 
   return {
+    accessories: pick(AVATAR_ACCESSORIES, rng).id,
     bodyBase,
     heightInches,
     hairStyle: pickCoded('hairStyle', coding, rng),
@@ -299,15 +308,49 @@ export const DEFAULT_AVATAR_DEFINITION: AvatarDefinition = Object.freeze({
   // First authored preset: the admitted luxury-festival male reference.
   // Each field still belongs to the normal closed editor pools, so the look
   // can be freely remixed instead of becoming a one-off hard-coded costume.
+  accessories: 'gold-hoops',
   bodyBase: 'male',
   heightInches: AVATAR_REFERENCE_HEIGHT_INCHES,
   hairStyle: 'textured-crop',
   hairColor: 'espresso',
   skinTone: 'sand',
-  top: 'sheer-bodysuit',
-  jacket: 'hooded-shell',
+  top: 'graphic-tee',
+  jacket: 'bomber',
   bottoms: 'tech-joggers',
   shoes: 'high-tops',
+}) as AvatarDefinition;
+
+/**
+ * OmniAvatar v2 foundation preview looks. Male selects the male morph and the
+ * authored starter kit; female selects the female morph and authored female
+ * options. Both are complete definitions, so neither falls back to the male
+ * default. Identity lives in the GLB morph defaults; these only drive slot
+ * visibility and tint, never bone scales.
+ */
+export const MALE_V2_PREVIEW_DEFINITION: AvatarDefinition = Object.freeze({
+  accessories: 'gold-hoops',
+  bodyBase: 'male',
+  heightInches: AVATAR_REFERENCE_HEIGHT_INCHES,
+  hairStyle: 'textured-crop',
+  hairColor: 'espresso',
+  skinTone: 'sand',
+  top: 'graphic-tee',
+  jacket: 'bomber',
+  bottoms: 'tech-joggers',
+  shoes: 'high-tops',
+}) as AvatarDefinition;
+
+export const FEMALE_V2_PREVIEW_DEFINITION: AvatarDefinition = Object.freeze({
+  accessories: 'gold-hoops',
+  bodyBase: 'female',
+  heightInches: AVATAR_REFERENCE_HEIGHT_INCHES,
+  hairStyle: 'long-waves',
+  hairColor: 'jet',
+  skinTone: 'honey',
+  top: 'mesh-crop',
+  jacket: 'cropped-puffer',
+  bottoms: 'mesh-shorts',
+  shoes: 'platform-boots',
 }) as AvatarDefinition;
 
 /** Total: snaps every field of an arbitrary definition onto a valid one. */
@@ -324,6 +367,11 @@ export function normalizeAvatarDefinition(definition: Partial<AvatarDefinition> 
       : fallback;
   };
   return {
+    accessories: optionOrDefault(
+      'accessories',
+      source.accessories,
+      DEFAULT_AVATAR_DEFINITION.accessories,
+    ),
     bodyBase: source.bodyBase === 'male' || source.bodyBase === 'female'
       ? source.bodyBase
       : DEFAULT_AVATAR_DEFINITION.bodyBase,
@@ -346,14 +394,15 @@ export function normalizeAvatarDefinition(definition: Partial<AvatarDefinition> 
 //
 // BUDGET: the Go server caps a loadout at 32 keys and 128 chars per key and
 // per value (backend/internal/omnigame/api/handlers/profile_handler.go).
-// This encoding spends 10 short keys (2 chars each) with option-id values that
-// top out around 16 chars, leaving 22 keys of headroom and using at most an
+// This encoding spends 11 short keys (2 chars each) with option-id values that
+// top out around 16 chars, leaving 21 keys of headroom and using at most an
 // eighth of the per-value budget.
 
 export const AVATAR_LOADOUT_SCHEMA_VERSION = '1';
 
 export const AVATAR_LOADOUT_KEYS = {
   version: 'av',
+  accessories: 'ac',
   bodyBase: 'bb',
   heightInches: 'ht',
   hairStyle: 'hs',
@@ -371,6 +420,7 @@ export function serializeAvatarLoadout(definition: AvatarDefinition): Record<str
   const safe = normalizeAvatarDefinition(definition);
   return {
     [AVATAR_LOADOUT_KEYS.version]: AVATAR_LOADOUT_SCHEMA_VERSION,
+    [AVATAR_LOADOUT_KEYS.accessories]: safe.accessories,
     [AVATAR_LOADOUT_KEYS.bodyBase]: safe.bodyBase === 'male' ? 'm' : 'f',
     [AVATAR_LOADOUT_KEYS.heightInches]: String(safe.heightInches),
     [AVATAR_LOADOUT_KEYS.hairStyle]: safe.hairStyle,
@@ -405,6 +455,7 @@ export function parseAvatarLoadout(
   const rawHeight = Number.parseInt(read(AVATAR_LOADOUT_KEYS.heightInches), 10);
 
   return normalizeAvatarDefinition({
+    accessories: read(AVATAR_LOADOUT_KEYS.accessories),
     bodyBase,
     heightInches: Number.isNaN(rawHeight) ? AVATAR_REFERENCE_HEIGHT_INCHES : rawHeight,
     hairStyle: read(AVATAR_LOADOUT_KEYS.hairStyle),

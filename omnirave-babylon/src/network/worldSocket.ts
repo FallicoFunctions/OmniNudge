@@ -1,3 +1,4 @@
+import { isShowState, type ShowState, type ShowCommand, type ShowResult } from '../showControl/showTypes';
 // World-socket client for the Go world server (gorilla/websocket at /ws?token=<jwt>).
 //
 // Framework-free: no Babylon imports here. The WebSocket itself is injected via
@@ -22,6 +23,10 @@ export interface WorldPlayer {
   playerName: string;
   mode: SessionMode;
   position: Vec3;
+  /** Transient movement posture; absent on older servers means standing. */
+  crouched?: boolean;
+  showPanel?: string;
+  showRevision?: number;
   zone: string;
   loadout: Record<string, string>;
 }
@@ -49,6 +54,7 @@ export interface ZoneEventState {
 }
 
 export interface WorldSnapshot {
+  showControl?: ShowState;
   players: WorldPlayer[];
   zoneMedia: ZoneMediaState[];
   zoneEvents: ZoneEventState[];
@@ -100,9 +106,11 @@ export interface WorldSocket {
   // cannot be reused for this - reconnect is the separate, non-terminal path.
   reconnect: (url: string, token: string) => void;
   dispose: () => void;
-  sendMove: (position: Vec3) => void;
+  sendMove: (position: Vec3, crouched?: boolean) => void;
   sendRespawn: () => void;
   sendChat: (body: string) => void;
+  sendShowCommand: (command:ShowCommand) => void;
+  onShowResult: (callback:(result:ShowResult)=>void) => ()=>void;
   sendLoadout: (loadout: Record<string, string>) => void;
   onSnapshot: (callback: (snapshot: WorldSnapshot) => void) => () => void;
   onChat: (callback: (message: WorldChatMessage) => void) => () => void;
@@ -144,11 +152,17 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   let reconnectTimer: number | null = null;
 
   let lastMoveSentAt = Number.NEGATIVE_INFINITY;
+  let lastMoveSent: Vec3 | null = null;
+  let confirmedPosition: Vec3 | null = null;
   let pendingMove: Vec3 | null = null;
+  let lastMoveCrouched = false;
+  let confirmedCrouched = false;
+  let pendingCrouched = false;
   let moveTrailingTimer: number | null = null;
 
   let warnedThisBurst = false;
 
+  const showCallbacks = new Set<(result:ShowResult)=>void>();
   const snapshotCallbacks: Array<(snapshot: WorldSnapshot) => void> = [];
   const chatCallbacks: Array<(message: WorldChatMessage) => void> = [];
   const statusCallbacks: Array<(status: WorldSocketStatus) => void> = [];
@@ -167,15 +181,44 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     socket.send(JSON.stringify(payload));
   }
 
+  function clearPendingMove(): void {
+    if (moveTrailingTimer !== null) {
+      clock.clearTimeout(moveTrailingTimer);
+      moveTrailingTimer = null;
+    }
+    pendingMove = null;
+    pendingCrouched = false;
+  }
+
+  function resetMovement(): void {
+    clearPendingMove();
+    lastMoveSentAt = Number.NEGATIVE_INFINITY;
+    lastMoveSent = null;
+    confirmedPosition = null;
+    lastMoveCrouched = confirmedCrouched = false;
+  }
+
+  function samePosition(a: Vec3 | null, b: Vec3): boolean {
+    return a !== null && a.x === b.x && a.y === b.y && a.z === b.z;
+  }
+
+  function sendPosition(position: Vec3, crouched: boolean): void {
+    if (disposed || !socket || status !== 'open') return;
+    send({ type: 'move', moveTo: position, ...(crouched ? { crouched: true } : {}) });
+    lastMoveSentAt = clock.now();
+    lastMoveSent = { ...position };
+    lastMoveCrouched = crouched;
+  }
+
   function flushPendingMove(): void {
     moveTrailingTimer = null;
     if (!pendingMove) {
       return;
     }
     const position = pendingMove;
+    const crouched = pendingCrouched;
     pendingMove = null;
-    lastMoveSentAt = clock.now();
-    send({ type: 'move', moveTo: position });
+    sendPosition(position, crouched);
   }
 
   function handleMessage(raw: string): void {
@@ -198,9 +241,18 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     switch (message.type) {
       case 'world_snapshot': {
         const snapshot = toWorldSnapshot(message);
+        const localPlayer = snapshot.players.find(player => player.id === snapshot.currentPlayerId);
+        confirmedPosition = localPlayer ? { ...localPlayer.position } : null;
+        confirmedCrouched = localPlayer?.crouched === true;
+        if (pendingMove && samePosition(confirmedPosition, pendingMove) && confirmedCrouched === pendingCrouched) clearPendingMove();
         for (const callback of snapshotCallbacks) {
           callback(snapshot);
         }
+        break;
+      }
+      case 'show_result': {
+        const result=message.result as ShowResult;
+        if(result && typeof result.requestId==='string' && typeof result.ok==='boolean' && typeof result.message==='string') showCallbacks.forEach(cb=>cb(result));
         break;
       }
       case 'chat_message': {
@@ -248,6 +300,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
       return;
     }
 
+    resetMovement();
     setStatus('connecting');
     const connectUrl = buildConnectUrl(currentUrl, currentToken);
     const nextSocket = webSocketFactory(connectUrl);
@@ -255,14 +308,17 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
 
     nextSocket.onopen = () => {
       reconnectAttempt = 0;
+      resetMovement();
       setStatus('open');
     };
 
     nextSocket.onerror = () => {
+      resetMovement();
       setStatus('error');
     };
 
     nextSocket.onclose = () => {
+      resetMovement();
       setStatus('closed');
       if (!disposed) {
         scheduleReconnect();
@@ -304,11 +360,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     disposed = true;
     clearReconnectTimer();
 
-    if (moveTrailingTimer !== null) {
-      clock.clearTimeout(moveTrailingTimer);
-      moveTrailingTimer = null;
-    }
-    pendingMove = null;
+    resetMovement();
 
     if (socket) {
       socket.onclose = null;
@@ -322,23 +374,35 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     setStatus('closed');
   }
 
-  function sendMove(position: Vec3): void {
+  function sendMove(position: Vec3, crouched = false): void {
+    if (disposed || !socket || status !== 'open') return;
+    // Presence and clocks use the server's scheduler. Stop duplicate sends
+    // only once the server confirms the position: it may clamp a large step
+    // or drop an event, in which case another throttled move must catch up.
+    if (samePosition(lastMoveSent, position) && samePosition(confirmedPosition, position)
+      && lastMoveCrouched === crouched && confirmedCrouched === crouched) {
+      clearPendingMove();
+      return;
+    }
     const now = clock.now();
     const elapsed = now - lastMoveSentAt;
 
     if (elapsed >= MOVE_THROTTLE_MS) {
-      lastMoveSentAt = now;
-      send({ type: 'move', moveTo: position });
+      // A delayed timer may still be queued after this throttle window.
+      clearPendingMove();
+      sendPosition(position, crouched);
       return;
     }
 
-    pendingMove = position;
+    pendingMove = { ...position };
+    pendingCrouched = crouched;
     if (moveTrailingTimer === null) {
       moveTrailingTimer = clock.setTimeout(flushPendingMove, MOVE_THROTTLE_MS - elapsed);
     }
   }
 
   function sendRespawn(): void {
+    resetMovement();
     send({ type: 'respawn' });
   }
 
@@ -388,6 +452,8 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     sendRespawn,
     sendChat,
     sendLoadout,
+    sendShowCommand(command){send({type:'show_control',show:command});},
+    onShowResult(callback){showCallbacks.add(callback);return ()=>{showCallbacks.delete(callback);};},
     onSnapshot,
     onChat,
     onStatusChange,
@@ -396,6 +462,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
 
 function toWorldSnapshot(message: Record<string, unknown>): WorldSnapshot {
   return {
+    ...(isShowState(message.showControl)?{showControl:message.showControl}:{}),
     players: Array.isArray(message.players) ? (message.players as WorldPlayer[]) : [],
     zoneMedia: Array.isArray(message.zoneMedia) ? (message.zoneMedia as ZoneMediaState[]) : [],
     zoneEvents: Array.isArray(message.zoneEvents) ? (message.zoneEvents as ZoneEventState[]) : [],

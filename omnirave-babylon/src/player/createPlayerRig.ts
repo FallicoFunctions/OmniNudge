@@ -4,17 +4,14 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import type { Vector3 } from '@babylonjs/core/Maths/math.vector';
 
 import { AVATAR_REFERENCE_HEIGHT_INCHES, resolveAvatarHeightScale } from './avatarDefinition';
+import { CROUCH_HEIGHT_SCALE, REFERENCE_CAPSULE_HEIGHT_METERS, REFERENCE_EYE_HEIGHT_METERS, REFERENCE_RADIUS_METERS } from './playerPresence';
 
 // The rig is authored at the avatar's reference height (71in / 1.80m):
 // a 1.8m capsule with the eye line at 1.65m. Sec 6.5 height effects are a
 // uniform scale off these numbers.
-const REFERENCE_EYE_HEIGHT_METERS = 1.65;
-const REFERENCE_RADIUS_METERS = 0.35;
-const REFERENCE_CAPSULE_HEIGHT_METERS = 1.8;
 // Sec 7.5: crouch shrinks eye line and capsule height only - radius is left
 // alone, so crouching does not change how tightly a player can squeeze past
 // solids horizontally, only what they can duck under / how tall they stand.
-const CROUCH_HEIGHT_SCALE = 0.62;
 
 export interface PlayerRig {
   avatarAnchor: TransformNode;
