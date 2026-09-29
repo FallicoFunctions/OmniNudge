@@ -68,10 +68,11 @@ func TestRouter_CompleteOutfitProfileSaveAndFreshAccountLaunch(t *testing.T) {
 	require.NoError(t, err)
 	expired, err := auth.GenerateJWTWithExpiry(aliceID, "alice", "user", -time.Minute)
 	require.NoError(t, err)
-	for name, token := range map[string]string{"missing": "", "invalid": "invalid", "guest-world": guestWorld, "account-world": accountWorld, "chat": chat, "expired": expired} {
+	// A sessionless token with no stated use is refused before the profile
+	// check; the game session token above is the credential that saves.
+	legacy, err := auth.GenerateJWT(aliceID, "alice", "user")
+	require.NoError(t, err)
+	for name, token := range map[string]string{"missing": "", "invalid": "invalid", "guest-world": guestWorld, "account-world": accountWorld, "chat": chat, "expired": expired, "legacy-access": legacy} {
 		t.Run(name, func(t *testing.T) { require.Equal(t, http.StatusUnauthorized, request(token, string(encoded))) })
 	}
-	access, err := auth.GenerateJWT(aliceID, "alice", "user")
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNoContent, request(access, string(encoded)))
 }

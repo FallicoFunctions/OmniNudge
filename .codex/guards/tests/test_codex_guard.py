@@ -94,7 +94,9 @@ class EditedPathTests(unittest.TestCase):
             path.write_text(json.dumps({"female": True, "views": 6}))
             self.assertIsNone(guard.check_file(path, root))
             path.write_text('{"male": true,}')
-            self.assertIn("trailing comma", (guard.check_file(path, root) or "").lower())
+            # The wording changed in Python 3.13 ("Illegal trailing comma");
+            # the position is stable across versions.
+            self.assertIn("line 1 column", (guard.check_file(path, root) or "").lower())
 
 
 class StopGateTests(unittest.TestCase):

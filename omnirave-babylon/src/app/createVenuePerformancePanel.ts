@@ -1,5 +1,6 @@
 import { EngineInstrumentation } from '@babylonjs/core/Instrumentation/engineInstrumentation.js';
 // WebGL's modular Engine entry point does not register timing queries.
+import '@babylonjs/core/Engines/AbstractEngine/abstractEngine.timeQuery.js';
 import '@babylonjs/core/Engines/Extensions/engine.query.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
 import type { Scene } from '@babylonjs/core/scene.js';

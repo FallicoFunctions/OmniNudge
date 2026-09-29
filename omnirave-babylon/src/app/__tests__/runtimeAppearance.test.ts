@@ -51,7 +51,7 @@ it('waits for saved bodies, publishes character switches, and permits independen
     dispose: vi.fn(), getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
     onDisposeObservable: { addOnce:vi.fn() }, resize:vi.fn(), runRenderLoop:vi.fn(), setHardwareScalingLevel:vi.fn(),
   };
-  vi.doMock('@babylonjs/core/Engines/engine', () => ({ Engine:vi.fn(() => engine) }));
+  vi.doMock('@babylonjs/core/Engines/engine', () => ({ Engine:vi.fn(function () { return engine; }) }));
   let finishLoad!: (success?: boolean) => void;
   let avatar = { root:{metadata:{}}, meshes:[] } as unknown as ReviewAvatar;
   const oldWardrobes: { wardrobe:CompleteAvatarWardrobe; listeners:Set<() => void> }[] = [];

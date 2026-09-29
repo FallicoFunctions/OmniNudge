@@ -100,11 +100,10 @@ describe('runtimeLogin', () => {
   });
 
   it('retains only an account response\'s separate profile credential', async () => {
-    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     for (const [mode, sessionToken, expected] of [
       ['account','profile-token','profile-token'], ['guest','unexpected-token',undefined], ['account',42,undefined],
     ]) {
-      fetchMock.mockResolvedValue({ok:true,json:async () => ({...SESSION_RESPONSE,mode,sessionToken})});
+      server(PASSWORD_ACCOUNT, { ok: true, body: { ...SESSION_RESPONSE, mode, sessionToken } });
       const result = await runtimeLogin({username:'fixture',password:'fixture',currentVenue:'main_stage'});
       expect(result.sessionToken).toBe(expected);
     }

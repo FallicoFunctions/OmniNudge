@@ -47,7 +47,7 @@ async function setup(preview = false) {
   })}));
   const engine = {dispose:vi.fn(),getFps:() => 60,getDeltaTime:() => 16,getHardwareScalingLevel:() => 1,
     onDisposeObservable:{addOnce:vi.fn()},resize:vi.fn(),runRenderLoop:vi.fn(),setHardwareScalingLevel:vi.fn()};
-  vi.doMock('@babylonjs/core/Engines/engine', () => ({Engine:vi.fn(() => engine)}));
+  vi.doMock('@babylonjs/core/Engines/engine', () => ({Engine:vi.fn(function () { return engine; })}));
   const makeAvatar = (loadout: Record<string,string>) => {
     const listeners = new Set<() => void>();
     const visible = new Map(COMPLETE_AVATAR_LOADOUT_SLOTS.map((slot,i) => [slot,loadout.cw[i] === '1']));

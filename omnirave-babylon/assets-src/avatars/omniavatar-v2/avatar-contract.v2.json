@@ -1,3 +1,77 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:66aa45709f931a1e642fb5cbe89aa50c15956808995e6f18c946a9be0538473c
-size 1953
+{
+  "schemaVersion": 1,
+  "contract": "omnirave-avatar/2",
+  "status": "draft-executable",
+  "validationProfile": "source-glb",
+  "allowedExtensions": [],
+  "coordinateSystem": {
+    "runtimeUp": "+Y",
+    "runtimeForward": "+Z",
+    "units": "meters",
+    "groundToleranceMeters": 0.03
+  },
+  "budgets": {
+    "maxFileBytes": 262144000,
+    "lod0Triangles": 60000,
+    "lod1Triangles": 30000,
+    "lod2Triangles": 12000,
+    "maxDrawCalls": 30,
+    "maxTextureBytes": 104857600,
+    "maxTextureDimension": 2048,
+    "maxVertexInfluences": 4,
+    "weightSumTolerance": 0.001
+  },
+  "requiredSceneExtras": {
+    "avatarContract": "omnirave-avatar/2",
+    "avatarCharacter": "non-empty",
+    "avatarSourceBlend": "non-empty",
+    "avatarExportDate": "non-empty"
+  },
+  "requiredNodes": [
+    "AvatarAsset",
+    "AvatarSkeleton",
+    "AvatarBody",
+    "AvatarSlot_hair",
+    "AvatarSlot_top",
+    "AvatarSlot_jacket",
+    "AvatarSlot_bottoms",
+    "AvatarSlot_shoes",
+    "AvatarSlot_accessories"
+  ],
+  "requiredJoints": [
+    "pelvis",
+    "spine_01",
+    "spine_02",
+    "spine_03",
+    "neck_01",
+    "head",
+    "jaw",
+    "clavicle_l",
+    "clavicle_r",
+    "upperarm_l",
+    "upperarm_r",
+    "lowerarm_l",
+    "lowerarm_r",
+    "hand_l",
+    "hand_r",
+    "thigh_l",
+    "thigh_r",
+    "calf_l",
+    "calf_r",
+    "foot_l",
+    "foot_r",
+    "ball_l",
+    "ball_r",
+    "eye_l",
+    "eye_r"
+  ],
+  "minimumJointCount": 56,
+  "requiredAnimations": ["idle", "walk", "run"],
+  "requiredMorphTargets": ["jawOpen", "blink_L", "blink_R", "browUp"],
+  "requiredPrimitiveAttributes": ["POSITION", "NORMAL", "TEXCOORD_0"],
+  "requiredSkinnedAttributes": ["JOINTS_0", "WEIGHTS_0"],
+  "requiredMaterialTextures": ["baseColor", "normal", "metallicRoughness"],
+  "allowedTextureMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+  "textureExemptionExtra": "omniAvatarTextureExemptions",
+  "textureExemptionReasonExtra": "omniAvatarTextureExemptionReason"
+}

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockShowControlRuntime } from './mockShowControlRuntime';
 
 // Vitest 5 cannot call a mock built on an arrow function with `new`, and the
 // runtime constructs Babylon's engines and the browser's Audio with `new`. A
@@ -115,6 +116,7 @@ describe('createRuntime', () => {
     vi.doUnmock('../../scene/createMainStageScene');
     vi.doUnmock('@babylonjs/core/Engines/engine');
     vi.doUnmock('@babylonjs/core/Engines/webgpuEngine');
+    mockShowControlRuntime();
     // Dev chrome (review HUD / perf overlay / debug panel) only appears when
     // explicitly requested. Most tests in this describe assert that chrome
     // exists, so opt in by default; the dedicated "no debug flag" test below
@@ -124,13 +126,15 @@ describe('createRuntime', () => {
 
   afterEach(() => {
     window.history.replaceState(null, '', '/');
+    vi.useRealTimers();
   });
 
-  it('disposes a failed WebGPU engine and falls back to WebGL', async () => {
+  it.each(['rejection', 'timeout'] as const)('recovers from WebGPU %s with a new WebGL canvas', async failure => {
     const webgpuDispose = vi.fn();
-    const webgpuInit = vi.fn().mockRejectedValue(new Error('WebGPU adapter failed'));
+    const pending = createDeferredPromise<void>();
+    const webgpuInit = vi.fn(() => failure === 'timeout' ? pending.promise : Promise.reject(new Error('WebGPU adapter failed')));
     const WebGPUEngineMock = Object.assign(
-      constructible(() => ({
+      constructible((_canvas: HTMLCanvasElement) => ({
         dispose: webgpuDispose,
         initAsync: webgpuInit,
       })),
@@ -166,14 +170,30 @@ describe('createRuntime', () => {
 
     const { createRuntime } = await import('../createRuntime');
     const host = document.createElement('div');
-    const runtime = await createRuntime(host);
+    if (failure === 'timeout') vi.useFakeTimers();
+    const starting = createRuntime(host);
+    if (failure === 'timeout') {
+      await vi.waitFor(() => expect(webgpuInit).toHaveBeenCalledTimes(1));
+      expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+    const runtime = await starting;
 
     expect(webgpuInit).toHaveBeenCalledTimes(1);
     expect(webgpuDispose).toHaveBeenCalledTimes(1);
     expect(EngineMock).toHaveBeenCalledTimes(1);
     expect(EngineMock.mock.calls[0]?.[2]).not.toHaveProperty('preserveDrawingBuffer');
     expect(runtime.engine).toBe(webglEngine);
+    expect(EngineMock.mock.calls[0]?.[0]).not.toBe(WebGPUEngineMock.mock.calls[0]?.[0]);
+    expect(host.querySelector('canvas')).toBe(EngineMock.mock.calls[0]?.[0]);
     expect(webglEngine.getHardwareScalingLevel).toHaveBeenCalledTimes(1);
+
+    if (failure === 'timeout') {
+      pending.resolve();
+      await Promise.resolve();
+      expect(webgpuDispose).toHaveBeenCalledTimes(2);
+      expect(runtime.engine).toBe(webglEngine);
+    }
 
     runtime.dispose();
   });
@@ -232,6 +252,40 @@ describe('createRuntime', () => {
     canvas.dispatchEvent(new MouseEvent('click'));
     expect(engineResize).toHaveBeenCalledTimes(1);
     expect(scenePick).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { search: '/', antialias: false, timestamps: false, supported: true },
+    { search: '/?perf=nopost', antialias: true, timestamps: false, supported: true },
+    { search: '/?debug=1&backbufferMsaa=1', antialias: true, timestamps: false, supported: true },
+    { search: '/?backbufferMsaa=1&gpuProfile=1', antialias: false, timestamps: false, supported: true },
+    { search: '/?debug=1&gpuProfile=1', antialias: false, timestamps: true, supported: true },
+    { search: '/?debug=1&gpuProfile=1', antialias: false, timestamps: true, supported: false },
+  ])('configures WebGPU output and optional timing for $search (timers: $supported)', async test => {
+    window.history.replaceState(null, '', test.search);
+    const engine = {
+      dispose: vi.fn(), initAsync: vi.fn(async () => {}), enableGPUTimingMeasurements: false,
+      getCaps: () => ({ timerQuery: test.supported }),
+      getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
+      onDisposeObservable: { addOnce: vi.fn() }, resize: vi.fn(), runRenderLoop: vi.fn(), setHardwareScalingLevel: vi.fn(),
+    };
+    const factory = Object.assign(constructible((_canvas: HTMLCanvasElement, _options: Record<string, unknown>) => engine),
+      { IsSupportedAsync: Promise.resolve(true) });
+    vi.doMock('@babylonjs/core/Engines/webgpuEngine', () => ({ WebGPUEngine: factory }));
+    const createScene = vi.fn(async () => {
+      // Timing must be enabled before render targets allocate their counters.
+      expect(engine.enableGPUTimingMeasurements).toBe(test.timestamps && test.supported);
+      return { metadata: {}, getMeshByName: () => null, pick: vi.fn(() => null), render: vi.fn() };
+    });
+    vi.doMock('../../scene/createMainStageScene', () => ({ createMainStageScene: createScene }));
+    const { createRuntime } = await import('../createRuntime');
+    const runtime = await createRuntime(document.createElement('div'));
+    expect(runtime.engine).toBe(engine);
+    expect(factory.mock.calls[0]?.[1]).toEqual({ adaptToDeviceRatio: true, antialias: test.antialias,
+      ...(test.timestamps ? { deviceDescriptor: { requiredFeatures: ['timestamp-query'] } } : {}),
+    });
+    expect(createScene).toHaveBeenCalledTimes(1);
+    runtime.dispose();
   });
 
   it('applies adaptive resolution before the next render instead of invalidating the submitted WebGPU frame', async () => {
