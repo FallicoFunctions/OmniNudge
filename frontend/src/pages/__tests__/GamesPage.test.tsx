@@ -14,7 +14,6 @@ vi.mock('../../services/omnigameService', () => ({
         slug: 'omnirave',
         name: 'OmniRave',
         summaryKey: 'games.omnirave.summary',
-        heroKey: 'games.omnirave.hero',
         runtimeUrl: 'http://localhost:4173/omnirave',
       },
     ],
@@ -28,11 +27,8 @@ vi.mock('react-i18next', () => ({
         ({
           'gamesPage.eyebrow': 'OmniGame',
           'gamesPage.title': 'OmniGame',
-          'gamesPage.description': 'Discover dedicated multiplayer experiences inside OmniNudge.',
-          'gamesPage.availableNow': 'Available now',
           'gamesPage.viewGame': 'View game',
-          'games.omnirave.summary': 'Shared world rave.',
-          'games.omnirave.hero': 'One world. Three stages. Shared playheads.',
+          'games.omnirave.summary': 'A virtual EDM festival',
         }) as Record<string, string>
       )[key] ?? key,
   }),
@@ -56,7 +52,6 @@ describe('GamesPage', () => {
       '/games/omnirave'
     );
     expect(screen.getByText('OmniRave')).toBeInTheDocument();
-    expect(screen.getByText('Shared world rave.')).toBeInTheDocument();
-    expect(screen.getByText('One world. Three stages. Shared playheads.')).toBeInTheDocument();
+    expect(screen.getByText('A virtual EDM festival')).toBeInTheDocument();
   });
 });

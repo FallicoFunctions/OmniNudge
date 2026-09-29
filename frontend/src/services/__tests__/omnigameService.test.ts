@@ -15,7 +15,6 @@ describe('omnigameService', () => {
       slug: 'omnirave',
       name: 'OmniRave',
       summaryKey: 'games.omnirave.summary',
-      heroKey: 'games.omnirave.hero',
     });
   });
 

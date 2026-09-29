@@ -15,7 +15,6 @@ const gameCatalog: GameCatalogEntry[] = [
     name: 'OmniRave',
     summaryKey: 'games.omnirave.summary',
     runtimeUrl: OMNIRAVE_RUNTIME_URL,
-    heroKey: 'games.omnirave.hero',
   },
 ];
 

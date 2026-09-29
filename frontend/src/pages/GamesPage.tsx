@@ -20,9 +20,6 @@ export default function GamesPage() {
         <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
           {t('gamesPage.title')}
         </h1>
-        <p className="max-w-3xl text-base text-[var(--color-text-secondary)]">
-          {t('gamesPage.description')}
-        </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -35,13 +32,7 @@ export default function GamesPage() {
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(4,8,14,0.82))]" />
             <div className="relative flex min-h-[22rem] flex-col justify-between p-6 sm:p-8">
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/72">
-                  {t('gamesPage.availableNow')}
-                </p>
                 <h2 className="text-3xl font-semibold tracking-tight">{game.name}</h2>
-                <p className="max-w-md text-sm uppercase tracking-[0.28em] text-white/65">
-                  {t(game.heroKey)}
-                </p>
               </div>
 
               <div className="space-y-5">

@@ -7,7 +7,6 @@ export interface GameCatalogEntry {
   name: string;
   summaryKey: string;
   runtimeUrl: string;
-  heroKey: string;
 }
 
 export interface OmniGameLaunchRequest {

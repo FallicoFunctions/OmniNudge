@@ -151,8 +151,6 @@
   "gamesPage": {
     "eyebrow": "OmniGame",
     "title": "Games",
-    "description": "Step into dedicated multiplayer spaces built inside OmniNudge, starting with the first live room: OmniRave.",
-    "availableNow": "Available now",
     "viewGame": "View game"
   },
   "gameDetailPage": {
@@ -219,8 +217,7 @@
   },
   "games": {
     "omnirave": {
-      "summary": "A browser rave where one live crowd moves through three synchronized stages in the same world.",
-      "hero": "One world. Three stages. Shared pulse."
+      "summary": "A virtual EDM festival"
     }
   },
   "bugReportModal": {

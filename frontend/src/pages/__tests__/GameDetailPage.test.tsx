@@ -22,7 +22,6 @@ vi.mock('../../services/omnigameService', () => ({
       slug: 'omnirave',
       name: 'OmniRave',
       summaryKey: 'games.omnirave.summary',
-      heroKey: 'games.omnirave.hero',
       runtimeUrl: 'http://localhost:4173/omnirave',
     }),
     createOmniRaveLaunch: mockedFns.createOmniRaveLaunch,
@@ -46,7 +45,6 @@ vi.mock('react-i18next', () => ({
           'gameDetailPage.playing': 'Entering OmniRave...',
           'gameDetailPage.launchError': 'Unable to launch OmniRave right now.',
           'games.omnirave.summary': 'Shared world rave.',
-          'games.omnirave.hero': 'One world. Three stages. Shared playheads.',
         }) as Record<string, string>
       )[key] ?? key,
   }),
@@ -72,11 +70,8 @@ describe('GameDetailPage', () => {
 
     expect(screen.getByRole('heading', { name: 'OmniRave' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Play' })).toHaveLength(1);
-    // The summary and hero lines belong to the games list, not this page.
+    // The summary belongs to the games list, not this page.
     expect(screen.queryByText('Shared world rave.')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('One world. Three stages. Shared playheads.')
-    ).not.toBeInTheDocument();
   });
 
   it('launches guest mode when the player is unauthenticated', async () => {
