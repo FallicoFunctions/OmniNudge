@@ -16,26 +16,6 @@ const gameCatalog: GameCatalogEntry[] = [
     summaryKey: 'games.omnirave.summary',
     runtimeUrl: OMNIRAVE_RUNTIME_URL,
     heroKey: 'games.omnirave.hero',
-    descriptionKeys: ['games.omnirave.description.0', 'games.omnirave.description.1'],
-    highlightKeys: [
-      'games.omnirave.highlights.0',
-      'games.omnirave.highlights.1',
-      'games.omnirave.highlights.2',
-    ],
-    gallery: [
-      {
-        titleKey: 'games.omnirave.gallery.0.title',
-        captionKey: 'games.omnirave.gallery.0.caption',
-      },
-      {
-        titleKey: 'games.omnirave.gallery.1.title',
-        captionKey: 'games.omnirave.gallery.1.caption',
-      },
-      {
-        titleKey: 'games.omnirave.gallery.2.title',
-        captionKey: 'games.omnirave.gallery.2.caption',
-      },
-    ],
   },
 ];
 

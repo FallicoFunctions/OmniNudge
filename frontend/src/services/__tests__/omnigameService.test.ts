@@ -16,9 +16,6 @@ describe('omnigameService', () => {
       name: 'OmniRave',
       summaryKey: 'games.omnirave.summary',
       heroKey: 'games.omnirave.hero',
-      gallery: expect.any(Array),
-      highlightKeys: expect.any(Array),
-      descriptionKeys: expect.any(Array),
     });
   });
 

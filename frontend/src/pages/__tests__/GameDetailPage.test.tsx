@@ -24,18 +24,6 @@ vi.mock('../../services/omnigameService', () => ({
       summaryKey: 'games.omnirave.summary',
       heroKey: 'games.omnirave.hero',
       runtimeUrl: 'http://localhost:4173/omnirave',
-      descriptionKeys: ['games.omnirave.description.0', 'games.omnirave.description.1'],
-      highlightKeys: [
-        'games.omnirave.highlights.0',
-        'games.omnirave.highlights.1',
-        'games.omnirave.highlights.2',
-      ],
-      gallery: [
-        {
-          titleKey: 'games.omnirave.gallery.0.title',
-          captionKey: 'games.omnirave.gallery.0.caption',
-        },
-      ],
     }),
     createOmniRaveLaunch: mockedFns.createOmniRaveLaunch,
   },
@@ -56,23 +44,9 @@ vi.mock('react-i18next', () => ({
           'gameDetailPage.eyebrow': 'OmniGame / OmniRave',
           'gameDetailPage.play': 'Play',
           'gameDetailPage.playing': 'Entering OmniRave...',
-          'gameDetailPage.heroTitle': 'Enter the room without any lobby shell.',
-          'gameDetailPage.heroBody':
-            'Play should feel immediate: black-in, live crowd, stage lights, and the room already moving.',
-          'gameDetailPage.launchHint':
-            'Signed-in players resume their account; everyone else enters as a guest.',
-          'gameDetailPage.highlightsTitle': 'What makes the room feel real',
           'gameDetailPage.launchError': 'Unable to launch OmniRave right now.',
           'games.omnirave.summary': 'Shared world rave.',
           'games.omnirave.hero': 'One world. Three stages. Shared playheads.',
-          'games.omnirave.description.0': 'Three stages pulse inside one authoritative world.',
-          'games.omnirave.description.1':
-            'Drop in instantly as a guest or return with your account identity automatically.',
-          'games.omnirave.highlights.0': 'Main Stage spawn',
-          'games.omnirave.highlights.1': 'Saved return points',
-          'games.omnirave.highlights.2': 'Authoritative zone audio',
-          'games.omnirave.gallery.0.title': 'Main Stage',
-          'games.omnirave.gallery.0.caption': 'Main Stage light wall',
         }) as Record<string, string>
       )[key] ?? key,
   }),
@@ -87,7 +61,7 @@ describe('GameDetailPage', () => {
     authState.isLoading = false;
   });
 
-  it('renders one Play button for logged-out players', () => {
+  it('renders only the title and one Play button', () => {
     render(
       <MemoryRouter initialEntries={['/games/omnirave']}>
         <Routes>
@@ -97,12 +71,12 @@ describe('GameDetailPage', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'OmniRave' })).toBeInTheDocument();
-    expect(screen.getByText('Shared world rave.')).toBeInTheDocument();
-    expect(screen.getByText('One world. Three stages. Shared playheads.')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Play' })).toHaveLength(1);
+    // The summary and hero lines belong to the games list, not this page.
+    expect(screen.queryByText('Shared world rave.')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Signed-in players resume their account; everyone else enters as a guest.')
-    ).toBeInTheDocument();
+      screen.queryByText('One world. Three stages. Shared playheads.')
+    ).not.toBeInTheDocument();
   });
 
   it('launches guest mode when the player is unauthenticated', async () => {
