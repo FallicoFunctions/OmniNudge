@@ -1,0 +1,82 @@
+"""Round the outer pony's repeated fan into staggered, narrow lock crests.
+
+Connection map: each of the 852 long outer cards retains its first two
+root pairs on the existing pony attachment, plus pair eight and the full
+hanging length. A cubic bridge matches both retained tangents. The existing
+short cheek cards, inner coverage, tie and scalp stay exact. Sixteen nearby
+families share crest height and roll; thin card edges clear the head by 4 mm
+in neutral and all four secondary corners. This is a hair clearance, not a
+structural overlap. Origins, topology, UV, color, weights and relative shape
+offsets keep their existing owners; no geometry or material is added.
+"""
+import math
+import bpy
+import numpy as np
+from mathutils import Vector, Quaternion
+from assemble_complete_pair import array
+from complete_pair_geometry import Surface
+from refine_complete_groom_finish import islands
+from refine_complete_male_hair import group_paths
+from refine_female_crown import bezier
+
+NAMES = [f'PLURR pony strands {i}' for i in range(3)]
+END = 8
+
+
+def round_upper_locks(mapping, report, apply):
+    body = Surface(bpy.data.objects['AvatarSkeleton'], bpy.data.objects['AvatarBody']).tree
+    bases = {n: array(bpy.data.objects[n]) for n in NAMES}
+    revised = {n: p.copy() for n, p in bases.items()}
+    rows = []; deltas = {}
+    for name, p in bases.items():
+        ob = bpy.data.objects[name]
+        deltas[name] = [np.array([v.co[:] for v in ob.data.shape_keys.key_blocks[k].data]) - p
+                       for k in ['Secondary_HairSide', 'Secondary_HairBack']]
+        for ids in islands(ob):
+            if len(ids) == 36: rows.append((name, ids, p[ids].reshape(18, 2, 3)))
+    paths = np.array([r.mean(1)[:END+1] for _, _, r in rows])
+    groups = group_paths(paths, 16)
+    selected = {n: [] for n in NAMES}; maximum_fit = 0.
+    for i, (name, ids, r) in enumerate(rows):
+        old = r.mean(1); g = int(groups[i]); phase = g * 2.399963
+        incoming = old[1] - old[0]; incoming /= np.linalg.norm(incoming)
+        outgoing = old[END+1] - old[END]; outgoing /= np.linalg.norm(outgoing)
+        span = np.linalg.norm(old[END] - old[1])
+        # Unequal rounded crests break the common horizontal ledge. Matching
+        # both tangents keeps this bridge continuous with its anchored roots
+        # and the already fitted shoulder-length locks.
+        handle = .036 + .032 * (.5 + .5 * math.sin(phase))
+        c = old.copy(); u = np.linspace(0, 1, END)
+        c[1:END+1] = bezier([old[1], old[1]+incoming*handle,
+                            old[END]-outgoing*span*.30, old[END]], u)
+        bell = np.sin(math.pi*u)**2
+        c[1:END+1, 1] += .008*math.cos(phase+.4)*bell
+        half = (r[:, 1] - r[:, 0])*.5; h = half.copy()
+        for j in range(2, END):
+            a = Vector(old[j+1]-old[j-1]).normalized()
+            b = Vector(c[j+1]-c[j-1]).normalized()
+            rotation = Quaternion(b, .65*math.sin(phase+.8)*bell[j-1])
+            h[j] = (rotation @ (a.rotation_difference(b) @ Vector(half[j]))) * (1-.55*bell[j-1])
+        rr = np.stack([c-h, c+h], axis=1); rr[:2]=r[:2];rr[END:]=r[END:]
+        da, db = [d[ids].reshape(18, 2, 3) for d in deltas[name]]
+        shift = np.zeros(18)
+        for delta in [np.zeros_like(da), da+db, da-db, -da+db, -da-db]:
+            for j in range(2, END):
+                for point in (rr+delta)[j]:
+                    hit,_,_,_ = body.ray_cast(Vector((point[0],point[1],2.2)), Vector((0,0,-1)), 1)
+                    if hit is not None: shift[j] = max(shift[j],hit.z+.004-point[2])
+        for _ in range(2):
+            smoothed=shift.copy();smoothed[2:END]=.15*shift[1:END-1]+.70*shift[2:END]+.15*shift[3:END+1]
+            shift=np.maximum(shift,smoothed)
+        rr[:,:,2]+=shift[:,None];maximum_fit=max(maximum_fit,float(shift.max()))
+        assert np.array_equal(rr[:2],r[:2]) and np.array_equal(rr[END:],r[END:])
+        revised[name][ids]=rr.reshape(-1,3);selected[name].append(ids[0])
+    for name,q in revised.items():
+        previous=dict(report[name]);saved_uv=mapping[name].get('addedUv')
+        apply(bpy.data.objects[name],q,mapping,report)
+        if saved_uv is not None:mapping[name]['addedUv']=saved_uv
+        report[name].update({k:v for k,v in previous.items() if k not in report[name]})
+    report['upperLocks']={'cards':len(rows),'guideGroups':16,'selectedCardFirstVertices':selected,
+        'retainedRootPairs':2,'retainedLowerStartPair':END,'maximumAdditionalBodyFitMm':maximum_fit*1000,
+        'maximumUpperWidthReduction':.55,'maximumRollRadians':.65,'addedGeometry':0,
+        'relativeSecondaryShapesRetained':True,'allTextureBytesRetained':True}

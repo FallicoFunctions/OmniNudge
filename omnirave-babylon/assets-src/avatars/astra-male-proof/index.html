@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniRave · Male likeness study</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#11151a;color:#eef0f3;font:15px/1.55 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:20px 22px}h1{font-size:28px;font-weight:600;letter-spacing:-.7px;margin:4px 0 10px}.eyebrow{color:#b9c5d2;font-size:12px;letter-spacing:2px;text-transform:uppercase}.status{display:inline-block;border:1px solid #a67e4c;border-radius:20px;padding:5px 12px;color:#e6bd85;font-size:12px}p{color:#b8c1cb;max-width:850px}nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}button{border:1px solid #46505e;background:#202833;color:#e9edf2;border-radius:7px;padding:9px 14px;cursor:pointer;font:inherit}button[aria-pressed=true]{background:#d5e2f0;color:#17212c;border-color:#d5e2f0}button:focus-visible{outline:3px solid #edbf74;outline-offset:3px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}figure{margin:0;min-width:0}figcaption{padding:12px 0;color:#d4dde5;font-size:13px}.portrait{position:relative;aspect-ratio:6/7;overflow:hidden;border:1px solid #37414e;border-radius:10px;background:#1b2025}.portrait>img{width:100%;height:100%;object-fit:contain;display:block}.portrait.crop>img{position:absolute;width:474.074%;max-width:none;height:auto;left:-187.5%;top:-23.016%}.notes{border-top:1px solid #35404d;margin-top:22px;padding-top:10px}.small{font-size:12px}a{color:#bbd6f4}.toolbar{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}#loading{color:#ffc682}.foot{margin-top:28px;font-size:12px;color:#8f9aa6}@media(max-width:650px){main{padding:20px 14px}.compare{gap:8px}h1{font-size:24px}button{padding:8px 10px;font-size:13px}figcaption{font-size:12px}}
+</style>
+<main>
+<div class="eyebrow">OmniRave / local Blender experiment</div>
+<h1>Male avatar · likeness study</h1>
+<span class="status">Likeness gate: not met</span>
+<p>The original artwork remains the identity reference. This is a head study on an existing body base. It is not an accepted avatar or a completed playable character.</p>
+<div class="toolbar">
+<nav aria-label="Model version"><button data-version="pose04" aria-pressed="false">Face control</button><button data-version="fit05" aria-pressed="false">Measured face</button><button data-version="face19" aria-pressed="true">Jaw and mouth pass</button><button data-version="curl18" aria-pressed="false">Full groom candidate</button></nav>
+<nav aria-label="Reference framing"><button id="crop" aria-pressed="true">Head crop</button><button id="full" aria-pressed="false">Full reference</button></nav>
+</div>
+<div class="compare">
+<figure><div id="referenceFrame" class="portrait crop"><img src="reference-original.png" alt="Original male avatar artwork: swept wavy dark hair, angular face, pearl and gold festival outfit"></div><figcaption>Original artwork · crop enlarged without added detail</figcaption></figure>
+<figure><div class="portrait"><img id="model" src="renders/face19-reference-angle.png" alt="Jaw and mouth pass from the fitted reference angle"></div><figcaption id="caption">Jaw and mouth pass · fitted reference angle</figcaption></figure>
+</div>
+<nav aria-label="Model camera"><button data-view="reference-angle" aria-pressed="true">Reference angle</button><button data-view="front" aria-pressed="false">Front</button><button data-view="three-quarter" aria-pressed="false">Three-quarter</button><button data-view="profile" aria-pressed="false">Profile</button></nav>
+<div id="loading" role="status"></div>
+<div class="notes"><p id="finding"><strong>Working candidate:</strong> full experimental groom with small jaw/mouth changes. Heavy fringe, blunt roots, uneven crown coverage and facial resemblance remain unresolved.</p><p class="small">All four versions share the fitted reference camera and lighting. The source lens and hidden geometry remain inferred. Front and profile views expose the geometry; newer hair candidates are experiments, not accepted improvements. Neck, body, deformation, modular clothing and game performance remain unverified.</p></div>
+<p><a id="blend" href="face19.blend">Download displayed Blender study</a> · <a href="README.md">Read findings and next steps</a> · <a href="manifest.json">Evidence manifest</a></p>
+<div class="foot">Local files only. No reference upload, paid generation, gameplay replacement, or likeness approval has occurred.</div>
+</main>
+<script>
+let version='face19', view='reference-angle';
+const labels={pose04:'Face control',fit05:'Measured face',face19:'Jaw and mouth pass',curl18:'Full groom candidate'};
+const findings={pose04:'Face control: same fitted camera, before the measured facial corrections. This is an edited base, not the untouched source.',fit05:'Measured face: selected landmark error fell from 1.67 to 1.12 original-image pixels. These points were used for fitting; this is not independent evidence of likeness.',face19:'Jaw and mouth pass: bounded lower-face changes of at most 2.24 mm, darker irises and a cooler skin tint. Groom matches Full groom candidate. Facial resemblance remains unaccepted.',curl18:'Full groom candidate: denser front curls, crown/back volume and bounded scalp paths. The fringe remains too heavy and some roots look blunt. Facial geometry is unchanged from Measured face; likeness remains unaccepted.'};
+const model=document.querySelector('#model'), status=document.querySelector('#loading');
+function update(){status.textContent='Loading comparison…';model.src=`renders/${version}-${view}.png`;model.alt=`${labels[version]}: ${view}`;document.querySelector('#caption').textContent=`${labels[version]} · ${view==='reference-angle'?'fitted reference angle':view}`;document.querySelector('#finding').textContent=findings[version];document.querySelector('#blend').href=`${version}.blend`;}
+model.addEventListener('load',()=>status.textContent='');model.addEventListener('error',()=>status.textContent='This comparison image could not be loaded.');
+for(const button of document.querySelectorAll('[data-version]'))button.addEventListener('click',()=>{version=button.dataset.version;for(const b of document.querySelectorAll('[data-version]'))b.setAttribute('aria-pressed',String(b===button));update()});
+for(const button of document.querySelectorAll('[data-view]'))button.addEventListener('click',()=>{view=button.dataset.view;for(const b of document.querySelectorAll('[data-view]'))b.setAttribute('aria-pressed',String(b===button));update()});
+for(const mode of ['crop','full'])document.querySelector('#'+mode).addEventListener('click',()=>{document.querySelector('#referenceFrame').classList.toggle('crop',mode==='crop');document.querySelector('#crop').setAttribute('aria-pressed',String(mode==='crop'));document.querySelector('#full').setAttribute('aria-pressed',String(mode==='full'))});
+</script>
+</html>

@@ -1,0 +1,1 @@
+Not delivered. Alpha-only tip taper changed too few rendered pixels because overlapping ribbons covered the shortened strands. This experiment is archived; the next pass changes the geometric endpoint spacing.
