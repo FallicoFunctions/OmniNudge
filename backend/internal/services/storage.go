@@ -2,18 +2,24 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awscredentials "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
+	"github.com/google/uuid"
 	"github.com/omninudge/backend/internal/config"
 )
+
+var immutableObjectKeyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 // StorageService defines the interface for file storage
 type StorageService interface {
@@ -62,6 +68,109 @@ func (s *LocalStorageService) Upload(ctx context.Context, key string, body io.Re
 	}
 
 	return fmt.Sprintf("%s/%s", s.baseURL, key), nil
+}
+
+// PutIfAbsent atomically creates a local object without replacing an existing
+// one. It is used by immutable pipeline artifacts, where silent overwrite would
+// invalidate the job's audit hashes.
+func (s *LocalStorageService) PutIfAbsent(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if body == nil {
+		return false, errors.New("local storage: immutable object body is required")
+	}
+	if err := validateImmutableObjectKey(key); err != nil {
+		return false, fmt.Errorf("local storage: %w", err)
+	}
+	cleanKey := filepath.Clean(key)
+	baseReal, err := filepath.EvalSymlinks(s.baseDir)
+	if err != nil {
+		return false, fmt.Errorf("local storage: resolve base directory: %w", err)
+	}
+	root, err := os.OpenRoot(baseReal)
+	if err != nil {
+		return false, fmt.Errorf("local storage: open base directory: %w", err)
+	}
+	defer root.Close()
+	if err := createLocalDirsWithoutSymlinks(root, filepath.Dir(cleanKey)); err != nil {
+		return false, fmt.Errorf("local storage: prepare parent for %q: %w", key, err)
+	}
+	temporaryName := filepath.Join(filepath.Dir(cleanKey), ".immutable-"+uuid.NewString())
+	temporary, err := root.OpenFile(temporaryName, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return false, fmt.Errorf("local storage: create temporary object for %q: %w", key, err)
+	}
+	defer root.Remove(temporaryName)
+	if _, err := io.Copy(temporary, contextReader{ctx: ctx, reader: body}); err != nil {
+		temporary.Close()
+		return false, fmt.Errorf("local storage: write temporary object for %q: %w", key, err)
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return false, fmt.Errorf("local storage: sync temporary object for %q: %w", key, err)
+	}
+	if err := temporary.Close(); err != nil {
+		return false, fmt.Errorf("local storage: close temporary object for %q: %w", key, err)
+	}
+	if err := root.Link(temporaryName, cleanKey); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			info, statErr := root.Lstat(cleanKey)
+			if statErr != nil {
+				return false, fmt.Errorf("local storage: inspect existing immutable object %q: %w", key, statErr)
+			}
+			if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+				return false, fmt.Errorf("local storage: existing immutable object %q is not a regular file", key)
+			}
+			return false, nil
+		}
+		return false, fmt.Errorf("local storage: publish immutable object %q: %w", key, err)
+	}
+	return true, nil
+}
+
+func validateImmutableObjectKey(key string) error {
+	cleanKey := filepath.Clean(key)
+	if key == "" || len(key) > 1024 || key != strings.TrimSpace(key) || !immutableObjectKeyPattern.MatchString(key) || filepath.IsAbs(key) || cleanKey != key || cleanKey == "." || cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(filepath.Separator)) || strings.ContainsRune(key, '\x00') || strings.Contains(key, "\\") {
+		return fmt.Errorf("invalid immutable object key %q", key)
+	}
+	return nil
+}
+
+func createLocalDirsWithoutSymlinks(root *os.Root, relativeDir string) error {
+	current := ""
+	if relativeDir == "." {
+		return nil
+	}
+	for _, segment := range strings.Split(relativeDir, string(filepath.Separator)) {
+		current = filepath.Join(current, segment)
+		info, err := root.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			if err := root.Mkdir(current, 0755); err != nil && !errors.Is(err, os.ErrExist) {
+				return err
+			}
+			info, err = root.Lstat(current)
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return errors.New("path contains a symlink or non-directory component")
+		}
+	}
+	return nil
+}
+
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r contextReader) Read(buffer []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.reader.Read(buffer)
 }
 
 func (s *LocalStorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
@@ -219,6 +328,52 @@ func (s *S3StorageService) Upload(ctx context.Context, key string, body io.Reade
 		return nil
 	})
 	return publicURL, err
+}
+
+// PutIfAbsent uses an S3 conditional write so concurrent workers cannot replace
+// immutable evidence at the same deterministic key.
+func (s *S3StorageService) PutIfAbsent(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if body == nil {
+		return false, errors.New("s3: immutable object body is required")
+	}
+	if err := validateImmutableObjectKey(key); err != nil {
+		return false, fmt.Errorf("s3: %w", err)
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	ifNoneMatch := "*"
+	created := false
+	err := s.cb.Do(func() error {
+		_, putErr := s.client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket:      &s.bucket,
+			Key:         &key,
+			Body:        body,
+			ContentType: &contentType,
+			IfNoneMatch: &ifNoneMatch,
+		})
+		if putErr == nil {
+			created = true
+			return nil
+		}
+		if isConditionalWriteConflict(putErr) {
+			return nil
+		}
+		return fmt.Errorf("s3: conditionally upload %q: %w", key, putErr)
+	})
+	return created, err
+}
+
+func isConditionalWriteConflict(err error) bool {
+	var apiError smithy.APIError
+	if errors.As(err, &apiError) && (apiError.ErrorCode() == "PreconditionFailed" || apiError.ErrorCode() == "ConditionalRequestConflict") {
+		return true
+	}
+	var statusError interface{ HTTPStatusCode() int }
+	return errors.As(err, &statusError) && (statusError.HTTPStatusCode() == 409 || statusError.HTTPStatusCode() == 412)
 }
 
 func (s *S3StorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {

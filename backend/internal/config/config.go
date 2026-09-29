@@ -31,6 +31,7 @@ type Config struct {
 	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 	TURN          TURNConfig
 	Gemini        GeminiConfig
+	Tripo         TripoConfig
 	Crypto        CryptoConfig
 }
 
@@ -46,6 +47,12 @@ type CryptoConfig struct {
 type GeminiConfig struct {
 	APIKey string // GEMINI_API_KEY
 	Model  string // GEMINI_MODEL — defaults to gemini-2.5-flash
+}
+
+// TripoConfig holds server-side credentials for the OmniAI-to-OmniAvatar
+// reconstruction pipeline. The API key must never be exposed to a frontend.
+type TripoConfig struct {
+	APIKey string // TRIPO_API_KEY
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -273,6 +280,9 @@ func Load() (*Config, error) {
 		Gemini: GeminiConfig{
 			APIKey: getEnv("GEMINI_API_KEY", ""),
 			Model:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+		},
+		Tripo: TripoConfig{
+			APIKey: getEnv("TRIPO_API_KEY", ""),
 		},
 	}
 
