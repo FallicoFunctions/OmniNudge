@@ -58,6 +58,48 @@ type MockMessage = {
   created_at: string;
 };
 
+// The smallest catalog the guided roleplay creator accepts: one answer for
+// every question, wired together the way the server wires them (the role
+// allows the goal, the region holds the venue, the opening beat fits the
+// region's kind, the user role allows the relationship).
+const roleplayCatalog = {
+  role_groups: [
+    {
+      id: 'guides',
+      label: 'Guides',
+      user_roles: ['traveler'],
+      roles: [{ id: 'launch-guide', label: 'Launch guide', goals: ['ship'], min_age: 18 }],
+    },
+  ],
+  goals: [{ id: 'ship', label: 'Ship the launch' }],
+  regions: [{ id: 'harbor', label: 'Harbor City', kind: 'real', venues: ['dock'] }],
+  venues: [{ id: 'dock', label: 'The dock' }],
+  first_names: { woman: ['Ada'], man: ['Alan'] },
+  last_names: ['Launch'],
+  hair_colors: [{ id: 'black', label: 'Black' }],
+  hair_styles: [{ id: 'short', label: 'Short' }],
+  eye_colors: [{ id: 'brown', label: 'Brown' }],
+  builds: [{ id: 'average', label: 'Average' }],
+  wardrobes: [{ id: 'coat', label: 'A long coat' }],
+  traits: [
+    { id: 'precise', label: 'Precise' },
+    { id: 'warm', label: 'Warm' },
+  ],
+  speech_styles: [{ id: 'concise', label: 'Concise' }],
+  backstories: [{ id: 'sailor', label: 'A former sailor' }],
+  user_roles: [{ id: 'traveler', label: 'A traveler', relationships: ['strangers'] }],
+  relationships: [{ id: 'strangers', label: 'Strangers' }],
+  opening_beats: [
+    {
+      id: 'arrival',
+      label: 'You arrive at the dock',
+      setting_kinds: ['real'],
+      opening: 'Greetings from your launch-ready guide.',
+    },
+  ],
+  response_styles: [{ id: 'natural_dialogue', label: 'Natural dialogue' }],
+};
+
 // The app talks to the API cross-origin (page on 127.0.0.1:4173, API on
 // localhost:8080) and every request is credentialed — `withCredentials` on the
 // axios client, `credentials: 'include'` in authenticatedFetch — because auth
@@ -182,23 +224,6 @@ async function installOmniChatApi(page: Page) {
       return;
     }
 
-    if (path === '/media/upload' && request.method() === 'POST') {
-      await fulfillJson(route, {
-        data: {
-          id: 1,
-          user_id: authUser.id,
-          filename: 'imported-avatar.png',
-          original_filename: 'imported-avatar.png',
-          file_type: 'image/png',
-          file_size: 512,
-          storage_url: '/uploads/imported-avatar.png',
-          storage_path: 'uploads/imported-avatar.png',
-          uploaded_at: now,
-        },
-      });
-      return;
-    }
-
     if (path === '/omnichat/personas' && request.method() === 'GET') {
       const personas = state.isAuthenticated
         ? [...state.publicPersonas, ...state.privatePersonas]
@@ -212,93 +237,48 @@ async function installOmniChatApi(page: Page) {
       return;
     }
 
-    if (path === '/omnichat/personas' && request.method() === 'POST') {
-      const payload = JSON.parse(request.postData() ?? '{}') as Partial<MockPersona>;
-      const persona: MockPersona = {
-        id: state.nextPersonaId++,
-        slug: `u${authUser.id}-${String(payload.name ?? 'persona')
-          .toLowerCase()
-          .replace(/\s+/g, '-')}`,
-        name: String(payload.name ?? 'Unnamed Persona'),
-        description: payload.description ? String(payload.description) : '',
-        category: (payload.category as MockPersona['category']) ?? 'original',
-        owner_user_id: authUser.id,
-        visibility: 'private',
-        source_format: 'native',
-        avatar_url: payload.avatar_url ? String(payload.avatar_url) : undefined,
-        preview_video_url: payload.preview_video_url
-          ? String(payload.preview_video_url)
-          : undefined,
-        gallery_urls: Array.isArray(payload.gallery_urls) ? payload.gallery_urls.map(String) : [],
-        tags: Array.isArray(payload.tags) ? payload.tags.map(String) : [],
-        creator_name: payload.creator_name ? String(payload.creator_name) : '',
-        character_version: payload.character_version ? String(payload.character_version) : '',
-        is_nsfw: Boolean(payload.is_nsfw),
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-        system_prompt: payload.system_prompt ? String(payload.system_prompt) : '',
-        personality: payload.personality ? String(payload.personality) : '',
-        scenario: payload.scenario ? String(payload.scenario) : '',
-        first_message: payload.first_message ? String(payload.first_message) : '',
-        example_dialogue: payload.example_dialogue ? String(payload.example_dialogue) : '',
-        post_history_instructions: payload.post_history_instructions
-          ? String(payload.post_history_instructions)
-          : '',
-        alternate_greetings: Array.isArray(payload.alternate_greetings)
-          ? payload.alternate_greetings.map(String)
-          : [],
-        creator_notes: payload.creator_notes ? String(payload.creator_notes) : '',
-        character_book_json:
-          payload.character_book_json && typeof payload.character_book_json === 'object'
-            ? (payload.character_book_json as Record<string, unknown>)
-            : {},
-        extensions_json:
-          payload.extensions_json && typeof payload.extensions_json === 'object'
-            ? (payload.extensions_json as Record<string, unknown>)
-            : {},
-      };
-      state.privatePersonas.unshift(persona);
-      await fulfillJson(route, { persona }, 201);
+    if (path === '/omnichat/personas/creation-options' && request.method() === 'GET') {
+      await fulfillJson(route, {
+        limit: 5,
+        owned: state.privatePersonas.length,
+        catalog: roleplayCatalog,
+        render_styles: ['realistic'],
+      });
       return;
     }
 
-    if (path === '/omnichat/personas/import' && request.method() === 'POST') {
-      const body = request.postData() ?? '';
-      const isPng = body.includes('filename="') && body.toLowerCase().includes('.png');
+    // The guided creator sends its answers, never a written persona: the
+    // server builds the name, story and opening message from the choices.
+    if (path === '/omnichat/personas' && request.method() === 'POST') {
+      const { answers } = JSON.parse(request.postData() ?? '{}') as {
+        answers: Record<string, string>;
+      };
+      const opening = roleplayCatalog.opening_beats.find(
+        (beat) => beat.id === answers.opening_beat_id
+      );
       const persona: MockPersona = {
         id: state.nextPersonaId++,
-        slug: `u${authUser.id}-${isPng ? 'hogwarts-simulator' : 'imported-archivist'}`,
-        name: isPng ? 'Hogwarts Simulator' : 'Imported Archivist',
-        description: isPng ? 'Imported from a PNG card.' : 'Imported from a JSON card.',
+        slug: `u${authUser.id}-${answers.first_name}-${answers.last_name}`.toLowerCase(),
+        name: `${answers.first_name} ${answers.last_name}`,
+        description: 'A guided roleplay character.',
         category: 'roleplay',
         owner_user_id: authUser.id,
         visibility: 'private',
-        source_format: 'chara_card_v2',
-        avatar_url: '/uploads/imported-avatar.png',
-        preview_video_url: undefined,
-        gallery_urls: [],
-        tags: ['imported'],
-        creator_name: 'Playwright',
-        character_version: '1.0',
+        source_format: 'native',
         is_nsfw: false,
         is_active: true,
         created_at: now,
         updated_at: now,
-        system_prompt: 'Stay in role.',
-        personality: 'Immersive',
-        scenario: 'A testable imported world.',
-        first_message: 'The imported story begins now.',
-        example_dialogue: '',
-        post_history_instructions: '',
-        alternate_greetings: [],
-        creator_notes: '',
-        character_book_json: {},
-        extensions_json: {},
-        import_source_filename: isPng ? 'hogwarts.png' : 'archivist.json',
+        first_message: opening?.opening ?? '',
       };
       state.privatePersonas.unshift(persona);
-      await fulfillJson(route, { persona }, 201);
+      await fulfillJson(route, persona, 201);
+      return;
+    }
+
+    // The portraits render in the background after creation; none arrive here.
+    if (/^\/omnichat\/omniai\/\d+\/likeness$/.test(path) && request.method() === 'GET') {
+      await fulfillJson(route, { candidates: [], pending: 0 });
       return;
     }
 
@@ -426,13 +406,11 @@ async function installOmniChatApi(page: Page) {
 }
 
 test.describe('OmniChat launch smoke', () => {
-  test('supports guest auth prompt plus create, PNG import, chat, and delete flows', async ({
-    page,
-  }) => {
+  test('supports guest auth prompt plus create, chat, and delete flows', async ({ page }) => {
     const api = await installOmniChatApi(page);
 
     await page.goto('/omnichat');
-    await page.getByRole('button', { name: /create or import character/i }).click();
+    await page.getByRole('button', { name: /create roleplay ai/i }).click();
     await expect(page.locator('input[type="password"]').first()).toBeVisible();
 
     // Signing in is entirely a server-side fact to this app: AuthContext drops
@@ -442,24 +420,51 @@ test.describe('OmniChat launch smoke', () => {
     // reload below is what makes AuthContext ask again.
     api.authenticate();
 
-    await page.goto('/omnichat/studio');
-    await page.getByRole('textbox', { name: /^Name$/ }).fill('Launch Wizard');
-    await page
-      .getByRole('textbox', { name: /^Description$/ })
-      .fill('Helps validate the launch path.');
-    await page.getByRole('textbox', { name: /^Personality$/ }).fill('Precise and concise.');
-    await page
-      .getByRole('textbox', { name: /^Opening Message$/ })
-      .fill('Greetings from your launch-ready bot.');
-    await page.getByRole('button', { name: /create character/i }).click();
+    await page.goto('/omnichat/new-roleplay');
+    const next = page.getByRole('button', { name: /^continue$/i });
 
-    await expect(page.getByRole('heading', { name: 'Launch Wizard' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /open chat/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Concept' })).toBeVisible();
+    await page.getByRole('button', { name: 'Launch guide' }).click();
+    await page.getByLabel('What is their current goal?').selectOption('ship');
+    await page.getByLabel('Where is the story set?').selectOption('harbor');
+    await page.getByLabel('Where does this scene begin?').selectOption('dock');
+    await next.click();
 
-    await page.getByRole('button', { name: /open chat/i }).click();
+    await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible();
+    await page.getByRole('button', { name: 'Woman' }).click();
+    await page.getByLabel('First name').selectOption('Ada');
+    await page.getByLabel('Last name').selectOption('Launch');
+    await page.getByLabel('Hair color').selectOption('black');
+    await page.getByLabel('Hair style').selectOption('short');
+    await page.getByLabel('Eye color').selectOption('brown');
+    await page.getByLabel('Build').selectOption('average');
+    await page.getByLabel('Usual clothes or signature style').selectOption('coat');
+    await next.click();
+
+    await expect(page.getByRole('heading', { name: 'Personality' })).toBeVisible();
+    await page.getByLabel('Main personality trait').selectOption('precise');
+    await page.getByLabel('Another personality trait').selectOption('warm');
+    await page.getByLabel('How do they speak?').selectOption('concise');
+    await page.getByLabel('What shaped their past?').selectOption('sailor');
+    await next.click();
+
+    await expect(page.getByRole('heading', { name: 'Relationship' })).toBeVisible();
+    await page.getByLabel('Who are you in this story?').selectOption('traveler');
+    await page.getByLabel('How do you know each other?').selectOption('strangers');
+    await next.click();
+
+    await expect(page.getByRole('heading', { name: 'Opening' })).toBeVisible();
+    await page.getByRole('button', { name: 'You arrive at the dock' }).click();
+    await next.click();
+
+    await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible();
+    await page.getByRole('button', { name: /^create character$/i }).click();
+
+    await expect(page.getByRole('heading', { name: 'Meet Ada Launch' })).toBeVisible();
+    await page.getByRole('button', { name: /^start chat$/i }).click();
     await expect(page).toHaveURL(/\/omnichat\/c\/\d+$/);
     await expect(
-      page.getByText('Greetings from your launch-ready bot.', { exact: true }).last()
+      page.getByText('Greetings from your launch-ready guide.', { exact: true }).last()
     ).toBeVisible();
 
     await page.getByPlaceholder(/say or do something/i).fill('Hello there');
@@ -468,34 +473,15 @@ test.describe('OmniChat launch smoke', () => {
     await expect(page.getByText('Replying to: Hello there', { exact: true }).last()).toBeVisible();
 
     await page.goto('/omnichat/studio');
-    await page
-      .locator('input[type="file"]')
-      .first()
-      .setInputFiles({
-        name: 'hogwarts.png',
-        mimeType: 'image/png',
-        buffer: Buffer.from([
-          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
-          0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
-          0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8,
-          0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xdd, 0x8d, 0xb1, 0x00, 0x00, 0x00,
-          0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
-        ]),
-      });
-
-    await expect(page.getByRole('heading', { name: 'Hogwarts Simulator' })).toBeVisible();
-    await expect(page.getByRole('img', { name: 'Avatar Image' })).toHaveAttribute(
-      'src',
-      /\/uploads\/imported-avatar\.png$/
-    );
-
-    await page.getByRole('button', { name: /^delete$/i }).click();
+    const character = page.getByRole('article', { name: 'Ada Launch' });
+    await expect(character).toBeVisible();
+    await character.getByRole('button', { name: 'Delete Ada Launch' }).click();
     await page
       .getByRole('dialog')
       .getByRole('button', { name: /delete character/i })
       .click();
 
-    await expect(page.getByRole('heading', { name: 'Hogwarts Simulator' })).not.toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Launch Wizard' })).toBeVisible();
+    await expect(character).not.toBeVisible();
+    await expect(page.getByText('You have no characters yet.')).toBeVisible();
   });
 });

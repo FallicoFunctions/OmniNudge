@@ -92,6 +92,7 @@ OmniRave deploys with every run of the script (`ENABLE_OMNIRAVE_DEPLOY=1` is the
 | `/audio/` | `/var/www/omnirave-audio/` (uploaded by hand, see below) |
 | `/api/v1/` | `omnigame-api` on `127.0.0.1:8091` |
 | `/ws` | `omnirave-world` on `127.0.0.1:8092` |
+| `/*-review.html`, `/img2threejs-glb-v2/` | 404: developer review tools ship in the build but nginx does not serve them |
 
 The deploy script builds the frontend with `VITE_OMNICHAT_ENABLED=false`, and production sets `OMNICHAT_ENABLED=false` for the backend. OmniChat routes, navigation, and `/api/v1/omnichat` endpoints do not exist in production until both are switched on.
 
