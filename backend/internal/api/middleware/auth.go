@@ -58,6 +58,7 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 		c.Set("token_version", claims.TokenVersion)
+		c.Set("token_use", claims.Use)
 
 		c.Next()
 	}

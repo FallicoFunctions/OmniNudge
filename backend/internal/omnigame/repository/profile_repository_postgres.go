@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,6 +20,17 @@ func NewPostgresProfileRepository(pool *pgxpool.Pool) *PostgresProfileRepository
 }
 
 func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile model.OmniRaveProfile) error {
+	return r.writeProfile(ctx, profile, "")
+}
+
+func (r *PostgresProfileRepository) UpdateProfileField(ctx context.Context, profile model.OmniRaveProfile, field ProfileField) error {
+	if !validProfileField(field) {
+		return fmt.Errorf("invalid profile field")
+	}
+	return r.writeProfile(ctx, profile, field)
+}
+
+func (r *PostgresProfileRepository) writeProfile(ctx context.Context, profile model.OmniRaveProfile, field ProfileField) error {
 	profile = model.NormalizeOmniRaveProfile(profile)
 
 	loadoutJSON, err := json.Marshal(profile.Loadout)
@@ -43,12 +55,12 @@ func (r *PostgresProfileRepository) UpsertProfile(ctx context.Context, profile m
 		INSERT INTO omnirave_profiles (user_id, loadout, return_point, settings, last_venue)
 		VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5)
 		ON CONFLICT (user_id) DO UPDATE
-		SET loadout = EXCLUDED.loadout,
-		    return_point = EXCLUDED.return_point,
-		    settings = EXCLUDED.settings,
-		    last_venue = EXCLUDED.last_venue,
+		SET loadout = CASE WHEN $6 IN ('', 'loadout') THEN EXCLUDED.loadout ELSE omnirave_profiles.loadout END,
+		    return_point = CASE WHEN $6 IN ('', 'return_point') THEN EXCLUDED.return_point ELSE omnirave_profiles.return_point END,
+		    settings = CASE WHEN $6 IN ('', 'settings') THEN EXCLUDED.settings ELSE omnirave_profiles.settings END,
+		    last_venue = CASE WHEN $6 IN ('', 'last_venue') THEN EXCLUDED.last_venue ELSE omnirave_profiles.last_venue END,
 		    updated_at = now()
-	`, profile.UserID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue)
+	`, profile.UserID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue, string(field))
 	return err
 }
 
