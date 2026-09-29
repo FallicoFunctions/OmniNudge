@@ -2,6 +2,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import type { Scene } from '@babylonjs/core/scene.js';
+import { scopeMaterialDirtyChecks } from './scopeMaterialDirtyChecks';
 
 export interface StageShowSummary {
   screens: number;
@@ -101,6 +102,7 @@ export function createStageShow(scene: Scene): StageShow {
   for (const entry of ledDeckMaterials) {
     entry.material.unfreeze?.();
   }
+  for (const material of new Set(ledDeckMaterials.map(entry => entry.material))) scopeMaterialDirtyChecks(material);
   const ledDeckBaseIntensity = ledDeckMaterials.map((entry) => entry.material.emissiveIntensity);
 
   let elapsed = 0;

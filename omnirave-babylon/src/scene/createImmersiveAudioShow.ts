@@ -5,6 +5,7 @@
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { scopeMaterialDirtyChecks } from './scopeMaterialDirtyChecks';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
@@ -217,6 +218,7 @@ function tryCreateAirSprite(scene: Scene): RawTexture | null {
 // Self-lit glow material per the venue's proven PBR recipe.
 function createGlowMaterial(scene: Scene, name: string, color: Color3, alpha: number): PBRMaterial {
   const material = new PBRMaterial(name, scene);
+  scopeMaterialDirtyChecks(material);
   material.emissiveColor = color;
   material.emissiveIntensity = CONE_BASE_INTENSITY;
   material.albedoColor = new Color3(0, 0, 0);

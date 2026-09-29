@@ -1,3 +1,4 @@
+import type { ShowDrone } from '../showControl/showTypes';
 // Side-effect import: augments Mesh.prototype with thinInstance* methods. MUST
 // live in this module - the app bundle tree-shakes per-module, so a missing
 // import here means no thinInstanceSetBuffer and a silent in-browser failure
@@ -299,7 +300,7 @@ const VENUE_SENTINEL_MESH = 'main-stage-hero-screen-panel-l';
 // same kind of "owner wants the space back, not the geometry deleted" case.
 const CANOPY_PLATE_PATTERN = /V113_CrownShell|V127_CrownScreen/;
 
-export type HologramShapeName = 'cube' | 'sphere' | 'helix' | 'wave' | 'wordmark';
+export type HologramShapeName = 'cube' | 'sphere' | 'helix' | 'wave' | 'wordmark' | 'cylinder' | 'crown' | 'orbit';
 export type HologramFormationOverride =
   | 'none'
   | 'countdown'
@@ -309,6 +310,7 @@ export type HologramFormationOverride =
 
 export interface HologramGrid {
   update: (dtSeconds: number) => void;
+  setControlState: (state:ShowDrone|null, serverNow:number) => void;
   setEventState: (state: StageEventStateInput | null) => void;
   dispose: () => void;
   /** Total lattice points (= thin instances) in the volume. */
@@ -338,6 +340,7 @@ export interface HologramGrid {
 const NOOP_GRID: HologramGrid = {
   update() {},
   setEventState() {},
+  setControlState() {},
   dispose() {},
   pointCount: 0,
   spacing: GRID_SPACING,
@@ -603,8 +606,18 @@ const shapeFireworksFinale: ShapeFn = (ctx, i, out) => {
   out.hue = (u + ring * 0.2) % 1;
 };
 
+const shapeCylinder: ShapeFn = (ctx,i,out) => {
+  const rings=32, perRing=Math.ceil(ctx.count/rings), ring=Math.floor(i/perRing);
+  const angle=(i%perRing)/perRing*Math.PI*2+ctx.time*.16;
+  const radius=12+Math.sin(ring*.4+ctx.time*.65)*.8;
+  out.x=CENTER_X+Math.cos(angle)*radius;out.y=CENTER_Y-9+ring/(rings-1)*18;
+  out.z=CENTER_Z+Math.sin(angle)*radius;out.w=1;out.hue=ring/rings;
+};
 const SHAPE_ORDER: readonly HologramShapeName[] = ['cube', 'sphere', 'helix', 'wave', 'wordmark'];
 const SHAPE_FNS: Readonly<Record<HologramShapeName, ShapeFn>> = {
+  cylinder: shapeCylinder,
+  crown: shapeFireworksCrown,
+  orbit: shapeFireworksOrbit,
   cube: shapeCube,
   sphere: shapeSphere,
   helix: shapeHelix,
@@ -944,6 +957,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let punchEnv = 0;
   let audioPresent = false;
   let elapsed = 0;
+  let control:ShowDrone|null=null, controlNow=0;
   let mode: StageVisualizerMode = 'normal';
   // 1-based minute within the active window, or undefined outside it. Only
   // the integer arrives over the wire (no sub-minute timing), so minute 1's
@@ -981,6 +995,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     const dt = dtSeconds > 0 ? dtSeconds : 0;
     elapsed += dt;
     paletteClock += dt;
+    if(control){elapsed=controlNow/1000;paletteClock=elapsed;}
 
     // --- spectrum + band split ---
     options.getFrequencyData(freqData);
@@ -1022,9 +1037,10 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     mids += (midsRaw - mids) * blendMid;
     highs += (highsRaw - highs) * blendMid;
 
-    const idle = !audioPresent && mode === 'normal';
-    const active = mode === 'active';
-    const leadIn = mode === 'lead_in';
+    if(control){bass=0;mids=0;highs=0;punchEnv=0;freqData.fill(0);}
+    const idle = !control && !audioPresent && mode === 'normal';
+    const active = !control && mode === 'active';
+    const leadIn = !control && mode === 'lead_in';
     const energy = bass * 0.55 + mids * 0.3 + highs * 0.15;
 
     if (idle) {
@@ -1154,7 +1170,8 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
         : morphing
           ? MORPH_TAU_SECONDS
           : SETTLE_TAU_SECONDS;
-    const easeK = 1 - Math.exp(-dt / easeTau);
+    const easeK = control ? 1 : 1 - Math.exp(-dt / easeTau);
+    const controlMix=control?smoothstep01((controlNow-control.startsAt)/Math.max(1,control.transitionMs)):1;
 
     shapeCtx.time = elapsed;
     shapeCtx.energy = energy;
@@ -1173,7 +1190,17 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
       let tz: number;
       let tw: number;
       let thue: number;
-      if (overrideShape) {
+      if (control) {
+        (SHAPE_FNS[control.clip as HologramShapeName]??shapeCube)(shapeCtx,i,outB);
+        tx=outB.x*controlMix;ty=outB.y*controlMix;tz=outB.z*controlMix;
+        tw=outB.w*controlMix;thue=outB.hue*controlMix;
+        const sources=control.from.length?control.from:[{clip:control.clip,weight:1}];
+        for(const source of sources){
+          (SHAPE_FNS[source.clip as HologramShapeName]??shapeCube)(shapeCtx,i,outA);
+          const weight=source.weight*(1-controlMix);
+          tx+=outA.x*weight;ty+=outA.y*weight;tz+=outA.z*weight;tw+=outA.w*weight;thue+=outA.hue*weight;
+        }
+      } else if (overrideShape) {
         // Override formation (countdown or the minute 1/3 wordmark beat):
         // still a deterministic function of the index, so the swarm still
         // moves IN TANDEM - it just bypasses the held/morphing library shape.
@@ -1286,7 +1313,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
       return formationOverrideValue;
     },
     get currentShape() {
-      return SHAPE_ORDER[shapeIndex];
+      return control ? control.clip as HologramShapeName : SHAPE_ORDER[shapeIndex];
     },
     get previousShape() {
       return SHAPE_ORDER[previousShapeIndex];
@@ -1310,6 +1337,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
       return peakColorBValue;
     },
     update,
+    setControlState(state,serverNow){control=state;controlNow=serverNow;},
     setEventState(state) {
       mode = resolveVisualizerMode(state);
       countdownSeconds = state?.countdownSeconds ?? 0;

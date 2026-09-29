@@ -1,3 +1,4 @@
+import { batchStaticPropMeshes } from './batchStaticPropMeshes';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Material } from '@babylonjs/core/Materials/material.js';
@@ -411,6 +412,9 @@ export function createMainStageProductionSurfaces(scene: Scene) {
   }
 
   return {
+    // Frames never animate; screens and their event overlays retain individual ownership.
+    batchStaticHousing: () => batchStaticPropMeshes(root.getChildMeshes()
+      .filter((mesh): mesh is Mesh => mesh instanceof Mesh && mesh.material === housingMaterial), root),
     root,
     surfaces,
   };

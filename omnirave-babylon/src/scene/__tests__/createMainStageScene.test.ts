@@ -39,6 +39,9 @@ async function loadCreateMainStageScene(
     const { MeshBuilder, TransformNode } = await import('@babylonjs/core');
 
     return {
+      // applyAvatarDefinition value-imports this helper from the same
+      // module; the mock must provide it (no-op) or every scene boot fails.
+      applyModularProfileBoneScales: vi.fn(),
       createReviewAvatar: vi.fn(async (scene) => {
         const root = new TransformNode('review-avatar-root', scene);
         const body = MeshBuilder.CreateBox('review-avatar-body', { size: 1 }, scene);
@@ -51,6 +54,28 @@ async function loadCreateMainStageScene(
         };
       }),
     };
+  });
+
+  vi.doMock('../../player/createCompleteAvatar', async () => {
+    const { createReviewAvatar } = await import('../../player/createReviewAvatar');
+    const { createCompleteAvatarWardrobe } = await import('../../player/completeAvatarWardrobe');
+    return { createCompleteAvatar: vi.fn(async (scene: Scene, character: string) => {
+      const avatar = await createReviewAvatar(scene);
+      avatar.root.metadata = { avatarCompleteCharacter: character };
+      avatar.wardrobe = createCompleteAvatarWardrobe(avatar.meshes);
+      return avatar;
+    }) };
+  });
+
+  vi.doMock('../../player/createCompleteAvatarAssetPool', async () => {
+    const { createCompleteAvatar } = await import('../../player/createCompleteAvatar');
+    return { createCompleteAvatarAssetPool: (scene: Scene) => ({
+      create: async (character: 'male' | 'female', detail: number) => {
+        const avatar = await createCompleteAvatar(scene, character);
+        avatar.root.metadata.avatarCompleteDetail = detail;
+        return avatar;
+      }, dispose: vi.fn(),
+    }) };
   });
 
   const module = await import('../createMainStageScene');
@@ -68,6 +93,7 @@ describe('createMainStageScene', () => {
     engine = undefined;
     vi.resetModules();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('wires a player rig and follow camera foundation into the scene', async () => {
@@ -117,7 +143,8 @@ describe('createMainStageScene', () => {
     expect(scene.getMeshByName('main-stage-arrival-void-veil')).not.toBeNull();
     expect(scene.environmentTexture?.name).toBe('main-stage-night-reflection-env');
     expect(scene.metadata?.reviewRuntime?.reviewAvatar).toBeDefined();
-    expect(scene.metadata?.reviewRuntime?.reviewAvatar.root.metadata?.avatarColorway).toBe('aurora');
+    expect(scene.metadata?.reviewRuntime?.reviewAvatar.root.metadata?.avatarCompleteCharacter).toBe('male');
+    expect(scene.metadata?.reviewRuntime?.avatarPreviewLocked).toBe(false);
     expect(scene.getTransformNodeByName('review-avatar-root')?.parent?.name).toBe('player-avatar-anchor');
     expect(scene.getTransformNodeByName('review-camera-target')).not.toBeNull();
     expect(scene.lights.map((light) => light.name)).toEqual(
@@ -126,7 +153,40 @@ describe('createMainStageScene', () => {
     expect(scene.effectLayers).toHaveLength(0);
   });
 
-  it('boots into the authored back-plaza landmark reveal and keeps it synced while idle', async () => {
+  it('boots the saved female character without a preview query and restores older profiles into the launch pair', async () => {
+    engine = new NullEngine();
+    const { createMainStageScene } = await loadCreateMainStageScene();
+    const scene = await createMainStageScene(engine, 'female');
+    const runtime = scene.metadata.reviewRuntime;
+    expect(runtime.reviewAvatar.root.metadata.avatarCompleteCharacter).toBe('female');
+    expect(runtime.avatarPreviewLocked).toBe(false);
+    expect(await runtime.restoreAvatarLoadout({ av: '1', bb: 'm' })).toBe(true);
+    expect(runtime.reviewAvatar.root.metadata.avatarCompleteCharacter).toBe('male');
+    expect(runtime.reviewAvatar.root.parent.name).toBe('player-avatar-anchor');
+    scene.dispose();
+  });
+
+  it('passes the current crouch to the avatar while the local eye height and capsule change', async () => {
+    engine = new NullEngine();
+    vi.spyOn(engine, 'getDeltaTime').mockReturnValue(16.667);
+    const { createMainStageScene } = await loadCreateMainStageScene();
+    const scene = await createMainStageScene(engine);
+    const runtime = scene.metadata.reviewRuntime;
+    scene.render();
+    const standingEye = runtime.playerRig.eyeHeightMeters;
+    runtime.input.state.crouch = true;
+    scene.render();
+    expect(runtime.playerRig.crouched).toBe(true);
+    expect(runtime.playerRig.eyeHeightMeters).toBeCloseTo(standingEye * .62);
+    expect(runtime.reviewAvatar.animate).toHaveBeenLastCalledWith(expect.any(Number), 'idle', true);
+    runtime.input.state.crouch = false;
+    scene.render();
+    expect(runtime.playerRig.eyeHeightMeters).toBeCloseTo(standingEye);
+    expect(runtime.reviewAvatar.animate).toHaveBeenLastCalledWith(expect.any(Number), 'idle', false);
+    scene.dispose();
+  });
+
+  it('boots with the avatar in a playable follow view and keeps it stable while idle', async () => {
     engine = new NullEngine();
     const { createMainStageScene } = await loadCreateMainStageScene();
 
@@ -134,11 +194,12 @@ describe('createMainStageScene', () => {
     const camera = scene.activeCamera as ArcRotateCamera | null;
 
     expect(camera).not.toBeNull();
-    expect(camera!.position.y).toBeCloseTo(30);
-    expect(camera!.position.z).toBeCloseTo(-102);
+    expect(camera!.position.y).toBeCloseTo(3.95);
+    expect(camera!.position.z).toBeCloseTo(-55);
     expect(camera!.lockedTarget?.name).toBe('review-camera-target');
-    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(28);
-    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(38);
+    expect((camera!.lockedTarget as TransformNode).position.y).toBeCloseTo(1.35);
+    expect((camera!.lockedTarget as TransformNode).position.z).toBeCloseTo(-48);
+    expect(camera!.radius).toBeLessThan(8);
 
     // Sec 7.2 camera collision: camera.radius is now resolved EVERY frame
     // from the rig's own requested-distance + collision state (both camera
@@ -151,6 +212,80 @@ describe('createMainStageScene', () => {
     scene.render();
 
     expect(camera!.radius).toBeCloseTo(radiusAfterFirstRender);
+  });
+
+  it('moves the avatar and camera together from spawn when ArrowUp is held', async () => {
+    engine = new NullEngine();
+    vi.spyOn(engine, 'getDeltaTime').mockReturnValue(100);
+    const { createMainStageScene } = await loadCreateMainStageScene((scene, assets) => {
+      assets.collisionMeshes.push(MeshBuilder.CreateGround('test-ground', { width: 200, height: 200 }, scene));
+    });
+    const scene = await createMainStageScene(engine);
+    const camera = scene.activeCamera as ArcRotateCamera;
+    const player = scene.getTransformNodeByName('player-root')!;
+    const avatar = scene.getTransformNodeByName('review-avatar-root')!;
+    scene.render();
+    const start = player.position.clone();
+    const cameraStart = camera.position.clone();
+    const radiusStart = camera.radius;
+    const alphaStart = camera.alpha;
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp' }));
+    for (let frame = 0; frame < 10; frame++) scene.render();
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp' }));
+    const traveled = player.position.z - start.z;
+    expect(traveled).toBeGreaterThan(1);
+    expect(camera.position.z - cameraStart.z).toBeCloseTo(traveled, 1);
+    expect(avatar.getAbsolutePosition().z).toBeCloseTo(player.position.z);
+    expect(camera.radius).toBeCloseTo(radiusStart, 1);
+    expect(camera.alpha).toBeCloseTo(alphaStart);
+    scene.render();
+    expect(player.position.z - start.z).toBeCloseTo(traveled);
+  });
+
+  it('focuses the canvas, orbits with right drag, and zooms with the wheel', async () => {
+    engine = new NullEngine();
+    const canvas = document.createElement('canvas');
+    canvas.setPointerCapture = vi.fn();
+    canvas.hasPointerCapture = vi.fn(() => true);
+    canvas.releasePointerCapture = vi.fn();
+    document.body.append(canvas);
+    vi.spyOn(engine, 'getRenderingCanvas').mockReturnValue(canvas);
+    const { createMainStageScene } = await loadCreateMainStageScene();
+    const scene = await createMainStageScene(engine);
+    const camera = scene.activeCamera as ArcRotateCamera;
+    const pointer = (type: string, x: number) => {
+      const event = new MouseEvent(type, { button: 2, clientX: x, clientY: 100, cancelable: true });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      canvas.dispatchEvent(event);
+    };
+    try {
+      const alphaBefore = camera.alpha;
+      pointer('pointerdown', 100);
+      expect(document.activeElement).toBe(canvas);
+      pointer('pointermove', 160);
+      expect(camera.alpha).not.toBeCloseTo(alphaBefore);
+      pointer('pointerup', 160);
+      const alphaAfter = camera.alpha;
+      pointer('pointermove', 200);
+      expect(camera.alpha).toBe(alphaAfter);
+      const radiusBefore = camera.radius;
+      const betaBefore = camera.beta;
+      const wheel = new WheelEvent('wheel', { deltaY: -100, cancelable: true });
+      canvas.dispatchEvent(wheel);
+      expect(wheel.defaultPrevented).toBe(true);
+      expect(camera.radius).toBeLessThan(radiusBefore);
+      expect(camera.alpha).toBeCloseTo(alphaAfter);
+      expect(camera.beta).toBeCloseTo(betaBefore);
+      const contextMenu = new Event('contextmenu', { cancelable: true });
+      canvas.dispatchEvent(contextMenu);
+      expect(contextMenu.defaultPrevented).toBe(true);
+      scene.dispose();
+      const disposedWheel = new WheelEvent('wheel', { deltaY: 100, cancelable: true });
+      canvas.dispatchEvent(disposedWheel);
+      expect(disposedWheel.defaultPrevented).toBe(false);
+    } finally {
+      canvas.remove();
+    }
   });
 
   it('hides the embodied avatar when zoomed into first-person', async () => {
@@ -169,8 +304,7 @@ describe('createMainStageScene', () => {
     // distance every frame, so the zoom has to go through the rig's zoom()
     // (which updates that requested distance) rather than a direct
     // camera.radius write, which the sync loop would just overwrite.
-    // The authored reveal starts much farther out than the old 9 m follow
-    // camera, so cross the full zoom range to reach first person.
+    // Cross the full zoom range to reach first person.
     cameraRig!.zoom(-1_000);
     scene.render();
 
@@ -488,7 +622,7 @@ describe('createMainStageScene', () => {
     expect(runtime!.playerController.currentSpeedMetersPerSecond).toBeGreaterThan(0);
     expect(runtime!.routeProgress.completedCount).toBeGreaterThanOrEqual(1);
     expect(runtime!.routeProgress.activeCheckpoint?.id).toBe('promenade_mid');
-    expect(runtime!.reviewAvatar.root.metadata?.animationState).toBe('run');
+    expect(runtime!.reviewAvatar.root.metadata?.animationState).toBe('walk');
     // Two contributors to this global Ray.prototype spy: playerController's
     // own ground-detection ray (two resolves per controller step, two steps,
     // over the ground mesh plus the nine authored walkable surfaces the
@@ -523,14 +657,15 @@ describe('createMainStageScene', () => {
     // single straight envelope side run with five runs (side south, the bay's
     // three walls, side north - envelopeSideBlockers in
     // createMainStageCollisionBlockers.ts): eight more blocker rows, checked
-    // by both rays. 398 is the actual observed count with all of the above in
-    // place, including the two basin-coping-outer walls, the FOUR VIP
-    // boundary/gate runs along the spawn-pylon line, and the 36 stepped
+    // by both rays. The sound booth now uses structural rail, case, console,
+    // and front blockers instead of one box; 414 is the observed count with
+    // all of the above in place, including the two basin-coping-outer walls,
+    // the FOUR VIP boundary/gate runs along the spawn-pylon line, and the 36 stepped
     // promenade-corridor segments that trace the approach deck's angled sides
     // (18 per flank - all in createMainStageCollisionBlockers.ts); re-derive
     // by running the test if this ever needs to change again rather than
     // hand-computing it.
-    expect(intersectsMesh).toHaveBeenCalledTimes(398);
+    expect(intersectsMesh).toHaveBeenCalledTimes(414);
     // Exactly TWO ray instances (ground-detection + camera-collision), each
     // reused across every frame - no per-frame allocation for either.
     expect(rayInstances.size).toBe(2);
