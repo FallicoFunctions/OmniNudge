@@ -34,6 +34,7 @@ it('waits for saved bodies, publishes character switches, and permits independen
   }) }));
   vi.doMock('../../media/stageMediaPlayer', () => ({ createStageMediaPlayer: () => ({
     getCurrentTime: () => 0, getDuration: () => 0, applyMedia: vi.fn(), dispose: vi.fn(),
+    unlock: vi.fn(), isAudible: () => false,
   }) }));
   const session = (character: 'male' | 'female' | null): RuntimeAuthSession => ({
     playerId:'me', playerName:'Fixture', mode: character ? 'account' : 'guest',

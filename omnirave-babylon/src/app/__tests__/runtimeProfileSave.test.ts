@@ -44,6 +44,7 @@ async function setup(preview = false) {
   })}));
   vi.doMock('../../media/stageMediaPlayer', () => ({createStageMediaPlayer:() => ({
     getCurrentTime:() => 0,getDuration:() => 0,applyMedia:vi.fn(),dispose:vi.fn(),
+    unlock:vi.fn(),isAudible:() => false,
   })}));
   const engine = {dispose:vi.fn(),getFps:() => 60,getDeltaTime:() => 16,getHardwareScalingLevel:() => 1,
     onDisposeObservable:{addOnce:vi.fn()},resize:vi.fn(),runRenderLoop:vi.fn(),setHardwareScalingLevel:vi.fn()};

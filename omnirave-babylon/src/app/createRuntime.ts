@@ -50,7 +50,7 @@ import { createPerfOverlay, updatePerfOverlay } from '../ui/createPerfOverlay';
 import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import type { FireworksPreviewAct } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
-import { createEnterOmniRaveOverlay } from '../ui/createEnterOmniRaveOverlay';
+import { createSoundHint } from '../ui/createSoundHint';
 import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
@@ -267,7 +267,8 @@ export async function createRuntime(host: HTMLElement) {
   let applyFireworksPreview: ((act: FireworksPreviewAct) => void) | undefined;
   let fireworksPreviewTimer: number | undefined;
   let fireworksAudioUnlocked = false;
-  let enterOverlay: import('../ui/createEnterOmniRaveOverlay').EnterOmniRaveOverlay | undefined;
+  let soundHint: import('../ui/createSoundHint').SoundHint | undefined;
+  let stopAudioGestureListeners: (() => void) | undefined;
   // Player-facing "Now Playing" / venue block. Never gated behind ?debug=1, and
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
@@ -322,7 +323,8 @@ export async function createRuntime(host: HTMLElement) {
     perfOverlay?.remove();
     hud?.remove();
     loadingOverlay?.remove();
-    enterOverlay?.dispose();
+    stopAudioGestureListeners?.();
+    soundHint?.dispose();
     if (playerHudTimer !== undefined) {
       window.clearInterval(playerHudTimer);
       playerHudTimer = undefined;
@@ -841,16 +843,30 @@ export async function createRuntime(host: HTMLElement) {
       });
       worldSocket.connect();
 
-      // Mobile (and most desktop) autoplay policy blocks audio until an
-      // explicit user gesture. This overlay's tap IS that gesture.
+      // The player arrives in the room as it is: nothing waits for audio.
+      // Stage audio starts now if the browser allows it, and otherwise on the
+      // player's first click, tap or key press anywhere (walking counts).
       const activeStageMediaPlayer = stageMediaPlayer;
-      enterOverlay = createEnterOmniRaveOverlay(host, () => {
+      activeStageMediaPlayer.unlock();
+      soundHint = createSoundHint(host);
+      const gestureEvents = ['pointerdown', 'keydown', 'touchend'] as const;
+      const unlockAudioOnGesture = () => {
+        stopAudioGestureListeners?.();
         activeStageMediaPlayer.unlock();
         fireworksAudioUnlocked = true;
         showControls?.unlockAudio();
-        enterOverlay?.dispose();
-        enterOverlay = undefined;
-      });
+        soundHint?.dispose();
+        soundHint = undefined;
+      };
+      stopAudioGestureListeners = () => {
+        for (const type of gestureEvents) {
+          window.removeEventListener(type, unlockAudioOnGesture, true);
+        }
+        stopAudioGestureListeners = undefined;
+      };
+      for (const type of gestureEvents) {
+        window.addEventListener(type, unlockAudioOnGesture, true);
+      }
 
       // DEV-ONLY audio scrubber + play/pause. Only in the world/music path and
       // only under ?debug=1 (same gate as the rest of the dev chrome).
@@ -865,12 +881,18 @@ export async function createRuntime(host: HTMLElement) {
     // connection) there is no media, so it shows the venue name and "No track
     // playing".
     // The elapsed time comes from the LOCAL playhead (the media player), so it
-    // keeps counting between snapshots; duration comes from the server entry.
+    // keeps counting between snapshots, and from the server's playhead until
+    // the browser lets the track play; duration comes from the server entry.
     {
       const { createPlayerHud, formatVenueName, resolvePlayerCounts } = await import('../ui/createPlayerHud');
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
+        // The browser allowed sound without a gesture: the note is moot.
+        if (soundHint && hudMediaPlayer?.isAudible()) {
+          soundHint.dispose();
+          soundHint = undefined;
+        }
         const counts = activePlayers ? resolvePlayerCounts(activePlayers, activeZoneId) : null;
         playerHud?.update({
           venueName: formatVenueName(activeZoneId),

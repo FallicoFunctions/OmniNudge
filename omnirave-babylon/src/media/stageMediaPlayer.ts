@@ -52,7 +52,12 @@ export interface StageMediaPlayerOptions {
 }
 
 export interface StageMediaPlayer {
+  // Starts playback of the synced track. Safe to call before any user gesture:
+  // if the browser blocks the attempt, a later call (from a gesture) retries at
+  // the server's latest playhead.
   unlock: () => void;
+  // True while the track is actually playing (the browser allowed it).
+  isAudible: () => boolean;
   applyMedia: (media: ZoneMediaState | null) => void;
   // Fills `target` with the live byte frequency spectrum of the synced track.
   // Fills zeros before unlock, when no track is playing, or where Web Audio is
@@ -122,9 +127,9 @@ function createAudioBackend(): StagePlayerBackend {
   let pendingSeekHandler: (() => void) | null = null;
 
   // Web Audio analysis tap. The AudioContext is created lazily on the FIRST
-  // playback (which only ever happens after the unlock gesture — the player
-  // stashes media until unlock), satisfying the autoplay policy that forbids
-  // creating an AudioContext before a user gesture. Graph shape:
+  // playback attempt. That attempt may come before any user gesture; the
+  // context then starts suspended and the gesture's retry resumes it. Graph
+  // shape:
   //   AudioContext -> MediaElementAudioSourceNode(element) -> Analyser -> destination
   // The analyser sits INLINE (source -> analyser -> destination) so the track
   // still reaches the speakers. We only ever attempt the build once: a
@@ -192,9 +197,9 @@ function createAudioBackend(): StagePlayerBackend {
 
   function startPlayback(): void {
     playing = true;
-    // First playback runs inside the unlock gesture: safe to build the
-    // AudioContext + analyser tap now. A suspended context (some browsers
-    // start suspended) is resumed here too; the returned promise is ignored.
+    // Build the AudioContext + analyser tap on the first attempt. A context
+    // created before a user gesture starts suspended; every attempt resumes
+    // it, and the attempt made from a gesture succeeds. The promise is ignored.
     ensureAudioGraph();
     if (audioContext && audioContext.state === 'suspended') {
       const resumeResult = audioContext.resume();
@@ -202,8 +207,9 @@ function createAudioBackend(): StagePlayerBackend {
         void resumeResult.catch(() => {});
       }
     }
-    // play() may reject under the browser autoplay policy; the Enter-OmniRave
-    // gesture unlocks it. Swallow the rejection — do NOT retry-loop. (Some
+    // play() may reject under the browser autoplay policy; the player's first
+    // click, tap or key press retries it. Swallow the rejection — do NOT
+    // retry-loop. (Some
     // environments return undefined rather than a promise; guard for that.)
     const result = element.play();
     if (result && typeof result.catch === 'function') {
@@ -338,12 +344,25 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   }
 
   function unlock(): void {
-    if (disposed || unlocked) return;
-    unlocked = true;
-    ensureBackend();
-    if (desiredMedia) {
-      playMedia(desiredMedia);
+    if (disposed) return;
+    if (!unlocked) {
+      unlocked = true;
+      ensureBackend();
+      if (desiredMedia) {
+        playMedia(desiredMedia);
+      }
+      return;
     }
+    // Already unlocked, but the browser blocked the earlier attempt: retry
+    // from the server's latest playhead, not the one the blocked load used.
+    if (!manualOverride && desiredMedia && backend?.isPaused()) {
+      backend.seek(desiredMedia.playheadSeconds);
+      backend.play();
+    }
+  }
+
+  function isAudible(): boolean {
+    return unlocked && backend !== undefined && !backend.isPaused();
   }
 
   function getFrequencyData(target: Uint8Array): void {
@@ -356,7 +375,12 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   }
 
   function getCurrentTime(): number {
-    return backend ? backend.getCurrentTime() : 0;
+    // Until the browser lets the track play, report the server's playhead
+    // (sent at least once a second) so the HUD shows the room's real time.
+    if (backend && (!backend.isPaused() || manualOverride)) {
+      return backend.getCurrentTime();
+    }
+    return desiredMedia ? desiredMedia.playheadSeconds : (backend?.getCurrentTime() ?? 0);
   }
 
   function getDuration(): number {
@@ -396,6 +420,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
 
   return {
     unlock,
+    isAudible,
     applyMedia,
     getFrequencyData,
     getCurrentTime,

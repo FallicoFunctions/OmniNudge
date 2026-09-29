@@ -183,6 +183,56 @@ describe('createStageMediaPlayer', () => {
     player.dispose();
   });
 
+  describe('arriving before the browser allows sound', () => {
+    it('retries a blocked start from the latest server playhead on a later unlock', () => {
+      let paused = true;
+      const backend = createFakeBackend({ isPaused: vi.fn(() => paused) });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      player.unlock(); // at load, no gesture: the browser blocks play()
+      expect(backend.load).toHaveBeenCalledWith('main-stage-set-01', 10);
+      expect(player.isAudible()).toBe(false);
+
+      player.applyMedia(media({ playheadSeconds: 95 }));
+      (backend.play as ReturnType<typeof vi.fn>).mockClear();
+      player.unlock(); // the player's first gesture
+      expect(backend.seek).toHaveBeenLastCalledWith(95);
+      expect(backend.play).toHaveBeenCalledTimes(1);
+
+      paused = false;
+      expect(player.isAudible()).toBe(true);
+    });
+
+    it('does not restart a track that is already playing', () => {
+      const backend = createFakeBackend({ isPaused: vi.fn(() => false) });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      player.applyMedia(media());
+      player.unlock();
+      (backend.play as ReturnType<typeof vi.fn>).mockClear();
+
+      player.unlock();
+      expect(backend.play).not.toHaveBeenCalled();
+    });
+
+    it('reports the server playhead while the track cannot play, and the local one once it does', () => {
+      let paused = true;
+      const backend = createFakeBackend({
+        isPaused: vi.fn(() => paused),
+        getCurrentTime: vi.fn(() => 3),
+      });
+      const player = createStageMediaPlayer({ backendFactory: () => backend });
+
+      player.applyMedia(media({ playheadSeconds: 228 }));
+      expect(player.getCurrentTime()).toBe(228);
+      player.unlock();
+      expect(player.getCurrentTime()).toBe(228);
+
+      paused = false;
+      expect(player.getCurrentTime()).toBe(3);
+    });
+  });
+
   describe('dev control surface', () => {
     it('delegates getDuration and isPaused to the backend after unlock', () => {
       const backend = createFakeBackend({

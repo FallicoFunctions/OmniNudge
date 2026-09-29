@@ -2,7 +2,7 @@
 // Gated behind ?debug=1 in createRuntime and only constructed when a
 // stageMediaPlayer exists (the world/music path). Follows the same
 // append-to-host, return-{element, update, dispose} idiom as the other small
-// fixed-position overlays (createPerfOverlay / createEnterOmniRaveOverlay).
+// fixed-position overlays (createPerfOverlay / createSoundHint).
 //
 // Scrubbing or pausing flips the player into MANUAL OVERRIDE, so the dev's
 // position sticks instead of being yanked back to the server playhead.
