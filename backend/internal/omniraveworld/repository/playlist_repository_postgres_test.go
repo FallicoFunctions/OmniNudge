@@ -23,27 +23,16 @@ func TestPostgresStagePlaylistRepository_LoadActiveStagePlaylists(t *testing.T) 
 
 	playlists, err := repo.LoadActiveStagePlaylists(ctx)
 	require.NoError(t, err)
-	require.Len(t, playlists, 3)
+	// Placeholder tracks without audio are gone (migration 222): only the
+	// Main Stage has a track, so the stages without one load no playlist.
+	require.Len(t, playlists, 1)
 
 	require.Equal(t, world.ZoneMainStage, playlists[0].ZoneID)
-	require.Len(t, playlists[0].Entries, 2)
+	require.Len(t, playlists[0].Entries, 1)
 	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
 	require.Equal(t, "Fallico", playlists[0].Entries[0].Artist)
 	require.Equal(t, "Nick's Mix Vol. 13", playlists[0].Entries[0].Title)
 	require.Equal(t, 7827*time.Second, playlists[0].Entries[0].Duration)
-	require.Equal(t, "main-stage-set-02", playlists[0].Entries[1].TrackID)
-	require.Equal(t, "OmniRave", playlists[0].Entries[1].Artist)
-	require.Equal(t, "Main Stage Set 02", playlists[0].Entries[1].Title)
-
-	require.Equal(t, world.ZoneUnderground, playlists[1].ZoneID)
-	require.Equal(t, "techno-room-set-01", playlists[1].Entries[0].TrackID)
-	require.Equal(t, "OmniRave", playlists[1].Entries[0].Artist)
-	require.Equal(t, "Techno Room Set 01", playlists[1].Entries[0].Title)
-
-	require.Equal(t, world.ZonePlurrPartay, playlists[2].ZoneID)
-	require.Equal(t, "neon-room-set-01", playlists[2].Entries[0].TrackID)
-	require.Equal(t, "OmniRave", playlists[2].Entries[0].Artist)
-	require.Equal(t, "Neon Room Set 01", playlists[2].Entries[0].Title)
 
 	for _, playlist := range playlists {
 		for _, entry := range playlist.Entries {
@@ -73,7 +62,7 @@ func TestPostgresStagePlaylistRepository_IgnoresInactiveSetlists(t *testing.T) {
 
 	playlists, err := repo.LoadActiveStagePlaylists(ctx)
 	require.NoError(t, err)
-	require.Len(t, playlists, 3)
+	require.Len(t, playlists, 1)
 	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
 }
 
@@ -104,12 +93,21 @@ func TestPostgresStagePlaylistRepository_UpgradeRenamesLegacyZoneIDs(t *testing.
 
 	require.NoError(t, db.Migrate(ctx))
 
-	repo := NewPostgresStagePlaylistRepository(db.Pool)
-
-	playlists, err := repo.LoadActiveStagePlaylists(ctx)
+	// Read the setlists directly: since migration 222 only the Main Stage
+	// has tracks, so the playlist loader returns no other zone.
+	rows, err := db.Pool.Query(ctx, `
+		SELECT zone_id FROM omnirave_stage_setlists
+		WHERE name = 'launch-default'
+		ORDER BY zone_id
+	`)
 	require.NoError(t, err)
-	require.Len(t, playlists, 3)
-	require.Equal(t, world.ZoneMainStage, playlists[0].ZoneID)
-	require.Equal(t, world.ZoneUnderground, playlists[1].ZoneID)
-	require.Equal(t, world.ZonePlurrPartay, playlists[2].ZoneID)
+	var zones []string
+	for rows.Next() {
+		var zone string
+		require.NoError(t, rows.Scan(&zone))
+		zones = append(zones, zone)
+	}
+	rows.Close()
+	require.NoError(t, rows.Err())
+	require.Equal(t, []string{string(world.ZoneMainStage), string(world.ZonePlurrPartay), string(world.ZoneUnderground)}, zones)
 }

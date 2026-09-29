@@ -27,6 +27,7 @@ func TestOmniChatExpansionMigrationsRollBackAndReapplyCleanly(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"222_omnirave_remove_placeholder_tracks",
 		"221_omnichat_character_creation_claims",
 		"220_group_invite_key_copies",
 		"214_message_group_key_version",
@@ -272,6 +273,7 @@ func TestBillingIntegrityMigrationGrandfathersLegacyImageJobs(t *testing.T) {
 		// the loop asserts it is what schema_migrations reports before
 		// rolling it back, so adding a migration without adding it here
 		// fails on the first iteration.
+		"222_omnirave_remove_placeholder_tracks",
 		"221_omnichat_character_creation_claims",
 		"220_group_invite_key_copies",
 		"214_message_group_key_version",

@@ -68,7 +68,7 @@ func TestMediaState_SnapshotCarriesTrackMetadata(t *testing.T) {
 
 func TestDefaultStagePlaylists_CarryArtistTitleAndDuration(t *testing.T) {
 	playlists := DefaultStagePlaylists()
-	require.Len(t, playlists, 3)
+	require.Len(t, playlists, 1)
 
 	byZone := make(map[ZoneID]StagePlaylist, len(playlists))
 	for _, playlist := range playlists {

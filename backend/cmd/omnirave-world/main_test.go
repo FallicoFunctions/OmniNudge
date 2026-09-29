@@ -28,7 +28,7 @@ func TestLoadStagePlaylists_UsesRepositoryPlaylistsWhenPresent(t *testing.T) {
 func TestLoadStagePlaylists_FallsBackToDefaultsWhenRepositoryIsEmpty(t *testing.T) {
 	playlists, err := loadStagePlaylists(context.Background(), fakeStagePlaylistRepository{})
 	require.NoError(t, err)
-	require.Len(t, playlists, 3)
+	require.Len(t, playlists, len(world.DefaultStagePlaylists()))
 	require.Equal(t, "main-stage-set-01", playlists[0].Entries[0].TrackID)
 }
 
