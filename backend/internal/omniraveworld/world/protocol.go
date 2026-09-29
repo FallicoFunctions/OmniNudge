@@ -37,10 +37,12 @@ type PlayerSession struct {
 }
 
 type InputFrame struct {
-	MoveTo Vec3 `json:"moveTo"`
+	MoveTo   Vec3 `json:"moveTo"`
+	Crouched bool `json:"crouched,omitempty"`
 }
 
 type Snapshot struct {
+	ShowControl     *ShowState       `json:"showControl,omitempty"`
 	Players         []*Player        `json:"players"`
 	ZoneMedia       []ZoneMediaState `json:"zoneMedia,omitempty"`
 	ZoneEvents      []ZoneEventState `json:"zoneEvents,omitempty"`
@@ -49,9 +51,12 @@ type Snapshot struct {
 }
 
 type ClientEvent struct {
-	Type string `json:"type"`
+	Show *ShowCommand `json:"show,omitempty"`
+	Type string       `json:"type"`
 	// MoveTo carries a "move" event's target position.
 	MoveTo *Vec3 `json:"moveTo,omitempty"`
+	// Crouched is transient presence; it never belongs to a saved loadout.
+	Crouched bool `json:"crouched,omitempty"`
 	// Body carries a "chat" event's message body.
 	Body string `json:"body,omitempty"`
 	// Loadout carries a "loadout" event's avatar description. It is UNTRUSTED

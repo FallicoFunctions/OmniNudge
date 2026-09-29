@@ -1,0 +1,53 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -14,7 +14,7 @@
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 6,
++    'version': 7,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -25,10 +25,10 @@
+     'mouthWiden': .24, 'cornerLift': .0004,
+     'cornerX': .022, 'cornerHalfWidth': .016, 'cornerHalfHeight': .015,
+     'smileScale': .55,
+-    'jawAngleTaper': .10,
++    'jawAngleTaper': .125,
+     'chinCenterZ': 1.508, 'chinHalfHeight': .030,
+     'chinHalfWidth': .047, 'chinFrontY': -.074, 'chinFrontSpan': .042,
+-    'chinRecess': .0022, 'chinLift': .0027,
++    'chinRecess': .0030, 'chinLift': .0055,
+     'cheekCenterX': .034, 'cheekHalfWidth': .023,
+     'cheekCenterZ': 1.580, 'cheekHalfHeight': .016,
+     'cheekFrontY': -.060, 'cheekFrontSpan': .045,
+@@ -43,7 +43,7 @@
+     'buccalCenterZ': 1.559, 'buccalHalfHeight': .034,
+     'buccalSideFullness': .0020, 'buccalFrontFullness': .0024,
+     'cheekRidgeEase': .0009, 'cheekRidgeRecess': .0006,
+-    'chinCornerLift': .0018,
++    'chinCornerLift': .0033,
+     'noseTipRecess': .0016, 'noseTipLift': .0011, 'noseWingInset': .0010,
+     'lipShoulderCompress': .12, 'lipShoulderRecess': .0008,
+     'upperLipBalanceRecess': .0009, 'lowerLipBalanceRecess': .0005,
+@@ -195,7 +195,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, fuller lower cheeks, rounded chin, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower cheeks, shorter rounded chin and softened mandibular corners, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -71,7 +71,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4,5,6].includes(record.spec.version));
++  assert([1,2,3,4,5,6,7].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

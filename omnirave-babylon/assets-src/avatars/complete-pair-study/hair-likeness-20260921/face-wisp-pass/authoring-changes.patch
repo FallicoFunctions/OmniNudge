@@ -1,0 +1,214 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -303,6 +303,8 @@
+         round_pony(mapping,report,apply_geometry)
+         from refine_female_pony_clearance import clear_rear_tips
+         clear_rear_tips(mapping,report,apply_geometry)
++        from refine_female_face_wisps import soften_face_wisps
++        soften_face_wisps(mapping,report,apply_geometry)
+         from refine_female_dye import color_pony
+         color_pony(mapping,report)
+         from refine_brunette_fibers import prepare_tints
+--- before/refine_female_face_wisps.py
++++ refine_female_face_wisps.py
+@@ -0,0 +1,108 @@
++"""Soften the forehead/temple strands and compact the green crown accent.
++
++Connection map: cheek cards retain their first four pairs under the goggles;
++front locks retain their first three rows on the cap; the green tuft retains
++its first two pairs at the pony core. Hair uses millimeter surface clearance,
++not structural overlap. All long pink cards, origins, topology, UVs, weights
++and relative secondary deltas remain intact. Free front edges fit the actual
++skin and sit behind the projected goggle lenses.
++"""
++import math
++import bpy,numpy as np
++from mathutils import Vector
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface,smooth
++from refine_complete_groom_finish import islands
++
++
++def soften_face_wisps(mapping,report,apply):
++    rig=bpy.data.objects['AvatarSkeleton']
++    body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    counts={};fitted=0
++    def fit(points,retained):
++        nonlocal fitted
++        for row in points[retained:]:
++            for point in row:
++                old=point.copy()
++                hit,_,_,_=body.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                if hit is not None:point[1]=min(point[1],hit.y-.0035)
++                # A depth-only gap shrinks to less than a millimeter on the
++                # steep temple. Preserve actual surface clearance there too.
++                skin,normal,_,distance=body.find_nearest(Vector(point))
++                if distance<.0028:point[:]=skin+normal*.0028
++                front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                if front is not None:point[1]=max(point[1],front.y+.0015)
++                skin_front,_,_,_=body.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                if skin_front is not None:assert point[1]<skin_front.y-.001,'No room between skin and lens'
++                fitted+=int(np.linalg.norm(point-old)>1e-8)
++        return points
++    def keep_report(ob,q):
++        old=dict(report.get(ob.name,{}));existing=ob.name in mapping
++        apply(ob,q,mapping,report)
++        # Added front locks are exported in full by export_additions. They
++        # have no counterpart in the archived original GLB to transfer onto.
++        if not existing:mapping.pop(ob.name)
++        for key,value in old.items():
++            if key not in report[ob.name]:report[ob.name][key]=value
++
++    for name in ['PLURR pony strands 0','PLURR pony strands 2']:
++        ob=bpy.data.objects[name];p=array(ob);q=p.copy();count=0
++        for i,ids in enumerate(islands(ob)):
++            if len(ids)!=34:continue
++            r=p[ids].reshape(17,2,3);old=r.mean(1);half=(r[:,1]-r[:,0])*.5
++            t=np.linspace(0,1,17);v=np.clip((t-t[3])/(1-t[3]),0,1)
++            side=np.sign(old[0,0]);phase=i*2.399963
++            length=.82+.18*(.5+.5*math.sin(phase))
++            sample=t[3]+v*(1-t[3])*length
++            c=np.stack([np.interp(sample,t,old[:,axis]) for axis in range(3)],axis=1)
++            c[:,0]+=side*.0035*np.sin(v*1.5*math.pi+phase)*np.sin(math.pi*v)
++            c[:,1]-=.0018*np.sin(math.pi*v)**2
++            # A small number of longer wisps breaks the comb-like row of ends.
++            c[:,2]-=(.012 if i%6==0 else -.003*math.sin(phase))*smooth(v)
++            c[:4]=old[:4];h=half.copy()
++            for j in range(4,17):
++                a=Vector(old[min(j+1,16)]-old[j-1]).normalized()
++                b=Vector(c[min(j+1,16)]-c[j-1]).normalized()
++                width=1-(.25+.18*(.5+.5*math.sin(phase)))*smooth(v[j]/.40)
++                h[j]=np.array(a.rotation_difference(b)@Vector(half[j]))*width
++            rr=np.stack([c-h,c+h],axis=1);rr[:4]=r[:4]
++            q[ids]=fit(rr,4).reshape(-1,3);count+=1
++        keep_report(ob,q);counts[name]=count
++
++    name='PLURR loose brunette front locks';ob=bpy.data.objects[name];p=array(ob);q=p.copy()
++    for i,ids in enumerate(islands(ob)):
++        r=p[ids].reshape(28,3,3);old=(r[:,0]+r[:,2])*.5;half=(r[:,2]-r[:,0])*.5
++        relief=r[:,1]-old;lock=i//5;layer=i%5;family=[0,0,0,1,1,2,2][lock]
++        t=np.linspace(0,1,28);v=np.clip((t-t[2])/(1-t[2]),0,1);tail=smooth((v-.55)/.45)
++        c=old.copy();c[:,0]+=.0018*np.sin(math.tau*v+lock*.7)*np.sin(math.pi*v)
++        c[:,0]+=[0,.003,.010][family]*tail
++        c[:,2]-=([0,.004,.010][family]+.0008*(layer-2))*tail
++        h=half.copy();rel=relief.copy()
++        for j in range(3,28):
++            a=Vector(old[min(j+1,27)]-old[j-1]).normalized()
++            b=Vector(c[min(j+1,27)]-c[j-1]).normalized();rotation=a.rotation_difference(b)
++            width=1-(.20+.06*math.sin(lock+layer))*smooth(v[j]/.40)
++            h[j]=np.array(rotation@Vector(half[j]))*width
++            rel[j]=rotation@Vector(relief[j])
++        rr=np.stack([c-h,c+rel,c+h],axis=1);rr[:3]=r[:3]
++        q[ids]=fit(rr,3).reshape(-1,3)
++    keep_report(ob,q);counts[name]=len(islands(ob))
++
++    name='PLURR pony strands 3';ob=bpy.data.objects[name];p=array(ob);q=p.copy()
++    for i,ids in enumerate(islands(ob)):
++        r=p[ids].reshape(18,2,3);old=r.mean(1);half=(r[:,1]-r[:,0])*.5
++        t=np.linspace(0,1,18);free=smooth((t-t[1])/.50);c=old.copy();root=old[0]
++        c[:,0]-=(old[:,0]-root[0])*.28*free
++        c[:,2]-=(old[:,2]-root[2])*(.13+.10*(.5+.5*math.sin(i*2.4)))*free
++        c[:,1]+=.0035*math.sin(i*2.399963)*np.sin(math.pi*t)*free
++        h=half.copy()
++        for j in range(2,18):
++            a=Vector(old[min(j+1,17)]-old[j-1]).normalized()
++            b=Vector(c[min(j+1,17)]-c[j-1]).normalized()
++            h[j]=np.array(a.rotation_difference(b)@Vector(half[j]))*(1-.15*free[j])
++        rr=np.stack([c-h,c+h],axis=1);rr[:2]=r[:2];q[ids]=rr.reshape(-1,3)
++    keep_report(ob,q);counts[name]=len(islands(ob))
++    report['faceWisps']={'cards':counts,'fittedFreeVertices':fitted,
++        'retainedCheekRootPairs':4,'retainedFrontRootRows':3,'retainedTuftRootPairs':2,
++        'longPonyUnchanged':True,'addedGeometry':0,'relativeSecondaryShapesRetained':True}
+--- before/validate_female_face_wisps.py
++++ validate_female_face_wisps.py
+@@ -0,0 +1,89 @@
++"""Check the face-wisp revision, fixed attachments and nine evaluated poses."""
++import json,sys,hashlib
++from pathlib import Path
++import bpy,numpy as np
++from mathutils import Vector
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from complete_pair_geometry import Surface
++from refine_complete_foil_finish import geometry_contract
++from refine_complete_groom_finish import islands
++from audit_complete_expressions import POSES,set_pose
++
++p=OUT/'hair-likeness-20260921';d=p/'face-wisp-pass'
++face_names=['PLURR pony strands 0','PLURR pony strands 2']
++changed=face_names+['PLURR loose brunette front locks','PLURR pony strands 3']
++def structure(ob):
++    h=hashlib.sha256()
++    for f in ob.data.polygons:h.update(np.asarray(f.vertices,dtype=np.int32).tobytes())
++    for layer in ob.data.uv_layers:h.update(np.asarray([v.uv[:] for v in layer.data],dtype=np.float32).tobytes())
++    for v in ob.data.vertices:h.update(repr([(g.group,g.weight) for g in v.groups]).encode())
++    for attr in ob.data.color_attributes:h.update(np.asarray([v.color[:] for v in attr.data],dtype=np.float32).tobytes())
++    return h.hexdigest()
++def keys(ob):
++    return {k.name:np.array([v.co[:] for v in k.data]) for k in ob.data.shape_keys.key_blocks} if ob.data.shape_keys else {}
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in changed}
++before={name:{'points':array(bpy.data.objects[name]),'structure':structure(bpy.data.objects[name]),'keys':keys(bpy.data.objects[name])} for name in changed}
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in changed}
++old=json.loads((d/'before/female-native-validation.json').read_text())
++native=json.loads((p/'female-native-validation.json').read_text());assert old['materials']==native['materials']
++mesh_checks={};tested={};long_count=0
++for name in changed:
++    ob=bpy.data.objects[name];q=array(ob);old=before[name];roots=[];long=[];free=[]
++    assert structure(ob)==old['structure'],name
++    for ids in islands(ob):
++        if name in face_names and len(ids)==36:long.extend(ids);continue
++        retained=8 if name in face_names else (9 if name=='PLURR loose brunette front locks' else 4)
++        roots.extend(ids[:retained]);free.extend(ids)
++    kept=roots+long;assert np.array_equal(q[kept],old['points'][kept]),name
++    drift=0.
++    for key,value in keys(ob).items():
++        assert np.array_equal(value[kept],old['keys'][key][kept]),(name,key)
++        drift=max(drift,float(np.max(np.abs((value-q)-(old['keys'][key]-old['points'])))))
++    assert drift<3e-7,(name,drift)
++    ob.data.calc_loop_triangles();tri=np.array([t.vertices[:] for t in ob.data.loop_triangles])
++    def area(points):
++        v=points[tri];return np.linalg.norm(np.cross(v[:,1]-v[:,0],v[:,2]-v[:,0]),axis=1)*.5
++    assert np.isfinite(q).all() and not np.any((area(old['points'])>1e-12)&(area(q)<1e-14)),name
++    mesh_checks[name]={'changedVertices':int(np.count_nonzero(np.linalg.norm(q-old['points'],axis=1)>1e-7)),
++        'retainedRootVertices':len(roots),'retainedLongPonyVertices':len(long),'maxRelativeShapeDeltaChangeMm':drift*1000,'newlyDegenerateTriangles':0}
++    tested[name]=free;long_count+=len(long)
++assert long_count==14580
++rig=bpy.data.objects['AvatarSkeleton'];rig.data.pose_position='REST';bpy.context.view_layer.update()
++def inside(tree,point):
++    votes=0
++    for direction in [Vector((.231,.941,.247)).normalized(),Vector((-.723,.317,.614)).normalized(),Vector((.831,-.514,.211)).normalized()]:
++        origin=Vector(point);count=0
++        for _ in range(30):
++            hit,_,_,_=tree.ray_cast(origin,direction,1)
++            if hit is None:break
++            count+=1;origin=hit+direction*.000003
++        votes+=count%2
++    return votes>=2
++cases=dict(POSES)
++cases['hair-cross-left']={'Secondary_HairSide':-1,'Secondary_HairBack':1}
++cases['hair-cross-right']={'Secondary_HairSide':1,'Secondary_HairBack':-1}
++rows=[]
++for label,values in cases.items():
++    set_pose(values);body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    for name in changed:
++        points=array(bpy.data.objects[name],True)[tested[name]];gaps=[];covered=[]
++        for point in points:
++            hit,n,_,distance=body.find_nearest(Vector(point));signed=(Vector(point)-hit).dot(n)
++            gaps.append(-distance if signed<0 and inside(body,point) else distance)
++            front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++            if front is not None and point[1]<front.y+.0005:covered.append(point.tolist())
++        rows.append({'pose':label,'mesh':name,'vertices':len(points),'minimumSkinClearanceMm':min(gaps)*1000,
++            'verticesInFrontOfLens':len(covered),'lensWitnesses':covered[:3],'closestPoint':points[int(np.argmin(gaps))].tolist()})
++report={'unchangedOtherMeshContracts':len(contracts),'meshChecks':mesh_checks,'unchangedLongPonyVertices':long_count,
++    'retainedTopologyUVWeightsAndColors':True,'hairMaterialManifestUnchanged':True,
++    'poses':len(cases),'samples':rows,'minimumSkinClearanceMm':min(r['minimumSkinClearanceMm'] for r in rows),
++    'maximumVerticesInFrontOfLens':max(r['verticesInFrontOfLens'] for r in rows),
++    'scope':'All revised cheek/front/green-tuft vertices in nine finite rest-rig expression/secondary poses. Fixed roots and long pony coordinates/shapes retained exactly; 57 other mesh contracts retained. The prior 31-pose long-pony collar check remains applicable. No continuous, triangle-interior, goggle-frame or hair-self-contact guarantee.'}
++(d/'native-face-wisp-validation.json').write_text(json.dumps(report,indent=2)+'\n')
++print('FACE_WISPS_VALIDATED',json.dumps({k:v for k,v in report.items() if k!='samples'}),flush=True)
++assert report['minimumSkinClearanceMm']>1.5,report['minimumSkinClearanceMm']
++assert report['maximumVerticesInFrontOfLens']==0,report['maximumVerticesInFrontOfLens']

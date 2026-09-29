@@ -1,0 +1,27 @@
+# Collar deformation refinement
+
+`male-rigged-collar-deformation.blend` reduces peak sampled collar edge strain from 69.384% to 53.807% while preserving the fitted rims. That is a reduction of 15.577 percentage points, or 22.45% relative to the preceding collar. The maximum remains at overhead-reach frame 49. Forward-reach strain improves from 52.674% to 48.840%, elbow-bend strain from 27.548% to 24.331%, and neck-control strain from 40.860% to 39.316%. Lowering and asymmetric-pose maxima remain 38.171%. These are geometric measurements, not physical cloth acceptance thresholds.
+
+The change redistributes skin weights across the band's measured cross-section arcs. Each of 439 cross sections retains both original rim weights; its interior blends 50% toward a linear interpolation of those endpoints by cumulative arc length. The blend fades in between 45 and 65 degrees around each side of the neck, preserving the front joins. The strongest four weights are normalized, and compensating bind coordinates retain the source's evaluated T shape within 0.2384 micrometers. The maximum discarded influence is 0.0025302%.
+
+Exactly 5,306 band vertices change weights and bind coordinates. The other 3,748 vertices remain exact, including all 1,152 original flap vertices and all 1,756 vertices on the band's two transverse rims. Topology, raw edge indices, smoothing, authored attributes, materials and all other objects remain exact. The original shirt, jacket, hardware, packed embroidery image, rig, actions, corrective shapes and drivers are preserved. The collar retains 9,054 vertices and 18,104 triangles; this refinement adds no geometry or new deformation controls.
+
+The independent `deformation-audit.json` verifies the preceding neckband audit and its source-model/report hashes, reconstructs the arc fractions and resulting weights from the original model, checks exact rim preservation, and evaluates the final saved model through all 354 established arm samples and 36 single-axis neck samples. All collar strict crossings with body, shirt, jacket, hardware, remaining shirt details and itself are zero. No mating exceptions or relaxed contact tolerances are used. Unchanged original geometry carries its preceding garment/hardware checks forward.
+
+A fresh rebuild reproduces all checked static geometry, raw topology, skin, shapes, attributes, rig/actions/materials and packed images exactly. All 25 evaluated meshes match in native T and lowered poses, as do all seven provenance arrays. Nine rendered views accompany the model; the four final motion views are pixel-identical to the directly reviewed fit candidate, and the five final overall views were inspected directly. All rendering preserves the source binary. All 47 preceding model binaries remain unchanged.
+
+The first convolution-based weight trial reached 46.349% peak strain but failed seven of 22 quick states with body contacts at the lower rim. Its audit, localization, weight provenance and method snapshots remain in `controls/`; those scripts were formatted after the trial and are retained as explanatory method snapshots. The accepted fixed-rim method resolves those contacts. The analytical sweep reports are design estimates; only the reopened Blender audits establish the reported acceptance scope.
+
+The band remains a separate fitted layer, joined to its collar flaps but not sewn into the original shirt. Existing side-pattern gaps are visible with the jacket hidden. Substantial strain remains, and physical cloth response, independent head motion, locomotion, arbitrary/combined motion, continuous or coplanar contact, and positive minimum clearance remain unvalidated. Full male/female likeness, hair, remaining outfits/accessories, material baking, corrective export and runtime/device validation remain unfinished. The existing body05/runtime candidate is unchanged.
+
+## Reproduce
+
+Run from the repository root with Blender 5.1.2 and fresh output paths. The default source is the preceding connected-neckband study; its matching `neckband-audit.json` must remain beside it.
+
+```sh
+blender --background --threads 3 --python-exit-code 1 --python omnirave-babylon/scripts/launch-body-proof/build_rigged_collar_deformation.py -- --output /tmp/collar-repeat/model.blend --provenance /tmp/collar-repeat/provenance.npz --report /tmp/collar-repeat/build.json
+blender --background --python-exit-code 1 --python omnirave-babylon/scripts/launch-body-proof/audit_rigged_collar_deformation.py -- --input /tmp/collar-repeat/model.blend --provenance /tmp/collar-repeat/provenance.npz --report /tmp/collar-repeat/audit.json
+blender --background --python-exit-code 1 --python omnirave-babylon/scripts/launch-body-proof/verify_rigged_shirt_reproduction.py -- --first omnirave-babylon/assets-src/avatars/launch-body-proof/rigged-collar-deformation-study/male-rigged-collar-deformation.blend --second /tmp/collar-repeat/model.blend --first-provenance omnirave-babylon/assets-src/avatars/launch-body-proof/rigged-collar-deformation-study/deformation-provenance.npz --second-provenance /tmp/collar-repeat/provenance.npz --report /tmp/collar-repeat/reproduction.json
+```
+
+`render_tailored_jacket_review.py` supplies five overall views and `render_rigged_collar_deformation.py` supplies four stressed-pose views. Both accept `--input` and `--output` after `--`. The final model SHA is `a7b2569197ac8608698f17b18e98cf4a05e94f560ceb7b7516a6e7701ff6b50a`.

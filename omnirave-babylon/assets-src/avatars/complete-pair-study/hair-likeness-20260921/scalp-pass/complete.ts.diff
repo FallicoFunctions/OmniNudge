@@ -1,0 +1,12 @@
+--- before/complete.ts
++++ src/review/complete.ts
+@@ -11,6 +11,9 @@
+ import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+ import { CreateScreenshotUsingRenderTargetAsync } from '@babylonjs/core/Misc/screenshotTools.js';
+ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
++// Register floor-line shaders before the preview's first render.
++import '@babylonjs/core/Shaders/color.vertex.js';
++import '@babylonjs/core/Shaders/color.fragment.js';
+ import { createCompleteAvatar } from '../player/createCompleteAvatar';
+ import type { ReviewAvatar } from '../player/createReviewAvatar';
+ import type { AvatarAnimationState } from '../player/avatarAnimationState';

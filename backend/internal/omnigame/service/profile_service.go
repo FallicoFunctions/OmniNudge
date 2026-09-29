@@ -16,71 +16,27 @@ func NewProfileService(repo repository.ProfileRepository) *ProfileService {
 }
 
 func (s *ProfileService) SaveLoadout(ctx context.Context, userID int, loadout map[string]string) error {
-	profile, err := s.repo.GetProfile(ctx, userID)
-	if err != nil {
-		return err
-	}
-
 	next := model.DefaultOmniRaveProfile(userID)
 	next.Loadout = loadout
-	if profile != nil {
-		next.ReturnPoint = profile.ReturnPoint
-		next.LastVenue = profile.LastVenue
-		next.Settings = profile.Settings
-	}
-
-	return s.repo.UpsertProfile(ctx, next)
+	return s.repo.UpdateProfileField(ctx, next, repository.ProfileLoadout)
 }
 
 func (s *ProfileService) SaveReturnPoint(ctx context.Context, userID int, point *model.SavedPoint) error {
-	profile, err := s.repo.GetProfile(ctx, userID)
-	if err != nil {
-		return err
-	}
-
 	next := model.DefaultOmniRaveProfile(userID)
 	next.ReturnPoint = point
-	if profile != nil {
-		next.Loadout = profile.Loadout
-		next.LastVenue = profile.LastVenue
-		next.Settings = profile.Settings
-	}
-
-	return s.repo.UpsertProfile(ctx, next)
+	return s.repo.UpdateProfileField(ctx, next, repository.ProfileReturnPoint)
 }
 
 func (s *ProfileService) SaveSettings(ctx context.Context, userID int, settings model.OmniRaveSettings) error {
-	profile, err := s.repo.GetProfile(ctx, userID)
-	if err != nil {
-		return err
-	}
-
 	next := model.DefaultOmniRaveProfile(userID)
 	next.Settings = settings
-	if profile != nil {
-		next.Loadout = profile.Loadout
-		next.ReturnPoint = profile.ReturnPoint
-		next.LastVenue = profile.LastVenue
-	}
-
-	return s.repo.UpsertProfile(ctx, next)
+	return s.repo.UpdateProfileField(ctx, next, repository.ProfileSettings)
 }
 
 func (s *ProfileService) SaveLastVenue(ctx context.Context, userID int, venue string) error {
-	profile, err := s.repo.GetProfile(ctx, userID)
-	if err != nil {
-		return err
-	}
-
 	next := model.DefaultOmniRaveProfile(userID)
 	next.LastVenue = venue
-	if profile != nil {
-		next.Loadout = profile.Loadout
-		next.ReturnPoint = profile.ReturnPoint
-		next.Settings = profile.Settings
-	}
-
-	return s.repo.UpsertProfile(ctx, next)
+	return s.repo.UpdateProfileField(ctx, next, repository.ProfileLastVenue)
 }
 
 func (s *ProfileService) GetProfile(ctx context.Context, userID int) (*model.OmniRaveProfile, error) {

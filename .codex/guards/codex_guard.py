@@ -14,9 +14,9 @@ from typing import Any
 
 MAX_UNTRACKED_BYTES = 10 * 1024 * 1024
 TRUNCATION_PATTERNS = (
-    re.compile(r"\boutput (?:was |is )?truncated\b", re.IGNORECASE),
-    re.compile(r"\btruncated output\b", re.IGNORECASE),
-    re.compile(r"\bshowing (?:the )?(?:first|last) .{0,30}\bof\b", re.IGNORECASE),
+    re.compile(r"^\s*(?:tool )?output (?:was |is )?truncated(?:[.;:].*)?$", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"^\s*warning:\s*truncated output(?:\s|\().*$", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"^\s*showing (?:the )?(?:first|last) .{0,30}\bof\b.*$", re.IGNORECASE | re.MULTILINE),
 )
 
 

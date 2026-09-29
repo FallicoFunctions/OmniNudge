@@ -1,0 +1,177 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -2,13 +2,15 @@
+ 
+ Connection map: the continuous body surface tapers through the jaw into the
+ unchanged neck. Mouth compression shares one field with its surrounding skin
+-and every expression shape. Eyelids, ears, hair roots and accessories are outside
+-the field. The iris shader receives a warm-brown tint without changing its image. Origins, topology, UVs and skin weights stay intact.
++and every expression shape. The orbital skin, eyelids, lash roots and brow
++ribbons share one continuous field, maintaining their existing submillimeter
++attachment offsets (structural overlap does not apply to these face surfaces).
++Eyeballs, irises, ears, hair roots and accessories keep their geometry. The iris shader receives a warm-brown tint without changing its image. Origins, topology, UVs and skin weights stay intact.
+ """
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 2,
++    'version': 3,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -30,6 +32,9 @@
+     'noseCenterZ': 1.574, 'noseHalfHeight': .024,
+     'noseHalfWidth': .024, 'noseFrontY': -.124, 'noseFrontSpan': .022,
+     'noseRecess': .0022, 'noseTaper': .05,
++    'outerEyeLift': .0013,
++    'innerBrowLift': .0022, 'browArchRelax': .0006,
++    'cupidDip': .00085, 'cupidPeak': .00030, 'upperLipRecess': .0009,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+@@ -76,6 +81,24 @@
+         nose *= smooth((spec['noseFrontY']-p[:, 1])/spec['noseFrontSpan'])
+         q[:, 1] += spec['noseRecess']*nose
+         q[:, 0] -= spec['noseTaper']*p[:, 0]*nose
++    if spec['version'] >= 3:
++        front = smooth((-.083-p[:, 1])/.037)
++        eye = smooth((abs(p[:, 0])-.025)/.020)
++        eye *= 1-smooth((abs(p[:, 0])-.052)/.014)
++        eye *= 1-smooth(abs(p[:, 2]-1.607)/.021)
++        q[:, 2] += spec['outerEyeLift']*eye*front
++        brow = 1-smooth(abs(p[:, 2]-1.624)/.028)
++        inner = 1-smooth(abs(abs(p[:, 0])-.014)/.023)
++        arch = 1-smooth(abs(abs(p[:, 0])-.037)/.020)
++        q[:, 2] += (spec['innerBrowLift']*inner-spec['browArchRelax']*arch)*brow*front
++        # Sculpt the lip border in the already-adjusted face coordinates.
++        upper = 1-smooth(abs(q[:, 2]-1.549)/.008)
++        upper *= smooth((-.133-q[:, 1])/.012)
++        dip = 1-smooth(abs(q[:, 0])/.0065)
++        peaks = 1-smooth(abs(abs(q[:, 0])-.006)/.005)
++        recess = 1-smooth(abs(q[:, 0])/.013)
++        q[:, 2] += (spec['cupidPeak']*peaks-spec['cupidDip']*dip)*upper
++        q[:, 1] += spec['upperLipRecess']*recess*upper
+     return q
+ 
+ 
+@@ -96,11 +119,10 @@
+     tint.inputs[2].default_value = spec['irisColorFactor']
+ 
+ 
+-def apply_to_body(body, spec=SPEC):
++def apply_to_mesh(body, spec=SPEC):
+     # All retained body transforms are identity; the same rest-space field is
+     # applied to exported vertices, including independently simplified LODs.
+     assert np.array_equal(np.array(body.matrix_world), np.eye(4))
+-    apply_iris_tint(spec)
+     before = np.array([v.co[:] for v in body.data.vertices])
+     after = warp(before, spec).astype(np.float32)
+     for key in body.data.shape_keys.key_blocks:
+@@ -113,4 +135,15 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Jaw, chin, cheek, nose and lip proportions, a restrained smile morph, and a warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, shared orbital/lash/brow field, defined upper lip, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++
++
++def apply_to_body(body, spec=SPEC):
++    import bpy
++    apply_iris_tint(spec)
++    result = apply_to_mesh(body, spec)
++    if spec['version'] >= 3:
++        result['companionMeshes'] = ['AvatarEyebrows', 'AvatarEyelashes']
++        result['companionRevisions'] = {name: apply_to_mesh(bpy.data.objects[name], spec)
++                                        for name in result['companionMeshes']}
++    return result
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -18,6 +18,18 @@
+     const nose=(1-smooth(Math.abs(x)/s.noseHalfWidth))*(1-smooth(Math.abs(z-s.noseCenterZ)/s.noseHalfHeight))*smooth((s.noseFrontY-y)/s.noseFrontSpan);
+     q[2]-=s.noseRecess*nose; q[0]-=s.noseTaper*x*nose;
+   }
++  if(s.version>=3) {
++    const gate=smooth((-.083-y)/.037);
++    const eye=smooth((Math.abs(x)-.025)/.020)*(1-smooth((Math.abs(x)-.052)/.014))*(1-smooth(Math.abs(z-1.607)/.021));
++    q[1]+=s.outerEyeLift*eye*gate;
++    const brow=1-smooth(Math.abs(z-1.624)/.028);
++    const inner=1-smooth(Math.abs(Math.abs(x)-.014)/.023),arch=1-smooth(Math.abs(Math.abs(x)-.037)/.020);
++    q[1]+=(s.innerBrowLift*inner-s.browArchRelax*arch)*brow*gate;
++    const upper=(1-smooth(Math.abs(q[1]-1.549)/.008))*smooth((-.133+q[2])/.012);
++    const dip=1-smooth(Math.abs(q[0])/.0065),peaks=1-smooth(Math.abs(Math.abs(q[0])-.006)/.005),recess=1-smooth(Math.abs(q[0])/.013);
++    q[1]+=(s.cupidPeak*peaks-s.cupidDip*dip)*upper;
++    q[2]-=s.upperLipRecess*recess*upper;
++  }
+   return q;
+ }
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+@@ -31,12 +43,14 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2].includes(record.spec.version));
++  assert([1,2,3].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));
+   }
+-  const node=doc.getRoot().listNodes().find(n=>n.getName()===record.mesh);assert(node);
++  const meshes={};
++  for(const name of [record.mesh,...(record.companionMeshes??[])]) {
++  const node=doc.getRoot().listNodes().find(n=>n.getName()===name);assert(node);
+   assert.deepEqual(node.getMatrix(),[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+   let changed=0,maxMove=0;
+   for(const primitive of node.getMesh().listPrimitives()) {
+@@ -48,9 +62,9 @@
+       const n=normal?.getElement(i,[]),nn=n?(move>0?normalAt(n,p,record.spec):n):null;
+       for(const [targetIndex,target] of primitive.listTargets().entries()) {
+         const scale=node.getMesh().getExtras().targetNames[targetIndex]==='Expression_Smile'?record.spec.smileScale:1;
+-        if(move===0&&scale===1)continue;
+         const dp=target.getAttribute('POSITION'),dn=target.getAttribute('NORMAL');
+         const d=dp.getElement(i,[]),pp=p.map((v,a)=>v+d[a]),qq=warp(pp,record.spec);
++        if(move===0&&scale===1&&qq.every((v,a)=>v===pp[a]))continue;
+         dp.setElement(i,qq.map((v,a)=>(v-q[a])*scale));
+         if(dn){
+           const nd=dn.getElement(i,[]);
+@@ -65,5 +79,7 @@
+       pos.setElement(i,q);if(normal)normal.setElement(i,nn);
+     }
+   }
+-  return {changedVertices:changed,maximumDisplacementMm:maxMove*1000};
++  meshes[name]={changedVertices:changed,maximumDisplacementMm:maxMove*1000};
++  }
++  return {...meshes[record.mesh],companionRevisions:Object.fromEntries(Object.entries(meshes).filter(([name])=>name!==record.mesh))};
+ }
+--- before/apply_reference_hair.mjs
++++ apply_reference_hair.mjs
+@@ -23,7 +23,7 @@
+ function retained(doc) {
+   const r=doc.getRoot(),changed=new Set();
+   for(const n of r.listNodes()) {
+-    if(native.faceContour?.mesh===n.getName())for(const p of n.getMesh().listPrimitives()) {
++    if(native.faceContour?.mesh===n.getName()||native.faceContour?.companionMeshes?.includes(n.getName()))for(const p of n.getMesh().listPrimitives()) {
+       for(const s of ['POSITION','NORMAL','TANGENT'])if(p.getAttribute(s))changed.add(p.getAttribute(s));
+       for(const t of p.listTargets())for(const s of ['POSITION','NORMAL'])if(t.getAttribute(s))changed.add(t.getAttribute(s));
+     }
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -416,7 +416,7 @@
+     bpy.context.preferences.filepaths.save_version=0
+     bpy.ops.wm.save_as_mainfile(filepath=str(PASS/f'{sex}-hair-refined.blend'),compress=True)
+     (PASS/f'{sex}-vertex-mapping.json').write_text(json.dumps(mapping)+'\n')
+-    (PASS/f'{sex}-native-validation.json').write_text(json.dumps({'meshes':report,'materials':materials,'additions':additions,'removedObjects':removed,'preservedNonHairMeshes':len(preserved)-(1 if face_contour else 0),'faceContour':face_contour},indent=2)+'\n')
++    (PASS/f'{sex}-native-validation.json').write_text(json.dumps({'meshes':report,'materials':materials,'additions':additions,'removedObjects':removed,'preservedNonHairMeshes':len(preserved)-(1+len(face_contour.get('companionMeshes',[])) if face_contour else 0),'faceContour':face_contour},indent=2)+'\n')
+     print('REFERENCE_HAIR',sex,json.dumps(report),flush=True)
+ 
+ 
+--- before/validate_reference_hair.py
++++ validate_reference_hair.py
+@@ -90,7 +90,7 @@
+             attachments[label]['frontLockRootDistanceMm']=root_gap*1000
+             attachments[label]['frontLockSkinClearanceMm']=[min(gaps)*1000,max(gaps)*1000]
+     set_pose({})
+-    report={'preservedNonHairMeshes':len(originals)-(1 if native.get('faceContour') else 0),'validatedFaceContour':native.get('faceContour'),'removedObjects':sorted(removed),'maxMorphDeltaChangeMm':max_delta*1000,
++    report={'preservedNonHairMeshes':len(originals)-(1+len(native['faceContour'].get('companionMeshes',[])) if native.get('faceContour') else 0),'validatedFaceContour':native.get('faceContour'),'removedObjects':sorted(removed),'maxMorphDeltaChangeMm':max_delta*1000,
+         'movementSamples':27,'maxHeadRelativeDriftMm':drift*1000,'attachments':attachments,
+         'scope':'Finite pose/shape samples and attachment distances; no continuous collision or strand self-contact guarantee.'}
+     (PASS/f'{sex}-motion-validation.json').write_text(json.dumps(report,indent=2)+'\n')

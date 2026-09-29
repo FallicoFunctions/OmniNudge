@@ -3,6 +3,41 @@ import { describe, expect, it } from 'vitest';
 import { createInputMap } from '../createInputMap';
 
 describe('createInputMap', () => {
+  it.each([
+    ['ArrowUp', 'KeyW', 'forward'],
+    ['ArrowDown', 'KeyS', 'backward'],
+    ['ArrowLeft', 'KeyA', 'left'],
+    ['ArrowRight', 'KeyD', 'right'],
+  ] as const)('moves with %s without scrolling or releasing a held WASD alias', (arrow, letter, direction) => {
+    const input = createInputMap(window);
+    const press = new KeyboardEvent('keydown', { code: arrow, cancelable: true });
+    window.dispatchEvent(press);
+    expect(input.state[direction]).toBe(true);
+    expect(press.defaultPrevented).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: letter }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: arrow }));
+    expect(input.state[direction]).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: letter }));
+    expect(input.state[direction]).toBe(false);
+    input.dispose();
+  });
+
+  it('leaves movement and editing keys alone in a focused form field', () => {
+    const input = createInputMap(window);
+    const field = document.createElement('input');
+    document.body.append(field);
+    field.focus();
+    for (const code of ['KeyW', 'ArrowUp', 'Space']) {
+      const event = new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true });
+      field.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(input.state.forward).toBe(false);
+    expect(input.state.jump).toBe(false);
+    field.remove();
+    input.dispose();
+  });
+
   it('tracks held movement key state, latches jump taps, and stops tracking after disposal', () => {
     const input = createInputMap(window);
 

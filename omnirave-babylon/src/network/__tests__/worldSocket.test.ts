@@ -34,10 +34,18 @@ class FakeWebSocket implements WorldSocketLike {
   triggerMessage(data: string): void {
     this.onmessage?.({ data });
   }
+
+  confirmPosition(x: number, y = 0, z = 0, crouched = false): void {
+    this.triggerMessage(JSON.stringify({
+      type: 'world_snapshot', currentPlayerId: 'local',
+      players: [{ id: 'local', position: { x, y, z }, ...(crouched ? { crouched: true } : {}) }],
+    }));
+  }
 }
 
 function createFakeClock(): WorldSocketClock & {
   advance: (ms: number) => void;
+  elapseWithoutTimers: (ms: number) => void;
   pendingCount: () => number;
 } {
   let now = 0;
@@ -46,6 +54,7 @@ function createFakeClock(): WorldSocketClock & {
 
   return {
     now: () => now,
+    elapseWithoutTimers: (ms) => { now += ms; },
     setTimeout: (callback, delayMs) => {
       const handle = nextHandle++;
       timers.set(handle, { fireAt: now + delayMs, callback });
@@ -157,6 +166,173 @@ describe('createWorldSocket', () => {
       JSON.stringify({ type: 'move', moveTo: { x: 1, y: 0, z: 0 } }),
       JSON.stringify({ type: 'move', moveTo: { x: 3, y: 0, z: 0 } }),
     ]);
+  });
+
+  it('sends one position across a minute of stationary frames, then sends movement immediately', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    for (let frame = 0; frame < 3600; frame++) {
+      worldSocket.sendMove({ x: 1, y: 0, z: 2 });
+      if (frame === 0) getLastSocket().confirmPosition(1, 0, 2);
+      clock.advance(1000 / 60);
+    }
+    expect(getLastSocket().sent).toHaveLength(1);
+    expect(clock.pendingCount()).toBe(0);
+    worldSocket.sendMove({ x: 1.001, y: 0, z: 2 });
+    expect(getLastSocket().sent.map((payload) => JSON.parse(payload))).toEqual([
+      { type: 'move', moveTo: { x: 1, y: 0, z: 2 } },
+      { type: 'move', moveTo: { x: 1.001, y: 0, z: 2 } },
+    ]);
+  });
+
+  it('cancels a queued excursion when the latest position returns to the sent position', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    getLastSocket().confirmPosition(0);
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    clock.advance(100);
+    expect(getLastSocket().sent).toHaveLength(1);
+    expect(clock.pendingCount()).toBe(0);
+  });
+
+  it('retries an unchanged target until the server finishes clamping its movement', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    const target = { x: 5, y: 0, z: 0 };
+    worldSocket.sendMove(target);
+    getLastSocket().confirmPosition(2.25);
+    worldSocket.sendMove(target);
+    clock.advance(100);
+    getLastSocket().confirmPosition(4.5);
+    worldSocket.sendMove(target);
+    clock.advance(100);
+    worldSocket.sendMove(target);
+    expect(clock.pendingCount()).toBe(1);
+    getLastSocket().confirmPosition(5);
+    clock.advance(100);
+    worldSocket.sendMove(target);
+    expect(getLastSocket().sent).toHaveLength(3);
+    expect(clock.pendingCount()).toBe(0);
+  });
+
+  it('keeps retrying an unacknowledged move and resumes after a server position correction', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    const target = { x: 5, y: 0, z: 0 };
+    worldSocket.sendMove(target);
+    clock.advance(100);
+    worldSocket.sendMove(target);
+    expect(getLastSocket().sent).toHaveLength(2);
+    getLastSocket().confirmPosition(5);
+    clock.advance(100);
+    worldSocket.sendMove(target);
+    expect(getLastSocket().sent).toHaveLength(2);
+    getLastSocket().confirmPosition(4);
+    worldSocket.sendMove(target);
+    expect(getLastSocket().sent).toHaveLength(3);
+  });
+
+  it('does not discard a newer queued position when an older move is acknowledged', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    getLastSocket().confirmPosition(0);
+    clock.advance(100);
+    expect(JSON.parse(getLastSocket().sent[1]).moveTo.x).toBe(2);
+  });
+
+  it('copies immediate and queued positions from mutable caller vectors', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    const position = { x: 0, y: 0, z: 0 };
+    worldSocket.sendMove(position);
+    position.x = 2;
+    worldSocket.sendMove(position);
+    position.x = 99;
+    clock.advance(100);
+    expect(getLastSocket().sent.map((payload) => JSON.parse(payload))).toEqual([
+      { type: 'move', moveTo: { x: 0, y: 0, z: 0 } },
+      { type: 'move', moveTo: { x: 2, y: 0, z: 0 } },
+    ]);
+  });
+
+  it('replaces an overdue trailing move with the latest immediate position', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    clock.elapseWithoutTimers(120);
+    worldSocket.sendMove({ x: 3, y: 0, z: 0 });
+    clock.advance(100);
+    expect(getLastSocket().sent.map((payload) => JSON.parse(payload))).toEqual([
+      { type: 'move', moveTo: { x: 0, y: 0, z: 0 } },
+      { type: 'move', moveTo: { x: 3, y: 0, z: 0 } },
+    ]);
+  });
+
+  it.each(['identity', 'network'] as const)('clears queued movement on %s reconnect and resends the first unchanged position', (kind) => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    if (kind === 'identity') {
+      worldSocket.reconnect('wss://example.test/ws', 'fresh-token');
+    } else {
+      getLastSocket().triggerServerClose();
+      clock.advance(1000);
+    }
+    worldSocket.sendMove({ x: 99, y: 0, z: 0 });
+    getLastSocket().triggerOpen();
+    clock.advance(100);
+    expect(getLastSocket().sent).toEqual([]);
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    expect(getLastSocket().sent.map((payload) => JSON.parse(payload))).toEqual([
+      { type: 'move', moveTo: { x: 0, y: 0, z: 0 } },
+    ]);
+  });
+
+  it('respawn cancels the old queued move and permits an immediate spawn position', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    worldSocket.sendRespawn();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    clock.advance(100);
+    expect(getLastSocket().sent.map((payload) => JSON.parse(payload))).toEqual([
+      { type: 'move', moveTo: { x: 0, y: 0, z: 0 } },
+      { type: 'respawn' },
+      { type: 'move', moveTo: { x: 0, y: 0, z: 0 } },
+    ]);
+  });
+
+  it('does not retain movement before open, after error, or after disposal', () => {
+    const { worldSocket, getLastSocket, clock } = setup();
+    worldSocket.sendMove({ x: 99, y: 0, z: 0 });
+    worldSocket.connect();
+    worldSocket.sendMove({ x: 99, y: 0, z: 0 });
+    getLastSocket().triggerOpen();
+    worldSocket.sendMove({ x: 0, y: 0, z: 0 });
+    worldSocket.sendMove({ x: 2, y: 0, z: 0 });
+    getLastSocket().onerror?.({});
+    worldSocket.sendMove({ x: 99, y: 0, z: 0 });
+    clock.advance(100);
+    worldSocket.dispose();
+    worldSocket.sendMove({ x: 99, y: 0, z: 0 });
+    expect(clock.pendingCount()).toBe(0);
+    expect(getLastSocket().sent).toHaveLength(1);
   });
 
   it('sends respawn and chat with the exact expected shape', () => {
@@ -448,4 +624,40 @@ describe('createWorldSocket', () => {
 
     expect(getLastSocket().sent).toEqual([JSON.stringify({ type: 'move', moveTo: { x: 0, y: 0, z: 0 } })]);
   });
+});
+
+it('sends posture changes at a confirmed position and waits for matching posture acknowledgement', () => {
+  const { worldSocket, clock, getLastSocket } = setup();
+  worldSocket.connect(); const socket = getLastSocket(); socket.triggerOpen();
+  const position = { x: 1, y: 1.65, z: 0 };
+  worldSocket.sendMove(position); socket.confirmPosition(1, 1.65);
+  worldSocket.sendMove(position, true);
+  // A prior standing snapshot cannot erase a queued crouch at the same point.
+  socket.confirmPosition(1, 1.65); clock.advance(100);
+  expect(JSON.parse(socket.sent[1])).toEqual({ type: 'move', moveTo: position, crouched: true });
+  socket.confirmPosition(1, 1.65, 0, true);
+  clock.advance(100); worldSocket.sendMove(position, true);
+  expect(socket.sent).toHaveLength(2);
+  worldSocket.sendMove(position, false);
+  expect(JSON.parse(socket.sent[2])).toEqual({ type: 'move', moveTo: position });
+  worldSocket.dispose();
+});
+
+it('cancels a queued crouch when standing resumes and clears posture across respawn/reconnect', () => {
+  const { worldSocket, clock, getLastSocket } = setup();
+  worldSocket.connect(); let socket = getLastSocket(); socket.triggerOpen();
+  const position = { x: 0, y: 0, z: 0 };
+  worldSocket.sendMove(position); socket.confirmPosition(0);
+  worldSocket.sendMove(position, true); worldSocket.sendMove(position, false);
+  clock.advance(100); expect(socket.sent).toHaveLength(1);
+  worldSocket.sendMove(position, true); socket.confirmPosition(0, 0, 0, true);
+  worldSocket.sendRespawn(); worldSocket.sendMove(position, false);
+  expect(JSON.parse(socket.sent.at(-1)!)).toEqual({ type: 'move', moveTo: position });
+  worldSocket.sendMove(position, true);
+  worldSocket.reconnect('wss://example.test/ws', 'new-token');
+  socket = getLastSocket(); socket.triggerOpen(); clock.advance(100);
+  expect(socket.sent).toEqual([]);
+  worldSocket.sendMove(position);
+  expect(JSON.parse(socket.sent[0])).toEqual({ type: 'move', moveTo: position });
+  worldSocket.dispose();
 });

@@ -1,23 +1,35 @@
+import { createCompleteAvatarAssetPool } from '../player/createCompleteAvatarAssetPool';
+import { resolveLocalAvatarDetail } from '../player/completeAvatarLod';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { cacheWebGpuMaterialBindings } from './cacheWebGpuMaterialBindings';
+import { cacheStaticPbrBindings } from './cacheStaticPbrBindings';
+import { cacheWebGpuLightBindings } from './cacheWebGpuLightBindings';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 
 import { createCompletionCelebration } from '../game/createCompletionCelebration';
+import { batchStaticPropMeshes } from './batchStaticPropMeshes';
+import { createLocalAvatarAppearance } from '../player/createLocalAvatarAppearance';
+import { createCompleteAvatar } from '../player/createCompleteAvatar';
 import { createMainStageRouteProgress } from '../game/mainStageRouteProgress';
 import { applyAvatarColorway, USER_AVATAR_COLORWAYS } from '../player/avatarColorways';
 import { applyAvatarDefinition } from '../player/applyAvatarDefinition';
 import {
   DEFAULT_AVATAR_DEFINITION,
-  serializeAvatarLoadout,
+  FEMALE_V2_PREVIEW_DEFINITION,
+  MALE_V2_PREVIEW_DEFINITION,
   type AvatarDefinition,
 } from '../player/avatarDefinition';
+import { resolveTravelCameraOffsets } from '../player/cameraRigMath';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarget } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
+import { serializeRenderedAvatarLoadout } from '../player/completeAvatarLoadout';
+import { createAvatarReviewLighting } from '../player/createAvatarReviewLighting';
 import { createAtmosphereRig } from './createAtmosphereRig';
 import { createBackstageEasterEgg } from './createBackstageEasterEgg';
 import { createCascadeCourtPaving } from './createCascadeCourtPaving';
@@ -43,24 +55,21 @@ import { createMainStageProductionSurfaces } from './createMainStageProductionSu
 import { loadMainStageAssets } from './loadMainStageAssets';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
 
-// The production entry uses the same authored landmark reveal as the review
-// route. Starting in a short over-the-shoulder shot put the camera against the
-// arrival stair and filled the frame with paving instead of the Crown.
-const PLAYABLE_START_CAMERA = MAIN_STAGE_REVIEW_ROUTE[0]!.camera;
-const TRACKPAD_CAMERA_YAW_SENSITIVITY = 0.0045;
-const TRACKPAD_CAMERA_PITCH_SENSITIVITY = 0.0032;
-// Proportional: each pinch tick scales the CURRENT follow distance, so one
-// full pinch gesture traverses the whole 0.1..140 zoom range (a fixed
-// per-tick step needed 10+ gestures, player-flagged) while staying
-// fine-grained near the avatar.
-const TRACKPAD_CAMERA_ZOOM_RATE = 0.01;
+// Gameplay starts with the same player-centred framing used after travel.
+// Scenic checkpoint compositions remain available in the review route.
+const PLAYABLE_START_CAMERA = {
+  ...MAIN_STAGE_REVIEW_ROUTE[0]!.camera,
+  ...resolveTravelCameraOffsets(MAIN_STAGE_REVIEW_ROUTE[0]!.camera),
+};
+const PINCH_CAMERA_ZOOM_RATE = 0.01;
+const WHEEL_CAMERA_ZOOM_RATE = 0.002;
 const POINTER_CAMERA_YAW_SENSITIVITY = 0.006;
 const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
 // Per movement frame: an authored checkpoint focus offset decays toward the
 // avatar, so walking recenters the camera within a few steps.
 const FOCUS_SETTLE_STRENGTH = 0.06;
 
-export async function createMainStageScene(engine: AbstractEngine) {
+export async function createMainStageScene(engine: AbstractEngine, launchCharacter: 'male' | 'female' = 'male') {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.02, 0.03, 0.06, 1);
   scene.collisionsEnabled = true;
@@ -70,6 +79,47 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
   const stageAssets = await loadMainStageAssets(scene);
   const perfFlags = parsePerfFlags(typeof window === 'undefined' ? '' : window.location.search);
+  const venuePerformanceBaseline = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('venueBaseline') === '1';
+  const avatarShaderCacheBaseline = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('avatarShaderCache') === '0';
+  const avatarBatchingBaseline = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('avatarBatching') === '0';
+  const avatarVertexBufferExperiment = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('avatarVertexBuffers') === '1';
+  const avatarMultiMaterialBatchExperiment = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('avatarMultiMaterialBatch') === '1';
+  const localPerformanceParams = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const optimized = (name: string) => !venuePerformanceBaseline && localPerformanceParams.get(name) !== '0';
+  scene.metadata = { venuePerformanceBaseline, avatarShaderCacheBaseline, avatarBatchingBaseline, avatarVertexBufferExperiment, avatarMultiMaterialBatchExperiment };
+  scene.metadata.dynamicTransmissionExperiment = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('dynamicTransmission') === '1';
+  scene.metadata.avatarMaterialPaletteExperiment = optimized('avatarMaterialPalette');
+  scene.metadata.avatarSharedMorphsExperiment = engine.isWebGPU && optimized('avatarSharedMorphs');
+  scene.metadata.avatarCopyBoundsExperiment = engine.isWebGPU && optimized('avatarCopyBounds');
+  scene.metadata.avatarLodReuseExperiment = engine.isWebGPU && optimized('avatarLodReuse');
+  scene.metadata.avatarInstanceMorphsExperiment = localPerformanceParams.get('avatarInstanceMorphs') === '1';
+  scene.metadata.avatarMaterialVariantsExperiment = localPerformanceParams.get('avatarMaterialVariants') === '1';
+  scene.metadata.avatarProjectedDetailExperiment = optimized('avatarProjectedDetail');
+  scene.metadata.avatarSmallDetailExperiment = optimized('avatarSmallDetail');
+  scene.metadata.reuseTransmissionExperiment = optimized('reuseTransmission');
+  scene.metadata.avatarInstanceExperiment = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('avatarInstances') === '1';
+  scene.metadata.avatarMaterialBindingsEnabled = optimized('avatarMaterialBindings');
+  if (optimized('materialBindingCache')) cacheWebGpuMaterialBindings(scene);
+  if (optimized('staticPbrBindings')) cacheStaticPbrBindings(scene);
+  if (optimized('lightBindingCache')) cacheWebGpuLightBindings(scene);
+
+  if (engine.isWebGPU && optimized('checkMatrixValues')) engine._features.uniformBufferHardCheckMatrix = true;
 
   // Collapse same-material static groups into single draw calls before any
   // rig reads mesh positions. Draw submission was the measured frame floor.
@@ -124,16 +174,88 @@ export async function createMainStageScene(engine: AbstractEngine) {
     scene,
     new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
   );
-  const reviewAvatar = await createReviewAvatar(scene);
-  let selectedAvatarColorway = applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
+  const localAvatarPreview = typeof window !== 'undefined'
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const avatarPreviewParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const previewFashion = localAvatarPreview && avatarPreviewParams.get('avatarFashion') === '1';
+  const previewEditorial = localAvatarPreview
+    && !previewFashion
+    && avatarPreviewParams.get('avatarEditorial') === '1';
+  const previewLean = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && avatarPreviewParams.get('avatarLean') === '1';
+  const previewClassic = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && !previewLean
+    && avatarPreviewParams.get('avatarClassic') === '1';
+  const previewLuxury = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && !previewLean
+    && !previewClassic
+    && avatarPreviewParams.get('avatarPreview') === '1';
+  const completeValue = avatarPreviewParams.get('avatarComplete');
+  const explicitComplete = localAvatarPreview && (completeValue === 'male' || completeValue === 'female')
+    ? completeValue : undefined;
+  const previewMaleV2 = localAvatarPreview
+    && avatarPreviewParams.get('avatarMaleV2') === '1';
+  const previewFemaleV2 = localAvatarPreview
+    && !previewMaleV2
+    && avatarPreviewParams.get('avatarFemaleV2') === '1';
+  const avatarPreviewLocked = Boolean(previewLuxury || previewClassic || previewLean || previewFashion
+    || previewEditorial || previewMaleV2 || previewFemaleV2);
+  const previewComplete = explicitComplete ?? (avatarPreviewLocked ? undefined : launchCharacter);
+  const localCompleteAssets = !avatarPreviewLocked && !explicitComplete
+    ? createCompleteAvatarAssetPool(scene, { sampledAnimationRate: 60 }) : null;
+  const loadLocalComplete = (character: 'male' | 'female') => localCompleteAssets
+    ? localCompleteAssets.create(character, 0)
+    : createCompleteAvatar(scene, character, { persistWardrobe: false });
+  let reviewAvatar = previewComplete
+    ? await loadLocalComplete(previewComplete)
+    : await createReviewAvatar(scene, {
+    previewComplete,
+    previewClassic,
+    previewEditorial,
+    previewFashion,
+    previewFemaleV2,
+    previewLean,
+    previewLuxury,
+    previewMaleV2,
+  });
+  // Both authored review assets already contain material separation that the
+  // broad procedural colorway pass would flatten. The AvatarDefinition below
+  // still controls the modular lean wardrobe, hair, skin, and shoes; skipping
+  // this first pass preserves authored eyes, brows, lashes, and texture detail.
+  let selectedAvatarColorway = previewComplete || previewLuxury || previewClassic || previewLean || previewFashion || previewEditorial || previewMaleV2 || previewFemaleV2
+    ? USER_AVATAR_COLORWAYS[0]
+    : applyAvatarColorway(reviewAvatar, USER_AVATAR_COLORWAYS[0].id);
   reviewAvatar.root.parent = playerRig.avatarAnchor;
+  let avatarReviewLighting: ReturnType<typeof createAvatarReviewLighting> | undefined;
+  if (explicitComplete || avatarPreviewLocked) {
+    avatarReviewLighting = createAvatarReviewLighting(scene, reviewAvatar.meshes, [
+      lightingRig.hemi,
+      lightingRig.key,
+      lightingRig.rim,
+      lightingRig.fill,
+    ], Boolean(previewComplete));
+  }
 
-  // Sec 6.2: every player is dressed from an AvatarDefinition. The scene boots
-  // on the default one; createRuntime replaces it with the guest's generated
-  // look as soon as the runtime is up. Applying a definition drives sec 6.5's
-  // height effects on BOTH halves: body scale (the avatar root) and standing
+  // Every launch character also has a compatible AvatarDefinition. Applying
+  // its definition drives the height effects on the player rig and body;
+  // body scale (the avatar root) and standing
   // presence (the rig capsule + eye level).
-  let localAvatarDefinition = applyAvatarDefinition(reviewAvatar, DEFAULT_AVATAR_DEFINITION);
+  // v2 golden-case previews use explicit per-character definitions so the
+  // female preview selects the female morph instead of the male default.
+  const bootAvatarDefinition = previewMaleV2 || previewComplete === 'male'
+    ? MALE_V2_PREVIEW_DEFINITION
+    : previewFemaleV2 || previewComplete === 'female'
+      ? FEMALE_V2_PREVIEW_DEFINITION
+      : DEFAULT_AVATAR_DEFINITION;
+  let localAvatarDefinition = applyAvatarDefinition(reviewAvatar, bootAvatarDefinition);
   playerRig.setHeightInches(localAvatarDefinition.heightInches);
   const setAvatarDefinition = (definition: AvatarDefinition) => {
     localAvatarDefinition = applyAvatarDefinition(reviewAvatar, definition);
@@ -172,6 +294,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // + nearest scoped light); this broader nearest-six list still gives that
   // cap the correct proximity-ordered candidates and benefits WebGL.
   trimMeshLightBudget(scene, 6);
+  if (!venuePerformanceBaseline) productionSurfaces.batchStaticHousing();
 
   // Shallow viewing angles across the LED module grids and brushed maps
   // alias into shimmer without anisotropic sampling.
@@ -217,6 +340,8 @@ export async function createMainStageScene(engine: AbstractEngine) {
   // game has no NPCs): it is authentic infrastructure, not a character set.
   // Its solid body is the authored FOH row in createMainStageCollisionBlockers.
   const soundBooth = createSoundBooth(scene);
+  const boothFloor= soundBooth.meshes.find(mesh=>mesh.name==='sound-booth-deck');
+  if(boothFloor)stageAssets.collisionMeshes.push(boothFloor);
 
   // The visible venue boundary. The envelope blockers that close the walkable
   // field are invisible boxes, so players walk into nothing and stop; this
@@ -241,6 +366,13 @@ export async function createMainStageScene(engine: AbstractEngine) {
   const vipSkydeck = createVipSkydeck(scene);
   const wingBridge = createWingBridge(scene);
   stageAssets.collisionMeshes.push(...vipSkydeck.walkableMeshes, ...wingBridge.walkableMeshes);
+  // These static additions are created after the imported venue's batching pass.
+  // Keep their floor surfaces intact for the player and camera collision rays.
+  if (!venuePerformanceBaseline) {
+    batchStaticPropMeshes(soundBooth.meshes, soundBooth.root);
+    batchStaticPropMeshes(vipSkydeck.meshes, vipSkydeck.root);
+    batchStaticPropMeshes(wingBridge.meshes, wingBridge.root);
+  }
 
   // The general lighting show runs continuously (per the venue docs: an
   // ambient show is always on; the completion celebration layers the special
@@ -280,7 +412,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
   let remotePlayerCollisionSource: (() => readonly RemotePlayerCollisionTarget[]) | undefined;
 
   const playerController = createPlayerController({
-    avatarRoot: reviewAvatar.root,
+    get avatarRoot() { return reviewAvatar.root; },
     camera: cameraRig.camera,
     collisionMeshes: stageAssets.collisionMeshes,
     getRemotePlayerCollisionTargets: () => remotePlayerCollisionSource?.() ?? [],
@@ -288,6 +420,27 @@ export async function createMainStageScene(engine: AbstractEngine) {
     ladders,
     playerRig,
     solidCollisionMeshes: stageAssets.solidCollisionMeshes,
+  });
+  const localAppearance = createLocalAvatarAppearance({
+    initial: reviewAvatar,
+    lockedPreview: avatarPreviewLocked,
+    launchCharacters: !avatarPreviewLocked,
+    load: character => character ? loadLocalComplete(character) : createReviewAvatar(scene),
+    loadDetail: localCompleteAssets ? (character, detail) => localCompleteAssets.create(character, detail) : undefined,
+    commit(avatar, definition, replaced) {
+      if (replaced) {
+        avatarReviewLighting?.dispose();
+        avatarReviewLighting = undefined;
+        const visibility = reviewAvatar.meshes[0]?.visibility ?? 1;
+        for (const mesh of avatar.meshes) mesh.visibility = visibility;
+        reviewAvatar = avatar;
+        if (explicitComplete) avatarReviewLighting = createAvatarReviewLighting(scene, avatar.meshes,
+          [lightingRig.hemi, lightingRig.key, lightingRig.rim, lightingRig.fill], true);
+        avatar.animate(avatarElapsedSeconds, playerController.animationState, playerRig.crouched);
+      }
+      localAvatarDefinition = definition;
+      playerRig.setHeightInches(definition.heightInches);
+    },
   });
   const routeProgress = createMainStageRouteProgress(MAIN_STAGE_REVIEW_ROUTE);
   const completionCelebration = createCompletionCelebration(scene);
@@ -299,25 +452,18 @@ export async function createMainStageScene(engine: AbstractEngine) {
   let lastCameraPointerY = 0;
   const handleCameraWheel = (event: WheelEvent) => {
     event.preventDefault();
-    if (event.ctrlKey) {
-      // macOS synthesizes a trackpad pinch as wheel + ctrlKey. deltaY > 0 is
-      // fingers together (zoom out, larger distance); preventDefault also
-      // stops the browser's page zoom.
-      cameraRig.zoom(event.deltaY * TRACKPAD_CAMERA_ZOOM_RATE * cameraRig.camera.radius);
-      return;
-    }
-
-    cameraRig.orbit(
-      event.deltaX * TRACKPAD_CAMERA_YAW_SENSITIVITY,
-      event.deltaY * TRACKPAD_CAMERA_PITCH_SENSITIVITY,
-    );
+    const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1);
+    const rate = event.ctrlKey ? PINCH_CAMERA_ZOOM_RATE : WHEEL_CAMERA_ZOOM_RATE;
+    const factor = Math.exp(Math.max(-0.8, Math.min(0.8, pixels * rate)));
+    cameraRig.zoom(cameraRig.camera.radius * (factor - 1));
   };
   const handleCameraPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 && event.button !== 2) {
       return;
     }
 
     event.preventDefault();
+    canvas?.focus({ preventScroll: true });
     activeCameraPointerId = event.pointerId;
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
@@ -349,7 +495,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
     }
   };
 
+  const handleCameraContextMenu = (event: Event) => event.preventDefault();
   if (canvas) {
+    canvas.tabIndex = 0;
+    canvas.addEventListener('contextmenu', handleCameraContextMenu);
     canvas.style.touchAction = 'none';
     canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
     canvas.addEventListener('pointerdown', handleCameraPointerDown);
@@ -360,13 +509,16 @@ export async function createMainStageScene(engine: AbstractEngine) {
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+    const localDetail = scene.metadata?.localAvatarDetailBaseline ? 0 : resolveLocalAvatarDetail(
+      Vector3.Distance(cameraRig.camera.globalPosition, playerRig.root.position), localAppearance.detail);
+    localAppearance.updateDetail(localDetail);
     playerController.step(deltaSeconds);
     // After the move: a guest who just walked into the VIP wall gets the log
     // in / sign up popup this frame, and a pending re-lock (logout) closes
     // the gate as soon as the player is back on the public side.
     vipGate.step(playerRig.root.position);
     avatarElapsedSeconds += deltaSeconds;
-    reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState);
+    reviewAvatar.animate(avatarElapsedSeconds, playerController.animationState, playerRig.crouched);
     routeProgress.step(playerRig.root.position);
     if (routeProgress.complete && !wasRouteComplete) {
       // false -> true: the player just reached the final checkpoint.
@@ -381,7 +533,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       cameraRig.settleFocus(FOCUS_SETTLE_STRENGTH);
     }
     const zoomState = cameraRig.syncZoomState();
-    const avatarVisibility = zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
+    const avatarVisibility = playerController.operating || zoomState.mode === 'first_person' ? 0 : zoomState.shoulderOpacity;
     for (const mesh of reviewAvatar.meshes) {
       mesh.visibility = avatarVisibility;
     }
@@ -395,7 +547,10 @@ export async function createMainStageScene(engine: AbstractEngine) {
       cameraRig,
       lightingRig,
       presentationRig,
-      reviewAvatar,
+      get reviewAvatar() { return reviewAvatar; },
+      restoreAvatarLoadout: localAppearance.apply,
+      subscribeAvatarChanged: localAppearance.subscribe,
+      avatarPreviewLocked,
       stageAssets,
       input,
       playerRig,
@@ -419,7 +574,7 @@ export async function createMainStageScene(engine: AbstractEngine) {
       },
       /** The outgoing world loadout for this player (sec 6.2 sync). */
       get avatarLoadout() {
-        return serializeAvatarLoadout(localAvatarDefinition);
+        return serializeRenderedAvatarLoadout(reviewAvatar, localAvatarDefinition);
       },
       setAvatarDefinition,
       productionSurfaces,
@@ -440,12 +595,16 @@ export async function createMainStageScene(engine: AbstractEngine) {
   };
 
   scene.onDisposeObservable.add(() => {
+    localAppearance.dispose();
+    localCompleteAssets?.dispose();
+    avatarReviewLighting?.dispose();
     completionCelebration.dispose();
     soundBooth.dispose();
     venuePerimeter.dispose();
     cascadeCourtPaving.dispose();
     vipSkydeck.dispose();
     wingBridge.dispose();
+    canvas?.removeEventListener('contextmenu', handleCameraContextMenu);
     canvas?.removeEventListener('wheel', handleCameraWheel);
     canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
     canvas?.removeEventListener('pointermove', handleCameraPointerMove);

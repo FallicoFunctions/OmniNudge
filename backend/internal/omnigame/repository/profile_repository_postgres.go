@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,6 +29,21 @@ func (r *PostgresProfileRepository) GetProfile(ctx context.Context, userID int) 
 }
 
 func (r *PostgresProfileRepository) UpsertProfileBySubject(ctx context.Context, profile model.OmniRaveProfile) error {
+	return r.writeProfile(ctx, profile, "")
+}
+
+// UpdateProfileField writes one field of an account resident's profile.
+func (r *PostgresProfileRepository) UpdateProfileField(ctx context.Context, profile model.OmniRaveProfile, field ProfileField) error {
+	if !validProfileField(field) {
+		return fmt.Errorf("invalid profile field")
+	}
+	profile.Subject = accountSubject(profile.UserID)
+	return r.writeProfile(ctx, profile, field)
+}
+
+// writeProfile writes every field when field is empty, and only that field
+// otherwise.
+func (r *PostgresProfileRepository) writeProfile(ctx context.Context, profile model.OmniRaveProfile, field ProfileField) error {
 	// Read as given, not through ResolvedSubject. That fallback derives an
 	// account subject from UserID, which is a safe thing to do when reading a
 	// profile written before the field existed and an unsafe one here: a
@@ -71,12 +87,12 @@ func (r *PostgresProfileRepository) UpsertProfileBySubject(ctx context.Context, 
 		VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7)
 		ON CONFLICT (subject_kind, subject_id) DO UPDATE
 		SET user_id = EXCLUDED.user_id,
-		    loadout = EXCLUDED.loadout,
-		    return_point = EXCLUDED.return_point,
-		    settings = EXCLUDED.settings,
-		    last_venue = EXCLUDED.last_venue,
+		    loadout = CASE WHEN $8 IN ('', 'loadout') THEN EXCLUDED.loadout ELSE omnirave_profiles.loadout END,
+		    return_point = CASE WHEN $8 IN ('', 'return_point') THEN EXCLUDED.return_point ELSE omnirave_profiles.return_point END,
+		    settings = CASE WHEN $8 IN ('', 'settings') THEN EXCLUDED.settings ELSE omnirave_profiles.settings END,
+		    last_venue = CASE WHEN $8 IN ('', 'last_venue') THEN EXCLUDED.last_venue ELSE omnirave_profiles.last_venue END,
 		    updated_at = now()
-	`, string(subject.Kind), subject.ID, userID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue)
+	`, string(subject.Kind), subject.ID, userID, string(loadoutJSON), nullableJSONB(returnPointJSON), string(settingsJSON), profile.LastVenue, string(field))
 	return err
 }
 

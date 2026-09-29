@@ -1,4 +1,5 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { scopeMaterialDirtyChecks } from './scopeMaterialDirtyChecks';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { ParticleSystem } from '@babylonjs/core/Particles/particleSystem.js';
@@ -166,6 +167,7 @@ function tryCreateSoftDotSprite(scene: Scene): RawTexture | null {
 // Self-lit glow material per the venue's proven PBR recipe.
 function createGlowMaterial(scene: Scene, name: string, color: Color3, intensity: number): PBRMaterial {
   const material = new PBRMaterial(name, scene);
+  scopeMaterialDirtyChecks(material);
   material.emissiveColor = color;
   material.emissiveIntensity = intensity;
   material.albedoColor = new Color3(0, 0, 0);

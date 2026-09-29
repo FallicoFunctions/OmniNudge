@@ -1,0 +1,79 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -9,12 +9,14 @@
+ fields fade before the lip border, ears and eye attachments.
+ The nasal tip and alar wings share a local skin field; the lip shoulders taper
+ into the mouth corners without moving the mouth interior independently.
++The nasal bridge recedes through the central skin, while medial cheek volume
++fades before the eyelid and lash attachments and the upper lip border.
+ Eyeballs, irises, ears, hair roots and accessories keep their geometry. The iris shader receives a warm-brown tint without changing its image. Origins, topology, UVs and skin weights stay intact.
+ """
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 8,
++    'version': 9,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -50,6 +52,13 @@
+     'eyeCenterX': .02827054, 'eyeCenterZ': 1.6091883,
+     'eyeHalfWidth': .026, 'eyeHalfHeight': .018,
+     'eyeOpeningCompress': .10, 'upperLidLower': .00035,
++    'bridgeCenterZ': 1.594, 'bridgeHalfHeight': .014,
++    'bridgeHalfWidth': .014, 'bridgeFrontY': -.103, 'bridgeFrontSpan': .032,
++    'bridgeRecess': .0018,
++    'innerCheekCenterX': .024, 'innerCheekHalfWidth': .015,
++    'innerCheekCenterZ': 1.579, 'innerCheekHalfHeight': .016,
++    'innerCheekFrontY': -.075, 'innerCheekFrontSpan': .045,
++    'innerCheekFullness': .0015,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+@@ -159,6 +168,14 @@
+         orbital *= smooth((-.101-p[:, 1])/.018)
+         upper = smooth((p[:, 2]-spec['eyeCenterZ'])/.005)
+         q[:, 2] -= (spec['eyeOpeningCompress']*(p[:, 2]-spec['eyeCenterZ'])+spec['upperLidLower']*upper)*orbital
++    if spec['version'] >= 9:
++        bridge = 1-smooth(abs(p[:, 0])/spec['bridgeHalfWidth'])
++        bridge *= 1-smooth(abs(p[:, 2]-spec['bridgeCenterZ'])/spec['bridgeHalfHeight'])
++        bridge *= smooth((spec['bridgeFrontY']-p[:, 1])/spec['bridgeFrontSpan'])
++        medial = 1-smooth(abs(abs(p[:, 0])-spec['innerCheekCenterX'])/spec['innerCheekHalfWidth'])
++        medial *= 1-smooth(abs(p[:, 2]-spec['innerCheekCenterZ'])/spec['innerCheekHalfHeight'])
++        medial *= smooth((spec['innerCheekFrontY']-p[:, 1])/spec['innerCheekFrontSpan'])
++        q[:, 1] += spec['bridgeRecess']*bridge-spec['innerCheekFullness']*medial
+     return q
+ 
+ 
+@@ -195,7 +212,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, fuller lower cheeks, shorter rounded chin and softened mandibular corners, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, fuller lip volume with a clearer central upper curve and relaxed corners, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower and medial cheeks, shorter rounded chin and softened mandibular corners, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, eased nasal bridge and reduced tip projection and wing width, fuller lip volume with a clearer central upper curve and relaxed corners, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -58,6 +58,11 @@
+     const upper=smooth((z-s.eyeCenterZ)/.005);
+     q[1]-=(s.eyeOpeningCompress*(z-s.eyeCenterZ)+s.upperLidLower*upper)*orbital;
+   }
++  if(s.version>=9) {
++    const bridge=(1-smooth(Math.abs(x)/s.bridgeHalfWidth))*(1-smooth(Math.abs(z-s.bridgeCenterZ)/s.bridgeHalfHeight))*smooth((s.bridgeFrontY-y)/s.bridgeFrontSpan);
++    const medial=(1-smooth(Math.abs(Math.abs(x)-s.innerCheekCenterX)/s.innerCheekHalfWidth))*(1-smooth(Math.abs(z-s.innerCheekCenterZ)/s.innerCheekHalfHeight))*smooth((s.innerCheekFrontY-y)/s.innerCheekFrontSpan);
++    q[2]-=s.bridgeRecess*bridge-s.innerCheekFullness*medial;
++  }
+   return q;
+ }
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+@@ -71,7 +76,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4,5,6,7,8].includes(record.spec.version));
++  assert([1,2,3,4,5,6,7,8,9].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

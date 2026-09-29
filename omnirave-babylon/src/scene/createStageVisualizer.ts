@@ -885,6 +885,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   // True only while the fireworks VideoTexture is actually backing the
   // screen this frame; exposed as a primitive via isFireworksVideoActive.
   let fireworksVideoActive = false;
+  let paintedBackingKey: string | undefined;
 
   function paintBacking(): void {
     // §13.3.1 fireworks video takes over the material's texture entirely
@@ -913,6 +914,22 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     if (!ctx || !offCtx || !offscreen || !texture) {
       return;
     }
+    // The 3D spectrum keeps moving independently. Its backing is often an
+    // identical solid fill or fully visible title for many consecutive frames.
+    // Keep those exact pixels on the GPU until the canvas content changes.
+    let backingKey: string | undefined;
+    if (mode !== 'lead_in' && mode !== 'active') {
+      if (titleCardRemaining > 0) {
+        if (titleCardRemaining >= TITLE_CARD_FADE_SECONDS && titleCardRemaining <= TITLE_CARD_SECONDS - TITLE_CARD_FADE_SECONDS) {
+          backingKey = JSON.stringify(['title', trackArtist, trackTitle]);
+        }
+      } else {
+        const cycle = elapsed % LOGO_PERIOD_SECONDS;
+        if (cycle >= LOGO_VISIBLE_SECONDS) backingKey = 'normal:blank';
+        else if (cycle >= LOGO_FADE_SECONDS && cycle <= LOGO_VISIBLE_SECONDS - LOGO_FADE_SECONDS) backingKey = 'normal:wordmark';
+      }
+    }
+    if (backingKey !== undefined && backingKey === paintedBackingKey) return;
     // Text with handedness (wordmark, countdown digits) is the known
     // DynamicTexture-on-a-plane mirroring gotcha. Pattern per
     // createWayfindingSigns: draw normally on an OFFSCREEN canvas, then blit
@@ -944,6 +961,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     // Default update() (invertY) is the call that actually uploads live
     // per-frame edits to the GPU.
     texture.update();
+    paintedBackingKey = backingKey;
   }
 
   return {

@@ -1,0 +1,59 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -14,15 +14,15 @@
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 7,
++    'version': 8,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+     'mouthCenterZ': 1.5430644, 'mouthHalfHeight': .025,
+     'mouthHalfWidth': .047, 'mouthFrontY': -.121,
+-    'mouthFrontSpan': .016, 'mouthCompress': .34,
++    'mouthFrontSpan': .016, 'mouthCompress': .25,
+     'mouthRecess': .0025,
+-    'mouthWiden': .24, 'cornerLift': .0004,
++    'mouthWiden': .24, 'cornerLift': .0010,
+     'cornerX': .022, 'cornerHalfWidth': .016, 'cornerHalfHeight': .015,
+     'smileScale': .55,
+     'jawAngleTaper': .125,
+@@ -38,7 +38,7 @@
+     'noseRecess': .0022, 'noseTaper': .05,
+     'outerEyeLift': .0013,
+     'innerBrowLift': .0040, 'browArchRelax': .0012,
+-    'cupidDip': .00085, 'cupidPeak': .00030, 'upperLipRecess': .0009,
++    'cupidDip': .00115, 'cupidPeak': .00055, 'upperLipRecess': .0009,
+     'buccalCenterX': .045, 'buccalHalfWidth': .024,
+     'buccalCenterZ': 1.559, 'buccalHalfHeight': .034,
+     'buccalSideFullness': .0020, 'buccalFrontFullness': .0024,
+@@ -46,7 +46,7 @@
+     'chinCornerLift': .0033,
+     'noseTipRecess': .0016, 'noseTipLift': .0011, 'noseWingInset': .0010,
+     'lipShoulderCompress': .12, 'lipShoulderRecess': .0008,
+-    'upperLipBalanceRecess': .0009, 'lowerLipBalanceRecess': .0005,
++    'upperLipBalanceRecess': .0005, 'lowerLipBalanceRecess': -.0006,
+     'eyeCenterX': .02827054, 'eyeCenterZ': 1.6091883,
+     'eyeHalfWidth': .026, 'eyeHalfHeight': .018,
+     'eyeOpeningCompress': .10, 'upperLidLower': .00035,
+@@ -195,7 +195,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, fuller lower cheeks, shorter rounded chin and softened mandibular corners, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower cheeks, shorter rounded chin and softened mandibular corners, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, fuller lip volume with a clearer central upper curve and relaxed corners, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -71,7 +71,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4,5,6,7].includes(record.spec.version));
++  assert([1,2,3,4,5,6,7,8].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

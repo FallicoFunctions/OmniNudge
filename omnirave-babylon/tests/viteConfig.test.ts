@@ -22,9 +22,11 @@ describe('vite config', () => {
     expect(configSource).toContain('chunkSizeWarningLimit: 2300');
     expect(bootstrapSource).not.toContain("import { createRuntime } from './createRuntime'");
     expect(bootstrapSource).toContain("import('./createRuntime')");
-    // The festival avatar is fully procedural (MeshBuilder + colorways);
-    // it must not pull any glTF loader into the eager chunk at all.
-    expect(avatarSource).not.toContain('@babylonjs/loaders');
+    // The authored modular avatar legitimately registers its glTF extension.
+    // createReviewAvatar is reached through createMainStageScene, which stays
+    // behind createRuntime's application-level dynamic import below, so the
+    // loader remains in the lazy scene/avatar chunk rather than bootstrap.
+    expect(avatarSource).toContain('@babylonjs/loaders/glTF/2.0/Extensions/EXT_texture_webp.js');
     expect(runtimeSource).not.toContain("import { createMainStageScene } from '../scene/createMainStageScene'");
     expect(runtimeSource).toContain("import('../scene/createMainStageScene')");
   });

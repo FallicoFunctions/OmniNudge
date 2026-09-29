@@ -17,6 +17,7 @@ interface AvatarMaterialMetadata {
   avatarBaseMaterial?: Material;
   avatarColorwayMaterials?: Record<string, Material>;
   avatarColorRole?: 'accent' | 'emissive' | 'primary';
+  avatarPreserveMaterial?: boolean;
 }
 
 export const USER_AVATAR_COLORWAYS: readonly AvatarColorway[] = [
@@ -52,6 +53,12 @@ export function applyAvatarColorway(avatar: ReviewAvatar, colorwayId: string) {
     }
 
     const metadata = (mesh.metadata ?? {}) as AvatarMaterialMetadata;
+    // Authored eyes, brows, lashes, jewelry, and other baked-detail surfaces
+    // are not palette swatches. Recoloring them destroys the texture/material
+    // separation that makes the imported character readable in the venue.
+    if (metadata.avatarPreserveMaterial) {
+      continue;
+    }
     const baseMaterial = metadata.avatarBaseMaterial ?? mesh.material;
     const colorwayMaterials = metadata.avatarColorwayMaterials ?? {};
     let material = colorwayMaterials[colorway.id];

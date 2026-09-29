@@ -15,6 +15,10 @@ import '@babylonjs/core/Shaders/particles.fragment';
 import '@babylonjs/core/Shaders/particles.vertex';
 import '@babylonjs/core/Shaders/pbr.fragment';
 import '@babylonjs/core/Shaders/pbr.vertex';
+// Asset-container cloning may briefly request the scene's StandardMaterial.
+// Register it before any clone can fall back to fetching a .fx file.
+import '@babylonjs/core/Shaders/default.vertex.js';
+import '@babylonjs/core/Shaders/default.fragment.js';
 import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import {
   ADAPTIVE_RESOLUTION_DEFAULTS,
@@ -25,8 +29,20 @@ import {
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
-import { generateAvatarDefinition, hasAvatarLoadout, parseAvatarLoadout, serializeAvatarLoadout } from '../player/avatarDefinition';
+import {
+  DEFAULT_AVATAR_DEFINITION,
+  FEMALE_V2_PREVIEW_DEFINITION,
+  hasAvatarLoadout,
+  MALE_V2_PREVIEW_DEFINITION,
+  parseAvatarLoadout,
+  serializeAvatarLoadout,
+  type AvatarDefinition,
+} from '../player/avatarDefinition';
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
+import { normalizeLaunchAvatarLoadout, parseCompleteAvatarLoadout, readGuestCharacter, saveGuestCharacter, serializeRenderedAvatarLoadout } from '../player/completeAvatarLoadout';
+import { createInitialWorldSpawn } from '../network/initialWorldSpawn';
+import { createInitialWorldAppearance } from '../network/initialWorldAppearance';
+import { createAvatarProfileSaver } from '../network/avatarProfileSave';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
 import type { StageEventStateInput } from '../scene/createStageVisualizer';
 import { createDebugPanel } from '../ui/createDebugPanel';
@@ -55,6 +71,22 @@ import { RUNTIME_CONFIG } from './runtimeConfig';
 // server can drive the scene without a world backend. It is not a mode players
 // can be in, and nothing about it should be described as a product feature.
 type RuntimeEngine = Engine | WebGPUEngine;
+
+const LEAN_PREVIEW_AVATAR_DEFINITION = Object.freeze({
+  ...DEFAULT_AVATAR_DEFINITION,
+  bodyBase: 'male',
+  // These are the closest authored counterparts to the protected male review
+  // look: the swept bob reads like its side-part, and the closed black shoe
+  // asset is a better starter than MPFB shoes03 (an open sandal despite the
+  // historical `work-boots` catalog label).
+  // Keep the lean male review visibly sex-consistent; the body morph and the
+  // fitted wardrobe remain unchanged.
+  hairStyle: 'textured-crop',
+  top: 'ribbed-tank',
+  jacket: 'utility-vest',
+  bottoms: 'cargo-pants',
+  shoes: 'skate-sneakers',
+}) satisfies AvatarDefinition;
 
 declare global {
   interface Window {
@@ -106,27 +138,49 @@ function createWebGlEngine(canvas: HTMLCanvasElement) {
   });
 }
 
-async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolean): Promise<RuntimeEngine> {
+async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolean,
+  replaceCanvas: () => HTMLCanvasElement,
+  { profileGpu, backbufferAntialias }: { profileGpu: boolean; backbufferAntialias: boolean }): Promise<RuntimeEngine> {
   if (!forceWebGl) {
     let webgpu: WebGPUEngine | undefined;
-
+    let abandoned = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const releaseWebgpu = () => {
+      try { webgpu?.dispose(); } catch { /* A partially initialized device may not support full teardown yet. */ }
+    };
     try {
-      if (await WebGPUEngine.IsSupportedAsync) {
-        webgpu = new WebGPUEngine(canvas, {
-          adaptToDeviceRatio: true,
-          antialias: true,
+      const attempt = (async () => {
+        if (!(await WebGPUEngine.IsSupportedAsync) || abandoned) return undefined;
+        webgpu = new WebGPUEngine(canvas, { adaptToDeviceRatio: true, antialias: backbufferAntialias,
+          // Babylon filters unavailable features before requesting the device.
+          ...(profileGpu ? { deviceDescriptor: { requiredFeatures: ['timestamp-query'] } } : {}),
         });
-        await webgpu.initAsync();
-        return webgpu;
-      }
+        try {
+          await webgpu.initAsync();
+          // Render targets allocate their pass counters at creation, before
+          // the benchmark panel exists. Opt in only for local GPU diagnosis.
+          if (!abandoned && profileGpu && webgpu.getCaps().timerQuery) webgpu.enableGPUTimingMeasurements = true;
+          return abandoned ? undefined : webgpu;
+        } finally {
+          // A request that resolves after the deadline must release its late
+          // device instead of taking ownership back from the WebGL engine.
+          if (abandoned) releaseWebgpu();
+        }
+      })();
+      const supported = await Promise.race([
+        attempt,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('WebGPU initialization timed out')), 10_000);
+        }),
+      ]);
+      if (supported) return supported;
     } catch {
-      // A rejected adapter/device request must not leave a partial WebGPU
-      // engine alive or prevent the supported WebGL fallback from booting.
-      try {
-        webgpu?.dispose();
-      } catch {
-        // Continue to WebGL even if the failed engine cannot finish teardown.
-      }
+      abandoned = true;
+      releaseWebgpu();
+      // A canvas that has acquired a WebGPU context cannot acquire WebGL.
+      canvas = replaceCanvas();
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
     }
   }
 
@@ -134,7 +188,7 @@ async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolea
 }
 
 export async function createRuntime(host: HTMLElement) {
-  const canvas = document.createElement('canvas');
+  let canvas = document.createElement('canvas');
   canvas.id = RUNTIME_CONFIG.defaultCanvasId;
   canvas.dataset.testid = RUNTIME_CONFIG.defaultCanvasId;
   canvas.className = 'babylon-render-canvas';
@@ -146,6 +200,9 @@ export async function createRuntime(host: HTMLElement) {
   // remains the automatic fallback, and ?perf=webgl forces it for
   // debugging comparisons.
   const perfFlags = parsePerfFlags(window.location.search);
+  const localDebugParams = perfFlags.debug && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? new URLSearchParams(window.location.search) : null;
+  const showDebugChrome = perfFlags.debug && localDebugParams?.get('benchmarkUi') !== 'player';
   host.classList.toggle('babylon-runtime-host--capture', perfFlags.capture);
   // The real launch flow (backend's SessionService.BuildLaunchURL) redirects
   // here with `?mode=<account|guest>&handoff=<one-time token>`, NOT a world
@@ -167,9 +224,10 @@ export async function createRuntime(host: HTMLElement) {
     ? 'account'
     : 'guest';
   // An SSO'd account's saved appearance, when the handoff carried one - see
-  // its use below at localAvatarDefinition, which applies this instead of
-  // generating a random guest look when present.
+  // its use below at launchLoadout, before the scene loads its local body.
   let resolvedAccountLoadout: Record<string, string> | undefined;
+  let resolvedProfileToken: string | undefined;
+  let resolvedProfilePlayerId: string | undefined;
   if (!resolvedWorldUrl || !resolvedWorldToken) {
     const exchangeParams = parseSessionExchangeParams(window.location.search);
     if (exchangeParams) {
@@ -181,20 +239,27 @@ export async function createRuntime(host: HTMLElement) {
         // Sign Up prompt for an identity they already have.
         resolvedSessionMode = exchanged.mode === 'account' ? 'account' : 'guest';
         resolvedAccountLoadout = exchanged.loadout;
+        resolvedProfileToken = exchanged.mode === 'account' ? exchanged.sessionToken : undefined;
+        resolvedProfilePlayerId = exchanged.mode === 'account' ? exchanged.playerId : undefined;
       } else {
         console.warn('[world] session exchange failed; continuing without a world connection');
       }
     }
   }
-  // The local player's current serialized appearance - starts as the guest's
-  // randomly generated one (see localAvatarDefinition below) and is
+  // The local player's current serialized appearance starts with the launch
+  // character (see launchLoadout below) and is
   // reassigned in place by applySessionUpgrade on login/signup/logout, so the
-  // world socket's onStatusChange('open') handler always (re)publishes
-  // whichever loadout is current, including across an in-place reconnect.
+  // first authoritative snapshot publishes the rendered look after restoration,
+  // including across an in-place reconnect.
   let localAvatarLoadout: Record<string, string> = {};
+  let unsubscribeCompleteWardrobe: (() => void) | undefined;
+  let unsubscribeAvatarChanged: (() => void) | undefined;
+  let worldAppearance: ReturnType<typeof createInitialWorldAppearance> | undefined;
+  let avatarProfileSaver: ReturnType<typeof createAvatarProfileSaver> | undefined;
   let engine: RuntimeEngine | undefined;
   let hud: HTMLElement | undefined;
   let perfOverlay: HTMLElement | undefined;
+  let venuePerformance: ReturnType<typeof import('./createVenuePerformancePanel').createVenuePerformancePanel> | undefined;
   let debugPanel: HTMLElement | undefined;
   let loadingOverlay: HTMLElement | undefined;
   // Assigned after the show modules exist. The review HUD is debug-only, and
@@ -236,6 +301,12 @@ export async function createRuntime(host: HTMLElement) {
       return;
     }
     disposed = true;
+    worldAppearance?.dispose();
+    avatarProfileSaver?.dispose();
+    resolvedProfileToken = undefined;
+    unsubscribeCompleteWardrobe?.();
+    unsubscribeCompleteWardrobe = undefined;
+    unsubscribeAvatarChanged?.(); unsubscribeAvatarChanged = undefined;
 
     if (engine && window.__OMNIRAVE_RUNTIME__?.engine === engine) {
       delete window.__OMNIRAVE_RUNTIME__;
@@ -247,6 +318,7 @@ export async function createRuntime(host: HTMLElement) {
       window.removeEventListener('resize', handleResize);
     }
     debugPanel?.remove();
+    venuePerformance?.dispose();
     perfOverlay?.remove();
     hud?.remove();
     loadingOverlay?.remove();
@@ -276,7 +348,19 @@ export async function createRuntime(host: HTMLElement) {
   };
 
   try {
-    engine = await createBabylonEngine(canvas, perfFlags.webgl);
+    loadingOverlay = createRuntimeLoadingOverlay(host);
+    engine = await createBabylonEngine(canvas, perfFlags.webgl, () => {
+      const replacement = canvas.cloneNode(false) as HTMLCanvasElement;
+      canvas.replaceWith(replacement);
+      canvas = replacement;
+      return replacement;
+    }, {
+      profileGpu: localDebugParams?.get('gpuProfile') === '1',
+      // The normal pipeline renders geometry into its own target and finishes
+      // with FXAA. Multisampling that final full-screen image adds a separate
+      // color/depth allocation and resolve without smoothing any geometry.
+      backbufferAntialias: perfFlags.noPost || localDebugParams?.get('backbufferMsaa') === '1',
+    });
     const activeEngine = engine;
 
     // Cap the effective render density: full retina (2x) quadruples the pixel
@@ -290,14 +374,16 @@ export async function createRuntime(host: HTMLElement) {
     }
 
     handleResize = () => {
+      if (venuePerformance?.isRunning()) return;
       activeEngine.resize();
     };
-    loadingOverlay = createRuntimeLoadingOverlay(host);
-
     // Keep the engine/bootstrap chunk small; scene construction brings in the
     // full Main Stage graph and can load behind the visible boot overlay.
     const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
-    const scene = await createScene(activeEngine);
+    const launchLoadout = normalizeLaunchAvatarLoadout(
+      resolvedSessionMode === 'account' || parseCompleteAvatarLoadout(resolvedAccountLoadout)
+        ? resolvedAccountLoadout : {}, readGuestCharacter());
+    const scene = await createScene(activeEngine, launchLoadout.cp as 'male' | 'female');
     const reviewRuntime = scene.metadata?.reviewRuntime;
     // Sec 8.2: ghosting starts on "first entry" - a fresh boot is exactly that.
     reviewRuntime?.playerController?.beginSpawnGhost?.();
@@ -310,22 +396,76 @@ export async function createRuntime(host: HTMLElement) {
     // in-game login falls back to when there is no socket to hot-swap).
     reviewRuntime?.vipGate?.setUnlocked?.(resolvedSessionMode === 'account');
 
-    // Sec 6.2: guests get a RANDOM GENERATED avatar, cannot edit it, and it is
-    // not persisted - so it is generated fresh here at boot and applied to the
-    // local body (which also applies sec 6.5's height effects to the rig).
-    // An SSO'd account player (arrived via the real omninudge.com handoff -
-    // see resolvedAccountLoadout above) gets their own saved appearance
-    // instead - they must see themselves as they saved themselves, not a
-    // random guest. The serialized form is the loadout other players would
-    // dress this ghost from, and is published below (once the world socket
-    // connects) via a "loadout" event so other players actually see it too.
-    const localAvatarDefinition = hasAvatarLoadout(resolvedAccountLoadout)
-      ? parseAvatarLoadout(resolvedAccountLoadout)
-      : generateAvatarDefinition();
+    // Normal gameplay uses the complete launch pair. Accounts restore their
+    // saved look; guests retain only their independent local character choice.
+    const avatarPreviewParams = new URLSearchParams(window.location.search);
+    const localAvatarPreview = window.location.hostname === 'localhost'
+      || window.location.hostname === '127.0.0.1';
+    const fashionPreviewMode = localAvatarPreview
+      && avatarPreviewParams.get('avatarFashion') === '1';
+    const editorialPreviewMode = localAvatarPreview
+      && !fashionPreviewMode
+      && avatarPreviewParams.get('avatarEditorial') === '1';
+    const leanPreviewMode = localAvatarPreview
+      && !fashionPreviewMode
+      && !editorialPreviewMode
+      && avatarPreviewParams.get('avatarLean') === '1';
+    const classicPreviewMode = localAvatarPreview
+      && !fashionPreviewMode
+      && !editorialPreviewMode
+      && !leanPreviewMode
+      && avatarPreviewParams.get('avatarClassic') === '1';
+    const avatarPreviewMode = localAvatarPreview
+      && (avatarPreviewParams.get('avatarPreview') === '1'
+        || ['male', 'female'].includes(avatarPreviewParams.get('avatarComplete') ?? '')
+        || avatarPreviewParams.get('avatarMaleV2') === '1'
+        || avatarPreviewParams.get('avatarFemaleV2') === '1'
+        || leanPreviewMode
+        || editorialPreviewMode
+        || fashionPreviewMode
+        || classicPreviewMode);
+    const maleV2PreviewMode = localAvatarPreview
+      && (avatarPreviewParams.get('avatarMaleV2') === '1' || avatarPreviewParams.get('avatarComplete') === 'male');
+    const femaleV2PreviewMode = localAvatarPreview
+      && !maleV2PreviewMode
+      && (avatarPreviewParams.get('avatarFemaleV2') === '1' || avatarPreviewParams.get('avatarComplete') === 'female');
+    const localAvatarDefinition = maleV2PreviewMode
+      ? MALE_V2_PREVIEW_DEFINITION
+      : femaleV2PreviewMode
+        ? FEMALE_V2_PREVIEW_DEFINITION
+        : leanPreviewMode || fashionPreviewMode || editorialPreviewMode
+          ? LEAN_PREVIEW_AVATAR_DEFINITION
+          : avatarPreviewMode
+            ? DEFAULT_AVATAR_DEFINITION
+            : parseAvatarLoadout(launchLoadout);
     reviewRuntime?.setAvatarDefinition?.(localAvatarDefinition);
-    localAvatarLoadout = hasAvatarLoadout(resolvedAccountLoadout)
-      ? (resolvedAccountLoadout as Record<string, string>)
-      : serializeAvatarLoadout(localAvatarDefinition);
+    if (avatarPreviewMode) {
+      // Local review framing for the first authored avatar. This is deliberately
+      // query-gated and localhost-only; normal guest generation and gameplay camera
+      // behavior remain unchanged.
+      reviewRuntime?.cameraRig?.applyCheckpointView?.({
+        // The authored GLB faces +Z.  The previous -PI/2 framing looked at
+        // the avatar's back in the review route, which made body comparisons
+        // misleading even though the asset itself was correct.
+        alpha: Math.PI / 2,
+        beta: 1.5,
+        // The authored full-body preview needs the same breathing room as the
+        // reference sheet; 2.15 cropped the legs and made the generic fallback
+        // read like a floating bust.
+        // The lean hierarchy is lifted into the stage by the authored import
+        // offset; give the review camera enough breathing room for both crown
+        // and footwear instead of cropping the head at the top edge.
+        radius: 2.80,
+        focusOffset: {
+          x: 0,
+          y: ['male', 'female'].includes(avatarPreviewParams.get('avatarComplete') ?? '') ? -0.80 : -0.25,
+          z: 0,
+        },
+      });
+    }
+    localAvatarLoadout = reviewRuntime?.avatarPreviewLocked
+      ? serializeAvatarLoadout(localAvatarDefinition) : launchLoadout;
+    if (resolvedAccountLoadout) await reviewRuntime?.restoreAvatarLoadout?.(localAvatarLoadout);
     scene.metadata = {
       ...scene.metadata,
       localAvatarLoadout,
@@ -341,8 +481,9 @@ export async function createRuntime(host: HTMLElement) {
     let completeBanner: HTMLElement | null = null;
     let pickReadout: HTMLOutputElement | null = null;
     let playerReadout: HTMLOutputElement | null = null;
+    let remoteAvatarReadout: HTMLOutputElement | null = null;
 
-    if (perfFlags.debug) {
+    if (showDebugChrome) {
       reviewHud = createReviewHud(host, {
         avatarColorways: reviewRuntime?.avatarColorways,
         checkpoints: reviewCheckpoints,
@@ -396,6 +537,7 @@ export async function createRuntime(host: HTMLElement) {
       completeBanner = reviewHud.querySelector<HTMLElement>('[data-review-complete]');
       pickReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="mesh-pick"]');
       playerReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="player-state"]');
+      remoteAvatarReadout = debugPanel.querySelector<HTMLOutputElement>('[data-debug-readout="remote-avatars"]');
 
       handleCanvasPick = (event: MouseEvent) => {
         if (!pickReadout) {
@@ -424,7 +566,7 @@ export async function createRuntime(host: HTMLElement) {
       cascadeCourtLightFloor?.dispose();
       hologramGrid?.dispose();
       stageAtmospherics?.dispose();
-      fireworksShow?.dispose();
+      showControls?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -434,6 +576,53 @@ export async function createRuntime(host: HTMLElement) {
     // outbound moves internally; the render loop just offers the freshest
     // position each frame.
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
+    let worldSpawnInitialized = false;
+    let restoringAppearance = false;
+    let appearanceRevision = 0;
+    let appearanceEditRevision = 0;
+    avatarProfileSaver = createAvatarProfileSaver();
+    avatarProfileSaver.setSession(reviewRuntime?.avatarPreviewLocked ? undefined : resolvedProfileToken);
+    resolvedProfileToken = undefined;
+    const publishRenderedLoadout = (send = true) => {
+      if (restoringAppearance || disposed) return;
+      const avatar = reviewRuntime?.reviewAvatar;
+      localAvatarLoadout = serializeRenderedAvatarLoadout(avatar, reviewRuntime?.avatarDefinition ?? parseAvatarLoadout(localAvatarLoadout), localAvatarLoadout);
+      scene.metadata = { ...scene.metadata, localAvatarLoadout };
+      if (send && worldAppearance?.ready) worldSocket?.sendLoadout(localAvatarLoadout);
+    };
+    const subscribeToWardrobe = () => {
+      unsubscribeCompleteWardrobe?.();
+      unsubscribeCompleteWardrobe = reviewRuntime?.reviewAvatar?.wardrobe?.subscribe(() => {
+        if (restoringAppearance || disposed) return;
+        appearanceEditRevision++;
+        publishRenderedLoadout();
+        avatarProfileSaver?.queue(localAvatarLoadout);
+      });
+    };
+    const restoreLocalAppearance = async (loadout: Record<string, string>): Promise<boolean> => {
+      const revision = ++appearanceRevision;
+      restoringAppearance = true;
+      unsubscribeCompleteWardrobe?.();
+      unsubscribeCompleteWardrobe = undefined;
+      localAvatarLoadout = reviewRuntime?.avatarPreviewLocked ? { ...loadout } : normalizeLaunchAvatarLoadout(loadout, readGuestCharacter());
+      let restored = true;
+      if (reviewRuntime?.restoreAvatarLoadout) restored = await reviewRuntime.restoreAvatarLoadout(localAvatarLoadout);
+      else reviewRuntime?.setAvatarDefinition?.(parseAvatarLoadout(localAvatarLoadout));
+      if (disposed || revision !== appearanceRevision) return false;
+      restoringAppearance = false;
+      topLeftControls?.setAvatarDefinition(reviewRuntime?.avatarDefinition ?? parseAvatarLoadout(localAvatarLoadout));
+      topLeftControls?.setCompleteWardrobe(reviewRuntime?.reviewAvatar?.wardrobe);
+      subscribeToWardrobe();
+      publishRenderedLoadout(false);
+      return restored;
+    };
+    publishRenderedLoadout(false);
+    subscribeToWardrobe();
+    unsubscribeAvatarChanged = reviewRuntime?.subscribeAvatarChanged?.(() => {
+      if (restoringAppearance || disposed) return;
+      topLeftControls?.setCompleteWardrobe(reviewRuntime?.reviewAvatar?.wardrobe);
+      subscribeToWardrobe();
+    });
     let remotePlayerRigs: import('../player/createRemotePlayerRigs').RemotePlayerRigs | undefined;
     // Sec 10.5: the local player gets above-head bubbles too - the doc's
     // "at respawn: player's own bubbles clear" only makes sense if they exist,
@@ -447,7 +636,8 @@ export async function createRuntime(host: HTMLElement) {
     let cascadeCourtLightFloor: import('../scene/createCascadeCourtLightFloor').CascadeCourtLightFloor | undefined;
     let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
-    let fireworksShow: import('../scene/createFireworksShow').FireworksShow | undefined;
+    let showControls: ReturnType<typeof import('../showControl/createShowControlRuntime').createShowControlRuntime> | undefined;
+    let latestShowSnapshot: import('../network/worldSocket').WorldSnapshot | undefined;
     let latestWorldEventState: StageEventStateInput | null = null;
     // Undefined follows the server. A concrete state is a debug-only local
     // preview override; it never mutates or broadcasts authoritative state.
@@ -460,7 +650,7 @@ export async function createRuntime(host: HTMLElement) {
       cascadeCourtLightFloor?.setEventState(eventState);
       hologramGrid?.setEventState(eventState);
       stageAtmospherics?.setEventState(eventState);
-      fireworksShow?.setEventState(eventState);
+      showControls?.setEventState(eventState);
     };
 
     applyFireworksPreview = (act) => {
@@ -470,7 +660,7 @@ export async function createRuntime(host: HTMLElement) {
       // The preview button click is a trusted player gesture, so it can also
       // satisfy autoplay policy in the no-world local review path.
       fireworksAudioUnlocked = true;
-      fireworksShow?.unlockAudio();
+      showControls?.unlockAudio();
       if (fireworksPreviewTimer !== undefined) {
         window.clearInterval(fireworksPreviewTimer);
         fireworksPreviewTimer = undefined;
@@ -561,7 +751,7 @@ export async function createRuntime(host: HTMLElement) {
           // see navigateToSession), so it is safe to read once here rather
           // than needing the setCanMute(true) upgrade path.
           canMute: resolvedSessionMode === 'account',
-          debugChromePresent: perfFlags.debug,
+          debugChromePresent: showDebugChrome,
         });
         const activeChatPanel = chatPanel;
         // Sec 10.5: the same message stream that fills the log drives the
@@ -569,7 +759,8 @@ export async function createRuntime(host: HTMLElement) {
         const localPlayerRoot = reviewRuntime?.playerRig?.root;
         if (localPlayerRoot) {
           const { createChatBubbleStack } = await import('../player/createChatBubbleStack');
-          localChatBubbles = createChatBubbleStack(scene, 'local', localPlayerRoot);
+          localChatBubbles = createChatBubbleStack(scene, 'local', localPlayerRoot,
+            reviewRuntime?.playerRig?.eyeHeightMeters ?? 1.65);
         }
         let localPlayerId = '';
         worldSocket.onChat((message) => {
@@ -599,7 +790,24 @@ export async function createRuntime(host: HTMLElement) {
         });
       }
 
+      const initializeWorldSpawn = createInitialWorldSpawn(reviewRuntime?.playerRig?.eyeHeightMeters ?? 1.65, position => {
+        reviewRuntime?.playerRig?.root.position.set(position.x, position.y, position.z);
+        const controller = reviewRuntime?.playerController;
+        if (controller) {
+          controller.verticalVelocityMetersPerSecond = 0;
+          controller.beginSpawnGhost();
+        }
+      });
+      worldAppearance = createInitialWorldAppearance({
+        sessionAppearanceRestored: Boolean(resolvedAccountLoadout),
+        restore: async loadout => { await restoreLocalAppearance(loadout); },
+        publish: () => publishRenderedLoadout(),
+      });
       worldSocket.onSnapshot((snapshot) => {
+        worldSpawnInitialized = initializeWorldSpawn(snapshot);
+        latestShowSnapshot=snapshot;
+        showControls?.applySnapshot(snapshot);
+        void worldAppearance?.snapshot(snapshot);
         remotePlayerRigs?.applySnapshot(snapshot);
         const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
         stageMediaPlayer?.applyMedia(activeMedia);
@@ -625,19 +833,11 @@ export async function createRuntime(host: HTMLElement) {
           : null;
         applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
       });
-      // Sec 6.2/6.5: publish the SAME loadout that was applied to the local
-      // render (the outer localAvatarLoadout variable) so other players'
-      // ghost of us matches what we see locally. Sent on every "open"
-      // transition - the initial connect AND every applySessionUpgrade
-      // reconnect - by READING the outer variable at fire time rather than
-      // closing over a snapshot of it, so a login/signup that reassigns it
-      // just before reconnecting publishes the new appearance, not the stale
-      // guest one this closure was created with.
+      // A direct launch's first snapshot carries its saved appearance. Restore
+      // it before publishing, so a generated body cannot overwrite it first.
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
-        if (status === 'open' && localAvatarLoadout) {
-          activeWorldSocket.sendLoadout(localAvatarLoadout);
-        }
+        worldAppearance?.status(status);
       });
       worldSocket.connect();
 
@@ -647,14 +847,14 @@ export async function createRuntime(host: HTMLElement) {
       enterOverlay = createEnterOmniRaveOverlay(host, () => {
         activeStageMediaPlayer.unlock();
         fireworksAudioUnlocked = true;
-        fireworksShow?.unlockAudio();
+        showControls?.unlockAudio();
         enterOverlay?.dispose();
         enterOverlay = undefined;
       });
 
       // DEV-ONLY audio scrubber + play/pause. Only in the world/music path and
       // only under ?debug=1 (same gate as the rest of the dev chrome).
-      if (perfFlags.debug) {
+      if (showDebugChrome) {
         const { createStageAudioDevControls } = await import('../ui/createStageAudioDevControls');
         stageAudioDevControls = createStageAudioDevControls(host, activeStageMediaPlayer);
       }
@@ -669,7 +869,7 @@ export async function createRuntime(host: HTMLElement) {
     {
       const { createPlayerHud, formatVenueName, resolvePlayerCounts } = await import('../ui/createPlayerHud');
       const hudMediaPlayer = stageMediaPlayer;
-      playerHud = createPlayerHud(host, { debugChromePresent: perfFlags.debug });
+      playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
         const counts = activePlayers ? resolvePlayerCounts(activePlayers, activeZoneId) : null;
         playerHud?.update({
@@ -828,10 +1028,50 @@ export async function createRuntime(host: HTMLElement) {
 
       topLeftControls = createTopLeftControls(host, {
         settingsPanel: settingsPopup.element,
+        avatarEditorEnabled: true,
+        characterSelection: reviewRuntime?.avatarPreviewLocked ? undefined : {
+          getSelected: () => reviewRuntime?.reviewAvatar?.root.metadata?.avatarCompleteCharacter,
+          async select(character) {
+            if (disposed || restoringAppearance) return false;
+            // Commit and publish only after the requested model finishes loading.
+            // Session restoration supersedes this request through appearanceRevision.
+            const applied = await restoreLocalAppearance({
+              ...localAvatarLoadout,
+              ...serializeAvatarLoadout(character === 'male' ? MALE_V2_PREVIEW_DEFINITION : FEMALE_V2_PREVIEW_DEFINITION),
+              cv: '1', cp: character, cw: '111111',
+            });
+            if (!applied || disposed) return false;
+            if (resolvedSessionMode === 'guest') saveGuestCharacter(character);
+            appearanceEditRevision++;
+            publishRenderedLoadout();
+            avatarProfileSaver?.queue(localAvatarLoadout);
+            return true;
+          },
+        },
+        completeWardrobe: reviewRuntime?.reviewAvatar?.wardrobe,
+        profileSave: reviewRuntime?.avatarPreviewLocked ? undefined : avatarProfileSaver,
+        onSignInToSave: () => authPopup?.open('login'),
         avatarColorways: reviewRuntime?.avatarColorways,
         selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
+        avatarDefinition: parseAvatarLoadout(localAvatarLoadout),
+        avatarOptionAvailability: reviewRuntime?.reviewAvatar?.slotOptions
+          ? Object.fromEntries(
+            [...reviewRuntime.reviewAvatar.slotOptions].map(([slot, slotOptions]) => [
+              slot,
+              [...slotOptions.keys()],
+            ]),
+          )
+          : undefined,
         onSelectAvatarColorway(colorway) {
           reviewRuntime?.setAvatarColorway?.(colorway.id);
+        },
+        onAvatarDefinitionChange(definition) {
+          appearanceEditRevision++;
+          const applied = reviewRuntime?.setAvatarDefinition?.(definition) ?? definition;
+          localAvatarLoadout = serializeRenderedAvatarLoadout(reviewRuntime?.reviewAvatar, applied, localAvatarLoadout);
+          scene.metadata = { ...scene.metadata, localAvatarLoadout };
+          if (worldAppearance?.ready) worldSocket?.sendLoadout(localAvatarLoadout);
+          avatarProfileSaver?.queue(localAvatarLoadout);
         },
         onPanelChange(panel) {
           if (panel === null) {
@@ -840,20 +1080,17 @@ export async function createRuntime(host: HTMLElement) {
           // Sec 11.2: a direct top-level UI action closes the welcome card and
           // then proceeds - the card never swallows the click.
           welcomeCard?.dismiss();
-          // Sec 12: guests keep the normal `Avatar` button, but clicking it
-          // "opens signup window immediately" instead of the editor, and
-          // "reopens on every click" - closing the panel here is what makes
-          // the next click a fresh open rather than a toggle-to-closed.
-          if (panel === 'avatar' && resolvedSessionMode === 'guest') {
+          // Historical prototype avatars retain their signup entry point.
+          if (panel === 'avatar' && resolvedSessionMode === 'guest' && !reviewRuntime?.reviewAvatar?.wardrobe) {
             topLeftControls?.openPanel(null);
             vipGateOpenedAuthPopup = false;
             authPopup?.open('signup');
           }
         },
-        debugChromePresent: perfFlags.debug,
+        debugChromePresent: showDebugChrome,
       });
 
-      hudNotice = createHudNotice(host, { debugChromePresent: perfFlags.debug });
+      hudNotice = createHudNotice(host, { debugChromePresent: showDebugChrome });
 
       // backend/internal/omnigame/api/handlers/runtime_auth_handler.go's
       // login/signup/logout endpoints all return the same session-exchange
@@ -862,12 +1099,17 @@ export async function createRuntime(host: HTMLElement) {
       // applySessionUpgrade instead hot-swaps in place: worldSocket.reconnect
       // keeps every chat/media/remote-player listener already registered
       // (see that method's own comment), and the local avatar mesh updates
-      // live via reviewRuntime.setAvatarDefinition, exactly like an avatar
-      // colorway change already does. currentVenue is the world server's own
+      // live via reviewRuntime.restoreAvatarLoadout before reconnecting.
+      // currentVenue is the world server's own
       // idea of "where you are right now" (activeZoneId, updated by every
       // snapshot below) so an account upgrade mid-session keeps the player in
       // the same venue rather than bouncing them back to main_stage.
-      const applySessionUpgrade = (session: import('../network/runtimeAuth').RuntimeAuthSession) => {
+      let sessionUpgradeRevision = 0;
+      let authActionRevision = 0;
+      const applySessionUpgrade = async (session: import('../network/runtimeAuth').RuntimeAuthSession) => {
+        const upgrade = ++sessionUpgradeRevision;
+        // No queued edit from the prior session may use this new credential.
+        avatarProfileSaver?.setSession(undefined);
         const nextMode: import('../ui/createTopRightControls').SessionMode =
           session.mode === 'account' ? 'account' : 'guest';
 
@@ -887,25 +1129,25 @@ export async function createRuntime(host: HTMLElement) {
           respawnPlayer();
         }
 
-        if (hasAvatarLoadout(session.loadout)) {
+        if (nextMode === 'account' && hasAvatarLoadout(session.loadout)) {
           // An existing account's saved appearance (or one just seeded from
           // this guest's own currentLoadout below, on a brand-new account).
           localAvatarLoadout = session.loadout;
         } else if (nextMode === 'guest') {
-          // Logout: back to an anonymous guest, so a fresh random look - sec
-          // 6.2's same "guests get a random generated avatar" rule the boot
-          // path above already applies.
-          localAvatarLoadout = serializeAvatarLoadout(generateAvatarDefinition());
+          // Keep the guest's own choice independent from the account just left.
+          localAvatarLoadout = normalizeLaunchAvatarLoadout({}, readGuestCharacter());
         }
-        reviewRuntime?.setAvatarDefinition?.(parseAvatarLoadout(localAvatarLoadout));
-        scene.metadata = { ...scene.metadata, localAvatarLoadout };
+        await restoreLocalAppearance(localAvatarLoadout);
+        if (disposed || upgrade !== sessionUpgradeRevision) return false;
+        avatarProfileSaver?.setSession(nextMode === 'account' && !reviewRuntime?.avatarPreviewLocked ? session.sessionToken : undefined);
+        resolvedProfilePlayerId = nextMode === 'account' ? session.playerId : undefined;
 
         if (!worldSocket) {
           // No world connection to hot-swap (dev/review scaffold - see the
           // module banner comment): nothing here to reconnect in place, so
           // fall back to the reload every other boot path already handles.
           navigateToSession(session);
-          return;
+          return false;
         }
         worldSocket.reconnect(session.worldSocketUrl, session.worldSessionToken);
         // Sec 11.2: "top-right auth controls update immediately to `Logout`".
@@ -927,6 +1169,7 @@ export async function createRuntime(host: HTMLElement) {
           // Sign Up, plus the new guest name and look.
           welcomeCard?.dismiss();
         }
+        return true;
       };
 
       authPopup = createAuthPopup({
@@ -938,7 +1181,13 @@ export async function createRuntime(host: HTMLElement) {
           vipGateOpenedAuthPopup = false;
         },
         async onSubmit(mode, fields) {
+          const action = ++authActionRevision;
           try {
+            await avatarProfileSaver?.flush();
+            if (disposed || action !== authActionRevision) return { ok: false, message: 'This session has changed.' };
+            const previousAccount = resolvedProfilePlayerId;
+            const pendingAtRequest = avatarProfileSaver?.getPendingLoadout();
+            const editsAtRequest = appearanceEditRevision;
             const session =
               mode === 'login'
                 ? await runtimeLogin({
@@ -956,7 +1205,17 @@ export async function createRuntime(host: HTMLElement) {
                     currentVenue: activeZoneId,
                     currentLoadout: localAvatarLoadout,
                   });
-            applySessionUpgrade(session);
+            if (disposed || action !== authActionRevision) return { ok: false, message: 'This session has changed.' };
+            // Include edits made while the authentication request was pending.
+            await avatarProfileSaver?.flush();
+            if (disposed || action !== authActionRevision) return { ok: false, message: 'This session has changed.' };
+            const pendingAppearance = pendingAtRequest || editsAtRequest !== appearanceEditRevision || avatarProfileSaver?.getPendingLoadout()
+              ? { ...localAvatarLoadout } : undefined;
+            // Reauthenticating the same account keeps unsaved visible edits;
+            // a different account always receives its own stored appearance.
+            const resumePending = pendingAppearance && session.mode === 'account' && session.playerId === previousAccount;
+            const applied = await applySessionUpgrade(resumePending ? { ...session, loadout: pendingAppearance } : session);
+            if (applied && resumePending && !disposed) avatarProfileSaver?.queue(localAvatarLoadout);
             return { ok: true };
           } catch (err) {
             const message = err instanceof RuntimeAuthError ? err.message : 'Something went wrong. Try again.';
@@ -1013,14 +1272,21 @@ export async function createRuntime(host: HTMLElement) {
           authPopup?.open('signup');
         },
         async onLogout() {
+          const action = ++authActionRevision;
           try {
+            const saved = await avatarProfileSaver?.flush();
+            if (disposed || action !== authActionRevision) return;
+            if (saved === false) hudNotice?.show('Your latest outfit changes could not be saved before logout.');
             const session = await runtimeLogout(activeZoneId);
-            applySessionUpgrade(session);
+            if (disposed || action !== authActionRevision) return;
+            await avatarProfileSaver?.flush();
+            if (disposed || action !== authActionRevision) return;
+            await applySessionUpgrade(session);
           } catch {
             hudNotice?.show('Could not log out. Try again.');
           }
         },
-        debugChromePresent: perfFlags.debug,
+        debugChromePresent: showDebugChrome,
       });
     }
 
@@ -1101,17 +1367,18 @@ export async function createRuntime(host: HTMLElement) {
     });
     const activeStageAtmospherics = stageAtmospherics;
 
-    // §5.1.1 Main Stage scheduled event: aerial sky bursts + stage-level pyro,
-    // idle (no launches) outside the event's active phase. Shares the same
-    // spectrum closure for palette/beat coherence with the rest of the venue.
-    const { createFireworksShow } = await import('../scene/createFireworksShow');
-    fireworksShow = createFireworksShow(scene, {
-      getFrequencyData: getStageFrequencyData,
+    // Shared aerial effects and player controls. Stage pyro remains owned by
+    // stageAtmospherics; fireworks cannot seize the independent drone rig.
+    const { createShowControlRuntime } = await import('../showControl/createShowControlRuntime');
+    showControls = createShowControlRuntime({
+      host,scene,socket:worldSocket,playerRig:reviewRuntime?.playerRig,
+      playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
     });
+    if(latestShowSnapshot)showControls.applySnapshot(latestShowSnapshot);
     if (fireworksAudioUnlocked) {
-      fireworksShow.unlockAudio();
+      showControls.unlockAudio();
     }
-    const activeFireworksShow = fireworksShow;
+    const activeShowControls = showControls;
 
     // A snapshot can arrive while these lazily imported show modules are still
     // building. Re-apply the retained state once every recipient exists.
@@ -1135,6 +1402,18 @@ export async function createRuntime(host: HTMLElement) {
     // production.
     if (perfFlags.debug) {
       window.__OMNIRAVE_RUNTIME__ = runtime;
+      if (localAvatarPreview && new URLSearchParams(window.location.search).get('benchmark') === '1') {
+        const { createVenuePerformancePanel } = await import('./createVenuePerformancePanel');
+        venuePerformance = createVenuePerformancePanel(host, scene, () => remotePlayerRigs?.stats() ?? null, {
+          onPreviewFireworks: act => applyFireworksPreview?.(act),
+          getEventState: () => debugEventOverride === undefined ? latestWorldEventState : debugEventOverride,
+        });
+        const replayMode = new URLSearchParams(window.location.search).get('commandReplay');
+        if (replayMode) {
+          const { createVenueCommandReplayProbe } = await import('./createVenueCommandReplayProbe');
+          createVenueCommandReplayProbe(host, scene, replayMode);
+        }
+      }
     }
     loadingOverlay.remove();
 
@@ -1143,18 +1422,25 @@ export async function createRuntime(host: HTMLElement) {
       // this callback returns. Resizing here, before recording the next frame,
       // prevents setHardwareScalingLevel() from destroying the swapchain
       // texture still referenced by the current submission.
-      if (pendingHardwareScalingLevel !== undefined) {
+      if (pendingHardwareScalingLevel !== undefined && !venuePerformance?.isRunning()) {
         activeEngine.setHardwareScalingLevel(pendingHardwareScalingLevel);
         pendingHardwareScalingLevel = undefined;
       }
+      const measuringFrame = venuePerformance?.isRunning();
+      const renderStart = measuringFrame ? performance.now() : 0;
+      activeShowControls.update();
+      const showControlEnd = measuringFrame ? performance.now() : 0;
       scene.render();
+      const renderEnd = measuringFrame ? performance.now() : 0;
       const playerRuntime = scene.metadata?.reviewRuntime;
       const playerPosition = playerRuntime?.playerRig?.root.position;
-      if (worldSocket && playerPosition) {
-        worldSocket.sendMove({ x: playerPosition.x, y: playerPosition.y, z: playerPosition.z });
+      if (worldSocket && worldSpawnInitialized && playerPosition && !activeShowControls.operating) {
+        worldSocket.sendMove({ x: playerPosition.x, y: playerPosition.y, z: playerPosition.z }, playerRuntime.playerRig.crouched === true);
       }
       const deltaSeconds = activeEngine.getDeltaTime() / 1000;
+      const crowdStart = measuringFrame ? performance.now() : 0;
       remotePlayerRigs?.update(deltaSeconds);
+      const crowdEnd = measuringFrame ? performance.now() : 0;
       if (localChatBubbles && playerPosition) {
         // Same sec 10.1/10.5 distance rules the remote rigs apply, measured
         // from the camera to the local avatar.
@@ -1171,7 +1457,11 @@ export async function createRuntime(host: HTMLElement) {
       activeCascadeCourtLightFloor.update(deltaSeconds);
       activeHologramGrid.update(deltaSeconds);
       activeStageAtmospherics.update(deltaSeconds);
-      activeFireworksShow.update(deltaSeconds);
+
+      if (measuringFrame) scene.metadata.venueCpuTimings = {
+        render: renderEnd - showControlEnd, crowd: crowdEnd - crowdStart, shows: performance.now() - crowdEnd,
+        showControl: showControlEnd - renderStart, fireworkQuads: activeShowControls.fireworkQuads,
+      };
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
@@ -1182,45 +1472,52 @@ export async function createRuntime(host: HTMLElement) {
       if (playerReadout && playerPosition && playerController) {
         const state = playerRuntime?.reviewAvatar?.root.metadata?.animationState ?? playerController.animationState;
         const groundedLabel = playerController.grounded ? 'grounded' : 'airborne';
-        playerReadout.value = `${playerPosition.x.toFixed(1)},${playerPosition.y.toFixed(1)},${playerPosition.z.toFixed(1)}`;
-        playerReadout.textContent = `Player: ${state} ${groundedLabel} ${playerController.currentSpeedMetersPerSecond.toFixed(1)}m/s @ ${playerReadout.value}`;
+        const coordinates = `${playerPosition.x.toFixed(1)},${playerPosition.y.toFixed(1)},${playerPosition.z.toFixed(1)}`;
+        const readout = `Player: ${state}${playerRuntime.playerRig.crouched ? ' crouched' : ''} ${groundedLabel} ${playerController.currentSpeedMetersPerSecond.toFixed(1)}m/s @ ${coordinates}`;
+        if (playerReadout.value !== coordinates) playerReadout.value = coordinates;
+        if (playerReadout.textContent !== readout) playerReadout.textContent = readout;
       }
       const routeProgress = playerRuntime?.routeProgress;
       if (objectiveReadout && routeProgress) {
         const objectiveText = routeProgress.complete || !routeProgress.activeCheckpoint
           ? `Objective: route complete (${routeProgress.completedCount}/${routeProgress.totalCount})`
           : `Objective: reach ${formatCheckpointLabel(routeProgress.activeCheckpoint.id)} (${routeProgress.completedCount}/${routeProgress.totalCount})`;
-        objectiveReadout.value = objectiveText;
-        objectiveReadout.textContent = objectiveText;
+        if (objectiveReadout.value !== objectiveText) objectiveReadout.value = objectiveText;
+        if (objectiveReadout.textContent !== objectiveText) objectiveReadout.textContent = objectiveText;
         if (completeBanner) {
-          completeBanner.hidden = !routeProgress.complete;
+          if (completeBanner.hidden !== !routeProgress.complete) completeBanner.hidden = !routeProgress.complete;
         }
         for (const button of Array.from(reviewHud?.querySelectorAll<HTMLButtonElement>('[data-review-checkpoint]') ?? [])) {
           const routeIndex = reviewCheckpoints?.findIndex((checkpoint) => checkpoint.id === button.dataset.reviewCheckpoint) ?? -1;
           if (routeIndex < 0 || routeIndex >= routeProgress.totalCount) {
-            delete button.dataset.routeState;
+            if (button.dataset.routeState !== undefined) delete button.dataset.routeState;
           } else if (routeIndex < routeProgress.completedCount) {
-            button.dataset.routeState = 'complete';
+            if (button.dataset.routeState !== 'complete') button.dataset.routeState = 'complete';
           } else if (routeIndex === routeProgress.activeIndex) {
-            button.dataset.routeState = 'active';
+            if (button.dataset.routeState !== 'active') button.dataset.routeState = 'active';
           } else {
-            delete button.dataset.routeState;
+            if (button.dataset.routeState !== undefined) delete button.dataset.routeState;
           }
         }
       }
       if (playerRuntime?.selectedAvatarColorway) {
         for (const button of Array.from(reviewHud?.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]') ?? [])) {
-          button.ariaPressed = String(button.dataset.avatarColorway === playerRuntime.selectedAvatarColorway.id);
+          const pressed = String(button.dataset.avatarColorway === playerRuntime.selectedAvatarColorway.id);
+          if (button.ariaPressed !== pressed) button.ariaPressed = pressed;
         }
       }
       perfFrameCounter += 1;
       if (perfFrameCounter % 30 === 0) {
         const fps = activeEngine.getFps();
+        if (remoteAvatarReadout && remotePlayerRigs) {
+          const stats = remotePlayerRigs.stats();
+          remoteAvatarReadout.textContent = `Remote avatars: ${stats.completePlayers} | Sources: ${stats.cachedAssets} | Detail: ${stats.detailCounts.join('/')} | Model tris: ${Math.round(stats.modelTriangles)} | Animating: ${stats.animatingPlayers} | Loading: ${stats.pending}`;
+        }
 
         // Hold the FPS target by trading render scale, never frame pacing:
         // sharp when the GPU can afford it, gracefully coarser when not. Skipped
         // entirely while the player pinned a manual Graphics level (sec 9.6).
-        if (graphicsAutoEnabled) {
+        if (graphicsAutoEnabled && !venuePerformance?.isRunning()) {
           const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
           if (nextState.level !== adaptiveState.level) {
             pendingHardwareScalingLevel = nextState.level;

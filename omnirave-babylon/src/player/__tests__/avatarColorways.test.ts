@@ -40,4 +40,23 @@ describe('avatarColorways', () => {
   it('falls back to the default avatar colorway for an unknown id', () => {
     expect(resolveAvatarColorway('missing-avatar').id).toBe(USER_AVATAR_COLORWAYS[0].id);
   });
+
+  it('preserves authored detail materials instead of flattening them into a colorway', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const mesh = MeshBuilder.CreateBox('avatar-eye-detail', { size: 1 }, scene);
+    const authoredMaterial = new StandardMaterial('authored-eye', scene);
+    mesh.material = authoredMaterial;
+    mesh.metadata = { avatarPreserveMaterial: true };
+    const avatar: ReviewAvatar = {
+      animate: () => {},
+      meshes: [mesh],
+      root: new TransformNode('avatar-root', scene),
+    };
+
+    applyAvatarColorway(avatar, 'pulse');
+
+    expect(mesh.material).toBe(authoredMaterial);
+    expect(mesh.metadata?.avatarColorway).toBeUndefined();
+  });
 });

@@ -1,0 +1,175 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -323,6 +323,8 @@
+         loosen_outer_locks(mapping,report,apply_geometry)
+         from refine_female_crown_settle import settle_crown
+         settle_crown(mapping,report,apply_geometry)
++        from refine_female_wind_layers import shape_wind_layers
++        shape_wind_layers(mapping,report,apply_geometry)
+     else:
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+--- before/refine_female_wind_layers.py
++++ refine_female_wind_layers.py
+@@ -0,0 +1,87 @@
++"""Separate the outer pony into staggered waves and brighter dyed locks.
++
++Connection map: existing long cards keep their first five crown pairs exactly.
++The selected free spans carry a broad, staggered bend with narrower ends;
++unselected strands and cheek cards keep their geometry. Actual card edges fit
++outside skin and the front collar. Hair uses millimeter surface clearance.
++Existing origins, topology, UVs, weights and relative secondary shapes remain.
++"""
++import math
++import bpy,numpy as np
++from mathutils import Vector,Quaternion
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface,smooth
++from refine_complete_groom_finish import islands
++from refine_complete_male_hair import group_paths
++from refine_female_face_fall import NAMES,fit_front_collar
++from refine_female_dye import DYE_BASE
++
++
++def shape_wind_layers(mapping,report,apply):
++    rig=bpy.data.objects['AvatarSkeleton'];body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    bases={n:array(bpy.data.objects[n]) for n in NAMES};rows=[];deltas={}
++    uv={n:mapping[n]['addedUv'] for n in NAMES if 'addedUv' in mapping[n]}
++    for name,p in bases.items():
++        ob=bpy.data.objects[name]
++        deltas[name]=[np.array([v.co[:] for v in ob.data.shape_keys.key_blocks[k].data])-p for k in ['Secondary_HairSide','Secondary_HairBack']]
++        for ids in islands(ob):
++            if len(ids)==36:rows.append((name,ids,p[ids].reshape(18,2,3)))
++    paths=np.array([r.mean(1) for _,_,r in rows]);groups=group_paths(paths,26);selected=[]
++    for g in np.unique(groups):
++        candidates=[i for i in np.flatnonzero(groups==g) if paths[i,-4:,1].mean()<-.035]
++        candidates.sort(key=lambda i:paths[i,8:15,0].mean())
++        if candidates:selected.extend(candidates[:max(2,int(len(candidates)*.42))])
++    revised={n:p.copy() for n,p in bases.items()};parts={n:[] for n in NAMES};max_fit=0
++    u=np.clip((np.arange(18)-4)/13,0,1);bell=np.sin(math.pi*u)**2;free=smooth(u)
++    for i in selected:
++        name,ids,r=rows[i];old=r.mean(1);g=int(groups[i]);phase=g*2.399963;strand=i*2.399963
++        c=old.copy();amplitude=.017+.011*(.5+.5*math.sin(phase))
++        c[:,0]+=amplitude*np.sin(math.pi*1.25*u+phase)*bell-.006*free
++        c[:,1]+=.016*np.sin(math.pi*1.25*u+phase+.8)*bell-.004*free
++        c[:,2]+=(.012+.035*(.5+.5*math.cos(phase))+.004*math.sin(strand))*free
++        # Fair the broad bend over the sparse existing rows.
++        for _ in range(3):
++            relaxed=c.copy();relaxed[5:-1]=.18*c[4:-2]+.64*c[5:-1]+.18*c[6:];c=relaxed
++        half=(r[:,1]-r[:,0])*.5;h=half.copy()
++        previously_thin=ids[0] in report['looseLocks']['selectedCardFirstVertices'][name]
++        for j in range(5,18):
++            a=Vector(old[min(j+1,17)]-old[j-1]).normalized();b=Vector(c[min(j+1,17)]-c[j-1]).normalized()
++            width=a.rotation_difference(b)@Vector(half[j])
++            width=Quaternion(b,.18*math.sin(phase)*bell[j])@width
++            h[j]=width*(1-(.08 if previously_thin else .28)*free[j])
++        rr=np.stack([c-h,c+h],axis=1);rr[:5]=r[:5]
++        da,db=[d[ids].reshape(18,2,3) for d in deltas[name]];shift=np.zeros(18)
++        for delta in [np.zeros_like(da),da+db,da-db,-da+db,-da-db]:
++            for j in range(5,18):
++                for point in (rr+delta)[j]:
++                    hit,_,_,_=body.ray_cast(Vector((-.5,point[1],point[2])),Vector((1,0,0)),1)
++                    if hit is not None:shift[j]=min(shift[j],hit.x-.008-point[0])
++        for _ in range(2):
++            s=shift.copy();s[5:-1]=.15*shift[4:-2]+.7*shift[5:-1]+.15*shift[6:];shift=np.minimum(shift,s)
++        rr[:,:,0]+=shift[:,None];max_fit=max(max_fit,float(-shift.min()))
++        revised[name][ids]=rr.reshape(-1,3);parts[name].append(ids)
++    for name,q in revised.items():
++        previous=dict(report[name]);apply(bpy.data.objects[name],q,mapping,report)
++        report[name].update({k:v for k,v in previous.items() if k not in report[name]})
++    collar=fit_front_collar(parts,mapping,report,apply)
++    for name,coords in uv.items():mapping[name]['addedUv']=coords
++    # Raise the exposed dye's brightness with per-lock variation. Keep the
++    # brunette roots and cheek fibers exact, using the existing base factor.
++    tinted=0
++    for name,p in bases.items():
++        ob=bpy.data.objects[name];attr=ob.data.color_attributes['ReferenceHairTint']
++        colors=np.array([v.color[:] for v in attr.data]);before=colors.copy()
++        for i,ids in enumerate(islands(ob)):
++            if len(ids)!=36:continue
++            phase=i*2.399963+NAMES.index(name)*1.7
++            t=np.repeat(np.linspace(0,1,18),2);strength=smooth((t-4/17)/.38)
++            gain=(.12+.22*(.5+.5*math.sin(phase+.65)))*strength
++            pigment=colors[ids,:3]*DYE_BASE
++            desired=np.minimum(pigment*(1+gain[:,None]*np.array([1.,1.1,.72])),DYE_BASE)
++            colors[ids,:3]=desired/DYE_BASE
++            colors[ids[:10]]=before[ids[:10]];tinted+=1
++        attr.data.foreach_set('color',colors.astype(np.float32).ravel());mapping[name]['addedColors']=colors.tolist()
++    report['windLayers']={'cards':len(selected),'tintedLongCards':tinted,'guideGroups':len(set(int(groups[i]) for i in selected)),
++        'selectedCardFirstVertices':{n:[ids[0] for ids in v] for n,v in parts.items()},'retainedRootPairs':5,
++        'maximumAdditionalBodyFitMm':max_fit*1000,'frontCollarFit':collar,
++        'addedGeometry':0,'relativeSecondaryShapesRetained':True,'textureBytesRetained':True}
+--- before/validate_female_wind_layers.py
++++ validate_female_wind_layers.py
+@@ -0,0 +1,71 @@
++"""Verify the loose outer locks against the preceding delivered source."""
++import sys,json,hashlib
++from pathlib import Path
++import bpy,numpy as np
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from refine_complete_groom_finish import islands
++from refine_complete_foil_finish import geometry_contract
++
++p=OUT/'hair-likeness-20260921';d=p/'wind-layer-pass'
++names=[f'PLURR pony strands {i}' for i in range(3)]
++def structure(ob):
++ h=hashlib.sha256()
++ for f in ob.data.polygons:h.update(np.asarray(f.vertices,dtype=np.int32).tobytes())
++ for layer in ob.data.uv_layers:h.update(np.asarray([v.uv[:] for v in layer.data],dtype=np.float32).tobytes())
++ for v in ob.data.vertices:h.update(repr([(g.group,g.weight) for g in v.groups]).encode())
++ return h.hexdigest()
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in names}
++before={}
++for name in names:
++ ob=bpy.data.objects[name];before[name]={'base':array(ob),'structure':structure(ob),'uv':np.array([v.uv[:] for v in ob.data.uv_layers.active.data]),'colors':np.array([v.color[:] for v in ob.data.color_attributes['ReferenceHairTint'].data]),'shapes':{k.name:np.array([v.co[:] for v in k.data]) for k in ob.data.shape_keys.key_blocks}}
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in names}
++authoring=json.loads((p/'female-native-validation.json').read_text())['meshes']['windLayers']
++rows={};total=0
++for name in names:
++ ob=bpy.data.objects[name];old=before[name];points=array(ob);assert structure(ob)==old['structure'],name
++ face=[];roots=[];long=[];count=0;unchanged=[]
++ selected=authoring['selectedCardFirstVertices'][name]
++ for ids in islands(ob):
++  if len(ids)!=36:face.extend(ids);continue
++  if ids[0] not in selected:unchanged.extend(ids)
++  long.extend(ids)
++  roots.extend(ids[:10])
++  if not np.array_equal(points[ids],old['base'][ids]):count+=1
++ unchanged+=face+roots
++ assert np.array_equal(points[unchanged],old['base'][unchanged]),(name,'unselected vertices')
++ uv=np.array([v.uv[:] for v in ob.data.uv_layers.active.data]);retained=set(unchanged)
++ retained_loops=[loop.index for loop in ob.data.loops if loop.vertex_index in retained]
++ assert np.array_equal(uv[retained_loops],old['uv'][retained_loops]),(name,'retained UV')
++ assert np.isfinite(uv).all() and uv.min()>=0 and uv.max()<=1
++ colors=np.array([v.color[:] for v in ob.data.color_attributes['ReferenceHairTint'].data])
++ assert np.array_equal(colors[face+roots],old['colors'][face+roots]),(name,'retained root/cheek pigment')
++ assert np.isfinite(colors).all() and colors.min()>=0 and colors.max()<=1
++ assert np.all(colors>=old['colors']-1e-7) and colors[:,0].mean()>old['colors'][:,0].mean()
++ assert np.array_equal(points[roots],old['base'][roots]),(name,'roots')
++ assert np.array_equal(points[face],old['base'][face]),(name,'face')
++ drift=0
++ for key in ob.data.shape_keys.key_blocks:
++  q=np.array([v.co[:] for v in key.data]);prior=old['shapes'][key.name]
++  assert np.array_equal(q[unchanged],prior[unchanged]),(name,key.name,'unchanged')
++  assert np.array_equal(q[face],prior[face]),(name,key.name,'face')
++  assert np.array_equal(q[roots],prior[roots]),(name,key.name,'roots')
++  drift=max(drift,float(np.abs((q-points)-(prior-old['base'])).max()))
++ assert drift<3e-7,(name,drift)
++ ob.data.calc_loop_triangles();tri=np.array([t.vertices[:] for t in ob.data.loop_triangles])
++ def areas(p):
++  v=p[tri];return np.linalg.norm(np.cross(v[:,1]-v[:,0],v[:,2]-v[:,0]),axis=1)*.5
++ old_area=areas(old['base']);new_area=areas(points)
++ assert np.isfinite(points).all() and not np.any((old_area>1e-12)&(new_area<1e-14)),name
++ rows[name]={'meanRedTintBefore':float(old['colors'][:,0].mean()),'meanRedTintAfter':float(colors[:,0].mean()),'reshapedCards':count,'unchangedVertices':len(set(unchanged)),'unchangedCheekVertices':len(face),'retainedRootVertices':len(roots),
++  'maxRelativeShapeDeltaChangeMm':drift*1000,'newlyDegenerateTriangles':0,
++  'previousLongCardBounds':[old['base'][long].min(0).tolist(),old['base'][long].max(0).tolist()],
++  'longCardBounds':[points[long].min(0).tolist(),points[long].max(0).tolist()]}
++ total+=count
++assert total==authoring['cards'] and total>124,(total,authoring['cards'])
++report={'unchangedOtherMeshContracts':len(contracts),'reshapedCards':total,'guideGroups':authoring['guideGroups'],'retainedTopologyUVsAndWeights':True,'retainedRootAndCheekPigment':True,'meshes':rows,
++ 'scope':'Exact retention of other meshes, cheek vertices and all shape coordinates, five crown pairs per long card, topology and weights; root/cheek pigment retained with brighter long-span tint. All UVs stay exact. Relative secondary-shape deltas retained within float rounding. Pose/clearance checks are separate.'}
++(d/'native-wind-layer-validation.json').write_text(json.dumps(report,indent=2)+'\n')
++print('WIND_LAYERS_VALIDATED',json.dumps(report),flush=True)

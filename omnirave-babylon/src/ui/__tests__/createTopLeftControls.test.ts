@@ -36,6 +36,27 @@ describe('createTopLeftControls', () => {
     expect(host.querySelector<HTMLElement>('[data-testid="avatar-popup"]')?.hidden).toBe(true);
   });
 
+  it('can hold the unfinished avatar picker out of the runtime while preserving Settings', () => {
+    const onPanelChange = vi.fn();
+    const { host, controls, button, settingsPanel } = setup({
+      avatarEditorEnabled: false,
+      onPanelChange,
+    });
+
+    expect(button('settings')).not.toBeNull();
+    expect(host.querySelector('[data-hud-control="avatar"]')).toBeNull();
+    expect(host.querySelector('[data-testid="avatar-popup"]')).toBeNull();
+    expect(host.querySelector('[data-testid="avatar-editor"]')).toBeNull();
+
+    controls.openPanel('avatar');
+    expect(controls.activePanel()).toBeNull();
+    expect(onPanelChange).not.toHaveBeenCalled();
+
+    button('settings').click();
+    expect(controls.activePanel()).toBe('settings');
+    expect(settingsPanel.hidden).toBe(false);
+  });
+
   it('opens a popup below the buttons, closes on a repeat click, and swaps to the other', () => {
     const { host, controls, button, settingsPanel } = setup();
     const avatarPanel = host.querySelector<HTMLElement>('[data-testid="avatar-popup"]')!;

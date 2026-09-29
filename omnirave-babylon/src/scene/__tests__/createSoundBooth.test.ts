@@ -1,3 +1,4 @@
+import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -121,8 +122,8 @@ describe('createSoundBooth', () => {
     expect(structure.minZ).toBeGreaterThan(FOH_BOOTH_Z - FOH_BOOTH_DECK_DEPTH / 2 - 0.5);
     expect(structure.maxZ).toBeLessThan(FOH_BOOTH_Z + FOH_BOOTH_DECK_DEPTH / 2 + 0.5);
     // Canopy overhead, not a wall.
-    expect(structure.maxY).toBeGreaterThan(3);
-    expect(structure.maxY).toBeLessThan(4);
+    expect(structure.maxY).toBeGreaterThan(8);
+    expect(structure.maxY).toBeLessThan(8.4);
   });
 
   it('faces the stage: the mixing desk sits on the +z half of the deck', () => {
@@ -131,10 +132,10 @@ describe('createSoundBooth', () => {
     expect((desk.minZ + desk.maxZ) / 2).toBeGreaterThan(FOH_BOOTH_Z);
   });
 
-  it('blocks the booth footprint but leaves x +/-10 at that z open', () => {
+  it('keeps the rear entrance and both operators clear while blocking structural parts', () => {
     const blockers = createMainStageCollisionBlockers(scene, []);
-    const booth = blockers.filter((mesh) => mesh.name === 'main-stage-blocker-foh-sound-booth');
-    expect(booth.length).toBe(1);
+    const booth = blockers.filter((mesh) => mesh.name.startsWith('main-stage-blocker-foh-'));
+    expect(booth.length).toBe(6);
 
     const blocked = (x: number, z: number) =>
       blockers.some((mesh) => {
@@ -148,9 +149,13 @@ describe('createSoundBooth', () => {
         );
       });
 
-    expect(blocked(FOH_BOOTH_X, FOH_BOOTH_Z)).toBe(true);
-    expect(blocked(FOH_BOOTH_X - 3, FOH_BOOTH_Z)).toBe(true);
-    expect(blocked(FOH_BOOTH_X + 3, FOH_BOOTH_Z)).toBe(true);
+    expect(blocked(FOH_BOOTH_X, FOH_BOOTH_Z)).toBe(false);
+    expect(blocked(-.92,-67.3)).toBe(false);
+    expect(blocked(.92,-67.3)).toBe(false);
+    expect(blocked(0,-66.45)).toBe(true);
+    expect(blocked(4,-68.2)).toBe(true);
+    expect(blocked(FOH_BOOTH_X - 3, FOH_BOOTH_Z)).toBe(false);
+    expect(blocked(FOH_BOOTH_X + 3, FOH_BOOTH_Z)).toBe(false);
     // The promenade either side of the booth stays walkable.
     expect(blocked(-10, FOH_BOOTH_Z)).toBe(false);
     expect(blocked(10, FOH_BOOTH_Z)).toBe(false);

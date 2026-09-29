@@ -1,0 +1,26 @@
+{
+  "completed_utc": "2026-09-05T10:36:41.652560+00:00",
+  "removed_binary_files": 67,
+  "removed_binary_bytes": 4863504715,
+  "directories": {
+    "astra-male-proof": {
+      "before_bytes": 1488301406,
+      "after_bytes": 375805142
+    },
+    "modular-v1": {
+      "before_bytes": 1680691342,
+      "after_bytes": 532581740
+    },
+    "omniavatar-v2": {
+      "before_bytes": 3118308762,
+      "after_bytes": 506173114
+    }
+  },
+  "retained_blends_open_and_assets_resolve": 12,
+  "unchanged_protected_files": 221,
+  "targeted_tests_passed": 166,
+  "comparison_model_views_resolve": 16,
+  "current_rebuild_visible_geometry_identical": true,
+  "current_rebuild_render_pixel_identical": true,
+  "likeness_gate": "NOT_PASSED"
+}

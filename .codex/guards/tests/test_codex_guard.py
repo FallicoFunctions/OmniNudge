@@ -65,6 +65,11 @@ class TruncationTests(unittest.TestCase):
     def test_does_not_infer_truncation_from_size_or_unrelated_prose(self) -> None:
         self.assertFalse(guard.find_truncation({"output": "x" * 60000}))
         self.assertFalse(guard.find_truncation("This test ensures ordinary output remains intact."))
+        self.assertFalse(guard.find_truncation('re.compile(r"truncated output")'))
+        self.assertFalse(guard.find_truncation('additionalContext: "Tool output was truncated. Read it again."'))
+
+    def test_detects_platform_warning_line_without_matching_embedded_source(self) -> None:
+        self.assertTrue(guard.find_truncation("Warning: truncated output (original token count: 12000)"))
 
     def test_post_output_response_has_exact_context_shape(self) -> None:
         response = guard.post_output_response({"tool_response": {"truncated": True}})

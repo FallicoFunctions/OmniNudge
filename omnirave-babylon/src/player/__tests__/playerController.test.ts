@@ -51,8 +51,8 @@ describe('createPlayerController', () => {
     expect(rig.root.position.x).toBeCloseTo(0);
     expect(rig.root.position.y).toBeCloseTo(1.65);
     expect(avatarRoot.rotation.y).toBeCloseTo(0);
-    expect(controller.animationState).toBe('run');
-    expect(avatarRoot.metadata?.animationState).toBe('run');
+    expect(controller.animationState).toBe('walk');
+    expect(avatarRoot.metadata?.animationState).toBe('walk');
     expect(controller.grounded).toBe(true);
   });
 
@@ -77,6 +77,8 @@ describe('createPlayerController', () => {
 
     expect(Math.hypot(rig.root.position.x, rig.root.position.z)).toBeCloseTo(6.975, 3);
     expect(controller.currentSpeedMetersPerSecond).toBeCloseTo(6.975, 3);
+    expect(controller.animationState).toBe('run');
+    expect(avatarRoot.metadata?.animationState).toBe('run');
   });
 
   it('blocks horizontal movement against solid collision meshes without using them as ground', () => {

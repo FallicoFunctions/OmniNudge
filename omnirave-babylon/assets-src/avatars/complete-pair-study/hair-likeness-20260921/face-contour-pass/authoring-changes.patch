@@ -1,0 +1,222 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -333,6 +333,8 @@
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+         soften_waves(mapping,report,apply_geometry)
++        from refine_male_loose_fringe import loosen
++        loosen(mapping,report,apply_geometry)
+     atlas=strand_texture(sex);materials=finish_materials(sex,atlas)
+     if sex=='female':
+         materials.update(scalp_finish())
+@@ -352,11 +354,15 @@
+         from refine_female_temple_plait import finish_temple_plait
+         finish_temple_plait(materials)
+     assert preserved=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.get('avatarSlot')!='hair'}
++    face_contour = None
++    if sex=='female':
++        from refine_female_face_contour import apply_to_body
++        face_contour = apply_to_body(bpy.data.objects['AvatarBody'])
+     rig.data.pose_position='POSE';rig.animation_data.action=bpy.data.actions['idle'];bpy.context.scene.frame_set(1)
+     bpy.context.preferences.filepaths.save_version=0
+     bpy.ops.wm.save_as_mainfile(filepath=str(PASS/f'{sex}-hair-refined.blend'),compress=True)
+     (PASS/f'{sex}-vertex-mapping.json').write_text(json.dumps(mapping)+'\n')
+-    (PASS/f'{sex}-native-validation.json').write_text(json.dumps({'meshes':report,'materials':materials,'additions':additions,'removedObjects':removed,'preservedNonHairMeshes':len(preserved)},indent=2)+'\n')
++    (PASS/f'{sex}-native-validation.json').write_text(json.dumps({'meshes':report,'materials':materials,'additions':additions,'removedObjects':removed,'preservedNonHairMeshes':len(preserved)-(1 if face_contour else 0),'faceContour':face_contour},indent=2)+'\n')
+     print('REFERENCE_HAIR',sex,json.dumps(report),flush=True)
+ 
+ 
+--- before/validate_reference_hair.py
++++ validate_reference_hair.py
+@@ -13,9 +13,13 @@
+ PASS=OUT/'hair-likeness-20260921'
+ 
+ def run(sex,render):
+-    removed=set(json.loads((PASS/f'{sex}-native-validation.json').read_text()).get('removedObjects',[]))
++    native=json.loads((PASS/f'{sex}-native-validation.json').read_text())
++    removed=set(native.get('removedObjects',[]))
+     assert removed<=set(['PLURR face gems -1','PLURR face gems 1'])
+     bpy.ops.wm.open_mainfile(filepath=str(PASS/'before'/f'{sex}-runtime.blend'))
++    if native.get('faceContour'):
++        from refine_female_face_contour import apply_to_body
++        apply_to_body(bpy.data.objects['AvatarBody'],native['faceContour']['spec'])
+     originals={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.get('avatarSlot')!='hair' and o.name not in removed}
+     deltas={}
+     for o in bpy.context.scene.objects:
+@@ -86,7 +90,7 @@
+             attachments[label]['frontLockRootDistanceMm']=root_gap*1000
+             attachments[label]['frontLockSkinClearanceMm']=[min(gaps)*1000,max(gaps)*1000]
+     set_pose({})
+-    report={'preservedNonHairMeshes':len(originals),'removedObjects':sorted(removed),'maxMorphDeltaChangeMm':max_delta*1000,
++    report={'preservedNonHairMeshes':len(originals)-(1 if native.get('faceContour') else 0),'validatedFaceContour':native.get('faceContour'),'removedObjects':sorted(removed),'maxMorphDeltaChangeMm':max_delta*1000,
+         'movementSamples':27,'maxHeadRelativeDriftMm':drift*1000,'attachments':attachments,
+         'scope':'Finite pose/shape samples and attachment distances; no continuous collision or strand self-contact guarantee.'}
+     (PASS/f'{sex}-motion-validation.json').write_text(json.dumps(report,indent=2)+'\n')
+--- before/apply_reference_hair.mjs
++++ apply_reference_hair.mjs
+@@ -1,4 +1,4 @@
+-/** Transfer the Blender hair revision to every LOD without re-exporting outfits. */
++/** Transfer reference hair and the optional face field without re-exporting outfits. */
+ import assert from 'node:assert/strict';
+ import fs from 'node:fs/promises';
+ import path from 'node:path';
+@@ -7,6 +7,7 @@
+ import { NodeIO } from '@gltf-transform/core';
+ import { ALL_EXTENSIONS, KHRMaterialsSpecular } from '@gltf-transform/extensions';
+ import { validateBytes } from 'gltf-validator';
++import { applyFaceContour } from './apply_female_face_contour.mjs';
+ 
+ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+ const pass=path.join(root,'assets-src/avatars/complete-pair-study/hair-likeness-20260921');
+@@ -22,6 +23,10 @@
+ function retained(doc) {
+   const r=doc.getRoot(),changed=new Set();
+   for(const n of r.listNodes()) {
++    if(native.faceContour?.mesh===n.getName())for(const p of n.getMesh().listPrimitives()) {
++      for(const s of ['POSITION','NORMAL','TANGENT'])if(p.getAttribute(s))changed.add(p.getAttribute(s));
++      for(const t of p.listTargets())for(const s of ['POSITION','NORMAL'])if(t.getAttribute(s))changed.add(t.getAttribute(s));
++    }
+     if(mapping[n.getName()]) for(const p of n.getMesh().listPrimitives()) {
+       for(const semantic of ['POSITION','NORMAL','TANGENT']) if(p.getAttribute(semantic))changed.add(p.getAttribute(semantic));
+       if(mapping[n.getName()].addedUv&&p.getAttribute('TEXCOORD_0'))changed.add(p.getAttribute('TEXCOORD_0'));
+@@ -139,13 +144,14 @@
+     r.listNodes().find(n=>n.getName()==='AvatarSkeleton').addChild(node);
+     rows[a.name]=count;
+   }
++  const faceContour=native.faceContour?applyFaceContour(doc,native.faceContour):null;
+   assert.equal(retained(doc),before,`${filename}: unrelated data changed`);
+   const bytes=await io.writeBinary(doc),validation=await validateBytes(bytes,{maxIssues:1000});
+   assert.equal(validation.issues.numErrors,0,JSON.stringify(validation.issues.messages.filter(m=>m.severity===0)));
+   assert.equal(retained(await io.readBinary(bytes)),before,`${filename}: serialization changed retained data`);
+   await fs.writeFile(path.join(root,'public/assets/avatars/complete-pair',filename),bytes);
+-  report[filename]={verticesUpdated:rows,sha256:hash(bytes),gltfErrors:0,preservedOutfitsRigAnimationsWeights:true,
++  report[filename]={verticesUpdated:rows,faceContour,sha256:hash(bytes),gltfErrors:0,preservedOutfitsRigAnimationsWeights:true,
+     addedHairMeshes:[...additionNames],removedObjects:[...removalNames],rescaledHairMorphs:Object.keys(mapping).filter(n=>mapping[n].morphs)};
+-  console.log(filename,'hair revision applied; other geometry and animation preserved');
++  console.log(filename,'reference revision applied; rig, outfits and animation preserved');
+ }
+ await fs.writeFile(path.join(pass,`${sex}-portable-validation.json`),JSON.stringify(report,null,2)+'\n');
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -0,0 +1,64 @@
++"""A restrained lower-face likeness pass, applied after the hair-only contract.
++
++Connection map: the continuous body surface tapers through the jaw into the
++unchanged neck. Mouth compression shares one field with its surrounding skin
++and every expression shape. Eyes, ears, hair roots and accessories are outside
++the field. Origins, topology, UVs and skin weights stay intact.
++"""
++import numpy as np
++
++SPEC = {
++    'version': 1,
++    'jawCenterZ': 1.530, 'jawHalfHeight': .059,
++    'jawFrontY': -.047, 'jawFrontSpan': .050,
++    'jawTaper': .065,
++    'mouthCenterZ': 1.5430644, 'mouthHalfHeight': .025,
++    'mouthHalfWidth': .038, 'mouthFrontY': -.121,
++    'mouthFrontSpan': .016, 'mouthCompress': .24,
++    'mouthRecess': .0011,
++    'mouthWiden': .055, 'cornerLift': .0012,
++    'cornerX': .022, 'cornerHalfWidth': .016, 'cornerHalfHeight': .015,
++    'smileScale': .55,
++}
++
++
++def smooth(x):
++    x = np.clip(x, 0, 1)
++    return x*x*(3-2*x)
++
++
++def warp(points, spec=SPEC):
++    p = np.asarray(points, dtype=float); q = p.copy()
++    jaw = (1-smooth(abs(p[:, 2]-spec['jawCenterZ'])/spec['jawHalfHeight']))
++    jaw *= smooth((spec['jawFrontY']-p[:, 1])/spec['jawFrontSpan'])
++    q[:, 0] *= 1-spec['jawTaper']*jaw
++    mouth = (1-smooth(abs(p[:, 0])/spec['mouthHalfWidth']))
++    mouth *= 1-smooth(abs(p[:, 2]-spec['mouthCenterZ'])/spec['mouthHalfHeight'])
++    mouth *= smooth((spec['mouthFrontY']-p[:, 1])/spec['mouthFrontSpan'])
++    q[:, 2] -= spec['mouthCompress']*(p[:, 2]-spec['mouthCenterZ'])*mouth
++    q[:, 1] += spec['mouthRecess']*mouth
++    q[:, 0] += spec['mouthWiden']*p[:, 0]*mouth
++    corner = 1-smooth(abs(abs(p[:, 0])-spec['cornerX'])/spec['cornerHalfWidth'])
++    corner *= 1-smooth(abs(p[:, 2]-spec['mouthCenterZ'])/spec['cornerHalfHeight'])
++    corner *= smooth((-.095-p[:, 1])/.025)
++    q[:, 2] += spec['cornerLift']*corner
++    return q
++
++
++def apply_to_body(body, spec=SPEC):
++    # All retained body transforms are identity; the same rest-space field is
++    # applied to exported vertices, including independently simplified LODs.
++    assert np.array_equal(np.array(body.matrix_world), np.eye(4))
++    before = np.array([v.co[:] for v in body.data.vertices])
++    after = warp(before, spec).astype(np.float32)
++    for key in body.data.shape_keys.key_blocks:
++        points = np.array([v.co[:] for v in key.data])
++        revised = warp(points, spec)
++        if key.name=='Expression_Smile':revised = after+(revised-after)*spec['smileScale']
++        key.data.foreach_set('co', revised.astype(np.float32).ravel())
++    body.data.vertices.foreach_set('co', after.ravel()); body.data.update()
++    return {'spec': spec, 'mesh': body.name,
++            'changedVertices': int(np.any(after != before, axis=1).sum()),
++            'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
++            'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
++            'scope': 'Lower-face geometry and a restrained smile morph; no texture, topology, skin-weight or locomotion edits.'}
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -0,0 +1,54 @@
++/** Apply the native lower-face field to arbitrary LOD vertices and morphs. */
++import assert from 'node:assert/strict';
++const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
++export function warp(p,s) {
++  // glTF Y is Blender Z; glTF Z is -Blender Y.
++  const [x,z,front]=p,y=-front;
++  const jaw=(1-smooth(Math.abs(z-s.jawCenterZ)/s.jawHalfHeight))*smooth((s.jawFrontY-y)/s.jawFrontSpan);
++  const mouth=(1-smooth(Math.abs(x)/s.mouthHalfWidth))*(1-smooth(Math.abs(z-s.mouthCenterZ)/s.mouthHalfHeight))*smooth((s.mouthFrontY-y)/s.mouthFrontSpan);
++  const corner=(1-smooth(Math.abs(Math.abs(x)-s.cornerX)/s.cornerHalfWidth))*(1-smooth(Math.abs(z-s.mouthCenterZ)/s.cornerHalfHeight))*smooth((-.095-y)/.025);
++  return [x*(1-s.jawTaper*jaw)+s.mouthWiden*x*mouth,z-s.mouthCompress*(z-s.mouthCenterZ)*mouth+s.cornerLift*corner,front-s.mouthRecess*mouth];
++}
++const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
++const unit=v=>{const d=Math.hypot(...v);assert(d>1e-9);return v.map(x=>x/d);};
++function jacobian(p,s) {
++  const h=1e-5;
++  return [0,1,2].map(a=>{const lo=[...p],hi=[...p];lo[a]-=h;hi[a]+=h;const l=warp(lo,s),r=warp(hi,s);return r.map((v,i)=>(v-l[i])/(2*h));});
++}
++function normalAt(n,p,s) {
++  const j=jacobian(p,s),cof=[cross(j[1],j[2]),cross(j[2],j[0]),cross(j[0],j[1])];
++  return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
++}
++export function applyFaceContour(doc,record) {
++  assert.equal(record.spec.version,1);
++  const node=doc.getRoot().listNodes().find(n=>n.getName()===record.mesh);assert(node);
++  assert.deepEqual(node.getMatrix(),[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
++  let changed=0,maxMove=0;
++  for(const primitive of node.getMesh().listPrimitives()) {
++    const pos=primitive.getAttribute('POSITION'),normal=primitive.getAttribute('NORMAL'),tangent=primitive.getAttribute('TANGENT');
++    for(let i=0;i<pos.getCount();i++) {
++      const p=pos.getElement(i,[]),q=warp(p,record.spec);
++      const move=Math.hypot(...q.map((v,a)=>v-p[a]));
++      if(move>0){changed++;maxMove=Math.max(maxMove,move);}
++      const n=normal?.getElement(i,[]),nn=n?(move>0?normalAt(n,p,record.spec):n):null;
++      for(const [targetIndex,target] of primitive.listTargets().entries()) {
++        const scale=node.getMesh().getExtras().targetNames[targetIndex]==='Expression_Smile'?record.spec.smileScale:1;
++        if(move===0&&scale===1)continue;
++        const dp=target.getAttribute('POSITION'),dn=target.getAttribute('NORMAL');
++        const d=dp.getElement(i,[]),pp=p.map((v,a)=>v+d[a]),qq=warp(pp,record.spec);
++        dp.setElement(i,qq.map((v,a)=>(v-q[a])*scale));
++        if(dn){
++          const nd=dn.getElement(i,[]);
++          // Preserve inactive morph vertices exactly. Renormalizing an unchanged
++          // float normal would introduce tiny deltas across the entire body.
++          if(d.every(v=>v===0)&&nd.every(v=>v===0))dn.setElement(i,[0,0,0]);
++          else {const posedNormal=normalAt(n.map((v,a)=>v+nd[a]),pp,record.spec);dn.setElement(i,posedNormal.map((v,a)=>(v-nn[a])*scale));}
++        }
++      }
++      if(move===0)continue;
++      if(tangent){const t=tangent.getElement(i,[]),j=jacobian(p,record.spec),tt=unit([0,1,2].map(a=>j.reduce((v,col,k)=>v+col[a]*t[k],0)));tangent.setElement(i,[...tt,t[3]]);}
++      pos.setElement(i,q);if(normal)normal.setElement(i,nn);
++    }
++  }
++  return {changedVertices:changed,maximumDisplacementMm:maxMove*1000};
++}

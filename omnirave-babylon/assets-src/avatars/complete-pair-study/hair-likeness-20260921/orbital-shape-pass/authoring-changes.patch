@@ -1,0 +1,77 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -14,7 +14,7 @@
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 5,
++    'version': 6,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -37,7 +37,7 @@
+     'noseHalfWidth': .024, 'noseFrontY': -.124, 'noseFrontSpan': .022,
+     'noseRecess': .0022, 'noseTaper': .05,
+     'outerEyeLift': .0013,
+-    'innerBrowLift': .0022, 'browArchRelax': .0006,
++    'innerBrowLift': .0040, 'browArchRelax': .0012,
+     'cupidDip': .00085, 'cupidPeak': .00030, 'upperLipRecess': .0009,
+     'buccalCenterX': .045, 'buccalHalfWidth': .024,
+     'buccalCenterZ': 1.559, 'buccalHalfHeight': .034,
+@@ -47,6 +47,9 @@
+     'noseTipRecess': .0016, 'noseTipLift': .0011, 'noseWingInset': .0010,
+     'lipShoulderCompress': .12, 'lipShoulderRecess': .0008,
+     'upperLipBalanceRecess': .0009, 'lowerLipBalanceRecess': .0005,
++    'eyeCenterX': .02827054, 'eyeCenterZ': 1.6091883,
++    'eyeHalfWidth': .026, 'eyeHalfHeight': .018,
++    'eyeOpeningCompress': .10, 'upperLidLower': .00035,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+@@ -148,6 +151,14 @@
+         lower = (1-smooth(abs(q[:, 0])/.018))*(1-smooth(abs(q[:, 2]-1.537)/.009))*lip_front
+         q[:, 1] += spec['lipShoulderRecess']*shoulder+spec['upperLipBalanceRecess']*upper+spec['lowerLipBalanceRecess']*lower
+         q[:, 2] -= spec['lipShoulderCompress']*(q[:, 2]-spec['mouthCenterZ'])*shoulder
++    if spec['version'] >= 6:
++        # Eyelids, surrounding orbital skin and lash roots share this field.
++        # The eyeballs and irises retain their original center and size.
++        orbital = 1-smooth(abs(abs(p[:, 0])-spec['eyeCenterX'])/spec['eyeHalfWidth'])
++        orbital *= 1-smooth(abs(p[:, 2]-spec['eyeCenterZ'])/spec['eyeHalfHeight'])
++        orbital *= smooth((-.101-p[:, 1])/.018)
++        upper = smooth((p[:, 2]-spec['eyeCenterZ'])/.005)
++        q[:, 2] -= (spec['eyeOpeningCompress']*(p[:, 2]-spec['eyeCenterZ'])+spec['upperLidLower']*upper)*orbital
+     return q
+ 
+ 
+@@ -184,7 +195,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, fuller lower cheeks, rounded chin, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, balanced lip projection, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower cheeks, rounded chin, eased inner brow angle, narrower eye openings with slightly lowered upper lids, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -53,6 +53,11 @@
+     q[2]-=s.lipShoulderRecess*shoulder+s.upperLipBalanceRecess*upper+s.lowerLipBalanceRecess*lower;
+     q[1]-=s.lipShoulderCompress*(q[1]-s.mouthCenterZ)*shoulder;
+   }
++  if(s.version>=6) {
++    const orbital=(1-smooth(Math.abs(Math.abs(x)-s.eyeCenterX)/s.eyeHalfWidth))*(1-smooth(Math.abs(z-s.eyeCenterZ)/s.eyeHalfHeight))*smooth((-.101-y)/.018);
++    const upper=smooth((z-s.eyeCenterZ)/.005);
++    q[1]-=(s.eyeOpeningCompress*(z-s.eyeCenterZ)+s.upperLidLower*upper)*orbital;
++  }
+   return q;
+ }
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+@@ -66,7 +71,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4,5].includes(record.spec.version));
++  assert([1,2,3,4,5,6].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

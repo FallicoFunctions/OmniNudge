@@ -1,0 +1,132 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -329,12 +329,16 @@
+         shape_front_sweep(mapping,report,apply_geometry)
+         from refine_female_crown_breakup import break_up_crown
+         break_up_crown(mapping,report,apply_geometry)
++        from refine_female_pony_shape import narrow_pony
++        narrow_pony(mapping,report,apply_geometry)
+     else:
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+         soften_waves(mapping,report,apply_geometry)
+         from refine_male_loose_fringe import loosen
+         loosen(mapping,report,apply_geometry)
++        from refine_male_hairline import lower_hairline
++        lower_hairline(mapping,report,apply_geometry)
+     atlas=strand_texture(sex);materials=finish_materials(sex,atlas)
+     if sex=='female':
+         materials.update(scalp_finish())
+--- before/refine_female_pony_shape.py
++++ refine_female_pony_shape.py
+@@ -0,0 +1,43 @@
++"""Narrow the broad outer pony fan while retaining its loose ends and layers.
++
++Connection map: the first five pairs of every long card remain at their crown
++attachment. A shared smooth lateral field gathers the outer free span toward
++the existing inner pony. Cheek wisps, core, inner fibers and short crown wisps
++stay fixed. The front locks fit outside the collar across 31 authored poses;
++thin hair uses millimeter clearances rather than structural overlap. Existing
++rig/object origins, topology, UVs, pigment and relative hair shapes stay intact.
++"""
++import bpy, numpy as np
++from assemble_complete_pair import array
++from complete_pair_geometry import smooth
++from refine_complete_groom_finish import islands
++from refine_female_face_fall import NAMES, fit_front_collar
++
++
++def narrow_pony(mapping, report, apply):
++    records={};parts={n:[] for n in NAMES};saved_uv={}
++    for name in NAMES:
++        ob=bpy.data.objects[name];p=array(ob);q=p.copy();roots=[];count=0
++        for ids in islands(ob):
++            if len(ids)!=36:continue
++            r=p[ids];weight=smooth((-r[:,0]-.110)/.080)
++            weight*=1-smooth((r[:,2]-1.65)/.10)
++            q[ids,0]+=.030*weight
++            roots.extend(ids[:10])
++            if np.any(q[ids]!=p[ids]):
++                count+=1
++                # Only locks already falling in front of the shoulder receive
++                # front-collar fitting; rear locks retain their existing side.
++                if r[-6:,1].mean()<0:parts[name].append(ids)
++        assert np.array_equal(q[roots],p[roots]),(name,'crown anchors')
++        prior=dict(report[name]);old_mapping=dict(mapping[name])
++        if 'addedUv' in old_mapping:saved_uv[name]=old_mapping['addedUv']
++        apply(ob,q,mapping,report)
++        report[name].update({k:v for k,v in prior.items() if k not in report[name]})
++        records[name]={'changedCards':count,'maximumLateralMoveMm':float(np.max(abs(q[:,0]-p[:,0]))*1000)}
++    fit=fit_front_collar(parts,mapping,report,apply,retained_pairs=5)
++    for name,uv in saved_uv.items():mapping[name]['addedUv']=uv
++    report['ponyShape']={'meshes':records,'retainedRootPairs':5,
++        'outerFieldStartX':-.110,'outerFieldSpan':.080,'maximumFieldMoveMm':30,
++        'frontCollarFit':fit,'addedGeometry':0,'relativeSecondaryShapesRetained':True,
++        'textureAndPigmentRetained':True}
+--- before/refine_female_face_fall.py
++++ refine_female_face_fall.py
+@@ -95,10 +95,10 @@
+         'addedGeometry':0,'relativeSecondaryShapesRetained':True}
+ 
+ 
+-def fit_front_collar(cards,mapping,report,apply):
++def fit_front_collar(cards,mapping,report,apply,retained_pairs=4):
+     rig=bpy.data.objects['AvatarSkeleton'];scene=bpy.context.scene
+     bases={n:array(bpy.data.objects[n]) for n in NAMES};amplitudes={n:np.zeros(len(cards[n])) for n in NAMES}
+-    ramp=smooth((np.linspace(0,1,18)-3/17)/.48)
++    ramp=smooth((np.linspace(0,1,18)-(retained_pairs-1)/17)/.48)
+     cases=[]
+     for clip in ['idle','walk','run']:
+         for frame in np.linspace(*bpy.data.actions[clip].frame_range,9):cases.append((clip,float(frame),{}))
+@@ -117,7 +117,7 @@
+                 for i,ids in enumerate(cards[name]):
+                     old=amplitudes[name][i];needed=old;card=points[ids].reshape(18,2,3)
+                     posed=card-direction[None,None,:]*old*ramp[:,None,None]
+-                    for j in range(4,18):
++                    for j in range(retained_pairs,18):
+                         for point in posed[j]:
+                             if point[2]>1.63:continue
+                             for tree in coats:
+--- before/validate_female_cascade.py
++++ validate_female_cascade.py
+@@ -30,7 +30,7 @@
+     body=Surface(rig,bpy.data.objects['AvatarBody'])
+     coats=[Surface(rig,bpy.data.objects[n]) for n in ['Structured armhole jacket','PLURR folded hood']]
+     body_min=float('inf');coat_min=float('inf');body_count=0;coat_count=0;closest=None;closest_coat=None
+-    intersections=0;witnesses=[]
++    intersections=0;body_intersections=0;witnesses=[]
+     for name in names:
+         all_points=array(bpy.data.objects[name],True);points=all_points[indices[name]]
+         for vertex,p in zip(indices[name],points):
+@@ -61,9 +61,11 @@
+             card=all_points[ids]
+             for j in range(4,18):
+                 for a,b in [(card[j-1,0],card[j,0]),(card[j-1,1],card[j,1]),(card[j,0],card[j,1])]:
+-                    if min(a[2],b[2])>1.63:continue
+                     direction=Vector(b-a);length=direction.length
+                     if length<1e-8:continue
++                    hit,_,_,_=body.tree.ray_cast(Vector(a),direction.normalized(),length)
++                    if hit is not None:body_intersections+=1
++                    if min(a[2],b[2])>1.63:continue
+                     for coat in coats:
+                         hit,_,_,_=coat.tree.ray_cast(Vector(a),direction.normalized(),length)
+                         if hit is not None:
+@@ -72,14 +74,16 @@
+     report.append({'clip':clip,'frame':frame,'shape':pose,'bodySamples':body_count,'closestBodyPoint':closest,
+         'minimumBodyClearanceMm':body_min*1000,'jacketSurfaceSamples':coat_count,
+         'closestJacketPoint':closest_coat,
+-        'strandEdgeJacketIntersections':intersections,'intersectionWitnesses':witnesses,
++        'strandEdgeBodyIntersections':body_intersections,'strandEdgeJacketIntersections':intersections,'intersectionWitnesses':witnesses,
+         'minimumJacketClearanceMm':coat_min*1000 if coat_count else None})
+ result={'samples':report,'minimumBodyClearanceMm':min(r['minimumBodyClearanceMm'] for r in report),
+     'minimumJacketClearanceMm':min(r['minimumJacketClearanceMm'] for r in report if r['jacketSurfaceSamples']),
++    'maximumStrandEdgeBodyIntersections':max(r['strandEdgeBodyIntersections'] for r in report),
+     'maximumStrandEdgeJacketIntersections':max(r['strandEdgeJacketIntersections'] for r in report),
+-    'scope':'31 finite native clip/secondary-shape poses; both edges of every existing long pony card from samples 4–17 of 18, including all free ends. Body side uses front/back Y-ray columns and nearest-surface distance; jacket clearance accepts either exterior Y-ray surface through height 1.63 m, with longitudinal/cross-card edge ray checks against actual coat triangles. Not continuous collision, full triangle-interior contact, self-contact, hidden carrier, simplified LOD or arbitrary runtime-pose proof.'}
++    'scope':'31 finite native clip/secondary-shape poses; both edges of every existing long pony card from samples 4–17 of 18, including all free ends. Body side uses front/back Y-ray columns and nearest-surface distance; jacket clearance accepts either exterior Y-ray surface through height 1.63 m, with longitudinal/cross-card edge ray checks against actual body and coat triangles. Not continuous collision, full triangle-interior contact, self-contact, hidden carrier, simplified LOD or arbitrary runtime-pose proof.'}
+ (folder/'female-cascade-clearance.json').write_text(json.dumps(result,indent=2)+'\n')
+ print('CASCADE_CLEARANCE',json.dumps({k:v for k,v in result.items() if k!='samples'}),flush=True)
+ assert result['minimumBodyClearanceMm']>0,result['minimumBodyClearanceMm']
+ assert result['minimumJacketClearanceMm']>0,result['minimumJacketClearanceMm']
+ assert result['maximumStrandEdgeJacketIntersections']==0,result['maximumStrandEdgeJacketIntersections']
++assert result['maximumStrandEdgeBodyIntersections']==0,result['maximumStrandEdgeBodyIntersections']

@@ -1,0 +1,11 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -62,7 +62,7 @@
+     'innerCheekFrontY': -.075, 'innerCheekFrontSpan': .045,
+     'innerCheekFullness': .0015,
+     'almondCompress': .11, 'almondPlateau': .009, 'almondFade': .009,
+-    'irisColorFactor': [1.0, .46, .24, 1.0],
++    'irisColorFactor': [.48, .20, .12, 1.0],
+ }
+ 
+ 

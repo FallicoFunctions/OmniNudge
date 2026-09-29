@@ -140,10 +140,12 @@ frontend/storybook-static/
 backend/omnichat_prompt_preview
 
 # Local generated / non-product artifacts
+.codex/cache/
 .git-lfs/
 .superpowers/
 .opencode/
 opencode.json
+.tooling/
 TMP_MAIN_STAGE_TEST.glb
 frontend/playwright-report/
 frontend/test-results/
@@ -163,3 +165,13 @@ tasks.json
 # extensionless pattern would hide real files.
 /omninudge
 /backend/bin/
+
+# Keep untracked avatar binaries out of routine Git scans: passing them through
+# the LFS filter repeatedly filled this worktree's local cache. Tracked assets
+# still work normally; stage a new approved binary explicitly with git add -f.
+/omnirave-babylon/**/*.blend
+/omnirave-babylon/**/*.glb
+
+# Local compiler output.
+/omnirave-babylon/tsconfig.tsbuildinfo
+/Test

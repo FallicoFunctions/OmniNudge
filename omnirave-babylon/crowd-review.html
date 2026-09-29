@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OmniRave · Crowd review</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#171a22;color:#f0f1f5;font:15px/1.5 system-ui}main{max-width:1500px;margin:auto;padding:20px}h1{margin:0;font-size:25px}p{color:#bbc1cf}.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}button,select,a{font:inherit;color:inherit;background:#303647;border:1px solid #5b647c;padding:7px 12px;border-radius:6px;text-decoration:none}button:disabled{opacity:.5}canvas{display:block;width:100%;height:66vh;min-height:400px;background:#22252d;touch-action:none;outline:0}output{display:block;margin:12px 0;color:#e6c899}pre{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;max-height:250px;overflow:auto;color:#bbc1cf}label{white-space:nowrap}
+</style>
+</head>
+<body><main><h1>Crowd review</h1><p>Both complete characters share loaded materials and geometry. Drag to orbit or scroll closer to inspect changes in detail.</p>
+<div class="controls"><label>Characters <select id="count"><option>8</option><option>16</option><option selected>32</option><option>64</option></select></label><label>Detail <select id="quality"><option value="adaptive">Automatic distance detail</option><option value="full">Full detail comparison</option></select></label><button id="reset">Reset view</button><button id="measure">Measure 5 seconds</button><a href="/complete-review.html">Character comparison</a></div>
+<label><input id="full-transmission" type="checkbox"> Full-quality transparency</label>
+<canvas id="canvas" aria-label="Animated avatar crowd"></canvas><output id="status" role="status">Loading crowd…</output><pre id="measurement" aria-label="Measurement results">Measurements use this browser, viewport and camera. Other devices can perform differently.</pre>
+</main><script type="module" src="/src/review/crowd.ts"></script></body></html>

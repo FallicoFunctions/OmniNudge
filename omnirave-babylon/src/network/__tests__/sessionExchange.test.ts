@@ -74,6 +74,7 @@ describe('exchangeLaunchSession', () => {
           worldSessionToken: 'jwt-token',
           activeZone: 'main_stage',
           mode: 'account',
+          sessionToken: 'profile-token',
         }),
       }),
     );
@@ -81,6 +82,7 @@ describe('exchangeLaunchSession', () => {
     const result = await exchangeLaunchSession({ mode: 'account', handoff: 'abc123' });
 
     expect(result?.mode).toBe('account');
+    expect(result?.sessionToken).toBe('profile-token');
   });
 
   it('carries the account saved appearance through so boot can skip the random guest avatar', async () => {
@@ -103,6 +105,18 @@ describe('exchangeLaunchSession', () => {
     const result = await exchangeLaunchSession({ mode: 'account', handoff: 'abc123' });
 
     expect(result?.loadout).toEqual({ av: '1', bb: 'f', tp: 'mesh-crop' });
+  });
+
+  it('does not grant profile saving from a guest response or a display-only account URL', async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    for (const mode of ['guest', undefined]) {
+      fetchMock.mockResolvedValue({ok:true,json:async () => ({
+        playerId:'fixture',playerName:'Fixture',worldSocketUrl:'ws://localhost/ws',worldSessionToken:'world',
+        activeZone:'main_stage',mode,sessionToken:'unexpected',
+      })});
+      const result = await exchangeLaunchSession({mode:'account',handoff:'fixture'});
+      expect(result?.sessionToken).toBeUndefined();
+    }
   });
 
   it('falls back to the requested mode when the response omits it', async () => {

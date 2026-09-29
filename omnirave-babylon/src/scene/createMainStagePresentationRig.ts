@@ -1,3 +1,4 @@
+import { combineVenueBloomAndColor } from './combineVenueBloomAndColor';
 // Post-process fragment shaders are not pulled in transitively by the ESM
 // pipeline modules; without these side-effect imports Babylon falls back to
 // fetching raw .fx files over HTTP, Vite answers with index.html, the GLSL
@@ -36,6 +37,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 const ENVIRONMENT_TEXTURE_SIZE = 16;
 
 import type { PerfFlags } from '../app/perfFlags';
+import { combineVenueFinishingPasses } from './combineVenueFinishingPasses';
 
 const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgl: false, debug: false, capture: false, worldUrl: null, worldToken: null, accountMode: false };
 
@@ -79,6 +81,30 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   pipeline.grainEnabled = true;
   pipeline.grain.intensity = 1.5;
   pipeline.grain.animated = false;
+  const localPerformanceParams = perfFlags.debug && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const optimized = (name: string) => !scene.metadata?.venuePerformanceBaseline && localPerformanceParams.get(name) !== '0';
+  // Local cost isolation retains the HDR input used by avatar refraction.
+  // Removing every postprocess would instead force a second scene render.
+  if (localPerformanceParams.get('isolateFinishing') === '1') {
+    pipeline.bloomEnabled = false;
+    pipeline.fxaaEnabled = false;
+    pipeline.sharpenEnabled = false;
+    pipeline.grainEnabled = false;
+    scene.metadata.venueFinishingIsolation = true;
+  }
+  if (optimized('fusedFinishing')) {
+    const caps = scene.getEngine().getCaps();
+    combineVenueFinishingPasses(scene, pipeline, caps.textureHalfFloatRender ? Constants.TEXTURETYPE_HALF_FLOAT
+      : caps.textureFloatRender ? Constants.TEXTURETYPE_FLOAT : Constants.TEXTURETYPE_UNSIGNED_BYTE);
+  }
+
+  if (optimized('fusedBloomColor')) {
+    const caps = scene.getEngine().getCaps();
+    combineVenueBloomAndColor(scene, pipeline, caps.textureHalfFloatRender ? Constants.TEXTURETYPE_HALF_FLOAT
+      : caps.textureFloatRender ? Constants.TEXTURETYPE_FLOAT : Constants.TEXTURETYPE_UNSIGNED_BYTE);
+  }
 
   return {
     backdropRoot,

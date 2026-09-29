@@ -37,6 +37,7 @@ type Config struct {
 	OmniChatVoice             OmniChatVoiceConfig
 	LiveKit                   LiveKitConfig
 	OmniChatBillingOffersJSON string
+	Tripo                     TripoConfig
 	Crypto                    CryptoConfig
 	OAuth                     OAuthConfig
 }
@@ -244,6 +245,12 @@ type LiveKitConfig struct {
 	APISecret      string
 	RoomPrefix     string
 	TokenTTLSecond int
+}
+
+// TripoConfig holds server-side credentials for the OmniAI-to-OmniAvatar
+// reconstruction pipeline. The API key must never be exposed to a frontend.
+type TripoConfig struct {
+	APIKey string // TRIPO_API_KEY
 }
 
 // TURNConfig holds coturn TURN server configuration for WebRTC relay
@@ -573,6 +580,9 @@ func Load() (*Config, error) {
 			GitHubClientSecret:  getEnv("GITHUB_CLIENT_SECRET", ""),
 			SteamAPIKey:         getEnv("STEAM_API_KEY", ""),
 			BackendURL:          getEnv("BACKEND_URL", "http://localhost:8080"),
+		},
+		Tripo: TripoConfig{
+			APIKey: getEnv("TRIPO_API_KEY", ""),
 		},
 	}
 	// RunPod workers return signed URLs from the same private object store that

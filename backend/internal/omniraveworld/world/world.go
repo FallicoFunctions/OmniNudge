@@ -20,12 +20,14 @@ type World struct {
 	cfg     Config
 	players map[string]*Player
 	mu      sync.RWMutex
+	show    *showControl
 }
 
 func NewWorld(cfg Config) *World {
 	return &World{
 		cfg:     cfg,
 		players: make(map[string]*Player),
+		show:    newShowControl(),
 	}
 }
 
@@ -37,6 +39,9 @@ func (w *World) AddPlayer(session PlayerSession) *Player {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if w.players[session.PlayerID] != nil {
+		w.removeShowPlayer(session.PlayerID)
+	}
 	spawn := w.cfg.SpawnPoint
 	if session.ReturnPoint != nil && w.cfg.Walkable.IsValid(*session.ReturnPoint) {
 		spawn = *session.ReturnPoint
@@ -64,13 +69,14 @@ func (w *World) ApplyInput(playerID string, frame InputFrame) {
 	defer w.mu.Unlock()
 
 	player, ok := w.players[playerID]
-	if !ok {
+	if !ok || player.ShowPanel != "" {
 		return
 	}
 
 	next := clampMoveTarget(player.Position, frame.MoveTo, maxMoveStep)
 	if w.cfg.Walkable.IsValid(next) {
 		player.Position = next
+		player.Crouched = frame.Crouched
 	}
 	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
 }
@@ -80,11 +86,12 @@ func (w *World) RespawnPlayer(playerID string) {
 	defer w.mu.Unlock()
 
 	player, ok := w.players[playerID]
-	if !ok {
+	if !ok || player.ShowPanel != "" {
 		return
 	}
 
 	player.Position = w.cfg.ZoneMap.SpawnFor(player.Zone, w.occupiedPositions(player.Zone, playerID))
+	player.Crouched = false
 	player.Zone = w.cfg.ZoneMap.ZoneFor(player.Position)
 }
 
@@ -112,6 +119,7 @@ func (w *World) RemovePlayer(playerID string, session *Player) {
 	defer w.mu.Unlock()
 
 	if current, ok := w.players[playerID]; ok && current == session {
+		w.removeShowPlayer(playerID)
 		delete(w.players, playerID)
 	}
 }
@@ -156,6 +164,7 @@ func (w *World) SnapshotForPlayer(playerID string, zoneMedia []ZoneMediaState, z
 		ZoneEvents:      zoneEvents,
 		CurrentPlayerID: playerID,
 		ActiveZone:      activeZone,
+		ShowControl:     w.show.snapshot(),
 	}
 }
 

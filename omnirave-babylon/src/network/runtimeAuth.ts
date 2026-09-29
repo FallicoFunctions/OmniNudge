@@ -25,14 +25,16 @@ export interface RuntimeAuthSession {
   playerName: string;
   worldSocketUrl: string;
   worldSessionToken: string;
+  /** Separate account credential for profile writes; never persist it in browser storage. */
+  sessionToken?: string;
   activeZone: string;
   mode: string;
   // The ACCOUNT's saved appearance (empty for a brand-new account or a guest
   // logout) - see session_service.go's BuildRuntimeAccountSession: if this is
   // empty AND the request carried currentLoadout, the server seeds the
   // account with the guest appearance the player already had instead of
-  // handing back nothing. createRuntime.ts applies this live via
-  // parseAvatarLoadout + reviewRuntime.setAvatarDefinition - no page reload.
+  // handing back nothing. createRuntime.ts restores the model and wardrobe
+  // before reconnecting the world session, without reloading the scene.
   loadout: Record<string, string>;
 }
 
@@ -104,6 +106,8 @@ async function postRuntimeAuth(path: string, body: unknown): Promise<RuntimeAuth
     playerName: data.playerName,
     worldSocketUrl: data.worldSocketUrl,
     worldSessionToken: data.worldSessionToken,
+    ...(data.mode === 'account' && typeof data.sessionToken === 'string' && data.sessionToken
+      ? { sessionToken: data.sessionToken } : {}),
     activeZone: data.activeZone,
     mode: data.mode,
     loadout: isStringRecord(data.loadout) ? data.loadout : {},

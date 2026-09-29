@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>OmniRave · Fireworks review</title>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div><p class="eyebrow">OMNIRAVE / EFFECT STUDIES</p><h1>Fireworks review</h1></div>
+      <nav aria-label="Review pages"><a href="/complete-review.html">Avatar review</a><a href="/">Venue</a></nav>
+    </header>
+    <p class="intro">One firework at a time. Drag to orbit, scroll to zoom, or pause and scrub to inspect a moment.</p>
+    <div class="studio">
+      <aside>
+        <fieldset id="library-controls" disabled>
+          <legend>Design library</legend>
+          <label class="field">Firework<select id="firework" aria-label="Firework"></select></label>
+          <div class="pair"><button id="previous" type="button">← Previous</button><button id="next" type="button">Next →</button></div>
+          <p id="design-description"></p>
+          <dl class="brief"><dt>Rising tail</dt><dd id="tail-brief"></dd><dt>Explosion</dt><dd id="explosion-brief"></dd></dl>
+          <details><summary>Sound direction</summary><p id="sound-brief"></p><p class="note">Procedural sound study. Final recorded and mastered sounds will follow individual review.</p></details>
+          <div class="seed-row"><label class="field">Variation<input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label><button id="variation" type="button">New variation</button></div>
+          <p class="note">Replay keeps the same variation.</p>
+        </fieldset>
+      </aside>
+      <section class="viewer" aria-label="Live firework viewer">
+        <div class="sky">
+          <canvas id="firework-canvas" aria-label="Interactive 3D firework. Drag to orbit and scroll to zoom."></canvas>
+          <div class="sky-label"><span id="design-name">Loading design…</span><span id="phase">Loading</span></div>
+          <div class="sky-caption">Animated design study</div>
+        </div>
+        <fieldset id="playback-controls" disabled>
+          <legend class="sr-only">Playback and inspection</legend>
+          <div class="transport"><button id="play" type="button" class="primary">Pause</button><button id="replay" type="button">Replay</button><button id="break" type="button">Inspect burst</button>
+            <label class="inline">Speed<select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label>
+            <label class="inline"><input id="loop" type="checkbox" checked>Repeat this firework</label>
+          </div>
+          <label class="timeline">Firework time <output id="time-label" aria-live="off">0.00 / 0.00 s</output><input id="time" aria-label="Firework time" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <div class="controls-row" aria-label="Camera views"><span class="control-label">View</span><button type="button" data-view="flight" aria-pressed="true">Whole flight</button><button type="button" data-view="burst">Burst close-up</button><button type="button" data-view="side">Side</button><button type="button" data-view="ground">From ground</button></div>
+          <div class="controls-row"><label class="inline"><input type="checkbox" id="bloom" checked>Bloom</label><label class="inline"><input type="checkbox" id="trails" checked>Trails</label><label class="inline"><input type="checkbox" id="sparks" checked>Fine sparks</label><label class="inline"><input type="checkbox" id="smoke" checked>Smoke</label><label class="inline"><input type="checkbox" id="guides">Ground guides</label>
+            <label class="inline">Detail<select id="quality"><option value="high">High</option><option value="low">Reduced</option></select></label></div>
+          <div class="controls-row audio-row"><label class="inline"><input type="checkbox" id="sound">Sound</label><label class="inline volume">Volume<input id="volume" type="range" min="0" max="100" value="30" aria-label="Sound volume"></label><span id="audio-status" class="note" role="status">Sound off · audition at 1× speed</span></div>
+          <div class="controls-row"><button id="copy-link" type="button">Copy this view</button><button id="save-frame" type="button">Save frame</button><span id="performance" class="note"></span></div>
+        </fieldset>
+      </section>
+    </div>
+    <p id="status" role="status">Preparing the review scene…</p>
+  </main>
+  <script type="module" src="/src/review/fireworks.ts"></script>
+</body>
+</html>

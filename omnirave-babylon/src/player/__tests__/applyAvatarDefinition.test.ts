@@ -1,6 +1,11 @@
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { Material } from '@babylonjs/core/Materials/material.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { MorphTarget } from '@babylonjs/core/Morph/morphTarget.js';
+import { MorphTargetManager } from '@babylonjs/core/Morph/morphTargetManager.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { applyAvatarDefinition, resolveAvatarPalette } from '../applyAvatarDefinition';
@@ -45,6 +50,7 @@ describe('applyAvatarDefinition', () => {
       jacket: 'bomber',
       bottoms: 'cargo-pants',
       shoes: 'work-boots',
+      accessories: 'gold-hoops',
     };
     applyAvatarDefinition(avatar, definition);
     const palette = resolveAvatarPalette(definition);
@@ -58,9 +64,60 @@ describe('applyAvatarDefinition', () => {
     expect(albedoHex(scene, 'review-avatar-right-shoe')).toBe(palette.shoesHex);
   });
 
+  it('preserves complete character geometry and materials when the runtime seeds a legacy loadout', () => {
+    avatar.root.metadata.avatarCompleteCharacter = 'female';
+    const originalScale = avatar.root.scaling.clone();
+    const originalMaterials = avatar.meshes.map(mesh => mesh.material);
+    const originalMeshScales = avatar.meshes.map(mesh => mesh.scaling.clone());
+    const result = applyAvatarDefinition(avatar, {
+      ...DEFAULT_AVATAR_DEFINITION,
+      bodyBase: 'male', heightInches: 84, skinTone: 'ebony', top: 'henley', shoes: 'work-boots',
+    });
+    expect(avatar.root.scaling.equals(originalScale)).toBe(true);
+    avatar.meshes.forEach((mesh, index) => {
+      expect(mesh.material).toBe(originalMaterials[index]);
+      expect(mesh.scaling.equals(originalMeshScales[index])).toBe(true);
+    });
+    expect(avatar.root.metadata.avatarDefinition).toBe(result);
+    expect(result.bodyBase).toBe('female');
+    expect(result.heightInches).toBe(71);
+  });
+
   it('uses PBR materials only - StandardMaterial renders flat white here', () => {
     applyAvatarDefinition(avatar, DEFAULT_AVATAR_DEFINITION);
     expect(avatar.meshes.every((mesh) => mesh.material instanceof PBRMaterial)).toBe(true);
+  });
+
+  it('keeps fitted footwear opaque when an authored texture contains alpha', () => {
+    const shoe = scene.getMeshByName('review-avatar-left-shoe')!;
+    const base = shoe.material as PBRMaterial;
+    base.transparencyMode = Material.MATERIAL_ALPHABLEND;
+    base.useAlphaFromAlbedoTexture = true;
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, shoes: 'work-boots' });
+
+    const material = shoe.material as PBRMaterial;
+    expect(material.transparencyMode).toBe(Material.MATERIAL_OPAQUE);
+    expect(material.useAlphaFromAlbedoTexture).toBe(false);
+  });
+
+  it('preserves authored facial submaterials carried by skin-shell GLB primitives', () => {
+    const eyePrimitive = MeshBuilder.CreateBox('AvatarLuxury_male_skin_face_shell_primitive1', { size: 1 }, scene);
+    const eyeMaterial = new PBRMaterial('AvatarLuxuryEyeWhite', scene);
+    eyeMaterial.albedoColor.set(0.72, 0.68, 0.61);
+    eyePrimitive.material = eyeMaterial;
+    eyePrimitive.metadata = {
+      avatarBodyBase: 'male',
+      avatarBodySurface: 'skin',
+      avatarPartRole: 'skin',
+      avatarPreserveMaterial: true,
+    };
+    avatar.meshes.push(eyePrimitive);
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, skinTone: 'ebony' });
+
+    expect(eyePrimitive.material).toBe(eyeMaterial);
+    expect(hexOf(eyeMaterial)).toBe('#b8ad9c');
   });
 
   it('paints the legs only when the bottoms are full length', () => {
@@ -111,6 +168,135 @@ describe('applyAvatarDefinition', () => {
       return scene.getMeshByName('review-avatar-hips')!.scaling.x;
     };
     expect(hipsWidth('pleated-skirt')).toBeGreaterThan(hipsWidth('cargo-pants'));
+  });
+
+  it('shows exactly one authored body base and retires fallback anatomy', () => {
+    const male = MeshBuilder.CreateBox('AvatarBody_male', { size: 1 }, scene);
+    male.material = new PBRMaterial('AvatarSkinBase_male', scene);
+    male.metadata = { avatarBodyBase: 'male', avatarPartRole: 'skin' };
+    const female = MeshBuilder.CreateBox('AvatarBody_female', { size: 1 }, scene);
+    female.material = new PBRMaterial('AvatarSkinBase_female', scene);
+    female.metadata = { avatarBodyBase: 'female', avatarPartRole: 'skin' };
+    avatar.meshes.push(male, female);
+    avatar.root.metadata = { ...avatar.root.metadata, avatarAuthoredBodiesLoaded: true };
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'male' });
+    expect(male.isEnabled()).toBe(true);
+    expect(female.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-head')!.isEnabled()).toBe(false);
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'female' });
+    expect(male.isEnabled()).toBe(false);
+    expect(female.isEnabled()).toBe(true);
+  });
+
+  it('switches the shared modular body and detail morphs without swapping skeletons', () => {
+    const modularBody = MeshBuilder.CreateBox('AvatarBody', { size: 1 }, scene);
+    modularBody.material = new PBRMaterial('AvatarSkin', scene);
+    const manager = new MorphTargetManager(scene);
+    const male = MorphTarget.FromMesh(modularBody, 'male', 0);
+    const female = MorphTarget.FromMesh(modularBody, 'female', 0);
+    const lean = MorphTarget.FromMesh(modularBody, 'lean', 0);
+    manager.addTarget(male);
+    manager.addTarget(female);
+    manager.addTarget(lean);
+    modularBody.morphTargetManager = manager;
+    modularBody.metadata = {
+      avatarAssetKind: 'body',
+      avatarBodySurface: 'skin',
+      avatarModularMorph: true,
+      avatarPartRole: 'skin',
+    };
+    avatar.meshes.push(modularBody);
+    avatar.root.metadata = {
+      ...avatar.root.metadata,
+      avatarAuthoredBodiesLoaded: true,
+      avatarAuthoredCharacterBases: ['male', 'female'],
+      avatarLeanMorphActive: true,
+    };
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'female' });
+    expect(male.influence).toBe(0);
+    expect(female.influence).toBe(1);
+    expect(lean.influence).toBe(1);
+    expect(modularBody.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('review-avatar-head')!.isEnabled()).toBe(false);
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'male' });
+    expect(male.influence).toBe(1);
+    expect(female.influence).toBe(0);
+    expect(lean.influence).toBe(1);
+
+    avatar.root.metadata = { ...avatar.root.metadata, avatarLeanMorphActive: false };
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'female' });
+    expect(male.influence).toBe(0);
+    expect(female.influence).toBe(1);
+    expect(lean.influence).toBe(0);
+  });
+
+  it('enables only the selected fitted option in each modular slot', () => {
+    const hairNone = new TransformNode('AvatarOption_hair__none', scene);
+    const crop = new TransformNode('AvatarOption_hair__textured-crop', scene);
+    const longWaves = new TransformNode('AvatarOption_hair__long-waves', scene);
+    const topNone = new TransformNode('AvatarOption_top__none', scene);
+    const tee = new TransformNode('AvatarOption_top__graphic-tee', scene);
+    avatar.slotOptions = new Map([
+      ['hair', new Map([
+        ['none', hairNone],
+        ['textured-crop', crop],
+        ['long-waves', longWaves],
+      ])],
+      ['top', new Map([
+        ['none', topNone],
+        ['graphic-tee', tee],
+      ])],
+    ]);
+
+    applyAvatarDefinition(avatar, {
+      ...DEFAULT_AVATAR_DEFINITION,
+      hairStyle: 'long-waves',
+      top: 'graphic-tee',
+    });
+    expect(longWaves.isEnabled()).toBe(true);
+    expect(crop.isEnabled()).toBe(false);
+    expect(hairNone.isEnabled()).toBe(false);
+    expect(tee.isEnabled()).toBe(true);
+    expect(topNone.isEnabled()).toBe(false);
+
+    applyAvatarDefinition(avatar, {
+      ...DEFAULT_AVATAR_DEFINITION,
+      hairStyle: 'buzz',
+      top: 'henley',
+    });
+    expect(hairNone.isEnabled()).toBe(false);
+    expect(crop.isEnabled()).toBe(true);
+    expect(longWaves.isEnabled()).toBe(false);
+    expect(topNone.isEnabled()).toBe(false);
+    expect(tee.isEnabled()).toBe(true);
+  });
+
+  it('retires the entire procedural fallback when a complete authored character is selected', () => {
+    const maleBody = MeshBuilder.CreateBox('AvatarBody_male', { size: 1 }, scene);
+    maleBody.material = new PBRMaterial('AvatarSkinBase_male', scene);
+    maleBody.metadata = { avatarBodyBase: 'male', avatarPartRole: 'skin' };
+    const bomber = MeshBuilder.CreateBox('AvatarLuxury_male_jacket_front', { size: 1 }, scene);
+    bomber.material = new PBRMaterial('AvatarLuxuryPearlSatin', scene);
+    bomber.metadata = { avatarBodyBase: 'male', avatarPartRole: 'jacket' };
+    avatar.meshes.push(maleBody, bomber);
+    avatar.root.metadata = {
+      ...avatar.root.metadata,
+      avatarAuthoredBodiesLoaded: true,
+      avatarAuthoredCharacterBases: ['male'],
+    };
+
+    applyAvatarDefinition(avatar, { ...DEFAULT_AVATAR_DEFINITION, bodyBase: 'male' });
+
+    expect(maleBody.isEnabled()).toBe(true);
+    expect(bomber.isEnabled()).toBe(true);
+    expect(scene.getMeshByName('review-avatar-head')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-jacket')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-visor')!.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('review-avatar-back-halo')!.isEnabled()).toBe(false);
   });
 
   it('is idempotent and caches its material clones instead of leaking one per call', () => {

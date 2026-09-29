@@ -1,0 +1,177 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -294,6 +294,8 @@
+         drape_shoulder(mapping,report,apply_geometry)
+         from refine_female_dye import color_pony
+         color_pony(mapping,report)
++        from refine_brunette_fibers import prepare_tints
++        prepare_tints(mapping,report)
+     else:
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+@@ -309,6 +311,9 @@
+         materials.update(extra_materials)
+     from refine_loose_pony import finish_fiber_normals
+     finish_fiber_normals(materials,save_texture,sex)
++    if sex=='female':
++        from refine_brunette_fibers import finish_brunette
++        finish_brunette(materials,save_texture)
+     assert preserved=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.get('avatarSlot')!='hair'}
+     rig.data.pose_position='POSE';rig.animation_data.action=bpy.data.actions['idle'];bpy.context.scene.frame_set(1)
+     bpy.context.preferences.filepaths.save_version=0
+--- before/refine_female_crown.py
++++ refine_female_crown.py
+@@ -254,13 +254,16 @@
+         bs.inputs['Specular IOR Level'].default_value=.18;bs.inputs['Roughness'].default_value=.57
+         materials[mat.name]={'color':color,'roughness':.57,'specular':.36,'texture':'female-braid-fibers.png' if is_braid else 'female-reference-hair-fibers.png','opaque':is_braid,'alphaCutoff':.32}
+         me=ob.data;me.calc_loop_triangles();me.update();uvs=me.uv_layers.active.data
+-        positions=[];normals=[];uv=[];indices=[];lookup={}
++        positions=[];normals=[];uv=[];indices=[];lookup={};colors=[]
++        tint=me.color_attributes.get('ReferenceHairTint')
+         for tri in me.loop_triangles:
+             for vi,li in zip(tri.vertices,tri.loops):
+                 texuv=tuple(uvs[li].uv);key=(vi,texuv)
+                 if key not in lookup:
+                     lookup[key]=len(positions);p=me.vertices[vi].co;n=me.vertices[vi].normal
+                     positions.append([p.x,p.z,-p.y]);normals.append([n.x,n.z,-n.y]);uv.append([texuv[0],1-texuv[1]])
++                    if tint:colors.append(list(tint.data[vi].color))
+                 indices.append(lookup[key])
+-        output.append({'name':ob.name,'material':mat.name,'positions':positions,'normals':normals,'uv':uv,'indices':indices,'extras':dict(ob.items())})
++        output.append({'name':ob.name,'material':mat.name,'positions':positions,'normals':normals,'uv':uv,'indices':indices,'extras':dict(ob.items()),
++            **({'colors':colors} if colors else {})})
+     return output,materials
+--- before/refine_brunette_fibers.py
++++ refine_brunette_fibers.py
+@@ -0,0 +1,80 @@
++"""Pigment and aligned fiber normals on the retained female brunette cards.
++
++No geometry, UV, alpha coverage, origins or attachments change. Two shared
++256x1024 maps replace the brunette materials' shared pony maps; two vertex
++color attributes vary neighboring locks without adding materials or meshes.
++"""
++import math
++import bpy,numpy as np
++from assemble_complete_pair import array
++from complete_pair_geometry import smooth
++from refine_complete_groom_finish import islands
++
++NAMES=['PLURR swept scalp groom','PLURR loose brunette front locks']
++
++
++def prepare_tints(mapping,report):
++    for name in NAMES:
++        ob=bpy.data.objects[name];p=array(ob);colors=np.ones((len(p),4))
++        parts=islands(ob)
++        for i,ids in enumerate(parts):
++            root=p[ids[:2 if name==NAMES[0] else 3]].mean(0)
++            phase=root[0]*130+root[1]*90
++            if name==NAMES[0]:shade=.78+.15*math.sin(phase)+.065*math.sin(i*2.399963)
++            else:shade=[.82,.72,.90,.73,.87,.78,.84][i//5]*(.87+.13*(.5+.5*math.sin(i*2.399963)))
++            colors[ids,:3]=[shade,shade*(.97+.025*math.cos(phase)),shade*(.94+.035*math.sin(phase))]
++        assert 0<=colors.min() and colors.max()<=1
++        attr=ob.data.color_attributes.get('ReferenceHairTint') or ob.data.color_attributes.new(name='ReferenceHairTint',type='FLOAT_COLOR',domain='POINT')
++        attr.data.foreach_set('color',colors.astype(np.float32).ravel())
++        if name in mapping:mapping[name]['addedColors']=colors.tolist()
++        report[name]['tintedLocks']=len(parts)
++
++
++def finish_brunette(materials,save_texture):
++    h,w=1024,256;v,u=np.mgrid[0:h,0:w].astype(float);u=(u+.5)/w;v=(v+.5)/h
++    alpha=np.zeros((h,w));pigment=np.zeros((h,w));normal=np.zeros((h,w,3));normal[:,:,2]=1
++    rng=np.random.default_rng(921)
++    for i in range(11):
++        # Exactly the same fiber boundaries and root/tip fades as the retained
++        # atlas. Color and normals follow each fiber's individual curved path.
++        center=.07+i*.086+.013*np.sin(v*8+i*.8)
++        width=rng.uniform(.016,.026)*(1-.7*smooth((v-.60)/.40))
++        coverage=np.clip((width-np.abs(u-center))/.004+.5,0,1)
++        end=rng.uniform(.80,1.04);rng.uniform(.68,1.0)
++        coverage*=np.clip((end-v)/.07,0,1)*smooth(v/.055)
++        shade=.48+.42*(.5+.5*math.sin(i*2.399963+.7))
++        pigment+=coverage*shade
++        nx=.52*np.clip((u-center)/np.maximum(width,.0001),-1,1)
++        ny=-nx*.104*np.cos(v*8+i*.8)
++        n=np.stack([nx,ny,np.sqrt(1-nx*nx-ny*ny)],axis=2)
++        selected=coverage>alpha;normal[selected]=n[selected]
++        alpha=np.maximum(alpha,coverage)
++    previous=np.array(bpy.data.images['female-reference-hair-fibers'].pixels[:]).reshape(h,w,4)
++    # Blender's byte image buffer quantizes the analytic coverage. Reuse that
++    # stored alpha exactly; tolerate only its one-byte rounding in this check.
++    assert np.max(np.abs(alpha-previous[:,:,3]))<=1/255+1e-7,'Brunette coverage changed'
++    rgba=np.ones((h,w,4));rgba[:,:,:3]=(np.clip(pigment/np.maximum(alpha,.001),.25,1)*(.48+.52*smooth(v/.22)))[:,:,None]
++    rgba[:,:,3]=previous[:,:,3]
++    color_image=save_texture('female-brunette-fibers',rgba)
++    assert np.array_equal(np.array(color_image.pixels[:]).reshape(h,w,4)[:,:,3],previous[:,:,3])
++    normal_rgba=np.ones((h,w,4));normal_rgba[:,:,:3]=normal*.5+.5
++    normal_image=save_texture('female-brunette-fiber-normal',normal_rgba,non_color=True)
++    for name in NAMES:
++        ob=bpy.data.objects[name];mat=ob.data.materials[0];tree=mat.node_tree;bs=tree.nodes['Principled BSDF']
++        color=(.056,.024,.012,1) if name==NAMES[0] else (.068,.028,.014,1)
++        rough=.64 if name==NAMES[0] else .60
++        for socket in ['Base Color','Alpha','Normal']:
++            for link in list(bs.inputs[socket].links):tree.links.remove(link)
++        tex=tree.nodes.new('ShaderNodeTexImage');tex.image=color_image
++        tint=tree.nodes.new('ShaderNodeAttribute');tint.attribute_name='ReferenceHairTint'
++        mix=tree.nodes.new('ShaderNodeMixRGB');mix.blend_type='MULTIPLY';mix.inputs[0].default_value=1;mix.inputs[1].default_value=color
++        tree.links.new(tex.outputs['Color'],mix.inputs[2])
++        variation=tree.nodes.new('ShaderNodeMixRGB');variation.blend_type='MULTIPLY';variation.inputs[0].default_value=1
++        tree.links.new(mix.outputs[0],variation.inputs[1]);tree.links.new(tint.outputs['Color'],variation.inputs[2])
++        tree.links.new(variation.outputs[0],bs.inputs['Base Color']);tree.links.new(tex.outputs['Alpha'],bs.inputs['Alpha'])
++        tex_normal=tree.nodes.new('ShaderNodeTexImage');tex_normal.image=normal_image
++        bump=tree.nodes.new('ShaderNodeNormalMap');bump.inputs['Strength'].default_value=.80
++        tree.links.new(tex_normal.outputs['Color'],bump.inputs['Color']);tree.links.new(bump.outputs['Normal'],bs.inputs['Normal'])
++        bs.inputs['Roughness'].default_value=rough;bs.inputs['Specular IOR Level'].default_value=.15
++        materials[mat.name]={'color':color,'roughness':rough,'specular':.30,'texture':'female-brunette-fibers.png','alphaCutoff':.32,
++            'normalTexture':'female-brunette-fiber-normal.png','normalScale':.80}
+--- before/apply_reference_hair.mjs
++++ apply_reference_hair.mjs
+@@ -131,6 +131,10 @@
+     const primitive=doc.createPrimitive().setAttribute('POSITION',attr('VEC3',a.positions)).setAttribute('NORMAL',attr('VEC3',a.normals))
+       .setAttribute('TEXCOORD_0',attr('VEC2',a.uv)).setAttribute('JOINTS_0',attr('VEC4',joints,Uint16Array)).setAttribute('WEIGHTS_0',attr('VEC4',weights))
+       .setIndices(attr('SCALAR',a.indices,Uint16Array)).setMaterial(r.listMaterials().find(m=>m.getName()===a.material));
++    if(a.colors){
++      assert(a.colors.length===count&&a.colors.every(c=>c.length===4&&c.every(v=>Number.isFinite(v)&&v>=0&&v<=1)),`${a.name}: invalid vertex colors`);
++      primitive.setAttribute('COLOR_0',attr('VEC4',a.colors));
++    }
+     const node=doc.createNode(a.name).setMesh(doc.createMesh(a.name).addPrimitive(primitive)).setSkin(skin).setExtras(a.extras);
+     r.listNodes().find(n=>n.getName()==='AvatarSkeleton').addChild(node);
+     rows[a.name]=count;
+--- before/validate_female_fibers.py
++++ validate_female_fibers.py
+@@ -0,0 +1,36 @@
++"""Verify that the pigment pass changes neither fit nor alpha coverage."""
++import json,sys
++from pathlib import Path
++import bpy,numpy as np
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT
++from refine_complete_foil_finish import geometry_contract
++from refine_brunette_fibers import NAMES
++
++p=OUT/'hair-likeness-20260921';d=p/'fiber-pass'
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH'}
++old=json.loads((d/'before/female-native-validation.json').read_text())['materials']
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH'}
++native=json.loads((p/'female-native-validation.json').read_text());materials=native['materials']
++changed={bpy.data.objects[name].data.materials[0].name for name in NAMES}
++assert {k:v for k,v in old.items() if k not in changed}=={k:v for k,v in materials.items() if k not in changed}
++def pixels(name):
++    image=bpy.data.images[name];return np.array(image.pixels[:]).reshape(image.size[1],image.size[0],4)
++base=pixels('female-reference-hair-fibers');brunette=pixels('female-brunette-fibers')
++assert np.array_equal(base[:,:,3],brunette[:,:,3])
++n=pixels('female-brunette-fiber-normal')[:,:,:3]*2-1
++length=np.linalg.norm(n,axis=2);assert length.min()>.98 and length.max()<1.02
++colors={}
++for name in NAMES:
++    ob=bpy.data.objects[name];attr=ob.data.color_attributes['ReferenceHairTint'];v=np.array([a.color[:] for a in attr.data])
++    assert np.isfinite(v).all() and v.min()>=0 and v.max()<=1 and np.all(v[:,3]==1)
++    colors[name]={'vertices':len(v),'uniquePigments':len(np.unique(v,axis=0)),'alphaAlwaysOne':True}
++report={'unchangedMeshContracts':len(contracts),'retainedGeometryUVWeightsAndShapes':True,'unchangedOtherHairMaterials':len(materials)-len(changed),
++        'alphaCoverageIdentical':True,'vertexColors':colors,'textureDimensions':[256,1024],
++        'additionalTextureImages':2,'additionalBaseLevelTextureBytes':2*256*1024*4,
++        'normalLengthRange':[float(length.min()),float(length.max())],
++        'scope':'Native geometry, UVs, skin weights and all shape coordinates exactly match the preceding front-wave source. Its finite motion and clearance results remain applicable; this does not add continuous collision or self-contact guarantees.'}
++(d/'native-fiber-validation.json').write_text(json.dumps(report,indent=2)+'\n')
++print('FIBER_VALIDATED',json.dumps(report),flush=True)

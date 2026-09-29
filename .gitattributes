@@ -1,3 +1,6 @@
 *.blend filter=lfs diff=lfs merge=lfs -text
 *.glb filter=lfs diff=lfs merge=lfs -text
 *.ktx2 filter=lfs diff=lfs merge=lfs -text
+omnirave-babylon/assets-src/**/*.json filter=lfs diff=lfs merge=lfs -text
+omnirave-babylon/assets-src/**/*.png filter=lfs diff=lfs merge=lfs -text
+*.glb.gz filter=lfs diff=lfs merge=lfs -text

@@ -1,3 +1,6 @@
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
+import { showIcon } from '../showControl/showIcons';
+import { SHOW_RULES } from '../showControl/showTypes';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
@@ -13,23 +16,10 @@ import {
   FOH_BOOTH_Z,
 } from './mainStageVenueBounds';
 
-// Front-of-house sound booth for the Main Stage. Every real festival stage
-// has one out in the crowd facing the stage; without it the promenade reads
-// as bare ground between the barriers and the mix position that a live show
-// obviously needs is simply missing.
-//
-// The game has no NPCs, so the booth is EMPTY - it is infrastructure, not a
-// character set. Raised deck on a dark scaffold skirt, gold waist rail
-// (venue's pearl-and-gold language, kept dim so it never competes with the
-// stage), a mixing desk facing +z toward the stage with small emissive
-// channel-strip accents, a dark canopy on four posts, ground cable looms
-// running toward the stage, and two flight cases parked beside the deck.
-//
-// Placement/size live in mainStageVenueBounds.ts (FOH_BOOTH_*) - see the
-// acoustic derivation there for why the mix position sits where it does -
-// because the authored collision row in createMainStageCollisionBlockers.ts
-// derives the booth's solid body from the same numbers. Nothing here may
-// hardcode a position.
+// Existing front-of-house booth, with two control surfaces in the mixing desk.
+// World metres: front faces +Z. The deck and rails retain their original footprint;
+// the canopy rises toward the stage to clear the aerial effects from both operators.
+// Collision follows the individual structural parts and the rear remains accessible.
 
 const DECK_TOP_Y = 0.5;
 const DECK_HALF_W = FOH_BOOTH_DECK_WIDTH / 2;
@@ -40,7 +30,11 @@ const FRONT_Z = FOH_BOOTH_Z + DECK_HALF_D;
 const BACK_Z = FOH_BOOTH_Z - DECK_HALF_D;
 const RAIL_TOP_Y = DECK_TOP_Y + 1.1;
 const RAIL_MID_Y = DECK_TOP_Y + 0.58;
-const CANOPY_Y = 3.2;
+export const BOOTH_ROOF_REAR_Y = 3.2;
+export const BOOTH_ROOF_FRONT_Y = 8.2;
+const CANOPY_Y = (BOOTH_ROOF_REAR_Y+BOOTH_ROOF_FRONT_Y)/2;
+const roofRise=BOOTH_ROOF_FRONT_Y-BOOTH_ROOF_REAR_Y;
+const roofDepth=FOH_BOOTH_DECK_DEPTH+.4;
 
 export interface SoundBoothHandle {
   root: TransformNode;
@@ -52,6 +46,7 @@ export function createSoundBooth(scene: Scene): SoundBoothHandle {
   const root = new TransformNode('sound-booth', scene);
   const meshes: Mesh[] = [];
   const materials: Material[] = [];
+  const textures:DynamicTexture[]=[];
 
   const track = <T extends Material>(material: T) => {
     materials.push(material);
@@ -196,37 +191,34 @@ export function createSoundBooth(scene: Scene): SoundBoothHandle {
   // --- Mixing desk, facing the stage (+z) -------------------------------
   const consoleZ = FRONT_Z - 0.95;
   box('sound-booth-console', 3.4, 0.72, 0.8, FOH_BOOTH_X, DECK_TOP_Y + 0.36, consoleZ, scaffoldMaterial);
-  // Sloped faceplate: channel strips reading toward the stage.
-  const faceplate = box(
-    'sound-booth-console-faceplate',
-    3.2,
-    0.52,
-    0.04,
-    FOH_BOOTH_X,
-    DECK_TOP_Y + 0.86,
-    consoleZ + 0.16,
-    faceplateMaterial,
-  );
-  faceplate.rotation.x = -0.85;
-  // Two small meter-bridge accents; deliberately tiny so the booth glows
-  // faintly instead of becoming a second screen.
-  for (const sx of [-1, 1]) {
-    box(
-      `sound-booth-console-meter-${sx > 0 ? 'r' : 'l'}`,
-      0.5,
-      0.06,
-      0.05,
-      FOH_BOOTH_X + sx * 1.2,
-      DECK_TOP_Y + 1.06,
-      consoleZ - 0.1,
-      meterMaterial,
-    );
+  // Two independent glass control surfaces, left fireworks / right drones.
+  for(const [index,panel] of (['fireworks','drones'] as const).entries()){
+    const x=FOH_BOOTH_X+(index===0?-.86:.86);
+    const housing=box(`sound-booth-${panel}-housing`,1.64,.68,.075,x,1.32,consoleZ-.08,scaffoldMaterial);
+    housing.rotation.x=-.85;
+    const face=box(index===0?'sound-booth-console-faceplate':'sound-booth-drone-faceplate',1.51,.57,.015,x,1.34,consoleZ-.12,faceplateMaterial);
+    face.rotation.x=-.85;
+    // Texture creation is optional in NullEngine; the physical panels still exist.
+    if(!scene.getEngine().getRenderingCanvas())continue;
+    const canvas=document.createElement('canvas');canvas.width=768;canvas.height=320;
+    const ctx=canvas.getContext('2d');if(!ctx)continue;
+    ctx.fillStyle='#08101a';ctx.fillRect(0,0,768,320);
+    ctx.strokeStyle=index===0?'#dca95b':'#5bcdde';ctx.lineWidth=3;ctx.strokeRect(5,5,758,310);
+    ctx.fillStyle=index===0?'#efc884':'#97ecf0';ctx.font='600 26px sans-serif';ctx.fillText(panel.toUpperCase(),24,40);
+    const ids=panel==='fireworks'?SHOW_RULES.fireworks:SHOW_RULES.drones;
+    const columns=panel==='fireworks'?9:4;
+    ids.forEach((item,i)=>{const col=i%columns,row=Math.floor(i/columns);const w=panel==='fireworks'?74:173,h=panel==='fireworks'?74:111;
+      ctx.drawImage(showIcon(item.id),24+col*(w+8),60+row*(h+8),w,h);});
+    const texture=new DynamicTexture(`sound-booth-${panel}-display`,canvas,scene,false);textures.push(texture);texture.update(false);
+    const surface=track(new PBRMaterial(`sound-booth-${panel}-screen`,scene));surface.albedoColor=Color3.Black();surface.emissiveColor=Color3.White();surface.emissiveTexture=texture;surface.emissiveIntensity=.7;surface.disableLighting=true;
+    face.material=surface;
   }
 
   // --- Canopy on four posts --------------------------------------------
-  const postTop = CANOPY_Y - 0.08;
+
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
+      const postTop=CANOPY_Y+sz*(DECK_HALF_D-.2)*roofRise/roofDepth-.08;
       box(
         `sound-booth-canopy-post-${sx > 0 ? 'r' : 'l'}${sz > 0 ? 'f' : 'b'}`,
         0.12,
@@ -242,9 +234,10 @@ export function createSoundBooth(scene: Scene): SoundBoothHandle {
   // Roof overhangs the deck slightly (7.4 x 5.4) - still well inside the
   // walkway, and the collision body deliberately ignores the overhang so it
   // cannot create a phantom wall.
-  box('sound-booth-canopy', FOH_BOOTH_DECK_WIDTH + 0.4, 0.12, FOH_BOOTH_DECK_DEPTH + 0.4, FOH_BOOTH_X, CANOPY_Y, FOH_BOOTH_Z, canopyMaterial);
+  const roof=box('sound-booth-canopy', FOH_BOOTH_DECK_WIDTH + 0.4, 0.12, Math.hypot(roofDepth,roofRise), FOH_BOOTH_X, CANOPY_Y, FOH_BOOTH_Z, canopyMaterial);
+  roof.rotation.x=-Math.atan2(roofRise,roofDepth);
   // Front valance hanging off the stage-side edge.
-  box('sound-booth-canopy-valance', FOH_BOOTH_DECK_WIDTH + 0.4, 0.3, 0.06, FOH_BOOTH_X, CANOPY_Y - 0.2, FRONT_Z + 0.17, canopyMaterial);
+  box('sound-booth-canopy-valance', FOH_BOOTH_DECK_WIDTH + 0.4, 0.3, 0.06, FOH_BOOTH_X, BOOTH_ROOF_FRONT_Y - 0.2, FRONT_Z + 0.17, canopyMaterial);
 
   // --- Cable looms running toward the stage ------------------------------
   // Flat ground-taped snakes leaving the front of the booth; they read as
@@ -264,8 +257,7 @@ export function createSoundBooth(scene: Scene): SoundBoothHandle {
   });
 
   // --- Flight cases beside the deck --------------------------------------
-  // Included in the collision body (see FOH_BOOTH_BLOCKER_WIDTH) so they are
-  // not walk-through props.
+  // Each case has its own solid blocker.
   for (const sx of [-1, 1]) {
     box(
       `sound-booth-flight-case-${sx > 0 ? 'r' : 'l'}`,
@@ -294,6 +286,7 @@ export function createSoundBooth(scene: Scene): SoundBoothHandle {
       material.dispose();
     }
     materials.length = 0;
+    textures.forEach(texture=>texture.dispose());
     root.dispose();
   };
 

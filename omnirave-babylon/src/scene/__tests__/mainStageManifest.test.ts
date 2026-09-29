@@ -495,7 +495,15 @@ describe('MAIN_STAGE_MANIFEST', { timeout: 15000 }, () => {
   it('declares the authored GLB, collision GLB, and review avatar runtime paths', () => {
     expect(MAIN_STAGE_MANIFEST.sceneGlb).toBe('/assets/venues/main-stage/main-stage.glb');
     expect(MAIN_STAGE_MANIFEST.collisionGlb).toBe('/assets/venues/main-stage/main-stage-collision.glb');
-    expect(MAIN_STAGE_MANIFEST.reviewAvatarGlb).toBe('/assets/avatars/review-rig/review-rig.glb');
+    expect(MAIN_STAGE_MANIFEST.reviewAvatarGlb).toBe('/assets/avatars/modular-v1/avatar-base.glb');
+    expect(MAIN_STAGE_MANIFEST.reviewAvatarLeanGlb)
+      .toBe('/assets/avatars/modular-v1/avatar-base-lean.glb');
+    expect(MAIN_STAGE_MANIFEST.reviewAvatarFashionGlb)
+      .toBe('/assets/avatars/modular-v1/avatar-base-fashion.glb');
+    expect(MAIN_STAGE_MANIFEST.sourceAvatarLeanBlend)
+      .toBe('assets-src/avatars/modular-v1/lean-v1/avatar-modular-v1-lean.blend');
+    expect(MAIN_STAGE_MANIFEST.sourceAvatarFashionBlend)
+      .toBe('assets-src/avatars/modular-v1/fashion-v2/avatar-modular-v1-fashion-v2.blend');
   });
 
   it('keeps the collision export contract wired through the export pipeline', () => {

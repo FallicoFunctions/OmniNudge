@@ -12,6 +12,7 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
+import { scopeMaterialDirtyChecks } from './scopeMaterialDirtyChecks';
 
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
@@ -259,12 +260,14 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
 
   // --- Effect 2: apex energy crystal ---------------------------------------
   const crystalMaterial = createGlowMaterial(scene, 'crown-fx-crystal-material', new Color3(1, 0.4, 0.1), CRYSTAL_IDLE_INTENSITY, 1, false);
+  scopeMaterialDirtyChecks(crystalMaterial);
   const crystal = MeshBuilder.CreatePolyhedron('crown-fx-crystal', { type: 1, size: CRYSTAL_RADIUS }, scene);
   crystal.position.set(CRYSTAL_POS.x, CRYSTAL_POS.y, CRYSTAL_POS.z);
   crystal.material = crystalMaterial;
   crystal.isPickable = false;
 
   const haloMaterial = createGlowMaterial(scene, 'crown-fx-halo-material', new Color3(1, 0.4, 0.1), CRYSTAL_IDLE_INTENSITY, 0.18, true);
+  scopeMaterialDirtyChecks(haloMaterial);
   const halo = MeshBuilder.CreateSphere('crown-fx-halo', { diameter: CRYSTAL_HALO_RADIUS * 2, segments: 16 }, scene);
   halo.position.set(CRYSTAL_POS.x, CRYSTAL_POS.y, CRYSTAL_POS.z);
   halo.material = haloMaterial;
@@ -276,6 +279,7 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
   const beaconPivot = new TransformNode('crown-fx-beacon-pivot', scene);
   beaconPivot.position.set(CRYSTAL_POS.x, BEACON_BASE_Y, CRYSTAL_POS.z);
   const beaconMaterial = createGlowMaterial(scene, 'crown-fx-beacon-material', new Color3(1, 0.4, 0.1), 0.6, 0.12, true);
+  scopeMaterialDirtyChecks(beaconMaterial);
   const beacon = MeshBuilder.CreateCylinder(
     'crown-fx-beacon',
     {

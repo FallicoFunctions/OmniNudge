@@ -9,8 +9,8 @@ import {
   CASCADE_BAY_X_MAX,
   CASCADE_BAY_Z_MAX,
   CASCADE_BAY_Z_MIN,
-  FOH_BOOTH_BLOCKER_WIDTH,
   FOH_BOOTH_DECK_DEPTH,
+  FOH_BOOTH_DECK_WIDTH,
   FOH_BOOTH_X,
   FOH_BOOTH_Z,
   FOUNTAIN_ELLIPSE,
@@ -509,24 +509,13 @@ const MAIN_STAGE_COLLISION_BLOCKERS: readonly CollisionBlockerSpec[] = [
   { name: 'main-stage-blocker-basin-coping-outer-left', x: -25, y: 1.5, z: -33.45, width: 1, height: 3, depth: 28.9 },
   { name: 'main-stage-blocker-basin-coping-outer-right', x: 25, y: 1.5, z: -33.45, width: 1, height: 3, depth: 28.9 },
   // Front-of-house sound booth (createSoundBooth.ts) - restricted crew
-  // infrastructure, so players walk around it. Authored here rather than
-  // pattern-matched: the source-mesh patterns above run over the loaded GLB
-  // meshes at scene build time, and the booth is authored later, after the
-  // static freeze. Dimensions come from the shared FOH_BOOTH_* constants so
-  // the body can never drift from the deck. Width covers the deck plus the
-  // two flight cases beside it; DEPTH is the DECK depth only, so neither the
-  // canopy overhang nor the ground cable looms leaving the front become
-  // phantom walls. It leaves ~9.4m of clear promenade on each side (crowd
-  // runs to |x| 14).
-  {
-    name: 'main-stage-blocker-foh-sound-booth',
-    x: FOH_BOOTH_X,
-    y: 1.5,
-    z: FOH_BOOTH_Z,
-    width: FOH_BOOTH_BLOCKER_WIDTH,
-    height: 3,
-    depth: FOH_BOOTH_DECK_DEPTH,
-  },
+  // The booth is accessible from the rear. Only structural parts block movement.
+  ...[-1,1].flatMap(side=>[
+    {name:`main-stage-blocker-foh-rail-${side}`,x:FOH_BOOTH_X+side*(FOH_BOOTH_DECK_WIDTH/2-.08),y:1.05,z:FOH_BOOTH_Z,width:.12,height:1.15,depth:FOH_BOOTH_DECK_DEPTH},
+    {name:`main-stage-blocker-foh-case-${side}`,x:FOH_BOOTH_X+side*4,y:.33,z:FOH_BOOTH_Z-.2,width:1.1,height:.66,depth:.85},
+  ]),
+  {name:'main-stage-blocker-foh-console',x:FOH_BOOTH_X,y:.92,z:FOH_BOOTH_Z+FOH_BOOTH_DECK_DEPTH/2-.95,width:3.4,height:.84,depth:.8},
+  {name:'main-stage-blocker-foh-front',x:FOH_BOOTH_X,y:1.05,z:FOH_BOOTH_Z+FOH_BOOTH_DECK_DEPTH/2-.08,width:FOH_BOOTH_DECK_WIDTH,height:1.15,depth:.12},
   ...fountainCollisionColumns(),
   ...envelopeSideBlockers(),
   ...vipBoundaryBlockers(),

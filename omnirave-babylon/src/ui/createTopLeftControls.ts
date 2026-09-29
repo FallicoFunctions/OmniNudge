@@ -8,26 +8,36 @@
 // are ordinary absolutely-positioned siblings inside the runtime host; the world
 // keeps rendering and keeps receiving input underneath them.
 //
-// AVATAR POPUP: the full avatar designer (sec 6.6) is a later block. Rather than
-// ship a dead panel, this popup drives the colorway system that already exists
-// today (player/avatarColorways.ts, exposed as reviewRuntime.avatarColorways /
-// setAvatarColorway) - a real picker whose selection applies immediately. When
-// the designer block lands it replaces the body of buildAvatarPanel(); the
-// open/close semantics here are unaffected.
-//
 // Pure DOM: no Babylon imports (the colorway type is type-only), safe under
 // jsdom.
 
+import type { AvatarDefinition } from '../player/avatarDefinition';
 import type { AvatarColorway } from '../player/avatarColorways';
+import type { CompleteAvatarWardrobe } from '../player/completeAvatarWardrobe';
+import type { AvatarProfileSaveView } from '../network/avatarProfileSave';
+import {
+  createAvatarEditor,
+  type AvatarOptionAvailability,
+  type LaunchCharacterSelection,
+} from './createAvatarEditor';
 
 export type TopLeftPanelId = 'settings' | 'avatar';
 
 export interface CreateTopLeftControlsOptions {
+  characterSelection?: LaunchCharacterSelection;
+  completeWardrobe?: CompleteAvatarWardrobe;
+  profileSave?: AvatarProfileSaveView;
+  onSignInToSave?: () => void;
   /** Settings popup body, built by createSettingsPopup and owned by the caller. */
   settingsPanel?: HTMLElement;
+  /** Keeps the unfinished avatar picker out of the runtime without removing it. */
+  avatarEditorEnabled?: boolean;
   avatarColorways?: readonly AvatarColorway[];
   selectedAvatarColorwayId?: string;
   onSelectAvatarColorway?: (colorway: AvatarColorway) => void;
+  avatarDefinition?: AvatarDefinition;
+  avatarOptionAvailability?: AvatarOptionAvailability;
+  onAvatarDefinitionChange?: (definition: AvatarDefinition) => void;
   onPanelChange?: (panel: TopLeftPanelId | null) => void;
   /** Offsets the block clear of the dev review HUD under ?debug=1. */
   debugChromePresent?: boolean;
@@ -38,6 +48,8 @@ export interface TopLeftControls {
   activePanel: () => TopLeftPanelId | null;
   openPanel: (panel: TopLeftPanelId | null) => void;
   setSelectedAvatarColorway: (colorwayId: string) => void;
+  setAvatarDefinition: (definition: AvatarDefinition) => void;
+  setCompleteWardrobe: (wardrobe: CompleteAvatarWardrobe | undefined) => void;
   dispose: () => void;
 }
 
@@ -45,6 +57,9 @@ export function createTopLeftControls(
   host: HTMLElement,
   options: CreateTopLeftControlsOptions = {},
 ): TopLeftControls {
+  let avatarEditorEnabled = options.avatarEditorEnabled ?? true;
+  let avatarDefinition = options.avatarDefinition;
+  let completeWardrobe = options.completeWardrobe;
   const element = document.createElement('div');
   element.dataset.testid = 'top-left-controls';
   element.className = options.debugChromePresent
@@ -56,14 +71,32 @@ export function createTopLeftControls(
 
   const settingsButton = createControlButton('Settings', 'settings');
   const avatarButton = createControlButton('Avatar', 'avatar');
-  buttonRow.append(settingsButton, avatarButton);
+  buttonRow.append(settingsButton);
+  if (avatarEditorEnabled) {
+    buttonRow.append(avatarButton);
+  }
 
   const slot = document.createElement('div');
   slot.className = 'hud-controls__slot';
 
-  const avatarPanel = buildAvatarPanel(options);
-  avatarPanel.hidden = true;
-  slot.appendChild(avatarPanel);
+  let avatarEditor = avatarEditorEnabled && options.avatarDefinition
+    ? createAvatarEditor({
+        characterSelection: options.characterSelection,
+        completeWardrobe: options.completeWardrobe,
+        profileSave: options.profileSave,
+        onSignInToSave: options.onSignInToSave,
+        availableOptions: options.avatarOptionAvailability,
+        definition: options.avatarDefinition,
+        onChange: options.onAvatarDefinitionChange,
+      })
+    : undefined;
+  let avatarPanel = avatarEditorEnabled
+    ? (avatarEditor?.element ?? buildAvatarPanel(options))
+    : undefined;
+  if (avatarPanel) {
+    avatarPanel.hidden = true;
+    slot.appendChild(avatarPanel);
+  }
 
   const settingsPanel = options.settingsPanel;
   if (settingsPanel) {
@@ -80,16 +113,21 @@ export function createTopLeftControls(
     if (settingsPanel) {
       settingsPanel.hidden = active !== 'settings';
     }
-    avatarPanel.hidden = active !== 'avatar';
+    if (avatarPanel) {
+      avatarPanel.hidden = active !== 'avatar';
+    }
     settingsButton.setAttribute('aria-expanded', String(active === 'settings'));
-    avatarButton.setAttribute('aria-expanded', String(active === 'avatar'));
+    if (avatarEditorEnabled) {
+      avatarButton.setAttribute('aria-expanded', String(active === 'avatar'));
+    }
   };
 
   const openPanel = (panel: TopLeftPanelId | null) => {
-    if (active === panel) {
+    const permittedPanel = panel === 'avatar' && !avatarEditorEnabled ? null : panel;
+    if (active === permittedPanel) {
       return;
     }
-    active = panel;
+    active = permittedPanel;
     render();
     options.onPanelChange?.(active);
   };
@@ -105,7 +143,7 @@ export function createTopLeftControls(
   avatarButton.addEventListener('click', handleAvatarClick);
 
   const swatches = Array.from(
-    avatarPanel.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]'),
+    avatarPanel?.querySelectorAll<HTMLButtonElement>('[data-avatar-colorway]') ?? [],
   );
   const swatchHandlers = new Map<HTMLButtonElement, () => void>();
   for (const swatch of swatches) {
@@ -134,6 +172,34 @@ export function createTopLeftControls(
     activePanel: () => active,
     openPanel,
     setSelectedAvatarColorway,
+    setAvatarDefinition(definition) {
+      avatarDefinition = definition;
+      avatarEditor?.setDefinition(definition);
+    },
+    setCompleteWardrobe(wardrobe) {
+      if (wardrobe === completeWardrobe) return;
+      completeWardrobe = wardrobe;
+      avatarEditor?.dispose();
+      avatarPanel?.remove();
+      avatarEditorEnabled = Boolean(wardrobe) || (options.avatarEditorEnabled ?? true);
+      avatarEditor = avatarEditorEnabled && avatarDefinition ? createAvatarEditor({
+        characterSelection: options.characterSelection,
+        definition: avatarDefinition,
+        completeWardrobe: wardrobe,
+        profileSave: options.profileSave,
+        onSignInToSave: options.onSignInToSave,
+        availableOptions: options.avatarOptionAvailability,
+        onChange: options.onAvatarDefinitionChange,
+      }) : undefined;
+      avatarPanel = avatarEditor?.element;
+      if (avatarPanel) slot.appendChild(avatarPanel);
+      if (avatarEditorEnabled) buttonRow.appendChild(avatarButton);
+      else {
+        avatarButton.remove();
+        if (active === 'avatar') active = null;
+      }
+      render();
+    },
     dispose() {
       settingsButton.removeEventListener('click', handleSettingsClick);
       avatarButton.removeEventListener('click', handleAvatarClick);
@@ -141,6 +207,7 @@ export function createTopLeftControls(
         swatch.removeEventListener('click', handler);
       }
       swatchHandlers.clear();
+      avatarEditor?.dispose();
       // The settings panel is caller-owned: hand it back rather than
       // destroying it with this block.
       settingsPanel?.remove();

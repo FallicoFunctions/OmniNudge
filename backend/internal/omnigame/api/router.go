@@ -98,6 +98,7 @@ func NewRouter(
 
 	protected := v1.Group("/omnigame/profile")
 	protected.Use(middleware.AuthRequired(authService))
+	protected.Use(requireProfileCredential())
 	profileHandler := handlers.NewProfileHandler(sessionService.ProfileService())
 	protected.PUT("/omnirave/loadout", profileHandler.SaveLoadout)
 	protected.PUT("/omnirave/settings", profileHandler.SaveRuntimeSettings)
@@ -106,4 +107,18 @@ func NewRouter(
 	protected.GET("/omnirave", profileHandler.GetProfile)
 
 	return router
+}
+
+// World-presence and chat tokens cannot authorize persistent account changes.
+func requireProfileCredential() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		use, exists := c.Get("token_use")
+		userID, validUser := c.Get("user_id")
+		id, isInteger := userID.(int)
+		if !exists || (use != "" && use != "game") || !validUser || !isInteger || id <= 0 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Account profile credential required"})
+			return
+		}
+		c.Next()
+	}
 }

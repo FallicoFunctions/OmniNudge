@@ -6,6 +6,8 @@ describe('resolveAvatarAnimationState', () => {
   it('maps speed to idle, walk, and run states', () => {
     expect(resolveAvatarAnimationState(0)).toBe('idle');
     expect(resolveAvatarAnimationState(1.2)).toBe('walk');
-    expect(resolveAvatarAnimationState(4.4)).toBe('run');
+    expect(resolveAvatarAnimationState(4.5)).toBe('walk');
+    expect(resolveAvatarAnimationState(5)).toBe('walk');
+    expect(resolveAvatarAnimationState(6.975)).toBe('run');
   });
 });

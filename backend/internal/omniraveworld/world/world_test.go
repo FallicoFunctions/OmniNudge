@@ -90,3 +90,22 @@ func TestSnapshotIncludesPlayerIdentityMetadata(t *testing.T) {
 	require.Equal(t, SessionModeGuest, snapshot.Players[0].Mode)
 	require.Equal(t, "guest-default", snapshot.Players[0].Loadout["body"])
 }
+
+func TestWorld_CrouchIsTransientPresenceAndResetsOnRespawn(t *testing.T) {
+	state := NewWorld(DefaultConfig())
+	look := Loadout{"cv": "1", "cp": "female", "cw": "110111"}
+	player := state.AddPlayer(PlayerSession{PlayerID: "crouching-player", Loadout: look})
+	state.ApplyInput(player.ID, InputFrame{MoveTo: player.Position, Crouched: true})
+	require.True(t, state.Player(player.ID).Crouched)
+	snapshot := state.SnapshotForPlayer(player.ID, nil, nil)
+	require.True(t, snapshot.Players[0].Crouched)
+	require.Equal(t, look, snapshot.Players[0].Loadout)
+	// An older client's omitted posture returns to standing.
+	state.ApplyInput(player.ID, InputFrame{MoveTo: player.Position})
+	require.False(t, state.Player(player.ID).Crouched)
+	state.ApplyInput(player.ID, InputFrame{MoveTo: player.Position, Crouched: true})
+	state.RespawnPlayer(player.ID)
+	require.False(t, state.Player(player.ID).Crouched)
+	require.True(t, snapshot.Players[0].Crouched, "prior snapshots must retain their own posture")
+	require.Equal(t, look, state.Player(player.ID).Loadout)
+}
