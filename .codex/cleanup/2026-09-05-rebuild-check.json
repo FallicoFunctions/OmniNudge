@@ -1,0 +1,158 @@
+{
+  "source": "face19.blend",
+  "rebuilt_from": "fit05.blend + rebuild_current.py + two landmark JSON files",
+  "objects": [
+    {
+      "name": "AvatarBody",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarBottoms_tech-joggers",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarEye_l",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarEye_r",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarEyebrows",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarIris_l",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarIris_r",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarJacket_bomber",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarPupil_l",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarPupil_r",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarShoes_high-tops",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "AvatarTop_graphic-tee",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Curl18_0",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Curl18_1",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Curl18_2",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Curl18_3",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Curl18_4",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Earring_-1",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Earring_1",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_Scalp18Surface",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_ScalpField0",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_ScalpField1",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_ScalpField2",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_ScalpField3",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    },
+    {
+      "name": "Proof_ScalpField4",
+      "max_coordinate_difference_m": 0.0,
+      "max_radius_difference_m": 0.0,
+      "topology_matches": true
+    }
+  ],
+  "passed": true,
+  "scope": "visible evaluated geometry equivalence; likeness remains unaccepted"
+}

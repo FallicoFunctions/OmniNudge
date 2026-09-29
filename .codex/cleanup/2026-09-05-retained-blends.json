@@ -1,0 +1,65 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/curl18.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/fit05.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/face19.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/pose04.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/study04.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/avatar-modular-v1.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/lean-v1/avatar-modular-v1-lean.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v2/avatar-modular-v1-fashion-v2.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v18/avatar-modular-v1-fashion-v18.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v1.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_female_plurr_v1.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_work.blend",
+      "opens": true,
+      "missing_libraries_or_images": []
+    }
+  ]
+}

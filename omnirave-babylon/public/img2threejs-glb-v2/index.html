@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <title>img2threejs GLB v2 reference viewer</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #242629; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #status { display: none; }
+  </style>
+</head>
+<body>
+  <div id="status">Loading GLB…</div>
+  <script type="importmap">
+  {"imports":{"three":"/node_modules/three/build/three.module.js"}}
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+
+    const profile = {
+      viewport: [720, 900],
+      camera: { position: [0, 0.9, 4.8], target: [0, 0.9, 0], near: 0.01, far: 100, fov: 25 },
+      background: '#242629'
+    };
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(profile.viewport[0], profile.viewport[1], false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(profile.background);
+    const camera = new THREE.PerspectiveCamera(profile.camera.fov, profile.viewport[0] / profile.viewport[1], profile.camera.near, profile.camera.far);
+    camera.position.fromArray(profile.camera.position);
+    camera.lookAt(...profile.camera.target);
+    const key = new THREE.DirectionalLight(0xffffff, 2.2);
+    key.position.set(2.5, 4.5, 4.5);
+    key.castShadow = true;
+    scene.add(key);
+    scene.add(new THREE.HemisphereLight(0xb9c5d4, 0x20252a, 1.1));
+    const loader = new GLTFLoader();
+    const root = new THREE.Group();
+    scene.add(root);
+    window.__GLB_ROOT__ = root;
+    window.__GLB_THREE__ = THREE;
+    const originalMaterials = new Map();
+    const regionColors = {
+      skin: new THREE.Color(1, 0, 0), hair: new THREE.Color(1, .5, 0), jacket: new THREE.Color(0, 1, 0),
+      top: new THREE.Color(0, 1, 1), bottoms: new THREE.Color(0, 0, 1), shoes: new THREE.Color(.5, 0, 1), accessories: new THREE.Color(1, 0, 1)
+    };
+    const regionFor = (name) => {
+      const n = name.toLowerCase();
+      if (n.includes('hair') || n.includes('brow') || n.includes('lash')) return 'hair';
+      if (n.includes('jacket')) return 'jacket';
+      if (n.includes('top')) return 'top';
+      if (n.includes('bottom')) return 'bottoms';
+      if (n.includes('shoe')) return 'shoes';
+      if (n.includes('access')) return 'accessories';
+      return 'skin';
+    };
+    const solid = (color) => new THREE.MeshBasicMaterial({ color, toneMapped: false });
+    // Keep the browser harness on the same bounded, reversible profile pass as
+    // the Babylon runtime: narrow the silhouette in X/Z and add a small amount
+    // of vertical length without changing the authored GLB or its rig.
+    const BODY_PROFILE_SCALE = { classic: [1, 1, 1], lean: [0.90, 1.08, 0.92] };
+    const BODY_PROFILE_BONE_SCALES = {
+      neck_01: [0.96, 1.05, 0.96],
+      head: [0.95, 0.95, 0.95],
+      hand_l: [0.90, 0.90, 0.90],
+      hand_r: [0.90, 0.90, 0.90],
+      pelvis: [0.97, 1, 0.97],
+      spine_01: [0.95, 1, 0.95],
+      spine_02: [0.92, 1, 0.93],
+      spine_03: [0.95, 1, 0.95],
+      upperarm_l: [0.96, 1, 0.96],
+      upperarm_r: [0.96, 1, 0.96],
+      lowerarm_l: [0.97, 1, 0.97],
+      lowerarm_r: [0.97, 1, 0.97],
+      thigh_l: [0.96, 1, 0.96],
+      thigh_r: [0.96, 1, 0.96],
+      calf_l: [0.98, 1, 0.98],
+      calf_r: [0.98, 1, 0.98],
+    };
+    const BODY_PROFILE_BONE_SCALES_BY_BODY = {
+      male: {
+        head: [0.98, 0.98, 0.98],
+        neck_01: [0.99, 0.98, 0.99],
+        pelvis: [0.72, .99, 0.78], spine_01: [0.92, 1.02, 0.88], spine_02: [0.91, 1.02, 0.83], spine_03: [1.02, 1, 0.92],
+        clavicle_l: [1.16, 1, 1.12], clavicle_r: [1.16, 1, 1.12],
+        upperarm_l: [0.98, 1.02, 0.98], upperarm_r: [0.98, 1.02, 0.98], lowerarm_l: [0.98, 1.02, 0.98], lowerarm_r: [0.98, 1.02, 0.98],
+        thigh_l: [0.86, 1.04, 0.87], thigh_r: [0.86, 1.04, 0.87], calf_l: [0.96, 1.02, 0.96], calf_r: [0.96, 1.02, 0.96],
+      },
+      female: {
+        head: [0.98, 0.98, 0.98],
+        neck_01: [0.98, 1.00, 0.98],
+        pelvis: [.76, .99, .78], spine_01: [0.90, 1.02, 0.84], spine_02: [0.84, 1.02, 0.84], spine_03: [0.98, 1, 0.88],
+        clavicle_l: [1.08, 1, 1.04], clavicle_r: [1.08, 1, 1.04],
+        upperarm_l: [0.97, 1.02, 0.97], upperarm_r: [0.97, 1.02, 0.97], lowerarm_l: [0.99, 1.02, 0.99], lowerarm_r: [0.99, 1.02, 0.99],
+        hand_l: [0.94, 0.94, 0.94], hand_r: [0.94, 0.94, 0.94],
+        thigh_l: [0.87, 1.04, 0.89], thigh_r: [0.87, 1.04, 0.89], calf_l: [0.98, 1.02, 0.98], calf_r: [0.98, 1.02, 0.98],
+      },
+    };
+    function applyProfileScale(leanWeight, bodyBase = 'male') {
+      const t = Math.max(0, Math.min(1, Number(leanWeight) || 0));
+      const classic = BODY_PROFILE_SCALE.classic;
+      const lean = BODY_PROFILE_SCALE.lean;
+      root.scale.set(
+        classic[0] + (lean[0] - classic[0]) * t,
+        classic[1] + (lean[1] - classic[1]) * t,
+        classic[2] + (lean[2] - classic[2]) * t,
+      );
+      const bodyTargets = BODY_PROFILE_BONE_SCALES_BY_BODY[bodyBase] || BODY_PROFILE_BONE_SCALES_BY_BODY.male;
+      for (const [name, target] of Object.entries({ ...BODY_PROFILE_BONE_SCALES, ...bodyTargets })) {
+        const bone = root.getObjectByName(name);
+        if (!bone) continue;
+        bone.scale.set(
+          1 + (target[0] - 1) * t,
+          1 + (target[1] - 1) * t,
+          1 + (target[2] - 1) * t,
+        );
+      }
+    }
+    let ready = false;
+    let loaded = false;
+
+    function eachMesh(fn) { root.traverse((obj) => { if (obj.isMesh) fn(obj); }); }
+    function restoreMaterials() { eachMesh((obj) => { const original = originalMaterials.get(obj); if (original) obj.material = original; }); }
+    function setPass(passId) {
+      restoreMaterials();
+      renderer.toneMapping = passId === 'beauty' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+      if (passId === 'beauty') { scene.background = new THREE.Color(profile.background); return; }
+      scene.background = new THREE.Color(0x000000);
+      if (passId === 'alpha-silhouette') eachMesh((obj) => { obj.material = solid(0xffffff); });
+      else if (passId === 'semantic-id' || passId === 'roughness-material-id') eachMesh((obj) => { obj.material = solid(regionColors[regionFor(obj.name)]); });
+      else if (passId === 'depth') eachMesh((obj) => { obj.material = new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking }); });
+      else if (passId === 'normal') eachMesh((obj) => { obj.material = new THREE.MeshNormalMaterial(); });
+    }
+    function render() { renderer.render(scene, camera); }
+    const clock = new THREE.Clock();
+    function tick() {
+      if (window.__GLB_MIXER__) window.__GLB_MIXER__.update(clock.getDelta());
+      render();
+      requestAnimationFrame(tick);
+    }
+    tick();
+    function cameraSpec(spec) {
+      const c = spec || {};
+      const az = (Number(c.azimuthDegrees || 0) * Math.PI) / 180;
+      const el = (Number(c.elevationDegrees || 0) * Math.PI) / 180;
+      const requestedTarget = Array.isArray(c.target) && c.target.some((value) => Number(value) !== 0) ? c.target : profile.camera.target;
+      const target = new THREE.Vector3(...requestedTarget);
+      const radius = 4.8;
+      camera.position.set(target.x + radius * Math.sin(az) * Math.cos(el), target.y + radius * Math.sin(el), target.z + radius * Math.cos(az));
+      camera.lookAt(target);
+      camera.updateProjectionMatrix();
+    }
+    window.__IMG2THREEJS_READY__ = false;
+    window.__IMG2THREEJS_CAPTURE__ = {
+      async setReferenceMode() { if (!loaded) throw new Error('GLB is not loaded'); root.visible = true; render(); },
+      async setCamera(spec) { cameraSpec(spec); render(); },
+      async capturePass({ passId = 'beauty' } = {}) { setPass(passId); render(); return { ok: true, selector: 'canvas' }; }
+    };
+    window.__IMG2THREEJS_EDITOR__ = {
+      setOption(slot, id) {
+        const prefix = `AvatarOption_${slot}__`;
+        let found = false;
+        root.traverse((obj) => {
+          if (!obj.name.startsWith(prefix)) return;
+          obj.visible = obj.name === `${prefix}${id}`;
+          if (obj.visible) found = true;
+        });
+        render();
+        return { ok: found, slot, id };
+      },
+      setBodyProfile(bodyBase = 'male', lean = 0) {
+        const base = bodyBase === 'female' ? 'female' : 'male';
+        const leanWeight = Math.max(0, Math.min(1, Number(lean) || 0));
+        window.__GLB_ACTIVE_BODY_BASE__ = base;
+        window.__GLB_ACTIVE_LEAN_WEIGHT__ = leanWeight;
+        let applied = 0;
+        root.traverse((obj) => {
+          if (!obj.isMesh || !obj.morphTargetDictionary || !obj.morphTargetInfluences) return;
+          for (let i = 0; i < obj.morphTargetInfluences.length; i += 1) obj.morphTargetInfluences[i] = 0;
+          const baseIndex = obj.morphTargetDictionary[base];
+          const leanIndex = obj.morphTargetDictionary.lean;
+          if (baseIndex !== undefined) { obj.morphTargetInfluences[baseIndex] = 1; applied += 1; }
+          if (leanIndex !== undefined) obj.morphTargetInfluences[leanIndex] = leanWeight;
+        });
+        applyProfileScale(leanWeight, base);
+        render();
+        return { ok: applied > 0, bodyBase: base, lean: leanWeight, meshes: applied };
+      },
+      setBodyVariant(variant) {
+        const name = String(variant);
+        if (name === 'lean') return this.setBodyProfile('male', 1);
+        if (name === 'male-lean') return this.setBodyProfile('male', 1);
+        if (name === 'female-lean') return this.setBodyProfile('female', 1);
+        let applied = 0;
+        root.traverse((obj) => {
+          if (!obj.isMesh || !obj.morphTargetDictionary || !obj.morphTargetInfluences) return;
+          for (let i = 0; i < obj.morphTargetInfluences.length; i += 1) obj.morphTargetInfluences[i] = 0;
+          if (Object.prototype.hasOwnProperty.call(obj.morphTargetDictionary, name)) {
+            obj.morphTargetInfluences[obj.morphTargetDictionary[name]] = 1;
+            applied += 1;
+          }
+        });
+        render();
+        return { ok: applied > 0, variant: name, meshes: applied };
+      },
+      playAnimation(name) {
+        if (!window.__GLB_MIXER__ || !window.__GLB_CLIPS__) return { ok: false, reason: 'animations not loaded' };
+        const clip = window.__GLB_CLIPS__.find((item) => item.name === name);
+        if (!clip) return { ok: false, reason: `unknown animation: ${name}` };
+        window.__GLB_MIXER__.stopAllAction();
+        window.__GLB_MIXER__.clipAction(clip).reset().play();
+        return { ok: true, name, duration: clip.duration };
+      },
+      setReviewPose(name = 'idle') {
+        const poseName = String(name).toLowerCase();
+        if (poseName === 'idle') return this.playAnimation('idle');
+        if (poseName !== 'bind' && poseName !== 't-pose') return { ok: false, reason: `unknown review pose: ${name}` };
+
+        window.__GLB_MIXER__?.stopAllAction();
+        root.traverse((obj) => {
+          if (obj.isSkinnedMesh && obj.skeleton) obj.skeleton.pose();
+        });
+        applyProfileScale(window.__GLB_ACTIVE_LEAN_WEIGHT__ ?? 0, window.__GLB_ACTIVE_BODY_BASE__ ?? 'male');
+        root.updateMatrixWorld(true);
+
+        if (poseName === 't-pose') {
+          const alignBoneYAxis = (boneName, targetDirection) => {
+            const bone = root.getObjectByName(boneName);
+            if (!bone?.isBone || !bone.parent) return false;
+            bone.updateWorldMatrix(true, true);
+            const worldRotation = bone.getWorldQuaternion(new THREE.Quaternion());
+            const currentDirection = new THREE.Vector3(0, 1, 0).applyQuaternion(worldRotation).normalize();
+            const correction = new THREE.Quaternion().setFromUnitVectors(currentDirection, targetDirection);
+            const targetWorldRotation = correction.multiply(worldRotation);
+            const parentWorldRotation = bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+            bone.quaternion.copy(parentWorldRotation.multiply(targetWorldRotation)).normalize();
+            bone.updateMatrixWorld(true);
+            return true;
+          };
+          alignBoneYAxis('upperarm_l', new THREE.Vector3(1, 0, 0));
+          alignBoneYAxis('lowerarm_l', new THREE.Vector3(1, 0, 0));
+          alignBoneYAxis('upperarm_r', new THREE.Vector3(-1, 0, 0));
+          alignBoneYAxis('lowerarm_r', new THREE.Vector3(-1, 0, 0));
+        }
+
+        render();
+        return { ok: true, name: poseName };
+      }
+    };
+    function applyVariantOptions(variant) {
+      const name = String(variant || '');
+      const female = name === 'female' || name === 'female-lean';
+      const preset = female
+        ? {
+            hair: 'long-waves',
+            top: 'mesh-crop',
+            jacket: 'cropped-puffer',
+            bottoms: 'mesh-shorts',
+            shoes: 'chunky-sneakers',
+            accessories: 'gold-hoops',
+          }
+        : {
+            // Match the production lean-preview loadout so the body review is
+            // not confounded by a different wardrobe shell.
+            hair: 'textured-crop',
+            top: 'ribbed-tank',
+            jacket: 'utility-vest',
+            bottoms: 'cargo-pants',
+            shoes: 'skate-sneakers',
+            accessories: 'gold-hoops',
+          };
+      for (const [slot, id] of Object.entries(preset)) window.__IMG2THREEJS_EDITOR__.setOption(slot, id);
+      return preset;
+    }
+    loader.load('/assets/avatars/modular-v1/avatar-base-editorial.glb', (gltf) => {
+      root.add(gltf.scene);
+      window.__GLB_CLIPS__ = gltf.animations;
+      window.__GLB_MIXER__ = new THREE.AnimationMixer(gltf.scene);
+      window.__GLB_ANIMATIONS__ = gltf.animations.map((clip) => ({ name: clip.name, duration: clip.duration, tracks: clip.tracks.length }));
+      window.__GLB_OPTIONS__ = [...gltf.scene.children].flatMap((node) => {
+        const names = [];
+        node.traverse((obj) => { if (obj.name.startsWith('AvatarOption_')) names.push(obj.name); });
+        return names;
+      });
+      const searchParams = new URLSearchParams(window.location.search);
+      const initialVariant = searchParams.get('variant');
+      if (initialVariant) {
+        window.__IMG2THREEJS_EDITOR__.setBodyVariant(initialVariant);
+        applyVariantOptions(initialVariant);
+      } else {
+        applyVariantOptions('male');
+      }
+      if (searchParams.get('bodyOnly') === '1') {
+        for (const slot of ['hair', 'top', 'jacket', 'bottoms', 'shoes', 'accessories']) {
+          window.__IMG2THREEJS_EDITOR__.setOption(slot, 'none');
+        }
+      }
+      gltf.scene.traverse((obj) => {
+        if (obj.isMesh) { originalMaterials.set(obj, obj.material); obj.castShadow = true; obj.receiveShadow = true; }
+      });
+      loaded = true;
+      window.__IMG2THREEJS_READY__ = true;
+      document.getElementById('status').textContent = 'GLB ready';
+      cameraSpec({
+        azimuthDegrees: Number(searchParams.get('azimuth') || 0),
+        elevationDegrees: Number(searchParams.get('elevation') || 0),
+      });
+      // The default remains the authored idle pose used by the game. A strict,
+      // runtime-only T-pose is available for skinning and attachment review;
+      // it never rewrites the GLB or changes the production animation clips.
+      window.__IMG2THREEJS_EDITOR__.setReviewPose(searchParams.get('pose') || 'idle');
+      render();
+    }, undefined, (error) => { document.getElementById('status').textContent = 'GLB load failed'; console.error(error); });
+  </script>
+</body>
+</html>

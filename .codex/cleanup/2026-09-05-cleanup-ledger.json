@@ -1,0 +1,496 @@
+{
+  "completed_utc": "2026-09-05T08:50:48.291051+00:00",
+  "deleted_files": [
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/baseline.blend1",
+      "bytes": 44554661,
+      "sha256": "c53da5141b1d363813f763f750188bae9f7038290fa49c7611cbcb2bf4a14400",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face05.blend1",
+      "bytes": 153233692,
+      "sha256": "61449fdc2d11aaae00a4617b491464b1cd3d0356a8311f74454d9d2547b79fe1",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_headtopo02.blend1",
+      "bytes": 67405216,
+      "sha256": "fbec2d2217d3af573c98ab7f391d9f3067b80ddd54ed4bf598282556d622c229",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_identity02.blend1",
+      "bytes": 71137323,
+      "sha256": "c012b4ded0f3a62dba097cfd50bb88466ec2b0afa93c2c44dbe3b2f8917dea2c",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_retarget01.blend1",
+      "bytes": 59801705,
+      "sha256": "15258e4b72b715461ff8af227ae51f8de8dd8ed0d2f6dd13a1efbc3ad319914b",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face03.blend1",
+      "bytes": 153139185,
+      "sha256": "f0072e0c5d81d7bfbfe698972355d076a6902980c0c1d5c9d6d5c470beb4dc2d",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face01.blend1",
+      "bytes": 153020988,
+      "sha256": "17651eaffa4ca4605782772e76a4b1621f7330ccd27eabdca28f700e4501a936",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_headtopo01.blend1",
+      "bytes": 67476170,
+      "sha256": "aa2e70e05335d4747d32da66da488707f3400daa79b422d9798ff6769271d886",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse.blend1",
+      "bytes": 161684959,
+      "sha256": "69aa42721b61828c98118b10afbf2e20de800b74358676c22097b2b0e1e81053",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face04.blend1",
+      "bytes": 153186394,
+      "sha256": "4d8d3e7d35850811041f9e58aae7bc252587bcf333102cbd012c4e31863f6cae",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face02.blend1",
+      "bytes": 153130692,
+      "sha256": "e821071b7345999451c1b3ec20d786a15a22c82ab6be292bb4f0ad09d8595b05",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_work.blend1",
+      "bytes": 109685039,
+      "sha256": "42e9cf842b406d8ab193ffd177d3b8aa165145642f43ab874f7a6b0374f3e6de",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_identity01.blend1",
+      "bytes": 65172020,
+      "sha256": "aa631ee6229ec64aea811ff6b80116ffa4705a6bb4f3cc4abba3434bac0e56f0",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/avatar-modular-v1.blend1",
+      "bytes": 44716438,
+      "sha256": "9d0657e409bf6600e077f52f3c85edb3257a27cff35f94b34cb3ee7f0f13d12e",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/body-bases/avatar.blend1",
+      "bytes": 1699173,
+      "sha256": "1d3517f63d42da53ecfa695b23dd1e9ff38ab7a4fa7df21290a009307079478c",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v10/avatar-modular-v1-fashion-v10.blend1",
+      "bytes": 44974245,
+      "sha256": "62fd6c15b7f6dee4994ccc0f6ba0ded083a9561c9d873450d29863693075c03d",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v2/avatar-modular-v1-fashion-v2.blend1",
+      "bytes": 44966686,
+      "sha256": "e8f74b1d37b7d88908a7e65e9dc118e772b471f4c53094295bc28a5e00f5e017",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v13/avatar-modular-v1-fashion-v13.blend1",
+      "bytes": 44976565,
+      "sha256": "c7173ba373e0f3a91467ba3b523de6900d7bb0c23625a596ad82043be1446046",
+      "reason": "Blender automatic backup; primary present before cleanup"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/quiff11.blend",
+      "bytes": 63773805,
+      "sha256": "5ffa89f7778665078570974ff836d99a47be22e9948a22f9edf6d98c2413e378",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/fiber09.blend",
+      "bytes": 51709112,
+      "sha256": "aecadeb9f5b8c3125cfc1d824185c5b9d56e2a0c2abcad727bf9688eb037cf49",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/master10.blend",
+      "bytes": 51733826,
+      "sha256": "4f54efbbf3e0b25cdd5942c863697513bacf9171916385dc599dffa268efdf82",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/scalp12.blend",
+      "bytes": 54683681,
+      "sha256": "574600cbed09782ca4419d931dcf22e7238076fdc47ac471ea8a86a22a98daec",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/optics20.blend",
+      "bytes": 95363830,
+      "sha256": "33b486dc8b9fd2cc43786fa7fff857419fe3ec5608ddae247a49891040acf60e",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/baseline.blend",
+      "bytes": 44554884,
+      "sha256": "5d97393f2f6d6ba727158068c77f49760d196f1ea473675dbde7eb2d0ac47bff",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/fiber08.blend",
+      "bytes": 51936333,
+      "sha256": "4fb848d85b477c29bddf5b4dccff74202b498e7663cdc65f9d37d21dcf862710",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/face17.blend",
+      "bytes": 95362816,
+      "sha256": "33e84aff0ec134366b6967b0cdfe6b953d34a48c154ac42bbd259798da6f0158",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/study03.blend",
+      "bytes": 45022202,
+      "sha256": "031aed9f773d9912797fcb78aa49db720e5dd11b780e5ad4e3e7fa009b81c9a6",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/study01.blend",
+      "bytes": 45223684,
+      "sha256": "a1e165eadea6a6308c168076b07c80cbe0c483789973df8186174ef70ebe6d54",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/trace07.blend",
+      "bytes": 47702655,
+      "sha256": "d0c3c3cdbff3904b28b15859bfddd70a3a0b4d92f3a07cb4154e313a476dd3d0",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/curl14.blend",
+      "bytes": 64097840,
+      "sha256": "48c79829f37ecef3a420361a39590a8e14938fe7ee7ab82b011a32424a7e258b",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/curl16.blend",
+      "bytes": 95348316,
+      "sha256": "91728ed27fe30a53d729eca104a4028876f554d5b0e3d846e75387fa2042134f",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/curl13.blend",
+      "bytes": 64110441,
+      "sha256": "0bcfa263404423d5ba192d25b11eeb4610f3780fcb733a2dd93b4f1f7e6575b3",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/study02.blend",
+      "bytes": 47825607,
+      "sha256": "8eb5cfe8649dacfbf288686e8694f1b734898924021b280f874c3aa68f673907",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/curl15.blend",
+      "bytes": 94056967,
+      "sha256": "d1369c682c480928c8a9f401513330982e2b9020e13d11012dc088a66b4d646c",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/trace06.blend",
+      "bytes": 44499029,
+      "sha256": "6a0a2fc6542afc3ad9377a1c5b3b249c0dec3ea0a1a64549a995995e4f75ef06",
+      "reason": "Superseded local checkpoint; renders and failure notes retained; current recipe consolidated"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face02.blend",
+      "bytes": 153144012,
+      "sha256": "a52b25d6d93f57fb4fdcd2aad2ad16d2b564382bc7710a7dedeff35fc16203f1",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_identity01.blend",
+      "bytes": 62585001,
+      "sha256": "60b77482d68cf20442d6f448dd279c77d2ae750a12d2b643e8e7d020a41f6cd2",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face04.blend",
+      "bytes": 153182291,
+      "sha256": "959bb2eb49f39f80c497f64647e67c18ec69a090b763cf77a33b3e85af4cccf7",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face03.blend",
+      "bytes": 153144653,
+      "sha256": "3f4238ee2008bea435c330bc208fd0444af240629cbe3229de3aca1d9ab2f598",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_identity02.blend",
+      "bytes": 68134690,
+      "sha256": "1f06974dcd8f05988486f31635e8c63cada05fb4b0e8f81d3a4da01bf840d8fe",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face01.blend",
+      "bytes": 153055135,
+      "sha256": "fb63d4bc7ce9bcac70962586a67820be656f7d67fc6bd44bb8e977a612efef4d",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse_face05.blend",
+      "bytes": 153233801,
+      "sha256": "89c4d47e1d0eee605a3055688e23b543cb67d7dab112cff7e708b9e83a8aa403",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_headtopo02.blend",
+      "bytes": 67492481,
+      "sha256": "fede3e4558139ebe5926eefdf8a90113aa04cd2bdb7dad61cfe71536a4686c1f",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v2_muse.blend",
+      "bytes": 152751288,
+      "sha256": "003ecd4ba7c3c570140ba25b8db8b8375bb32e70dc255d6b09d82571b546e5ce",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_tripo_retarget01.blend",
+      "bytes": 59865584,
+      "sha256": "bd51e3d7095166dfe61012994202628098e922165bb25be2c54a4c499df896eb",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/omniavatar-v2/OA_male_luxury_v3_headtopo01.blend",
+      "bytes": 67473525,
+      "sha256": "c729b7818c83aedba6e1fac23a56dd52c9391ed99a9b69a89d528889e4e919bc",
+      "reason": "Quarantined reconstruction intermediate; reports/captures and raw benchmark sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v3/avatar-modular-v1-fashion-v3.blend",
+      "bytes": 44967113,
+      "sha256": "beba06ae9cd9adcbecc3e4f09d447d9f83024b092fc730529563c5bad41d076c",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v4/avatar-modular-v1-fashion-v4.blend",
+      "bytes": 44971682,
+      "sha256": "5f83d41e1025f5f1d392dcdb7a333eae47c44b9700bcf50a2f70f0a6b99de3ff",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v5/avatar-modular-v1-fashion-v5.blend",
+      "bytes": 44970919,
+      "sha256": "02482bf7758d189a20ea160dd0d94c50bb00dcf3ec43c6d5a9e9f769dc2fb3d2",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v6/avatar-modular-v1-fashion-v6.blend",
+      "bytes": 44973660,
+      "sha256": "570508b513cfcde05252bc131f8de3a3101591cf0b2bbe3afe641bc144b95cf4",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v7/avatar-modular-v1-fashion-v7.blend",
+      "bytes": 44970802,
+      "sha256": "125787c60e78ebf87d7838b4aa1b72c5f66345ea9666373d541110949b829a7d",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v8/avatar-modular-v1-fashion-v8.blend",
+      "bytes": 44970703,
+      "sha256": "b716c992953087b8772a79cd31e2c0c904571474000e6f0088ab854e4924c8c2",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v9/avatar-modular-v1-fashion-v9.blend",
+      "bytes": 44975088,
+      "sha256": "eb7e32f6e3103743546cd0d6d521b5a118a6834953a00cf0ee707a6059c9d4eb",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v10/avatar-modular-v1-fashion-v10.blend",
+      "bytes": 44973623,
+      "sha256": "4f80a7fd61e60921550eb0754c33a4891a5a322995519bc74cadd086a2adfb76",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v11/avatar-modular-v1-fashion-v11.blend",
+      "bytes": 44977712,
+      "sha256": "eb4d018eedad146e7fff0ef607d592e3bf50ffd8ca67bd2e0b1d05bbd176c57d",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v12/avatar-modular-v1-fashion-v12.blend",
+      "bytes": 44980387,
+      "sha256": "1edf325ae4aa26cdc1d845ceab9c2ead5edca6cdce855477edc03b6b54cd888d",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v12/export/avatar-base-editorial.glb",
+      "bytes": 48976416,
+      "sha256": "cd1e68b1a0be2e2b466376710a2b02494bacfbe395881c0ddcfaecae699d9d43",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v13/avatar-modular-v1-fashion-v13.blend",
+      "bytes": 44976177,
+      "sha256": "04352fa8df9b58c343cf7ada3a6bfe14509d8dd0fde0d1fdc5a6bc7b4e2b4d37",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v13/export/avatar-base-editorial.glb",
+      "bytes": 48976532,
+      "sha256": "df0c6bea652d1c5d670b5732e8a8cf99deddae30560b985c999d7642c5b6652f",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v14/avatar-modular-v1-fashion-v14.blend",
+      "bytes": 44978045,
+      "sha256": "0da2653f62f9a4e83733d0f16b9b9883d2c5ec748897e030d272dbbaa1b66bd7",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v14/export/avatar-base-editorial.glb",
+      "bytes": 48976460,
+      "sha256": "f8e658b90c3bc3d8ce940ef8ed9fddba47f7cf06ca016b7bc4aff34316ed94c8",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v15/avatar-modular-v1-fashion-v15.blend",
+      "bytes": 44976105,
+      "sha256": "e0c225bafaba5f11131bf2ef20304a3e561842d0a3c1cc09d05fb747634b5039",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v15/export/avatar-base-editorial.glb",
+      "bytes": 48976460,
+      "sha256": "88749881c4d35d3341b4ce4ddd7f8e65f34967ca38d5902b32ba417dcd0da0a3",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v16/avatar-modular-v1-fashion-v16.blend",
+      "bytes": 44977524,
+      "sha256": "37f047500ff20f1478eb1c0f2ba423fadf82b31c470177f93013cee9cf1710f1",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v16/export/avatar-base-editorial.glb",
+      "bytes": 48976460,
+      "sha256": "19fa0715f0f0e94863dc225641a78f0bc1f01e36d5ac767eb849ac708d211df7",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v17/avatar-modular-v1-fashion-v17.blend",
+      "bytes": 44977747,
+      "sha256": "a98859dab231e19858e07e6532d7727780070db63bb4565b76f42edb851a3d36",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    },
+    {
+      "path": "omnirave-babylon/assets-src/avatars/modular-v1/fashion-v17/export/avatar-base-editorial.glb",
+      "bytes": 48976460,
+      "sha256": "35aed88a47d61eb1f9a52713fdf6da1bd962158930f375aad6104a1456e180a7",
+      "reason": "Superseded editorial authoring/export revision; final V18 and active profile sources retained"
+    }
+  ],
+  "deleted_bytes": 4863504715,
+  "archived_scripts": [
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/fiber_groom.py",
+      "bytes": 6466,
+      "sha256": "e82db10d2161ddb6eaa36df939aaae87af95767168ecc2792deb0384951726de",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/recess_undercoat.py",
+      "bytes": 1724,
+      "sha256": "35a24707524d283ac1086b437d0e4c366e97f6e522ff45a77d27fdd843d1cdfa",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/refine_expression_bounded.py",
+      "bytes": 2623,
+      "sha256": "7deeb48f9e96e0d95a46170d34c38183cc8e5db6f8231104ef9fb08680d4bb19",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/complete_curl_groom.py",
+      "bytes": 9340,
+      "sha256": "5aeed7e4a42a16834e55c011f2f299ca2e43d76f63f61078c998f325f2f6e6cf",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/dense_curl_groom.py",
+      "bytes": 6725,
+      "sha256": "cfce2b1822e15f511e48655b5eeb345a6dc9087763a9de5c6fe1d3fcf021c5f8",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/polish_master.py",
+      "bytes": 3036,
+      "sha256": "d1430d18034d1452958fcc7455ec66672dc243f21536d351bb89511b252a96e2",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/hair_optics.py",
+      "bytes": 1806,
+      "sha256": "ecbdfe2f69fc413bfa9d5d26768431e4e18ba6f79aa6e04d4add431bcf95fd85",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/curl_groom.py",
+      "bytes": 6307,
+      "sha256": "64c03ffd52e63652b99250e34d7da81f0e90390ea3e6beb6ba4cece58184127c",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/traced_groom.py",
+      "bytes": 9181,
+      "sha256": "4c314f64a4ea2cfbf8554727c01954025129e32052bed3190e9e776bc23fcc86",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/volume_groom.py",
+      "bytes": 5146,
+      "sha256": "2739ec3059f1b84b06350b6a52f1a2525db642ef7fd21d9220512738c628b99f",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/bounded_curl_groom.py",
+      "bytes": 9501,
+      "sha256": "398a7f5497b7291ae40363166d4b15c9abb559e27624bbfe8e85d31495abc88a",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/scalp_groom.py",
+      "bytes": 5398,
+      "sha256": "aa425ddcaa3905f82cfa45ab826f57c4a7df4ad8e0ac820c959a7d01c875bb38",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    },
+    {
+      "path": "omnirave-babylon/scripts/astra-male-proof/refine_expression.py",
+      "bytes": 2623,
+      "sha256": "8cc3b851c0156c3f3d98b48436e9b7e20e23d0620783727cdf6fef9f55d9f5d0",
+      "archive": "omnirave-babylon/assets-src/avatars/astra-male-proof/historical-scripts.zip"
+    }
+  ],
+  "candidate_replacement": {
+    "path": "omnirave-babylon/assets-src/avatars/astra-male-proof/face19.blend",
+    "old_sha256": "a8535e76c8d3616a8d32d124093ce65fb492b514038770e5b1fbbc3538488c50",
+    "new_sha256": "234b81e9acdcd7f922082b4dcb4d1c54b927f282fd660035a803e6e9814d0409",
+    "reason": "equivalent consolidated source; hidden rejected hair removed; compressed Blender save"
+  },
+  "rebuild_geometry_pass": true,
+  "reference_render_pixel_identical": true
+}

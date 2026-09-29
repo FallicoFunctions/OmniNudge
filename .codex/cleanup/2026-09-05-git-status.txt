@@ -1,0 +1,66 @@
+ M .env.example
+ M .github/workflows/ci.yml
+ M .gitignore
+ M backend/.env.example
+A  backend/bin/omninudge
+A  backend/bin/server
+ M backend/internal/config/config.go
+ M backend/internal/services/storage.go
+A  omninudge
+ M omnirave-babylon/assets-src/avatars/body-bases/avatar.blend
+ M omnirave-babylon/package-lock.json
+ M omnirave-babylon/package.json
+ M omnirave-babylon/public/assets/avatars/avatar-bodies.glb
+ M omnirave-babylon/scripts/generate-luxury-festival-avatar.py
+ M omnirave-babylon/src/app/createRuntime.ts
+ M omnirave-babylon/src/player/__tests__/applyAvatarDefinition.test.ts
+ M omnirave-babylon/src/player/__tests__/avatarColorways.test.ts
+ M omnirave-babylon/src/player/__tests__/avatarDefinition.test.ts
+ M omnirave-babylon/src/player/applyAvatarDefinition.ts
+ M omnirave-babylon/src/player/avatarColorways.ts
+ M omnirave-babylon/src/player/avatarDefinition.ts
+ M omnirave-babylon/src/player/createRemotePlayerRigs.ts
+ M omnirave-babylon/src/player/createReviewAvatar.ts
+ M omnirave-babylon/src/scene/__tests__/createMainStageScene.test.ts
+ M omnirave-babylon/src/scene/__tests__/mainStageManifest.test.ts
+ M omnirave-babylon/src/scene/createMainStageScene.ts
+ M omnirave-babylon/src/scene/mainStageManifest.ts
+ M omnirave-babylon/src/ui/__tests__/createAvatarEditor.test.ts
+ M omnirave-babylon/src/ui/__tests__/createTopLeftControls.test.ts
+ M omnirave-babylon/src/ui/createAvatarEditor.ts
+ M omnirave-babylon/src/ui/createTopLeftControls.ts
+ M omnirave-babylon/tests/viteConfig.test.ts
+ M omnirave-babylon/vite.config.ts
+?? .codex/
+?? Test
+?? backend/cmd/tripo-avatar-benchmark/
+?? backend/internal/database/migrations/111_omniavatar_pipeline_jobs.down.sql
+?? backend/internal/database/migrations/111_omniavatar_pipeline_jobs.up.sql
+?? backend/internal/database/migrations/112_omniavatar_worker_leases.down.sql
+?? backend/internal/database/migrations/112_omniavatar_worker_leases.up.sql
+?? backend/internal/database/migrations/113_omniavatar_provider_dispatch_outbox.down.sql
+?? backend/internal/database/migrations/113_omniavatar_provider_dispatch_outbox.up.sql
+?? backend/internal/omniavatar/
+?? backend/internal/services/storage_immutable_test.go
+?? docs/technical/omnirave/avatar-reconstruction-plan.md
+?? omnirave-babylon/.img2threejs-glb-v2/
+?? omnirave-babylon/assets-src/avatars/astra-male-proof/
+?? omnirave-babylon/assets-src/avatars/modular-v1/
+?? omnirave-babylon/assets-src/avatars/omniavatar-v2/
+?? omnirave-babylon/assets-src/avatars/reference-turnarounds/
+?? omnirave-babylon/public/assets/avatars/modular-v1/
+?? omnirave-babylon/public/assets/avatars/omniavatar-v2/
+?? omnirave-babylon/public/img2threejs-glb-v2/
+?? omnirave-babylon/review.html
+?? omnirave-babylon/scripts/astra-male-proof/
+?? omnirave-babylon/scripts/avatar-modular-v1/
+?? omnirave-babylon/scripts/compose-luxury-comparison.py
+?? omnirave-babylon/scripts/omniavatar-v2/
+?? omnirave-babylon/scripts/render_glb_turntable.py
+?? omnirave-babylon/src/player/__tests__/createAvatarReviewLighting.test.ts
+?? omnirave-babylon/src/player/__tests__/modularAvatarAsset.test.ts
+?? omnirave-babylon/src/player/__tests__/modularAvatarContract.test.ts
+?? omnirave-babylon/src/player/__tests__/omniAvatarV2Assets.test.ts
+?? omnirave-babylon/src/player/createAvatarReviewLighting.ts
+?? omnirave-babylon/src/player/modularAvatarContract.ts
+?? omnirave-babylon/src/review/
