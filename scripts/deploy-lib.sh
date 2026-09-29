@@ -17,10 +17,12 @@ BACKUP_KEEP_TAR="${BACKUP_KEEP_TAR:-5}"
 BACKUP_KEEP_SQL="${BACKUP_KEEP_SQL:-10}"
 SERVICE_NAME="${SERVICE_NAME:-omninudge-backend}"
 ENABLE_OMNIRAVE_DEPLOY="${ENABLE_OMNIRAVE_DEPLOY:-1}"
-# Public build values. OmniRave runs on its own origin because the runtime
-# loads /assets and /audio from its site root. OmniChat stays off in
-# production until it launches.
-OMNIRAVE_PUBLIC_ORIGIN="${OMNIRAVE_PUBLIC_ORIGIN:-https://play.omninudge.com}"
+# Public build values. OmniRave is served from the main site, so the Play
+# click and the game share one site (the browser then lets the game start its
+# audio without a second click). OmniChat stays off in production until it
+# launches.
+SITE_ORIGIN="${SITE_ORIGIN:-https://omninudge.com}"
+OMNIRAVE_BASE_PATH="${OMNIRAVE_BASE_PATH:-/games/omnirave/play/}"
 PRODUCTION_OMNICHAT_ENABLED="${PRODUCTION_OMNICHAT_ENABLED:-false}"
 OMNIGAME_API_SERVICE_NAME="${OMNIGAME_API_SERVICE_NAME:-omnigame-api}"
 OMNIRAVE_WORLD_SERVICE_NAME="${OMNIRAVE_WORLD_SERVICE_NAME:-omnirave-world}"
@@ -132,7 +134,7 @@ assert_clean_tree() {
 }
 
 build_frontend_locally() {
-  run_capture "frontend build" /bin/zsh -lc "cd '$LOCAL_FRONTEND_DIR' && VITE_OMNICHAT_ENABLED='$PRODUCTION_OMNICHAT_ENABLED' VITE_OMNIRAVE_RUNTIME_URL='$OMNIRAVE_PUBLIC_ORIGIN' VITE_OMNIGAME_API_URL='$OMNIRAVE_PUBLIC_ORIGIN/api/v1' npm run build"
+  run_capture "frontend build" /bin/zsh -lc "cd '$LOCAL_FRONTEND_DIR' && VITE_OMNICHAT_ENABLED='$PRODUCTION_OMNICHAT_ENABLED' VITE_OMNIRAVE_RUNTIME_URL='$SITE_ORIGIN$OMNIRAVE_BASE_PATH' VITE_OMNIGAME_API_URL='$SITE_ORIGIN/api/v1' npm run build"
 }
 
 build_backend_locally() {
@@ -140,7 +142,7 @@ build_backend_locally() {
 }
 
 build_omnirave_locally() {
-  run_capture "omnirave-babylon build" /bin/zsh -lc "cd '$LOCAL_OMNIRAVE_DIR' && VITE_OMNIGAME_API_URL='$OMNIRAVE_PUBLIC_ORIGIN/api/v1' npm run build"
+  run_capture "omnirave-babylon build" /bin/zsh -lc "cd '$LOCAL_OMNIRAVE_DIR' && OMNIRAVE_BASE='$OMNIRAVE_BASE_PATH' VITE_OMNIGAME_API_URL='$SITE_ORIGIN/api/v1' npm run build"
 }
 
 build_omnirave_backend_binaries_locally() {

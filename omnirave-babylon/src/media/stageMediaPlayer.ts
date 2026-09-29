@@ -12,6 +12,7 @@
 // Vitest with a hand-rolled FakeBackend and never touches the DOM / network.
 
 import type { ZoneMediaState } from '../network/worldSocket';
+import { publicUrl } from '../app/publicUrl';
 
 // The served audio file extension. A single named constant so switching the
 // whole setlist to a different container (e.g. .m4a) is a one-line change.
@@ -19,7 +20,7 @@ const AUDIO_FILE_EXTENSION = '.mp3';
 
 // Resolves a server-reported trackId to the URL of its self-hosted audio file.
 function resolveTrackUrl(trackId: string): string {
-  return `/audio/${trackId}${AUDIO_FILE_EXTENSION}`;
+  return publicUrl(`/audio/${trackId}${AUDIO_FILE_EXTENSION}`);
 }
 
 // If the server-reported playhead and our local playback position drift by

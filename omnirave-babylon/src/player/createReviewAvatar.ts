@@ -33,6 +33,7 @@ import {
   type ModularAvatarProfile,
   type ModularAvatarSlot,
 } from './modularAvatarContract';
+import { publicUrl } from '../app/publicUrl';
 
 export interface ReviewAvatar {
   wardrobe?: import('./completeAvatarWardrobe').CompleteAvatarWardrobe;
@@ -479,7 +480,7 @@ async function loadAuthoredBodyBases(
   if (!scene.getEngine().getRenderingCanvas()) return undefined;
 
   const loadLegacyAvatar = async (preserveAuthoredMaterials: boolean) => {
-    const imported = await SceneLoader.ImportMeshAsync('', '', '/assets/avatars/avatar-bodies.glb', scene);
+    const imported = await SceneLoader.ImportMeshAsync('', '', publicUrl('/assets/avatars/avatar-bodies.glb'), scene);
     const importedNodes = [...imported.meshes, ...imported.transformNodes];
     for (const node of importedNodes) {
       if (node.parent === null) node.parent = visualPivot;

@@ -1,13 +1,14 @@
+import { publicUrl } from '../app/publicUrl';
 export const MODULAR_AVATAR_CONTRACT_VERSION = 'omnirave-avatar/1' as const;
 export const OMNIAVATAR_CONTRACT_VERSION_V2 = 'omnirave-avatar/2' as const;
 export const OMNIAVATAR_MALE_V1_ASSET_URL =
-  '/assets/avatars/omniavatar-v2/male-luxury-festival-v1.glb' as const;
+  publicUrl('/assets/avatars/omniavatar-v2/male-luxury-festival-v1.glb');
 export const OMNIAVATAR_FEMALE_V1_ASSET_URL =
-  '/assets/avatars/omniavatar-v2/female-plurr-warehouse-v1.glb' as const;
-export const MODULAR_AVATAR_ASSET_URL = '/assets/avatars/modular-v1/avatar-base.glb' as const;
-export const MODULAR_AVATAR_LEAN_ASSET_URL = '/assets/avatars/modular-v1/avatar-base-lean.glb' as const;
-export const MODULAR_AVATAR_FASHION_ASSET_URL = '/assets/avatars/modular-v1/avatar-base-fashion.glb' as const;
-export const MODULAR_AVATAR_EDITORIAL_ASSET_URL = '/assets/avatars/modular-v1/avatar-base-editorial.glb' as const;
+  publicUrl('/assets/avatars/omniavatar-v2/female-plurr-warehouse-v1.glb');
+export const MODULAR_AVATAR_ASSET_URL = publicUrl('/assets/avatars/modular-v1/avatar-base.glb');
+export const MODULAR_AVATAR_LEAN_ASSET_URL = publicUrl('/assets/avatars/modular-v1/avatar-base-lean.glb');
+export const MODULAR_AVATAR_FASHION_ASSET_URL = publicUrl('/assets/avatars/modular-v1/avatar-base-fashion.glb');
+export const MODULAR_AVATAR_EDITORIAL_ASSET_URL = publicUrl('/assets/avatars/modular-v1/avatar-base-editorial.glb');
 
 /**
  * Authoring profiles are runtime asset revisions, not player-facing body

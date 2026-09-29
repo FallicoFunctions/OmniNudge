@@ -21,6 +21,7 @@ import {
 import { createReviewAvatar } from '../player/createReviewAvatar';
 import type { AvatarAnimationState } from '../player/avatarAnimationState';
 import { resolveReviewCharacter, resolveReviewCheckpoint } from './reviewCheckpoints';
+import { publicUrl } from '../app/publicUrl';
 
 async function boot(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
@@ -104,8 +105,8 @@ async function boot(): Promise<void> {
     console.log(`REVIEW-MESHES enabled=${avatar.meshes.filter((m) => m.isEnabled()).length} ` + rows.join(' '));
   }
   const assetUrl = character === 'male'
-    ? '/assets/avatars/omniavatar-v2/male-luxury-festival-v1.glb'
-    : '/assets/avatars/omniavatar-v2/female-plurr-warehouse-v1.glb';
+    ? publicUrl('/assets/avatars/omniavatar-v2/male-luxury-festival-v1.glb')
+    : publicUrl('/assets/avatars/omniavatar-v2/female-plurr-warehouse-v1.glb');
   let fileBytes: number | null = null;
   try {
     const head = await fetch(assetUrl, { method: 'HEAD' });

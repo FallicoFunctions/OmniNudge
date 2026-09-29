@@ -18,6 +18,7 @@ import type { Scene } from '@babylonjs/core/scene.js';
 import '@babylonjs/loaders/glTF/index.js';
 import type { AvatarAnimationState } from './avatarAnimationState';
 import type { ReviewAvatar } from './createReviewAvatar';
+import { publicUrl } from '../app/publicUrl';
 
 type CompleteAvatarAssets = Pick<ISceneLoaderAsyncResult, 'meshes' | 'transformNodes' | 'skeletons' | 'animationGroups'>;
 interface CompleteAvatarOptions {
@@ -35,7 +36,7 @@ export async function createCompleteAvatar(
   options: CompleteAvatarOptions = {},
 ): Promise<ReviewAvatar> {
   const source = await loadCompleteAvatarSource(`${character}.glb`);
-  const imported = await SceneLoader.ImportMeshAsync('', '/assets/avatars/complete-pair/', source, scene, undefined, '.glb');
+  const imported = await SceneLoader.ImportMeshAsync('', publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb');
   return createCompleteAvatarFromAssets(scene, character, imported, options);
 }
 

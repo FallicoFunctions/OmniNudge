@@ -26,7 +26,8 @@ function isLfsPointer(file: string): boolean {
 }
 
 export default defineConfig({
-  base: './',
+  // OMNIRAVE_BASE: where production mounts the game, e.g. /games/omnirave/play/.
+  base: process.env.OMNIRAVE_BASE ?? './',
   build: {
     chunkSizeWarningLimit: 2300,
     rollupOptions: {

@@ -84,15 +84,18 @@ What the script does:
 
 If a production-changing step fails after backup creation, the script prints the raw error and asks whether to roll back immediately.
 
-OmniRave deploys with every run of the script (`ENABLE_OMNIRAVE_DEPLOY=1` is the default; set it to `0` to skip). The runtime is served from its own origin, `https://play.omninudge.com`, because it loads `/assets/...` and `/audio/...` from its site root:
+OmniRave deploys with every run of the script (`ENABLE_OMNIRAVE_DEPLOY=1` is the default; set it to `0` to skip). The game is served from the main site, so the Play click on `/games/omnirave` and the game share one site: the browser then lets the game start its audio without a second click. The runtime is built with `OMNIRAVE_BASE=/games/omnirave/play/`, which prefixes every model, audio and decoder URL.
 
-| On `play.omninudge.com` | Served by |
+| On `omninudge.com` | Served by |
 |---|---|
-| `/` | `/var/www/omninudge/omnirave-babylon/dist` (uploaded by the deploy script) |
-| `/audio/` | `/var/www/omnirave-audio/` (uploaded by hand, see below) |
-| `/api/v1/` | `omnigame-api` on `127.0.0.1:8091` |
-| `/ws` | `omnirave-world` on `127.0.0.1:8092` |
-| `/*-review.html`, `/img2threejs-glb-v2/` | 404: developer review tools ship in the build but nginx does not serve them |
+| `/games/omnirave` | the React app (landing page with the Play button) |
+| `/games/omnirave/play/` | `/var/www/omninudge/omnirave-babylon/dist` (uploaded by the deploy script) |
+| `/games/omnirave/play/audio/` | `/var/www/omnirave-audio/` (uploaded by hand, see below) |
+| `/games/omnirave/play/*-review.html`, `.../img2threejs-glb-v2/` | 404: developer review tools ship in the build but nginx does not serve them |
+| `/api/v1/omnigame/` | `omnigame-api` on `127.0.0.1:8091` |
+| `/games/omnirave/ws` | `omnirave-world` on `127.0.0.1:8092` |
+
+`play.omninudge.com` only redirects to `https://omninudge.com/games/omnirave`. nginx takes the client address from Cloudflare's `CF-Connecting-IP` (`/etc/nginx/conf.d/cloudflare-real-ip.conf`), so `$remote_addr` is the player, not a Cloudflare edge.
 
 The deploy script builds the frontend with `VITE_OMNICHAT_ENABLED=false`, and production sets `OMNICHAT_ENABLED=false` for the backend. OmniChat routes, navigation, and `/api/v1/omnichat` endpoints do not exist in production until both are switched on.
 

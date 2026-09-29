@@ -1,6 +1,7 @@
 import downloads from './completeAvatarDownloads.json';
+import { publicUrl } from '../app/publicUrl';
 
-const base = '/assets/avatars/complete-pair/';
+const base = publicUrl('/assets/avatars/complete-pair/');
 
 /** Decode the smaller transport copy; older browsers retain the ordinary GLB. */
 export async function loadCompleteAvatarSource(file: string): Promise<string | Uint8Array> {

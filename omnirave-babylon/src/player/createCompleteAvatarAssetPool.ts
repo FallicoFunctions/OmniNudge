@@ -14,6 +14,7 @@ import { packCompleteAvatarMaterials } from './packCompleteAvatarMaterials';
 import { createAvatarInstanceRenderer } from './createAvatarInstanceRenderer';
 import { shareAvatarMorphTargetBuffers } from './shareAvatarMorphTargetBuffers';
 import { prepareAvatarCopyBounds } from './prepareAvatarCopyBounds';
+import { publicUrl } from '../app/publicUrl';
 
 /** One immutable source per character/detail, with independent rigged copies. */
 export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAnimationRate?: number; crowd?: boolean } = {}) {
@@ -66,7 +67,7 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
     const file = completeAvatarAssetName(character, detail);
     let pending = sources.get(file);
     if (!pending) {
-      pending = loadCompleteAvatarSource(file).then(source => SceneLoader.LoadAssetContainerAsync('/assets/avatars/complete-pair/', source, scene, undefined, '.glb')).then(container => {
+      pending = loadCompleteAvatarSource(file).then(source => SceneLoader.LoadAssetContainerAsync(publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb')).then(container => {
         const stores: ReturnType<typeof shareAvatarMorphTargetBuffers>[] = [];
         let bounds: ReturnType<typeof prepareAvatarCopyBounds> | undefined;
         try {

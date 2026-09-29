@@ -13,9 +13,9 @@ import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
 // must never be a production dependency.
 DracoCompression.Configuration = {
   decoder: {
-    wasmUrl: '/libs/draco/draco_wasm_wrapper_gltf.js',
-    wasmBinaryUrl: '/libs/draco/draco_decoder_gltf.wasm',
-    fallbackUrl: '/libs/draco/draco_decoder_gltf.js',
+    wasmUrl: publicUrl('/libs/draco/draco_wasm_wrapper_gltf.js'),
+    wasmBinaryUrl: publicUrl('/libs/draco/draco_decoder_gltf.wasm'),
+    fallbackUrl: publicUrl('/libs/draco/draco_decoder_gltf.js'),
   },
 };
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
@@ -24,6 +24,7 @@ import type { Scene } from '@babylonjs/core/scene';
 
 import { MAIN_STAGE_MANIFEST } from './mainStageManifest';
 import { polishMainStageMaterials } from './mainStageMaterialPolish';
+import { publicUrl } from '../app/publicUrl';
 
 // Clearcoat adds a second specular lobe evaluated per fragment. The polish
 // pass had it enabled on ~350 materials, which dominated the pixel-shader cost

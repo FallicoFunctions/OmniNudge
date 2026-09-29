@@ -19,6 +19,7 @@ import type { ReviewAvatar } from '../player/createReviewAvatar';
 import type { AvatarAnimationState } from '../player/avatarAnimationState';
 import type { CompleteExpression, CompleteBlink } from '../player/completeAvatarExpression';
 import { createCompleteWardrobeControls } from '../ui/createCompleteWardrobeControls';
+import { publicUrl } from '../app/publicUrl';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#canvas')!;
 const character = document.querySelector<HTMLSelectElement>('#character')!;
@@ -94,7 +95,7 @@ async function load() {
   exportImage.disabled = true;
   document.querySelector<HTMLElement>('#image-output')!.hidden = true;
   status.textContent = 'Loading character…';
-  document.querySelector<HTMLImageElement>('#reference')!.src = `/assets/avatars/complete-pair/${sex}-reference.png`;
+  document.querySelector<HTMLImageElement>('#reference')!.src = publicUrl(`/assets/avatars/complete-pair/${sex}-reference.png`);
   document.querySelector<HTMLAnchorElement>('#venue')!.href = `/?avatarComplete=${sex}`;
   const next = await createCompleteAvatar(scene, sex);
   if (current !== generation) { next.dispose?.(); next.root.dispose(false, true); return; }

@@ -3,10 +3,11 @@ import {
   MODULAR_AVATAR_FASHION_ASSET_URL,
   MODULAR_AVATAR_LEAN_ASSET_URL,
 } from '../player/modularAvatarContract';
+import { publicUrl } from '../app/publicUrl';
 
 export const MAIN_STAGE_MANIFEST = {
-  sceneGlb: '/assets/venues/main-stage/main-stage.glb',
-  collisionGlb: '/assets/venues/main-stage/main-stage-collision.glb',
+  sceneGlb: publicUrl('/assets/venues/main-stage/main-stage.glb'),
+  collisionGlb: publicUrl('/assets/venues/main-stage/main-stage-collision.glb'),
   reviewAvatarGlb: MODULAR_AVATAR_ASSET_URL,
   reviewAvatarLeanGlb: MODULAR_AVATAR_LEAN_ASSET_URL,
   reviewAvatarFashionGlb: MODULAR_AVATAR_FASHION_ASSET_URL,

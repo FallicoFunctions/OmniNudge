@@ -12,6 +12,7 @@ import { prepareCompleteAvatarVertexBuffers } from './completeAvatarBuffers';
 import { createCompleteExpressionControls, type CompleteExpressionControls } from './completeAvatarExpression';
 import { completeAvatarAssetName, resolveCompleteAvatarDetail, type CompleteAvatarDetail } from './completeAvatarLod';
 import { createCompleteCrowdTransmission } from './completeCrowdTransmission';
+import { publicUrl } from '../app/publicUrl';
 
 export type CompleteCrowdMode = 'adaptive' | 'full';
 type Character = 'male' | 'female';
@@ -50,7 +51,7 @@ export function createCompleteAvatarCrowd(scene: Scene) {
     const key = `${character}:${detail}`;
     let promise = sources.get(key);
     if (!promise) {
-      promise = loadCompleteAvatarSource(completeAvatarAssetName(character, detail)).then(source => SceneLoader.LoadAssetContainerAsync('/assets/avatars/complete-pair/', source, scene, undefined, '.glb')).then(container => {
+      promise = loadCompleteAvatarSource(completeAvatarAssetName(character, detail)).then(source => SceneLoader.LoadAssetContainerAsync(publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb')).then(container => {
         if (disposed) { container.dispose(); throw new Error('Crowd has been disposed.'); }
         if (container.skeletons.length !== 1 || container.skeletons[0].bones.length !== 56
           || ['idle', 'walk', 'run'].some(name => !container.animationGroups.some(group => group.name === name))) {
