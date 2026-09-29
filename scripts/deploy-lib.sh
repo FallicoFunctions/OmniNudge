@@ -346,11 +346,24 @@ restore_backup_bundle() {
 cd '$SERVER_PATH'
 rm -rf '$SERVER_PATH/backend' '$SERVER_PATH/frontend' '$OMNIRAVE_RUNTIME_REMOTE_PATH'
 tar -xzf '$BACKUP_DIR/${backup_name}.tar.gz'"
+  # The dump is loaded into a fresh database and swapped in by name. Loading it
+  # over the live database fails once migrations have added tables that
+  # reference the dumped ones (--clean cannot drop what they depend on), and a
+  # partial load leaves the live database half dropped. The replaced database
+  # is kept as <name>_rolled_back_<backup> for inspection.
   run_remote_capture "database restore" "set -eo pipefail
 DB_USER=\$(grep '^DB_USER=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
-DB_PASSWORD=\$(grep '^DB_PASSWORD=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
 DB_NAME=\$(grep '^DB_NAME=' '$SERVER_PATH/backend/.env' | cut -d= -f2-)
-PGPASSWORD=\"\$DB_PASSWORD\" gunzip -c '$BACKUP_DIR/${backup_name}.sql.gz' | psql -v ON_ERROR_STOP=1 -U \"\$DB_USER\" -h localhost \"\$DB_NAME\""
+STAGING=\"\${DB_NAME}_restore\"
+KEPT=\"\${DB_NAME}_rolled_back_\$(echo '${backup_name}' | tr -c 'a-zA-Z0-9\n' '_')\"
+cd /tmp
+sudo -u postgres dropdb --if-exists \"\$STAGING\"
+sudo -u postgres createdb -O \"\$DB_USER\" \"\$STAGING\"
+gunzip -c '$BACKUP_DIR/${backup_name}.sql.gz' | sudo -u postgres psql -q -v ON_ERROR_STOP=1 --single-transaction -d \"\$STAGING\" >/dev/null
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d postgres \
+  -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\$DB_NAME' AND pid <> pg_backend_pid();\" \
+  -c \"ALTER DATABASE \\\"\$DB_NAME\\\" RENAME TO \\\"\$KEPT\\\";\" \
+  -c \"ALTER DATABASE \\\"\$STAGING\\\" RENAME TO \\\"\$DB_NAME\\\";\" >/dev/null"
 }
 
 rebuild_backend_after_restore() {

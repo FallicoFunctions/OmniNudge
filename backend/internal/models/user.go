@@ -600,7 +600,11 @@ func (r *UserRepository) BackfillEmailLookupHashes(ctx context.Context) (int, er
 		if encrypted {
 			plaintext, err = utils.DecryptEmail(storedEmail)
 			if err != nil {
-				return 0, fmt.Errorf("decrypt email for user %d: %w", userID, err)
+				// A row encrypted under an earlier key cannot be indexed, and
+				// could not be found by email before this backfill either.
+				// Skipping it keeps one unreadable row from stopping startup.
+				log.Printf("WARNING: Failed to decrypt email for user_id=%d: %v (key mismatch?)", userID, err)
+				continue
 			}
 		}
 		hash, err := utils.EmailLookupHash(plaintext)

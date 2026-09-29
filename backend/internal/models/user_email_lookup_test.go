@@ -46,6 +46,18 @@ func TestUserEmailLookupUsesBlindIndexAndBackfillsLegacyRows(t *testing.T) {
 		RETURNING id
 	`, legacyCiphertext).Scan(&legacyID))
 
+	// A row encrypted under an earlier key: the backfill skips it instead of
+	// failing, so one unreadable row cannot stop the server from starting.
+	require.NoError(t, utils.SetEncryptionKey("fedcba9876543210fedcba9876543210"))
+	staleCiphertext, err := utils.EncryptEmail("stale@example.com")
+	require.NoError(t, err)
+	require.NoError(t, utils.SetEncryptionKey("0123456789abcdef0123456789abcdef"))
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO users (username, username_normalized, email, email_encrypted, password_hash)
+		VALUES ('stale_email_lookup', 'stale_email_lookup', $1, TRUE, 'test-hash')
+	`, staleCiphertext)
+	require.NoError(t, err)
+
 	backfilled, err := repo.BackfillEmailLookupHashes(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, backfilled)
