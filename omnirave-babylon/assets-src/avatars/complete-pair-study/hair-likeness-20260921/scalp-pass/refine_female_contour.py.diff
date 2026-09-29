@@ -1,0 +1,89 @@
+--- before/refine_female_contour.py
++++ scripts/launch-body-proof/refine_female_contour.py
+@@ -34,21 +34,46 @@
+     apply(cap,q,mapping,report)
+     scalp=Surface(rig,cap)
+     ob=bpy.data.objects['PLURR swept scalp groom'];p=array(ob);q=p.copy()
+-    parts=islands(ob);paths=np.array([p[ids].reshape(24,2,3).mean(1) for ids in parts])
+-    groups=group_paths(paths,38)
++    parts=islands(ob)
++    eye=np.mean([array(bpy.data.objects['AvatarEye_'+side],True).mean(0) for side in ['l','r']],axis=0)
++    center=np.array([0,-.032,eye[2]+.039])
++    target=array(bpy.data.objects['PLURR gathered pony root'],True).mean(0)-center
++    target/=np.linalg.norm(target)
++    # The braid is constructed immediately after this stage using this guide.
++    # Reserve a shallow channel beneath it; the hardware remains untouched.
++    from refine_female_crown import bezier
++    braid_path=bezier([[-.067,-.066,1.641],[-.083,-.089,1.681],[-.045,-.063,1.731],[-.011,.014,1.722]],np.linspace(0,1,97))
++    braid_tree=KDTree(len(braid_path))
++    for j,point in enumerate(braid_path):
++        hit,_,_,_=scalp.tree.find_nearest(Vector(point));braid_tree.insert(hit,j)
++    braid_tree.balance()
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    fitted_locks=0
+     for i,ids in enumerate(parts):
+         r=p[ids].reshape(24,2,3);old=r.mean(1);c=old.copy();half=(r[:,1]-r[:,0])*.5
+-        t=np.linspace(0,1,len(r));phase=int(groups[i])*2.399963
+-        root=old[0];front=float(smooth((-root[1]-.032)/.07))
+-        side=float(smooth((abs(root[0])-.042)/.026))
++        t=np.linspace(0,1,len(r));root=old[0].copy();root[2]+=temple_shift(root)
++        hit,n,_,_=scalp.tree.find_nearest(Vector(root));root=np.array(hit+n*.0014)
++        direction=root-center;direction/=np.linalg.norm(direction)
++        angle=math.acos(float(np.clip(direction@target,-1,1)))
++        front=float(smooth((-root[1]-.032)/.07))
++        phase=math.atan2(root[0],root[1]+.032)*3.0
+         arch=np.sin(math.pi*t)**1.15
+-        for j,point in enumerate(c):
+-            probe=point.copy();probe[2]+=temple_shift(point)
+-            probe[0]-=.008*front*arch[j]
+-            probe[2]+=.0025*math.sin(phase)*arch[j]
+-            hit,n,_,_=scalp.tree.find_nearest(Vector(probe))
+-            lift=.0014+(.003+.009*front+.004*side)*arch[j]*(.72+.28*math.sin(phase)**2)
++        for j,v in enumerate(t):
++            # A common spherical flow gathers every lock toward the tie.
++            # Independent sideways offsets made adjacent paths cross and left
++            # an exposed striped cap. This gentle shared twist stays ordered.
++            travel=.94*v
++            d=(math.sin((1-travel)*angle)*direction+math.sin(travel*angle)*target)/max(math.sin(angle),1e-7)
++            twist=.30*angle*travel
++            d=d*math.cos(twist)+np.cross(target,d)*math.sin(twist)+target*(target@d)*(1-math.cos(twist))
++            d/=np.linalg.norm(d)
++            hit,n,_,_=scalp.tree.ray_cast(Vector(center+d*.35),Vector(-d),.70)
++            if hit is None:hit,n,_,_=scalp.tree.find_nearest(Vector(center+d*.10))
++            braid_distance=braid_tree.find(hit)[2]
++            open_braid=float(smooth((braid_distance-.003)/.012))
++            lift=.0014+(.0026+.0040*front)*arch[j]*(.82+.18*math.sin(phase)**2)*open_braid
+             c[j]=hit+n*lift
++        c[0]=root
+         # Rotate the original cross section with the curve, avoiding abrupt
+         # changes from triangle normals on the low-density scalp carrier.
+         widths=[]
+@@ -56,10 +81,25 @@
+             old_t=Vector(old[min(j+1,23)]-old[max(j-1,0)]).normalized()
+             new_t=Vector(c[min(j+1,23)]-c[max(j-1,0)]).normalized()
+             widths.append(np.array(old_t.rotation_difference(new_t)@Vector(half[j])))
+-        h=np.array(widths)
+-        q[ids]=np.stack([c-h,c+h],axis=1).reshape(-1,3)
++        # Broader middles overlap into locks; taper into the hidden gathering
++        # point so the crown does not accumulate a hard ridge of blunt tips.
++        h=np.array(widths)*(1+.14*arch-.65*smooth((t-.72)/.28))[:,None]
++        rr=np.stack([c-h,c+h],axis=1)
++        offset=np.zeros(len(t))
++        for j,pair in enumerate(rr):
++            for point in pair:
++                front_hit,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                if front_hit is not None:offset[j]=max(offset[j],front_hit.y+.001-point[1])
++        if offset.max()>0:
++            fitted_locks+=1
++            spread=offset.copy()
++            for j in range(len(t)):
++                for k in range(max(0,j-2),min(len(t),j+3)):
++                    spread[k]=max(spread[k],offset[j]*[1,.45,.15][abs(k-j)])
++            rr[:,:,1]+=spread[:,None]
++        q[ids]=rr.reshape(-1,3)
+     apply(ob,q,mapping,report)
+-    report[ob.name]['contourGuides']=38
++    report[ob.name]['gatheredFlow']={'locks':len(parts),'twistRadiansPerRadian':.30,'rootClearanceMm':1.4,'lensFittedLocks':fitted_locks}
+ 
+ 
+ def shape_pony(mapping,report,apply):

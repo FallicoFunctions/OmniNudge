@@ -1,0 +1,96 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -7,12 +7,14 @@
+ attachment offsets (structural overlap does not apply to these face surfaces).
+ The cheek pad and chin corners blend into the continuous facial skin; their
+ fields fade before the lip border, ears and eye attachments.
++The nasal tip and alar wings share a local skin field; the lip shoulders taper
++into the mouth corners without moving the mouth interior independently.
+ Eyeballs, irises, ears, hair roots and accessories keep their geometry. The iris shader receives a warm-brown tint without changing its image. Origins, topology, UVs and skin weights stay intact.
+ """
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 4,
++    'version': 5,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -42,6 +44,9 @@
+     'buccalSideFullness': .0020, 'buccalFrontFullness': .0024,
+     'cheekRidgeEase': .0009, 'cheekRidgeRecess': .0006,
+     'chinCornerLift': .0018,
++    'noseTipRecess': .0016, 'noseTipLift': .0011, 'noseWingInset': .0010,
++    'lipShoulderCompress': .12, 'lipShoulderRecess': .0008,
++    'upperLipBalanceRecess': .0009, 'lowerLipBalanceRecess': .0005,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+@@ -122,6 +127,27 @@
+         chin_corner *= 1-smooth(abs(p[:, 2]-1.504)/.023)
+         chin_corner *= smooth((-.075-p[:, 1])/.045)
+         q[:, 2] += spec['chinCornerLift']*chin_corner
++    if spec['version'] >= 5:
++        tip = 1-smooth(abs(p[:, 0])/.021)
++        tip *= 1-smooth(abs(p[:, 2]-1.574)/.024)
++        tip *= smooth((-.126-p[:, 1])/.022)
++        wing = 1-smooth(abs(abs(p[:, 0])-.013)/.011)
++        wing *= 1-smooth(abs(p[:, 2]-1.571)/.016)
++        wing *= smooth((-.119-p[:, 1])/.021)
++        q[:, 1] += spec['noseTipRecess']*tip
++        q[:, 2] += spec['noseTipLift']*tip
++        q[:, 0] -= np.sign(p[:, 0])*spec['noseWingInset']*wing
++        # Evaluate every lip weight before modifying q so the field is shared
++        # by the outline, adjacent skin and expression shapes in both exporters.
++        lip_front = smooth((-.124-q[:, 1])/.015)
++        shoulder = smooth((abs(q[:, 0])-.004)/.009)
++        shoulder *= 1-smooth((abs(q[:, 0])-.014)/.009)
++        shoulder *= 1-smooth(abs(q[:, 2]-spec['mouthCenterZ'])/.015)
++        shoulder *= lip_front
++        upper = (1-smooth(abs(q[:, 0])/.020))*(1-smooth(abs(q[:, 2]-1.549)/.009))*lip_front
++        lower = (1-smooth(abs(q[:, 0])/.018))*(1-smooth(abs(q[:, 2]-1.537)/.009))*lip_front
++        q[:, 1] += spec['lipShoulderRecess']*shoulder+spec['upperLipBalanceRecess']*upper+spec['lowerLipBalanceRecess']*lower
++        q[:, 2] -= spec['lipShoulderCompress']*(q[:, 2]-spec['mouthCenterZ'])*shoulder
+     return q
+ 
+ 
+@@ -158,7 +184,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, fuller lower cheeks, eased cheekbone ridge, rounded chin corners, shared orbital/lash/brow field, defined upper lip, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower cheeks, rounded chin, shared orbital/lash/brow field, reduced nasal projection and wing width, tapered lip shoulders, balanced lip projection, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -40,6 +40,19 @@
+     const chinCorner=(1-smooth(Math.abs(Math.abs(x)-.024)/.019))*(1-smooth(Math.abs(z-1.504)/.023))*smooth((-.075-y)/.045);
+     q[1]+=s.chinCornerLift*chinCorner;
+   }
++  if(s.version>=5) {
++    const tip=(1-smooth(Math.abs(x)/.021))*(1-smooth(Math.abs(z-1.574)/.024))*smooth((-.126-y)/.022);
++    const wing=(1-smooth(Math.abs(Math.abs(x)-.013)/.011))*(1-smooth(Math.abs(z-1.571)/.016))*smooth((-.119-y)/.021);
++    q[2]-=s.noseTipRecess*tip;
++    q[1]+=s.noseTipLift*tip;
++    q[0]-=Math.sign(x)*s.noseWingInset*wing;
++    const lipFront=smooth((-.124+q[2])/.015);
++    const shoulder=smooth((Math.abs(q[0])-.004)/.009)*(1-smooth((Math.abs(q[0])-.014)/.009))*(1-smooth(Math.abs(q[1]-s.mouthCenterZ)/.015))*lipFront;
++    const upper=(1-smooth(Math.abs(q[0])/.020))*(1-smooth(Math.abs(q[1]-1.549)/.009))*lipFront;
++    const lower=(1-smooth(Math.abs(q[0])/.018))*(1-smooth(Math.abs(q[1]-1.537)/.009))*lipFront;
++    q[2]-=s.lipShoulderRecess*shoulder+s.upperLipBalanceRecess*upper+s.lowerLipBalanceRecess*lower;
++    q[1]-=s.lipShoulderCompress*(q[1]-s.mouthCenterZ)*shoulder;
++  }
+   return q;
+ }
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+@@ -53,7 +66,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4].includes(record.spec.version));
++  assert([1,2,3,4,5].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

@@ -1,0 +1,227 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -387,6 +387,10 @@
+         shape_pony_locks(mapping,report,apply_geometry)
+         from refine_female_crown_flow import loosen_crown
+         loosen_crown(mapping,report,apply_geometry,materials)
++        from refine_female_root_dye import blend_pony_roots
++        blend_pony_roots(mapping,report,materials)
++        from refine_female_rear_drape import drape_rear_pony
++        drape_rear_pony(mapping,report,apply_geometry)
+     rig.data.pose_position='POSE';rig.animation_data.action=bpy.data.actions['idle'];bpy.context.scene.frame_set(1)
+     bpy.context.preferences.filepaths.save_version=0
+     bpy.ops.wm.save_as_mainfile(filepath=str(PASS/f'{sex}-hair-refined.blend'),compress=True)
+--- before/refine_female_root_dye.py
++++ refine_female_root_dye.py
+@@ -0,0 +1,75 @@
++"""Carry irregular magenta streaks through the gathered pony roots.
++
++Connection map: this is a pigment-only edit. All mesh vertices, normals, UVs,
++weights, shape keys and attachment overlaps remain exact. Outer long cards
++retain their root pair, lower pairs 7 onward and every cheek card. Inner fibers
++retain their original effective pigment on the first two pairs and after 70%
++of their length. Their new tint attribute reuses the existing textured material.
++Alpha coverage and texture bytes remain exact; no materials or geometry are added.
++"""
++import math
++import bpy
++import numpy as np
++from complete_pair_geometry import smooth
++from refine_complete_groom_finish import islands
++from refine_female_dye import DYE_BASE, BRUNETTE, NAMES
++
++INNER = 'PLURR pony surface fibers'
++
++
++def blend_pony_roots(mapping, report, materials):
++    rows = {}
++    for mi, name in enumerate(NAMES):
++        ob = bpy.data.objects[name]; attr = ob.data.color_attributes['ReferenceHairTint']
++        colors = np.array([v.color[:] for v in attr.data]); before = colors.copy(); cards = 0
++        for i, ids in enumerate(islands(ob)):
++            if len(ids) != 36: continue
++            t = np.repeat(np.linspace(0, 1, 18), 2); phase = i * 2.399963 + mi * 1.7
++            # Each lock has its own onset; avoid another horizontal dye band.
++            start = .003 + .017 * (.5 + .5 * math.sin(phase))
++            span = .10 + .10 * (.5 + .5 * math.cos(phase + .7))
++            dye = smooth((t - start) / span)
++            pink = before[ids[12:14], :3].mean(0) * DYE_BASE
++            pigment = BRUNETTE * (1 - dye[:, None]) + pink * dye[:, None]
++            upper = 1 - smooth((t - .16) / .25)
++            colors[ids, :3] = before[ids, :3] * (1 - upper[:, None]) + pigment / DYE_BASE * upper[:, None]
++            colors[ids[:2]] = before[ids[:2]]; colors[ids[14:]] = before[ids[14:]]
++            cards += 1
++        assert np.isfinite(colors).all() and colors.min() >= 0 and colors.max() <= 1
++        attr.data.foreach_set('color', colors.astype(np.float32).ravel())
++        mapping[name]['addedColors'] = colors.tolist()
++        rows[name] = {'cards': cards, 'retainedRootPairs': 1, 'unchangedLowerStartPair': 7,
++                      'changedColorVertices': int(np.count_nonzero(np.max(abs(colors - before), axis=1) > 1e-7))}
++
++    ob = bpy.data.objects[INNER]; mat = ob.data.materials[0]; old_base = np.array(materials[mat.name]['color'][:3])
++    colors = np.ones((len(ob.data.vertices), 4)); colors[:, :3] = old_base / DYE_BASE
++    effective = np.tile(old_base, (len(colors), 1)); cards = 0
++    for i, ids in enumerate(islands(ob)):
++        n = len(ids) // 2; t = np.repeat(np.linspace(0, 1, n), 2); phase = i * 2.399963
++        light = .5 + .5 * math.sin(phase)
++        pink = np.array([.46 + .20 * light, .005 + .004 * light, .14 + .075 * light])
++        if i % 7 == 0: pink *= .65
++        dye = smooth((t - .035) / (.11 + .09 * (.5 + .5 * math.cos(phase))))
++        dye *= 1 - smooth((t - .35) / .35)
++        effective[ids] = old_base * (1 - dye[:, None]) + pink * dye[:, None]
++        effective[ids[:4]] = old_base
++        colors[ids, :3] = effective[ids] / DYE_BASE; cards += 1
++    assert np.isfinite(colors).all() and colors.min() >= 0 and colors.max() <= 1
++    assert ob.data.color_attributes.get('ReferenceHairTint') is None
++    attr = ob.data.color_attributes.new(name='ReferenceHairTint', type='FLOAT_COLOR', domain='POINT')
++    attr.data.foreach_set('color', colors.astype(np.float32).ravel()); mapping[INNER]['addedColors'] = colors.tolist()
++    tree = mat.node_tree; bs = tree.nodes['Principled BSDF']
++    base_mix = bs.inputs['Base Color'].links[0].from_node
++    assert base_mix.type == 'MIX_RGB' and base_mix.blend_type == 'MULTIPLY'
++    base_mix.inputs[1].default_value = (*DYE_BASE, 1.)
++    vertex = tree.nodes.new('ShaderNodeAttribute'); vertex.attribute_name = 'ReferenceHairTint'
++    tint = tree.nodes.new('ShaderNodeMixRGB'); tint.blend_type = 'MULTIPLY'; tint.inputs[0].default_value = 1
++    tree.links.new(vertex.outputs['Color'], tint.inputs[1]); tree.links.new(base_mix.outputs[0], tint.inputs[2])
++    tree.links.new(tint.outputs[0], bs.inputs['Base Color'])
++    materials[mat.name]['color'] = [*DYE_BASE, 1.]
++    rows[INNER] = {'cards': cards, 'retainedRootPairs': 2, 'unchangedLowerStartPair': 17,
++                   'previousBaseColor': old_base.tolist(), 'newBaseColor': DYE_BASE.tolist(),
++                   'changedColorVertices': int(np.count_nonzero(np.max(abs(effective - old_base), axis=1) > 1e-7))}
++    report['rootDye'] = {'meshes': rows, 'changedMaterial': mat.name,
++                         'allGeometryAndRelativeShapesRetained': True, 'allTextureBytesRetained': True,
++                         'addedColorAttributes': [INNER], 'addedGeometry': 0, 'addedTextureImages': 0}
+--- before/refine_female_rear_drape.py
++++ refine_female_rear_drape.py
+@@ -0,0 +1,74 @@
++"""Shorten the rear pony fan into softly bent, shoulder-length tiers.
++
++Connection map: all first nine pairs retain their exact crown-to-fall path;
++front-facing and cheek cards stay fixed. Rear free spans are resampled shorter,
++with distinct tip heights and soft bends. Both card edges clear skin by 8 mm
++in neutral/four secondary corners, and the rear collar in 31 evaluated poses.
++Thin hair uses millimeter clearance. Origins, topology, UVs, weights, pigment
++and relative secondary offsets retain their owners.
++"""
++import math
++import bpy
++import numpy as np
++from mathutils import Vector
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface,smooth
++from refine_complete_groom_finish import islands
++from refine_complete_male_hair import group_paths
++from refine_female_face_fall import NAMES,apply_retained
++from refine_female_pony_clearance import clear_rear_tips
++
++
++def drape_rear_pony(mapping,report,apply):
++    rig=bpy.data.objects['AvatarSkeleton'];body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    bases={n:array(bpy.data.objects[n]) for n in NAMES};revised={n:p.copy() for n,p in bases.items()}
++    saved_uv={n:mapping[n]['addedUv'] for n in NAMES if 'addedUv' in mapping[n]}
++    rows=[];deltas={};selected={n:[] for n in NAMES}
++    for name,p in bases.items():
++        ob=bpy.data.objects[name]
++        deltas[name]=[np.array([v.co[:] for v in ob.data.shape_keys.key_blocks[k].data])-p for k in ['Secondary_HairSide','Secondary_HairBack']]
++        for ids in islands(ob):
++            if len(ids)!=36:continue
++            r=p[ids].reshape(18,2,3)
++            if r[-4:,:,1].mean()>=-.025:rows.append((name,ids,r))
++    groups=group_paths(np.array([r.mean(1) for _,_,r in rows]),12)
++    t=np.arange(18);u=np.clip((t-8)/9,0,1);free=smooth(u);bell=np.sin(math.pi*u)**2
++    tips_before=[];max_fit=0
++    for i,(name,ids,r) in enumerate(rows):
++        old=r.mean(1);phase=int(groups[i])*2.399963;length=.58+.20*(.5+.5*math.sin(phase))
++        sample=8+(t-8)*(1-(1-length)*free)
++        c=np.stack([np.interp(sample,t,old[:,axis]) for axis in range(3)],axis=1)
++        c[:,0]+=.012*math.sin(phase)*bell
++        c[:,1]-=.035*free; c[:,1]+=.010*math.sin(phase+.6)*bell
++        tip_z=1.435+.045*(.5+.5*math.cos(phase))
++        c[:,2]+=max(0,tip_z-c[-1,2])*free
++        c[:9]=old[:9]
++        half=(r[:,1]-r[:,0])*.5;h=half.copy()
++        for j in range(9,18):
++            a=Vector(old[min(j+1,17)]-old[j-1]).normalized();b=Vector(c[min(j+1,17)]-c[j-1]).normalized()
++            h[j]=(a.rotation_difference(b)@Vector(half[j]))*(1-.18*free[j])
++        rr=np.stack([c-h,c+h],axis=1);rr[:9]=r[:9]
++        da,db=[v[ids].reshape(18,2,3) for v in deltas[name]];shift=np.zeros(18)
++        for delta in [np.zeros_like(da),da+db,da-db,-da+db,-da-db]:
++            for j in range(9,18):
++                for point in (rr+delta)[j]:
++                    hit,_,_,_=body.ray_cast(Vector((-.5,point[1],point[2])),Vector((1,0,0)),1)
++                    if hit is not None:shift[j]=min(shift[j],hit.x-.008-point[0])
++        for _ in range(2):
++            smoothed=shift.copy();smoothed[9:-1]=.15*shift[8:-2]+.70*shift[9:-1]+.15*shift[10:];shift=np.minimum(shift,smoothed)
++        rr[:,:,0]+=shift[:,None];max_fit=max(max_fit,float(-shift.min()))
++        revised[name][ids]=rr.reshape(-1,3);selected[name].append(ids);tips_before.extend(r[-1])
++    for name,q in revised.items():apply_retained(bpy.data.objects[name],q,mapping,report,apply)
++    clear_rear_tips(mapping,report,apply,cards_override=selected,retained_pairs=9)
++    for name,uv in saved_uv.items():mapping[name]['addedUv']=uv
++    tips_after=np.concatenate([array(bpy.data.objects[n])[np.array(ids[-2:])] for n,parts in selected.items() for ids in parts])
++    tips_before=np.array(tips_before)
++    report['rearDrape']={'cards':len(rows),'guideGroups':12,'retainedRootPairs':9,
++        'selectedCardFirstVertices':{n:[ids[0] for ids in parts] for n,parts in selected.items()},
++        'byMesh':{n:len(parts) for n,parts in selected.items()},'maximumAdditionalBodyFitMm':max_fit*1000,
++        'collarFit':dict(report['rearTipClearance']),
++        'beforeTipBounds':[tips_before.min(0).tolist(),tips_before.max(0).tolist()],
++        'afterTipBounds':[tips_after.min(0).tolist(),tips_after.max(0).tolist()],
++        'medianTipLiftMm':float(np.median(tips_after[:,2]-tips_before[:,2])*1000),
++        'medianTipPullForwardMm':float(np.median(tips_before[:,1]-tips_after[:,1])*1000),
++        'addedGeometry':0,'relativeSecondaryShapesRetained':True}
+--- before/refine_female_pony_clearance.py
++++ refine_female_pony_clearance.py
+@@ -4,6 +4,8 @@
+ can bend away from the collar. A smooth shared displacement moves both edges
+ of each card, retaining its taper, UVs, head weights and relative shape deltas.
+ The collar is measured in evaluated animation poses, not just in the rest pose.
++An explicit card subset can choose a different retained-pair boundary; the
++default keeps the original rear-tip fit unchanged for earlier authoring stages.
+ """
+ import bpy,numpy as np
+ from mathutils import Vector
+@@ -13,17 +15,20 @@
+ from audit_complete_expressions import set_pose,POSES
+ 
+ 
+-def clear_rear_tips(mapping,report,apply):
++def clear_rear_tips(mapping,report,apply,cards_override=None,retained_pairs=10):
+  rig=bpy.data.objects['AvatarSkeleton'];scene=bpy.context.scene
+  names=[f'PLURR pony strands {i}' for i in range(3)]
+  bases={n:array(bpy.data.objects[n]) for n in names};cards={};amplitudes={}
+- ramp=smooth((np.linspace(0,1,18)-.56)/.44)
++ if cards_override is None:ramp=smooth((np.linspace(0,1,18)-.56)/.44)
++ else:
++  start=(retained_pairs-1)/17
++  ramp=smooth((np.linspace(0,1,18)-start)/(1-start))
+  for name in names:
+   ob=bpy.data.objects[name];head=ob.vertex_groups['head'].index
+   assert np.allclose(np.array(ob.matrix_world),np.eye(4)),name
+   assert all(abs(sum(g.weight for g in v.groups if g.group==head)-1)<1e-6 and
+              sum(g.weight for g in v.groups if g.group!=head)<1e-6 for v in ob.data.vertices),name
+-  cards[name]=[ids for ids in islands(bpy.data.objects[name]) if len(ids)==36 and bases[name][ids].reshape(18,2,3)[12:,:,1].mean()>.015]
++  cards[name]=cards_override[name] if cards_override is not None else [ids for ids in islands(bpy.data.objects[name]) if len(ids)==36 and bases[name][ids].reshape(18,2,3)[12:,:,1].mean()>.015]
+   amplitudes[name]=np.zeros(len(cards[name]))
+  cases=[]
+  for clip in ['idle','walk','run']:
+@@ -43,7 +48,7 @@
+     for i,ids in enumerate(cards[name]):
+      old=amplitudes[name][i];needed=old
+      card=points[ids].reshape(18,2,3)
+-     for j in range(10,18):
++     for j in range(retained_pairs,18):
+       if ramp[j]<.001:continue
+       for point in card[j]+direction*old*ramp[j]:
+        if point[2]>1.63:continue
+@@ -54,7 +59,7 @@
+      # A long last segment can cross the hood even when both endpoints lie
+      # outside its outline. Fit actual edge intersections as well as vertices.
+      posed=card+direction[None,None,:]*old*ramp[:,None,None]
+-     for j in range(10,18):
++     for j in range(retained_pairs,18):
+       for a,b,ra,rb in [(posed[j-1,0],posed[j,0],ramp[j-1],ramp[j]),
+                         (posed[j-1,1],posed[j,1],ramp[j-1],ramp[j]),
+                         (posed[j,0],posed[j,1],ramp[j],ramp[j])]:
+@@ -88,4 +93,4 @@
+   counts[name]=count
+  report['rearTipClearance']={'cards':sum(counts.values()),'byMesh':counts,'poseSamples':len(cases),
+   'targetJacketMarginMm':8,'edgeIntersectionTargetMarginMm':10,'maximumTipAdjustmentMm':maximum*1000,'iterationIncreasesMm':rounds,
+-  'rootPairsRetained':4,'relativeSecondaryShapesRetained':True}
++  'rootPairsRetained':retained_pairs if cards_override is not None else 4,'relativeSecondaryShapesRetained':True}

@@ -1,0 +1,99 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -5,12 +5,14 @@
+ and every expression shape. The orbital skin, eyelids, lash roots and brow
+ ribbons share one continuous field, maintaining their existing submillimeter
+ attachment offsets (structural overlap does not apply to these face surfaces).
++The cheek pad and chin corners blend into the continuous facial skin; their
++fields fade before the lip border, ears and eye attachments.
+ Eyeballs, irises, ears, hair roots and accessories keep their geometry. The iris shader receives a warm-brown tint without changing its image. Origins, topology, UVs and skin weights stay intact.
+ """
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 3,
++    'version': 4,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -24,7 +26,7 @@
+     'jawAngleTaper': .10,
+     'chinCenterZ': 1.508, 'chinHalfHeight': .030,
+     'chinHalfWidth': .047, 'chinFrontY': -.074, 'chinFrontSpan': .042,
+-    'chinRecess': .0022, 'chinLift': .0018,
++    'chinRecess': .0022, 'chinLift': .0027,
+     'cheekCenterX': .034, 'cheekHalfWidth': .023,
+     'cheekCenterZ': 1.580, 'cheekHalfHeight': .016,
+     'cheekFrontY': -.060, 'cheekFrontSpan': .045,
+@@ -35,6 +37,11 @@
+     'outerEyeLift': .0013,
+     'innerBrowLift': .0022, 'browArchRelax': .0006,
+     'cupidDip': .00085, 'cupidPeak': .00030, 'upperLipRecess': .0009,
++    'buccalCenterX': .045, 'buccalHalfWidth': .024,
++    'buccalCenterZ': 1.559, 'buccalHalfHeight': .034,
++    'buccalSideFullness': .0020, 'buccalFrontFullness': .0024,
++    'cheekRidgeEase': .0009, 'cheekRidgeRecess': .0006,
++    'chinCornerLift': .0018,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+@@ -99,6 +106,22 @@
+         recess = 1-smooth(abs(q[:, 0])/.013)
+         q[:, 2] += (spec['cupidPeak']*peaks-spec['cupidDip']*dip)*upper
+         q[:, 1] += spec['upperLipRecess']*recess*upper
++    if spec['version'] >= 4:
++        front = smooth((-.028-p[:, 1])/.077)
++        pad = 1-smooth(abs(abs(p[:, 0])-spec['buccalCenterX'])/spec['buccalHalfWidth'])
++        pad *= 1-smooth(abs(p[:, 2]-spec['buccalCenterZ'])/spec['buccalHalfHeight'])
++        pad *= front
++        q[:, 0] += np.sign(p[:, 0])*spec['buccalSideFullness']*pad
++        q[:, 1] -= spec['buccalFrontFullness']*pad
++        ridge = 1-smooth(abs(abs(p[:, 0])-.054)/.018)
++        ridge *= 1-smooth(abs(p[:, 2]-1.580)/.016)
++        ridge *= smooth((-.045-p[:, 1])/.055)
++        q[:, 0] -= np.sign(p[:, 0])*spec['cheekRidgeEase']*ridge
++        q[:, 1] += spec['cheekRidgeRecess']*ridge
++        chin_corner = 1-smooth(abs(abs(p[:, 0])-.024)/.019)
++        chin_corner *= 1-smooth(abs(p[:, 2]-1.504)/.023)
++        chin_corner *= smooth((-.075-p[:, 1])/.045)
++        q[:, 2] += spec['chinCornerLift']*chin_corner
+     return q
+ 
+ 
+@@ -135,7 +158,7 @@
+             'changedVertices': int(np.any(after != before, axis=1).sum()),
+             'maximumDisplacementMm': float(np.linalg.norm(after-before, axis=1).max()*1000),
+             'expressionShapes': [k.name for k in body.data.shape_keys.key_blocks[1:]],
+-            'scope': 'Face proportions, shared orbital/lash/brow field, defined upper lip, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
++            'scope': 'Face proportions, fuller lower cheeks, eased cheekbone ridge, rounded chin corners, shared orbital/lash/brow field, defined upper lip, restrained smile and warm iris tint; topology, texture images, skin weights and locomotion retained.'}
+ 
+ 
+ def apply_to_body(body, spec=SPEC):
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -30,6 +30,16 @@
+     q[1]+=(s.cupidPeak*peaks-s.cupidDip*dip)*upper;
+     q[2]-=s.upperLipRecess*recess*upper;
+   }
++  if(s.version>=4) {
++    const pad=(1-smooth(Math.abs(Math.abs(x)-s.buccalCenterX)/s.buccalHalfWidth))*(1-smooth(Math.abs(z-s.buccalCenterZ)/s.buccalHalfHeight))*smooth((-.028-y)/.077);
++    q[0]+=Math.sign(x)*s.buccalSideFullness*pad;
++    q[2]+=s.buccalFrontFullness*pad;
++    const ridge=(1-smooth(Math.abs(Math.abs(x)-.054)/.018))*(1-smooth(Math.abs(z-1.580)/.016))*smooth((-.045-y)/.055);
++    q[0]-=Math.sign(x)*s.cheekRidgeEase*ridge;
++    q[2]-=s.cheekRidgeRecess*ridge;
++    const chinCorner=(1-smooth(Math.abs(Math.abs(x)-.024)/.019))*(1-smooth(Math.abs(z-1.504)/.023))*smooth((-.075-y)/.045);
++    q[1]+=s.chinCornerLift*chinCorner;
++  }
+   return q;
+ }
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+@@ -43,7 +53,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3].includes(record.spec.version));
++  assert([1,2,3,4].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

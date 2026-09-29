@@ -1,0 +1,122 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -251,7 +251,14 @@
+     flow=np.arctan2(direction@across,direction@up)+.30*polar
+     fibers=.5+.5*np.cos(flow*155+.3*np.sin(flow*31))
+     pigment=.72+.065*fibers+.025*np.sin(flow*19)**2
+-    edge=.991+.003*np.sin(u*math.tau*193)+.003*np.sin(u*math.tau*67)
++    # Pull only the forehead underpainting back beneath the free locks. Fine
++    # strand-aligned endpoints replace the former uniform sawtooth cut edge.
++    # The rear/temple coverage and physical cap/card attachments stay intact.
++    front=smooth((np.cos(theta)-.15)/.65)
++    root_fibers=.5+.5*np.cos(flow*380+.25*np.sin(flow*47))
++    old_edge=.991+.003*np.sin(u*math.tau*193)+.003*np.sin(u*math.tau*67)
++    feathered=.974+.008*root_fibers+.0015*np.sin(flow*37)
++    edge=old_edge*(1-front)+feathered*front
+     rgba=np.ones((h,w,4));rgba[:,:,:3]=pigment[:,:,None];rgba[:,:,3]=np.clip((edge-v)/.032,0,1)
+     tex_image=save_texture('reference-female-hairline',rgba)
+     mat=bpy.data.objects['Complete scalp'].data.materials[0];tree=mat.node_tree;bs=tree.nodes['Principled BSDF']
+--- before/refine_female_crown.py
++++ refine_female_crown.py
+@@ -194,23 +194,26 @@
+         shift=(lock-3)*.0020
+         family=[0,0,0,1,1,2,2][lock]
+         offset=[-.0014,0,.0014,-.0008,.0008,-.0008,.0008][lock]
+-        ends=[[-.060,-.119,1.621],[-.071,-.100,1.641],[-.066,-.108,1.654]]
++        ends=[[-.056,-.123,1.620],[-.072,-.099,1.644],[-.064,-.111,1.660]]
+         end=np.array(ends[family]);end[2]+=offset
+         guides=bezier([[.028+shift,-.13,1.674+shift],
+-            [.003-.001*family,-.153,1.676+.003*family+offset],
+-            [-.045-.004*family,-.143,1.646+.006*family+offset],end],np.linspace(0,1,28))
++            [-.003-.005*family,-.153,1.689+.004*family+offset],
++            [-.034-.011*family,-.143,1.651+.007*family+offset],end],np.linspace(0,1,28))
+         for layer in range(5):
+             center=[];normal=[];t=np.linspace(0,1,len(guides))
+             for j,point in enumerate(guides):
+                 hit,n,_,_=body.tree.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
+                 if hit is None:hit,n,_,_=body.tree.find_nearest(Vector(point))
+-                lift=.003+(.005+.001*family)*math.sin(math.pi*t[j])+.00028*layer
++                lift=.003+(.005+.001*family)*math.sin(math.pi*t[j])+.00024*layer
+                 center.append(np.array(hit+n*lift));normal.append(np.array(n))
+             center=np.array(center);normal=np.array(normal)
+             tangent=np.gradient(center,axis=0);tangent/=np.linalg.norm(tangent,axis=1)[:,None]
+             across=np.cross(tangent,normal);across/=np.linalg.norm(across,axis=1)[:,None]
+-            center+=across*((layer-2)*.00065*np.sin(math.pi*t)+.0007*np.sin(t*math.pi*2+lock*.6)*np.sin(math.pi*t))[:,None]
+-            width=(.0028+.00025*math.sin(lock*3.1+layer))*(.20+.80*np.sin(math.pi*t)**.5)*(1-.97*t**2.1)
++            # The middle of each lock is distinct, then its last third turns
++            # down into an unequal fine tip. Slight layer separation exposes
++            # the fibers rather than stacking five cards into a dark band.
++            center+=across*((layer-2)*.00090*np.sin(math.pi*t)+.0014*np.sin(t*math.pi*2+lock*.6)*np.sin(math.pi*t))[:,None]
++            width=(.00185+.00022*math.sin(lock*3.1+layer))*(.20+.80*np.sin(math.pi*t)**.5)*(1-.97*t**2.1)
+             vs=[];fs=[];uv=[]
+             for j in range(len(t)):
+                 for k,u in enumerate([0,.5,1]):
+--- before/validate_female_hairline.py
++++ validate_female_hairline.py
+@@ -0,0 +1,66 @@
++"""Check front-lock clearance and preservation against the fiber-pass source.
++
++Connection map: the 35 retained card roots meet the existing scalp beneath the
++goggles. Roots remain fitted; free lengths clear the evaluated face and
++project behind the lenses. The cap edit is alpha coverage only, so root checks
++refer to its physical surface, with visible coverage reviewed in native/game views.
++"""
++import json,sys
++from pathlib import Path
++import bpy,numpy as np
++from mathutils import Vector
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from complete_pair_geometry import Surface
++from refine_complete_foil_finish import geometry_contract
++from refine_complete_groom_finish import islands
++from audit_complete_expressions import POSES,set_pose
++
++p=OUT/'hair-likeness-20260921';d=p/'hairline-pass';name='PLURR loose brunette front locks'
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name!=name}
++ob=bpy.data.objects[name];parts=islands(ob);old=array(ob)
++old_roots=np.array([old[ids[:3]].mean(0) for ids in parts])
++def structural(ob):
++ return {'indices':[tuple(f.vertices) for f in ob.data.polygons],
++  'uv':[tuple(v.uv) for v in ob.data.uv_layers.active.data],
++  'weights':[[(g.group,g.weight) for g in v.groups] for v in ob.data.vertices],
++  'colors':[tuple(c.color) for c in ob.data.color_attributes['ReferenceHairTint'].data]}
++retained=structural(ob)
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name!=name}
++ob=bpy.data.objects[name];current=structural(ob)
++for key in ['indices','uv','weights']:assert retained[key]==current[key],key
++color_drift=float(np.abs(np.asarray(retained['colors'])-np.asarray(current['colors'])).max())
++# Tint is derived from fitted root positions. Narrower roots may move slightly
++# when their edges are fitted behind the lens; exported colors must match the
++# resulting native values (checked separately), not the old floating values.
++colors=np.asarray(current['colors']);assert np.isfinite(colors).all() and colors.min()>=0 and colors.max()<=1
++roots=np.array([array(ob)[ids[:3]].mean(0) for ids in islands(ob)])
++root_delta=float(np.linalg.norm(roots-old_roots,axis=1).max())
++print('ROOT_FIT_CHANGE_MM',root_delta*1000,'TINT_CHANGE',color_drift,flush=True)
++rig=bpy.data.objects['AvatarSkeleton'];rig.data.pose_position='REST';bpy.context.view_layer.update()
++rows=[]
++for label,values in POSES.items():
++ set_pose(values)
++ body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++ lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++ scalp=Surface(rig,bpy.data.objects['Complete scalp']).tree
++ points=array(ob,True);gaps=[];occluding=0
++ for point in points:
++  hit,n,_,_=body.find_nearest(Vector(point));gaps.append((Vector(point)-hit).dot(n))
++  front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++  if front is not None and point[1]<front.y+.0005:occluding+=1
++ root_gap=max(scalp.find_nearest(Vector(points[ids[:3]].mean(0)))[3] for ids in islands(ob))
++ rows.append({'pose':label,'minimumSkinClearanceMm':min(gaps)*1000,'verticesInFrontOfLens':occluding,'maximumRootDistanceMm':root_gap*1000})
++assert min(x['minimumSkinClearanceMm'] for x in rows)>.5
++assert max(x['verticesInFrontOfLens'] for x in rows)==0
++assert max(x['maximumRootDistanceMm'] for x in rows)<3
++report={'unchangedOtherMeshContracts':len(contracts),'changedMesh':name,'vertices':len(ob.data.vertices),
++ 'retainedIndicesUVWeights':True,'maximumRootDerivedTintChange':color_drift,'maximumRootCenterChangeMm':root_delta*1000,
++ 'sampledExpressionHairPoses':len(rows),'samples':rows,
++ 'minimumSkinClearanceMm':min(x['minimumSkinClearanceMm'] for x in rows),
++ 'maximumVerticesInFrontOfLens':max(x['verticesInFrontOfLens'] for x in rows),
++ 'scope':'Front-lock vertices in seven finite rest-rig expression/hair poses; exact geometry retention for all other meshes. Does not certify continuous/triangle-interior collisions, goggle frame contact or hair self-contact.'}
++(d/'native-hairline-validation.json').write_text(json.dumps(report,indent=2)+'\n')
++print('HAIRLINE_VALIDATED',json.dumps(report),flush=True)

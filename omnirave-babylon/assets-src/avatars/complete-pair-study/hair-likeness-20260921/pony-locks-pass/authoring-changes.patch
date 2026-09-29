@@ -1,0 +1,97 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -377,6 +377,8 @@
+         refresh_front_addition({'additions':additions},front_before)
+         from refine_female_swept_layers import shape_swept_layers
+         shape_swept_layers(mapping,report,apply_geometry)
++        from refine_female_pony_locks import shape_pony_locks
++        shape_pony_locks(mapping,report,apply_geometry)
+     rig.data.pose_position='POSE';rig.animation_data.action=bpy.data.actions['idle'];bpy.context.scene.frame_set(1)
+     bpy.context.preferences.filepaths.save_version=0
+     bpy.ops.wm.save_as_mainfile(filepath=str(PASS/f'{sex}-hair-refined.blend'),compress=True)
+--- before/refine_female_pony_locks.py
++++ refine_female_pony_locks.py
+@@ -0,0 +1,83 @@
++"""Break the front pony curtain into coherent, softly waved locks.
++
++Connection map: the first five pairs stay on the measured crown attachment.
++Only long cards already falling in front of the shoulder change. Their free
++spans follow 18 shared guides; actual edges clear the left side of the body by
++8 mm in neutral and extreme secondary shapes. The existing 31-pose front-collar
++fit keeps them outside the jacket. Cheek fibers, rear pony, core and crown wisps
++stay fixed. Millimeter hair clearances replace structural overlap; all origins,
++topology, UVs, weights, pigment and relative secondary offsets remain intact.
++"""
++import math
++import bpy
++import numpy as np
++from mathutils import Vector
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface, smooth
++from refine_complete_groom_finish import islands
++from refine_complete_male_hair import group_paths
++from refine_female_face_fall import NAMES, fit_front_collar
++
++
++def shape_pony_locks(mapping, report, apply):
++    rig = bpy.data.objects['AvatarSkeleton']
++    body = Surface(rig, bpy.data.objects['AvatarBody']).tree
++    bases = {n: array(bpy.data.objects[n]) for n in NAMES}
++    revised = {n: p.copy() for n, p in bases.items()}
++    deltas = {}; rows = []; parts = {n: [] for n in NAMES}
++    saved_uv = {n: mapping[n]['addedUv'] for n in NAMES if 'addedUv' in mapping[n]}
++    for name, p in bases.items():
++        ob = bpy.data.objects[name]
++        deltas[name] = [np.array([v.co[:] for v in ob.data.shape_keys.key_blocks[k].data]) - p
++                       for k in ['Secondary_HairSide', 'Secondary_HairBack']]
++        for ids in islands(ob):
++            if len(ids) != 36: continue
++            r = p[ids].reshape(18, 2, 3)
++            if r[-4:, :, 1].mean() < -.025:
++                rows.append((name, ids, r))
++    paths = np.array([r.mean(1) for _, _, r in rows])
++    groups = group_paths(paths, 18)
++    guides = {g: paths[groups == g].mean(0) for g in np.unique(groups)}
++    u = np.clip((np.arange(18) - 4) / 13, 0, 1)
++    free = smooth(u / .55); bell = np.sin(math.pi * u) ** .8
++    max_body_fit = 0
++    for i, (name, ids, r) in enumerate(rows):
++        g = int(groups[i]); phase = g * 2.399963
++        old = r.mean(1); guide = guides[g]
++        c = old + (guide - old) * (.45 * free[:, None])
++        c[:, 0] += (.014 * np.sin(math.tau * 1.15 * u + phase) * bell + .006 * math.sin(phase)) * free
++        c[:, 1] += .011 * np.sin(math.tau * u + phase + .8) * bell * free
++        c[:, 2] += .018 * math.cos(phase) * free
++        c[:5] = old[:5]
++        h = (r[:, 1] - r[:, 0]) * .5; half = h.copy()
++        for j in range(5, 18):
++            a = Vector(old[min(j + 1, 17)] - old[j - 1]).normalized()
++            b = Vector(c[min(j + 1, 17)] - c[j - 1]).normalized()
++            half[j] = (a.rotation_difference(b) @ Vector(h[j])) * (1 - .25 * free[j])
++        rr = np.stack([c - half, c + half], axis=1); rr[:5] = r[:5]
++        da, db = [v[ids].reshape(18, 2, 3) for v in deltas[name]]
++        shift = np.zeros(18)
++        for delta in [np.zeros_like(da), da + db, da - db, -da + db, -da - db]:
++            for j in range(5, 18):
++                for point in (rr + delta)[j]:
++                    hit, _, _, _ = body.ray_cast(Vector((-.5, point[1], point[2])), Vector((1, 0, 0)), 1)
++                    if hit is not None: shift[j] = min(shift[j], hit.x - .008 - point[0])
++        for _ in range(2):
++            smoothed = shift.copy()
++            smoothed[5:-1] = .15 * shift[4:-2] + .70 * shift[5:-1] + .15 * shift[6:]
++            shift = np.minimum(shift, smoothed)
++        rr[:, :, 0] += shift[:, None]
++        max_body_fit = max(max_body_fit, float(-shift.min()))
++        revised[name][ids] = rr.reshape(-1, 3); parts[name].append(ids)
++    for name, points in revised.items():
++        prior = dict(report[name]); apply(bpy.data.objects[name], points, mapping, report)
++        report[name].update({k: v for k, v in prior.items() if k not in report[name]})
++    collar = fit_front_collar(parts, mapping, report, apply, retained_pairs=5)
++    for name, uv in saved_uv.items(): mapping[name]['addedUv'] = uv
++    report['ponyLocks'] = {
++        'guideGroups': 18, 'cards': len(rows), 'retainedRootPairs': 5,
++        'selectedCardFirstVertices': {n: [ids[0] for ids in pp] for n, pp in parts.items()},
++        'byMesh': {n: len(pp) for n, pp in parts.items()},
++        'maximumAdditionalBodyFitMm': max_body_fit * 1000, 'frontCollarFit': collar,
++        'addedGeometry': 0, 'relativeSecondaryShapesRetained': True,
++        'allTextureBytesRetained': True}

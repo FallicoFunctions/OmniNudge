@@ -1,0 +1,15 @@
+--- before/refine_female_contour.py
++++ scripts/launch-body-proof/refine_female_contour.py
+@@ -19,7 +19,11 @@
+     x,y,z=point
+     side=float(smooth((abs(x)-.043)/.023))
+     lower=float(smooth((1.684-z)/.048))
+-    return -.023*side*math.exp(-((y+.040)/.041)**2)*lower
++    # Connect the diagonal front wave to the underlayer. A low asymmetric
++    # contour fills the former exposed wedge without thickening the free ends.
++    front=float(smooth((-y-.055)/.045))*float(smooth((1.710-z)/.047))
++    wave=-.016*math.exp(-((x+.038)/.037)**2)*front
++    return -.023*side*math.exp(-((y+.040)/.041)**2)*lower+wave
+ 
+ 
+ def shape_scalp(mapping,report,apply):

@@ -1,0 +1,102 @@
+--- before/refine_female_crown.py
++++ scripts/launch-body-proof/refine_female_crown.py
+@@ -117,6 +117,33 @@
+     from refine_female_contour import shape_scalp
+     shape_scalp(mapping,report,apply)
+     scalp=Surface(rig,bpy.data.objects['Complete scalp'])
++    # Retained cheek locks are correctly rooted, but their first curved
++    # sections arched in front of the goggle lenses. Keep roots and tips exact;
++    # tuck only the offending upper pairs behind the measured lens surface.
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    fitted_cards=0
++    for name in ['PLURR pony strands 0','PLURR pony strands 2']:
++        ob=bpy.data.objects[name];p=array(ob);q=p.copy()
++        for ids in islands(ob):
++            if len(ids)!=34:continue
++            rr=p[ids].reshape(17,2,3).copy();offset=np.zeros(17)
++            for j,pair in enumerate(rr):
++                if j==0:continue
++                for point in pair:
++                    hit,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                    if hit is not None:offset[j]=max(offset[j],hit.y+.0015-point[1])
++            if offset.max()<=0:continue
++            fitted_cards+=1;spread=offset.copy()
++            for j in range(1,16):
++                spread[j]=max(offset[j],.40*offset[j-1],.40*offset[j+1])
++            for j in range(1,17):
++                for point in rr[j]:
++                    point[1]+=spread[j]
++                    hit,_,_,_=body.tree.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                    if hit is not None:point[1]=min(point[1],hit.y-.003)
++            q[ids]=rr.reshape(-1,3)
++        apply(ob,q,mapping,report)
++    report['faceLensFit']={'cards':fitted_cards,'rootPairsRetained':True,'clearanceMm':1.5}
+     # Landmark curve wraps the exposed left temple behind the goggle edge and
+     # enters the existing crown. Projection derives depth from the real scalp.
+     guides=bezier([[-.067,-.066,1.641],[-.083,-.089,1.681],[-.045,-.063,1.731],[-.011,.014,1.722]],np.linspace(0,1,97))
+@@ -156,34 +183,45 @@
+     report[ob.name]={'vertices':len(p),'bounds':[p.min(0).tolist(),p.max(0).tolist()],
+         'scalpClearanceMm':[min(gaps)*1000,max(gaps)*1000],'headWeight':1}
+     braid=ob
+-    # A side-parted fringe breaks the cap's straight frontal boundary. Several
+-    # nested cards form each rounded lock, with measured forehead clearance.
+-    # Root positions start below the existing lenses; hardware stays fixed.
++    # Connection map: the original roots remain under the goggles, with the
++    # free length curving across the forehead and turning toward the temple.
++    # Three overlapping families share a sweep, with unequal tapered ends.
++    # All card edges clear skin by 2 mm and sit behind any projected lens.
+     parts=[]
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    fitted_vertices=0
+     for lock in range(7):
+         shift=(lock-3)*.0020
+         family=[0,0,0,1,1,2,2][lock]
+         offset=[-.0014,0,.0014,-.0008,.0008,-.0008,.0008][lock]
+-        ends=[[-.059,-.119,1.646],[-.067,-.100,1.657],[-.060,-.108,1.671]]
++        ends=[[-.060,-.119,1.621],[-.071,-.100,1.641],[-.066,-.108,1.654]]
+         end=np.array(ends[family]);end[2]+=offset
+         guides=bezier([[.028+shift,-.13,1.674+shift],
+-            [.001-.001*family,-.153,1.670+.005*family+offset],
+-            [-.042-.005*family,-.143,1.662+.007*family+offset],end],np.linspace(0,1,28))
++            [.003-.001*family,-.153,1.676+.003*family+offset],
++            [-.045-.004*family,-.143,1.646+.006*family+offset],end],np.linspace(0,1,28))
+         for layer in range(5):
+             center=[];normal=[];t=np.linspace(0,1,len(guides))
+             for j,point in enumerate(guides):
+-                hit,n,_,_=body.tree.find_nearest(Vector(point))
+-                lift=.003+(.010+.0015*family)*math.sin(math.pi*t[j])+.00035*layer
++                hit,n,_,_=body.tree.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                if hit is None:hit,n,_,_=body.tree.find_nearest(Vector(point))
++                lift=.003+(.005+.001*family)*math.sin(math.pi*t[j])+.00028*layer
+                 center.append(np.array(hit+n*lift));normal.append(np.array(n))
+             center=np.array(center);normal=np.array(normal)
+             tangent=np.gradient(center,axis=0);tangent/=np.linalg.norm(tangent,axis=1)[:,None]
+             across=np.cross(tangent,normal);across/=np.linalg.norm(across,axis=1)[:,None]
+-            center+=across*(layer-2)*.00065*np.sin(math.pi*t)[:,None]
+-            width=(.0021+.00025*math.sin(lock*3.1+layer))*(.25+.75*np.sin(math.pi*t)**.5)*(1-.97*t**3)
++            center+=across*((layer-2)*.00065*np.sin(math.pi*t)+.0007*np.sin(t*math.pi*2+lock*.6)*np.sin(math.pi*t))[:,None]
++            width=(.0028+.00025*math.sin(lock*3.1+layer))*(.20+.80*np.sin(math.pi*t)**.5)*(1-.97*t**2.1)
+             vs=[];fs=[];uv=[]
+             for j in range(len(t)):
+                 for k,u in enumerate([0,.5,1]):
+                     point=center[j]+across[j]*width[j]*(2*u-1)+normal[j]*(.0005 if k==1 else 0)*math.sin(math.pi*t[j])
++                    # Fit actual edges: a clear centerline can still let the
++                    # wide edge cross the curved forehead or goggle outline.
++                    skin,n,_,_=body.tree.find_nearest(Vector(point));gap=(Vector(point)-skin).dot(n)
++                    if gap<.002:point=np.array(skin+n*.002)
++                    front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                    if front is not None and point[1]<front.y+.001:
++                        point[1]=front.y+.001;fitted_vertices+=1
+                     vs.append(point);uv.append((u,t[j]))
+                 if j:
+                     for k in range(2):
+@@ -192,7 +230,8 @@
+     vs,fs,uv=join(parts);mat=material('PLURR loose brunette front locks',(.045,.018,.008),.60)
+     ob=create('PLURR loose brunette front locks',vs,fs,mat,body,weights=rigid(body,vs,'head'),uv=uv,slot='hair',option='plurr-pony')
+     ob['launchCharacter']='female';p=array(ob)
+-    report[ob.name]={'vertices':len(p),'bounds':[p.min(0).tolist(),p.max(0).tolist()],'headWeight':1}
++    report[ob.name]={'vertices':len(p),'bounds':[p.min(0).tolist(),p.max(0).tolist()],'headWeight':1,
++        'frontWaveFamilies':3,'lensFittedVertices':fitted_vertices}
+     return [braid,ob]
+ 
+ 

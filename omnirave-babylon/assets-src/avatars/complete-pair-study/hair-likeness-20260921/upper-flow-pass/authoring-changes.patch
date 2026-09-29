@@ -1,0 +1,236 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -317,6 +317,8 @@
+         refine_roots(mapping,report,apply_geometry)
+         from refine_female_face_fall import shape_face_fall
+         shape_face_fall(mapping,report,apply_geometry)
++        from refine_female_upper_flow import refine_upper_flow
++        refine_upper_flow(mapping,report,apply_geometry)
+     else:
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+--- before/refine_female_upper_flow.py
++++ refine_female_upper_flow.py
+@@ -0,0 +1,67 @@
++"""Replace folded upper pony paths with a continuous crown-to-fall sweep.
++
++Connection map: existing pony, inner fiber and long flyaway cards keep their
++first four crown pairs and lower six/seven pairs exactly. Short cheek and
++crown wisps stay fixed. The free upper span connects those measured anchors
++with matching tangents; widths travel with the curve. Hair clears the body by
++millimeters, rather than using the structural assembly overlap. Origins,
++weights, textures and relative secondary displacements retain their owners.
++"""
++import bpy,numpy as np
++from mathutils import Vector
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface
++from refine_complete_groom_finish import islands
++from refine_female_crown import bezier
++
++NAMES=[f'PLURR pony strands {i}' for i in range(3)]+['PLURR pony surface fibers','Polished female flyaways']
++
++
++def active_card(name,ids,index):
++    return len(ids)!=34 and not (name=='Polished female flyaways' and index%3==0)
++
++
++def end_pair(count):return int(round((count-1)*.72))
++
++
++def refine_upper_flow(mapping,report,apply):
++    rig=bpy.data.objects['AvatarSkeleton'];body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    records={};total=0
++    for name in NAMES:
++        ob=bpy.data.objects[name];p=array(ob);q=p.copy();count=0;max_fit=0
++        deltas=[np.array([v.co[:] for v in ob.data.shape_keys.key_blocks[k].data])-p for k in ['Secondary_HairSide','Secondary_HairBack']]
++        for i,ids in enumerate(islands(ob)):
++            if not active_card(name,ids,i):continue
++            r=p[ids].reshape(-1,2,3);old=r.mean(1);n=len(old);end=end_pair(n)
++            start=old[3];finish=old[end];span=np.linalg.norm(finish-start)
++            incoming=old[3]-old[2];incoming/=np.linalg.norm(incoming)
++            outgoing=old[end+1]-old[end];outgoing/=np.linalg.norm(outgoing)
++            # Match the existing attached and hanging tangents while replacing
++            # intermediate zigzags. A modest crown handle rounds the turnover.
++            length=min(span*.31,.068)
++            c=old.copy();u=np.linspace(0,1,end-3+1)
++            c[3:end+1]=bezier([start,start+incoming*length,finish-outgoing*span*.27,finish],u)
++            h=(r[:,1]-r[:,0])*.5;half=h.copy()
++            for j in range(4,end):
++                a=Vector(old[j+1]-old[j-1]).normalized();b=Vector(c[j+1]-c[j-1]).normalized()
++                half[j]=a.rotation_difference(b)@Vector(h[j])
++            rr=np.stack([c-half,c+half],axis=1);rr[:4]=r[:4];rr[end:]=r[end:]
++            da,db=[d[ids].reshape(n,2,3) for d in deltas];shift=np.zeros(n)
++            for delta in [np.zeros_like(da),da+db,da-db,-da+db,-da-db]:
++                for j in range(4,end):
++                    for point in (rr+delta)[j]:
++                        hit,_,_,_=body.ray_cast(Vector((-.5,point[1],point[2])),Vector((1,0,0)),1)
++                        if hit is not None:shift[j]=min(shift[j],hit.x-.008-point[0])
++            for _ in range(2):
++                smoothed=shift.copy();smoothed[4:end]=.15*shift[3:end-1]+.70*shift[4:end]+.15*shift[5:end+1]
++                shift=np.minimum(shift,smoothed)
++            rr[:,:,0]+=shift[:,None];max_fit=max(max_fit,float(-shift.min()))
++            assert np.array_equal(rr[:4],r[:4]) and np.array_equal(rr[end:],r[end:])
++            q[ids]=rr.reshape(-1,3);count+=1
++        old_report=dict(report[name]);old_mapping=dict(mapping[name]);apply(ob,q,mapping,report)
++        # UVs from the preceding lower-fall stage must survive this geometry edit.
++        if 'addedUv' in old_mapping:mapping[name]['addedUv']=old_mapping['addedUv']
++        report[name].update({k:v for k,v in old_report.items() if k not in report[name]})
++        records[name]={'cards':count,'maximumAdditionalBodyFitMm':max_fit*1000};total+=count
++    report['upperFlow']={'cards':total,'meshes':records,'retainedRootPairs':4,
++        'unchangedLowerEndPairFraction':.72,'addedGeometry':0,'relativeSecondaryShapesRetained':True}
+--- before/validate_female_upper_flow.py
++++ validate_female_upper_flow.py
+@@ -0,0 +1,62 @@
++"""Measure upper-path turns and preserve attachments, ends and other meshes."""
++import sys,json,hashlib
++from pathlib import Path
++import bpy,numpy as np
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from refine_complete_groom_finish import islands
++from refine_complete_foil_finish import geometry_contract
++from refine_female_upper_flow import NAMES,active_card,end_pair
++p=OUT/'hair-likeness-20260921';d=p/'upper-flow-pass'
++
++def structure(ob):
++ h=hashlib.sha256()
++ for f in ob.data.polygons:h.update(np.asarray(f.vertices,dtype=np.int32).tobytes())
++ for layer in ob.data.uv_layers:h.update(np.asarray([v.uv[:] for v in layer.data],dtype=np.float32).tobytes())
++ for v in ob.data.vertices:h.update(repr([(g.group,g.weight) for g in v.groups]).encode())
++ for attr in ob.data.color_attributes:h.update(np.asarray([v.color[:] for v in attr.data],dtype=np.float32).tobytes())
++ return h.hexdigest()
++
++def angles(q):
++ delta=np.diff(q.mean(1),axis=0);delta/=np.maximum(np.linalg.norm(delta,axis=1)[:,None],1e-12)
++ return np.degrees(np.arccos(np.clip((delta[:-1]*delta[1:]).sum(1),-1,1)))
++
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in NAMES}
++before={}
++for name in NAMES:
++ ob=bpy.data.objects[name];before[name]={'base':array(ob),'structure':structure(ob),'shapes':{k.name:np.array([v.co[:] for v in k.data]) for k in ob.data.shape_keys.key_blocks}}
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in NAMES}
++rows={};total=0
++for name in NAMES:
++ ob=bpy.data.objects[name];old=before[name];points=array(ob);assert structure(ob)==old['structure'],name
++ retained=[];active=[];count=0;old_angles=[];new_angles=[]
++ for i,ids in enumerate(islands(ob)):
++  if not active_card(name,ids,i):retained.extend(ids);continue
++  n=len(ids)//2;end=end_pair(n);retained.extend(ids[:8]+ids[end*2:]);active.extend(ids[8:end*2]);count+=1
++  old_angles.extend(angles(old['base'][ids].reshape(n,2,3))[2:end].tolist())
++  new_angles.extend(angles(points[ids].reshape(n,2,3))[2:end].tolist())
++ assert np.array_equal(points[retained],old['base'][retained]),name
++ drift=0
++ for key in ob.data.shape_keys.key_blocks:
++  q=np.array([v.co[:] for v in key.data]);prior=old['shapes'][key.name]
++  assert np.array_equal(q[retained],prior[retained]),(name,key.name,'retained')
++  drift=max(drift,float(np.abs((q-points)-(prior-old['base'])).max()))
++ assert drift<3e-7,(name,drift)
++ ob.data.calc_loop_triangles();tri=np.array([t.vertices[:] for t in ob.data.loop_triangles])
++ def areas(p):
++  v=p[tri];return np.linalg.norm(np.cross(v[:,1]-v[:,0],v[:,2]-v[:,0]),axis=1)*.5
++ assert np.isfinite(points).all() and not np.any((areas(old['base'])>1e-12)&(areas(points)<1e-14)),name
++ previous=float(np.percentile(old_angles,95));current=float(np.percentile(new_angles,95))
++ assert current<previous,(name,previous,current)
++ rows[name]={'reshapedCards':count,'retainedVertices':len(retained),'changedSpanVertices':len(active),
++  'maxRelativeShapeDeltaChangeMm':drift*1000,'newlyDegenerateTriangles':0,
++  'upperTurnDegrees95Before':previous,'upperTurnDegrees95After':current,
++  'upperTurnDegreesMaximumBefore':max(old_angles),'upperTurnDegreesMaximumAfter':max(new_angles)}
++ total+=count
++assert total==1212,total
++report={'unchangedOtherMeshContracts':len(contracts),'reshapedCards':total,'retainedTopologyUVWeightsAndColors':True,'meshes':rows,
++ 'scope':'Other meshes exact; four crown pairs and lower 28 percent of each active card exact in all shape keys, cheek cards and short crown wisps exact. Topology, UVs, weights, colors and relative shape deltas retained. 95th-percentile upper centerline turning angle measured including both join rows. Finite motion/body clearance checks are separate.'}
++(d/'native-upper-flow-validation.json').write_text(json.dumps(report,indent=2)+'\n')
++print('UPPER_FLOW_VALIDATED',json.dumps(report),flush=True)
+--- before/validate_female_upper_clearance.py
++++ validate_female_upper_clearance.py
+@@ -0,0 +1,87 @@
++"""Check the edited upper pony, fiber and flyaway spans in 31 poses."""
++import sys,json,bpy,numpy as np
++from pathlib import Path
++from mathutils import Vector
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from complete_pair_geometry import Surface
++from refine_complete_groom_finish import islands
++from audit_complete_expressions import set_pose,POSES
++
++folder=OUT/'hair-likeness-20260921'
++bpy.ops.wm.open_mainfile(filepath=str(folder/'female-hair-refined.blend'))
++rig=bpy.data.objects['AvatarSkeleton'];rig.data.pose_position='POSE';scene=bpy.context.scene
++from refine_female_upper_flow import NAMES as names,active_card,end_pair
++indices={};card_indices={}
++for name in names:
++    card_indices[name]=[np.array(ids).reshape(-1,2) for i,ids in enumerate(islands(bpy.data.objects[name])) if active_card(name,ids,i)]
++    indices[name]=np.concatenate([ids[4:end_pair(len(ids))].ravel() for ids in card_indices[name]])
++cases=[]
++for clip in ['idle','walk','run']:
++    action=bpy.data.actions[clip]
++    for frame in np.linspace(*action.frame_range,9):cases.append((clip,float(frame),{}))
++cases += [('idle',1,POSES['hair-left']),('idle',1,POSES['hair-right'])]
++cases += [('idle',1,{'Secondary_HairSide':side,'Secondary_HairBack':back}) for side,back in [(-1,1),(1,-1)]]
++report=[]
++for clip,frame,pose in cases:
++    rig.animation_data.action=bpy.data.actions[clip];scene.frame_set(int(frame),subframe=frame%1);set_pose(pose)
++    body=Surface(rig,bpy.data.objects['AvatarBody'])
++    coats=[Surface(rig,bpy.data.objects[n]) for n in ['Structured armhole jacket','PLURR folded hood']]
++    body_min=float('inf');coat_min=float('inf');body_count=0;coat_count=0;closest=None;closest_coat=None
++    intersections=0;body_intersections=0;witnesses=[]
++    for name in names:
++        all_points=array(bpy.data.objects[name],True);points=all_points[indices[name]]
++        for vertex,p in zip(indices[name],points):
++            _,_,_,distance=body.tree.find_nearest(Vector(p))
++            # A nearest triangle's normal misclassifies points beside the
++            # concave ear: its plane extends far outside the body. Determine
++            # side from front/back body ray intersections at this X/Z instead.
++            back,_,_,_=body.tree.ray_cast(Vector((p[0],.5,p[2])),Vector((0,-1,0)),1)
++            front,_,_,_=body.tree.ray_cast(Vector((p[0],-.5,p[2])),Vector((0,1,0)),1)
++            inside=back is not None and front is not None and front.y<=p[1]<=back.y
++            gap=-distance if inside else distance
++            if gap<body_min:closest={'mesh':name,'vertex':int(vertex),'position':p.tolist()}
++            body_min=min(body_min,gap);body_count+=1
++            if p[2]>1.63:continue
++            for coat in coats:
++                front,_,_,_=coat.tree.ray_cast(Vector((p[0],-.5,p[2])),Vector((0,1,0)),1)
++                back,_,_,_=coat.tree.ray_cast(Vector((p[0],.5,p[2])),Vector((0,-1,0)),1)
++                if front is not None and back is not None:
++                    # Either exterior side is valid for hair: some locks hang
++                    # behind the jacket while the new layer drapes in front.
++                    gap=max(front.y-p[1],p[1]-back.y)
++                    if gap<coat_min:closest_coat={'mesh':name,'vertex':int(vertex),'position':p.tolist(),
++                        'jacket':coat.body.name,'frontY':front.y,'backY':back.y}
++                    coat_min=min(coat_min,gap);coat_count+=1
++        # Endpoints outside a folded surface can still straddle a fold. Check
++        # the free longitudinal and cross-card edges against actual triangles.
++        for ids in card_indices[name]:
++            card=all_points[ids]
++            for j in range(4,end_pair(len(ids))+1):
++                for a,b in [(card[j-1,0],card[j,0]),(card[j-1,1],card[j,1]),(card[j,0],card[j,1])]:
++                    direction=Vector(b-a);length=direction.length
++                    if length<1e-8:continue
++                    hit,_,_,_=body.tree.ray_cast(Vector(a),direction.normalized(),length)
++                    if hit is not None:body_intersections+=1
++                    if min(a[2],b[2])>1.63:continue
++                    for coat in coats:
++                        hit,_,_,_=coat.tree.ray_cast(Vector(a),direction.normalized(),length)
++                        if hit is not None:
++                            intersections+=1
++                            if len(witnesses)<5:witnesses.append({'mesh':name,'pair':j,'firstVertex':int(ids[0,0]),'jacket':coat.body.name,'hit':list(hit)})
++    report.append({'clip':clip,'frame':frame,'shape':pose,'bodySamples':body_count,'closestBodyPoint':closest,
++        'minimumBodyClearanceMm':body_min*1000,'jacketSurfaceSamples':coat_count,
++        'closestJacketPoint':closest_coat,
++        'strandEdgeBodyIntersections':body_intersections,'strandEdgeJacketIntersections':intersections,'intersectionWitnesses':witnesses,
++        'minimumJacketClearanceMm':coat_min*1000 if coat_count else None})
++result={'samples':report,'minimumBodyClearanceMm':min(r['minimumBodyClearanceMm'] for r in report),
++    'minimumJacketClearanceMm':min((r['minimumJacketClearanceMm'] for r in report if r['jacketSurfaceSamples']),default=None),
++    'maximumStrandEdgeBodyIntersections':max(r['strandEdgeBodyIntersections'] for r in report),
++    'maximumStrandEdgeJacketIntersections':max(r['strandEdgeJacketIntersections'] for r in report),
++    'scope':'31 finite native clip/secondary-shape poses. Both edges of changed upper spans in 852 long pony, 240 inner fiber and 120 long flyaway cards, plus longitudinal/cross-card edges through both retained joins. Body side uses front/back Y-ray columns and nearest-surface distance; edges ray-test actual body triangles. Jacket accepts either exterior Y surface below 1.63 m with edge/triangle checks. Excludes continuous contact, full triangle interiors, self-contact, hidden carrier, simplified LODs and arbitrary runtime poses.'}
++(folder/'upper-flow-pass/upper-span-clearance.json').write_text(json.dumps(result,indent=2)+'\n')
++print('CASCADE_CLEARANCE',json.dumps({k:v for k,v in result.items() if k!='samples'}),flush=True)
++assert result['minimumBodyClearanceMm']>0,result['minimumBodyClearanceMm']
++assert result['minimumJacketClearanceMm'] is None or result['minimumJacketClearanceMm']>0,result['minimumJacketClearanceMm']
++assert result['maximumStrandEdgeBodyIntersections']==0,result['maximumStrandEdgeBodyIntersections']
++assert result['maximumStrandEdgeJacketIntersections']==0,result['maximumStrandEdgeJacketIntersections']

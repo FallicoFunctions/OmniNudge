@@ -1,0 +1,40 @@
+--- before/refine_female_face_contour.py
++++ refine_female_face_contour.py
+@@ -18,7 +18,7 @@
+ import numpy as np
+ 
+ SPEC = {
+-    'version': 10,
++    'version': 11,
+     'jawCenterZ': 1.530, 'jawHalfHeight': .059,
+     'jawFrontY': -.047, 'jawFrontSpan': .050,
+     'jawTaper': .15,
+@@ -53,7 +53,7 @@
+     'upperLipBalanceRecess': .0005, 'lowerLipBalanceRecess': -.0006,
+     'eyeCenterX': .02827054, 'eyeCenterZ': 1.6091883,
+     'eyeHalfWidth': .026, 'eyeHalfHeight': .018,
+-    'eyeOpeningCompress': .10, 'upperLidLower': .00035,
++    'eyeOpeningCompress': .15, 'upperLidLower': .00065,
+     'bridgeCenterZ': 1.594, 'bridgeHalfHeight': .014,
+     'bridgeHalfWidth': .014, 'bridgeFrontY': -.103, 'bridgeFrontSpan': .032,
+     'bridgeRecess': .0018,
+@@ -61,7 +61,7 @@
+     'innerCheekCenterZ': 1.579, 'innerCheekHalfHeight': .016,
+     'innerCheekFrontY': -.075, 'innerCheekFrontSpan': .045,
+     'innerCheekFullness': .0015,
+-    'almondCompress': .085, 'almondPlateau': .009, 'almondFade': .009,
++    'almondCompress': .11, 'almondPlateau': .009, 'almondFade': .009,
+     'irisColorFactor': [1.0, .46, .24, 1.0],
+ }
+ 
+--- before/apply_female_face_contour.mjs
++++ apply_female_face_contour.mjs
+@@ -80,7 +80,7 @@
+   return unit([0,1,2].map(i=>cof.reduce((sum,c,a)=>sum+c[i]*n[a],0)));
+ }
+ export function applyFaceContour(doc,record) {
+-  assert([1,2,3,4,5,6,7,8,9,10].includes(record.spec.version));
++  assert([1,2,3,4,5,6,7,8,9,10,11].includes(record.spec.version));
+   if(record.spec.version>=2) {
+     const iris=doc.getRoot().listMaterials().find(m=>m.getName()==='Launch female iris');assert(iris);
+     iris.setBaseColorFactor(iris.getBaseColorFactor().map((v,i)=>v*record.spec.irisColorFactor[i]));

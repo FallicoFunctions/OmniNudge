@@ -1,0 +1,63 @@
+--- before/refine_female_face_surface.py
++++ refine_female_face_surface.py
+@@ -14,6 +14,12 @@
+         'skinRestore': .76, 'lipTintStrength': .14,
+         'skinColor': [.477, .205, .105, 1], 'lipColor': [.235, .058, .041, 1],
+         'lipRoughness': .43}
++
++TONE_SPEC = {**SPEC, 'version': 2, 'lipTintStrength': .55,
++             'lipColor': [.15, .028, .025, 1], 'lipRoughness': .36,
++             'lidCenterX': .0283, 'lidHalfWidth': .023,
++             'lidCenterZ': 1.618, 'lidHalfHeight': .014,
++             'lidTintStrength': .50, 'lidColor': [.12, .058, .041, 1]}
+ 
+ 
+ def author(body, spec=SPEC):
+@@ -53,3 +59,36 @@
+             'changedGeometry':False,'maskVertices':int(np.sum(cleanup>0)),
+             'pigmentVertices':int(np.sum(lip>0)),
+             'attributes':['Reference lip silhouette','Reference lip edge transition','Reference lip tone']},color,softened
++
++
++def refine_tone(body, previous, spec=TONE_SPEC):
++    """Revise the retained makeup graph, without stacking its baked output."""
++    assert previous['spec']['version'] == 1
++    assert not body.data.attributes.get('Reference upper lid tone')
++    mat = body.data.materials[0]; nodes, links = mat.node_tree.nodes, mat.node_tree.links
++    assert mat.name == previous['material']
++    tone = body.data.attributes['Reference lip tone']
++    values = np.array([v.value for v in tone.data])
++    values *= spec['lipTintStrength']/previous['spec']['lipTintStrength']
++    assert np.isfinite(values).all() and values.min() >= 0 and values.max() <= 1
++    tone.data.foreach_set('value', values.astype(np.float32))
++    nodes['Reference soft rose lip'].inputs[2].default_value = spec['lipColor']
++    nodes['Reference satin lip roughness'].inputs[2].default_value = [spec['lipRoughness']]*3+[1]
++    p = np.array([v.co[:] for v in body.data.vertices]); x, y, z = p.T
++    lid = 1-smooth(abs(abs(x)-spec['lidCenterX'])/spec['lidHalfWidth'])
++    lid *= 1-smooth(abs(z-spec['lidCenterZ'])/spec['lidHalfHeight'])
++    lid *= smooth((z-1.606)/.006)*smooth((-.095-y)/.022)
++    values = lid*spec['lidTintStrength']
++    attr = body.data.attributes.new('Reference upper lid tone', 'FLOAT', 'POINT')
++    attr.data.foreach_set('value', values.astype(np.float32))
++    mask = nodes.new('ShaderNodeAttribute'); mask.name = attr.name; mask.attribute_name = attr.name
++    blend = nodes.new('ShaderNodeMixRGB'); blend.name = 'Reference warm upper lid'
++    links.new(mask.outputs['Fac'], blend.inputs[0])
++    links.new(nodes['Reference soft rose lip'].outputs[0], blend.inputs[1])
++    blend.inputs[2].default_value = spec['lidColor']
++    color, rough = blend.outputs[0], nodes['Reference satin lip roughness'].outputs[0]
++    bs = nodes['Principled BSDF']; links.new(color, bs.inputs['Base Color']); links.new(rough, bs.inputs['Roughness'])
++    return {**previous, 'spec': spec, 'changedGeometry': False,
++            'upperLidMaskVertices': int(np.sum(lid>0)),
++            'attributes': [*previous['attributes'], attr.name],
++            'authoredFromSurfaceVersion': previous['spec']['version']}, color, rough
+--- before/apply_female_face_surface.mjs
++++ apply_female_face_surface.mjs
+@@ -7,7 +7,7 @@
+ 
+ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+ export async function applyFaceSurface(doc, record, sourceDirectory) {
+-  assert.equal(record.spec.version, 1);
++  assert([1, 2].includes(record.spec.version));
+   const material = doc.getRoot().listMaterials().find(m => m.getName() === record.material);
+   assert(material, 'Missing facial skin material');
+   const report = {};

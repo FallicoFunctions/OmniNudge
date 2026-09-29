@@ -1,0 +1,169 @@
+--- before/refine_reference_hair.py
++++ refine_reference_hair.py
+@@ -321,6 +321,8 @@
+         refine_upper_flow(mapping,report,apply_geometry)
+         from refine_female_loose_locks import loosen_outer_locks
+         loosen_outer_locks(mapping,report,apply_geometry)
++        from refine_female_crown_settle import settle_crown
++        settle_crown(mapping,report,apply_geometry)
+     else:
+         male(mapping,report)
+         from refine_male_waves import soften_waves
+--- before/refine_female_crown_settle.py
++++ refine_female_crown_settle.py
+@@ -0,0 +1,75 @@
++"""Set the upper pony closer to the crown and lengthen a few temple wisps.
++
++Connection map: a shared displacement field acts on the upper carrier, long
++cards, inner fibers and flyaways. It is zero at every measured pony root and
++below 1.58 m. The carrier's scalp attachment stays fixed. Selected cheek cards
++retain their first four pairs under the goggles; the free tips follow the
++cheek surface. Thin hair uses millimeter surface clearance. Existing origins,
++head weights, UVs, colors and relative secondary offsets stay in place.
++"""
++import math
++import bpy,numpy as np
++from mathutils import Vector
++from assemble_complete_pair import array
++from complete_pair_geometry import Surface,smooth
++from refine_complete_groom_finish import islands
++
++NAMES=[f'PLURR pony strands {i}' for i in range(3)]+['PLURR pony surface fibers','Polished female flyaways','PLURR gathered pony bundle']
++
++
++def settle_crown(mapping,report,apply):
++    rig=bpy.data.objects['AvatarSkeleton'];body=Surface(rig,bpy.data.objects['AvatarBody']).tree
++    lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++    rows={};cheek_ids={};root_ids={};fitted=0
++    for name in NAMES:
++        ob=bpy.data.objects[name];p=array(ob);q=p.copy();cheeks=[];roots=[]
++        if name!='PLURR gathered pony bundle':
++            for ids in islands(ob):
++                if len(ids)==34:cheeks.append(ids)
++                else:roots.extend(ids[:2])
++        weight=smooth((-p[:,0]-.063)/.070)*smooth((p[:,2]-1.58)/.16)
++        q+=weight[:,None]*np.array([.012,-.006,-.006])
++        if cheeks:q[np.concatenate(cheeks)]=p[np.concatenate(cheeks)]
++        if roots:assert np.array_equal(q[roots],p[roots]),(name,'root field')
++        # Surface fitting is limited to displaced vertices, so hidden anchors
++        # and existing intentional overlaps are not altered incidentally.
++        for vi in np.flatnonzero(np.linalg.norm(q-p,axis=1)>1e-8):
++            point=q[vi]
++            hit,_,_,_=body.ray_cast(Vector((-.5,point[1],point[2])),Vector((1,0,0)),1)
++            if hit is not None and point[0]>hit.x-.003:
++                point[0]=hit.x-.003;fitted+=1
++        selected=[]
++        # Each side receives two slightly longer, curved tendrils. Keep the
++        # many finer surrounding cheek fibers at their established length.
++        for side in [-1,1]:
++            candidates=[ids for ids in cheeks if np.sign(p[ids[:2]].mean(0)[0])==side]
++            if not candidates:continue
++            candidates.sort(key=lambda ids:p[ids[-2:]].mean(0)[2])
++            for order,ids in enumerate(candidates[:2]):
++                r=p[ids].reshape(17,2,3);old=r.mean(1);half=(r[:,1]-r[:,0])*.5
++                v=np.clip((np.linspace(0,1,17)-3/16)/(1-3/16),0,1);free=smooth(v)
++                c=old.copy();c[:,2]-=(.026 if order==0 else .016)*free
++                c[:,0]+=side*(.004*np.sin(math.pi*v)-.003*free)
++                h=half.copy()
++                for j in range(4,17):
++                    a=Vector(old[min(j+1,16)]-old[j-1]).normalized();b=Vector(c[min(j+1,16)]-c[j-1]).normalized()
++                    h[j]=np.array(a.rotation_difference(b)@Vector(half[j]))*(1+.22*np.sin(math.pi*v[j]))
++                rr=np.stack([c-h,c+h],axis=1);rr[:4]=r[:4]
++                for pair in rr[4:]:
++                    for point in pair:
++                        hit,_,_,_=body.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                        if hit is not None:point[1]=min(point[1],hit.y-.0035)
++                        skin,normal,_,dist=body.find_nearest(Vector(point))
++                        if dist<.0028:point[:]=skin+normal*.0028
++                        front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++                        if front is not None:point[1]=max(point[1],front.y+.0015)
++                q[ids]=rr.reshape(-1,3);selected.append(ids[0])
++        prior=dict(report[name]);old_mapping=dict(mapping[name]);apply(ob,q,mapping,report)
++        if 'addedUv' in old_mapping:mapping[name]['addedUv']=old_mapping['addedUv']
++        report[name].update({k:v for k,v in prior.items() if k not in report[name]})
++        rows[name]={'changedVertices':int(np.count_nonzero(np.linalg.norm(q-p,axis=1)>1e-7)),
++            'maximumMovementMm':float(np.linalg.norm(q-p,axis=1).max()*1000)}
++        cheek_ids[name]=selected;root_ids[name]=roots
++    report['crownSettle']={'meshes':rows,'selectedCheekFirstVertices':cheek_ids,'skinFittedVertices':fitted,
++        'sharedDisplacementMeters':[.012,-.006,-.006],'unchangedLowerHeight':1.58,
++        'rootPairsRetained':True,'addedGeometry':0,'relativeSecondaryShapesRetained':True}
+--- before/validate_female_crown_settle.py
++++ validate_female_crown_settle.py
+@@ -0,0 +1,77 @@
++"""Check the crown fit, retained attachments and evaluated skin/lens clearance."""
++import json,sys,hashlib
++from pathlib import Path
++import bpy,numpy as np
++from mathutils import Vector
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++from assemble_complete_pair import OUT,array
++from complete_pair_geometry import Surface
++from refine_complete_foil_finish import geometry_contract
++from refine_complete_groom_finish import islands
++from audit_complete_expressions import POSES,set_pose
++from refine_female_crown_settle import NAMES
++p=OUT/'hair-likeness-20260921';d=p/'crown-settle-pass'
++
++def structure(ob):
++ h=hashlib.sha256()
++ for f in ob.data.polygons:h.update(np.asarray(f.vertices,dtype=np.int32).tobytes())
++ for layer in ob.data.uv_layers:h.update(np.asarray([v.uv[:] for v in layer.data],dtype=np.float32).tobytes())
++ for v in ob.data.vertices:h.update(repr([(g.group,g.weight) for g in v.groups]).encode())
++ for attr in ob.data.color_attributes:h.update(np.asarray([v.color[:] for v in attr.data],dtype=np.float32).tobytes())
++ return h.hexdigest()
++
++def keys(ob):return {k.name:np.array([v.co[:] for v in k.data]) for k in ob.data.shape_keys.key_blocks} if ob.data.shape_keys else {}
++
++bpy.ops.wm.open_mainfile(filepath=str(d/'before/female-hair-refined.blend'))
++contracts={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in NAMES}
++before={name:{'points':array(bpy.data.objects[name]),'structure':structure(bpy.data.objects[name]),'keys':keys(bpy.data.objects[name])} for name in NAMES}
++bpy.ops.wm.open_mainfile(filepath=str(p/'female-hair-refined.blend'))
++assert contracts=={o.name:geometry_contract(o) for o in bpy.context.scene.objects if o.type=='MESH' and o.name not in NAMES}
++old_native=json.loads((d/'before/female-native-validation.json').read_text());native=json.loads((p/'female-native-validation.json').read_text());assert old_native['materials']==native['materials'] and old_native['additions']==native['additions']
++authored=native['meshes']['crownSettle'];rows={};tested={};cheeks={}
++for name in NAMES:
++ ob=bpy.data.objects[name];q=array(ob);old=before[name];roots=[];kept=[];face=[]
++ assert structure(ob)==old['structure'],name
++ selected=authored['selectedCheekFirstVertices'][name]
++ if name!='PLURR gathered pony bundle':
++  for ids in islands(ob):
++   if len(ids)==34:
++    if ids[0] in selected:roots.extend(ids[:8]);face.extend(ids)
++    else:kept.extend(ids)
++   else:roots.extend(ids[:2])
++ kept.extend(roots)
++ nonface=set(range(len(q)))-set(face)
++ kept.extend(i for i in nonface if old['points'][i,2]<=1.58 or old['points'][i,0]>=-.063)
++ kept=list(set(kept));assert np.array_equal(q[kept],old['points'][kept]),name
++ drift=0
++ for k,value in keys(ob).items():
++  assert np.array_equal(value[kept],old['keys'][k][kept]),(name,k)
++  drift=max(drift,float(np.abs((value-q)-(old['keys'][k]-old['points'])).max()))
++ assert drift<3e-7,(name,drift)
++ ob.data.calc_loop_triangles();tri=np.array([t.vertices[:] for t in ob.data.loop_triangles])
++ def area(points):
++  v=points[tri];return np.linalg.norm(np.cross(v[:,1]-v[:,0],v[:,2]-v[:,0]),axis=1)*.5
++ assert np.isfinite(q).all() and not np.any((area(old['points'])>1e-12)&(area(q)<1e-14)),name
++ ids=np.flatnonzero(np.linalg.norm(q-old['points'],axis=1)>1e-7);tested[name]=ids;cheeks[name]=face
++ rows[name]={'changedVertices':len(ids),'retainedVertices':len(kept),'retainedRootVertices':len(roots),'extendedCheekCards':len(selected),'maxRelativeShapeDeltaChangeMm':drift*1000,'newlyDegenerateTriangles':0}
++rig=bpy.data.objects['AvatarSkeleton'];rig.data.pose_position='REST';bpy.context.view_layer.update()
++cases=dict(POSES);cases['hair-cross-left']={'Secondary_HairSide':-1,'Secondary_HairBack':1};cases['hair-cross-right']={'Secondary_HairSide':1,'Secondary_HairBack':-1}
++samples=[]
++for label,values in cases.items():
++ set_pose(values);body=Surface(rig,bpy.data.objects['AvatarBody']).tree;lens=Surface(rig,bpy.data.objects['PLURR goggle lens']).tree
++ for name,ids in tested.items():
++  pts=array(bpy.data.objects[name],True);gaps=[];occluded=0
++  for vi in ids:
++   point=pts[vi];_,_,_,distance=body.find_nearest(Vector(point))
++   back,_,_,_=body.ray_cast(Vector((point[0],.5,point[2])),Vector((0,-1,0)),1)
++   front,_,_,_=body.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++   inside=front is not None and back is not None and front.y<=point[1]<=back.y
++   gaps.append(-distance if inside else distance)
++  for vi in cheeks[name]:
++   point=pts[vi];front,_,_,_=lens.ray_cast(Vector((point[0],-.5,point[2])),Vector((0,1,0)),1)
++   occluded+=int(front is not None and point[1]<front.y+.0005)
++  samples.append({'pose':label,'mesh':name,'vertices':len(ids),'minimumSkinClearanceMm':min(gaps)*1000,'verticesInFrontOfLens':occluded})
++report={'unchangedOtherMeshContracts':len(contracts),'meshes':rows,'retainedTopologyUVWeightsAndColors':True,'hairMaterialManifestUnchanged':True,'poses':len(cases),'samples':samples,'minimumSkinClearanceMm':min(r['minimumSkinClearanceMm'] for r in samples),'maximumVerticesInFrontOfLens':max(r['verticesInFrontOfLens'] for r in samples),'scope':'All changed crown/carrier/cheek vertices in nine finite rest-rig expression and secondary poses. Pony first pairs, cheek first four pairs, lower pony region and 55 other mesh contracts retained exactly. Standard clip/attachment and long-pony jacket checks are separate. No continuous, full triangle-interior, goggle-frame or self-contact guarantee.'}
++(d/'native-crown-settle-validation.json').write_text(json.dumps(report,indent=2)+'\n');print('CROWN_SETTLE_VALIDATED',json.dumps({k:v for k,v in report.items() if k!='samples'}),flush=True)
++assert report['minimumSkinClearanceMm']>1.5,report['minimumSkinClearanceMm']
++assert report['maximumVerticesInFrontOfLens']==0,report['maximumVerticesInFrontOfLens']

@@ -1,0 +1,39 @@
+--- before/refine_reference_hair.py
++++ scripts/launch-body-proof/refine_reference_hair.py
+@@ -195,7 +195,7 @@
+             if sex=='female':
+                 color = {'PLURR pony strands 0':(.60,.020,.160,1),'PLURR pony strands 1':(.72,.008,.19,1),
+                     'PLURR pony strands 2':(.24,.015,.31,1),'PLURR pony strands 3':(.35,.55,.009,1),
+-                    'PLURR swept scalp groom':(.060,.026,.012,1),'Polished female flyaways':(.60,.009,.17,1),
++                    'PLURR swept scalp groom':(.036,.015,.008,1),'Polished female flyaways':(.60,.009,.17,1),
+                     'PLURR pony surface fibers':(.22,.003,.054,1)}.get(ob.name,color)
+             for socket in ['Base Color','Alpha']:
+                 for link in list(bs.inputs[socket].links):tree.links.remove(link)
+@@ -237,11 +237,22 @@
+ 
+ def scalp_finish():
+     h,w=1024,1024;v,u=np.mgrid[0:h,0:w].astype(float);u=(u+.5)/w;v=(v+.5)/h
+-    flow=u+.11*(1-v)+.035*np.sin(v*math.pi)
+-    fibers=.5+.5*np.cos(flow*math.tau*185+.5*np.sin(flow*math.tau*41))
+-    pigment=.50+.18*fibers+.10*(.5+.5*np.cos(flow*math.tau*37))
+-    edge=.991+.005*np.sin(u*math.tau*193)
+-    rgba=np.ones((h,w,4));rgba[:,:,:3]=pigment[:,:,None];rgba[:,:,3]=np.clip((edge-v)/.020,0,1)
++    # The cap is quiet underpainting. Its fibers follow the same gathering
++    # direction as the cards, instead of competing as straight vertical bands.
++    theta=u*math.tau
++    end=1.18+1.02*((1-np.cos(theta))*.5)**.8+.06*np.sin(theta*3)**2
++    phi=.003+(end-.003)*v
++    direction=np.stack([np.sin(phi)*np.sin(theta),-np.sin(phi)*np.cos(theta),np.cos(phi)],axis=-1)
++    eye=np.mean([array(bpy.data.objects['AvatarEye_'+s],True).mean(0) for s in ['l','r']],axis=0)
++    target=array(bpy.data.objects['PLURR gathered pony root'],True).mean(0)-[0,-.032,eye[2]+.039]
++    target/=np.linalg.norm(target)
++    across=np.cross(target,[1,0,0]);across/=np.linalg.norm(across);up=np.cross(across,target)
++    polar=np.arccos(np.clip(direction@target,-1,1))
++    flow=np.arctan2(direction@across,direction@up)+.30*polar
++    fibers=.5+.5*np.cos(flow*155+.3*np.sin(flow*31))
++    pigment=.72+.065*fibers+.025*np.sin(flow*19)**2
++    edge=.991+.003*np.sin(u*math.tau*193)+.003*np.sin(u*math.tau*67)
++    rgba=np.ones((h,w,4));rgba[:,:,:3]=pigment[:,:,None];rgba[:,:,3]=np.clip((edge-v)/.032,0,1)
+     tex_image=save_texture('reference-female-hairline',rgba)
+     mat=bpy.data.objects['Complete scalp'].data.materials[0];tree=mat.node_tree;bs=tree.nodes['Principled BSDF']
+     color=(.025,.012,.006,1)

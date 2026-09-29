@@ -1,0 +1,144 @@
+--- before/refine_female_face_surface.py
++++ refine_female_face_surface.py
+@@ -0,0 +1,55 @@
++"""Author a softer lip border and satin roughness on the existing facial skin.
++
++Connection map: this is one continuous skin surface. Pigment and roughness
++follow retained lip vertices and UVs through every expression; no geometry,
++attachment, transform, joint, or skin weight is changed. No overlap is added.
++The material masks are baked from Blender shaders for portable glTF delivery.
++"""
++import numpy as np
++import bpy
++from refine_female_face_contour import smooth
++
++SPEC = {'version': 1, 'mouthCenterZ': 1.5431, 'halfWidth': .024,
++        'upperHeight': .0062, 'lowerHeight': .0095, 'borderFeather': .0016,
++        'skinRestore': .76, 'lipTintStrength': .14,
++        'skinColor': [.477, .205, .105, 1], 'lipColor': [.235, .058, .041, 1],
++        'lipRoughness': .43}
++
++
++def author(body, spec=SPEC):
++    assert not body.data.attributes.get('Reference lip silhouette'), 'Apply once to archived source'
++    p=np.array([v.co[:] for v in body.data.vertices]);x,y,z=p.T
++    group=body.vertex_groups['lips'].index
++    membership=np.array([max([g.weight for g in v.groups if g.group==group] or [0]) for v in body.data.vertices])
++    width=spec['halfWidth'];arch=np.sqrt(np.maximum(0,1-(x/width)**2))
++    bow=.0016*np.exp(-((abs(x)-.006)/.004)**2)-.0005*np.exp(-(x/.003)**2)
++    top=spec['mouthCenterZ']+(spec['upperHeight']+bow)*arch
++    bottom=spec['mouthCenterZ']-spec['lowerHeight']*arch**1.6
++    lip=smooth((top-z)/spec['borderFeather'])*smooth((z-bottom)/spec['borderFeather'])
++    front=smooth((-.119-y)/.014)
++    lip*=front
++    cleanup=membership*(1-lip)*front
++    mat=body.data.materials[0];nodes,links=mat.node_tree.nodes,mat.node_tree.links
++    bs=nodes['Principled BSDF'];source=bs.inputs['Base Color'].links[0].from_socket
++    rough=bs.inputs['Roughness'].links[0].from_socket
++    def attribute(name,values):
++        a=body.data.attributes.new(name,'FLOAT','POINT');a.data.foreach_set('value',values.astype(np.float32))
++        n=nodes.new('ShaderNodeAttribute');n.name=name;n.attribute_name=name
++        return n.outputs['Fac']
++    lp=attribute('Reference lip silhouette',lip)
++    edge=attribute('Reference lip edge transition',cleanup*spec['skinRestore'])
++    tint=attribute('Reference lip tone',lip*membership*spec['lipTintStrength'])
++    # Preserve the original color variation wherever the new border is solid.
++    def mix(name,a,b,fac):
++        n=nodes.new('ShaderNodeMixRGB');n.name=name;links.new(a,n.inputs[1]);n.inputs[2].default_value=b;links.new(fac,n.inputs[0]);return n.outputs[0]
++    color=mix('Reference lip edge skin',source,spec['skinColor'],edge)
++    color=mix('Reference soft rose lip',color,spec['lipColor'],tint)
++    # Restore skin roughness at the former broad pigment border, then apply
++    # a softer sheen inside the authored vermilion silhouette.
++    softened=mix('Reference lip edge roughness',rough,[.46,.46,.46,1],edge)
++    softened=mix('Reference satin lip roughness',softened,[spec['lipRoughness']]*3+[1],lp)
++    links.new(color,bs.inputs['Base Color']);links.new(softened,bs.inputs['Roughness'])
++    return {'spec':spec,'mesh':body.name,'material':mat.name,
++            'changedGeometry':False,'maskVertices':int(np.sum(cleanup>0)),
++            'pigmentVertices':int(np.sum(lip>0)),
++            'attributes':['Reference lip silhouette','Reference lip edge transition','Reference lip tone']},color,softened
+--- before/apply_female_face_surface.mjs
++++ apply_female_face_surface.mjs
+@@ -0,0 +1,41 @@
++/** Transfer Blender's authored lip finish without touching mesh or rig data. */
++import assert from 'node:assert/strict';
++import fs from 'node:fs/promises';
++import path from 'node:path';
++import {createHash} from 'node:crypto';
++import sharp from 'sharp';
++
++const hash = bytes => createHash('sha256').update(bytes).digest('hex');
++export async function applyFaceSurface(doc, record, sourceDirectory) {
++  assert.equal(record.spec.version, 1);
++  const material = doc.getRoot().listMaterials().find(m => m.getName() === record.material);
++  assert(material, 'Missing facial skin material');
++  const report = {};
++  for (const [channel, source] of Object.entries(record.channels)) {
++    assert(['baseColor', 'roughness'].includes(channel));
++    const texture = channel === 'baseColor' ? material.getBaseColorTexture() : material.getMetallicRoughnessTexture();
++    assert.equal(texture?.getName(), source.texture);
++    // Shared image replacement must not silently modify another material.
++    assert(texture.listParents().every(p => p.propertyType === 'Root' || p === material));
++    const input = await fs.readFile(path.join(sourceDirectory, source.file));
++    assert.equal(hash(input), record.sourceTextureHashes[channel]);
++    const previous = await sharp(Buffer.from(texture.getImage())).removeAlpha().raw().toBuffer({resolveWithObject: true});
++    const {width, height, channels} = previous.info;
++    assert.equal(channels, 3);
++    let bytes;
++    const colorQuality = width >= 2048 ? 92 : width >= 1024 ? 88 : 82;
++    if (channel === 'baseColor') {
++      bytes = await sharp(input).resize(width, height).removeAlpha().webp({quality: colorQuality}).toBuffer();
++    } else {
++      const roughness = await sharp(input).resize(width, height).extractChannel(0).raw().toBuffer();
++      assert.equal(roughness.length, width * height);
++      // glTF owns roughness in green. Retain metallic and occlusion bytes.
++      const packed = Buffer.from(previous.data);
++      for (let i = 0; i < roughness.length; i++) packed[3 * i + 1] = roughness[i];
++      bytes = await sharp(packed, {raw: {width, height, channels: 3}}).webp({lossless: true}).toBuffer();
++    }
++    texture.setImage(bytes).setMimeType('image/webp');
++    report[channel] = {texture: texture.getName(), width, height, ...(channel === 'baseColor' ? {colorQuality} : {lossless: true}), sha256: hash(bytes)};
++  }
++  return report;
++}
+--- before/apply_reference_hair.mjs
++++ apply_reference_hair.mjs
+@@ -8,6 +8,7 @@
+ import { ALL_EXTENSIONS, KHRMaterialsSpecular } from '@gltf-transform/extensions';
+ import { validateBytes } from 'gltf-validator';
+ import { applyFaceContour } from './apply_female_face_contour.mjs';
++import { applyFaceSurface } from './apply_female_face_surface.mjs';
+ 
+ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+ const pass=path.join(root,'assets-src/avatars/complete-pair-study/hair-likeness-20260921');
+@@ -16,6 +17,7 @@
+ const native=JSON.parse(await fs.readFile(path.join(pass,`${sex}-native-validation.json`),'utf8'));
+ const additionNames=new Set((native.additions??[]).map(a=>a.name));
+ const removalNames=new Set(native.removedObjects??[]);
++const faceSurfaceTextures=new Set(Object.values(native.faceSurface?.channels??{}).map(c=>c.texture));
+ const io=new NodeIO().registerExtensions(ALL_EXTENSIONS);
+ const hash=data=>createHash('sha256').update(data).digest('hex');
+ const arrayHash=a=>hash(new Uint8Array(a.getArray().buffer,a.getArray().byteOffset,a.getArray().byteLength));
+@@ -44,7 +46,7 @@
+     animations:r.listAnimations().map(a=>[a.getName(),a.listChannels().map(c=>[c.getTargetNode().getName(),c.getTargetPath(),c.getSampler().getInterpolation()])]),
+     skins:r.listSkins().map(s=>s.listJoints().map(j=>j.getName())),
+     materials:r.listMaterials().filter(m=>!native.materials[m.getName()]).map(m=>[m.getName(),native.faceContour?.spec.version>=2&&m.getName()==='Launch female iris'?null:m.getBaseColorFactor(),m.getRoughnessFactor(),m.getMetallicFactor()]),
+-    textures:r.listTextures().filter(t=>t.getName()!=='Reference hair resolved fibers').map(t=>[t.getName(),hash(t.getImage())]),
++    textures:r.listTextures().filter(t=>t.getName()!=='Reference hair resolved fibers'&&!faceSurfaceTextures.has(t.getName())).map(t=>[t.getName(),hash(t.getImage())]),
+   }));
+ }
+ const unit=v=>{const l=Math.hypot(...v);assert(l>1e-9);return v.map(x=>x/l);};
+@@ -145,12 +147,13 @@
+     rows[a.name]=count;
+   }
+   const faceContour=native.faceContour?applyFaceContour(doc,native.faceContour):null;
++  const faceSurface=native.faceSurface?await applyFaceSurface(doc,native.faceSurface,pass):null;
+   assert.equal(retained(doc),before,`${filename}: unrelated data changed`);
+   const bytes=await io.writeBinary(doc),validation=await validateBytes(bytes,{maxIssues:1000});
+   assert.equal(validation.issues.numErrors,0,JSON.stringify(validation.issues.messages.filter(m=>m.severity===0)));
+   assert.equal(retained(await io.readBinary(bytes)),before,`${filename}: serialization changed retained data`);
+   await fs.writeFile(path.join(root,'public/assets/avatars/complete-pair',filename),bytes);
+-  report[filename]={verticesUpdated:rows,faceContour,sha256:hash(bytes),gltfErrors:0,preservedOutfitsRigAnimationsWeights:true,
++  report[filename]={verticesUpdated:rows,faceContour,...(faceSurface?{faceSurface}:{}),sha256:hash(bytes),gltfErrors:0,preservedOutfitsRigAnimationsWeights:true,
+     addedHairMeshes:[...additionNames],removedObjects:[...removalNames],rescaledHairMorphs:Object.keys(mapping).filter(n=>mapping[n].morphs)};
+   console.log(filename,'reference revision applied; rig, outfits and animation preserved');
+ }
