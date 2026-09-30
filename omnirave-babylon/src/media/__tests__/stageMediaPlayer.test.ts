@@ -348,6 +348,13 @@ describe('createStageMediaPlayer', () => {
       expect((fill.mock.lastCall as unknown[] | undefined)?.[1]).toBeCloseTo(42, 5);
     });
 
+    it('stops the spectrum downloads when the player is disposed', () => {
+      const spectrum = { fill: vi.fn(() => false), dispose: vi.fn() };
+      const player = createStageMediaPlayer({ now: () => 0, spectrum, backendFactory: () => createFakeBackend() });
+      player.dispose();
+      expect(spectrum.dispose).toHaveBeenCalledTimes(1);
+    });
+
     it('falls back to the live analysis when the spectrum part is not downloaded', () => {
       const backend = createFakeBackend({ getFrequencyData: vi.fn((target: Uint8Array) => target.fill(3)) });
       const player = createStageMediaPlayer({

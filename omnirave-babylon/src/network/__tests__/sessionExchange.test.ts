@@ -74,8 +74,8 @@ describe('exchangeLaunchSession', () => {
         activeZone: 'main_stage',
         mode: 'guest',
         zoneMedia: [
-          { zoneId: 'main_stage', videoId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343 },
-          { zoneId: 'underground', videoId: '', playlistIndex: 0, playheadSeconds: 0 },
+          { zoneId: 'main_stage', videoId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343.25, sampledAtMs: 1790745413577 },
+          { zoneId: 'underground', videoId: '', playlistIndex: 0, playheadSeconds: 0, sampledAtMs: 1790745413577 },
           { zoneId: 'broken' },
         ],
       }),
@@ -84,7 +84,7 @@ describe('exchangeLaunchSession', () => {
     const result = await exchangeLaunchSession({ mode: 'guest', handoff: 'abc123' });
 
     expect(result?.zoneMedia).toEqual([
-      { zoneId: 'main_stage', trackId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343 },
+      { zoneId: 'main_stage', trackId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343.25, sampledAtMs: 1790745413577 },
     ]);
   });
 

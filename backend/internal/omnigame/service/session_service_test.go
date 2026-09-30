@@ -718,5 +718,8 @@ func TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServ
 		require.Equal(t, snapshot.TrackID, bootstrap.ZoneMedia[index].VideoID)
 		require.Equal(t, snapshot.Index, bootstrap.ZoneMedia[index].PlaylistIndex)
 		require.InDelta(t, snapshot.Playhead.Seconds(), bootstrap.ZoneMedia[index].PlayheadSeconds, 0.001)
+		// The client moves the playhead forward from this moment on the
+		// server's clock, so the exchange must say when it read it.
+		require.Equal(t, fixedNow.UnixMilli(), bootstrap.ZoneMedia[index].SampledAtMS)
 	}
 }
