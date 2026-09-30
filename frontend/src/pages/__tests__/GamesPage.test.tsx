@@ -20,6 +20,10 @@ vi.mock('../../services/omnigameService', () => ({
   },
 }));
 
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ isAuthenticated: false, isLoading: false }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
@@ -28,6 +32,7 @@ vi.mock('react-i18next', () => ({
           'gamesPage.eyebrow': 'OmniGame',
           'gamesPage.title': 'OmniGame',
           'gamesPage.viewGame': 'View game',
+          'gamesPage.playGame': 'Play game',
           'games.omnirave.summary': 'A virtual EDM festival',
         }) as Record<string, string>
       )[key] ?? key,
@@ -53,5 +58,10 @@ describe('GamesPage', () => {
     );
     expect(screen.getByText('OmniRave')).toBeInTheDocument();
     expect(screen.getByText('A virtual EDM festival')).toBeInTheDocument();
+    // Play game sits beside View game and shares its fixed width.
+    const play = screen.getByRole('button', { name: 'Play game' });
+    const view = screen.getByRole('link', { name: 'View game' });
+    expect(play.className).toContain('w-36');
+    expect(view.className).toContain('w-36');
   });
 });

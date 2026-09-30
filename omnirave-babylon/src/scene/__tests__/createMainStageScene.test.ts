@@ -268,12 +268,20 @@ describe('createMainStageScene', () => {
       pointer('pointerdown', { clientX: 100 });
       expect(requestPointerLock).toHaveBeenCalledTimes(1);
       lockedElement = canvas;
+      document.dispatchEvent(new Event('pointerlockchange'));
+      // The system cursor hides under the lock; a stand-in stays at the press point.
+      const held = document.querySelector<HTMLElement>('[data-testid="held-cursor"]');
+      expect(held?.style.left).toBe('100px');
+      expect(held?.style.top).toBe('100px');
       const alphaBefore = camera.alpha;
       // Locked: the cursor position stays put and only movementX turns.
       pointer('pointermove', { clientX: 100, movementX: 60 });
       expect(camera.alpha).toBeLessThan(alphaBefore);
       pointer('pointerup', { clientX: 100 });
       expect(exitPointerLock).toHaveBeenCalledTimes(1);
+      lockedElement = null;
+      document.dispatchEvent(new Event('pointerlockchange'));
+      expect(document.querySelector('[data-testid="held-cursor"]')).toBeNull();
     } finally {
       scene.dispose();
       canvas.remove();

@@ -151,7 +151,8 @@
   "gamesPage": {
     "eyebrow": "OmniGame",
     "title": "Games",
-    "viewGame": "View game"
+    "viewGame": "View game",
+    "playGame": "Play game"
   },
   "gameDetailPage": {
     "eyebrow": "OmniGame / OmniRave",
