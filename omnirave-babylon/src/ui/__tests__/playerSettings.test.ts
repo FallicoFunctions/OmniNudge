@@ -64,13 +64,13 @@ describe('playerSettings', () => {
   it('round-trips settings through the guest-scoped store', () => {
     const storage = createMemoryStorage();
     savePlayerSettings(
-      { ...DEFAULT_PLAYER_SETTINGS, uiTheme: 'hybrid-premium', graphicsAuto: false, graphicsLevel: 8 },
+      { ...DEFAULT_PLAYER_SETTINGS, uiTheme: 'midnight-gold', graphicsAuto: false, graphicsLevel: 8 },
       storage,
     );
 
     expect(storage.getItem(PLAYER_SETTINGS_STORAGE_KEY) !== null).toBe(true);
     const loaded = loadPlayerSettings(storage);
-    expect(loaded.uiTheme).toBe('hybrid-premium');
+    expect(loaded.uiTheme).toBe('midnight-gold');
     expect(loaded.graphicsAuto).toBe(false);
     expect(loaded.graphicsLevel).toBe(8);
   });

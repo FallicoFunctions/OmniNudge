@@ -28,10 +28,10 @@ const THEME_TOKENS = [
 describe('uiTheme', () => {
   it('offers exactly the three spec themes and defaults to Luminous Panels', () => {
     expect(UI_THEMES.map((theme) => theme.id).join(',')).toBe(
-      'obsidian-glass,luminous-panels,hybrid-premium',
+      'obsidian-glass,luminous-panels,midnight-gold',
     );
     expect(UI_THEMES.map((theme) => theme.label).join(',')).toBe(
-      'Obsidian Glass,Luminous Panels,Hybrid Premium',
+      'Obsidian Glass,Luminous Panels,Midnight Gold',
     );
     expect(DEFAULT_UI_THEME).toBe('luminous-panels');
   });
@@ -41,7 +41,7 @@ describe('uiTheme', () => {
     expect(isUiThemeId('neon-slabs')).toBe(false);
     expect(resolveUiThemeId('neon-slabs')).toBe('luminous-panels');
     expect(resolveUiThemeId(undefined)).toBe('luminous-panels');
-    expect(resolveUiThemeId('hybrid-premium')).toBe('hybrid-premium');
+    expect(resolveUiThemeId('midnight-gold')).toBe('midnight-gold');
   });
 
   it('applies a theme immediately as one dataset write on the root', () => {
@@ -51,9 +51,9 @@ describe('uiTheme', () => {
     expect(host.dataset.uiTheme).toBe('obsidian-glass');
     expect(readAppliedUiTheme(host)).toBe('obsidian-glass');
 
-    applyUiTheme(host, 'hybrid-premium');
-    expect(host.dataset.uiTheme).toBe('hybrid-premium');
-    expect(readAppliedUiTheme(host)).toBe('hybrid-premium');
+    applyUiTheme(host, 'midnight-gold');
+    expect(host.dataset.uiTheme).toBe('midnight-gold');
+    expect(readAppliedUiTheme(host)).toBe('midnight-gold');
   });
 
   it('falls back to the default theme for an unknown applied value', () => {

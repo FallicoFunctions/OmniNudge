@@ -1,7 +1,7 @@
 // Core HUD theme system (design doc sec 9.5).
 //
-// Three themes - `Obsidian Glass`, `Luminous Panels` (default), `Hybrid
-// Premium` - implemented as CSS custom properties scoped to a root class
+// Three themes - `Obsidian Glass`, `Luminous Panels` (default), `Midnight
+// Gold` - implemented as CSS custom properties scoped to a root class
 // (`[data-ui-theme="..."]` on the runtime host). Switching a theme therefore
 // costs ONE dataset write: every HUD surface below the host reads the same
 // token set (`--hud-panel-bg`, `--hud-border`, `--hud-text`, `--hud-text-muted`,
@@ -14,7 +14,7 @@
 //
 // Pure DOM: no Babylon imports, safe under jsdom.
 
-export type UiThemeId = 'obsidian-glass' | 'luminous-panels' | 'hybrid-premium';
+export type UiThemeId = 'obsidian-glass' | 'luminous-panels' | 'midnight-gold';
 
 export interface UiThemeOption {
   id: UiThemeId;
@@ -24,7 +24,7 @@ export interface UiThemeOption {
 export const UI_THEMES: readonly UiThemeOption[] = [
   { id: 'obsidian-glass', label: 'Obsidian Glass' },
   { id: 'luminous-panels', label: 'Luminous Panels' },
-  { id: 'hybrid-premium', label: 'Hybrid Premium' },
+  { id: 'midnight-gold', label: 'Midnight Gold' },
 ];
 
 export const DEFAULT_UI_THEME: UiThemeId = 'luminous-panels';

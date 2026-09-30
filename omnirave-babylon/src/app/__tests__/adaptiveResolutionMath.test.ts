@@ -11,25 +11,25 @@ import {
 const cfg = ADAPTIVE_RESOLUTION_DEFAULTS;
 
 describe('resolveManualHardwareScalingLevel', () => {
-  it('maps the settings slider 1..10 across the controller bounds', () => {
-    expect(resolveManualHardwareScalingLevel(1, cfg)).toBeCloseTo(cfg.sharpestLevel);
-    expect(resolveManualHardwareScalingLevel(10, cfg)).toBeCloseTo(cfg.coarsestLevel);
-    // Linear, inclusive: step 4 sits three ninths along the range.
-    expect(resolveManualHardwareScalingLevel(4, cfg)).toBeCloseTo(
+  it('maps the settings slider 1 (lowest detail) .. 10 (highest) across the controller bounds', () => {
+    expect(resolveManualHardwareScalingLevel(1, cfg)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(10, cfg)).toBeCloseTo(cfg.sharpestLevel);
+    // Linear, inclusive: step 7 sits three ninths along the range from the top.
+    expect(resolveManualHardwareScalingLevel(7, cfg)).toBeCloseTo(
       cfg.sharpestLevel + (3 / 9) * (cfg.coarsestLevel - cfg.sharpestLevel),
     );
-    // Every step is strictly softer than the one before it.
+    // Every step is strictly sharper (a smaller scaling level) than the one before it.
     for (let step = 2; step <= 10; step += 1) {
       expect(
-        resolveManualHardwareScalingLevel(step, cfg) > resolveManualHardwareScalingLevel(step - 1, cfg),
+        resolveManualHardwareScalingLevel(step, cfg) < resolveManualHardwareScalingLevel(step - 1, cfg),
       ).toBe(true);
     }
   });
 
   it('clamps out-of-range and non-finite slider values', () => {
-    expect(resolveManualHardwareScalingLevel(0, cfg)).toBeCloseTo(cfg.sharpestLevel);
-    expect(resolveManualHardwareScalingLevel(-5, cfg)).toBeCloseTo(cfg.sharpestLevel);
-    expect(resolveManualHardwareScalingLevel(42, cfg)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(0, cfg)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(-5, cfg)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(42, cfg)).toBeCloseTo(cfg.sharpestLevel);
     expect(resolveManualHardwareScalingLevel(Number.NaN, cfg)).toBeCloseTo(cfg.sharpestLevel);
     expect(resolveManualHardwareScalingLevel(6.4, cfg)).toBeCloseTo(
       resolveManualHardwareScalingLevel(6, cfg),
@@ -37,8 +37,8 @@ describe('resolveManualHardwareScalingLevel', () => {
   });
 
   it('defaults to the shipped controller config', () => {
-    expect(resolveManualHardwareScalingLevel(1)).toBeCloseTo(cfg.sharpestLevel);
-    expect(resolveManualHardwareScalingLevel(10)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(1)).toBeCloseTo(cfg.coarsestLevel);
+    expect(resolveManualHardwareScalingLevel(10)).toBeCloseTo(cfg.sharpestLevel);
   });
 });
 

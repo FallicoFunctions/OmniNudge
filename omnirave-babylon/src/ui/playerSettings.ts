@@ -21,7 +21,7 @@ export interface PlayerSettings {
   uiTheme: UiThemeId;
   cameraFollow: CameraFollowMode;
   graphicsAuto: boolean;
-  /** 1 (sharpest) .. 10 (softest); only honoured while graphicsAuto is false. */
+  /** 1 (lowest detail) .. 10 (highest); only honoured while graphicsAuto is false. */
   graphicsLevel: number;
   displayNames: boolean;
   crouchMode: CrouchMode;
@@ -42,7 +42,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   // Sec 7: default camera mode is Free Camera; Auto-Follow is opt-in.
   cameraFollow: 'free',
   graphicsAuto: true,
-  graphicsLevel: 5,
+  graphicsLevel: 6,
   displayNames: true,
   crouchMode: 'hold',
   chatOpen: true,

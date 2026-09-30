@@ -119,7 +119,7 @@ describe('createSettingsPopup', () => {
 
     expect(select.value).toBe('luminous-panels');
     expect(Array.from(select.options).map((option) => option.value).join(',')).toBe(
-      'obsidian-glass,luminous-panels,hybrid-premium',
+      'obsidian-glass,luminous-panels,midnight-gold',
     );
 
     select.value = 'obsidian-glass';
@@ -185,7 +185,7 @@ describe('createSettingsPopup', () => {
     const { control, segment } = setup({
       settings: {
         ...DEFAULT_PLAYER_SETTINGS,
-        uiTheme: 'hybrid-premium',
+        uiTheme: 'midnight-gold',
         cameraFollow: 'free',
         graphicsAuto: false,
         graphicsLevel: 7,
@@ -194,7 +194,7 @@ describe('createSettingsPopup', () => {
       },
     });
 
-    expect(control<HTMLSelectElement>('ui-theme').value).toBe('hybrid-premium');
+    expect(control<HTMLSelectElement>('ui-theme').value).toBe('midnight-gold');
     expect(segment('camera-follow', 'free').getAttribute('aria-pressed')).toBe('true');
     expect(segment('crouch-mode', 'toggle').getAttribute('aria-pressed')).toBe('true');
     expect(control<HTMLInputElement>('graphics-auto').checked).toBe(false);

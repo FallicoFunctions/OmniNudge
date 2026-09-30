@@ -58,7 +58,7 @@ body,
   --hud-radius: 12px;
 }
 
-.babylon-runtime-host[data-ui-theme="hybrid-premium"] {
+.babylon-runtime-host[data-ui-theme="midnight-gold"] {
   --hud-panel-bg: linear-gradient(145deg, rgba(8, 14, 26, 0.86), rgba(24, 18, 10, 0.72));
   --hud-panel-border: rgba(236, 193, 93, 0.45);
   --hud-text: #fff8df;
