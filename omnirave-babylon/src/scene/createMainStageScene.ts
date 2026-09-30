@@ -69,6 +69,15 @@ const POINTER_CAMERA_PITCH_SENSITIVITY = 0.0045;
 // avatar, so walking recenters the camera within a few steps.
 const FOCUS_SETTLE_STRENGTH = 0.06;
 
+// The V65 arrival trim (threshold gold bands and shadow grooves, runway
+// pearl/gold/cyan bands) is a set of serrated ridges up to 0.3 m tall,
+// authored for ground that was never built. The V151 approach deck and stair
+// now fill that space, so each ridge is buried except for its tooth tips,
+// which showed above every stair tread as jagged tan and dark bands
+// (player-flagged as "blurry shadows"). Hidden, like the mannequins below:
+// the trim has no collision and nothing else reads it.
+export const BURIED_ARRIVAL_TRIM_PATTERN = /V65_Arrival(Threshold|Runway)/;
+
 export async function createMainStageScene(engine: AbstractEngine, launchCharacter: 'male' | 'female' = 'male') {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.02, 0.03, 0.06, 1);
@@ -146,7 +155,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   // hiding them is the whole fix.
   const MANNEQUIN_PATTERN = /V32_Crowd(Cluster|WearableGlow)_/;
   for (const mesh of scene.meshes) {
-    if (MANNEQUIN_PATTERN.test(mesh.name)) {
+    if (MANNEQUIN_PATTERN.test(mesh.name) || BURIED_ARRIVAL_TRIM_PATTERN.test(mesh.name)) {
       mesh.setEnabled(false);
     }
   }
