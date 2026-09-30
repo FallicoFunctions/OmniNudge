@@ -91,6 +91,65 @@ describe('createTrackBeats', () => {
     expect(out.energy).toBeLessThan(0.6);
   });
 
+  describe('build-ups', () => {
+    // A track: full music to 30 s, a quiet break with no hits, then (from
+    // `buildFrom`) snares and hats that get denser and louder into a drop at
+    // 90 s, and full music again after it.
+    function track(buildFrom: number | null) {
+      const full = (t: number) => t < 30 || t >= 90;
+      const rising = (t: number) => buildFrom !== null && t >= buildFrom && t < 90;
+      const power = Array.from({ length: 480 }, (_, block) => {
+        const t = block * 0.25;
+        if (full(t)) return 0.1;
+        if (rising(t)) return 0.002 * Math.pow(50, (t - buildFrom!) / (90 - buildFrom!));
+        return 0.002;
+      });
+      const kicks: Hit[] = [];
+      for (let t = 0; t < 120; t += 0.5) if (full(t)) kicks.push([t, 1]);
+      const snares: Hit[] = [];
+      for (let t = 0; t < 120; t += 0.1) {
+        if (full(t) && Math.round(t * 10) % 5 === 0) snares.push([t, 0.8]);
+        // The roll: a hit every 0.1 s, getting stronger toward the drop.
+        else if (rising(t)) snares.push([t, 0.3 + 0.7 * ((t - buildFrom!) / (90 - buildFrom!))]);
+      }
+      return beatsFile(kicks, snares, [], power);
+    }
+
+    async function progressAt(buildFrom: number | null, times: number[]) {
+      const fetchImpl = vi.fn(async () => new Response(track(buildFrom).slice(), { status: 200 }));
+      const beats = createTrackBeats({ fetchImpl });
+      const out = createStageBeat();
+      beats.read('set', 0, 1, out);
+      await settle();
+      return times.map((t) => {
+        beats.read('set', t, t, out);
+        return out.buildUp;
+      });
+    }
+
+    it('measures a long build-up from the bottom of the break to the drop', async () => {
+      const [inBreak, early, half, late, after] = await progressAt(60, [50, 62, 75, 88, 95]);
+      expect(inBreak).toBe(0);
+      expect(early).toBeGreaterThan(0);
+      expect(early).toBeLessThan(0.2);
+      expect(half).toBeGreaterThan(0.35);
+      expect(half).toBeLessThan(0.65);
+      expect(late).toBeGreaterThan(0.85);
+      expect(after).toBe(0); // the drop ends it
+    });
+
+    it('measures a short snare roll just as well', async () => {
+      const [before, during] = await progressAt(86, [80, 88.5]);
+      expect(before).toBe(0);
+      expect(during).toBeGreaterThan(0.3);
+    });
+
+    it('finds none when the break stays flat up to the drop', async () => {
+      const progress = await progressAt(null, [40, 60, 80, 89]);
+      expect(progress).toEqual([0, 0, 0, 0]);
+    });
+  });
+
   it('marks the first kick after a passage with no kick as a drop, when steady kicks follow', async () => {
     const { read } = await loaded();
     expect(read(0.9, 1).drop).toBe(false); // the first kick of the track is not a drop

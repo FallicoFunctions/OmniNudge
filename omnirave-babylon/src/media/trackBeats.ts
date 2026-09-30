@@ -46,6 +46,28 @@ const ENERGY_HALF_WINDOW = 2;
 const ENERGY_STEP_SECONDS = LOUDNESS_BLOCK_SECONDS;
 const ENERGY_BAND_WEIGHTS = [1, 0.5, 0.5];
 const ENERGY_HIT_WEIGHT = 0.5;
+// Build-up: the part before a drop where the music keeps rising into it
+// (snare rolls, risers), from 4 s to over a minute long. Found per drop:
+//   1. A rise level: snare and hat hits within 1 s each side, and loudness,
+//      each placed between their own 5th and 95th percentile over the (up
+//      to) BUILD_LOOKBACK_SECONDS before the drop, averaged, then smoothed
+//      over 2 s (the peak) and over 6 s (the bottom).
+//   2. Walking back from the drop, down through the build-up to the bottom
+//      of the break: the break starts where the music (6 s level) is full
+//      again, BUILD_FULL_LEVEL or more and BUILD_FULL_RISE above the lowest
+//      level passed. (The end of a build-up is loud too, so "the last time
+//      the music was full" would land inside the build-up.)
+//   3. The build-up starts at the last moment the music is at the bottom
+//      of that break (within BUILD_BOTTOM_TOLERANCE of its lowest level).
+//   4. It counts only when the music then rises by BUILD_MIN_RISE up to the
+//      last 4 s before the drop, over at least BUILD_MIN_SECONDS; otherwise
+//      the drop has no build-up.
+const BUILD_LOOKBACK_SECONDS = 120;
+const BUILD_BOTTOM_TOLERANCE = 0.05;
+const BUILD_MIN_RISE = 0.2;
+const BUILD_MIN_SECONDS = 2;
+const BUILD_FULL_LEVEL = 0.6;
+const BUILD_FULL_RISE = 0.4;
 
 /** What the lights heard in one frame. Reused objects; read, do not keep. */
 export interface StageBeat {
@@ -63,10 +85,13 @@ export interface StageBeat {
   // How much is going on in the music around now, 0 (breakdown) to 1 (drop),
   // relative to the rest of the track.
   energy: number;
+  // Progress through a build-up into a drop: 0 at its start, rising to 1 at
+  // the drop; 0 outside a build-up.
+  buildUp: number;
 }
 
 export function createStageBeat(): StageBeat {
-  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0 };
+  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0 };
 }
 
 export interface TrackBeats {
@@ -93,6 +118,9 @@ export interface ParsedBeats {
   kickSeconds: Float32Array;
   kickIsDrop: Uint8Array;
   energy: Float32Array;
+  // Each drop with a build-up: its time, and when its build-up starts.
+  buildDrops: Float32Array;
+  buildStarts: Float32Array;
 }
 
 export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
@@ -134,7 +162,91 @@ export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
     const following = firstAfter(kickSeconds, kicks[i] + DROP_CHECK_SECONDS) - (i + 1);
     if (following >= DROP_KICKS_AFTER) kickIsDrop[i] = 1;
   }
-  return { bands, kickSeconds, kickIsDrop, energy: energyCurve(bands, power) };
+  const dropSeconds = kicks.filter((_, i) => kickIsDrop[i] === 1);
+  const builds = buildUps(bands, power, dropSeconds);
+  return { bands, kickSeconds, kickIsDrop, energy: energyCurve(bands, power), ...builds };
+}
+
+// Centred moving average over `width` steps.
+function smooth(values: Float32Array, width: number): Float32Array {
+  const sum = new Float64Array(values.length + 1);
+  for (let i = 0; i < values.length; i += 1) sum[i + 1] = sum[i] + values[i];
+  const half = Math.floor(width / 2);
+  return values.map((_, i) => {
+    const from = Math.max(0, i - half);
+    const to = Math.min(values.length, i + half + 1);
+    return (sum[to] - sum[from]) / (to - from);
+  });
+}
+
+function percentile(values: Float32Array, q: number): number {
+  const sorted = Float32Array.from(values).sort();
+  return sorted.length ? sorted[Math.floor(q * (sorted.length - 1))] : 0;
+}
+
+function buildUps(bands: Band[], power: Float32Array, dropSeconds: number[]) {
+  const starts: number[] = [];
+  const drops: number[] = [];
+  const steps = power.length;
+  if (!steps) return { buildDrops: new Float32Array(), buildStarts: new Float32Array() };
+  const step = LOUDNESS_BLOCK_SECONDS;
+  // Snare and hat hits within 1 s each side, and loudness (dB) over 2 s.
+  const busy = new Float32Array(steps);
+  for (const band of [bands[1], bands[2]]) {
+    const sum = new Float64Array(band.strength.length + 1);
+    for (let i = 0; i < band.strength.length; i += 1) sum[i + 1] = sum[i] + band.strength[i];
+    for (let i = 0; i < steps; i += 1) {
+      busy[i] += sum[firstAfter(band.seconds, i * step + 1)] - sum[firstAfter(band.seconds, i * step - 1)];
+    }
+  }
+  const powerSum = new Float64Array(steps + 1);
+  for (let i = 0; i < steps; i += 1) powerSum[i + 1] = powerSum[i] + power[i];
+  const loud = new Float32Array(steps).map((_, i) => {
+    const from = Math.max(0, i - 4);
+    const to = Math.min(steps, i + 4);
+    return 10 * Math.log10((powerSum[to] - powerSum[from]) / Math.max(1, to - from) + 1e-12);
+  });
+
+  let previousDrop = 0;
+  for (const drop of dropSeconds) {
+    const regionStart = Math.floor(Math.max(previousDrop, drop - BUILD_LOOKBACK_SECONDS) / step);
+    const regionEnd = Math.min(steps, Math.floor((drop - 0.3) / step));
+    previousDrop = drop;
+    if (regionEnd - regionStart < 8 / step) continue;
+    const place = (values: Float32Array) => {
+      const region = values.subarray(regionStart, regionEnd);
+      const low = percentile(region, 0.05);
+      const span = Math.max(percentile(region, 0.95) - low, 1e-9);
+      return region.map((value) => Math.min(1, Math.max(0, (value - low) / span)));
+    };
+    const busyLevel = place(busy);
+    const loudLevel = place(loud);
+    const level = busyLevel.map((value, i) => 0.5 * value + 0.5 * loudLevel[i]);
+    const peakLevel = smooth(level, Math.round(2 / step));
+    const bottomLevel = smooth(level, Math.round(6 / step));
+    // In region steps from here on.
+    const at = (seconds: number) => Math.min(level.length, Math.max(0, Math.floor(seconds / step) - regionStart));
+    let peak = 0;
+    for (let i = at(drop - 4); i < level.length; i += 1) peak = Math.max(peak, peakLevel[i]);
+    const breakEnd = at(drop - 1);
+    let breakStart = 0;
+    let bottom = Infinity;
+    for (let i = breakEnd - 1; i >= 0; i -= 1) {
+      if (bottomLevel[i] >= BUILD_FULL_LEVEL && bottomLevel[i] >= bottom + BUILD_FULL_RISE) {
+        breakStart = i;
+        break;
+      }
+      bottom = Math.min(bottom, bottomLevel[i]);
+    }
+    if (breakEnd <= breakStart || !Number.isFinite(bottom)) continue;
+    let start = breakStart;
+    for (let i = breakStart; i < breakEnd; i += 1) if (bottomLevel[i] <= bottom + BUILD_BOTTOM_TOLERANCE) start = i;
+    const startSeconds = (regionStart + start) * step;
+    if (peak - bottomLevel[start] < BUILD_MIN_RISE || drop - startSeconds < BUILD_MIN_SECONDS) continue;
+    drops.push(drop);
+    starts.push(startSeconds);
+  }
+  return { buildDrops: Float32Array.from(drops), buildStarts: Float32Array.from(starts) };
 }
 
 // Values placed between their own 10th and 90th percentile, 0..1.
@@ -268,6 +380,12 @@ export function createTrackBeats(options: TrackBeatsOptions = {}): TrackBeats {
       out.energy = beats.energy.length
         ? beats.energy[step] + (beats.energy[next] - beats.energy[step]) * Math.min(1, position - step)
         : 0;
+      const nextDrop = firstAfter(beats.buildDrops, toSeconds);
+      out.buildUp = 0;
+      if (nextDrop < beats.buildDrops.length && toSeconds >= beats.buildStarts[nextDrop]) {
+        const length = beats.buildDrops[nextDrop] - beats.buildStarts[nextDrop];
+        out.buildUp = length > 0 ? Math.min(1, (toSeconds - beats.buildStarts[nextDrop]) / length) : 0;
+      }
       return true;
     },
     dispose() {

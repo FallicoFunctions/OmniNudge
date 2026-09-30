@@ -177,6 +177,29 @@ describe('createImmersiveAudioShow', () => {
     show.dispose();
   });
 
+  it('in a build-up speeds up, lights more beams and climbs toward the sky, from the same quiet break', () => {
+    const beat = createStageBeat();
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+    const settle = (buildUp: number) => {
+      beat.energy = 0; // the break's own level
+      beat.buildUp = buildUp;
+      for (let i = 0; i < 180; i++) show.update(0.016);
+      return {
+        lit: show.laserBeamsLit, speed: show.laserSpeed, elevation: show.laserElevation,
+        brightness: show.laserIntensity, spread: show.laserSpread,
+      };
+    };
+    const pause = settle(0);
+    const nearDrop = settle(0.9);
+    expect(nearDrop.spread).toBeLessThan(pause.spread * 0.5); // gathered into a bundle
+    expect(nearDrop.speed).toBeGreaterThan(2);
+    expect(nearDrop.speed).toBeGreaterThan(pause.speed * 10);
+    expect(nearDrop.lit).toBeGreaterThan(pause.lit * 2);
+    expect(nearDrop.elevation).toBeGreaterThan(pause.elevation + 0.1);
+    expect(nearDrop.brightness).toBeGreaterThan(pause.brightness * 2);
+    show.dispose();
+  });
+
   it('keeps its own level-based detection for a track without a beat list', () => {
     let loud = false;
     const show = createImmersiveAudioShow(scene, {

@@ -77,6 +77,15 @@ const BREAK_SWEEP = 0.9;
 const BREAK_BEAMS_ON = 0.25;
 const BREAK_SPEED = 0.12;
 const DROP_SPEED = 2.1;
+// A build-up into a drop (known ahead from the beat list) has its own look:
+// the lasers speed up, gather into a tight bundle and climb toward the sky
+// until the drop, which then releases them onto the crowd.
+//   BUILD_SPEED: pattern speed at the end of the build-up (faster than a drop).
+//   BUILD_LIFT: how far (radians) the beams have climbed at the drop.
+//   BUILD_GATHER: how much of the fan's spread is gathered in at the drop.
+const BUILD_SPEED = 2.8;
+const BUILD_LIFT = 1.1;
+const BUILD_GATHER = 0.8;
 const PUNCH_DECAY_SECONDS = 0.25;
 // Fast attack (~40ms) so a kick reads instantly; decay handled by the impulse.
 const PUNCH_ATTACK_SECONDS = 0.04;
@@ -158,11 +167,13 @@ export interface ImmersiveAudioShow {
   readonly beatFlash: number;
   // Current global laser brightness scalar, for diagnostics/tests.
   readonly laserIntensity: number;
-  // Beams lit at least half way this frame, the laser pattern speed, and the
-  // mean beam elevation (radians, up is positive).
+  // Beams lit at least half way this frame, the laser pattern speed, the mean
+  // beam elevation (radians, up is positive) and the mean sideways spread of
+  // the beams from their emitter's aim (radians).
   readonly laserBeamsLit: number;
   readonly laserSpeed: number;
   readonly laserElevation: number;
+  readonly laserSpread: number;
   // A primitive sampled from the current crossfaded palette (0..1); shifts as
   // the palette cycles/crossfades over time.
   readonly currentColorR: number;
@@ -265,6 +276,7 @@ const NOOP_SHOW: ImmersiveAudioShow = {
   laserBeamsLit: 0,
   laserSpeed: 0,
   laserElevation: 0,
+  laserSpread: 0,
   currentColorR: 0,
   currentColorG: 0,
   currentColorB: 0,
@@ -566,6 +578,8 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let laserSpeedValue = 0;
   let laserElevationValue = 0;
   let elevationSum = 0;
+  let laserSpreadValue = 0;
+  let spreadSum = 0;
 
   // Exposed diagnostics (updated each frame).
   let laserIntensityValue = LASER_IDLE_INTENSITY;
@@ -749,15 +763,22 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     const patternFn = selectPattern(phraseIndex).fn;
 
     // Phase advance: mids drive the sweep speed; idle/lead_in crawl.
-    const laserSpeed = beat && !idle
+    // Build-up progress: 0 at its start (or outside one), 1 at the drop.
+    const buildUp = beat && !idle ? beat.buildUp : 0;
+    const buildRamp = buildUp * Math.sqrt(buildUp); // speeds up toward the drop
+    const energySpeed = beat && !idle
       ? Math.max(active ? 1.5 : 0, BREAK_SPEED + (DROP_SPEED - BREAK_SPEED) * energyOverall)
       : mode === 'lead_in' ? 0.12 : active ? 1.5 : idle ? 0.15 : 0.4 + motion * 1.6;
+    const laserSpeed = energySpeed + (Math.max(energySpeed, BUILD_SPEED) - energySpeed) * buildRamp;
     // Break shaping: 0 in a full drop (or with no beat list), 1 in a break.
     const breakAmount = beat && !idle ? 1 - energyOverall : 0;
-    const beamsOn = 1 - (1 - BREAK_BEAMS_ON) * breakAmount;
+    const beamsOn = 1 - (1 - BREAK_BEAMS_ON) * breakAmount * (1 - buildUp);
+    const spreadScale = 1 - BUILD_GATHER * buildUp;
+    const lift = BREAK_LIFT * breakAmount * (1 - buildUp) + BUILD_LIFT * buildUp;
     laserSpeedValue = laserSpeed;
     laserBeamsLitValue = 0;
     elevationSum = 0;
+    spreadSum = 0;
     laserPhase = advancePhase(laserPhase, dt, laserSpeed);
     const driftPhase = elapsed * (0.3 + motion * 0.6);
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
@@ -769,7 +790,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
       // With the track's energy the range is wider: dim in a breakdown,
       // full in a drop.
       laserIntensityValue = beat
-        ? ((active ? 0.8 : 0.45) + 2.2 * energyOverall + 1.5 * punchEnv) * flashMul
+        ? ((active ? 0.8 : 0.45) + 2.2 * Math.max(energyOverall, 0.8 * buildUp) + 1.5 * punchEnv) * flashMul
         : ((active ? 1.2 : 0.8) + 1.4 * energyOverall + 1.5 * punchEnv) * flashMul;
     }
 
@@ -783,18 +804,20 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
           // Base aim + pattern offset + low-amplitude organic drift + beat accent.
           const yaw =
             em.baseYaw +
-            off.yaw +
-            LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
-            BREAK_SWEEP * breakAmount * Math.sin(laserPhase * 0.35 + em.seed * 2.1 + b * 0.05) +
+            spreadScale *
+              (off.yaw +
+                LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
+                BREAK_SWEEP * breakAmount * (1 - buildUp) * Math.sin(laserPhase * 0.35 + em.seed * 2.1 + b * 0.05)) +
             0.04 * punchEnv * Math.sin(g);
           const pitch =
             em.basePitch +
-            off.pitch +
+            off.pitch * spreadScale +
             LASER_DRIFT_AMPLITUDE * organicDrift(em.seed * 1.3 + b * 0.17, driftPhase * 1.1) +
-            BREAK_LIFT * breakAmount +
+            lift +
             0.03 * punchEnv * Math.cos(g);
 
           elevationSum += pitch;
+          spreadSum += Math.abs(yaw - em.baseYaw);
           const cosy = Math.cos(yaw);
           const siny = Math.sin(yaw);
           const cosp = Math.cos(pitch);
@@ -830,6 +853,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
         }
       }
       laserElevationValue = elevationSum / BEAM_TOTAL;
+      laserSpreadValue = spreadSum / BEAM_TOTAL;
       beamMesh.thinInstanceBufferUpdated('matrix');
       beamMesh.thinInstanceBufferUpdated('color');
     }
@@ -883,6 +907,9 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     },
     get laserElevation() {
       return laserElevationValue;
+    },
+    get laserSpread() {
+      return laserSpreadValue;
     },
     get laserIntensity() {
       return laserIntensityValue;
