@@ -50,6 +50,45 @@ function source() {
   return container;
 }
 
+it('preloads a hidden template and reuses it for the first visible copy', async () => {
+  let finish!: (container: AssetContainer) => void;
+  const load = vi.spyOn(SceneLoader, 'LoadAssetContainerAsync').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const pool = createCompleteAvatarAssetPool(scene);
+  const preload = pool.preload('female');
+  await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+  const container = source();
+  finish(container);
+  await preload;
+  expect(scene.meshes).toHaveLength(0);
+  expect(scene.materials).toHaveLength(0);
+  expect(pool.stats()).toEqual({ cachedAssets: 1, activeInstances: 0 });
+  const avatar = await pool.create('female');
+  expect(load).toHaveBeenCalledTimes(1);
+  expect(avatar.meshes.some(mesh => mesh.name === 'top')).toBe(true);
+  expect(pool.stats()).toEqual({ cachedAssets: 1, activeInstances: 1 });
+  pool.dispose();
+  await expect(pool.preload('female')).rejects.toThrow('disposed');
+});
+
+it('retries a failed preload and disposes a template arriving after scene teardown', async () => {
+  let finish!: (container: AssetContainer) => void;
+  const load = vi.spyOn(SceneLoader, 'LoadAssetContainerAsync').mockRejectedValueOnce(new Error('offline'))
+    .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const pool = createCompleteAvatarAssetPool(scene);
+  await expect(pool.preload('male')).rejects.toThrow('offline');
+  const pending = pool.preload('male');
+  await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  const late = source();
+  const meshes = [...late.meshes];
+  const dispose = vi.spyOn(late, 'dispose');
+  scene.dispose();
+  finish(late);
+  await expect(pending).rejects.toThrow('disposed');
+  expect(dispose).toHaveBeenCalled();
+  expect(meshes.every(mesh => mesh.isDisposed())).toBe(true);
+  expect(pool.stats()).toEqual({ cachedAssets: 0, activeInstances: 0 });
+});
+
 it('shares one load and its immutable resources while keeping wardrobe, expressions and poses independent', async () => {
   const load = vi.spyOn(SceneLoader, 'LoadAssetContainerAsync').mockImplementation(async () => source());
   const pool = createCompleteAvatarAssetPool(scene);
@@ -192,8 +231,8 @@ it('keeps hidden source morphs on the CPU and independent visible-copy morphs in
   pool.dispose();
 });
 
-it('shares one morph upload through native pooled clones, animation, wardrobe and cleanup with prepared bounds', async () => {
-  Object.defineProperty(engine, 'isWebGPU', { get: () => true });
+it.each([false, true])('shares morph storage and prepared bounds through animation, wardrobe and cleanup (WebGPU: %s)', async isWebGPU => {
+  Object.defineProperty(engine, 'isWebGPU', { get: () => isWebGPU });
   scene.metadata = { avatarSharedMorphsExperiment: true, avatarCopyBoundsExperiment: true };
   Object.assign(engine.getCaps(), { canUseGLVertexID: true, textureFloat: true,
     maxVertexTextureImageUnits: 16, texture2DArrayMaxLayerCount: 256, maxTextureSize: 4096 });
@@ -235,8 +274,8 @@ it('shares one morph upload through native pooled clones, animation, wardrobe an
   expect(scene.meshes).toHaveLength(0); expect(scene.morphTargetManagers).toHaveLength(0);
 });
 
-it('releases the retained morph upload immediately when later source preparation fails', async () => {
-  Object.defineProperty(engine, 'isWebGPU', { get: () => true });
+it.each([false, true])('releases retained morph storage when source preparation fails (WebGPU: %s)', async isWebGPU => {
+  Object.defineProperty(engine, 'isWebGPU', { get: () => isWebGPU });
   scene.metadata = { avatarSharedMorphsExperiment: true, avatarCopyBoundsExperiment: true };
   Object.assign(engine.getCaps(), { canUseGLVertexID: true, textureFloat: true,
     maxVertexTextureImageUnits: 16, texture2DArrayMaxLayerCount: 256, maxTextureSize: 4096 });

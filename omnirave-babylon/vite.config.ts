@@ -31,6 +31,14 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2300,
     rollupOptions: {
+      output: {
+        // Babylon's internal lazy imports otherwise produce hundreds of tiny
+        // engine/shader requests. Keep the engine in one cacheable download;
+        // application screens and review tools still load independently.
+        codeSplitting: {
+          groups: [{ name: 'babylon', test: /node_modules[\\/]@babylonjs[\\/]/ }],
+        },
+      },
       // Isolated review stages ship next to the main runtime.
       input: {
         main: 'index.html',

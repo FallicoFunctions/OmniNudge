@@ -22,6 +22,7 @@ export function trimMeshLightBudget(
     (light): light is PointLight => light instanceof PointLight,
   );
   const pointLightCap = Math.max(0, Math.floor(maxPointLightsPerMesh));
+  const exclusions = new Map<PointLight, AbstractMesh[]>();
 
   let assignmentsTrimmed = 0;
   for (const mesh of scene.meshes) {
@@ -46,10 +47,17 @@ export function trimMeshLightBudget(
 
     entries.sort((a, b) => a.distanceSquared - b.distanceSquared);
     for (const { light } of entries.slice(retainedPointLights)) {
-      excludeMeshFromLight(light, mesh);
+      const meshes = exclusions.get(light) ?? [];
+      meshes.push(mesh);
+      exclusions.set(light, meshes);
       assignmentsTrimmed += 1;
     }
   }
+
+  // Keep the authored inclusion scopes intact. Removing their last entry
+  // makes a Babylon light unrestricted, and each splice rescans every mesh.
+  // Native exclusion pushes update only the affected meshes' light sources.
+  for (const [light, meshes] of exclusions) light.excludedMeshes.push(...meshes);
 
   return { assignmentsTrimmed };
 }
@@ -88,16 +96,4 @@ function distanceSquaredToBounds(mesh: AbstractMesh, light: PointLight) {
   const dy = position.y - y;
   const dz = position.z - z;
   return dx * dx + dy * dy + dz * dz;
-}
-
-function excludeMeshFromLight(light: PointLight, mesh: AbstractMesh) {
-  const includedIndex = light.includedOnlyMeshes.indexOf(mesh);
-  if (includedIndex >= 0) {
-    light.includedOnlyMeshes.splice(includedIndex, 1);
-    return;
-  }
-
-  if (!light.excludedMeshes.includes(mesh)) {
-    light.excludedMeshes.push(mesh);
-  }
 }

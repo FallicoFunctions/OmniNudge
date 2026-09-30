@@ -1,5 +1,7 @@
 import { MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
+import { InternalTexture, InternalTextureSource } from '@babylonjs/core/Materials/Textures/internalTexture.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { deduplicateMaterials } from '../deduplicateMaterials';
@@ -109,5 +111,59 @@ describe('deduplicateMaterials', () => {
     deduplicateMaterials(scene);
 
     expect(serialize).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares the same image while retaining distinct images and texture transforms without exporting pixels', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const image = new InternalTexture(engine, InternalTextureSource.Raw, true);
+    const otherImage = new InternalTexture(engine, InternalTextureSource.Raw, true);
+    const textures = [image, image, otherImage, image].map(internalTexture => {
+      const texture = new Texture(null, scene);
+      texture.name = 'same-label';
+      vi.spyOn(texture, 'getInternalTexture').mockReturnValue(internalTexture);
+      return texture;
+    });
+    textures[3].uOffset = 0.25;
+    const meshes = textures.map((texture, index) => {
+      const material = new PBRMaterial(`material-${index}`, scene);
+      material.albedoTexture = texture;
+      const serialize = material.serialize.bind(material);
+      vi.spyOn(material, 'serialize').mockImplementation(() => {
+        expect(Texture.SerializeBuffers).toBe(false);
+        expect(Texture.ForceSerializeBuffers).toBe(false);
+        return serialize();
+      });
+      const mesh = MeshBuilder.CreateBox(`mesh-${index}`, {}, scene);
+      mesh.material = material;
+      return mesh;
+    });
+    const flags = [Texture.SerializeBuffers, Texture.ForceSerializeBuffers];
+    expect(deduplicateMaterials(scene).materialsRemapped).toBe(1);
+    expect(meshes[0].material).toBe(meshes[1].material);
+    expect(meshes[0].material).not.toBe(meshes[2].material);
+    expect(meshes[0].material).not.toBe(meshes[3].material);
+    expect([Texture.SerializeBuffers, Texture.ForceSerializeBuffers]).toEqual(flags);
+    scene.dispose();
+    image.dispose(); otherImage.dispose();
+  });
+
+  it('restores serialization flags even if a material cannot serialize', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const material = new PBRMaterial('invalid', scene);
+    MeshBuilder.CreateBox('mesh', {}, scene).material = material;
+    vi.spyOn(material, 'serialize').mockImplementation(() => { throw new Error('invalid material'); });
+    const flags = [Texture.SerializeBuffers, Texture.ForceSerializeBuffers];
+    try {
+      Texture.SerializeBuffers = true;
+      Texture.ForceSerializeBuffers = true;
+      expect(() => deduplicateMaterials(scene)).toThrow('invalid material');
+      expect(Texture.SerializeBuffers).toBe(true);
+      expect(Texture.ForceSerializeBuffers).toBe(true);
+    } finally {
+      [Texture.SerializeBuffers, Texture.ForceSerializeBuffers] = flags;
+    }
+    scene.dispose();
   });
 });

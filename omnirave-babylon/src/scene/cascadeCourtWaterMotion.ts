@@ -196,29 +196,46 @@ export function createCascadeCourtWaterMotion(scene: Scene): CascadeWaterMotionS
   return summary;
 }
 
+// [freqX, freqY, amplitude, phase] - integer frequencies tile cleanly.
+export const WATER_NORMAL_WAVES: ReadonlyArray<readonly [number, number, number, number]> = [
+  [2, 3, 1.0, 0.0],
+  [5, 2, 0.55, 1.7],
+  [3, 7, 0.35, 3.9],
+  [8, 5, 0.22, 2.3],
+  [11, 9, 0.14, 5.1],
+];
+export const WATER_NORMAL_SIZE = 256;
+
 // A small tiling water-normal map, generated at load: layered integer-
 // frequency sine waves (so the texture tiles seamlessly) converted to a
 // tangent-space normal encoding. Raw pixel data keeps generation identical
 // across browser, WebGPU, WebGL, and NullEngine environments.
-function tryCreateWaterNormalData(): Uint8Array | null {
+export function tryCreateWaterNormalData(): Uint8Array | null {
   try {
-    const size = 256;
+    const size = WATER_NORMAL_SIZE;
     const height = new Float32Array(size * size);
-    const waves: Array<[number, number, number, number]> = [
-      // [freqX, freqY, amplitude, phase] - integer frequencies tile cleanly
-      [2, 3, 1.0, 0.0],
-      [5, 2, 0.55, 1.7],
-      [3, 7, 0.35, 3.9],
-      [8, 5, 0.22, 2.3],
-      [11, 9, 0.14, 5.1],
-    ];
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        let h = 0;
-        for (const [fx, fy, amp, phase] of waves) {
-          h += amp * Math.sin((2 * Math.PI * (fx * x + fy * y)) / size + phase);
-        }
-        height[y * size + x] = h;
+    // Each wave is sin(u(x) + v(y)) = sin u cos v + cos u sin v, so the sines
+    // and cosines are computed once per column and per row (about 2,500 calls)
+    // instead of once per pixel and wave (327,680). Computing them per pixel
+    // took 0.3 s in Chromium, and far longer in Safari, on every load.
+    const column = new Float64Array(size);
+    const columnCos = new Float64Array(size);
+    const row = new Float64Array(size);
+    const rowCos = new Float64Array(size);
+    for (const [fx, fy, amp, phase] of WATER_NORMAL_WAVES) {
+      for (let i = 0; i < size; i++) {
+        const u = (2 * Math.PI * fx * i) / size;
+        const v = (2 * Math.PI * fy * i) / size + phase;
+        column[i] = amp * Math.sin(u);
+        columnCos[i] = amp * Math.cos(u);
+        row[i] = Math.sin(v);
+        rowCos[i] = Math.cos(v);
+      }
+      for (let y = 0; y < size; y++) {
+        const sinV = row[y];
+        const cosV = rowCos[y];
+        const offset = y * size;
+        for (let x = 0; x < size; x++) height[offset + x] += column[x] * cosV + columnCos[x] * sinV;
       }
     }
 

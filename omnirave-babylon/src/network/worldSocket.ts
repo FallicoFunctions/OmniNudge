@@ -98,10 +98,13 @@ export interface WorldSocketOptions {
   clock?: WorldSocketClock;
   // Receives the replies to the socket's clock pings.
   serverClock?: ServerClock;
+  /** Keep only the latest world state until the scene is ready to apply it. */
+  deferSnapshots?: boolean;
 }
 
 export interface WorldSocket {
   connect: () => void;
+  resumeSnapshots: () => void;
   // Swaps the connection to a new url/token (an in-place login/signup/logout
   // identity upgrade - see createRuntime.ts's navigateToSession callers)
   // WITHOUT tearing down this instance: every onSnapshot/onChat/onStatusChange
@@ -162,6 +165,8 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   let socket: WorldSocketLike | null = null;
   let disposed = false;
   let status: WorldSocketStatus = 'closed';
+  let snapshotsDeferred = options.deferSnapshots === true;
+  let deferredSnapshot: WorldSnapshot | null = null;
 
   let reconnectAttempt = 0;
   let reconnectTimer: number | null = null;
@@ -280,9 +285,8 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
         confirmedPosition = localPlayer ? { ...localPlayer.position } : null;
         confirmedCrouched = localPlayer?.crouched === true;
         if (pendingMove && samePosition(confirmedPosition, pendingMove) && confirmedCrouched === pendingCrouched) clearPendingMove();
-        for (const callback of snapshotCallbacks) {
-          callback(snapshot);
-        }
+        if (snapshotsDeferred) deferredSnapshot = snapshot;
+        else for (const callback of snapshotCallbacks) callback(snapshot);
         break;
       }
       case 'show_result': {
@@ -341,6 +345,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
       return;
     }
 
+    deferredSnapshot = null;
     resetMovement();
     setStatus('connecting');
     const connectUrl = buildConnectUrl(currentUrl, currentToken);
@@ -357,11 +362,13 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     };
 
     nextSocket.onerror = () => {
+      deferredSnapshot = null;
       resetMovement();
       setStatus('error');
     };
 
     nextSocket.onclose = () => {
+      deferredSnapshot = null;
       stopTimeSync();
       resetMovement();
       setStatus('closed');
@@ -404,6 +411,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
 
   function dispose(): void {
     disposed = true;
+    deferredSnapshot = null;
     clearReconnectTimer();
     stopTimeSync();
 
@@ -493,6 +501,13 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
 
   return {
     connect,
+    resumeSnapshots() {
+      if (disposed || !snapshotsDeferred) return;
+      snapshotsDeferred = false;
+      const snapshot = deferredSnapshot;
+      deferredSnapshot = null;
+      if (snapshot) for (const callback of snapshotCallbacks) callback(snapshot);
+    },
     reconnect,
     renew(token) {
       currentToken = token;

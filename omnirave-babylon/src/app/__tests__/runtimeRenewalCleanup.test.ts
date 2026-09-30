@@ -14,6 +14,7 @@ it('releases the world socket, the stage player and the renewal when the boot fa
   mockShowControlRuntime();
   window.history.replaceState(null, '', '/?perf=webgl&world=ws://localhost/ws&wtoken=fixture');
   const socket = {
+    resumeSnapshots: vi.fn(), status: () => 'open',
     onSnapshot: vi.fn(), onStatusChange: vi.fn(), onChat: vi.fn(), connect: vi.fn(), dispose: vi.fn(),
     sendLoadout: vi.fn(), reconnect: vi.fn(),
   };
@@ -54,4 +55,41 @@ it('releases the world socket, the stage player and the renewal when the boot fa
   expect(socket.dispose).toHaveBeenCalledTimes(1);
   expect(player.dispose).toHaveBeenCalledTimes(1);
   expect(rigs.dispose).toHaveBeenCalledTimes(1);
+}, 20_000);
+
+it.each([false, true])('cleans up a connection opened during scene loading, including a late module (late: %s)', async lateModule => {
+  vi.resetModules();
+  mockShowControlRuntime();
+  window.history.replaceState(null, '', '/?perf=webgl&world=ws://localhost/ws&wtoken=fixture');
+  const socket = { onStatusChange: vi.fn(), connect: vi.fn(), dispose: vi.fn() };
+  const createSocket = vi.fn(() => socket);
+  let finishModule!: () => void;
+  const moduleReady = new Promise<void>(resolve => { finishModule = resolve; });
+  vi.doMock('../../network/worldSocket', async () => {
+    await moduleReady;
+    return { createWorldSocket: createSocket };
+  });
+  if (!lateModule) finishModule();
+  const stopRenewal = vi.fn();
+  vi.doMock('../../network/worldSessionRenewal', () => ({ keepWorldSessionAlive: () => stopRenewal }));
+  let failScene!: (error: Error) => void;
+  const pendingScene = new Promise((_resolve, reject) => { failScene = reject; });
+  const createScene = vi.fn(() => pendingScene);
+  vi.doMock('../../scene/createMainStageScene', () => ({ createMainStageScene: createScene }));
+  const engine = { dispose: vi.fn(), getHardwareScalingLevel: () => 1, setHardwareScalingLevel: vi.fn() };
+  vi.doMock('@babylonjs/core/Engines/engine', () => ({ Engine: vi.fn(function () { return engine; }) }));
+  const { createRuntime } = await import('../createRuntime');
+  const host = document.createElement('div');
+  const starting = createRuntime(host).catch(error => error as Error);
+  await vi.waitFor(() => expect(createScene).toHaveBeenCalledTimes(1));
+  if (!lateModule) await vi.waitFor(() => expect(socket.connect).toHaveBeenCalledTimes(1));
+  failScene(new Error('venue failed'));
+  expect((await starting as Error).message).toBe('venue failed');
+  finishModule();
+  await vi.dynamicImportSettled();
+  expect(socket.connect).toHaveBeenCalledTimes(lateModule ? 0 : 1);
+  expect(socket.dispose).toHaveBeenCalledTimes(lateModule ? 0 : 1);
+  expect(stopRenewal).toHaveBeenCalledTimes(lateModule ? 0 : 1);
+  expect(engine.dispose).toHaveBeenCalledTimes(1);
+  expect(host.children).toHaveLength(0);
 }, 20_000);

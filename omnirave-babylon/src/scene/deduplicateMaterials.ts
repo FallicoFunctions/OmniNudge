@@ -1,4 +1,5 @@
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 export interface DeduplicateMaterialsSummary {
@@ -67,11 +68,27 @@ function materialSignature(material: PBRMaterial) {
   // including BRDF, clearcoat, sheen, anisotropy, subsurface, stencil,
   // texture transforms, culling, and depth settings. Remove only instance
   // identity so visually identical clones can share one canonical material.
-  const serialized = material.serialize();
+  // A signature compares texture settings and the shared image, not an
+  // exported copy of its pixels. glTF textures otherwise re-encode their
+  // buffers (or read back the GPU) for every cloned material.
+  const serializeBuffers = Texture.SerializeBuffers;
+  const forceSerializeBuffers = Texture.ForceSerializeBuffers;
+  let serialized;
+  try {
+    Texture.SerializeBuffers = false;
+    Texture.ForceSerializeBuffers = false;
+    serialized = material.serialize();
+  } finally {
+    Texture.SerializeBuffers = serializeBuffers;
+    Texture.ForceSerializeBuffers = forceSerializeBuffers;
+  }
   delete serialized.id;
   delete serialized.name;
   delete serialized.uniqueId;
-  return JSON.stringify(serialized);
+  // Distinct images with the same URL/name must not be coalesced. Cloned
+  // Texture wrappers can still share the same underlying GPU image.
+  return JSON.stringify([serialized, material.getActiveTextures().map(texture =>
+    texture.getInternalTexture()?.uniqueId ?? `texture:${texture.uniqueId}`)]);
 }
 
 function isMaterialReferenced(scene: Scene, material: PBRMaterial) {

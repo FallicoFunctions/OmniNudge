@@ -40,9 +40,14 @@ const bounds = (mesh: Mesh) => [mesh.getBoundingInfo(), ...mesh.subMeshes.map(su
 it('matches native skinned and morphed mesh/submesh bounds under a mirrored parent', () => {
   const { container, mesh } = fixture();
   const native = mesh.clone('native', null, true)!;
+  expect(native._positions).toHaveLength(mesh.getTotalVertices());
+  mesh.refreshBoundingInfo(true, true);
+  expect(mesh._positions).toHaveLength(mesh.getTotalVertices());
   const original = mesh.clone;
   const prepared = prepareAvatarCopyBounds(container);
   const copy = mesh.clone('prepared', null, true)!;
+  expect(mesh._positions).toBeNull();
+  expect(copy._positions).toBeNull();
   expect(bounds(copy)).toEqual(bounds(native));
   expect(copy.geometry).toBe(native.geometry);
   expect(copy.getBoundingInfo()).not.toBe(native.getBoundingInfo());

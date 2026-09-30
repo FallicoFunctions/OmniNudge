@@ -15,7 +15,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
 import { MultiMaterial } from '@babylonjs/core/Materials/multiMaterial.js';
 import type { Scene } from '@babylonjs/core/scene.js';
-import '@babylonjs/loaders/glTF/index.js';
+import './registerCompleteAvatarLoader';
 import type { AvatarAnimationState } from './avatarAnimationState';
 import type { ReviewAvatar } from './createReviewAvatar';
 import { publicUrl } from '../app/publicUrl';

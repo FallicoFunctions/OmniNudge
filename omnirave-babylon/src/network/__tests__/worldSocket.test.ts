@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createWorldSocket } from '../worldSocket';
-import type { WorldSocketClock, WorldSocketLike } from '../worldSocket';
+import type { WorldSocketClock, WorldSocketLike, WorldSocketOptions } from '../worldSocket';
 
 class FakeWebSocket implements WorldSocketLike {
   sent: string[] = [];
@@ -83,7 +83,7 @@ function createFakeClock(): WorldSocketClock & {
   };
 }
 
-function setup() {
+function setup(options: Pick<WorldSocketOptions, 'deferSnapshots'> = {}) {
   const clock = createFakeClock();
   let lastSocket: FakeWebSocket | null = null;
   const sockets: FakeWebSocket[] = [];
@@ -96,6 +96,7 @@ function setup() {
   });
 
   const worldSocket = createWorldSocket({
+    ...options,
     url: 'wss://example.test/ws',
     token: 'jwt-token',
     webSocketFactory,
@@ -120,6 +121,43 @@ describe('createWorldSocket', () => {
 
   afterEach(() => {
     warnSpy.mockRestore();
+  });
+
+  it('retains only the latest startup snapshot until every scene handler is ready', () => {
+    const { worldSocket, getLastSocket } = setup({ deferSnapshots: true });
+    const early = vi.fn(), late = vi.fn();
+    worldSocket.onSnapshot(early);
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    for (let x = 1; x <= 100; x++) getLastSocket().confirmPosition(x);
+    worldSocket.onSnapshot(late);
+    expect(early).not.toHaveBeenCalled();
+    expect(late).not.toHaveBeenCalled();
+    worldSocket.resumeSnapshots();
+    worldSocket.resumeSnapshots();
+    expect(early).toHaveBeenCalledTimes(1);
+    expect(late).toHaveBeenCalledTimes(1);
+    expect(early.mock.calls[0][0].players[0].position.x).toBe(100);
+    getLastSocket().confirmPosition(101);
+    expect(early).toHaveBeenCalledTimes(2);
+    expect(early.mock.calls[1][0].players[0].position.x).toBe(101);
+    worldSocket.dispose();
+  });
+
+  it.each(['reconnect', 'close', 'error', 'dispose'] as const)('drops a held snapshot on %s', action => {
+    const { worldSocket, getLastSocket } = setup({ deferSnapshots: true });
+    const received = vi.fn();
+    worldSocket.onSnapshot(received);
+    worldSocket.connect();
+    getLastSocket().triggerOpen();
+    getLastSocket().confirmPosition(1);
+    if (action === 'reconnect') worldSocket.reconnect('wss://example.test/ws', 'new-identity');
+    else if (action === 'close') getLastSocket().triggerServerClose();
+    else if (action === 'error') getLastSocket().onerror?.(new Error('offline'));
+    else worldSocket.dispose();
+    worldSocket.resumeSnapshots();
+    expect(received).not.toHaveBeenCalled();
+    worldSocket.dispose();
   });
 
   it('connects to the token-suffixed url and reports status transitions', () => {

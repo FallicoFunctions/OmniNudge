@@ -23,6 +23,7 @@ it('waits for saved bodies, publishes character switches, and permits independen
   const statusListeners: ((status: WorldSocketStatus) => void)[] = [];
   const status = (value: WorldSocketStatus) => statusListeners.forEach(listener => listener(value));
   const socket = {
+    resumeSnapshots: vi.fn(), status: () => 'open',
     onSnapshot: (listener: typeof snapshotListeners[number]) => snapshotListeners.push(listener),
     onStatusChange: (listener: typeof statusListeners[number]) => statusListeners.push(listener),
     onChat: vi.fn(), connect: () => status('connecting'), dispose: vi.fn(),

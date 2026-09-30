@@ -33,6 +33,7 @@ async function setup(preview = false) {
   const snapshots: ((snapshot: WorldSnapshot) => void)[] = [];
   const statuses: ((status: WorldSocketStatus) => void)[] = [];
   const socket = {
+    resumeSnapshots: vi.fn(), status: () => 'open',
     onSnapshot:(listener:typeof snapshots[number]) => snapshots.push(listener),
     onStatusChange:(listener:typeof statuses[number]) => statuses.push(listener),
     onChat:vi.fn(),connect:() => statuses.forEach(listener => listener('connecting')),dispose:vi.fn(),sendLoadout:vi.fn(),

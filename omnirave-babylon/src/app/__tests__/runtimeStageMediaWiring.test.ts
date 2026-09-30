@@ -25,6 +25,7 @@ async function bootWorldPath(search: string, handoff?: { zoneMedia: unknown[] },
     }));
   }
   const socket = {
+    resumeSnapshots: vi.fn(), status: () => 'open',
     onSnapshot: vi.fn(), onStatusChange: vi.fn(), onChat: vi.fn(), connect: vi.fn(), dispose: vi.fn(),
     sendLoadout: vi.fn(), reconnect: vi.fn(),
   };

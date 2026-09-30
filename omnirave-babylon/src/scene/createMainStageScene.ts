@@ -80,17 +80,29 @@ const FOCUS_SETTLE_STRENGTH = 0.06;
 export const BURIED_ARRIVAL_TRIM_PATTERN = /V65_Arrival(Threshold|Runway)/;
 
 export async function createMainStageScene(engine: AbstractEngine, launchCharacter: 'male' | 'female' = 'male') {
+  markBootPhase('scene_start');
   const scene = new Scene(engine);
+  // No frames render until construction finishes. Material setters otherwise
+  // rescan every mesh for each change to hundreds of imported materials and
+  // lights. Invalidate once at the end, before the first rendered frame.
+  scene.blockMaterialDirtyMechanism = true;
+  try {
+    return await populateMainStageScene(scene, engine, launchCharacter);
+  } catch (error) {
+    scene.dispose();
+    throw error;
+  } finally {
+    scene.blockMaterialDirtyMechanism = false;
+  }
+}
+
+async function populateMainStageScene(scene: Scene, engine: AbstractEngine, launchCharacter: 'male' | 'female') {
   scene.clearColor = new Color4(0.02, 0.03, 0.06, 1);
   scene.collisionsEnabled = true;
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogDensity = 0.0095;
   scene.fogColor = new Color3(0.11, 0.14, 0.21);
 
-  const stageAssets = await loadMainStageAssets(scene);
-  // Boot timing inside the scene build (see app/bootTiming.ts): one mark per
-  // large step, so a slow start in a player's browser shows which step it is.
-  markBootPhase('scene_assets');
   const perfFlags = parsePerfFlags(typeof window === 'undefined' ? '' : window.location.search);
   const venuePerformanceBaseline = perfFlags.debug && typeof window !== 'undefined'
     && ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -116,8 +128,10 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     && ['localhost', '127.0.0.1'].includes(window.location.hostname)
     && new URLSearchParams(window.location.search).get('dynamicTransmission') === '1';
   scene.metadata.avatarMaterialPaletteExperiment = optimized('avatarMaterialPalette');
-  scene.metadata.avatarSharedMorphsExperiment = engine.isWebGPU && optimized('avatarSharedMorphs');
-  scene.metadata.avatarCopyBoundsExperiment = engine.isWebGPU && optimized('avatarCopyBounds');
+  // Both renderers can reuse immutable morph storage and template bounds.
+  // The storage helper checks each manager's actual texture capabilities.
+  scene.metadata.avatarSharedMorphsExperiment = optimized('avatarSharedMorphs');
+  scene.metadata.avatarCopyBoundsExperiment = optimized('avatarCopyBounds');
   scene.metadata.avatarLodReuseExperiment = engine.isWebGPU && optimized('avatarLodReuse');
   scene.metadata.avatarInstanceMorphsExperiment = localPerformanceParams.get('avatarInstanceMorphs') === '1';
   scene.metadata.avatarMaterialVariantsExperiment = localPerformanceParams.get('avatarMaterialVariants') === '1';
@@ -128,6 +142,54 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     && ['localhost', '127.0.0.1'].includes(window.location.hostname)
     && new URLSearchParams(window.location.search).get('avatarInstances') === '1';
   scene.metadata.avatarMaterialBindingsEnabled = optimized('avatarMaterialBindings');
+  const localAvatarPreview = typeof window !== 'undefined'
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const avatarPreviewParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const previewFashion = localAvatarPreview && avatarPreviewParams.get('avatarFashion') === '1';
+  const previewEditorial = localAvatarPreview
+    && !previewFashion
+    && avatarPreviewParams.get('avatarEditorial') === '1';
+  const previewLean = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && avatarPreviewParams.get('avatarLean') === '1';
+  const previewClassic = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && !previewLean
+    && avatarPreviewParams.get('avatarClassic') === '1';
+  const previewLuxury = localAvatarPreview
+    && !previewFashion
+    && !previewEditorial
+    && !previewLean
+    && !previewClassic
+    && avatarPreviewParams.get('avatarPreview') === '1';
+  const completeValue = avatarPreviewParams.get('avatarComplete');
+  const explicitComplete = localAvatarPreview && (completeValue === 'male' || completeValue === 'female')
+    ? completeValue : undefined;
+  const previewMaleV2 = localAvatarPreview
+    && avatarPreviewParams.get('avatarMaleV2') === '1';
+  const previewFemaleV2 = localAvatarPreview
+    && !previewMaleV2
+    && avatarPreviewParams.get('avatarFemaleV2') === '1';
+  const avatarPreviewLocked = Boolean(previewLuxury || previewClassic || previewLean || previewFashion
+    || previewEditorial || previewMaleV2 || previewFemaleV2);
+  const previewComplete = explicitComplete ?? (avatarPreviewLocked ? undefined : launchCharacter);
+  const localCompleteAssets = !avatarPreviewLocked && !explicitComplete
+    ? createCompleteAvatarAssetPool(scene, { sampledAnimationRate: 60 }) : null;
+  const loadLocalComplete = (character: 'male' | 'female') => localCompleteAssets
+    ? localCompleteAssets.create(character, 0)
+    : createCompleteAvatar(scene, character, { persistWardrobe: false });
+  // Fetch and decode the hidden avatar template while the venue downloads.
+  // The visible copy is created below, after the venue's material/mesh pass.
+  const avatarPreload = localCompleteAssets && previewComplete
+    ? localCompleteAssets.preload(previewComplete) : undefined;
+  // Observe failure immediately; awaiting it below still fails the boot.
+  void avatarPreload?.catch(() => {});
+  const stageAssets = await loadMainStageAssets(scene);
+  markBootPhase('scene_assets');
   if (optimized('materialBindingCache')) cacheWebGpuMaterialBindings(scene);
   if (optimized('staticPbrBindings')) cacheStaticPbrBindings(scene);
   if (optimized('lightBindingCache')) cacheWebGpuLightBindings(scene);
@@ -138,6 +200,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   // rig reads mesh positions. Draw submission was the measured frame floor.
   // Practical cores stay individual: the pool lights locate them by name.
   deduplicateMaterials(scene);
+  markBootPhase('scene_materials');
   mergeStaticMeshGroups(scene, {
     dynamicMeshes: [],
     preserveNamePatterns: [
@@ -190,46 +253,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     scene,
     new Vector3(BACK_PLAZA_SPAWN.x, BACK_PLAZA_SPAWN.y, BACK_PLAZA_SPAWN.z),
   );
-  const localAvatarPreview = typeof window !== 'undefined'
-    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const avatarPreviewParams = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams();
-  const previewFashion = localAvatarPreview && avatarPreviewParams.get('avatarFashion') === '1';
-  const previewEditorial = localAvatarPreview
-    && !previewFashion
-    && avatarPreviewParams.get('avatarEditorial') === '1';
-  const previewLean = localAvatarPreview
-    && !previewFashion
-    && !previewEditorial
-    && avatarPreviewParams.get('avatarLean') === '1';
-  const previewClassic = localAvatarPreview
-    && !previewFashion
-    && !previewEditorial
-    && !previewLean
-    && avatarPreviewParams.get('avatarClassic') === '1';
-  const previewLuxury = localAvatarPreview
-    && !previewFashion
-    && !previewEditorial
-    && !previewLean
-    && !previewClassic
-    && avatarPreviewParams.get('avatarPreview') === '1';
-  const completeValue = avatarPreviewParams.get('avatarComplete');
-  const explicitComplete = localAvatarPreview && (completeValue === 'male' || completeValue === 'female')
-    ? completeValue : undefined;
-  const previewMaleV2 = localAvatarPreview
-    && avatarPreviewParams.get('avatarMaleV2') === '1';
-  const previewFemaleV2 = localAvatarPreview
-    && !previewMaleV2
-    && avatarPreviewParams.get('avatarFemaleV2') === '1';
-  const avatarPreviewLocked = Boolean(previewLuxury || previewClassic || previewLean || previewFashion
-    || previewEditorial || previewMaleV2 || previewFemaleV2);
-  const previewComplete = explicitComplete ?? (avatarPreviewLocked ? undefined : launchCharacter);
-  const localCompleteAssets = !avatarPreviewLocked && !explicitComplete
-    ? createCompleteAvatarAssetPool(scene, { sampledAnimationRate: 60 }) : null;
-  const loadLocalComplete = (character: 'male' | 'female') => localCompleteAssets
-    ? localCompleteAssets.create(character, 0)
-    : createCompleteAvatar(scene, character, { persistWardrobe: false });
+  await avatarPreload;
   let reviewAvatar = previewComplete
     ? await loadLocalComplete(previewComplete)
     : await createReviewAvatar(scene, {
@@ -294,7 +318,9 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
 
   scene.activeCamera = cameraRig.camera;
   const presentationRig = createMainStagePresentationRig(scene, cameraRig.camera, perfFlags);
+  markBootPhase('scene_presentation');
   const productionSurfaces = createMainStageProductionSurfaces(scene);
+  markBootPhase('scene_surfaces');
 
   // The production surfaces just created 9 lit PBR materials AFTER the
   // lighting rig's own budget bump ran, so they still hold Babylon's default
@@ -328,6 +354,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     dynamicNamePatterns: [/^player-/],
     dynamicMeshes: reviewAvatar.meshes,
   });
+  markBootPhase('scene_frozen');
 
   // After the freeze: bring the cascade court's water to life (rippling
   // pools, streaming spills, breathing mist, summit spray). The module
@@ -340,6 +367,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   // unfreezes only the field's own material. (It used to scatter grass tufts
   // too; player-flagged and removed - see that module's header.)
   const festivalField = createFestivalField(scene);
+  markBootPhase('scene_landscape');
 
   // Wayfinding signs flanking the promenade: name/point to the VIP terrace,
   // cascade courts and stage so players can find them (the authored pylons
@@ -396,6 +424,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   // finale on top): beat-driven screen pulses, spill-light color sweeps, and
   // the side LED decks answering each other. Unfreezes only what it animates.
   const stageShow = createStageShow(scene);
+  markBootPhase('scene_props');
 
   // Sec 7.7 ladder: derived from the ladder mesh's own world bounding box
   // rather than hand-authored coordinates, so it can never drift out of sync

@@ -127,6 +127,7 @@ describe('createRuntime', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/');
     vi.useRealTimers();
+    vi.doUnmock('../../scene/createCrownEffects');
   });
 
   it.each(['rejection', 'timeout'] as const)('recovers from WebGPU %s with a new WebGL canvas', async failure => {
@@ -638,7 +639,7 @@ describe('createRuntime', () => {
     runtime.dispose();
   });
 
-  it('shows a loading overlay until the scene finishes booting', async () => {
+  it('keeps the loading overlay and visible timing pending until the first frame finishes', async () => {
     const engineDispose = vi.fn();
     const engineRunRenderLoop = vi.fn();
     const engineResize = vi.fn();
@@ -648,6 +649,13 @@ describe('createRuntime', () => {
       pick: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
     }>();
+    const showModuleRequested = vi.fn();
+    const deferredShowModule = createDeferredPromise<void>();
+    vi.doMock('../../scene/createCrownEffects', async importOriginal => {
+      showModuleRequested();
+      await deferredShowModule.promise;
+      return importOriginal();
+    });
 
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
@@ -665,12 +673,15 @@ describe('createRuntime', () => {
       createMainStageScene: vi.fn(() => deferredScene.promise),
     }));
 
+    const bootTiming = await import('../bootTiming');
+    const mark = vi.spyOn(bootTiming, 'markBootPhase').mockImplementation(() => {});
     const { createRuntime } = await import('../createRuntime');
     const host = document.createElement('div');
 
     const runtimePromise = createRuntime(host);
     await vi.waitFor(() => {
       expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+      expect(showModuleRequested).toHaveBeenCalledTimes(1);
     });
     expect(host.textContent).toContain('Loading Main Stage');
     expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
@@ -681,14 +692,57 @@ describe('createRuntime', () => {
       pick: vi.fn(() => null),
       render: vi.fn(),
     });
+    deferredShowModule.resolve();
 
     const runtime = await runtimePromise;
 
-    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
+    expect(mark).toHaveBeenCalledWith('render_ready');
+    expect(mark).not.toHaveBeenCalledWith('visible');
+    const renderFrame = engineRunRenderLoop.mock.calls[0][0] as () => void;
+    renderFrame();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
+    expect(mark).toHaveBeenCalledWith('visible');
+    renderFrame();
+    expect(mark.mock.calls.filter(([phase]) => phase === 'visible')).toHaveLength(1);
     expect(engineDispose).not.toHaveBeenCalled();
 
     runtime.dispose();
+    mark.mockRestore();
+  });
+
+  it('handles a preloaded module failure through normal startup cleanup', async () => {
+    const dispose = vi.fn();
+    const scene = createDeferredPromise<object>();
+    const createScene = vi.fn(() => scene.promise);
+    const moduleRequested = vi.fn();
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: constructible(() => ({
+        dispose, getHardwareScalingLevel: () => 1, setHardwareScalingLevel: vi.fn(),
+      })),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({ createMainStageScene: createScene }));
+    vi.doMock('../../scene/createCrownEffects', async () => {
+      moduleRequested();
+      throw new Error('show module download failed');
+    });
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+    const starting = createRuntime(host);
+    const rejection = starting.catch(error => error as Error);
+    await vi.waitFor(() => {
+      expect(createScene).toHaveBeenCalledTimes(1);
+      expect(moduleRequested).toHaveBeenCalledTimes(1);
+    });
+    expect(dispose).not.toHaveBeenCalled();
+    scene.resolve({ metadata: {}, getMeshByName: () => null, render: vi.fn() });
+    const error = await rejection as Error;
+    // Vitest wraps module-factory rejections; the original download error
+    // remains the cause. Real browser imports reject with the original error.
+    expect((error.cause as Error | undefined)?.message ?? error.message).toBe('show module download failed');
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(host.children).toHaveLength(0);
   });
 
   it('creates only the render canvas when the debug flag is absent', async () => {
@@ -745,7 +799,14 @@ describe('createRuntime', () => {
     // Render loop still runs and does not throw despite no HUD/overlay/panel.
     expect(engineRunRenderLoop).toHaveBeenCalledTimes(1);
     const renderFrame = engineRunRenderLoop.mock.calls[0]?.[0] as (() => void) | undefined;
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    scene.render.mockImplementationOnce(() => {
+      // Shader setup can block the first render; keep its loading state
+      // visible until render() has actually completed.
+      expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    });
     expect(() => renderFrame?.()).not.toThrow();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
 
     runtime.dispose();
   });

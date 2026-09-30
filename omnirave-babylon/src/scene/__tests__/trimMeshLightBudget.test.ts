@@ -8,7 +8,7 @@ import {
   Scene,
   Vector3,
 } from '@babylonjs/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { trimMeshLightBudget } from '../trimMeshLightBudget';
 
@@ -16,6 +16,7 @@ describe('trimMeshLightBudget', () => {
   let engine: NullEngine | undefined;
 
   afterEach(() => {
+    vi.restoreAllMocks();
     engine?.dispose();
     engine = undefined;
   });
@@ -36,8 +37,9 @@ describe('trimMeshLightBudget', () => {
 
     const summary = trimMeshLightBudget(scene, 2);
 
-    const stillIncluding = lights.filter((l) => l.includedOnlyMeshes.includes(mesh)).map((l) => l.name);
+    const stillIncluding = lights.filter((l) => l.canAffectMesh(mesh)).map((l) => l.name);
     expect(stillIncluding).toEqual(['pool-0', 'pool-1']);
+    expect(mesh.lightSources).toEqual(lights.slice(0, 2));
     expect(summary.assignmentsTrimmed).toBe(3);
   });
 
@@ -79,7 +81,7 @@ describe('trimMeshLightBudget', () => {
 
     const summary = trimMeshLightBudget(scene, 6);
 
-    expect(lights.filter((light) => light.includedOnlyMeshes.includes(mesh))).toEqual([
+    expect(lights.filter((light) => light.canAffectMesh(mesh))).toEqual([
       lights[0],
       lights[1],
     ]);
@@ -104,7 +106,45 @@ describe('trimMeshLightBudget', () => {
 
     trimMeshLightBudget(scene, 1);
 
-    expect(aboveCenter.includedOnlyMeshes).not.toContain(mesh);
-    expect(besideEdge.includedOnlyMeshes).toContain(mesh);
+    expect(aboveCenter.canAffectMesh(mesh)).toBe(false);
+    expect(besideEdge.canAffectMesh(mesh)).toBe(true);
+    expect(mesh.lightSources).toEqual([besideEdge]);
+  });
+
+  it('keeps a fully trimmed scoped light away from existing and newly created meshes', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const scoped = MeshBuilder.CreateBox('scoped', {}, scene);
+    const outside = MeshBuilder.CreateBox('outside', {}, scene);
+    const light = new PointLight('scoped-light', Vector3.Up(), scene);
+    light.includedOnlyMeshes = [scoped];
+
+    expect(trimMeshLightBudget(scene, 0).assignmentsTrimmed).toBe(1);
+    const later = MeshBuilder.CreateBox('later', {}, scene);
+    for (const mesh of [scoped, outside, later]) {
+      expect(light.canAffectMesh(mesh)).toBe(false);
+      expect(mesh.lightSources).not.toContain(light);
+    }
+    expect(trimMeshLightBudget(scene, 0).assignmentsTrimmed).toBe(0);
+  });
+
+  it('updates each trimmed assignment without repeatedly rescanning the scene', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const meshes = Array.from({ length: 60 }, (_, i) => MeshBuilder.CreateBox(`prop-${i}`, {}, scene));
+    const nearest = new PointLight('nearest', Vector3.Zero(), scene);
+    const scoped = new PointLight('scoped', new Vector3(10, 0, 0), scene);
+    const unscoped = new PointLight('unscoped', new Vector3(20, 0, 0), scene);
+    scoped.includedOnlyMeshes = [...meshes];
+    unscoped.excludedMeshes = [meshes[0]];
+    const rescans = [nearest, scoped, unscoped].map(light => vi.spyOn(light, '_resyncMeshes'));
+    const meshUpdates = meshes.map(mesh => vi.spyOn(mesh, '_resyncLightSource'));
+
+    expect(trimMeshLightBudget(scene, 1).assignmentsTrimmed).toBe(119);
+    expect(rescans.every(spy => spy.mock.calls.length === 0)).toBe(true);
+    expect(meshUpdates.reduce((count, spy) => count + spy.mock.calls.length, 0)).toBe(119);
+    for (const mesh of meshes) expect(mesh.lightSources).toEqual([nearest]);
+    expect(trimMeshLightBudget(scene, 1).assignmentsTrimmed).toBe(0);
+    expect(unscoped.excludedMeshes).toHaveLength(60);
   });
 });

@@ -31,7 +31,13 @@ export function prepareAvatarCopyBounds(container: AssetContainer) {
       || source.skeleton.needInitialSkinMatrix || source.getBoundingInfo().isLocked) continue;
     // The container's clips are stopped and their joint nodes never animate;
     // every visible copy gets its own skeleton after this native clone step.
-    source.refreshBoundingInfo(true, true);
+    // Bounds need the skinned coordinates, not Babylon's separate per-vertex
+    // Vector3 cache used by picking/collision. Hidden templates never use that
+    // cache; allocating it here creates hundreds of thousands of objects.
+    source.refreshBoundingInfo({ applySkeleton: true, applyMorph: true, updatePositionsArray: false });
+    // Import/mesh batching may already have populated the same unused cache.
+    // Babylon recreates it if a later caller explicitly requests point data.
+    source._internalAbstractMeshDataInfo._positions = null;
     const prepared = { bounds: copyBounds(source.getBoundingInfo()),
       subBounds: source.subMeshes.map(sub => copyBounds(sub.getBoundingInfo())),
       geometry: source.geometry, skeleton: source.skeleton, morphs: source.morphTargetManager };

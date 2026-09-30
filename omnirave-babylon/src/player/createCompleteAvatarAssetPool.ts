@@ -15,6 +15,7 @@ import { createAvatarInstanceRenderer } from './createAvatarInstanceRenderer';
 import { shareAvatarMorphTargetBuffers } from './shareAvatarMorphTargetBuffers';
 import { prepareAvatarCopyBounds } from './prepareAvatarCopyBounds';
 import { publicUrl } from '../app/publicUrl';
+import { markBootPhase } from '../app/bootTiming';
 
 /** One immutable source per character/detail, with independent rigged copies. */
 export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAnimationRate?: number; crowd?: boolean } = {}) {
@@ -67,7 +68,11 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
     const file = completeAvatarAssetName(character, detail);
     let pending = sources.get(file);
     if (!pending) {
-      pending = loadCompleteAvatarSource(file).then(source => SceneLoader.LoadAssetContainerAsync(publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb')).then(container => {
+      pending = loadCompleteAvatarSource(file).then(source => {
+        if (!options.crowd && detail === 0) markBootPhase('avatar_downloaded');
+        return SceneLoader.LoadAssetContainerAsync(publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb');
+      }).then(container => {
+        if (!options.crowd && detail === 0) markBootPhase('avatar_imported');
         const stores: ReturnType<typeof shareAvatarMorphTargetBuffers>[] = [];
         let bounds: ReturnType<typeof prepareAvatarCopyBounds> | undefined;
         try {
@@ -80,16 +85,19 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
           packCompleteAvatarMaterials(container);
           if (!scene.metadata?.avatarBatchingBaseline) batchCompleteAvatarMeshes(container,
             { combineMaterials: scene.metadata?.avatarMultiMaterialBatchExperiment === true });
+          if (!options.crowd && detail === 0) markBootPhase('avatar_batched');
           interleaveCompleteAvatarVertexBuffers(scene, container.meshes);
           for (const material of container.materials) shaders?.watch(material);
           for (const group of container.animationGroups) group.stop();
-          if (scene.getEngine().isWebGPU && scene.metadata?.avatarSharedMorphsExperiment) {
+          if (scene.metadata?.avatarSharedMorphsExperiment) {
             for (const manager of container.morphTargetManagers) stores.push(shareAvatarMorphTargetBuffers(scene, manager));
           }
           // Hidden templates need the CPU targets for cloning, but never draw.
-          // Release their GPU morph textures; each visible copy owns its pose.
+          // Release the template's texture wrapper. Shared storage retains one
+          // native upload while every visible copy owns its independent pose.
           for (const manager of container.morphTargetManagers) manager.useTextureToStoreTargets = false;
           if (scene.metadata?.avatarCopyBoundsExperiment) bounds = prepareAvatarCopyBounds(container);
+          if (!options.crowd && detail === 0) markBootPhase('avatar_prepared');
           sharedMorphStores.push(...stores);
           if (bounds) preparedBounds.push(bounds);
           loaded.add(container);
@@ -109,7 +117,9 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
   function buildCopy(container: AssetContainer, character: 'male' | 'female', detail: CompleteAvatarDetail): ReviewAvatar {
     const profile = scene.metadata?.avatarCopyProfile;
     const start = profile ? performance.now() : 0;
+    if (!options.crowd && detail === 0) markBootPhase('avatar_copy_started');
     const model = container.instantiateModelsToScene(name => name, false, { doNotInstantiate: true });
+    if (!options.crowd && detail === 0) markBootPhase('avatar_instantiated');
     const instantiated = profile ? performance.now() : 0;
     const meshes = model.rootNodes.flatMap(root => [
       ...(root instanceof AbstractMesh ? [root] : []), ...root.getChildMeshes(),
@@ -146,6 +156,11 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
   }
 
   const pool = {
+    /** Load only the hidden template; no player copy enters the scene yet. */
+    async preload(character: 'male' | 'female', detail: CompleteAvatarDetail = 0): Promise<void> {
+      if (disposed) throw new Error('Avatar asset pool has been disposed.');
+      await source(character, detail);
+    },
     async create(character: 'male' | 'female', detail: CompleteAvatarDetail = 0, isCurrent?: () => boolean): Promise<ReviewAvatar> {
       if (disposed) throw new Error('Avatar asset pool has been disposed.');
       if (isCurrent && !isCurrent()) throw new Error('Avatar copy request is no longer current.');

@@ -164,3 +164,43 @@ describe('createCascadeCourtWaterMotion', () => {
     expect(() => scene.render()).not.toThrow();
   });
 });
+
+describe('water normal data', () => {
+  it('matches the per-pixel sine sum it replaces, byte for byte within one step', async () => {
+    const { tryCreateWaterNormalData, WATER_NORMAL_WAVES, WATER_NORMAL_SIZE } = await import('../cascadeCourtWaterMotion');
+    const size = WATER_NORMAL_SIZE;
+    // The original computation: one sine per pixel and wave.
+    const height = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        let h = 0;
+        for (const [fx, fy, amp, phase] of WATER_NORMAL_WAVES) h += amp * Math.sin((2 * Math.PI * (fx * x + fy * y)) / size + phase);
+        height[y * size + x] = h;
+      }
+    }
+    const expected = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = height[y * size + ((x + 1) % size)] - height[y * size + x];
+        const dy = height[((y + 1) % size) * size + x] - height[y * size + x];
+        const inverseLength = 1 / Math.hypot(dx * 2.2, dy * 2.2, 1);
+        const idx = (y * size + x) * 4;
+        expected[idx] = Math.round(((-dx * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
+        expected[idx + 1] = Math.round(((-dy * 2.2 * inverseLength) * 0.5 + 0.5) * 255);
+        expected[idx + 2] = Math.round((inverseLength * 0.5 + 0.5) * 255);
+        expected[idx + 3] = 255;
+      }
+    }
+    const data = tryCreateWaterNormalData();
+    expect(data?.length).toBe(expected.length);
+    let largest = 0;
+    let different = 0;
+    for (let i = 0; i < expected.length; i++) {
+      const diff = Math.abs(data![i] - expected[i]);
+      largest = Math.max(largest, diff);
+      if (diff) different += 1;
+    }
+    expect(largest).toBeLessThanOrEqual(1);
+    expect(different).toBeLessThan(expected.length / 1000);
+  });
+});

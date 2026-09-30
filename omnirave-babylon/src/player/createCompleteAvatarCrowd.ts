@@ -7,7 +7,7 @@ import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup.j
 import type { MorphTargetManager } from '@babylonjs/core/Morph/morphTargetManager.js';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer.js';
 import type { Scene } from '@babylonjs/core/scene.js';
-import '@babylonjs/loaders/glTF/index.js';
+import './registerCompleteAvatarLoader';
 import { prepareCompleteAvatarVertexBuffers } from './completeAvatarBuffers';
 import { createCompleteExpressionControls, type CompleteExpressionControls } from './completeAvatarExpression';
 import { completeAvatarAssetName, resolveCompleteAvatarDetail, type CompleteAvatarDetail } from './completeAvatarLod';

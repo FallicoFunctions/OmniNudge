@@ -70,6 +70,7 @@ async function loadCreateMainStageScene(
   vi.doMock('../../player/createCompleteAvatarAssetPool', async () => {
     const { createCompleteAvatar } = await import('../../player/createCompleteAvatar');
     return { createCompleteAvatarAssetPool: (scene: Scene) => ({
+      preload: async () => {},
       create: async (character: 'male' | 'female', detail: number) => {
         const avatar = await createCompleteAvatar(scene, character);
         avatar.root.metadata.avatarCompleteDetail = detail;
@@ -98,10 +99,15 @@ describe('createMainStageScene', () => {
 
   it('wires a player rig and follow camera foundation into the scene', async () => {
     engine = new NullEngine();
-    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene();
+    const { createMainStageScene, stageAssets } = await loadCreateMainStageScene(scene => {
+      expect(scene.blockMaterialDirtyMechanism).toBe(true);
+    });
 
     const scene = await createMainStageScene(engine);
 
+    expect(scene.blockMaterialDirtyMechanism).toBe(false);
+    expect(scene.metadata.avatarSharedMorphsExperiment).toBe(true);
+    expect(scene.metadata.avatarCopyBoundsExperiment).toBe(true);
     expect(scene.collisionsEnabled).toBe(true);
     expect(scene.fogDensity).toBeGreaterThanOrEqual(0.007);
     expect(scene.fogDensity).toBeLessThanOrEqual(0.0105);
@@ -151,6 +157,19 @@ describe('createMainStageScene', () => {
       expect.arrayContaining(['main-stage-hemi-light', 'main-stage-key-light']),
     );
     expect(scene.effectLayers).toHaveLength(0);
+  });
+
+  it('disposes a partially built scene and restores material invalidation after a load failure', async () => {
+    engine = new NullEngine();
+    let failedScene: Scene | undefined;
+    const { createMainStageScene } = await loadCreateMainStageScene(scene => {
+      failedScene = scene;
+      throw new Error('venue unavailable');
+    });
+    await expect(createMainStageScene(engine)).rejects.toThrow('venue unavailable');
+    expect(failedScene!.isDisposed).toBe(true);
+    expect(failedScene!.blockMaterialDirtyMechanism).toBe(false);
+    expect(engine.scenes).toHaveLength(0);
   });
 
   it('boots the saved female character without a preview query and restores older profiles into the launch pair', async () => {

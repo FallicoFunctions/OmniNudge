@@ -2,6 +2,7 @@
 // glTF barrel pulls every optional extension (FlowGraph, OpenPBR, audio, ...)
 // into the initial game chunk.
 import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/ExtrasAsMetadata.js';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_draco_mesh_compression.js';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_emissive_strength.js';
 
@@ -25,6 +26,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import { MAIN_STAGE_MANIFEST } from './mainStageManifest';
 import { polishMainStageMaterials } from './mainStageMaterialPolish';
 import { publicUrl } from '../app/publicUrl';
+import { markBootPhase } from '../app/bootTiming';
 
 // Clearcoat adds a second specular lobe evaluated per fragment. The polish
 // pass had it enabled on ~350 materials, which dominated the pixel-shader cost
@@ -54,8 +56,10 @@ export interface MainStageAssetLoadResult {
 
 export async function loadMainStageAssets(scene: Scene): Promise<MainStageAssetLoadResult> {
   const main = await SceneLoader.ImportMeshAsync('', '', MAIN_STAGE_MANIFEST.sceneGlb, scene);
+  markBootPhase('scene_imported');
   polishMainStageMaterials(main.meshes);
   trimSubtleClearcoat(scene);
+  markBootPhase('scene_polished');
 
   const collision = await SceneLoader.ImportMeshAsync('', '', MAIN_STAGE_MANIFEST.collisionGlb, scene);
 

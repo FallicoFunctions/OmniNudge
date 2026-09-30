@@ -139,6 +139,14 @@ function createWebGlEngine(canvas: HTMLCanvasElement) {
   });
 }
 
+function preloadModule<T>(pending: Promise<T>): Promise<T> {
+  // Downloads run during session exchange and scene construction. Attach an
+  // early handler so a failed download waits for its owning startup await,
+  // where the normal error overlay and resource cleanup can handle it.
+  void pending.catch(() => {});
+  return pending;
+}
+
 async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolean,
   replaceCanvas: () => HTMLCanvasElement,
   { profileGpu, backbufferAntialias }: { profileGpu: boolean; backbufferAntialias: boolean }): Promise<RuntimeEngine> {
@@ -206,6 +214,39 @@ export async function createRuntime(host: HTMLElement) {
     ? new URLSearchParams(window.location.search) : null;
   const showDebugChrome = perfFlags.debug && localDebugParams?.get('benchmarkUi') !== 'player';
   host.classList.toggle('babylon-runtime-host--capture', perfFlags.capture);
+  // Start all shipped startup dependencies together. Waiting to request each
+  // module at its construction site turns network latency into a long serial
+  // tail after the venue is ready, especially on a player's first visit.
+  // Queue the clock first because session exchange needs it before anything
+  // can be constructed (including on HTTP/1 connections with few slots).
+  const clockModules = Promise.all([
+    import('../network/serverClock'),
+    import('../media/trackSpectrum'),
+    import('../media/trackBeats'),
+  ]);
+  const sceneModule = preloadModule(import('../scene/createMainStageScene'));
+  const [{ createServerClock }, { createTrackSpectrum }, { createTrackBeats, createStageBeat }] = await clockModules;
+  const mediaModule = preloadModule(import('../media/stageMediaPlayer'));
+  const uiModules = preloadModule(Promise.all([
+    import('../ui/createPlayerHud'),
+    import('../ui/createStaminaBar'),
+  ]));
+  const worldModules = preloadModule(Promise.all([
+    import('../network/worldSocket'),
+    import('../player/createRemotePlayerRigs'),
+    import('../ui/createChatPanel'),
+    import('../player/createChatBubbleStack'),
+    import('../network/worldSessionRenewal'),
+  ]));
+  const showModules = preloadModule(Promise.all([
+    import('../scene/createStageVisualizer'),
+    import('../scene/createImmersiveAudioShow'),
+    import('../scene/createCrownEffects'),
+    import('../scene/createCascadeCourtLightFloor'),
+    import('../scene/createHologramGrid'),
+    import('../scene/createStageAtmospherics'),
+    import('../showControl/createShowControlRuntime'),
+  ]));
   // The real launch flow (backend's SessionService.BuildLaunchURL) redirects
   // here with `?mode=<account|guest>&handoff=<one-time token>`, NOT a world
   // socket URL/token directly - those only exist after exchanging the
@@ -220,11 +261,6 @@ export async function createRuntime(host: HTMLElement) {
   let earlyStageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
   // One server clock and one spectrum reader for the stage player, whichever
   // path creates it. The world socket feeds the clock.
-  const [{ createServerClock }, { createTrackSpectrum }, { createTrackBeats, createStageBeat }] = await Promise.all([
-    import('../network/serverClock'),
-    import('../media/trackSpectrum'),
-    import('../media/trackBeats'),
-  ]);
   const stageMediaOptions = {
     serverClock: createServerClock(),
     spectrum: createTrackSpectrum(),
@@ -274,7 +310,7 @@ export async function createRuntime(host: HTMLElement) {
       // does not wait for the scene and the world socket's first snapshot.
       const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
       if (handoffMedia) {
-        const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
+        const { createStageMediaPlayer } = await mediaModule;
         earlyStageMediaPlayer = createStageMediaPlayer(stageMediaOptions);
         earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
         earlyStageMediaPlayer.unlock();
@@ -343,6 +379,7 @@ export async function createRuntime(host: HTMLElement) {
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
   let disposed = false;
+  let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
   // Stops the world token renewal. Owned here, not by the world block, so a
   // boot that fails after the socket opened stops renewing too: a leftover
   // socket then ends at its token's expiry instead of living on.
@@ -359,6 +396,8 @@ export async function createRuntime(host: HTMLElement) {
     disposed = true;
     stopWorldSessionRenewal?.();
     stopWorldSessionRenewal = undefined;
+    worldSocket?.dispose();
+    worldSocket = undefined;
     releaseWorldResources?.();
     releaseWorldResources = undefined;
     worldAppearance?.dispose();
@@ -412,6 +451,26 @@ export async function createRuntime(host: HTMLElement) {
   try {
     loadingOverlay = createRuntimeLoadingOverlay(host);
     markBootPhase('loading_panel');
+    const worldConnection = preloadModule((async () => {
+      if (!resolvedWorldUrl || !resolvedWorldToken) return;
+      const [{ createWorldSocket }, , , , { keepWorldSessionAlive }] = await worldModules;
+      if (disposed) return;
+      worldSocket = createWorldSocket({
+        url: resolvedWorldUrl,
+        token: resolvedWorldToken,
+        serverClock: stageMediaOptions.serverClock,
+        deferSnapshots: true,
+      });
+      worldSocket.onStatusChange(status => {
+        if (disposed) return;
+        console.info(`[world] socket ${status}`);
+        if (status === 'open') markBootPhase('socket_open');
+        worldAppearance?.status(status);
+      });
+      worldSocket.connect();
+      stopWorldSessionRenewal = keepWorldSessionAlive(worldSocket, { freshLaunch: import.meta.env.PROD });
+      return worldSocket;
+    })());
     engine = await createBabylonEngine(canvas, perfFlags.webgl, () => {
       const replacement = canvas.cloneNode(false) as HTMLCanvasElement;
       canvas.replaceWith(replacement);
@@ -441,9 +500,7 @@ export async function createRuntime(host: HTMLElement) {
       if (venuePerformance?.isRunning()) return;
       activeEngine.resize();
     };
-    // Keep the engine/bootstrap chunk small; scene construction brings in the
-    // full Main Stage graph and can load behind the visible boot overlay.
-    const { createMainStageScene: createScene } = await import('../scene/createMainStageScene');
+    const { createMainStageScene: createScene } = await sceneModule;
     const launchLoadout = normalizeLaunchAvatarLoadout(
       resolvedSessionMode === 'account' || parseCompleteAvatarLoadout(resolvedAccountLoadout)
         ? resolvedAccountLoadout : {}, readGuestCharacter());
@@ -531,6 +588,7 @@ export async function createRuntime(host: HTMLElement) {
     localAvatarLoadout = reviewRuntime?.avatarPreviewLocked
       ? serializeAvatarLoadout(localAvatarDefinition) : launchLoadout;
     if (resolvedAccountLoadout) await reviewRuntime?.restoreAvatarLoadout?.(localAvatarLoadout);
+    markBootPhase('appearance_ready');
     scene.metadata = {
       ...scene.metadata,
       localAvatarLoadout,
@@ -628,7 +686,6 @@ export async function createRuntime(host: HTMLElement) {
     // connected player as an embodied ghost. The socket module throttles
     // outbound moves internally; the render loop just offers the freshest
     // position each frame.
-    let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
     let worldSpawnInitialized = false;
     let restoringAppearance = false;
     let appearanceRevision = 0;
@@ -691,7 +748,6 @@ export async function createRuntime(host: HTMLElement) {
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     let showControls: ReturnType<typeof import('../showControl/createShowControlRuntime').createShowControlRuntime> | undefined;
     releaseWorldResources = () => {
-      worldSocket?.dispose();
       remotePlayerRigs?.dispose();
       localChatBubbles?.dispose();
       stageAudioDevControls?.dispose();
@@ -771,32 +827,23 @@ export async function createRuntime(host: HTMLElement) {
     // inventing numbers.
     let activePlayers: readonly import('../network/worldSocket').WorldPlayer[] | null = null;
     if (resolvedWorldUrl && resolvedWorldToken) {
-      const [{ createWorldSocket }, { createRemotePlayerRigs }, { createStageMediaPlayer }] = await Promise.all([
-        import('../network/worldSocket'),
-        import('../player/createRemotePlayerRigs'),
-        import('../media/stageMediaPlayer'),
-      ]);
+      const [, { createRemotePlayerRigs }, { createChatPanel }, { createChatBubbleStack }] = await worldModules;
+      const { createStageMediaPlayer } = await mediaModule;
+      worldSocket = await worldConnection;
+      if (!worldSocket) throw new Error('World startup was cancelled.');
       remotePlayerRigs = createRemotePlayerRigs(scene);
       // Sec 7.8: playerController was constructed before this rig existed
       // (see createMainStageScene's setRemotePlayerCollisionSource), so this
       // is the one-time hookup for local-vs-remote-player collision.
       reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
       stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer(stageMediaOptions);
-      worldSocket = createWorldSocket({
-        url: resolvedWorldUrl,
-        token: resolvedWorldToken,
-        serverClock: stageMediaOptions.serverClock,
-      });
       const activeWorldSocket = worldSocket;
 
       // ---- Chat panel (sec 9.8 / 10.2 / 10.3 / 10.4). Player-facing, so NOT
       // gated behind perfFlags.debug - only its bottom-left anchor lifts when
       // the dev stage-audio scrubber occupies that corner under ?debug=1.
       {
-        const [{ createChatPanel }, { formatVenueName: formatChatVenueName }] = await Promise.all([
-          import('../ui/createChatPanel'),
-          import('../ui/createPlayerHud'),
-        ]);
+        const [{ formatVenueName: formatChatVenueName }] = await uiModules;
         chatPanel = createChatPanel(host, {
           // Sec 9.8: default open when no saved preference exists; the stored
           // guest-scoped blob supplies it otherwise.
@@ -826,7 +873,6 @@ export async function createRuntime(host: HTMLElement) {
         // above-head bubbles.
         const localPlayerRoot = reviewRuntime?.playerRig?.root;
         if (localPlayerRoot) {
-          const { createChatBubbleStack } = await import('../player/createChatBubbleStack');
           localChatBubbles = createChatBubbleStack(scene, 'local', localPlayerRoot,
             reviewRuntime?.playerRig?.eyeHeightMeters ?? 1.65);
         }
@@ -901,18 +947,10 @@ export async function createRuntime(host: HTMLElement) {
           : null;
         applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
       });
-      // A direct launch's first snapshot carries its saved appearance. Restore
-      // it before publishing, so a generated body cannot overwrite it first.
-      worldSocket.onStatusChange((status) => {
-        console.info(`[world] socket ${status}`);
-        if (status === 'open') markBootPhase('socket_open');
-        worldAppearance?.status(status);
-      });
-      worldSocket.connect();
-      // The world token lasts five minutes; renew it on the open socket
-      // before then so the session does not end under the player.
-      const { keepWorldSessionAlive } = await import('../network/worldSessionRenewal');
-      stopWorldSessionRenewal = keepWorldSessionAlive(worldSocket, { freshLaunch: import.meta.env.PROD });
+      // The handshake ran while the scene loaded. Apply its latest state only
+      // after spawn, appearance, chat and remote-avatar handlers all exist.
+      worldAppearance.status(worldSocket.status());
+      worldSocket.resumeSnapshots();
 
       // The player arrives in the room as it is: nothing waits for audio.
       // Stage audio starts now if the browser allows it, and otherwise on the
@@ -947,6 +985,7 @@ export async function createRuntime(host: HTMLElement) {
         stageAudioDevControls = createStageAudioDevControls(host, activeStageMediaPlayer);
       }
     }
+    markBootPhase('world_ready');
 
     // The player HUD ships in BOTH paths: with a world socket it shows the
     // active venue and its synced track; on the dev/review path (no world
@@ -956,7 +995,7 @@ export async function createRuntime(host: HTMLElement) {
     // keeps counting between snapshots, and from the server's playhead until
     // the browser lets the track play; duration comes from the server entry.
     {
-      const { createPlayerHud, formatVenueName, resolvePlayerCounts } = await import('../ui/createPlayerHud');
+      const [{ createPlayerHud, formatVenueName, resolvePlayerCounts }] = await uiModules;
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
@@ -993,7 +1032,7 @@ export async function createRuntime(host: HTMLElement) {
     // HUD tick above) since stamina drains/recovers continuously and needs to
     // read as responsive while sprinting.
     {
-      const { createStaminaBar } = await import('../ui/createStaminaBar');
+      const [, { createStaminaBar }] = await uiModules;
       staminaBar = createStaminaBar(host);
     }
 
@@ -1420,7 +1459,11 @@ export async function createRuntime(host: HTMLElement) {
       }
       return stageBeatKnown ? stageBeat : null;
     };
-    const { createStageVisualizer } = await import('../scene/createStageVisualizer');
+    markBootPhase('ui_ready');
+    const [{ createStageVisualizer }, { createImmersiveAudioShow }, { createCrownEffects },
+      { createCascadeCourtLightFloor }, { createHologramGrid }, { createStageAtmospherics },
+      { createShowControlRuntime }] = await showModules;
+    markBootPhase('show_modules_ready');
     stageVisualizer = createStageVisualizer(scene, {
       getFrequencyData: getStageFrequencyData,
     });
@@ -1430,7 +1473,6 @@ export async function createRuntime(host: HTMLElement) {
     // pulse). Like the visualizer it runs in BOTH paths: audio-reactive with
     // the world/music path, gentle idle sweeps when no audio is present (no
     // world connection).
-    const { createImmersiveAudioShow } = await import('../scene/createImmersiveAudioShow');
     immersiveAudioShow = createImmersiveAudioShow(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
@@ -1441,7 +1483,6 @@ export async function createRuntime(host: HTMLElement) {
     // the apex energy crystal, the sky beacon). Shares the exact same spectrum
     // closure so it stays audio- and color-coherent with the venue; idle when
     // no audio is present (no world connection).
-    const { createCrownEffects } = await import('../scene/createCrownEffects');
     crownEffects = createCrownEffects(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
@@ -1454,7 +1495,6 @@ export async function createRuntime(host: HTMLElement) {
     // so it stays audio- and colour-coherent with the venue; a slow calm
     // shimmer when no audio is present (no world connection) so the floor
     // still reads as pearl.
-    const { createCascadeCourtLightFloor } = await import('../scene/createCascadeCourtLightFloor');
     cascadeCourtLightFloor = createCascadeCourtLightFloor(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
@@ -1469,7 +1509,6 @@ export async function createRuntime(host: HTMLElement) {
     // spectrum closure so its formations and colours stay coherent with the
     // venue; slow drifting formations when no audio is present (no world
     // connection).
-    const { createHologramGrid } = await import('../scene/createHologramGrid');
     hologramGrid = createHologramGrid(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
@@ -1480,7 +1519,6 @@ export async function createRuntime(host: HTMLElement) {
     // cold-spark fountains, strobe pods): the PHYSICAL effects show. Shares the
     // same spectrum closure; haze-only idle when no audio is present (no world
     // connection).
-    const { createStageAtmospherics } = await import('../scene/createStageAtmospherics');
     stageAtmospherics = createStageAtmospherics(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
@@ -1489,7 +1527,6 @@ export async function createRuntime(host: HTMLElement) {
 
     // Shared aerial effects and player controls. Stage pyro remains owned by
     // stageAtmospherics; fireworks cannot seize the independent drone rig.
-    const { createShowControlRuntime } = await import('../showControl/createShowControlRuntime');
     showControls = createShowControlRuntime({
       host,scene,socket:worldSocket,playerRig:reviewRuntime?.playerRig,
       playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
@@ -1535,10 +1572,11 @@ export async function createRuntime(host: HTMLElement) {
         }
       }
     }
-    loadingOverlay.remove();
-    markBootPhase('visible');
+    markBootPhase('render_ready');
+    let firstFrame = true;
 
     activeEngine.runRenderLoop(() => {
+      if (firstFrame) markBootPhase('frame_started');
       // WebGPU submits the command buffers recorded by scene.render() after
       // this callback returns. Resizing here, before recording the next frame,
       // prevents setHardwareScalingLevel() from destroying the swapchain
@@ -1552,6 +1590,13 @@ export async function createRuntime(host: HTMLElement) {
       activeShowControls.update();
       const showControlEnd = measuringFrame ? performance.now() : 0;
       scene.render();
+      if (firstFrame) {
+        firstFrame = false;
+        // Include the first frame's shader/texture setup in boot timing.
+        // Removing the overlay before render() hid that cost behind a blank canvas.
+        loadingOverlay?.remove();
+        markBootPhase('visible');
+      }
       const renderEnd = measuringFrame ? performance.now() : 0;
       const playerRuntime = scene.metadata?.reviewRuntime;
       const playerPosition = playerRuntime?.playerRig?.root.position;
