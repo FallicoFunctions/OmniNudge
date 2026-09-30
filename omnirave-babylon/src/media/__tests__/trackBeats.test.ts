@@ -29,7 +29,7 @@ async function settle() {
 }
 
 async function loaded() {
-  const fetchImpl = vi.fn(async (_url: RequestInfo | URL) => new Response(beatsFile(BASS, MIDS, HIGHS).slice(), { status: 200 }));
+  const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(beatsFile(BASS, MIDS, HIGHS).slice(), { status: 200 }));
   const beats = createTrackBeats({ fetchImpl, urlFor: (id) => `/audio/${id}.beats` });
   const out = createStageBeat();
   expect(beats.read('set', 0, 1, out)).toBe(false); // not downloaded yet
@@ -46,6 +46,8 @@ describe('createTrackBeats', () => {
     const { fetchImpl, read } = await loaded();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl.mock.calls[0][0]).toBe('/audio/set.beats');
+    // Revalidated on every load, so a new build of the list replaces a cached one.
+    expect((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].cache).toBe('no-cache');
 
     expect(read(0.9, 1)).toMatchObject({ bass: 1, mids: 0, highs: 0 }); // a hit exactly at the end counts
     expect(read(1, 1.1)).toMatchObject({ bass: 0, mids: 0, highs: 0 }); // and is not counted again

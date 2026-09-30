@@ -136,7 +136,10 @@ export function createTrackBeats(options: TrackBeatsOptions = {}): TrackBeats {
   function load(): void {
     const forTrack = trackId!;
     beats = 'loading';
-    fetchImpl(urlFor(forTrack), { signal: abort.signal })
+    // Ask the server whether the file changed (a 304 when it did not): the
+    // audio folder is cached for 7 days, and a browser holding an older
+    // build of the list would otherwise keep it that long.
+    fetchImpl(urlFor(forTrack), { signal: abort.signal, cache: 'no-cache' })
       .then(async (response) => {
         const parsed = response.ok ? parseBeats(new Uint8Array(await response.arrayBuffer())) : null;
         if (disposed || forTrack !== trackId) return;
