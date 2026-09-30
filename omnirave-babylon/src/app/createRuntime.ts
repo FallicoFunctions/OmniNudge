@@ -51,7 +51,7 @@ import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import type { FireworksPreviewAct } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { createSoundHint } from '../ui/createSoundHint';
-import { markBootPhase, reportBootTiming } from './bootTiming';
+import { markBootPhase } from './bootTiming';
 import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
@@ -919,10 +919,7 @@ export async function createRuntime(host: HTMLElement) {
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
-        if (hudMediaPlayer?.isAudible()) {
-          markBootPhase('audible');
-          reportBootTiming();
-        }
+        if (hudMediaPlayer?.isAudible()) markBootPhase('audible');
         // Ask for a gesture only when the browser actually held the track
         // back: a track is due but has stayed silent for two ticks. Where the
         // Play click carried over (Chrome, Firefox) the note never shows.
