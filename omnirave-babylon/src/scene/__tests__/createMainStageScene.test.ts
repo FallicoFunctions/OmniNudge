@@ -263,7 +263,8 @@ describe('createMainStageScene', () => {
       pointer('pointerdown', 100);
       expect(document.activeElement).toBe(canvas);
       pointer('pointermove', 160);
-      expect(camera.alpha).not.toBeCloseTo(alphaBefore);
+      // Owner-set horizontal direction: a drag to the right lowers alpha.
+      expect(camera.alpha).toBeLessThan(alphaBefore);
       pointer('pointerup', 160);
       const alphaAfter = camera.alpha;
       pointer('pointermove', 200);

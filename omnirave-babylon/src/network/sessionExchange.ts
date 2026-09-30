@@ -36,6 +36,17 @@ export interface ExchangedSession {
   // must see their own saved look on boot, not a random one, same reasoning
   // as runtimeAuth.ts's RuntimeAuthSession.loadout for the in-game login path.
   loadout: Record<string, string>;
+  // Each stage's track and playhead at the moment of the exchange. The runtime
+  // starts the active stage's audio from this while the scene still builds,
+  // instead of waiting for the world socket's first snapshot.
+  zoneMedia: ExchangedZoneMedia[];
+}
+
+export interface ExchangedZoneMedia {
+  zoneId: string;
+  trackId: string;
+  playlistIndex: number;
+  playheadSeconds: number;
 }
 
 export interface SessionExchangeParams {
@@ -103,10 +114,23 @@ export async function exchangeLaunchSession(
       // failing the whole exchange over a missing field.
       mode: typeof data.mode === 'string' && data.mode ? data.mode : params.mode,
       loadout: isStringRecord(data.loadout) ? data.loadout : {},
+      zoneMedia: parseZoneMedia((data as { zoneMedia?: unknown }).zoneMedia),
     };
   } catch {
     return null;
   }
+}
+
+function parseZoneMedia(value: unknown): ExchangedZoneMedia[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const zone = entry as Record<string, unknown>;
+    return typeof zone?.zoneId === 'string' && typeof zone.videoId === 'string' && zone.videoId
+      && typeof zone.playlistIndex === 'number' && typeof zone.playheadSeconds === 'number'
+      ? [{ zoneId: zone.zoneId, trackId: zone.videoId, playlistIndex: zone.playlistIndex,
+        playheadSeconds: zone.playheadSeconds }]
+      : [];
+  });
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {

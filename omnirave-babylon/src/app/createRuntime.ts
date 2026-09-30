@@ -51,6 +51,7 @@ import { createReviewHud, formatCheckpointLabel } from '../ui/createReviewHud';
 import type { FireworksPreviewAct } from '../ui/createReviewHud';
 import { createRuntimeLoadingOverlay } from '../ui/createRuntimeLoadingOverlay';
 import { createSoundHint } from '../ui/createSoundHint';
+import { markBootPhase, reportBootTiming } from './bootTiming';
 import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
@@ -188,6 +189,7 @@ async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolea
 }
 
 export async function createRuntime(host: HTMLElement) {
+  markBootPhase('runtime');
   let canvas = document.createElement('canvas');
   canvas.id = RUNTIME_CONFIG.defaultCanvasId;
   canvas.dataset.testid = RUNTIME_CONFIG.defaultCanvasId;
@@ -213,6 +215,9 @@ export async function createRuntime(host: HTMLElement) {
   // describes. exchangeLaunchSession resolves to null on any failure (no
   // handoff param, expired/consumed token, network error), which correctly
   // falls through to no world connection rather than throwing during boot.
+  // Started from the handoff before the scene builds; the world socket path
+  // takes this same player over.
+  let earlyStageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
   let resolvedWorldUrl = perfFlags.worldUrl;
   let resolvedWorldToken = perfFlags.worldToken;
   // Covers three ways the top-right controls can end up in 'account' mode:
@@ -232,6 +237,7 @@ export async function createRuntime(host: HTMLElement) {
     const exchangeParams = parseSessionExchangeParams(window.location.search);
     if (exchangeParams) {
       const exchanged = await exchangeLaunchSession(exchangeParams);
+      markBootPhase('exchanged');
       if (exchanged) {
         resolvedWorldUrl = exchanged.worldSocketUrl;
         resolvedWorldToken = exchanged.worldSessionToken;
@@ -241,6 +247,22 @@ export async function createRuntime(host: HTMLElement) {
         resolvedAccountLoadout = exchanged.loadout;
         resolvedProfileToken = exchanged.mode === 'account' ? exchanged.sessionToken : undefined;
         resolvedProfilePlayerId = exchanged.mode === 'account' ? exchanged.playerId : undefined;
+        // Start the stage track from the handoff's playhead now, so sound
+        // does not wait for the scene and the world socket's first snapshot.
+        const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
+        if (handoffMedia) {
+          const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
+          earlyStageMediaPlayer = createStageMediaPlayer();
+          earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
+          earlyStageMediaPlayer.unlock();
+          // Boot timing: note the moment sound starts, even mid-scene-build.
+          const player = earlyStageMediaPlayer;
+          const startedWatching = performance.now();
+          const watchAudible = window.setInterval(() => {
+            if (player.isAudible()) markBootPhase('audible');
+            if (player.isAudible() || performance.now() - startedWatching > 60_000) window.clearInterval(watchAudible);
+          }, 250);
+        }
       } else {
         console.warn('[world] session exchange failed; continuing without a world connection');
       }
@@ -328,6 +350,7 @@ export async function createRuntime(host: HTMLElement) {
     loadingOverlay?.remove();
     stopAudioGestureListeners?.();
     soundHint?.dispose();
+    earlyStageMediaPlayer?.dispose();
     if (playerHudTimer !== undefined) {
       window.clearInterval(playerHudTimer);
       playerHudTimer = undefined;
@@ -354,6 +377,7 @@ export async function createRuntime(host: HTMLElement) {
 
   try {
     loadingOverlay = createRuntimeLoadingOverlay(host);
+    markBootPhase('loading_panel');
     engine = await createBabylonEngine(canvas, perfFlags.webgl, () => {
       const replacement = canvas.cloneNode(false) as HTMLCanvasElement;
       canvas.replaceWith(replacement);
@@ -367,6 +391,7 @@ export async function createRuntime(host: HTMLElement) {
       backbufferAntialias: perfFlags.noPost || localDebugParams?.get('backbufferMsaa') === '1',
     });
     const activeEngine = engine;
+    markBootPhase('engine', activeEngine.isWebGPU ? 'webgpu' : 'webgl');
 
     // Cap the effective render density: full retina (2x) quadruples the pixel
     // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half
@@ -389,6 +414,7 @@ export async function createRuntime(host: HTMLElement) {
       resolvedSessionMode === 'account' || parseCompleteAvatarLoadout(resolvedAccountLoadout)
         ? resolvedAccountLoadout : {}, readGuestCharacter());
     const scene = await createScene(activeEngine, launchLoadout.cp as 'male' | 'female');
+    markBootPhase('scene');
     const reviewRuntime = scene.metadata?.reviewRuntime;
     // Sec 8.2: ghosting starts on "first entry" - a fresh boot is exactly that.
     reviewRuntime?.playerController?.beginSpawnGhost?.();
@@ -719,7 +745,7 @@ export async function createRuntime(host: HTMLElement) {
       // (see createMainStageScene's setRemotePlayerCollisionSource), so this
       // is the one-time hookup for local-vs-remote-player collision.
       reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
-      stageMediaPlayer = createStageMediaPlayer();
+      stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer();
       worldSocket = createWorldSocket({
         url: resolvedWorldUrl,
         token: resolvedWorldToken,
@@ -842,6 +868,7 @@ export async function createRuntime(host: HTMLElement) {
       // it before publishing, so a generated body cannot overwrite it first.
       worldSocket.onStatusChange((status) => {
         console.info(`[world] socket ${status}`);
+        if (status === 'open') markBootPhase('socket_open');
         worldAppearance?.status(status);
       });
       worldSocket.connect();
@@ -854,6 +881,7 @@ export async function createRuntime(host: HTMLElement) {
       const gestureEvents = ['pointerdown', 'keydown', 'touchend'] as const;
       const unlockAudioOnGesture = () => {
         audioGestureSeen = true;
+        markBootPhase('gesture');
         stopAudioGestureListeners?.();
         activeStageMediaPlayer.unlock();
         fireworksAudioUnlocked = true;
@@ -891,6 +919,10 @@ export async function createRuntime(host: HTMLElement) {
       const hudMediaPlayer = stageMediaPlayer;
       playerHud = createPlayerHud(host, { debugChromePresent: showDebugChrome });
       const refreshPlayerHud = () => {
+        if (hudMediaPlayer?.isAudible()) {
+          markBootPhase('audible');
+          reportBootTiming();
+        }
         // Ask for a gesture only when the browser actually held the track
         // back: a track is due but has stayed silent for two ticks. Where the
         // Play click carried over (Chrome, Firefox) the note never shows.
@@ -1448,6 +1480,7 @@ export async function createRuntime(host: HTMLElement) {
       }
     }
     loadingOverlay.remove();
+    markBootPhase('visible');
 
     activeEngine.runRenderLoop(() => {
       // WebGPU submits the command buffers recorded by scene.render() after

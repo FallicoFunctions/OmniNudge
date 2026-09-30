@@ -479,8 +479,10 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     const deltaY = event.clientY - lastCameraPointerY;
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
+    // Owner-set direction: dragging right turns the view the other way from
+    // the camera angle's natural increase.
     cameraRig.orbit(
-      deltaX * POINTER_CAMERA_YAW_SENSITIVITY,
+      -deltaX * POINTER_CAMERA_YAW_SENSITIVITY,
       -deltaY * POINTER_CAMERA_PITCH_SENSITIVITY,
     );
   };

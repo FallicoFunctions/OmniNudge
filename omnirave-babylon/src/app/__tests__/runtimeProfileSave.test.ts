@@ -24,7 +24,7 @@ async function setup(preview = false) {
   mockShowControlRuntime();
   const first = account();
   vi.doMock('../../network/sessionExchange', () => ({
-    parseSessionExchangeParams: () => ({mode:'account',handoff:'fixture'}), exchangeLaunchSession:async () => first,
+    parseSessionExchangeParams: () => ({mode:'account',handoff:'fixture'}), exchangeLaunchSession:async () => ({...first,zoneMedia:[]}),
   }));
   const login = vi.fn().mockResolvedValue(account('alice','female','renewed-alice'));
   vi.doMock('../../network/runtimeAuth', () => ({

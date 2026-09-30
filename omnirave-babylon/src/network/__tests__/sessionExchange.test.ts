@@ -52,6 +52,7 @@ describe('exchangeLaunchSession', () => {
       activeZone: 'main_stage',
       mode: 'guest',
       loadout: {},
+      zoneMedia: [],
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:8091/api/v1/omnigame/session/exchange',
@@ -60,6 +61,31 @@ describe('exchangeLaunchSession', () => {
         body: JSON.stringify({ handoff: 'abc123', mode: 'guest' }),
       }),
     );
+  });
+
+  it('keeps each well-formed zone playhead so audio can start before the world connects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        playerId: 'guest-abc',
+        playerName: 'Guest1234',
+        worldSocketUrl: 'wss://example.com/ws',
+        worldSessionToken: 'jwt-token',
+        activeZone: 'main_stage',
+        mode: 'guest',
+        zoneMedia: [
+          { zoneId: 'main_stage', videoId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343 },
+          { zoneId: 'underground', videoId: '', playlistIndex: 0, playheadSeconds: 0 },
+          { zoneId: 'broken' },
+        ],
+      }),
+    }));
+
+    const result = await exchangeLaunchSession({ mode: 'guest', handoff: 'abc123' });
+
+    expect(result?.zoneMedia).toEqual([
+      { zoneId: 'main_stage', trackId: 'main-stage-set-01', playlistIndex: 0, playheadSeconds: 1343 },
+    ]);
   });
 
   it('resolves an already-logged-in omninudge.com handoff into account mode', async () => {
