@@ -9,7 +9,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('stops renewing the world token when the boot fails after the socket opened', async () => {
+it('releases the world socket, the stage player and the renewal when the boot fails after the socket opened', async () => {
   vi.resetModules();
   mockShowControlRuntime();
   window.history.replaceState(null, '', '/?perf=webgl&world=ws://localhost/ws&wtoken=fixture');
@@ -20,13 +20,13 @@ it('stops renewing the world token when the boot fails after the socket opened',
   vi.doMock('../../network/worldSocket', () => ({ createWorldSocket: () => socket }));
   const stopRenewal = vi.fn();
   vi.doMock('../../network/worldSessionRenewal', () => ({ keepWorldSessionAlive: vi.fn(() => stopRenewal) }));
-  vi.doMock('../../player/createRemotePlayerRigs', () => ({ createRemotePlayerRigs: () => ({
-    applySnapshot: vi.fn(), dispose: vi.fn(), setNameplatesVisible: vi.fn(),
-  }) }));
-  vi.doMock('../../media/stageMediaPlayer', () => ({ createStageMediaPlayer: () => ({
+  const rigs = { applySnapshot: vi.fn(), dispose: vi.fn(), setNameplatesVisible: vi.fn() };
+  vi.doMock('../../player/createRemotePlayerRigs', () => ({ createRemotePlayerRigs: () => rigs }));
+  const player = {
     getCurrentTime: () => 0, getDuration: () => 0, applyMedia: vi.fn(), dispose: vi.fn(),
     unlock: vi.fn(), isAudible: () => false,
-  }) }));
+  };
+  vi.doMock('../../media/stageMediaPlayer', () => ({ createStageMediaPlayer: () => player }));
   // A part of the scene built after the world connects fails to load.
   vi.doMock('../../scene/createStageVisualizer', () => ({
     createStageVisualizer: () => { throw new Error('visualizer failed'); },
@@ -50,4 +50,8 @@ it('stops renewing the world token when the boot fails after the socket opened',
 
   expect(socket.connect).toHaveBeenCalledTimes(1);
   expect(stopRenewal).toHaveBeenCalledTimes(1);
+  // No ghost player in the world, and no music behind the error.
+  expect(socket.dispose).toHaveBeenCalledTimes(1);
+  expect(player.dispose).toHaveBeenCalledTimes(1);
+  expect(rigs.dispose).toHaveBeenCalledTimes(1);
 }, 20_000);

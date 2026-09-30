@@ -342,6 +342,10 @@ export async function createRuntime(host: HTMLElement) {
   // boot that fails after the socket opened stops renewing too: a leftover
   // socket then ends at its token's expiry instead of living on.
   let stopWorldSessionRenewal: (() => void) | undefined;
+  // Releases the world socket, the stage player and the show modules. Owned
+  // here for the same reason: a boot that fails after the world connected
+  // must not leave a ghost player in the world or music behind the error.
+  let releaseWorldResources: (() => void) | undefined;
 
   const cleanupOwnedResources = () => {
     if (disposed) {
@@ -350,6 +354,8 @@ export async function createRuntime(host: HTMLElement) {
     disposed = true;
     stopWorldSessionRenewal?.();
     stopWorldSessionRenewal = undefined;
+    releaseWorldResources?.();
+    releaseWorldResources = undefined;
     worldAppearance?.dispose();
     avatarProfileSaver?.dispose();
     resolvedProfileToken = undefined;
@@ -609,18 +615,6 @@ export async function createRuntime(host: HTMLElement) {
       if (disposed) {
         return;
       }
-      worldSocket?.dispose();
-      remotePlayerRigs?.dispose();
-      localChatBubbles?.dispose();
-      stageAudioDevControls?.dispose();
-      stageMediaPlayer?.dispose();
-      stageVisualizer?.dispose();
-      immersiveAudioShow?.dispose();
-      crownEffects?.dispose();
-      cascadeCourtLightFloor?.dispose();
-      hologramGrid?.dispose();
-      stageAtmospherics?.dispose();
-      showControls?.dispose();
       cleanupOwnedResources();
       activeEngine.dispose();
     };
@@ -691,6 +685,20 @@ export async function createRuntime(host: HTMLElement) {
     let hologramGrid: import('../scene/createHologramGrid').HologramGrid | undefined;
     let stageAtmospherics: import('../scene/createStageAtmospherics').StageAtmospherics | undefined;
     let showControls: ReturnType<typeof import('../showControl/createShowControlRuntime').createShowControlRuntime> | undefined;
+    releaseWorldResources = () => {
+      worldSocket?.dispose();
+      remotePlayerRigs?.dispose();
+      localChatBubbles?.dispose();
+      stageAudioDevControls?.dispose();
+      stageMediaPlayer?.dispose();
+      stageVisualizer?.dispose();
+      immersiveAudioShow?.dispose();
+      crownEffects?.dispose();
+      cascadeCourtLightFloor?.dispose();
+      hologramGrid?.dispose();
+      stageAtmospherics?.dispose();
+      showControls?.dispose();
+    };
     let latestShowSnapshot: import('../network/worldSocket').WorldSnapshot | undefined;
     let latestWorldEventState: StageEventStateInput | null = null;
     // Undefined follows the server. A concrete state is a debug-only local
