@@ -71,58 +71,22 @@ async function setup(preview = false) {
   cleanup.push(runtime.dispose);
   const emit = () => snapshots.forEach(listener => listener({currentPlayerId:'alice',activeZone:'main_stage',zoneMedia:[],zoneEvents:[],
     players:[{id:'alice',playerName:'Alice',mode:'account',position:{x:0,y:1.65,z:0},zone:'main_stage',loadout:first.loadout}]}));
-  emit(); host.querySelector<HTMLButtonElement>('[data-hud-control=avatar]')!.click();
-  const checkbox = (label: string) => Array.from(host.querySelectorAll('label')).find(item => item.textContent === label)!.querySelector('input')!;
-  const button = (text: string) => Array.from(host.querySelectorAll('button')).find(item => item.textContent === text)!;
-  const status = () => host.querySelector('[aria-label="Avatar editor"] fieldset [role=status]')!.textContent;
-  const submitLogin = () => {
-    button('Sign in to save').click();
-    host.querySelector<HTMLInputElement>('[data-auth-field=username]')!.value = 'fixture';
-    host.querySelector<HTMLInputElement>('[data-auth-field=password]')!.value = 'fixture';
-    host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
-  };
-  return {fetchMock,login,checkbox,button,status,submitLogin,restore,socket,emit};
+  emit();
+  // Outfit edits reach the saver through the wardrobe itself; the venue panel
+  // no longer has part checkboxes.
+  const toggle = (slot: 'jacket' | 'hair') => avatar.wardrobe!.setVisible(slot, !avatar.wardrobe!.isVisible(slot));
+  return {fetchMock,login,toggle,restore,socket,emit};
 }
 
-it('does not save restored state, then exposes a failed edit and saves its retry', async () => {
-  const app = await setup(); expect(app.status()).toBe('Changes save to your account.'); expect(app.fetchMock).not.toHaveBeenCalled();
-  app.fetchMock.mockResolvedValueOnce({status:500}); app.checkbox('Jacket').click();
-  await vi.waitFor(() => expect(app.status()).toContain('could not be saved'));
-  expect(app.checkbox('Jacket').checked).toBe(true); app.button('Retry save').click();
-  await vi.waitFor(() => expect(app.status()).toBe('Outfit saved to your account.'));
-  expect(app.fetchMock).toHaveBeenCalledTimes(2);
+it('saves an outfit edit to the account and never the restored state', async () => {
+  const app = await setup(); expect(app.fetchMock).not.toHaveBeenCalled();
+  app.toggle('jacket');
+  await vi.waitFor(() => expect(app.fetchMock).toHaveBeenCalledTimes(1));
   expect(app.fetchMock.mock.lastCall![1]).toMatchObject({headers:{Authorization:'Bearer profile-alice'},body:expect.stringContaining('"cw":"111111"')});
-  app.emit(); expect(app.fetchMock).toHaveBeenCalledTimes(2);
-},20_000);
-
-it('preserves the latest edits through same-account reauthentication and saves with the renewed credential', async () => {
-  const app = await setup(); app.fetchMock.mockResolvedValueOnce({status:401}); app.checkbox('Jacket').click();
-  await vi.waitFor(() => expect(app.status()).toContain('Sign in again'));
-  let finishLogin!: (value: RuntimeAuthSession) => void;
-  app.login.mockReturnValueOnce(new Promise<RuntimeAuthSession>(resolve => {finishLogin = resolve;}));
-  app.submitLogin(); await vi.waitFor(() => expect(app.login).toHaveBeenCalledTimes(1));
-  app.checkbox('Hair').click(); // Still editable while authentication is pending.
-  finishLogin(account('alice','female','renewed-alice'));
-  await vi.waitFor(() => expect(app.socket.reconnect).toHaveBeenCalled());
-  await vi.waitFor(() => expect(app.status()).toBe('Outfit saved to your account.'));
-  expect(app.checkbox('Jacket').checked).toBe(true); expect(app.checkbox('Hair').checked).toBe(false);
-  expect(app.fetchMock.mock.lastCall![1]).toMatchObject({headers:{Authorization:'Bearer renewed-alice'},body:expect.stringContaining('"cw":"011111"')});
-},20_000);
-
-it('loads a different account\'s own outfit without copying the prior account\'s unsaved edits', async () => {
-  const app = await setup(); app.fetchMock.mockResolvedValueOnce({status:401}); app.checkbox('Jacket').click();
-  await vi.waitFor(() => expect(app.status()).toContain('Sign in again'));
-  app.login.mockResolvedValueOnce(account('bob','male','profile-bob')); app.submitLogin();
-  await vi.waitFor(() => expect(app.socket.reconnect).toHaveBeenCalledWith('ws://localhost/ws','world-bob'));
-  expect(app.checkbox('Jacket').checked).toBe(false); expect(app.status()).toBe('Changes save to your account.');
-  expect(app.fetchMock).toHaveBeenCalledTimes(1);
-  expect(app.restore).toHaveBeenLastCalledWith(expect.objectContaining(account('bob','male','profile-bob').loadout));
-  app.checkbox('Jacket').click(); await vi.waitFor(() => expect(app.fetchMock).toHaveBeenCalledTimes(2));
-  expect(app.fetchMock.mock.lastCall![1]).toMatchObject({headers:{Authorization:'Bearer profile-bob'},body:expect.stringContaining('"cp":"male"')});
+  app.emit(); expect(app.fetchMock).toHaveBeenCalledTimes(1);
 },20_000);
 
 it('keeps explicit design previews separate from account saving even with an account handoff', async () => {
-  const app = await setup(true); app.checkbox('Jacket').click();
-  expect(app.status()).toContain('Browser saving');
+  const app = await setup(true); app.toggle('jacket');
   await new Promise(resolve => setTimeout(resolve,450)); expect(app.fetchMock).not.toHaveBeenCalled();
 },20_000);

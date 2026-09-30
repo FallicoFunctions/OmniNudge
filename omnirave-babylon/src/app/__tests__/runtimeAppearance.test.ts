@@ -96,8 +96,8 @@ it('waits for saved bodies, publishes character switches, and permits independen
     finishLoad();
     await vi.waitFor(() => expect(socket.sendLoadout).toHaveBeenLastCalledWith(expect.objectContaining({cp:'female',cw:'110111'})));
     button('Avatar').click();
-    const jacket = Array.from(host.querySelectorAll('label')).find(label => label.textContent === 'Jacket')!.querySelector('input')!;
-    expect(jacket.checked).toBe(false); jacket.click();
+    expect(oldWardrobes[0].wardrobe.isVisible('jacket')).toBe(false);
+    oldWardrobes[0].wardrobe.setVisible('jacket', true);
     expect(socket.sendLoadout).toHaveBeenLastCalledWith(expect.objectContaining({cp:'female',cw:'111111'}));
     expect(save).not.toHaveBeenCalled(); // A world token alone cannot save an account profile.
 
@@ -153,7 +153,7 @@ it('waits for saved bodies, publishes character switches, and permits independen
     expect(window.localStorage.getItem('omnirave.guest-character.v1')).toBe('female');
     expect(save).toHaveBeenCalledTimes(accountSaves);
     expect(host.querySelector('[data-auth-field=username]')!.closest('[hidden]')).not.toBeNull();
-    // A camera-driven model replacement must rewire the open editor without
+    // A camera-driven model replacement must rewire the wardrobe listener without
     // publishing an unchanged outfit or leaving listeners on the old model.
     const previousWardrobe = oldWardrobes.at(-1)!;
     const beforeDetailSends = socket.sendLoadout.mock.calls.length;
@@ -161,8 +161,7 @@ it('waits for saved bodies, publishes character switches, and permits independen
     avatarChanged.forEach(listener => listener());
     expect(previousWardrobe.listeners.size).toBe(0);
     expect(socket.sendLoadout).toHaveBeenCalledTimes(beforeDetailSends);
-    const newJacket = Array.from(host.querySelectorAll('label')).find(label => label.textContent === 'Jacket')!.querySelector('input')!;
-    newJacket.click();
+    oldWardrobes.at(-1)!.wardrobe.setVisible('jacket', false);
     expect(socket.sendLoadout).toHaveBeenLastCalledWith(expect.objectContaining({cp:'female',cw:'110111'}));
 
   } finally { runtime.dispose(); expect(avatarChanged.size).toBe(0); }

@@ -151,8 +151,8 @@ describe('stepStamina', () => {
     expect(state.stamina).toBeLessThan(STAMINA_RESUME_THRESHOLD);
     expect(stepStamina(state, true, 0.001)).toBe(false);
 
-    // Recover well past the threshold: sprint is allowed again.
-    for (let i = 0; i < 20; i += 1) {
+    // Recover to a full meter: sprint is allowed again.
+    for (let i = 0; i < 70; i += 1) {
       stepStamina(state, false, 0.1);
     }
     expect(state.stamina).toBeGreaterThanOrEqual(STAMINA_RESUME_THRESHOLD);
@@ -163,8 +163,9 @@ describe('stepStamina', () => {
     const state = createStaminaState();
     for (let i = 0; i < 100; i += 1) {
       stepStamina(state, true, 1);
+      expect(state.stamina).toBeGreaterThanOrEqual(0);
+      expect(state.stamina).toBeLessThanOrEqual(STAMINA_MAX);
     }
-    expect(state.stamina).toBe(0);
 
     for (let i = 0; i < 100; i += 1) {
       stepStamina(state, false, 1);

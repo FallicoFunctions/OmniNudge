@@ -468,6 +468,16 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
     canvas?.setPointerCapture(event.pointerId);
+    // A right-drag holds the cursor still: the pointer is locked for the drag
+    // and the camera turns by raw mouse movement instead.
+    if (event.button === 2 && canvas?.requestPointerLock) {
+      try {
+        const locking = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
+        void locking?.catch?.(() => {});
+      } catch {
+        // No lock available: the drag works as before, with a moving cursor.
+      }
+    }
   };
   const handleCameraPointerMove = (event: PointerEvent) => {
     if (activeCameraPointerId !== event.pointerId) {
@@ -475,8 +485,9 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     }
 
     event.preventDefault();
-    const deltaX = event.clientX - lastCameraPointerX;
-    const deltaY = event.clientY - lastCameraPointerY;
+    const locked = Boolean(canvas) && document.pointerLockElement === canvas;
+    const deltaX = locked ? event.movementX : event.clientX - lastCameraPointerX;
+    const deltaY = locked ? event.movementY : event.clientY - lastCameraPointerY;
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
     // Owner-set direction: dragging right turns the view the other way from
@@ -494,6 +505,9 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     activeCameraPointerId = undefined;
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
+    }
+    if (canvas && document.pointerLockElement === canvas) {
+      document.exitPointerLock();
     }
   };
 

@@ -117,8 +117,12 @@ export const STAMINA_MAX = 1;
 export const STAMINA_SPRINT_DRAIN_PER_SECOND = 0.1667;
 /** ~6.7s from empty to full at rest. */
 export const STAMINA_RECOVERY_PER_SECOND = 0.15;
-/** Hysteresis floor: must climb back above 15% before sprint re-engages. */
-export const STAMINA_RESUME_THRESHOLD = 0.15;
+/**
+ * After the meter runs empty, sprint stays off until it is full again. A low
+ * floor (it was 15%) let a held sprint key bounce the meter between empty and
+ * the floor forever instead of refilling it.
+ */
+export const STAMINA_RESUME_THRESHOLD = STAMINA_MAX;
 
 export interface StaminaState {
   stamina: number;

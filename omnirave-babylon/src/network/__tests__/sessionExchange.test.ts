@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { exchangeLaunchSession, parseSessionExchangeParams } from '../sessionExchange';
+import { exchangeLaunchSession, parseSessionExchangeParams, requestFreshLaunch } from '../sessionExchange';
 
 describe('parseSessionExchangeParams', () => {
   it('returns mode + handoff when both are present', () => {
@@ -199,5 +199,39 @@ describe('exchangeLaunchSession', () => {
     const result = await exchangeLaunchSession({ mode: 'guest', handoff: 'abc123' });
 
     expect(result).toBeNull();
+  });
+});
+
+describe('requestFreshLaunch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.cookie = 'omni_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  });
+
+  const launched = (handoff: string) => ({
+    ok: true,
+    json: async () => ({ launch_url: `https://omninudge.com/games/omnirave/play/?handoff=${handoff}&mode=guest` }),
+  });
+
+  it('asks for a guest launch when no site session is present', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(launched('fresh-guest'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(requestFreshLaunch()).resolves.toEqual({ mode: 'guest', handoff: 'fresh-guest' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ mode: 'guest' });
+  });
+
+  it('tries the signed-in account first and falls back to a guest launch', async () => {
+    document.cookie = 'omni_csrf=csrf-value';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, json: async () => ({}) })
+      .mockResolvedValueOnce(launched('fresh-guest'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(requestFreshLaunch()).resolves.toEqual({ mode: 'guest', handoff: 'fresh-guest' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ mode: 'account' });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: 'include', headers: { 'X-CSRF-Token': 'csrf-value' } });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ mode: 'guest' });
   });
 });

@@ -54,6 +54,37 @@ export interface SessionExchangeParams {
   handoff: string;
 }
 
+/**
+ * Asks for a new one-time launch, as omninudge.com's Play button does: as the
+ * signed-in account when the site's session cookie proves one (the CSRF
+ * header must accompany it), otherwise as a guest. Used when the page's own
+ * token is missing or already spent, as after a refresh.
+ */
+export async function requestFreshLaunch(): Promise<SessionExchangeParams | null> {
+  const csrfToken = document.cookie.split(';').map((item) => item.trim())
+    .find((item) => item.startsWith('omni_csrf='))?.slice('omni_csrf='.length);
+  for (const mode of csrfToken ? ['account', 'guest'] : ['guest']) {
+    try {
+      const response = await fetch(`${OMNIGAME_API_URL}/omnigame/launch/omnirave`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) } : {}),
+        },
+        body: JSON.stringify({ mode }),
+      });
+      if (!response.ok) continue;
+      const { launch_url: launchUrl } = (await response.json()) as { launch_url?: string };
+      const params = launchUrl ? parseSessionExchangeParams(new URL(launchUrl, window.location.href).search) : null;
+      if (params) return params;
+    } catch {
+      // Try the next mode; no launch at all falls back like a failed exchange.
+    }
+  }
+  return null;
+}
+
 /** Reads `?mode=&handoff=` from a location.search string, or null if either is absent. */
 export function parseSessionExchangeParams(search: string): SessionExchangeParams | null {
   const params = new URLSearchParams(search);

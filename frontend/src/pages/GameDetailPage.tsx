@@ -4,6 +4,7 @@ import { Navigate } from 'react-router';
 import { PageShell } from '../components/common/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { omnigameService } from '../services/omnigameService';
+import { primeGameAudio, startGameInPage } from '../services/omniraveInPageLaunch';
 
 export default function GameDetailPage() {
   const { t } = useTranslation();
@@ -17,6 +18,9 @@ export default function GameDetailPage() {
   }
 
   const handleLaunch = async () => {
+    // Inside the click, before any await: this is what lets Safari play the
+    // stage audio without a second click once the game is running.
+    const primedAudio = primeGameAudio();
     setIsLaunching(true);
     setLaunchError('');
 
@@ -24,7 +28,7 @@ export default function GameDetailPage() {
       const launch = await omnigameService.createOmniRaveLaunch(
         isAuthenticated ? 'account' : 'guest'
       );
-      window.location.assign(launch.launch_url);
+      await startGameInPage(launch.launch_url, primedAudio);
     } catch (error) {
       setLaunchError(error instanceof Error ? error.message : t('gameDetailPage.launchError'));
       setIsLaunching(false);

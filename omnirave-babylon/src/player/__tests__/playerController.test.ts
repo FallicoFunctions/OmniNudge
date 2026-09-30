@@ -336,6 +336,28 @@ describe('createPlayerController', () => {
     expect(controller.stamina0to1).toBe(1);
   });
 
+  it('does not drain sprint stamina while the sprint key is held standing still', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 500, height: 500 }, scene);
+    const rig = createPlayerRig(scene, new Vector3(0, 1.65, 0));
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(0, 2, -5), scene);
+    camera.setTarget(new Vector3(0, 2, 0));
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground],
+      input: createInput({ sprint: true }),
+      playerRig: rig,
+    });
+
+    for (let i = 0; i < 3; i += 1) {
+      controller.step(1);
+    }
+    expect(controller.stamina0to1).toBe(1);
+  });
+
   it('depletes sprint stamina and forces walk speed once empty, then re-allows sprint after recovering', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
@@ -364,10 +386,11 @@ describe('createPlayerController', () => {
 
     input.sprint = false;
     input.forward = false;
-    for (let i = 0; i < 20; i += 1) {
+    // Sprint returns only once the meter is full again (~6.7s at rest).
+    for (let i = 0; i < 70; i += 1) {
       controller.step(0.1);
     }
-    expect(controller.stamina0to1).toBeGreaterThan(0.15);
+    expect(controller.stamina0to1).toBe(1);
 
     input.sprint = true;
     input.forward = true;

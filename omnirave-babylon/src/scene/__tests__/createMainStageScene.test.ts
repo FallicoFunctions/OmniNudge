@@ -242,6 +242,45 @@ describe('createMainStageScene', () => {
     expect(player.position.z - start.z).toBeCloseTo(traveled);
   });
 
+  it('locks the pointer for a right drag and turns by raw movement', async () => {
+    engine = new NullEngine();
+    const canvas = document.createElement('canvas');
+    canvas.setPointerCapture = vi.fn();
+    canvas.hasPointerCapture = vi.fn(() => true);
+    canvas.releasePointerCapture = vi.fn();
+    const requestPointerLock = vi.fn();
+    canvas.requestPointerLock = requestPointerLock as unknown as typeof canvas.requestPointerLock;
+    const exitPointerLock = vi.fn();
+    document.exitPointerLock = exitPointerLock;
+    let lockedElement: Element | null = null;
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => lockedElement });
+    document.body.append(canvas);
+    vi.spyOn(engine, 'getRenderingCanvas').mockReturnValue(canvas);
+    const { createMainStageScene } = await loadCreateMainStageScene();
+    const scene = await createMainStageScene(engine);
+    const camera = scene.activeCamera as ArcRotateCamera;
+    const pointer = (type: string, init: MouseEventInit) => {
+      const event = new MouseEvent(type, { button: 2, clientY: 100, cancelable: true, ...init });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      canvas.dispatchEvent(event);
+    };
+    try {
+      pointer('pointerdown', { clientX: 100 });
+      expect(requestPointerLock).toHaveBeenCalledTimes(1);
+      lockedElement = canvas;
+      const alphaBefore = camera.alpha;
+      // Locked: the cursor position stays put and only movementX turns.
+      pointer('pointermove', { clientX: 100, movementX: 60 });
+      expect(camera.alpha).toBeLessThan(alphaBefore);
+      pointer('pointerup', { clientX: 100 });
+      expect(exitPointerLock).toHaveBeenCalledTimes(1);
+    } finally {
+      scene.dispose();
+      canvas.remove();
+      delete (document as { pointerLockElement?: Element | null }).pointerLockElement;
+    }
+  });
+
   it('focuses the canvas, orbits with right drag, and zooms with the wheel', async () => {
     engine = new NullEngine();
     const canvas = document.createElement('canvas');

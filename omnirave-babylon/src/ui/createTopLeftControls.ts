@@ -14,7 +14,6 @@
 import type { AvatarDefinition } from '../player/avatarDefinition';
 import type { AvatarColorway } from '../player/avatarColorways';
 import type { CompleteAvatarWardrobe } from '../player/completeAvatarWardrobe';
-import type { AvatarProfileSaveView } from '../network/avatarProfileSave';
 import {
   createAvatarEditor,
   type AvatarOptionAvailability,
@@ -26,8 +25,6 @@ export type TopLeftPanelId = 'settings' | 'avatar';
 export interface CreateTopLeftControlsOptions {
   characterSelection?: LaunchCharacterSelection;
   completeWardrobe?: CompleteAvatarWardrobe;
-  profileSave?: AvatarProfileSaveView;
-  onSignInToSave?: () => void;
   /** Settings popup body, built by createSettingsPopup and owned by the caller. */
   settingsPanel?: HTMLElement;
   /** Keeps the unfinished avatar picker out of the runtime without removing it. */
@@ -83,8 +80,6 @@ export function createTopLeftControls(
     ? createAvatarEditor({
         characterSelection: options.characterSelection,
         completeWardrobe: options.completeWardrobe,
-        profileSave: options.profileSave,
-        onSignInToSave: options.onSignInToSave,
         availableOptions: options.avatarOptionAvailability,
         definition: options.avatarDefinition,
         onChange: options.onAvatarDefinitionChange,
@@ -186,8 +181,6 @@ export function createTopLeftControls(
         characterSelection: options.characterSelection,
         definition: avatarDefinition,
         completeWardrobe: wardrobe,
-        profileSave: options.profileSave,
-        onSignInToSave: options.onSignInToSave,
         availableOptions: options.avatarOptionAvailability,
         onChange: options.onAvatarDefinitionChange,
       }) : undefined;

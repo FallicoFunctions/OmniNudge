@@ -7,23 +7,17 @@ const state=():ShowState=>({version:1,serverAt:0,eventStartsAt:10000,eventEndsAt
 const click=(name:string)=>{const b=Array.from(document.querySelectorAll('button')).find(b=>(b.getAttribute('aria-label')??b.textContent)===name);expect(b,name).toBeDefined();b!.click();};
 describe('show control HUD',()=>{
  it('preserves an acknowledged opening when a later rejection arrives before its snapshot',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=1000;s.fireworks.preparing={...turn,opening:[]};hud.apply(s,'a');
   click('Ruby Peony');hud.result({requestId:sent[0].requestId,ok:true,message:'Accepted'});
   click('Champagne Willow');hud.result({requestId:sent[1].requestId,ok:false,message:'Choose a smaller opening group.'});hud.update(1000);
   expect(document.querySelector('.show-selection')?.textContent).toBe('Ruby Peony · C');hud.dispose();
  });
- it('does not unmute an explicitly muted panel when selecting a firework',async()=>{
-  let enabled=true;const audio={get enabled(){return enabled;},enable:vi.fn(async(on:boolean)=>{enabled=on;return on;})};
-  const hud=createShowControlHud(document.body,()=>{},audio),s=state();s.serverAt=10000;s.fireworks.active={...turn};hud.apply(s,'a');
-  click('Sound on');await Promise.resolve();expect(enabled).toBe(false);
-  click('Ruby Peony');await Promise.resolve();expect(enabled).toBe(false);hud.dispose();
- });
 
  beforeEach(()=>{localStorage.clear();document.body.replaceChildren();});
  afterEach(()=>{document.body.replaceChildren();});
  it('does no hidden queue DOM work, keeps operator controls live, and refreshes on reopening',()=>{
-  const hud=createShowControlHud(document.body,()=>{},{enabled:false,enable:async()=>true}),s=state();
+  const hud=createShowControlHud(document.body,()=>{},{}),s=state();
   hud.apply(s,'a');click('Hide queues');
   const queue=document.querySelector('.show-queue')!;
   const observer=new MutationObserver(()=>{});observer.observe(queue,{subtree:true,childList:true,attributes:true,characterData:true});
@@ -40,7 +34,7 @@ describe('show control HUD',()=>{
   observer.disconnect();hud.dispose();
  });
  it('explains a queued turn and counts down to controls while the current show is automatic',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true}),s=state();
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{}),s=state();
   s.serverAt=20000;s.fireworks.nextAt=160000;s.fireworks.queue=[{playerId:'a',playerName:'A',joinedAt:19000}];hud.apply(s,'a');
   const queue=document.querySelector('[aria-label="Fireworks queue"]')!;
   expect(queue.textContent).toContain('Playing automatically');expect(queue.textContent).toContain("You're first in line");
@@ -50,7 +44,7 @@ describe('show control HUD',()=>{
   hud.status(false);hud.update(51000);expect(queue.querySelector('.show-queue-progress')?.hasAttribute('hidden')).toBe(true);hud.dispose();
  });
  it('waits behind an assigned player but readies controls for a late join to an open window',()=>{
-  const hud=createShowControlHud(document.body,()=>{},{enabled:false,enable:async()=>true}),s=state();
+  const hud=createShowControlHud(document.body,()=>{},{}),s=state();
   s.serverAt=20000;s.fireworks.nextAt=160000;s.fireworks.queue=[{playerId:'b',playerName:'B',joinedAt:1000},{playerId:'a',playerName:'A',joinedAt:19000}];hud.apply(s,'a');
   const progress=document.querySelector('[aria-label="Fireworks queue"] .show-queue-progress')!;
   expect(progress.textContent).toContain("You're #2 in line");expect(progress.textContent).toContain('Next turn window in 2:20');expect(progress.querySelector('.show-queue-wait')?.textContent).not.toContain('Your controls open');
@@ -60,7 +54,7 @@ describe('show control HUD',()=>{
   expect(progress.hasAttribute('hidden')).toBe(true);expect(document.querySelector('.show-board')?.hasAttribute('hidden')).toBe(false);hud.dispose();
  });
  it('stages an opening, hides the queue without leaving, and renders player names as text',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=1000;s.fireworks.preparing={...turn};hud.apply(s,'a');hud.update(1000);
   expect(document.body.textContent).toContain('Starts in 0:09');
   click('Ruby Peony');expect(sent.at(-1)).toMatchObject({action:'prepare',turnId:'turn-a',shots:[{design:'F01',bank:3}]});
@@ -69,7 +63,7 @@ describe('show control HUD',()=>{
   hud.dispose();expect(document.querySelector('.show-controls')).toBeNull();
  });
  it('places the active countdown and queued repeat on the same icon',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=20000;s.drones.active=turn;hud.apply(s,'a');hud.update(20000);
   const wave=document.querySelector('button[aria-label="Wave"]')!;
   expect(wave.querySelector('.show-icon-count')?.textContent).toBe('4');click('Wave');
@@ -82,7 +76,7 @@ describe('show control HUD',()=>{
   expect(Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Join drones')?.disabled).toBe(true);hud.dispose();
  });
  it('clears the opening selection after the server starts the turn',()=>{
-  const hud=createShowControlHud(document.body,()=>{}, {enabled:false,enable:async()=>true});
+  const hud=createShowControlHud(document.body,()=>{}, {});
   const s=state();s.serverAt=9000;s.fireworks.preparing={...turn,opening:[{design:'F01',bank:3}]};hud.apply(s,'a');
   expect(document.querySelector('.show-selection')?.textContent).toContain('Ruby Peony');
   s.serverAt=10000;s.fireworks.active=s.fireworks.preparing;s.fireworks.preparing=null;s.cooldowns.F01=14000;hud.apply(s,'a');
@@ -91,7 +85,7 @@ describe('show control HUD',()=>{
   expect(document.querySelector('button[aria-label="Ruby Peony"] .show-icon-count')?.textContent).toBe('4');hud.dispose();
  });
  it('keeps a rejected group for retry and prevents duplicate clicks while awaiting the result',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=10000;s.fireworks.active={...turn};hud.apply(s,'a');
   click('Select Multiple');click('Ruby Peony');click('Launch bank R2');click('Copper Palm');hud.update(10000);
   click('Launch Together');click('Launch Together');expect(sent).toHaveLength(1);
@@ -104,7 +98,7 @@ describe('show control HUD',()=>{
   expect(document.querySelector('.show-selection')?.children).toHaveLength(0);hud.dispose();
  });
  it('does not discard a newer selection when an earlier launch is acknowledged',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{enabled:false,enable:async()=>true});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=10000;s.fireworks.active={...turn};hud.apply(s,'a');
   click('Select Multiple');click('Ruby Peony');hud.update(10000);click('Launch Together');
   click('Clear selection');click('Launch bank R2');click('Copper Palm');

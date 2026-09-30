@@ -16,8 +16,6 @@ import {
 } from '../player/avatarDefinition';
 import type { ModularAvatarSlot } from '../player/modularAvatarContract';
 import type { CompleteAvatarWardrobe } from '../player/completeAvatarWardrobe';
-import { createCompleteWardrobeControls } from './createCompleteWardrobeControls';
-import type { AvatarProfileSaveView } from '../network/avatarProfileSave';
 
 export type AvatarOptionAvailability = Partial<
   Readonly<Record<ModularAvatarSlot, readonly string[]>>
@@ -31,8 +29,6 @@ export interface LaunchCharacterSelection {
 export interface CreateAvatarEditorOptions {
   characterSelection?: LaunchCharacterSelection;
   completeWardrobe?: CompleteAvatarWardrobe;
-  profileSave?: AvatarProfileSaveView;
-  onSignInToSave?: () => void;
   /** Fitted option ids present in the currently loaded modular GLB. */
   availableOptions?: AvatarOptionAvailability;
   definition?: AvatarDefinition;
@@ -125,14 +121,11 @@ export function createAvatarEditor(options: CreateAvatarEditorOptions = {}): Ava
       }
       panel.append(picker, message);
     }
-    const controls = options.completeWardrobe
-      ? createCompleteWardrobeControls(options.completeWardrobe, options.profileSave, options.onSignInToSave) : undefined;
-    if (controls) panel.appendChild(controls.element);
     return {
       element: panel,
       getDefinition: () => ({ ...definition }),
       setDefinition: next => { definition = normalizeAvatarDefinition(next); },
-      dispose() { disposed = true; disposers.forEach(dispose => dispose()); controls?.dispose(); panel.remove(); },
+      dispose() { disposed = true; disposers.forEach(dispose => dispose()); panel.remove(); },
     };
   }
 

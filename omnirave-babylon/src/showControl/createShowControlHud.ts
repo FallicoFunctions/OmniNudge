@@ -8,7 +8,7 @@ export function countdown(ms:number):string {const seconds=Math.max(0,Math.ceil(
 function element<K extends keyof HTMLElementTagNameMap>(tag:K,cls='',text=''){const e=document.createElement(tag);e.className=cls;e.textContent=text;return e;}
 function button(text:string,click:()=>void,cls=''){const b=element('button',cls,text);b.type='button';b.onclick=click;return b;}
 
-export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{enable:(on:boolean)=>Promise<boolean>;unlock?:()=>Promise<boolean>;readonly enabled:boolean}){
+export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>}){
   const root=element('div','show-controls');host.append(root);
   const toggle=button('Show queues',()=>{hidden=!hidden;try{localStorage.setItem('omnirave.showQueuesHidden',String(hidden));}catch{}updateVisibility();if(!hidden)render();},'show-queue-toggle');root.append(toggle);
   const queue=element('section','show-queue');queue.setAttribute('aria-label','Show queues');root.append(queue);
@@ -24,8 +24,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   }
   const board=element('section','show-board');board.hidden=true;board.setAttribute('aria-label','Show control panel');root.append(board);
   const heading=element('header','show-board-heading'),title=element('strong'),timer=element('span','show-turn-clock');
-  const sound=button('Sound off',()=>{void audio.enable(!audio.enabled).then(()=>{sound.textContent=audio.enabled?'Sound on':'Sound off';});});
-  const exit=button('End turn',()=>{if(panel&&turn)command(panel,'leave',{turnId:turn.id});});heading.append(title,timer,sound,exit);board.append(heading);
+  const exit=button('End turn',()=>{if(panel&&turn)command(panel,'leave',{turnId:turn.id});});heading.append(title,timer,exit);board.append(heading);
   const body=element('div','show-board-body'),grid=element('div','show-icon-grid'),side=element('aside','show-launch-options');body.append(grid,side);board.append(body);
   const hint=element('div','show-hint');board.append(hint);
   const message=element('div','show-message');message.setAttribute('role','status');root.append(message);
@@ -100,7 +99,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
     const key=`${nextPanel}:${nextTurn?.id}:${isPrep}`;panel=nextPanel;turn=nextTurn;preparing=isPrep;
     if(key!==viewKey){viewKey=key;selected=preparing?[...(turn?.opening??[])]:[];acceptedOpening=[...selected];pendingOpenings.clear();selectionRevision++;pendingLaunch=undefined;multiple=false;bank=3;buildBoard();}
     board.hidden=!panel;board.classList.toggle('is-preparing',preparing);
-    if(turn){timer.textContent=`${preparing?'Starts in':'Time left'} ${countdown((preparing?turn.startsAt:turn.endsAt)-now)}`;sound.textContent=audio.enabled?'Sound on':'Sound off';}
+    if(turn){timer.textContent=`${preparing?'Starts in':'Time left'} ${countdown((preparing?turn.startsAt:turn.endsAt)-now)}`;}
     // Movement snapshots keep arriving while this panel is hidden. Retain the
     // latest state, then refresh the queue synchronously when it is reopened.
     // Operator controls below remain live independently of queue visibility.

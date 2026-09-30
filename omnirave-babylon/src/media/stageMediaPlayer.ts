@@ -109,11 +109,29 @@ function createNoopBackend(): StagePlayerBackend {
   };
 }
 
+// A launch from omninudge.com's Play button hands over an audio element and an
+// AudioContext it started inside that click (see the frontend's
+// omniraveInPageLaunch.ts). Safari lets those play later without another
+// click; a new element or context would stay silent until the player clicks.
+interface PrimedGameAudio {
+  element: HTMLAudioElement;
+  context?: AudioContext;
+}
+
+function takePrimedAudio(): PrimedGameAudio | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const holder = window as { __omniravePrimedAudio?: PrimedGameAudio };
+  const primed = holder.__omniravePrimedAudio;
+  delete holder.__omniravePrimedAudio;
+  return primed;
+}
+
 // The real backend: wraps an HTMLAudioElement pointed at the self-hosted file.
 function createAudioBackend(): StagePlayerBackend {
+  const primed = takePrimedAudio();
   let audio: HTMLAudioElement;
   try {
-    audio = new Audio();
+    audio = primed?.element ?? new Audio();
     // Not a UI element; keep it out of layout. It is never appended to the DOM.
     audio.preload = 'auto';
   } catch {
@@ -154,7 +172,7 @@ function createAudioBackend(): StagePlayerBackend {
       if (!AudioContextCtor) {
         return;
       }
-      const context = new AudioContextCtor();
+      const context = primed?.context ?? new AudioContextCtor();
       const source = context.createMediaElementSource(element);
       const node = context.createAnalyser();
       // 256-point FFT -> 128 frequency bins: enough spectral detail for a

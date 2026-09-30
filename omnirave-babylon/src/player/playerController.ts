@@ -250,8 +250,8 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       resolveCameraForward(options.camera, cameraForward);
       const move = resolveCameraRelativeMoveVector(options.input, cameraForward);
       // Sec 7.5: crouch overrides sprint, so stamina only drains for sprint
-      // that is actually being applied as speed.
-      const sprintEngaged = options.input.sprint && !crouchActive;
+      // that is actually being applied as speed - and only while moving.
+      const sprintEngaged = options.input.sprint && !crouchActive && move.magnitude > 0;
       const sprintAllowed = stepStamina(staminaState, sprintEngaged, deltaSeconds);
       controller.stamina0to1 = staminaState.stamina;
       const speed = resolvePlayerSpeed(options.playerRig.speedMetersPerSecond, sprintAllowed, crouchActive);

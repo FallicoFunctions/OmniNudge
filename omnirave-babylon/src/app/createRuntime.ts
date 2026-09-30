@@ -1,7 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
 import { parsePerfFlags } from './perfFlags';
-import { exchangeLaunchSession, parseSessionExchangeParams } from '../network/sessionExchange';
+import { exchangeLaunchSession, parseSessionExchangeParams, requestFreshLaunch } from '../network/sessionExchange';
 import { runtimeLogin, runtimeLogout, runtimeSignup, RuntimeAuthError, type RuntimeAuthSession } from '../network/runtimeAuth';
 import './webgpuShaders';
 import '@babylonjs/core/Shaders/bloomMerge.fragment';
@@ -235,37 +235,47 @@ export async function createRuntime(host: HTMLElement) {
   let resolvedProfilePlayerId: string | undefined;
   if (!resolvedWorldUrl || !resolvedWorldToken) {
     const exchangeParams = parseSessionExchangeParams(window.location.search);
-    if (exchangeParams) {
-      const exchanged = await exchangeLaunchSession(exchangeParams);
-      markBootPhase('exchanged');
-      if (exchanged) {
-        resolvedWorldUrl = exchanged.worldSocketUrl;
-        resolvedWorldToken = exchanged.worldSessionToken;
-        // An SSO'd omninudge.com account player must never see a Log In /
-        // Sign Up prompt for an identity they already have.
-        resolvedSessionMode = exchanged.mode === 'account' ? 'account' : 'guest';
-        resolvedAccountLoadout = exchanged.loadout;
-        resolvedProfileToken = exchanged.mode === 'account' ? exchanged.sessionToken : undefined;
-        resolvedProfilePlayerId = exchanged.mode === 'account' ? exchanged.playerId : undefined;
-        // Start the stage track from the handoff's playhead now, so sound
-        // does not wait for the scene and the world socket's first snapshot.
-        const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
-        if (handoffMedia) {
-          const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
-          earlyStageMediaPlayer = createStageMediaPlayer();
-          earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
-          earlyStageMediaPlayer.unlock();
-          // Boot timing: note the moment sound starts, even mid-scene-build.
-          const player = earlyStageMediaPlayer;
-          const startedWatching = performance.now();
-          const watchAudible = window.setInterval(() => {
-            if (player.isAudible()) markBootPhase('audible');
-            if (player.isAudible() || performance.now() - startedWatching > 60_000) window.clearInterval(watchAudible);
-          }, 250);
-        }
-      } else {
-        console.warn('[world] session exchange failed; continuing without a world connection');
+    let exchanged = exchangeParams ? await exchangeLaunchSession(exchangeParams) : null;
+    // A refresh reuses a spent one-time token (or the address has none). The
+    // live game then asks for a fresh launch itself, as the Play button does;
+    // only local development keeps the no-world review path.
+    if (!exchanged && import.meta.env.PROD) {
+      const fresh = await requestFreshLaunch();
+      exchanged = fresh ? await exchangeLaunchSession(fresh) : null;
+    }
+    markBootPhase('exchanged');
+    if (exchanged) {
+      // The token is spent: drop it from the address so a refresh starts clean.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('handoff');
+      cleanUrl.searchParams.delete('mode');
+      window.history.replaceState(window.history.state, '', cleanUrl.toString());
+      resolvedWorldUrl = exchanged.worldSocketUrl;
+      resolvedWorldToken = exchanged.worldSessionToken;
+      // An SSO'd omninudge.com account player must never see a Log In /
+      // Sign Up prompt for an identity they already have.
+      resolvedSessionMode = exchanged.mode === 'account' ? 'account' : 'guest';
+      resolvedAccountLoadout = exchanged.loadout;
+      resolvedProfileToken = exchanged.mode === 'account' ? exchanged.sessionToken : undefined;
+      resolvedProfilePlayerId = exchanged.mode === 'account' ? exchanged.playerId : undefined;
+      // Start the stage track from the handoff's playhead now, so sound
+      // does not wait for the scene and the world socket's first snapshot.
+      const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
+      if (handoffMedia) {
+        const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
+        earlyStageMediaPlayer = createStageMediaPlayer();
+        earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
+        earlyStageMediaPlayer.unlock();
+        // Boot timing: note the moment sound starts, even mid-scene-build.
+        const player = earlyStageMediaPlayer;
+        const startedWatching = performance.now();
+        const watchAudible = window.setInterval(() => {
+          if (player.isAudible()) markBootPhase('audible');
+          if (player.isAudible() || performance.now() - startedWatching > 60_000) window.clearInterval(watchAudible);
+        }, 250);
       }
+    } else {
+      console.warn('[world] session exchange failed; continuing without a world connection');
     }
   }
   // The local player's current serialized appearance starts with the launch
@@ -1110,8 +1120,6 @@ export async function createRuntime(host: HTMLElement) {
           },
         },
         completeWardrobe: reviewRuntime?.reviewAvatar?.wardrobe,
-        profileSave: reviewRuntime?.avatarPreviewLocked ? undefined : avatarProfileSaver,
-        onSignInToSave: () => authPopup?.open('login'),
         avatarColorways: reviewRuntime?.avatarColorways,
         selectedAvatarColorwayId: reviewRuntime?.selectedAvatarColorway?.id,
         avatarDefinition: parseAvatarLoadout(localAvatarLoadout),
