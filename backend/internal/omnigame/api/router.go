@@ -86,6 +86,8 @@ func NewRouter(
 	runtimeAuthHandler := handlers.NewRuntimeAuthHandler(handlers.NewRuntimeAuthService(sessionService, authService))
 	v1.POST("/omnigame/launch/omnirave", launchHandler.CreateOmniRaveLaunch)
 	v1.POST("/omnigame/session/exchange", launchHandler.ExchangeSession)
+	renewHandler := handlers.NewRenewHandler(authService, sessionService, handlers.NewGuestIdentityResolver(trustedProxies))
+	v1.POST("/omnigame/session/renew", renewHandler.Renew)
 	// The runtime signs in against the same accounts as the main API, so it
 	// carries the same limits under the same keys; with a shared Redis the two
 	// servers share one count, and switching servers does not reset it.

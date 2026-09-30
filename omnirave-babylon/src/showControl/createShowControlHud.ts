@@ -109,7 +109,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
       const committed=!!panel||(['fireworks','drones'] as const).some(n=>state![n].queue.some(q=>q.playerId===playerId));
       for(const name of ['fireworks','drones'] as const){const p=state[name],ui=queueSections.get(name)!;ui.roster.replaceChildren();
         if(p.preparing)ui.roster.append(element('li','is-next',`${p.preparing.playerName} · preparing`));
-        p.queue.forEach(q=>ui.roster.append(element('li',q.playerId===playerId?'is-you':'',q.playerName+(q.playerId===playerId?' · you':''))));
+        p.queue.forEach(q=>ui.roster.append(element('li',q.playerId===playerId?'is-you':'',q.playerName+(q.playerId===playerId?' · you':'')+(q.awaySince?' · away':''))));
         if(!p.preparing&&!p.queue.length)ui.roster.append(element('li','','Queue open'));
         ui.join.hidden=connected&&(p.active?.playerId===playerId||p.preparing?.playerId===playerId||p.queue.some(q=>q.playerId===playerId));
         ui.join.disabled=!connected||committed;ui.leave.hidden=!p.queue.some(q=>q.playerId===playerId)&&p.preparing?.playerId!==playerId;
@@ -163,7 +163,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
       if(!result.ok)notify(result.message);
       render();
     },
-    status(open:boolean){connected=open;rosterKey='';if(!open){board.hidden=true;if(state)notify('Connection lost. Your queue place is released.');}else{message.textContent='';render();}},
+    status(open:boolean){connected=open;rosterKey='';if(!open){board.hidden=true;if(state&&(['fireworks','drones'] as const).some(n=>state![n].queue.some(q=>q.playerId===playerId)||state![n].preparing?.playerId===playerId))notify('Connection lost. Your queue place is held for 2 minutes.');}else{message.textContent='';render();}},
     dispose(){root.remove();},
   };
 }

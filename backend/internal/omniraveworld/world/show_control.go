@@ -64,7 +64,14 @@ type ShowQueueEntry struct {
 	PlayerID   string `json:"playerId"`
 	PlayerName string `json:"playerName"`
 	JoinedAt   int64  `json:"joinedAt"`
+	// AwaySince is when the player's connection dropped (0 while present). An
+	// away player keeps the place for ShowQueueGraceMS; turns skip them.
+	AwaySince int64 `json:"awaySince,omitempty"`
 }
+
+// ShowQueueGraceMS is how long a disconnected player keeps a queue place.
+const ShowQueueGraceMS = int64(2 * 60 * 1000)
+
 type ShowTurn struct {
 	ID          string     `json:"id"`
 	PlayerID    string     `json:"playerId"`
@@ -211,12 +218,25 @@ func (w *World) endShowTurn(p *ShowPanel) {
 	}
 	p.Active = nil
 }
-func (w *World) removeShowPlayer(id string) {
+
+// markShowPlayerAway keeps id's queue places but marks them away from now:
+// a turn being prepared for them passes on, and an active turn ends.
+func (w *World) markShowPlayerAway(id string, now int64) {
 	s := w.show
 	for _, p := range []*ShowPanel{&s.Fireworks, &s.Drones} {
-		p.Queue = slices.DeleteFunc(p.Queue, func(q ShowQueueEntry) bool { return q.PlayerID == id })
+		for i := range p.Queue {
+			if p.Queue[i].PlayerID == id && p.Queue[i].AwaySince == 0 {
+				p.Queue[i].AwaySince = now
+			}
+		}
 		if p.Preparing != nil && p.Preparing.PlayerID == id {
+			// Back in line at the front, so the turn goes to the next present
+			// player and this one keeps their place for the one after.
+			turn := p.Preparing
 			p.Preparing = nil
+			if !slices.ContainsFunc(p.Queue, func(q ShowQueueEntry) bool { return q.PlayerID == id }) {
+				p.Queue = slices.Insert(p.Queue, 0, ShowQueueEntry{PlayerID: id, PlayerName: turn.PlayerName, JoinedAt: turn.StartsAt - s.PreparationMS, AwaySince: now})
+			}
 		}
 		if p.Active != nil && p.Active.PlayerID == id {
 			w.endShowTurn(p)
@@ -228,6 +248,29 @@ func (w *World) removeShowPlayer(id string) {
 	delete(s.results, id)
 	delete(s.resultOrder, id)
 }
+
+// markShowPlayerPresent returns id's queue places to them on reconnect.
+func (w *World) markShowPlayerPresent(id string) {
+	s := w.show
+	for _, p := range []*ShowPanel{&s.Fireworks, &s.Drones} {
+		for i := range p.Queue {
+			if p.Queue[i].PlayerID == id {
+				p.Queue[i].AwaySince = 0
+			}
+		}
+	}
+}
+
+// expireAwayQueueEntries drops places whose player has been away too long.
+func (w *World) expireAwayQueueEntries(now int64) {
+	s := w.show
+	for _, p := range []*ShowPanel{&s.Fireworks, &s.Drones} {
+		p.Queue = slices.DeleteFunc(p.Queue, func(q ShowQueueEntry) bool {
+			return q.AwaySince != 0 && now-q.AwaySince >= ShowQueueGraceMS
+		})
+	}
+}
+
 func (w *World) prepareShow(p *ShowPanel, at, now int64) {
 	p.NextAt = at
 	// Preparation opens up to ten seconds early; arrivals may use the remaining
@@ -235,12 +278,13 @@ func (w *World) prepareShow(p *ShowPanel, at, now int64) {
 	if p.Preparing != nil || now < at-w.show.PreparationMS || now >= at {
 		return
 	}
-	for len(p.Queue) > 0 {
-		q := p.Queue[0]
-		p.Queue = p.Queue[1:]
-		if w.players[q.PlayerID] == nil {
+	// The first player in line who is present takes the turn; anyone away
+	// keeps their place for a later one.
+	for i, q := range p.Queue {
+		if q.AwaySince != 0 || w.players[q.PlayerID] == nil {
 			continue
 		}
+		p.Queue = slices.Delete(p.Queue, i, i+1)
 		p.Preparing = &ShowTurn{ID: w.show.id("turn"), PlayerID: q.PlayerID, PlayerName: q.PlayerName, StartsAt: at, EndsAt: at + w.show.TurnMS, Opening: []ShowShot{}}
 		return
 	}
@@ -285,6 +329,7 @@ func (w *World) advanceShows(now int64) bool {
 	oldF, oldD := s.Fireworks.Active, s.Drones.Active
 	oldP, oldQ := s.Fireworks.Preparing, s.Drones.Preparing
 	s.ServerAt = now
+	w.expireAwayQueueEntries(now)
 	s.Launches = slices.DeleteFunc(s.Launches, func(l ShowLaunch) bool { return l.EndsAt <= now })
 	for _, p := range []*ShowPanel{&s.Fireworks, &s.Drones} {
 		if p.Active != nil && now >= p.Active.EndsAt {
@@ -320,8 +365,9 @@ func (w *World) advanceShows(now int64) bool {
 			next = now + s.PreparationMS
 		}
 		s.lastDroneBoundary = next
-		if s.Drones.Active == nil && len(s.Drones.Queue) > 0 && s.Drones.Queue[0].JoinedAt > next-s.PreparationMS {
-			s.lastDroneBoundary = s.Drones.Queue[0].JoinedAt + s.PreparationMS
+		// Only a present player's arrival can shift the next drone boundary.
+		if i := slices.IndexFunc(s.Drones.Queue, func(q ShowQueueEntry) bool { return q.AwaySince == 0 }); s.Drones.Active == nil && i >= 0 && s.Drones.Queue[i].JoinedAt > next-s.PreparationMS {
+			s.lastDroneBoundary = s.Drones.Queue[i].JoinedAt + s.PreparationMS
 			next = s.lastDroneBoundary
 		}
 		w.prepareShow(&s.Drones, next, now)
@@ -503,7 +549,7 @@ func (w *World) ApplyShowCommand(playerID string, session *Player, c ShowCommand
 			if len(p.Queue) >= 100 {
 				return "This queue is full."
 			}
-			p.Queue = append(p.Queue, ShowQueueEntry{playerID, session.PlayerName, at})
+			p.Queue = append(p.Queue, ShowQueueEntry{PlayerID: playerID, PlayerName: session.PlayerName, JoinedAt: at})
 			// Publish preparation in this command, including a join just before start.
 			w.advanceShows(at)
 			return ""

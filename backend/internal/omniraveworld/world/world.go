@@ -3,6 +3,7 @@ package world
 import (
 	"math"
 	"sync"
+	"time"
 )
 
 // maxMoveStep bounds how far a single ApplyInput call may relocate a player
@@ -21,6 +22,8 @@ type World struct {
 	players map[string]*Player
 	mu      sync.RWMutex
 	show    *showControl
+	// now is the wall clock; tests replace it to step through queue grace.
+	now func() time.Time
 }
 
 func NewWorld(cfg Config) *World {
@@ -28,6 +31,7 @@ func NewWorld(cfg Config) *World {
 		cfg:     cfg,
 		players: make(map[string]*Player),
 		show:    newShowControl(),
+		now:     time.Now,
 	}
 }
 
@@ -40,8 +44,11 @@ func (w *World) AddPlayer(session PlayerSession) *Player {
 	defer w.mu.Unlock()
 
 	if w.players[session.PlayerID] != nil {
-		w.removeShowPlayer(session.PlayerID)
+		// A reconnect replacing a live connection: the old one's turn ends,
+		// but its queue places carry over to this one.
+		w.markShowPlayerAway(session.PlayerID, w.now().UnixMilli())
 	}
+	w.markShowPlayerPresent(session.PlayerID)
 	spawn := w.cfg.SpawnPoint
 	if session.ReturnPoint != nil && w.cfg.Walkable.IsValid(*session.ReturnPoint) {
 		spawn = *session.ReturnPoint
@@ -119,7 +126,9 @@ func (w *World) RemovePlayer(playerID string, session *Player) {
 	defer w.mu.Unlock()
 
 	if current, ok := w.players[playerID]; ok && current == session {
-		w.removeShowPlayer(playerID)
+		// A dropped connection keeps its queue places for ShowQueueGraceMS;
+		// a reconnect within that time finds them where they were.
+		w.markShowPlayerAway(playerID, w.now().UnixMilli())
 		delete(w.players, playerID)
 	}
 }

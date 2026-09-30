@@ -63,6 +63,8 @@ type ClientEvent struct {
 	// client input: the handler validates it with ValidateLoadout and strips
 	// control characters before it is applied and broadcast.
 	Loadout Loadout `json:"loadout,omitempty"`
+	// Token carries a "renew" event's fresh world token.
+	Token string `json:"token,omitempty"`
 }
 
 type ZoneMediaState struct {

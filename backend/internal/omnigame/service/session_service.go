@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -356,4 +357,46 @@ func (s *SessionService) hydrateGuestRuntimeResponse(session *model.LaunchSessio
 	}
 
 	return bootstrap, nil
+}
+
+// ErrRenewalNotSupported refuses modes that renew by another path: a persona
+// is re-admitted by its own runtime through the admission endpoint.
+var ErrRenewalNotSupported = errors.New("omnigame: this session renews through admission")
+
+// RenewWorldToken issues a fresh world token for the same player as current,
+// a token that has already been validated (for an account that validation
+// re-read the account: banned, deleted or signed out everywhere fail there).
+// A guest is asked the network sanction question again. The five-minute
+// token, and with it the bound on how long a sanction takes to hold, stays.
+func (s *SessionService) RenewWorldToken(ctx context.Context, current *services.OmniRaveWorldJWTClaims, remoteIP string) (string, error) {
+	if s.tokenIssuer == nil {
+		return "", errors.New("omnigame: no world token issuer")
+	}
+	switch model.LaunchMode(current.Mode) {
+	case model.LaunchModeAccount:
+		if current.UserID == nil {
+			return "", ErrRenewalNotSupported
+		}
+	case model.LaunchModeGuest:
+		blocked, err := s.guestService.IsNetworkBlocked(ctx, remoteIP)
+		if err != nil {
+			return "", err
+		}
+		if blocked {
+			return "", ErrSanctionedGuest
+		}
+	default:
+		return "", ErrRenewalNotSupported
+	}
+	return s.tokenIssuer.GenerateOmniRaveWorldJWT(services.OmniRaveWorldTokenInput{
+		UserID:       current.UserID,
+		Username:     current.Username,
+		TokenVersion: current.TokenVersion,
+		SubjectKind:  current.SubjectKind,
+		PlayerID:     current.PlayerID,
+		PlayerName:   current.PlayerName,
+		Mode:         current.Mode,
+		Loadout:      current.Loadout,
+		ReturnPoint:  current.ReturnPoint,
+	})
 }

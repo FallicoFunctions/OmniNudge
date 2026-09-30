@@ -450,28 +450,6 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   let activeCameraPointerId: number | undefined;
   let lastCameraPointerX = 0;
   let lastCameraPointerY = 0;
-  // Pointer Lock always hides the system cursor. While a right-drag holds the
-  // lock, an arrow drawn at the press point stands in for it, so the cursor
-  // stays visible and still.
-  let heldCursor: HTMLElement | undefined;
-  let heldCursorX = 0;
-  let heldCursorY = 0;
-  const removeHeldCursor = () => {
-    heldCursor?.remove();
-    heldCursor = undefined;
-  };
-  const handlePointerLockChange = () => {
-    if (canvas && document.pointerLockElement === canvas) {
-      removeHeldCursor();
-      heldCursor = document.createElement('div');
-      heldCursor.dataset.testid = 'held-cursor';
-      heldCursor.style.cssText = `position:fixed;left:${heldCursorX}px;top:${heldCursorY}px;width:12px;height:19px;pointer-events:none;z-index:2147483647`;
-      heldCursor.innerHTML = '<svg width="12" height="19" viewBox="0 0 12 19" xmlns="http://www.w3.org/2000/svg"><path d="M0.5 0.5v16.2l3.9-3.8 2.4 5.6 2.4-1-2.3-5.5h5.4z" fill="#000" stroke="#fff"/></svg>';
-      document.body.appendChild(heldCursor);
-    } else {
-      removeHeldCursor();
-    }
-  };
   const handleCameraWheel = (event: WheelEvent) => {
     event.preventDefault();
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1);
@@ -490,18 +468,6 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
     canvas?.setPointerCapture(event.pointerId);
-    // A right-drag holds the cursor still: the pointer is locked for the drag
-    // and the camera turns by raw mouse movement instead.
-    if (event.button === 2 && canvas?.requestPointerLock) {
-      heldCursorX = event.clientX;
-      heldCursorY = event.clientY;
-      try {
-        const locking = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
-        void locking?.catch?.(() => {});
-      } catch {
-        // No lock available: the drag works as before, with a moving cursor.
-      }
-    }
   };
   const handleCameraPointerMove = (event: PointerEvent) => {
     if (activeCameraPointerId !== event.pointerId) {
@@ -509,9 +475,8 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     }
 
     event.preventDefault();
-    const locked = Boolean(canvas) && document.pointerLockElement === canvas;
-    const deltaX = locked ? event.movementX : event.clientX - lastCameraPointerX;
-    const deltaY = locked ? event.movementY : event.clientY - lastCameraPointerY;
+    const deltaX = event.clientX - lastCameraPointerX;
+    const deltaY = event.clientY - lastCameraPointerY;
     lastCameraPointerX = event.clientX;
     lastCameraPointerY = event.clientY;
     // Owner-set direction: dragging right turns the view the other way from
@@ -530,16 +495,12 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }
-    if (canvas && document.pointerLockElement === canvas) {
-      document.exitPointerLock();
-    }
   };
 
   const handleCameraContextMenu = (event: Event) => event.preventDefault();
   if (canvas) {
     canvas.tabIndex = 0;
     canvas.addEventListener('contextmenu', handleCameraContextMenu);
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
     canvas.style.touchAction = 'none';
     canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
     canvas.addEventListener('pointerdown', handleCameraPointerDown);
@@ -646,8 +607,6 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     vipSkydeck.dispose();
     wingBridge.dispose();
     canvas?.removeEventListener('contextmenu', handleCameraContextMenu);
-    document.removeEventListener('pointerlockchange', handlePointerLockChange);
-    removeHeldCursor();
     canvas?.removeEventListener('wheel', handleCameraWheel);
     canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
     canvas?.removeEventListener('pointermove', handleCameraPointerMove);

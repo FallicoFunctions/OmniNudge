@@ -199,6 +199,22 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch event.Type {
+		case "renew":
+			// A token fresh from /omnigame/session/renew moves this session's
+			// end to its expiry, without a reconnect. It must name this same
+			// player; minting it asked the admission questions again, and the
+			// validation above re-reads an account's standing once more.
+			renewed, until, err := h.sessionFromToken(r.Context(), event.Token)
+			if err != nil || renewed.PlayerID != clientSession.PlayerID {
+				continue
+			}
+			// Stop reports false once the old deadline has already fired; that
+			// connection is closing and is not revived.
+			if expiryTimer.Stop() {
+				expiryTimer = time.AfterFunc(time.Until(until), func() {
+					h.disconnectConn(clientSession.PlayerID, cc)
+				})
+			}
 		case "show_control":
 			if event.Show == nil {
 				continue
@@ -541,7 +557,16 @@ func (h *WSHandler) parsePlayerSession(ctx context.Context, r *http.Request) (wo
 		return world.PlayerSession{}, time.Time{}, http.ErrNoCookie
 	}
 
-	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	return h.sessionFromToken(ctx, r.URL.Query().Get("token"))
+}
+
+// sessionFromToken validates a world token (at the upgrade, and again for
+// each "renew") and returns the session it admits and when it expires.
+func (h *WSHandler) sessionFromToken(ctx context.Context, token string) (world.PlayerSession, time.Time, error) {
+	if h.auth == nil {
+		return world.PlayerSession{}, time.Time{}, http.ErrNoCookie
+	}
+	token = strings.TrimSpace(token)
 	if token == "" {
 		return world.PlayerSession{}, time.Time{}, http.ErrNoCookie
 	}

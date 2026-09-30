@@ -596,6 +596,7 @@ export async function createRuntime(host: HTMLElement) {
       if (disposed) {
         return;
       }
+      stopWorldSessionRenewal?.();
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
       localChatBubbles?.dispose();
@@ -617,6 +618,7 @@ export async function createRuntime(host: HTMLElement) {
     // outbound moves internally; the render loop just offers the freshest
     // position each frame.
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
+    let stopWorldSessionRenewal: (() => void) | undefined;
     let worldSpawnInitialized = false;
     let restoringAppearance = false;
     let appearanceRevision = 0;
@@ -882,6 +884,10 @@ export async function createRuntime(host: HTMLElement) {
         worldAppearance?.status(status);
       });
       worldSocket.connect();
+      // The world token lasts five minutes; renew it on the open socket
+      // before then so the session does not end under the player.
+      const { keepWorldSessionAlive } = await import('../network/worldSessionRenewal');
+      stopWorldSessionRenewal = keepWorldSessionAlive(worldSocket, { freshLaunch: import.meta.env.PROD });
 
       // The player arrives in the room as it is: nothing waits for audio.
       // Stage audio starts now if the browser allows it, and otherwise on the

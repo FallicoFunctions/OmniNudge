@@ -181,3 +181,44 @@ func isTimeout(err error) bool {
 	}
 	return false
 }
+
+func TestWSHandler_RenewMovesTheSessionEndToTheFreshToken(t *testing.T) {
+	worldState, testServer, authService := newExpiryTestServer(t)
+
+	token := newWorldSessionTokenWithTTL(t, authService, "guest-renewing", "Guest-Renewing", shortSessionTTL)
+	conn, _, err := websocket.DefaultDialer.Dial(
+		buildWorldWSURL(testServer.URL, token, ""),
+		worldDialHeader("https://play.omninudge.com"),
+	)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	fresh := newGuestWorldSessionToken(t, authService, "guest-renewing", "Guest-Renewing", nil)
+	require.NoError(t, conn.WriteJSON(map[string]any{"type": "renew", "token": fresh}))
+
+	time.Sleep(shortSessionTTL + 500*time.Millisecond)
+	require.NotNil(t, worldState.Player("guest-renewing"), "a renewed session must outlive the token it opened with")
+}
+
+func TestWSHandler_RenewForAnotherPlayerExtendsNothing(t *testing.T) {
+	worldState, testServer, authService := newExpiryTestServer(t)
+
+	token := newWorldSessionTokenWithTTL(t, authService, "guest-a", "Guest-A", shortSessionTTL)
+	conn, _, err := websocket.DefaultDialer.Dial(
+		buildWorldWSURL(testServer.URL, token, ""),
+		worldDialHeader("https://play.omninudge.com"),
+	)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	someoneElse := newGuestWorldSessionToken(t, authService, "guest-b", "Guest-B", nil)
+	require.NoError(t, conn.WriteJSON(map[string]any{"type": "renew", "token": someoneElse}))
+
+	require.Eventually(t, func() bool {
+		return worldState.Player("guest-a") == nil
+	}, shortSessionTTL+5*time.Second, 20*time.Millisecond, "another player's token must not extend this session")
+}

@@ -73,6 +73,12 @@ func (s *GuestService) ExchangeBootstrap(ctx context.Context, token, remoteIP st
 	}, nil
 }
 
+// IsNetworkBlocked asks the network half of the bootstrap question again, for
+// a guest renewing a world session (the one-time launch token is long spent).
+func (s *GuestService) IsNetworkBlocked(ctx context.Context, remoteIP string) (bool, error) {
+	return s.sanctions.IsBootstrapBlocked(ctx, "", hashGuestNetwork(remoteIP))
+}
+
 func hashGuestNetwork(remoteIP string) string {
 	remoteIP = strings.TrimSpace(remoteIP)
 	if remoteIP == "" {

@@ -90,18 +90,26 @@ func TestShowDisconnectAndStaleSession(t *testing.T) {
 		}
 	}
 	join(p, "first")
+	w.now = func() time.Time { return now }
 	fresh := w.AddPlayer(PlayerSession{PlayerID: "p"})
-	if len(w.show.Fireworks.Queue) != 0 {
-		t.Fatal("reconnect preserved old place")
+	if len(w.show.Fireworks.Queue) != 1 || w.show.Fireworks.Queue[0].AwaySince != 0 {
+		t.Fatal("reconnect did not keep the queue place", w.show.Fireworks.Queue)
 	}
-	join(fresh, "new")
 	w.RemovePlayer("p", p)
-	if len(w.show.Fireworks.Queue) != 1 {
-		t.Fatal("stale cleanup removed fresh entry")
+	if len(w.show.Fireworks.Queue) != 1 || w.show.Fireworks.Queue[0].AwaySince != 0 {
+		t.Fatal("stale cleanup touched the fresh connection's place")
 	}
 	w.RemovePlayer("p", fresh)
+	if len(w.show.Fireworks.Queue) != 1 || w.show.Fireworks.Queue[0].AwaySince != now.UnixMilli() {
+		t.Fatal("disconnect did not keep the place as away", w.show.Fireworks.Queue)
+	}
+	w.AdvanceShows(now.Add(2*time.Minute - time.Second))
+	if len(w.show.Fireworks.Queue) != 1 {
+		t.Fatal("place released before the two-minute grace")
+	}
+	w.AdvanceShows(now.Add(2 * time.Minute))
 	if len(w.show.Fireworks.Queue) != 0 {
-		t.Fatal("disconnect did not remove place")
+		t.Fatal("place kept after the two-minute grace")
 	}
 }
 
@@ -274,12 +282,19 @@ func TestVacatedPreparationPromotesNextPlayerForSameFullTurn(t *testing.T) {
 				}
 				boundary := p.Preparing.StartsAt
 				if departure == "disconnect" {
+					w.now = func() time.Time { return time.UnixMilli(boundary - 4000) }
 					w.RemovePlayer(a.ID, a)
 				} else if r := w.ApplyShowCommand(a.ID, a, ShowCommand{RequestID: "leave", Panel: panel, Action: "leave", TurnID: p.Preparing.ID}, time.UnixMilli(boundary-4000)); !r.OK {
 					t.Fatal(r)
 				}
 				w.AdvanceShows(time.UnixMilli(boundary - 3000))
-				if p.Preparing == nil || p.Preparing.PlayerID != b.ID || p.Preparing.StartsAt != boundary || len(p.Queue) != 0 {
+				// A departed player is gone from the line; a disconnected one keeps
+				// the place (away) for the turn after.
+				wantQueue := 0
+				if departure == "disconnect" {
+					wantQueue = 1
+				}
+				if p.Preparing == nil || p.Preparing.PlayerID != b.ID || p.Preparing.StartsAt != boundary || len(p.Queue) != wantQueue {
 					t.Fatal("replacement did not receive the remaining preparation", p)
 				}
 				if p.Preparing.EndsAt-p.Preparing.StartsAt != 150000 {
@@ -294,5 +309,42 @@ func TestVacatedPreparationPromotesNextPlayerForSameFullTurn(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestAwayPlayerKeepsPlaceWhileTheTurnPassesToThePresentPlayer(t *testing.T) {
+	w := NewWorld(DefaultConfig())
+	start := time.Date(2026, 9, 17, 20, 0, 0, 0, time.UTC)
+	a := w.AddPlayer(PlayerSession{PlayerID: "a"})
+	b := w.AddPlayer(PlayerSession{PlayerID: "b"})
+	for _, p := range []*Player{a, b} {
+		if r := w.ApplyShowCommand(p.ID, p, ShowCommand{RequestID: "join", Panel: "fireworks", Action: "join"}, start.Add(-time.Minute)); !r.OK {
+			t.Fatal(r)
+		}
+	}
+	w.now = func() time.Time { return start.Add(-30 * time.Second) }
+	w.RemovePlayer(a.ID, a)
+
+	// A's turn comes up while A is away: the present player behind takes it.
+	w.AdvanceShows(start.Add(-10 * time.Second))
+	f := &w.show.Fireworks
+	if f.Preparing == nil || f.Preparing.PlayerID != b.ID {
+		t.Fatal("the turn did not pass to the present player", f.Preparing)
+	}
+	if len(f.Queue) != 1 || f.Queue[0].PlayerID != a.ID || f.Queue[0].AwaySince == 0 {
+		t.Fatal("the away player lost their place", f.Queue)
+	}
+
+	// A comes back within the grace and is next in line again.
+	w.now = func() time.Time { return start }
+	returned := w.AddPlayer(PlayerSession{PlayerID: "a"})
+	if f.Queue[0].AwaySince != 0 {
+		t.Fatal("the returning player is still marked away")
+	}
+	w.AdvanceShows(start)
+	next := f.Active.EndsAt
+	w.AdvanceShows(time.UnixMilli(next - 10000))
+	if f.Preparing == nil || f.Preparing.PlayerID != returned.ID {
+		t.Fatal("the returning player did not get the next turn", f.Preparing)
 	}
 }

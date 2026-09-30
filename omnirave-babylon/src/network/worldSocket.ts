@@ -105,6 +105,11 @@ export interface WorldSocket {
   // local player is. dispose() is deliberately terminal (see its comment) and
   // cannot be reused for this - reconnect is the separate, non-terminal path.
   reconnect: (url: string, token: string) => void;
+  // Hands the world a fresh token for this same player over the open socket,
+  // moving the session's end to its expiry, and keeps it for any reconnect.
+  renew: (token: string) => void;
+  currentToken: () => string;
+  status: () => WorldSocketStatus;
   dispose: () => void;
   sendMove: (position: Vec3, crouched?: boolean) => void;
   sendRespawn: () => void;
@@ -447,6 +452,12 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   return {
     connect,
     reconnect,
+    renew(token) {
+      currentToken = token;
+      send({ type: 'renew', token });
+    },
+    currentToken: () => currentToken,
+    status: () => status,
     dispose,
     sendMove,
     sendRespawn,

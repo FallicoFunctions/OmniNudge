@@ -6,6 +6,21 @@ const turn:ShowTurn={id:'turn-a',playerId:'a',playerName:'<img src=x onerror=ale
 const state=():ShowState=>({version:1,serverAt:0,eventStartsAt:10000,eventEndsAt:310000,turnMs:150000,preparationMs:10000,fireworks:{active:null,preparing:null,queue:[],nextAt:10000},drones:{active:null,preparing:null,queue:[],nextAt:10000},launches:[],cooldowns:{},banks:{},drone:{clip:'wave',startsAt:10000,endsAt:24000,transitionMs:2500,from:[{clip:'cube',weight:1}],next:''}});
 const click=(name:string)=>{const b=Array.from(document.querySelectorAll('button')).find(b=>(b.getAttribute('aria-label')??b.textContent)===name);expect(b,name).toBeDefined();b!.click();};
 describe('show control HUD',()=>{
+ it('holds a queued place on disconnect and marks away players in the line',()=>{
+  const hud=createShowControlHud(document.body,()=>{},{}),s=state();
+  s.fireworks.queue=[{playerId:'b',playerName:'Bea',joinedAt:1,awaySince:5},{playerId:'a',playerName:'Ace',joinedAt:2}];
+  hud.apply(s,'a');hud.status(true);hud.update(0);
+  expect(document.querySelector('[aria-label="Fireworks queue"] ol')?.textContent).toContain('Bea · away');
+  hud.status(false);
+  expect(document.querySelector('.show-message')?.textContent).toBe('Connection lost. Your queue place is held for 2 minutes.');
+  hud.dispose();
+ });
+ it('says nothing about a queue place on disconnect when the player holds none',()=>{
+  const hud=createShowControlHud(document.body,()=>{},{});
+  hud.apply(state(),'a');hud.status(true);hud.status(false);
+  expect(document.querySelector('.show-message')?.textContent ?? '').toBe('');
+  hud.dispose();
+ });
  it('preserves an acknowledged opening when a later rejection arrives before its snapshot',()=>{
   const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
   const s=state();s.serverAt=1000;s.fireworks.preparing={...turn,opening:[]};hud.apply(s,'a');

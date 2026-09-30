@@ -3,7 +3,7 @@ export const SHOW_RULES = catalogue;
 export type PanelName = 'fireworks' | 'drones';
 export interface ShowShot { design:string; bank:number }
 export interface ShowTurn { id:string; playerId:string; playerName:string; startsAt:number; endsAt:number; opening:ShowShot[]|null; clip?:string }
-export interface ShowPanel { queue:{playerId:string;playerName:string;joinedAt:number}[]; active:ShowTurn|null; preparing:ShowTurn|null; nextAt:number }
+export interface ShowPanel { queue:{playerId:string;playerName:string;joinedAt:number;awaySince?:number}[]; active:ShowTurn|null; preparing:ShowTurn|null; nextAt:number }
 export interface ShowLaunch { id:string; design:string; bank:number; seed:number; startsAt:number; endsAt:number; cost:number }
 export interface ShowDrone { clip:string; startsAt:number; endsAt:number; transitionMs:number; from:{clip:string;weight:number}[]; next:string }
 export interface ShowState { version:number; serverAt:number; eventStartsAt:number; eventEndsAt:number; turnMs:number; preparationMs:number; fireworks:ShowPanel; drones:ShowPanel; launches:ShowLaunch[]; cooldowns:Record<string,number>; banks:Record<string,number>; drone:ShowDrone }
