@@ -66,6 +66,9 @@ describe('createLightingRig', () => {
     expect(rig.shadowGenerator).not.toBeNull();
     if (!rig.shadowGenerator) throw new Error('unreachable');
     expect(rig.shadowGenerator.bias).toBeGreaterThan(0);
+    // Filtered edges: one map covers the whole venue, so an unfiltered (hard)
+    // compare draws every shadow edge as a row of square steps.
+    expect(rig.shadowGenerator.filter).not.toBe(0);
     const casters = rig.shadowGenerator.getShadowMap()?.renderList ?? [];
     const casterNames = casters.map((mesh) => mesh.name);
     expect(casterNames).toContain('V01_SolidMass');

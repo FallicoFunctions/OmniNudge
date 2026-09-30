@@ -148,18 +148,18 @@ export function applyPracticalPoolLightBudget(scene: Scene) {
 function createKeyShadowGenerator(scene: Scene, key: DirectionalLight) {
   key.autoCalcShadowZBounds = true;
 
-  // Hard 1-tap shadows: PCF filtering was the single largest per-pixel cost
-  // in the whole frame (measured 11 -> 28 fps switching it off; even
-  // QUALITY_LOW halves the frame rate). At night, crisp edges read as clean
-  // moonlight and the soft ambient fill hides the hardness. The larger map
-  // keeps those hard edges clean, and it bakes once for the static set.
+  // Soft (PCF) shadow edges. One map covers the whole venue and bakes once
+  // for the static set, so a shadow texel is several centimetres wide: with a
+  // hard 1-tap compare every shadow edge was a row of square steps
+  // (player-flagged as jagged shadows on the approach stairs). An earlier
+  // measurement made PCF the largest per-pixel cost in the frame; measured
+  // again on this build at 4096x3072 (WebGL2, map baked once) it is not:
+  // hard 123 ms per frame, PCF medium 114 ms.
   const shadowGenerator = new ShadowGenerator(4096, key);
-  shadowGenerator.usePercentageCloserFiltering = false;
-  shadowGenerator.usePoissonSampling = false;
-  // Hard 1-tap shadows show acne that PCF's blur used to hide: banded
-  // dashes on surfaces grazing the raked key (stage rear face, canopy
-  // lips). The normal-offset bias is the grazing-angle acne killer and
-  // needs to be meaningful in world units at this venue's scale.
+  shadowGenerator.usePercentageCloserFiltering = true;
+  shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  // The normal-offset bias is the grazing-angle acne killer and needs to be
+  // meaningful in world units at this venue's scale.
   shadowGenerator.bias = 0.0015;
   shadowGenerator.normalBias = 0.05;
   // Store back-face depths in the map: lit front faces then never compare
