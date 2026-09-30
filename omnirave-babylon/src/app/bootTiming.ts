@@ -23,12 +23,24 @@ export function reportBootTiming(): void {
     void fetch(`${OMNIGAME_API_URL}/analytics/track`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'omnirave_boot', properties: { ...phases, reported_at: Math.round(performance.now()) } }),
+      body: JSON.stringify({ event: 'omnirave_boot', properties: { ...phases, ...largeDownloads(), reported_at: Math.round(performance.now()) } }),
       keepalive: true,
     }).catch(() => {});
   } catch {
     // Timing is diagnostic; it never affects the game.
   }
+}
+
+// Start and end of each model download (models are the large files), so a
+// slow start can be split into network time and processing time.
+function largeDownloads(): Record<string, string> {
+  const downloads: Record<string, string> = {};
+  for (const entry of performance.getEntriesByType('resource') as PerformanceResourceTiming[]) {
+    const file = entry.name.split('?')[0].split('/').pop() ?? '';
+    if (!/\.glb(\.gz)?$/.test(file) || Object.keys(downloads).length >= 12) continue;
+    downloads[`dl_${file}`] = `${Math.round(entry.startTime)}-${Math.round(entry.responseEnd)}`;
+  }
+  return downloads;
 }
 
 // A player whose audio never starts still reports the phases that did happen.
