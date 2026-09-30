@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/omninudge/backend/internal/config"
@@ -86,6 +88,9 @@ func buildMediaState(ctx context.Context) (*world.MediaState, func(), *models.Us
 			db.Close()
 			return nil, nil, nil, err
 		}
+		for _, warning := range missingTrackFiles(playlists, envOrDefault("OMNIRAVE_AUDIO_DIR", defaultAudioDir)) {
+			log.Print(warning)
+		}
 
 		return world.NewMediaStateWithPlaylists(playlists, envStartTime()), db.Close, models.NewUserRepository(db.Pool), nil
 	}
@@ -110,6 +115,47 @@ func loadStagePlaylists(ctx context.Context, repo repository.StagePlaylistReposi
 		return world.DefaultStagePlaylists(), nil
 	}
 	return playlists, nil
+}
+
+// defaultAudioDir is where production serves the stage audio from (nginx
+// /games/omnirave/play/audio/). OMNIRAVE_AUDIO_DIR overrides it.
+const defaultAudioDir = "/var/www/omnirave-audio"
+
+// trackFileKinds are the files every track in a playlist needs: the audio,
+// and the two the stage lights read (scripts/upload-stage-tracks.sh builds
+// and uploads all three). Without the last two the lights fall back to a
+// level guess that almost never fires on a loud master.
+var trackFileKinds = []string{".mp3", ".spectrum", ".beats"}
+
+// missingTrackFiles lists, as log lines, each playlist track whose files are
+// not all in dir. A missing dir (a local machine without the audio) gives
+// nothing: there is nothing to compare against there.
+func missingTrackFiles(playlists []world.StagePlaylist, dir string) []string {
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return nil
+	}
+	var warnings []string
+	seen := map[string]bool{}
+	for _, playlist := range playlists {
+		for _, entry := range playlist.Entries {
+			if seen[entry.TrackID] {
+				continue
+			}
+			seen[entry.TrackID] = true
+			var missing []string
+			for _, kind := range trackFileKinds {
+				if _, err := os.Stat(filepath.Join(dir, entry.TrackID+kind)); err != nil {
+					missing = append(missing, entry.TrackID+kind)
+				}
+			}
+			if len(missing) > 0 {
+				warnings = append(warnings, "omnirave-world: WARNING track "+entry.TrackID+" in the "+string(playlist.ZoneID)+
+					" playlist is missing "+strings.Join(missing, ", ")+" in "+dir+
+					"; run scripts/upload-stage-tracks.sh with its MP3")
+			}
+		}
+	}
+	return warnings
 }
 
 func envStartTime() time.Time {

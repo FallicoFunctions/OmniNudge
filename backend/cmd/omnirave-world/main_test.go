@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/omninudge/backend/internal/omniraveworld/world"
@@ -46,4 +48,29 @@ type fakeStagePlaylistRepository struct {
 
 func (f fakeStagePlaylistRepository) LoadActiveStagePlaylists(context.Context) ([]world.StagePlaylist, error) {
 	return f.playlists, f.err
+}
+
+func TestMissingTrackFiles_NamesEachTrackWithoutItsLightFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"complete.mp3", "complete.spectrum", "complete.beats", "no-lights.mp3", "no-beats.mp3", "no-beats.spectrum"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644))
+	}
+	playlists := []world.StagePlaylist{
+		{ZoneID: world.ZoneMainStage, Entries: []world.PlaylistEntry{{TrackID: "complete"}, {TrackID: "no-lights"}, {TrackID: "no-beats"}}},
+		// The same track in a second playlist is reported once.
+		{ZoneID: "underground", Entries: []world.PlaylistEntry{{TrackID: "no-lights"}, {TrackID: "not-uploaded"}}},
+	}
+
+	warnings := missingTrackFiles(playlists, dir)
+
+	require.Len(t, warnings, 3)
+	require.Contains(t, warnings[0], "no-lights in the main_stage playlist is missing no-lights.spectrum, no-lights.beats")
+	require.Contains(t, warnings[1], "no-beats in the main_stage playlist is missing no-beats.beats in "+dir)
+	require.Contains(t, warnings[2], "not-uploaded in the underground playlist is missing not-uploaded.mp3, not-uploaded.spectrum, not-uploaded.beats")
+	require.Contains(t, warnings[0], "scripts/upload-stage-tracks.sh")
+}
+
+func TestMissingTrackFiles_SaysNothingWithoutTheAudioFolder(t *testing.T) {
+	playlists := []world.StagePlaylist{{ZoneID: world.ZoneMainStage, Entries: []world.PlaylistEntry{{TrackID: "anything"}}}}
+	require.Empty(t, missingTrackFiles(playlists, filepath.Join(t.TempDir(), "absent")))
 }

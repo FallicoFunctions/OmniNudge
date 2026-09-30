@@ -101,13 +101,18 @@ The deploy script builds the frontend with `VITE_OMNICHAT_ENABLED=false`, and pr
 
 Both game services read the backend's environment file through `EnvironmentFile=`. They build their database URL from the `DB_*` values when `DATABASE_URL` is not set.
 
-Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`:
+Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`. Each track also needs two files built from its MP3: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. Every light effect (lasers, crown, light floor, hologram grid, CO2, flames, sparks, strobes) fires on the hits in the beats file (bass, mid and high bands, with the kicks, drops, build-ups and energy found from them); without it, they guess from the spectrum level, which almost never fires on a loud master.
 
-Each track also needs two files that one script builds: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. Every light effect (lasers, crown, light floor, hologram grid, CO2, flames, sparks, strobes) fires on the hits in the beats file (bass, mid and high bands, with the kicks and drops found from them); without it, they guess from the spectrum level, which almost never fires on a loud master. Build them with ffmpeg installed, then upload all three files:
+One command builds both files, uploads all three, and reads each back from the site to compare its size (needs node and ffmpeg; about 4 minutes for a 2-hour set, and it skips files that are newer than the MP3). It takes several MP3s at once, and the file name is the track id:
 
 ```bash
-node omnirave-babylon/scripts/build-track-spectrum.mjs omnirave-babylon/public/audio/<trackId>.mp3
-rsync -avP omnirave-babylon/public/audio/<trackId>.mp3 omnirave-babylon/public/audio/<trackId>.spectrum omnirave-babylon/public/audio/<trackId>.beats root@77.42.47.79:/var/www/omnirave-audio/
+bash scripts/upload-stage-tracks.sh path/to/<trackId>.mp3 [more.mp3 ...]
+```
+
+Then add each track id to a stage setlist. When `omnirave-world` starts, it logs a `WARNING` for every playlist track that is missing any of the three files in `/var/www/omnirave-audio` (`OMNIRAVE_AUDIO_DIR`):
+
+```bash
+ssh root@77.42.47.79 'journalctl -u omnirave-world --since today --no-pager | grep WARNING'
 ```
 
 For guest moderation to be durable across fresh guest bootstraps, `OMNIGAME_TRUSTED_PROXIES` must include only the real proxy hop CIDRs in front of `omnigame-api`. Do not trust public client ranges. The intended production shape is Cloudflare -> nginx -> `omnigame-api`, with nginx/loopback as the trusted hop and external forwarding headers stripped/rewritten before the request reaches Gin.

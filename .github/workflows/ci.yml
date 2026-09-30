@@ -103,6 +103,11 @@ jobs:
       - name: No tracked build artifacts
         run: bash scripts/no-build-artifacts.sh
 
+      # The command that uploads stage tracks with the files the lights need;
+      # node, rsync and curl are stand-ins here, so nothing is uploaded.
+      - name: Stage track upload script
+        run: bash scripts/upload-stage-tracks.test.sh
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
