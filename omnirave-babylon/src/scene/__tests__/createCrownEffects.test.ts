@@ -2,6 +2,7 @@ import { MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createCrownEffects } from '../createCrownEffects';
+import { createStageBeat } from '../../media/trackBeats';
 
 describe('createCrownEffects', () => {
   let engine: NullEngine;
@@ -113,5 +114,21 @@ describe('createCrownEffects', () => {
     effects.dispose();
 
     expect(ownResources()).toBe(0);
+  });
+
+  it('flares the crystal on the hits of the track beat list when the loud level gives no jump', () => {
+    const beat = createStageBeat();
+    const effects = createCrownEffects(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+    for (let i = 0; i < 120; i++) effects.update(0.016);
+    const settled = effects.crystalIntensity;
+
+    beat.bass = 1;
+    beat.kick = true;
+    effects.update(0.016);
+    beat.bass = 0;
+    beat.kick = false;
+    effects.update(0.016);
+    expect(effects.crystalIntensity).toBeGreaterThan(settled + 0.5);
+    effects.dispose();
   });
 });

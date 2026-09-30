@@ -13,7 +13,7 @@
 
 import type { ZoneMediaState } from '../network/worldSocket';
 import { publicUrl } from '../app/publicUrl';
-import type { TrackBeats } from './trackBeats';
+import type { StageBeat, TrackBeats } from './trackBeats';
 import type { TrackSpectrum } from './trackSpectrum';
 
 // The served audio file extension. A single named constant so switching the
@@ -77,7 +77,7 @@ export interface StageMediaPlayerOptions {
   // Precomputed spectrum of each track. The lights read it at the position
   // this player hears, so they do not depend on this tab's audio output.
   spectrum?: TrackSpectrum;
-  // The bass hits of each track, found ahead of time (see trackBeats.ts).
+  // The hits of each track, found ahead of time (see trackBeats.ts).
   beats?: TrackBeats;
   // Local time in milliseconds (tests replace it).
   now?: () => number;
@@ -97,10 +97,10 @@ export interface StageMediaPlayer {
   // music, also when this tab is muted or blocked. Without that data it falls
   // back to the live analysis of this tab's audio. Never throws.
   getFrequencyData: (target: Uint8Array) => void;
-  // The strength (0..1) of the strongest bass hit the player heard since the
-  // previous call, 0 when there was none. Null when the track has no beat list
-  // (or it is not downloaded yet): the lights then detect hits themselves.
-  getBeatStrength: () => number | null;
+  // Fills `out` with the hits the player heard since the previous call. False
+  // when the track has no beat list (or it is not downloaded yet): the lights
+  // then detect hits themselves. One reader: each call moves the window on.
+  readBeat: (out: StageBeat) => boolean;
   // Dev control surface (used by the debug-only audio scrubber). All safe
   // no-ops before unlock, when there is no backend yet.
   getCurrentTime: () => number;
@@ -496,16 +496,15 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     }
   }
 
-  function getBeatStrength(): number | null {
+  function readBeat(out: StageBeat): boolean {
     const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
-    if (!trackId || !options.beats) return null;
+    if (!trackId || !options.beats) return false;
     const until = heardSeconds() + BEAT_LEAD_SECONDS;
     const from = beatSeconds;
     const continues = trackId === beatTrackId && until >= from && until - from <= MAX_BEAT_STEP_SECONDS;
     beatTrackId = trackId;
     beatSeconds = until;
-    const strongest = options.beats.strongestBetween(trackId, continues ? from : until, until);
-    return strongest;
+    return options.beats.read(trackId, continues ? from : until, until, out);
   }
 
   function getCurrentTime(): number {
@@ -559,7 +558,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     isAudible,
     applyMedia,
     getFrequencyData,
-    getBeatStrength,
+    readBeat,
     getCurrentTime,
     getDuration,
     isPaused,

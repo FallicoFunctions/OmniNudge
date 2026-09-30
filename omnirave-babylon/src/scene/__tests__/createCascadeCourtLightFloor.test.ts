@@ -7,6 +7,7 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createCascadeCourtLightFloor } from '../createCascadeCourtLightFloor';
+import { createStageBeat } from '../../media/trackBeats';
 import { createCascadeCourtPaving } from '../createCascadeCourtPaving';
 
 describe('createCascadeCourtLightFloor', () => {
@@ -173,5 +174,21 @@ describe('createCascadeCourtLightFloor', () => {
     expect(scene.materials.length).toBe(materialBaseline);
     // Idempotent.
     expect(() => floor.dispose()).not.toThrow();
+  });
+
+  it('pulses each band on its own hits from the track beat list, not on the level', () => {
+    const beat = createStageBeat();
+    const floor = createCascadeCourtLightFloor(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+    // Each band alone: a loud, steady level with no listed hit leaves the
+    // floor at rest, and the band's own hit lifts it clearly (about +0.34).
+    for (const band of ['bass', 'mids', 'highs'] as const) {
+      for (let i = 0; i < 90; i++) floor.update(0.016);
+      const before = floor.peakBrightness;
+      beat[band] = 1;
+      floor.update(0.016);
+      beat[band] = 0;
+      expect(floor.peakBrightness, band).toBeGreaterThan(before + 0.2);
+    }
+    floor.dispose();
   });
 });

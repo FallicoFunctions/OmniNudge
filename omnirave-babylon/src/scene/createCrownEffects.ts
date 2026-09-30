@@ -18,6 +18,8 @@ import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
+import type { StageBeat } from '../media/trackBeats';
+import { stepBassPunch } from './stagePunch';
 
 // Signature figurehead effects for the Main Stage crown spire. The crown is the
 // venue's landmark: a tall central spire climbing from the obelisk base
@@ -43,14 +45,11 @@ const FREQ_BIN_COUNT = 128;
 const BASS_END = 11;
 const MIDS_END = 61;
 
-// Bass punch detector: a raw reading this far above the smoothed level is a
-// hit; the impulse decays back to zero over PUNCH_DECAY_SECONDS. Fast attack
-// (~40ms) so a kick reads instantly.
-const PUNCH_RATIO = 1.25;
-const PUNCH_FLOOR = 0.12;
+// Bass punch (see stagePunch.ts): the impulse snaps up on a bass hit and
+// decays back to zero over PUNCH_DECAY_SECONDS. Fast attack (~40ms) so a kick
+// reads instantly.
 const PUNCH_DECAY_SECONDS = 0.2;
 const PUNCH_ATTACK_SECONDS = 0.04;
-const STRONG_PUNCH = 0.35;
 
 // --- Palette cycling (same cadence as the immersive show so the crown stays
 // color-coherent with the venue) --------------------------------------------
@@ -92,6 +91,10 @@ export interface CrownEffectsOptions {
   // Fills the passed array with the current byte frequency spectrum (same
   // closure as the stage visualizer / immersive show; zero-filled idle).
   getFrequencyData: (target: Uint8Array) => void;
+  // The hits this player heard in this frame, from the track's beat list;
+  // null (or absent) when the track has none, and the effect then detects
+  // hits from the spectrum level itself.
+  getBeat?: () => StageBeat | null;
 }
 
 // The effects only build when the Main Stage venue is actually present (same
@@ -339,13 +342,9 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     audioPresent = bassSum + midSum + highSum > 0;
 
     // Punch detection BEFORE smoothing absorbs this frame's hit.
-    let strongBurst = false;
-    if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
-      punch = 1;
-      strongBurst = bassRaw > STRONG_PUNCH;
-    } else {
-      punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
-    }
+    // The track's real bass hits when it has a beat list (see stagePunch.ts).
+    const beat = options.getBeat ? options.getBeat() : null;
+    punch = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS).punch;
     // Attack-smoothed envelope: chase punch up quickly (~40ms), follow it down.
     if (punch > punchEnv) {
       const attack = 1 - Math.exp(-dt / PUNCH_ATTACK_SECONDS);

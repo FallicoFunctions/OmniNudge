@@ -17,6 +17,8 @@ import type { StageEventStateInput, StageVisualizerMode } from './createStageVis
 import { FOUNTAIN_ELLIPSE } from './mainStageVenueBounds';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
+import type { StageBeat } from '../media/trackBeats';
+import { stepBassPunch } from './stagePunch';
 
 // Music-reactive LIGHT LAYER for the Cascade Court flank paving. The pearl
 // tiles in createCascadeCourtPaving.ts are the real, walkable, physical floor
@@ -58,14 +60,12 @@ const FREQ_BIN_COUNT = 128;
 const BASS_END = 11;
 const MIDS_END = 61;
 
-// Bass punch detector: a raw reading this far above the smoothed level is a
-// hit; the impulse snaps to 1 and decays back to zero over PUNCH_DECAY_SECONDS.
-// A STRONG hit (raw over STRONG_PUNCH) additionally fires the outward kick
-// burst.
+// Bass punch (see stagePunch.ts): the impulse snaps up on a bass hit and
+// decays back to zero over PUNCH_DECAY_SECONDS. A kick additionally fires the
+// outward kick burst. PUNCH_RATIO is for the mids/highs level guess below,
+// used only for a track with no beat list.
 const PUNCH_RATIO = 1.25;
-const PUNCH_FLOOR = 0.12;
 const PUNCH_DECAY_SECONDS = 0.22;
-const STRONG_PUNCH = 0.35;
 
 // Per-band transient pulses drive the band-affinity tiles: a band reading this
 // far over its smoothed level snaps that band's tiles. Fast decay so it reads
@@ -157,6 +157,10 @@ export interface CascadeCourtLightFloorOptions {
   // closure as the stage visualizer / immersive show / crown; zero-filled when
   // there is no world connection, which yields the idle shimmer).
   getFrequencyData: (target: Uint8Array) => void;
+  // The hits this player heard in this frame, from the track's beat list;
+  // null (or absent) when the track has none, and the effect then detects
+  // hits from the spectrum level itself.
+  getBeat?: () => StageBeat | null;
 }
 
 // The light floor only builds when the Main Stage venue is actually present
@@ -374,22 +378,24 @@ export function createCascadeCourtLightFloor(
     // --- transient detection (BEFORE smoothing absorbs this frame's hit) ---
     // Bass punch: snaps to 1 on a hit, decays over PUNCH_DECAY_SECONDS. A
     // strong hit also fires the outward kick burst.
-    let strongBurst = false;
-    if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && bandPulse[0] <= 0.2) {
-      bandPulse[0] = 1;
-      strongBurst = bassRaw > STRONG_PUNCH;
-    } else {
-      bandPulse[0] = Math.max(0, bandPulse[0] - dt / PUNCH_DECAY_SECONDS);
-    }
+    // With the track's beat list every band pulses on its own real hits
+    // (kicks, snares, hats); the level-based guesses are only for a track
+    // without one (see stagePunch.ts).
+    const beat = options.getBeat ? options.getBeat() : null;
+    const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, bandPulse[0], dt, PUNCH_DECAY_SECONDS);
+    bandPulse[0] = punchStep.punch;
+    const strongBurst = punchStep.kick;
     // Mids / highs pulses: same snap-and-decay so their affinity tiles hit on
     // their own band's transients (lows and hats light different tiles).
-    if (audioPresent && midsRaw > MID_PULSE_FLOOR && midsRaw > mids * PUNCH_RATIO && bandPulse[1] <= 0.2) {
-      bandPulse[1] = 1;
+    if (beat ? audioPresent && beat.mids > 0 && beat.mids >= bandPulse[1]
+      : audioPresent && midsRaw > MID_PULSE_FLOOR && midsRaw > mids * PUNCH_RATIO && bandPulse[1] <= 0.2) {
+      bandPulse[1] = beat ? beat.mids : 1;
     } else {
       bandPulse[1] = Math.max(0, bandPulse[1] - dt / BAND_PULSE_DECAY_SECONDS);
     }
-    if (audioPresent && highsRaw > HIGH_PULSE_FLOOR && highsRaw > highs * PUNCH_RATIO && bandPulse[2] <= 0.2) {
-      bandPulse[2] = 1;
+    if (beat ? audioPresent && beat.highs > 0 && beat.highs >= bandPulse[2]
+      : audioPresent && highsRaw > HIGH_PULSE_FLOOR && highsRaw > highs * PUNCH_RATIO && bandPulse[2] <= 0.2) {
+      bandPulse[2] = beat ? beat.highs : 1;
     } else {
       bandPulse[2] = Math.max(0, bandPulse[2] - dt / BAND_PULSE_DECAY_SECONDS);
     }

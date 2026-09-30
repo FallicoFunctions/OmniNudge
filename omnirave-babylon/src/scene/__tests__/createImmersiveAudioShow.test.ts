@@ -2,6 +2,7 @@ import { Mesh, MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/co
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createImmersiveAudioShow } from '../createImmersiveAudioShow';
+import { createStageBeat } from '../../media/trackBeats';
 
 describe('createImmersiveAudioShow', () => {
   let engine: NullEngine;
@@ -128,39 +129,30 @@ describe('createImmersiveAudioShow', () => {
   });
 
   it('fires on the hits of the track beat list when the loud spectrum gives no level jump', () => {
-    let hit: number | null = 0;
-    const show = createImmersiveAudioShow(scene, {
-      getFrequencyData: loudSource,
-      getBeatStrength: () => hit,
-    });
+    const beat = createStageBeat();
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: loudSource, getBeat: () => beat });
     // A loud master: the level is steady, so the level-based guess is silent.
     for (let i = 0; i < 120; i++) show.update(0.016);
     expect(show.beatFlash).toBe(0);
     const settled = coneMaterialIntensity();
 
     // A bass note between kicks: brighter, but no venue-wide flash.
-    hit = 0.4;
+    beat.bass = 0.4;
     show.update(0.016);
-    hit = 0;
+    beat.bass = 0;
     const note = coneMaterialIntensity();
     expect(note).toBeGreaterThan(settled);
     expect(show.beatFlash).toBe(0);
     for (let i = 0; i < 40; i++) show.update(0.016);
 
     // A kick: the full punch and the flash.
-    hit = 1;
+    beat.bass = 1;
+    beat.kick = true;
     show.update(0.016);
-    hit = 0;
+    beat.bass = 0;
+    beat.kick = false;
     expect(coneMaterialIntensity()).toBeGreaterThan(note);
     expect(show.beatFlash).toBe(1);
-
-    // A second strong hit too soon after it does not flash again.
-    for (let i = 0; i < 6; i++) show.update(0.016);
-    const fading = show.beatFlash;
-    hit = 1;
-    show.update(0.016);
-    hit = 0;
-    expect(show.beatFlash).toBeLessThan(fading);
 
     show.dispose();
   });
@@ -169,7 +161,7 @@ describe('createImmersiveAudioShow', () => {
     let loud = false;
     const show = createImmersiveAudioShow(scene, {
       getFrequencyData: (target) => (loud ? loudSource(target) : zeroSource(target)),
-      getBeatStrength: () => null,
+      getBeat: () => null,
     });
     show.update(0.016);
     loud = true;

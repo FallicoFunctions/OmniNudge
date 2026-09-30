@@ -20,6 +20,8 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
 
+import type { StageBeat } from '../media/trackBeats';
+import { stepBassPunch } from './stagePunch';
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import {
@@ -56,20 +58,13 @@ const FREQ_BIN_COUNT = 128;
 const BASS_END = 11;
 const MIDS_END = 61;
 
-// Bass punch detector: a raw reading this far above the smoothed level is a
-// hit; the impulse decays back to zero over PUNCH_DECAY_SECONDS. A STRONG hit
-// (raw over STRONG_PUNCH) additionally fires the venue-wide beat flash and can
-// advance the phrase / jump the palette.
-// Beat-list hits: this strong is a kick (venue-wide flash, counts toward the
-// next laser pattern); flashes stay at least this far apart, so a busy bass
-// line does not strobe; the pattern changes after this many kicks (four bars).
-const STRONG_BEAT = 0.7;
-const STRONG_BEAT_GAP_SECONDS = 0.3;
+// Bass punch (see stagePunch.ts): the impulse snaps up on a bass hit and
+// decays back to zero over PUNCH_DECAY_SECONDS. A kick additionally fires the
+// venue-wide beat flash and can advance the phrase / jump the palette.
+// With the track's beat list the laser pattern changes on a kick, after this
+// many kicks (four bars).
 const KICKS_PER_PHRASE = 16;
-const PUNCH_RATIO = 1.25;
-const PUNCH_FLOOR = 0.12;
 const PUNCH_DECAY_SECONDS = 0.25;
-const STRONG_PUNCH = 0.35;
 // Fast attack (~40ms) so a kick reads instantly; decay handled by the impulse.
 const PUNCH_ATTACK_SECONDS = 0.04;
 // Venue-wide beat flash: a strong kick briefly boosts ALL emitters together.
@@ -123,10 +118,10 @@ export interface ImmersiveAudioShowOptions {
   // closure as the stage visualizer; zero-filled when there is no world
   // connection, i.e. no audio).
   getFrequencyData: (target: Uint8Array) => void;
-  // The strength (0..1) of the strongest bass hit heard since the last call
-  // (0 for none), from the track's beat list. Null, or absent, when there is
-  // no list: the show then detects hits from the spectrum level itself.
-  getBeatStrength?: () => number | null;
+  // The hits this player heard in this frame, from the track's beat list;
+  // null (or absent) when the track has none, and the effect then detects
+  // hits from the spectrum level itself.
+  getBeat?: () => StageBeat | null;
 }
 
 // The show only builds when the Main Stage venue is actually present (same
@@ -541,7 +536,6 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let phraseIndex = 0;
   let phraseTimer = 0;
   let bassEventAccum = 0;
-  let sinceStrongBeat = 0;
 
   // Exposed diagnostics (updated each frame).
   let laserIntensityValue = LASER_IDLE_INTENSITY;
@@ -599,27 +593,13 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     let punchBurst = false;
     let strongBurst = false;
     // The track's own bass hits when it has a beat list; the level-based
-    // guess below only for a track without one. A loud master keeps the bass
-    // band near its ceiling, so that guess almost never fires.
-    const beatStrength = options.getBeatStrength ? options.getBeatStrength() : null;
-    const beatDriven = beatStrength !== null;
-    sinceStrongBeat += dt;
-    if (beatDriven) {
-      if (audioPresent && beatStrength > 0 && beatStrength >= punch) {
-        punch = beatStrength;
-        punchBurst = true;
-        strongBurst = beatStrength >= STRONG_BEAT && sinceStrongBeat >= STRONG_BEAT_GAP_SECONDS;
-        if (strongBurst) sinceStrongBeat = 0;
-      } else {
-        punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
-      }
-    } else if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
-      punch = 1;
-      punchBurst = true;
-      strongBurst = bassRaw > STRONG_PUNCH;
-    } else {
-      punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
-    }
+    // guess only for a track without one (see stagePunch.ts).
+    const beat = options.getBeat ? options.getBeat() : null;
+    const beatDriven = beat !== null;
+    const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
+    punch = punchStep.punch;
+    punchBurst = punchStep.hit;
+    strongBurst = punchStep.kick;
     // Attack-smoothed envelope: chase punch up quickly (~40ms), follow it down.
     if (punch > punchEnv) {
       const attack = 1 - Math.exp(-dt / PUNCH_ATTACK_SECONDS);

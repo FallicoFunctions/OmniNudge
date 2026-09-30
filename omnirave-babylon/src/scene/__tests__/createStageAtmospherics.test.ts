@@ -2,6 +2,7 @@ import { MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createStageAtmospherics } from '../createStageAtmospherics';
+import { createStageBeat } from '../../media/trackBeats';
 
 describe('createStageAtmospherics', () => {
   let engine: NullEngine;
@@ -153,5 +154,84 @@ describe('createStageAtmospherics', () => {
     atmo.dispose();
 
     expect(ownResources()).toBe(0);
+  });
+
+  describe('with the track beat list', () => {
+    function setup() {
+      const beat = createStageBeat();
+      const atmo = createStageAtmospherics(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+      // One kick, then the rest of the beat (0.45 s) with no hit.
+      const kick = (count: number, drop = false) => {
+        Object.assign(beat, { bass: 1, kick: true, kickCount: count, drop });
+        atmo.update(0.016);
+        Object.assign(beat, { bass: 0, kick: false, drop: false });
+        for (let i = 0; i < 28; i++) atmo.update(0.016);
+      };
+      return { atmo, kick };
+    }
+
+    it('does not fire the pyro on every kick: CO2 every 16, strobes every 8, flames and sparks every 32', () => {
+      const { atmo, kick } = setup();
+      for (let count = 1; count <= 7; count++) kick(count);
+      expect(atmo.activeCo2Bursts).toBe(0);
+      expect(atmo.flameBurstCount).toBe(0);
+      expect(atmo.strobeFlashCount).toBe(0);
+      expect(atmo.sparkRate).toBe(0);
+
+      kick(8);
+      expect(atmo.strobeFlashCount).toBeGreaterThan(0);
+      expect(atmo.activeCo2Bursts).toBe(0);
+
+      for (let count = 9; count <= 15; count++) kick(count);
+      expect(atmo.activeCo2Bursts).toBe(0);
+      kick(16);
+      expect(atmo.activeCo2Bursts).toBe(1);
+      expect(atmo.flameBurstCount).toBe(0);
+
+      for (let count = 17; count <= 31; count++) kick(count);
+      expect(atmo.flameBurstCount).toBe(0);
+      kick(32);
+      expect(atmo.flameBurstCount).toBeGreaterThan(0);
+      expect(atmo.activeCo2Bursts).toBe(2);
+      atmo.dispose();
+    });
+
+    it('pops the cold sparks half way between two flame cascades', () => {
+      const { atmo, kick } = setup();
+      for (let count = 1; count <= 15; count++) kick(count);
+      expect(atmo.sparkRate).toBe(0);
+      // The kick itself starts the fountain; read it before it times out.
+      const beat = createStageBeat();
+      const direct = createStageAtmospherics(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+      Object.assign(beat, { bass: 1, kick: true, kickCount: 16 });
+      direct.update(0.016);
+      expect(direct.sparkRate).toBeGreaterThan(0);
+      Object.assign(beat, { kickCount: 32 });
+      const other = createStageAtmospherics(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+      other.update(0.016);
+      expect(other.sparkRate).toBe(0);
+      atmo.dispose();
+      direct.dispose();
+      other.dispose();
+    });
+
+    it('fires CO2, flames and strobes together on a drop', () => {
+      const { atmo, kick } = setup();
+      kick(101, true);
+      expect(atmo.activeCo2Bursts).toBe(1);
+      expect(atmo.flameBurstCount).toBeGreaterThan(0);
+      expect(atmo.strobeFlashCount).toBeGreaterThan(0);
+      atmo.dispose();
+    });
+
+    it('stays haze-only through a passage with no hits, however loud the level', () => {
+      const beat = createStageBeat();
+      const atmo = createStageAtmospherics(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+      for (let i = 0; i < 400; i++) atmo.update(0.016);
+      expect(atmo.activeCo2Bursts).toBe(0);
+      expect(atmo.flameBurstCount).toBe(0);
+      expect(atmo.strobeFlashCount).toBe(0);
+      atmo.dispose();
+    });
   });
 });

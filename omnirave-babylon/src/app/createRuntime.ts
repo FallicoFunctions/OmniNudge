@@ -220,7 +220,7 @@ export async function createRuntime(host: HTMLElement) {
   let earlyStageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
   // One server clock and one spectrum reader for the stage player, whichever
   // path creates it. The world socket feeds the clock.
-  const [{ createServerClock }, { createTrackSpectrum }, { createTrackBeats }] = await Promise.all([
+  const [{ createServerClock }, { createTrackSpectrum }, { createTrackBeats, createStageBeat }] = await Promise.all([
     import('../network/serverClock'),
     import('../media/trackSpectrum'),
     import('../media/trackBeats'),
@@ -1405,6 +1405,21 @@ export async function createRuntime(host: HTMLElement) {
         target.fill(0);
       }
     };
+    // ONE beat reading per frame for every light effect: the hits of the
+    // track's beat list that this player heard since the previous frame. The
+    // player's reader moves its window on each call, so the effects share the
+    // frame's reading instead of each taking a part of it. Null when the
+    // track has no beat list; the effects then detect hits themselves.
+    const stageBeat = createStageBeat();
+    let stageBeatFrame: number | undefined = -1;
+    let stageBeatKnown = false;
+    const getStageBeat = () => {
+      if (activeEngine.frameId !== stageBeatFrame) {
+        stageBeatFrame = activeEngine.frameId;
+        stageBeatKnown = stageMediaPlayer ? stageMediaPlayer.readBeat(stageBeat) : false;
+      }
+      return stageBeatKnown ? stageBeat : null;
+    };
     const { createStageVisualizer } = await import('../scene/createStageVisualizer');
     stageVisualizer = createStageVisualizer(scene, {
       getFrequencyData: getStageFrequencyData,
@@ -1418,9 +1433,7 @@ export async function createRuntime(host: HTMLElement) {
     const { createImmersiveAudioShow } = await import('../scene/createImmersiveAudioShow');
     immersiveAudioShow = createImmersiveAudioShow(scene, {
       getFrequencyData: getStageFrequencyData,
-      // The lasers fire on the track's own bass hits, at the position this
-      // player hears. One reader: each call reports the hits since the last.
-      getBeatStrength: () => (stageMediaPlayer ? stageMediaPlayer.getBeatStrength() : null),
+      getBeat: getStageBeat,
     });
     const activeImmersiveAudioShow = immersiveAudioShow;
 
@@ -1431,6 +1444,7 @@ export async function createRuntime(host: HTMLElement) {
     const { createCrownEffects } = await import('../scene/createCrownEffects');
     crownEffects = createCrownEffects(scene, {
       getFrequencyData: getStageFrequencyData,
+      getBeat: getStageBeat,
     });
     const activeCrownEffects = crownEffects;
 
@@ -1443,6 +1457,7 @@ export async function createRuntime(host: HTMLElement) {
     const { createCascadeCourtLightFloor } = await import('../scene/createCascadeCourtLightFloor');
     cascadeCourtLightFloor = createCascadeCourtLightFloor(scene, {
       getFrequencyData: getStageFrequencyData,
+      getBeat: getStageBeat,
     });
     const activeCascadeCourtLightFloor = cascadeCourtLightFloor;
 
@@ -1457,6 +1472,7 @@ export async function createRuntime(host: HTMLElement) {
     const { createHologramGrid } = await import('../scene/createHologramGrid');
     hologramGrid = createHologramGrid(scene, {
       getFrequencyData: getStageFrequencyData,
+      getBeat: getStageBeat,
     });
     const activeHologramGrid = hologramGrid;
 
@@ -1467,6 +1483,7 @@ export async function createRuntime(host: HTMLElement) {
     const { createStageAtmospherics } = await import('../scene/createStageAtmospherics');
     stageAtmospherics = createStageAtmospherics(scene, {
       getFrequencyData: getStageFrequencyData,
+      getBeat: getStageBeat,
     });
     const activeStageAtmospherics = stageAtmospherics;
 

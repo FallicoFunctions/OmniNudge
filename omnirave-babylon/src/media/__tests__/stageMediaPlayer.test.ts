@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStageMediaPlayer, type StagePlayerBackend } from '../stageMediaPlayer';
 import type { ZoneMediaState } from '../../network/worldSocket';
+import { createStageBeat, type StageBeat } from '../trackBeats';
 
 // Vitest 5 cannot call a mock built on an arrow function with `new`, and the
 // runtime constructs Babylon's engines and the browser's Audio with `new`. A
@@ -348,43 +349,47 @@ describe('createStageMediaPlayer', () => {
       expect((fill.mock.lastCall as unknown[] | undefined)?.[1]).toBeCloseTo(42, 5);
     });
 
-    it('reports the bass hits heard since the last reading, a little ahead of the sound', () => {
+    it('reads the hits heard since the last reading, a little ahead of the sound', () => {
       let position = 100;
-      const strongestBetween = vi.fn(() => 0.8);
+      const read = vi.fn((_trackId: string, _from: number, _to: number, out: StageBeat) => {
+        out.bass = 0.8;
+        return true;
+      });
       const backend = createFakeBackend({ getCurrentTime: vi.fn(() => position), isPaused: vi.fn(() => false) });
       const player = createStageMediaPlayer({
         now: () => 0,
-        beats: { strongestBetween, dispose: vi.fn() },
+        beats: { read, dispose: vi.fn() },
         backendFactory: () => backend,
       });
       player.applyMedia(media({ playheadSeconds: 100 }));
       player.unlock();
+      const out = createStageBeat();
 
       // The first reading has no earlier one: an empty window, no replay.
-      expect(player.getBeatStrength()).toBe(0.8);
-      expect(strongestBetween.mock.lastCall).toEqual(['main-stage-set-01', 100.04, 100.04]);
+      expect(player.readBeat(out)).toBe(true);
+      expect(out.bass).toBe(0.8);
+      expect(read.mock.lastCall?.slice(0, 3)).toEqual(['main-stage-set-01', 100.04, 100.04]);
       position = 100.016;
-      player.getBeatStrength();
-      const [, from, until] = strongestBetween.mock.lastCall as unknown as [string, number, number];
-      expect(from).toBeCloseTo(100.04, 5);
-      expect(until).toBeCloseTo(100.056, 5);
+      player.readBeat(out);
+      expect(read.mock.lastCall?.[1]).toBeCloseTo(100.04, 5);
+      expect(read.mock.lastCall?.[2]).toBeCloseTo(100.056, 5);
 
       // A seek (or a stalled tab): the hits in between are not replayed.
       position = 400;
-      player.getBeatStrength();
-      const [, afterSeekFrom, afterSeekUntil] = strongestBetween.mock.lastCall as unknown as [string, number, number];
-      expect(afterSeekFrom).toBe(afterSeekUntil);
+      player.readBeat(out);
+      expect(read.mock.lastCall?.[1]).toBe(read.mock.lastCall?.[2]);
     });
 
     it('has no beat reading without a beat list, and stops the list when disposed', () => {
+      const out = createStageBeat();
       const without = createStageMediaPlayer({ now: () => 0, backendFactory: () => createFakeBackend() });
       without.applyMedia(media());
-      expect(without.getBeatStrength()).toBeNull();
+      expect(without.readBeat(out)).toBe(false);
 
-      const beats = { strongestBetween: vi.fn(() => null), dispose: vi.fn() };
+      const beats = { read: vi.fn(() => false), dispose: vi.fn() };
       const player = createStageMediaPlayer({ now: () => 0, beats, backendFactory: () => createFakeBackend() });
       player.applyMedia(media());
-      expect(player.getBeatStrength()).toBeNull();
+      expect(player.readBeat(out)).toBe(false);
       player.dispose();
       expect(beats.dispose).toHaveBeenCalledTimes(1);
     });

@@ -14,6 +14,8 @@ import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
+import type { StageBeat } from '../media/trackBeats';
+import { stepBassPunch } from './stagePunch';
 
 // Atmospheric + pyro + flash effects for the Main Stage: the PHYSICAL show
 // layered under the light show (createImmersiveAudioShow) and the crown
@@ -38,13 +40,10 @@ const FREQ_BIN_COUNT = 128;
 const BASS_END = 11;
 const MIDS_END = 61;
 
-// Bass punch detector: a raw reading this far above the smoothed level is a
-// hit; the impulse decays back to zero over PUNCH_DECAY_SECONDS. A STRONG hit
-// (raw over STRONG_PUNCH) is what fires the pyro punctuation.
-const PUNCH_RATIO = 1.25;
-const PUNCH_FLOOR = 0.12;
+// Bass punch (see stagePunch.ts): the impulse snaps up on a bass hit and
+// decays back to zero over PUNCH_DECAY_SECONDS. A kick is what fires the pyro
+// punctuation.
 const PUNCH_DECAY_SECONDS = 0.2;
-const STRONG_PUNCH = 0.35;
 
 // --- Palette (haze tint only - pyro colors are physically fixed) -----------
 const PALETTE_CYCLE_SECONDS = 22;
@@ -84,6 +83,23 @@ const SPARK_RATE = 220;
 const SPARK_POP_SECONDS = 2; // outside events: short fountain length
 const SPARK_PUNCH_INTERVAL = 8; // ...fired on every 8th strong punch
 
+// --- With the track's beat list ---------------------------------------------
+// The effects above punctuate; they must not fire on every kick. With real
+// hits they follow the music's structure instead of a level:
+//   - a DROP (the first kick after a passage with no kick) fires the CO2
+//     jets, a flame cascade and the strobes;
+//   - between drops, fixed kick counts keep the punctuation going: CO2 every
+//     16 kicks (four bars), strobes every 8, a short flame cascade every 32,
+//     and the cold sparks every 32, half way between two flame cascades.
+// The kick count is the track's own, so every player sees these together.
+const CO2_KICK_INTERVAL = 16;
+const STROBE_KICK_INTERVAL = 8;
+const FLAME_KICK_INTERVAL = 32;
+const SPARK_KICK_INTERVAL = 32;
+const SPARK_KICK_OFFSET = 16;
+const FLAME_DROP_SECONDS = 3; // how long a drop keeps the cascade going
+const FLAME_PHRASE_SECONDS = 1.2;
+
 // --- Effect 5: strobe pods -------------------------------------------------
 const STROBE_THRESHOLD_NORMAL = 0.45; // bassRaw at the punch frame
 const STROBE_THRESHOLD_ACTIVE = 0.32;
@@ -96,6 +112,10 @@ export interface StageAtmosphericsOptions {
   // Fills the passed array with the current byte frequency spectrum (same
   // closure as the stage visualizer / immersive show; zero-filled idle).
   getFrequencyData: (target: Uint8Array) => void;
+  // The hits this player heard in this frame, from the track's beat list;
+  // null (or absent) when the track has none, and the effect then detects
+  // hits from the spectrum level itself.
+  getBeat?: () => StageBeat | null;
 }
 
 // The effects only build when the Main Stage venue is actually present (same
@@ -392,6 +412,7 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
   let strobeWasOn = false;
   let sparkTimer = 0;
   let strongPunchCounter = 0;
+  let flameArmSeconds = 0;
 
   // Exposed diagnostics.
   let co2BurstCount = 0;
@@ -426,15 +447,15 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     audioPresent = bassSum + midSum + highSum > 0;
 
     // Punch detection BEFORE smoothing absorbs this frame's hit.
-    let punchBurst = false;
-    let strongBurst = false;
-    if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
-      punch = 1;
-      punchBurst = true;
-      strongBurst = bassRaw > STRONG_PUNCH;
-    } else {
-      punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
-    }
+    // The track's real bass hits when it has a beat list (see stagePunch.ts).
+    const beat = options.getBeat ? options.getBeat() : null;
+    const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
+    punch = punchStep.punch;
+    const punchBurst = punchStep.hit;
+    const strongBurst = punchStep.kick;
+    const drop = beat !== null && strongBurst && beat.drop;
+    const onKick = (interval: number, offset = 0) =>
+      beat !== null && strongBurst && beat.kickCount % interval === offset;
 
     const blendBass = Math.min(1, dt * 12);
     const blendMid = Math.min(1, dt * 8);
@@ -483,7 +504,9 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     // --- Effect 2: CO2 jets --------------------------------------------------
     // Strong punches only in normal mode; ANY punch in active. lead_in and
     // idle stay silent - the jets punctuate drops, they never spray.
-    const co2Fire = !leadIn && !idle && (strongBurst || (active && punchBurst));
+    const co2Fire = !leadIn && !idle && (beat
+      ? drop || onKick(CO2_KICK_INTERVAL) || (active && strongBurst)
+      : strongBurst || (active && punchBurst));
     if (co2Fire) {
       // Round-robin from the next nozzle, skipping any still cooling down.
       for (let scan = 0; scan < co2Systems.length; scan++) {
@@ -508,7 +531,13 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     // --- Effect 3: flame jets ------------------------------------------------
     // Sustained high bass (slow envelope over threshold) cascades flames one
     // mount at a time; each mount then rests FLAME_COOLDOWN_SECONDS.
-    if (!leadIn && !idle && bassSlow > FLAME_THRESHOLD && flameFireGap <= 0) {
+    // With a beat list: armed by a drop, or briefly every FLAME_KICK_INTERVAL
+    // kicks. Without: sustained high bass (the slow envelope over threshold).
+    if (drop) flameArmSeconds = FLAME_DROP_SECONDS;
+    else if (onKick(FLAME_KICK_INTERVAL)) flameArmSeconds = Math.max(flameArmSeconds, FLAME_PHRASE_SECONDS);
+    else flameArmSeconds = Math.max(0, flameArmSeconds - dt);
+    const flameArmed = beat ? flameArmSeconds > 0 : bassSlow > FLAME_THRESHOLD;
+    if (!leadIn && !idle && flameArmed && flameFireGap <= 0) {
       for (let scan = 0; scan < flameSystems.length; scan++) {
         const idx = (flameNextIndex + scan) % flameSystems.length;
         if (flameCooldowns[idx] <= 0) {
@@ -534,7 +563,11 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     if (active) {
       sparkRateValue = SPARK_RATE; // continuous during the event
     } else {
-      if (strongBurst && mode === 'normal') {
+      if (beat) {
+        if (mode === 'normal' && onKick(SPARK_KICK_INTERVAL, SPARK_KICK_OFFSET)) {
+          sparkTimer = SPARK_POP_SECONDS;
+        }
+      } else if (strongBurst && mode === 'normal') {
         strongPunchCounter += 1;
         if (strongPunchCounter % SPARK_PUNCH_INTERVAL === 0) {
           sparkTimer = SPARK_POP_SECONDS;
@@ -551,7 +584,8 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     // Only the strongest punches (bassRaw over the mode threshold at the punch
     // frame) trigger a burst; the cooldown keeps them punctuation.
     const strobeThreshold = active ? STROBE_THRESHOLD_ACTIVE : STROBE_THRESHOLD_NORMAL;
-    if (!leadIn && punchBurst && bassRaw > strobeThreshold && strobeCooldown <= 0) {
+    const strobeHit = beat ? drop || onKick(STROBE_KICK_INTERVAL) : punchBurst && bassRaw > strobeThreshold;
+    if (!leadIn && strobeHit && strobeCooldown <= 0) {
       strobeTimeLeft = STROBE_BURST_SECONDS;
       strobeCooldown = STROBE_COOLDOWN_SECONDS;
       strobeWasOn = false;

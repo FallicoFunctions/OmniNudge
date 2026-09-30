@@ -17,6 +17,8 @@ import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
+import type { StageBeat } from '../media/trackBeats';
+import { stepBassPunch } from './stagePunch';
 
 // A floating 3D LIGHT GRID - a drone-show hologram volume - hanging above the
 // crowd behind the Main Stage, in the airspace the V113 crown-shell canopy
@@ -146,14 +148,11 @@ const FREQ_BIN_COUNT = 128;
 const BASS_END = 11;
 const MIDS_END = 61;
 
-// Bass punch detector (the venue's shared idiom): a raw reading this far above
-// the smoothed level is a hit; the impulse decays over PUNCH_DECAY_SECONDS. A
-// STRONG hit counts toward the musical phrase that advances the choreography.
-const PUNCH_RATIO = 1.25;
-const PUNCH_FLOOR = 0.12;
+// Bass punch (the venue's shared idiom, see stagePunch.ts): the impulse snaps
+// up on a bass hit and decays over PUNCH_DECAY_SECONDS. A kick counts toward
+// the musical phrase that advances the choreography.
 const PUNCH_DECAY_SECONDS = 0.22;
 const PUNCH_ATTACK_SECONDS = 0.04;
-const STRONG_PUNCH = 0.35;
 
 // --- Choreography ----------------------------------------------------------
 // Hold a formation, then morph to the next. Advance on musical phrase
@@ -278,6 +277,10 @@ export interface HologramGridOptions {
   // zero-filled when there is no world connection, which yields the idle
   // drift).
   getFrequencyData: (target: Uint8Array) => void;
+  // The hits this player heard in this frame, from the track's beat list;
+  // null (or absent) when the track has none, and the effect then detects
+  // hits from the spectrum level itself.
+  getBeat?: () => StageBeat | null;
 }
 
 // The grid only builds when the Main Stage venue is actually present (same
@@ -1018,13 +1021,11 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     audioPresent = bassSum + midSum + highSum > 0;
 
     // --- punch detection (BEFORE smoothing absorbs this frame's hit) ---
-    let strongKick = false;
-    if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
-      punch = 1;
-      strongKick = bassRaw > STRONG_PUNCH;
-    } else {
-      punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
-    }
+    // The track's real bass hits when it has a beat list (see stagePunch.ts).
+    const beat = options.getBeat ? options.getBeat() : null;
+    const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
+    punch = punchStep.punch;
+    const strongKick = punchStep.kick;
     if (punch > punchEnv) {
       punchEnv += (punch - punchEnv) * (1 - Math.exp(-dt / PUNCH_ATTACK_SECONDS));
     } else {

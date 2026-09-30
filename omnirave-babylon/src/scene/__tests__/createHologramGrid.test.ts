@@ -13,6 +13,7 @@ import {
   createHologramGrid,
   planHologramLattice,
 } from '../createHologramGrid';
+import { createStageBeat } from '../../media/trackBeats';
 
 const LAMELLA = 'merged:V113_CrownShellLamellaArray+1';
 const GOLD_SEAM = 'merged:V113_CrownShellGoldSeamArray+1';
@@ -362,5 +363,30 @@ describe('createHologramGrid', () => {
     expect(scene.materials.length).toBe(materialBaseline);
     // Idempotent.
     expect(() => grid.dispose()).not.toThrow();
+  });
+
+  it('flashes on the kicks of the track beat list and lets them change the formation before the hold timer', () => {
+    const beat = createStageBeat();
+    const grid = createHologramGrid(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+    for (let i = 0; i < 200; i++) grid.update(0.016);
+    const settled = grid.peakBrightness;
+    const first = grid.currentShape;
+
+    const kick = (count: number) => {
+      Object.assign(beat, { bass: 1, kick: true, kickCount: count });
+      grid.update(0.016);
+      Object.assign(beat, { bass: 0, kick: false });
+      grid.update(0.016);
+      const flash = grid.peakBrightness;
+      for (let i = 0; i < 27; i++) grid.update(0.016);
+      return flash;
+    };
+    expect(kick(1)).toBeGreaterThan(settled);
+    // 24 kicks take the show to about 14 s: past the minimum hold (11 s after
+    // the opening morph), and short of the 16 s hold timer, so only the 16
+    // counted kicks can have changed the formation.
+    for (let count = 2; count <= 24; count++) kick(count);
+    expect(grid.currentShape).not.toBe(first);
+    grid.dispose();
   });
 });

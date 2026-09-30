@@ -103,7 +103,7 @@ Both game services read the backend's environment file through `EnvironmentFile=
 
 Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`:
 
-Each track also needs two files that one script builds: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. The lasers fire on the bass hits in the beats file; without it, they guess the beat from the spectrum level, which almost never fires on a loud master. Build them with ffmpeg installed, then upload all three files:
+Each track also needs two files that one script builds: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. Every light effect (lasers, crown, light floor, hologram grid, CO2, flames, sparks, strobes) fires on the hits in the beats file (bass, mid and high bands, with the kicks and drops found from them); without it, they guess from the spectrum level, which almost never fires on a loud master. Build them with ffmpeg installed, then upload all three files:
 
 ```bash
 node omnirave-babylon/scripts/build-track-spectrum.mjs omnirave-babylon/public/audio/<trackId>.mp3
