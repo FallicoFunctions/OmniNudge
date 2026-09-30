@@ -215,6 +215,14 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					h.disconnectConn(clientSession.PlayerID, cc)
 				})
 			}
+		case "time_sync":
+			// The client's clock and the server's differ. This reply lets the
+			// client measure that difference, so every player hears the same
+			// moment of the track at the same time.
+			serverTime := float64(h.currentTime().UnixMicro()) / 1000
+			if err := cc.writeJSON(map[string]any{"type": "time_sync", "clientTime": event.ClientTime, "serverTime": serverTime}); err != nil {
+				return
+			}
 		case "show_control":
 			if event.Show == nil {
 				continue
@@ -528,7 +536,8 @@ func currentZoneMedia(mediaState *world.MediaState, now time.Time) []world.ZoneM
 			Artist:          snapshot.Artist,
 			Title:           snapshot.Title,
 			PlaylistIndex:   snapshot.Index,
-			PlayheadSeconds: int64(snapshot.Playhead / time.Second),
+			PlayheadSeconds: float64(snapshot.Playhead.Milliseconds()) / 1000,
+			SampledAtMS:     now.UnixMilli(),
 			DurationSeconds: int64(snapshot.Duration / time.Second),
 		})
 	}

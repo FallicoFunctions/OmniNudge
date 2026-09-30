@@ -21,6 +21,9 @@ function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePl
     getCurrentTime: vi.fn(() => 0),
     getDuration: vi.fn(() => 0),
     isPaused: vi.fn(() => true),
+    isReady: vi.fn(() => true),
+    setPlaybackRate: vi.fn(),
+    outputLatencySeconds: vi.fn(() => 0),
     setMuted: vi.fn(),
     getFrequencyData: vi.fn(),
     dispose: vi.fn(),
@@ -44,7 +47,7 @@ function media(overrides: Partial<ZoneMediaState> = {}): ZoneMediaState {
 describe('createStageMediaPlayer', () => {
   it('stashes applyMedia calls made before unlock and applies them on unlock', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
 
     player.applyMedia(media());
     expect(backend.load).not.toHaveBeenCalled();
@@ -58,7 +61,7 @@ describe('createStageMediaPlayer', () => {
 
   it('loads and seeks to the playhead when the trackId changes', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media({ trackId: 'track-a', playheadSeconds: 5 }));
@@ -71,7 +74,7 @@ describe('createStageMediaPlayer', () => {
 
   it('loads and seeks to the playhead when only the playlistIndex changes', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media({ trackId: 'track-a', playlistIndex: 0, playheadSeconds: 5 }));
@@ -80,30 +83,40 @@ describe('createStageMediaPlayer', () => {
     expect(backend.load).toHaveBeenNthCalledWith(2, 'track-a', 40);
   });
 
-  it('does not re-seek the same track when drift is within threshold', () => {
-    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 11) });
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+  it('speeds up a little instead of seeking when the track is slightly behind', () => {
+    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 11.8), isPaused: vi.fn(() => false) });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media({ playheadSeconds: 10 }));
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
 
-    // Server playhead advanced a bit; local time (11s) is within 2.5s of it.
+    // 0.2 s behind the server: no audible skip, 2% faster until it agrees.
     player.applyMedia(media({ playheadSeconds: 12 }));
 
     expect(backend.load).not.toHaveBeenCalled();
     expect(backend.seek).not.toHaveBeenCalled();
+    expect((backend.setPlaybackRate as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(1.02, 5);
+  });
+
+  it('plays at normal speed when the track is in sync', () => {
+    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 12.01), isPaused: vi.fn(() => false) });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
+    player.unlock();
+    player.applyMedia(media({ playheadSeconds: 10 }));
+    player.applyMedia(media({ playheadSeconds: 12 }));
+    expect(backend.setPlaybackRate).toHaveBeenLastCalledWith(1);
   });
 
   it('seeks the same track when drift exceeds the threshold', () => {
-    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5) });
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5), isPaused: vi.fn(() => false) });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media({ playheadSeconds: 10 }));
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
 
-    // Local time (5s) drifted more than 2.5s from the reported playhead (30s).
+    // Local time (5s) drifted more than 0.5s from the reported playhead (30s).
     player.applyMedia(media({ playheadSeconds: 30 }));
 
     expect(backend.load).not.toHaveBeenCalled();
@@ -112,7 +125,7 @@ describe('createStageMediaPlayer', () => {
 
   it('pauses on null media', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media());
@@ -123,7 +136,7 @@ describe('createStageMediaPlayer', () => {
 
   it('re-loads if the same track returns after a null gap', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
 
     player.applyMedia(media());
@@ -136,7 +149,7 @@ describe('createStageMediaPlayer', () => {
 
   it('disposes the backend cleanly and is a no-op afterwards', () => {
     const backend = createFakeBackend();
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
     player.applyMedia(media());
 
@@ -158,7 +171,7 @@ describe('createStageMediaPlayer', () => {
         }
       }),
     });
-    const player = createStageMediaPlayer({ backendFactory: () => backend });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
 
     // Before unlock there is no backend at all: the player fills zeros and does
     // not construct one just to read the spectrum.
@@ -175,7 +188,7 @@ describe('createStageMediaPlayer', () => {
 
   it('does not create a backend or throw before unlock even if applyMedia is called', () => {
     const backendFactory = vi.fn(() => createFakeBackend());
-    const player = createStageMediaPlayer({ backendFactory });
+    const player = createStageMediaPlayer({ now: () => 0, backendFactory });
 
     expect(() => player.applyMedia(media())).not.toThrow();
     expect(backendFactory).not.toHaveBeenCalled();
@@ -187,7 +200,7 @@ describe('createStageMediaPlayer', () => {
     it('retries a blocked start from the latest server playhead on a later unlock', () => {
       let paused = true;
       const backend = createFakeBackend({ isPaused: vi.fn(() => paused) });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
 
       player.applyMedia(media({ playheadSeconds: 10 }));
       player.unlock(); // at load, no gesture: the browser blocks play()
@@ -206,7 +219,7 @@ describe('createStageMediaPlayer', () => {
 
     it('does not restart a track that is already playing', () => {
       const backend = createFakeBackend({ isPaused: vi.fn(() => false) });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
       player.applyMedia(media());
       player.unlock();
       (backend.play as ReturnType<typeof vi.fn>).mockClear();
@@ -221,7 +234,7 @@ describe('createStageMediaPlayer', () => {
         isPaused: vi.fn(() => paused),
         getCurrentTime: vi.fn(() => 3),
       });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
 
       player.applyMedia(media({ playheadSeconds: 228 }));
       expect(player.getCurrentTime()).toBe(228);
@@ -233,13 +246,130 @@ describe('createStageMediaPlayer', () => {
     });
   });
 
+  describe('the same moment for every player', () => {
+    it('starts at the server playhead moved forward on the server clock', () => {
+      const backend = createFakeBackend();
+      const serverClock = { now: () => 1_000_000 + 1500 };
+      const player = createStageMediaPlayer({ now: () => 0, serverClock, backendFactory: () => backend });
+      player.applyMedia(media({ playheadSeconds: 10, sampledAtMs: 1_000_000 }));
+      player.unlock();
+      expect(backend.load).toHaveBeenCalledWith('main-stage-set-01', 11.5);
+    });
+
+    it('counts from the arrival time before the server clock is known', () => {
+      let localMs = 5000;
+      const backend = createFakeBackend();
+      const player = createStageMediaPlayer({
+        now: () => localMs,
+        serverClock: { now: () => undefined },
+        backendFactory: () => backend,
+      });
+      player.applyMedia(media({ playheadSeconds: 10, sampledAtMs: 123 }));
+      localMs += 2000;
+      expect(player.getCurrentTime()).toBe(12);
+    });
+
+    it('does not correct while the track downloads or seeks', () => {
+      const backend = createFakeBackend({
+        getCurrentTime: vi.fn(() => 5),
+        isPaused: vi.fn(() => false),
+        isReady: vi.fn(() => false),
+      });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
+      player.unlock();
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      player.applyMedia(media({ playheadSeconds: 30 }));
+      expect(backend.seek).not.toHaveBeenCalled();
+    });
+
+    it('learns how far a seek falls behind and seeks that far ahead next time', () => {
+      let position = 5;
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => position), isPaused: vi.fn(() => false) });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
+      player.unlock();
+      player.applyMedia(media({ playheadSeconds: 10 }));
+
+      player.applyMedia(media({ playheadSeconds: 30 }));
+      expect(backend.seek).toHaveBeenLastCalledWith(30);
+      // The seek stalled: once playing again it is 0.4 s behind the server.
+      position = 40.6;
+      player.applyMedia(media({ playheadSeconds: 41 }));
+
+      position = 50;
+      player.applyMedia(media({ playheadSeconds: 60 }));
+      expect((backend.seek as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(60.4, 5);
+    });
+
+    it('aims ahead by the output latency, so the speakers play the server moment', () => {
+      const backend = createFakeBackend({
+        getCurrentTime: vi.fn(() => 5),
+        isPaused: vi.fn(() => false),
+        outputLatencySeconds: vi.fn(() => 0.1),
+      });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
+      player.unlock();
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      player.applyMedia(media({ playheadSeconds: 30 }));
+      expect((backend.seek as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(30.1, 5);
+    });
+
+    it('reads the lights from the track spectrum at the heard position, also when muted or blocked', () => {
+      const fill = vi.fn((_trackId: string, _seconds: number, target: Uint8Array) => {
+        target.fill(7);
+        return true;
+      });
+      const backend = createFakeBackend({ getFrequencyData: vi.fn() });
+      const player = createStageMediaPlayer({
+        now: () => 0,
+        spectrum: { fill, dispose: vi.fn() },
+        backendFactory: () => backend,
+      });
+      player.applyMedia(media({ playheadSeconds: 42 }));
+      player.unlock(); // blocked: the element stays paused
+
+      const buffer = new Uint8Array(4);
+      player.getFrequencyData(buffer);
+      expect(fill).toHaveBeenLastCalledWith('main-stage-set-01', 42, buffer);
+      expect(Array.from(buffer)).toEqual([7, 7, 7, 7]);
+      expect(backend.getFrequencyData).not.toHaveBeenCalled();
+    });
+
+    it('reads the heard position, minus the output latency, while the track plays', () => {
+      const fill = vi.fn(() => true);
+      const backend = createFakeBackend({
+        getCurrentTime: vi.fn(() => 42.3),
+        isPaused: vi.fn(() => false),
+        outputLatencySeconds: vi.fn(() => 0.3),
+      });
+      const player = createStageMediaPlayer({ now: () => 0, spectrum: { fill, dispose: vi.fn() }, backendFactory: () => backend });
+      player.applyMedia(media({ playheadSeconds: 42 }));
+      player.unlock();
+      player.getFrequencyData(new Uint8Array(4));
+      expect((fill.mock.lastCall as unknown[] | undefined)?.[1]).toBeCloseTo(42, 5);
+    });
+
+    it('falls back to the live analysis when the spectrum part is not downloaded', () => {
+      const backend = createFakeBackend({ getFrequencyData: vi.fn((target: Uint8Array) => target.fill(3)) });
+      const player = createStageMediaPlayer({
+        now: () => 0,
+        spectrum: { fill: vi.fn(() => false), dispose: vi.fn() },
+        backendFactory: () => backend,
+      });
+      player.applyMedia(media());
+      player.unlock();
+      const buffer = new Uint8Array(2);
+      player.getFrequencyData(buffer);
+      expect(Array.from(buffer)).toEqual([3, 3]);
+    });
+  });
+
   describe('dev control surface', () => {
     it('delegates getDuration and isPaused to the backend after unlock', () => {
       const backend = createFakeBackend({
         getDuration: vi.fn(() => 180),
         isPaused: vi.fn(() => false),
       });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
       player.unlock();
 
       expect(player.getDuration()).toBe(180);
@@ -248,7 +378,7 @@ describe('createStageMediaPlayer', () => {
 
     it('reports safe defaults and does not create a backend before unlock', () => {
       const backendFactory = vi.fn(() => createFakeBackend());
-      const player = createStageMediaPlayer({ backendFactory });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory });
 
       expect(player.getDuration()).toBe(0);
       expect(player.getCurrentTime()).toBe(0);
@@ -259,8 +389,8 @@ describe('createStageMediaPlayer', () => {
     });
 
     it('setManualOverride(true) suppresses drift-correction on a drifted snapshot', () => {
-      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5) });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5), isPaused: vi.fn(() => false) });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
       player.unlock();
 
       player.applyMedia(media({ playheadSeconds: 10 }));
@@ -276,8 +406,8 @@ describe('createStageMediaPlayer', () => {
     });
 
     it('setManualOverride(false) resumes drift-correction on the next snapshot', () => {
-      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5) });
-      const player = createStageMediaPlayer({ backendFactory: () => backend });
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5), isPaused: vi.fn(() => false) });
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
       player.unlock();
 
       player.applyMedia(media({ playheadSeconds: 10 }));

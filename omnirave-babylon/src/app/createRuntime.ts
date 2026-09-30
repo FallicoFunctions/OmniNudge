@@ -218,6 +218,13 @@ export async function createRuntime(host: HTMLElement) {
   // Started from the handoff before the scene builds; the world socket path
   // takes this same player over.
   let earlyStageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
+  // One server clock and one spectrum reader for the stage player, whichever
+  // path creates it. The world socket feeds the clock.
+  const [{ createServerClock }, { createTrackSpectrum }] = await Promise.all([
+    import('../network/serverClock'),
+    import('../media/trackSpectrum'),
+  ]);
+  const stageMediaOptions = { serverClock: createServerClock(), spectrum: createTrackSpectrum() };
   let resolvedWorldUrl = perfFlags.worldUrl;
   let resolvedWorldToken = perfFlags.worldToken;
   // Covers three ways the top-right controls can end up in 'account' mode:
@@ -263,7 +270,7 @@ export async function createRuntime(host: HTMLElement) {
       const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
       if (handoffMedia) {
         const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
-        earlyStageMediaPlayer = createStageMediaPlayer();
+        earlyStageMediaPlayer = createStageMediaPlayer(stageMediaOptions);
         earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
         earlyStageMediaPlayer.unlock();
         // Boot timing: note the moment sound starts, even mid-scene-build.
@@ -757,10 +764,11 @@ export async function createRuntime(host: HTMLElement) {
       // (see createMainStageScene's setRemotePlayerCollisionSource), so this
       // is the one-time hookup for local-vs-remote-player collision.
       reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
-      stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer();
+      stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer(stageMediaOptions);
       worldSocket = createWorldSocket({
         url: resolvedWorldUrl,
         token: resolvedWorldToken,
+        serverClock: stageMediaOptions.serverClock,
       });
       const activeWorldSocket = worldSocket;
 

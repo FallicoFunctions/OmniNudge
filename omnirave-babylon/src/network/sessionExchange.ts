@@ -47,6 +47,8 @@ export interface ExchangedZoneMedia {
   trackId: string;
   playlistIndex: number;
   playheadSeconds: number;
+  // The server time (Unix ms) at which playheadSeconds was read.
+  sampledAtMs?: number;
 }
 
 export interface SessionExchangeParams {
@@ -159,7 +161,8 @@ function parseZoneMedia(value: unknown): ExchangedZoneMedia[] {
     return typeof zone?.zoneId === 'string' && typeof zone.videoId === 'string' && zone.videoId
       && typeof zone.playlistIndex === 'number' && typeof zone.playheadSeconds === 'number'
       ? [{ zoneId: zone.zoneId, trackId: zone.videoId, playlistIndex: zone.playlistIndex,
-        playheadSeconds: zone.playheadSeconds }]
+        playheadSeconds: zone.playheadSeconds,
+        ...(typeof zone.sampledAtMs === 'number' ? { sampledAtMs: zone.sampledAtMs } : {}) }]
       : [];
   });
 }

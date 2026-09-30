@@ -661,3 +661,40 @@ it('cancels a queued crouch when standing resumes and clears posture across resp
   expect(JSON.parse(socket.sent[0])).toEqual({ type: 'move', moveTo: position });
   worldSocket.dispose();
 });
+
+it('pings the server clock after open, quickly at first, and feeds the replies to the clock', () => {
+  const clock = createFakeClock();
+  const sockets: FakeWebSocket[] = [];
+  const serverClock = { now: vi.fn(() => undefined), addSample: vi.fn() };
+  const worldSocket = createWorldSocket({
+    url: 'wss://example.test/ws',
+    token: 'jwt-token',
+    webSocketFactory: (url) => {
+      const socket = new FakeWebSocket(url);
+      sockets.push(socket);
+      return socket;
+    },
+    clock,
+    serverClock,
+  });
+  worldSocket.connect();
+  const socket = sockets[0];
+  clock.advance(500);
+  socket.triggerOpen();
+  const pings = () => socket.sent.map((raw) => JSON.parse(raw)).filter((message) => message.type === 'time_sync');
+  expect(pings()).toEqual([{ type: 'time_sync', clientTime: 500 }]);
+
+  for (let second = 0; second < 3; second += 1) clock.advance(1000);
+  expect(pings()).toHaveLength(4);
+  clock.advance(14_000);
+  expect(pings()).toHaveLength(4);
+  clock.advance(1000);
+  expect(pings()).toHaveLength(5);
+
+  clock.elapseWithoutTimers(40);
+  socket.triggerMessage(JSON.stringify({ type: 'time_sync', clientTime: 500, serverTime: 9_000_000 }));
+  expect(serverClock.addSample).toHaveBeenCalledWith(500, 9_000_000, 18_540);
+
+  worldSocket.dispose();
+  expect(clock.pendingCount()).toBe(0);
+});

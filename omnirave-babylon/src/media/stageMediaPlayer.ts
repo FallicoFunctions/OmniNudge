@@ -13,6 +13,7 @@
 
 import type { ZoneMediaState } from '../network/worldSocket';
 import { publicUrl } from '../app/publicUrl';
+import type { TrackSpectrum } from './trackSpectrum';
 
 // The served audio file extension. A single named constant so switching the
 // whole setlist to a different container (e.g. .m4a) is a one-line change.
@@ -23,12 +24,19 @@ function resolveTrackUrl(trackId: string): string {
   return publicUrl(`/audio/${trackId}${AUDIO_FILE_EXTENSION}`);
 }
 
-// If the server-reported playhead and our local playback position drift by
-// more than this, snap to the server position. Below this we just let
-// playback run: the browser's own audio clock is close enough moment-to-moment
-// that reseeking on every ~1s snapshot would audibly stutter the track for no
-// audible sync benefit.
-const DRIFT_THRESHOLD_SECONDS = 2.5;
+// Every player must hear the same moment of the track at the same time.
+// The player compares its audio position with the server's playhead, moved
+// forward to "now" on the server's clock (see serverClock.ts):
+// - More than SEEK_THRESHOLD off: seek. A seek stalls while the new part
+//   downloads, so the player learns that stall and seeks that far ahead.
+// - Less than that: change the speed by a few percent until the position
+//   agrees. The browser keeps the pitch, and there is no audible skip.
+const SEEK_THRESHOLD_SECONDS = 0.5;
+const IN_SYNC_SECONDS = 0.02;
+// Speed change per second of drift, and the largest speed change.
+const RATE_PER_DRIFT_SECOND = 0.1;
+const MAX_RATE_CHANGE = 0.03;
+const MAX_SEEK_LEAD_SECONDS = 3;
 
 export interface StagePlayerBackend {
   load(trackId: string, startSeconds: number): void;
@@ -40,6 +48,12 @@ export interface StagePlayerBackend {
   getDuration(): number;
   // Whether playback is currently paused.
   isPaused(): boolean;
+  // True when playback runs without a stall: not seeking, and enough audio
+  // is downloaded to continue.
+  isReady(): boolean;
+  setPlaybackRate(rate: number): void;
+  // Seconds from the decoded position to the speakers (0 when unknown).
+  outputLatencySeconds(): number;
   setMuted(muted: boolean): void;
   // Fills `target` with the current byte frequency spectrum (0..255 per bin,
   // low frequencies first). No-op / leaves the caller's zeros in place when no
@@ -50,6 +64,14 @@ export interface StagePlayerBackend {
 
 export interface StageMediaPlayerOptions {
   backendFactory?: () => StagePlayerBackend;
+  // The world server's clock. Without it (before the first clock ping), the
+  // player counts from the time each playhead arrived.
+  serverClock?: { now(): number | undefined };
+  // Precomputed spectrum of each track. The lights read it at the position
+  // this player hears, so they do not depend on this tab's audio output.
+  spectrum?: TrackSpectrum;
+  // Local time in milliseconds (tests replace it).
+  now?: () => number;
 }
 
 export interface StageMediaPlayer {
@@ -60,11 +82,11 @@ export interface StageMediaPlayer {
   // True while the track is actually playing (the browser allowed it).
   isAudible: () => boolean;
   applyMedia: (media: ZoneMediaState | null) => void;
-  // Fills `target` with the live byte frequency spectrum of the synced track.
-  // Fills zeros before unlock, when no track is playing, or where Web Audio is
-  // unavailable — always safe, never throws. Because every client plays the
-  // same server-synced track, each client's spectrum is ~identical, so the
-  // visualizer can be driven purely from this local analysis (no server push).
+  // Fills `target` with the byte frequency spectrum of the synced track at the
+  // moment this player hears. It reads the track's precomputed spectrum, so
+  // every player's lights show the same thing for the same moment of the
+  // music, also when this tab is muted or blocked. Without that data it falls
+  // back to the live analysis of this tab's audio. Never throws.
   getFrequencyData: (target: Uint8Array) => void;
   // Dev control surface (used by the debug-only audio scrubber). All safe
   // no-ops before unlock, when there is no backend yet.
@@ -100,6 +122,13 @@ function createNoopBackend(): StagePlayerBackend {
     },
     isPaused() {
       return true;
+    },
+    isReady() {
+      return false;
+    },
+    setPlaybackRate() {},
+    outputLatencySeconds() {
+      return 0;
     },
     setMuted() {},
     getFrequencyData(target) {
@@ -264,6 +293,17 @@ function createAudioBackend(): StagePlayerBackend {
     isPaused() {
       return element.paused;
     },
+    isReady() {
+      // HAVE_FUTURE_DATA (3): playback can continue past the current frame.
+      return !element.seeking && element.readyState >= 3;
+    },
+    setPlaybackRate(rate) {
+      if (element.playbackRate !== rate) element.playbackRate = rate;
+    },
+    outputLatencySeconds() {
+      const latency = (audioContext?.baseLatency ?? 0) + (audioContext?.outputLatency ?? 0);
+      return Number.isFinite(latency) ? latency : 0;
+    },
     setMuted(muted) {
       element.muted = muted;
     },
@@ -292,6 +332,7 @@ function createAudioBackend(): StagePlayerBackend {
 
 export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): StageMediaPlayer {
   const createBackend = options.backendFactory ?? createAudioBackend;
+  const localNow = options.now ?? (() => Date.now());
 
   let backend: StagePlayerBackend | undefined;
   let unlocked = false;
@@ -304,6 +345,10 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   // calls before unlock() are stashed and applied once unlocked instead of
   // being dropped.
   let desiredMedia: ZoneMediaState | null = null;
+  let desiredReceivedAt = 0;
+  // How far ahead of the target a seek lands on the target, after the stall.
+  let seekLead = 0;
+  let measureSeekLead = false;
   let currentTrackId: string | undefined;
   let currentPlaylistIndex: number | undefined;
 
@@ -314,6 +359,18 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     return backend;
   }
 
+  // The server's playhead now: the reported position plus the time since
+  // the server read it, on the server's clock when it is known.
+  function expectedPlayhead(media: ZoneMediaState): number {
+    const serverNow = options.serverClock?.now();
+    const elapsedMs =
+      serverNow !== undefined && typeof media.sampledAtMs === 'number'
+        ? serverNow - media.sampledAtMs
+        : localNow() - desiredReceivedAt;
+    const seconds = media.playheadSeconds + Math.max(0, elapsedMs) / 1000;
+    return media.durationSeconds > 0 ? Math.min(seconds, media.durationSeconds) : seconds;
+  }
+
   function playMedia(media: ZoneMediaState): void {
     const activeBackend = ensureBackend();
     const isNewTrack =
@@ -322,23 +379,50 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (isNewTrack) {
       currentTrackId = media.trackId;
       currentPlaylistIndex = media.playlistIndex;
-      activeBackend.load(media.trackId, media.playheadSeconds);
+      measureSeekLead = false;
+      activeBackend.setPlaybackRate(1);
+      activeBackend.load(media.trackId, expectedPlayhead(media));
       activeBackend.setMuted(false);
       activeBackend.play();
       return;
     }
+    syncPlayback(activeBackend, media);
+  }
 
-    // Same track: drift-correct only, don't restart/reseek on every
-    // snapshot or playback will audibly stutter.
-    const drift = Math.abs(activeBackend.getCurrentTime() - media.playheadSeconds);
-    if (drift > DRIFT_THRESHOLD_SECONDS) {
-      activeBackend.seek(media.playheadSeconds);
+  function syncPlayback(activeBackend: StagePlayerBackend, media: ZoneMediaState): void {
+    // Paused (blocked by the browser) or still downloading: a position read
+    // now is not what the player hears.
+    if (activeBackend.isPaused() || !activeBackend.isReady()) return;
+    const target = expectedPlayhead(media) + activeBackend.outputLatencySeconds();
+    const drift = activeBackend.getCurrentTime() - target;
+    if (Math.abs(drift) > SEEK_THRESHOLD_SECONDS) {
+      activeBackend.setPlaybackRate(1);
+      activeBackend.seek(target + seekLead);
+      measureSeekLead = true;
+      return;
     }
+    if (measureSeekLead) {
+      // The first reading after a seek shows how far the stall put it behind.
+      measureSeekLead = false;
+      seekLead = Math.min(MAX_SEEK_LEAD_SECONDS, Math.max(0, seekLead - drift));
+    }
+    const rateChange = Math.min(MAX_RATE_CHANGE, Math.max(-MAX_RATE_CHANGE, -drift * RATE_PER_DRIFT_SECOND));
+    activeBackend.setPlaybackRate(Math.abs(drift) <= IN_SYNC_SECONDS ? 1 : 1 + rateChange);
+  }
+
+  // The track position this player hears now.
+  function heardSeconds(): number {
+    if (backend && manualOverride) return backend.getCurrentTime();
+    if (backend && !backend.isPaused() && backend.isReady()) {
+      return Math.max(0, backend.getCurrentTime() - backend.outputLatencySeconds());
+    }
+    return desiredMedia ? expectedPlayhead(desiredMedia) : 0;
   }
 
   function applyMedia(media: ZoneMediaState | null): void {
     if (disposed) return;
     desiredMedia = media;
+    desiredReceivedAt = localNow();
 
     if (!unlocked) {
       // Stashed; will be applied by unlock().
@@ -375,7 +459,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     // Already unlocked, but the browser blocked the earlier attempt: retry
     // from the server's latest playhead, not the one the blocked load used.
     if (!manualOverride && desiredMedia && backend?.isPaused()) {
-      backend.seek(desiredMedia.playheadSeconds);
+      backend.seek(expectedPlayhead(desiredMedia));
       backend.play();
     }
   }
@@ -385,6 +469,10 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   }
 
   function getFrequencyData(target: Uint8Array): void {
+    const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
+    if (trackId && options.spectrum?.fill(trackId, heardSeconds(), target)) {
+      return;
+    }
     if (backend) {
       backend.getFrequencyData(target);
     } else {
@@ -399,7 +487,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (backend && (!backend.isPaused() || manualOverride)) {
       return backend.getCurrentTime();
     }
-    return desiredMedia ? desiredMedia.playheadSeconds : (backend?.getCurrentTime() ?? 0);
+    return desiredMedia ? expectedPlayhead(desiredMedia) : (backend?.getCurrentTime() ?? 0);
   }
 
   function getDuration(): number {
@@ -433,6 +521,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   function dispose(): void {
     if (disposed) return;
     disposed = true;
+    options.spectrum?.dispose();
     backend?.dispose();
     backend = undefined;
   }

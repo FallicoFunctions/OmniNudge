@@ -103,8 +103,11 @@ Both game services read the backend's environment file through `EnvironmentFile=
 
 Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`:
 
+Each track also needs its spectrum file, `<trackId>.spectrum`. The stage lights read it at the track position, so they are the same for every player. Without it, the lights follow the audio of each player's own tab. Build it with ffmpeg installed, then upload both files:
+
 ```bash
-rsync -avP omnirave-babylon/public/audio/<trackId>.mp3 root@77.42.47.79:/var/www/omnirave-audio/
+node omnirave-babylon/scripts/build-track-spectrum.mjs omnirave-babylon/public/audio/<trackId>.mp3
+rsync -avP omnirave-babylon/public/audio/<trackId>.mp3 omnirave-babylon/public/audio/<trackId>.spectrum root@77.42.47.79:/var/www/omnirave-audio/
 ```
 
 For guest moderation to be durable across fresh guest bootstraps, `OMNIGAME_TRUSTED_PROXIES` must include only the real proxy hop CIDRs in front of `omnigame-api`. Do not trust public client ranges. The intended production shape is Cloudflare -> nginx -> `omnigame-api`, with nginx/loopback as the trusted hop and external forwarding headers stripped/rewritten before the request reaches Gin.

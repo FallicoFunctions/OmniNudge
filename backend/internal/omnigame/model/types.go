@@ -229,10 +229,13 @@ type RuntimeAuthRequest struct {
 type RuntimeAuthResponse = SessionExchangeResponse
 
 type ZoneMediaState struct {
-	ZoneID          string `json:"zoneId"`
-	VideoID         string `json:"videoId"`
-	PlaylistIndex   int    `json:"playlistIndex"`
-	PlayheadSeconds int64  `json:"playheadSeconds"`
+	ZoneID        string `json:"zoneId"`
+	VideoID       string `json:"videoId"`
+	PlaylistIndex int    `json:"playlistIndex"`
+	// PlayheadSeconds is the position, to the millisecond, at the server
+	// time SampledAtMS (Unix milliseconds).
+	PlayheadSeconds float64 `json:"playheadSeconds"`
+	SampledAtMS     int64   `json:"sampledAtMs"`
 }
 
 type ZoneEventState struct {

@@ -717,6 +717,6 @@ func TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServ
 		require.Equal(t, string(snapshot.ZoneID), bootstrap.ZoneMedia[index].ZoneID)
 		require.Equal(t, snapshot.TrackID, bootstrap.ZoneMedia[index].VideoID)
 		require.Equal(t, snapshot.Index, bootstrap.ZoneMedia[index].PlaylistIndex)
-		require.Equal(t, int64(snapshot.Playhead/time.Second), bootstrap.ZoneMedia[index].PlayheadSeconds)
+		require.InDelta(t, snapshot.Playhead.Seconds(), bootstrap.ZoneMedia[index].PlayheadSeconds, 0.001)
 	}
 }

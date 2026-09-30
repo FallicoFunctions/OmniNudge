@@ -556,7 +556,7 @@ func TestCurrentZoneMedia_CarriesArtistTitleAndDuration(t *testing.T) {
 		time.Unix(1000, 0),
 	)
 
-	zoneMedia := currentZoneMedia(mediaState, time.Unix(1060, 0))
+	zoneMedia := currentZoneMedia(mediaState, time.Unix(1060, 250*int64(time.Millisecond)))
 	require.NotEmpty(t, zoneMedia)
 
 	mainStage := zoneMedia[0]
@@ -564,7 +564,8 @@ func TestCurrentZoneMedia_CarriesArtistTitleAndDuration(t *testing.T) {
 	require.Equal(t, "main-stage-set-01", mainStage.TrackID)
 	require.Equal(t, "Fallico", mainStage.Artist)
 	require.Equal(t, "Nick's Mix Vol. 13", mainStage.Title)
-	require.Equal(t, int64(60), mainStage.PlayheadSeconds)
+	require.Equal(t, 60.25, mainStage.PlayheadSeconds)
+	require.Equal(t, int64(1060250), mainStage.SampledAtMS)
 	require.Equal(t, int64(7827), mainStage.DurationSeconds)
 }
 
@@ -577,7 +578,8 @@ func TestZoneMediaState_WireFieldNames(t *testing.T) {
 		Artist:          "Fallico",
 		Title:           "Nick's Mix Vol. 13",
 		PlaylistIndex:   0,
-		PlayheadSeconds: 60,
+		PlayheadSeconds: 60.25,
+		SampledAtMS:     1060250,
 		DurationSeconds: 7827,
 	})
 	require.NoError(t, err)
@@ -587,7 +589,8 @@ func TestZoneMediaState_WireFieldNames(t *testing.T) {
 	require.Equal(t, "Fallico", decoded["artist"])
 	require.Equal(t, "Nick's Mix Vol. 13", decoded["title"])
 	require.Equal(t, float64(7827), decoded["durationSeconds"])
-	require.Equal(t, float64(60), decoded["playheadSeconds"])
+	require.Equal(t, 60.25, decoded["playheadSeconds"])
+	require.Equal(t, float64(1060250), decoded["sampledAtMs"])
 	require.Equal(t, "main-stage-set-01", decoded["trackId"])
 }
 

@@ -222,3 +222,29 @@ func TestWSHandler_RenewForAnotherPlayerExtendsNothing(t *testing.T) {
 		return worldState.Player("guest-a") == nil
 	}, shortSessionTTL+5*time.Second, 20*time.Millisecond, "another player's token must not extend this session")
 }
+
+func TestWSHandler_TimeSyncEchoesTheClientTimeWithTheServerTime(t *testing.T) {
+	_, testServer, authService := newExpiryTestServer(t)
+
+	token := newGuestWorldSessionToken(t, authService, "guest-clock", "Guest-Clock", nil)
+	conn, _, err := websocket.DefaultDialer.Dial(
+		buildWorldWSURL(testServer.URL, token, ""),
+		worldDialHeader("https://play.omninudge.com"),
+	)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	var joinSnapshot map[string]any
+	require.NoError(t, conn.ReadJSON(&joinSnapshot))
+
+	before := float64(time.Now().UnixMilli())
+	require.NoError(t, conn.WriteJSON(map[string]any{"type": "time_sync", "clientTime": 1234.5}))
+	var reply map[string]any
+	for reply["type"] != "time_sync" {
+		reply = nil
+		require.NoError(t, conn.ReadJSON(&reply))
+	}
+	require.Equal(t, 1234.5, reply["clientTime"])
+	serverTime, ok := reply["serverTime"].(float64)
+	require.True(t, ok)
+	require.InDelta(t, before, serverTime, 2000)
+}

@@ -65,14 +65,23 @@ type ClientEvent struct {
 	Loadout Loadout `json:"loadout,omitempty"`
 	// Token carries a "renew" event's fresh world token.
 	Token string `json:"token,omitempty"`
+	// ClientTime carries a "time_sync" event's send time on the client's
+	// clock. The reply echoes it with the server's time, so the client can
+	// measure the round trip and its offset from the server clock.
+	ClientTime float64 `json:"clientTime,omitempty"`
 }
 
 type ZoneMediaState struct {
-	ZoneID          ZoneID `json:"zoneId"`
-	TrackID         string `json:"trackId"`
-	Artist          string `json:"artist"`
-	Title           string `json:"title"`
-	PlaylistIndex   int    `json:"playlistIndex"`
-	PlayheadSeconds int64  `json:"playheadSeconds"`
-	DurationSeconds int64  `json:"durationSeconds"`
+	ZoneID        ZoneID `json:"zoneId"`
+	TrackID       string `json:"trackId"`
+	Artist        string `json:"artist"`
+	Title         string `json:"title"`
+	PlaylistIndex int    `json:"playlistIndex"`
+	// PlayheadSeconds is the track position, to the millisecond, at the
+	// server time SampledAtMS (Unix milliseconds). A client adds the time
+	// since then on the server's clock, so a slow delivery does not delay
+	// its music.
+	PlayheadSeconds float64 `json:"playheadSeconds"`
+	SampledAtMS     int64   `json:"sampledAtMs"`
+	DurationSeconds int64   `json:"durationSeconds"`
 }

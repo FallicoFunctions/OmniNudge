@@ -221,7 +221,8 @@ func (s *SessionService) currentZoneMedia(now time.Time) []model.ZoneMediaState 
 			ZoneID:          string(snapshot.ZoneID),
 			VideoID:         snapshot.TrackID,
 			PlaylistIndex:   snapshot.Index,
-			PlayheadSeconds: int64(snapshot.Playhead / time.Second),
+			PlayheadSeconds: float64(snapshot.Playhead.Milliseconds()) / 1000,
+			SampledAtMS:     now.UnixMilli(),
 		})
 	}
 	return zoneMedia

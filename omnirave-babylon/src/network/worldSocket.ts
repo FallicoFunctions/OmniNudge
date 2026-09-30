@@ -1,4 +1,5 @@
 import { isShowState, type ShowState, type ShowCommand, type ShowResult } from '../showControl/showTypes';
+import type { ServerClock } from './serverClock';
 // World-socket client for the Go world server (gorilla/websocket at /ws?token=<jwt>).
 //
 // Framework-free: no Babylon imports here. The WebSocket itself is injected via
@@ -40,6 +41,8 @@ export interface ZoneMediaState {
   title: string;
   playlistIndex: number;
   playheadSeconds: number;
+  // The server time (Unix ms) at which playheadSeconds was read.
+  sampledAtMs?: number;
   // 0 when the server has no duration for the current entry.
   durationSeconds: number;
 }
@@ -93,6 +96,8 @@ export interface WorldSocketOptions {
   token: string;
   webSocketFactory?: (url: string) => WorldSocketLike;
   clock?: WorldSocketClock;
+  // Receives the replies to the socket's clock pings.
+  serverClock?: ServerClock;
 }
 
 export interface WorldSocket {
@@ -123,6 +128,11 @@ export interface WorldSocket {
 }
 
 const MOVE_THROTTLE_MS = 100;
+// Clock pings: a few quick ones after the socket opens, so the stage music
+// syncs soon, then a slow one to follow network changes.
+const TIME_SYNC_QUICK_PINGS = 4;
+const TIME_SYNC_QUICK_MS = 1000;
+const TIME_SYNC_SLOW_MS = 15000;
 const BACKOFF_SCHEDULE_MS = [1000, 2000, 4000, 8000];
 
 const defaultClock: WorldSocketClock = {
@@ -166,6 +176,8 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   let moveTrailingTimer: number | null = null;
 
   let warnedThisBurst = false;
+  let timeSyncTimer: number | null = null;
+  let timeSyncPings = 0;
 
   const showCallbacks = new Set<(result:ShowResult)=>void>();
   const snapshotCallbacks: Array<(snapshot: WorldSnapshot) => void> = [];
@@ -226,6 +238,24 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     sendPosition(position, crouched);
   }
 
+  function stopTimeSync(): void {
+    if (timeSyncTimer !== null) {
+      clock.clearTimeout(timeSyncTimer);
+      timeSyncTimer = null;
+    }
+  }
+
+  function pingServerClock(): void {
+    timeSyncTimer = null;
+    if (!options.serverClock || disposed || status !== 'open') return;
+    send({ type: 'time_sync', clientTime: clock.now() });
+    timeSyncPings += 1;
+    timeSyncTimer = clock.setTimeout(
+      pingServerClock,
+      timeSyncPings < TIME_SYNC_QUICK_PINGS ? TIME_SYNC_QUICK_MS : TIME_SYNC_SLOW_MS,
+    );
+  }
+
   function handleMessage(raw: string): void {
     let parsed: unknown;
     try {
@@ -258,6 +288,12 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
       case 'show_result': {
         const result=message.result as ShowResult;
         if(result && typeof result.requestId==='string' && typeof result.ok==='boolean' && typeof result.message==='string') showCallbacks.forEach(cb=>cb(result));
+        break;
+      }
+      case 'time_sync': {
+        if (typeof message.clientTime === 'number' && typeof message.serverTime === 'number') {
+          options.serverClock?.addSample(message.clientTime, message.serverTime, clock.now());
+        }
         break;
       }
       case 'chat_message': {
@@ -315,6 +351,9 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
       reconnectAttempt = 0;
       resetMovement();
       setStatus('open');
+      stopTimeSync();
+      timeSyncPings = 0;
+      pingServerClock();
     };
 
     nextSocket.onerror = () => {
@@ -323,6 +362,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     };
 
     nextSocket.onclose = () => {
+      stopTimeSync();
       resetMovement();
       setStatus('closed');
       if (!disposed) {
@@ -346,6 +386,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
     // race a scheduleReconnect() timer that would otherwise fire later and
     // re-open with whatever credentials happened to be current at that time.
     clearReconnectTimer();
+    stopTimeSync();
     reconnectAttempt = 0;
     if (socket) {
       // Detach handlers before closing so the old socket's close event does
@@ -364,6 +405,7 @@ export function createWorldSocket(options: WorldSocketOptions): WorldSocket {
   function dispose(): void {
     disposed = true;
     clearReconnectTimer();
+    stopTimeSync();
 
     resetMovement();
 
