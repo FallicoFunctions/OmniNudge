@@ -348,6 +348,47 @@ describe('createStageMediaPlayer', () => {
       expect((fill.mock.lastCall as unknown[] | undefined)?.[1]).toBeCloseTo(42, 5);
     });
 
+    it('reports the bass hits heard since the last reading, a little ahead of the sound', () => {
+      let position = 100;
+      const strongestBetween = vi.fn(() => 0.8);
+      const backend = createFakeBackend({ getCurrentTime: vi.fn(() => position), isPaused: vi.fn(() => false) });
+      const player = createStageMediaPlayer({
+        now: () => 0,
+        beats: { strongestBetween, dispose: vi.fn() },
+        backendFactory: () => backend,
+      });
+      player.applyMedia(media({ playheadSeconds: 100 }));
+      player.unlock();
+
+      // The first reading has no earlier one: an empty window, no replay.
+      expect(player.getBeatStrength()).toBe(0.8);
+      expect(strongestBetween.mock.lastCall).toEqual(['main-stage-set-01', 100.04, 100.04]);
+      position = 100.016;
+      player.getBeatStrength();
+      const [, from, until] = strongestBetween.mock.lastCall as unknown as [string, number, number];
+      expect(from).toBeCloseTo(100.04, 5);
+      expect(until).toBeCloseTo(100.056, 5);
+
+      // A seek (or a stalled tab): the hits in between are not replayed.
+      position = 400;
+      player.getBeatStrength();
+      const [, afterSeekFrom, afterSeekUntil] = strongestBetween.mock.lastCall as unknown as [string, number, number];
+      expect(afterSeekFrom).toBe(afterSeekUntil);
+    });
+
+    it('has no beat reading without a beat list, and stops the list when disposed', () => {
+      const without = createStageMediaPlayer({ now: () => 0, backendFactory: () => createFakeBackend() });
+      without.applyMedia(media());
+      expect(without.getBeatStrength()).toBeNull();
+
+      const beats = { strongestBetween: vi.fn(() => null), dispose: vi.fn() };
+      const player = createStageMediaPlayer({ now: () => 0, beats, backendFactory: () => createFakeBackend() });
+      player.applyMedia(media());
+      expect(player.getBeatStrength()).toBeNull();
+      player.dispose();
+      expect(beats.dispose).toHaveBeenCalledTimes(1);
+    });
+
     it('stops the spectrum downloads when the player is disposed', () => {
       const spectrum = { fill: vi.fn(() => false), dispose: vi.fn() };
       const player = createStageMediaPlayer({ now: () => 0, spectrum, backendFactory: () => createFakeBackend() });

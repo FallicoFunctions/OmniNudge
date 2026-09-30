@@ -13,6 +13,7 @@
 
 import type { ZoneMediaState } from '../network/worldSocket';
 import { publicUrl } from '../app/publicUrl';
+import type { TrackBeats } from './trackBeats';
 import type { TrackSpectrum } from './trackSpectrum';
 
 // The served audio file extension. A single named constant so switching the
@@ -37,6 +38,12 @@ const IN_SYNC_SECONDS = 0.02;
 const RATE_PER_DRIFT_SECOND = 0.1;
 const MAX_RATE_CHANGE = 0.03;
 const MAX_SEEK_LEAD_SECONDS = 3;
+// The lights see a bass hit this long before the player hears it, so their
+// brightness (which takes about this long to rise) peaks on the hit.
+const BEAT_LEAD_SECONDS = 0.04;
+// A longer step than this between two beat readings is a seek or a stalled
+// tab, not playback; the hits in between are not replayed.
+const MAX_BEAT_STEP_SECONDS = 0.5;
 
 export interface StagePlayerBackend {
   load(trackId: string, startSeconds: number): void;
@@ -70,6 +77,8 @@ export interface StageMediaPlayerOptions {
   // Precomputed spectrum of each track. The lights read it at the position
   // this player hears, so they do not depend on this tab's audio output.
   spectrum?: TrackSpectrum;
+  // The bass hits of each track, found ahead of time (see trackBeats.ts).
+  beats?: TrackBeats;
   // Local time in milliseconds (tests replace it).
   now?: () => number;
 }
@@ -88,6 +97,10 @@ export interface StageMediaPlayer {
   // music, also when this tab is muted or blocked. Without that data it falls
   // back to the live analysis of this tab's audio. Never throws.
   getFrequencyData: (target: Uint8Array) => void;
+  // The strength (0..1) of the strongest bass hit the player heard since the
+  // previous call, 0 when there was none. Null when the track has no beat list
+  // (or it is not downloaded yet): the lights then detect hits themselves.
+  getBeatStrength: () => number | null;
   // Dev control surface (used by the debug-only audio scrubber). All safe
   // no-ops before unlock, when there is no backend yet.
   getCurrentTime: () => number;
@@ -349,6 +362,8 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   // How far ahead of the target a seek lands on the target, after the stall.
   let seekLead = 0;
   let measureSeekLead = false;
+  let beatTrackId: string | undefined;
+  let beatSeconds = 0;
   let currentTrackId: string | undefined;
   let currentPlaylistIndex: number | undefined;
 
@@ -481,6 +496,18 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     }
   }
 
+  function getBeatStrength(): number | null {
+    const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
+    if (!trackId || !options.beats) return null;
+    const until = heardSeconds() + BEAT_LEAD_SECONDS;
+    const from = beatSeconds;
+    const continues = trackId === beatTrackId && until >= from && until - from <= MAX_BEAT_STEP_SECONDS;
+    beatTrackId = trackId;
+    beatSeconds = until;
+    const strongest = options.beats.strongestBetween(trackId, continues ? from : until, until);
+    return strongest;
+  }
+
   function getCurrentTime(): number {
     // Until the browser lets the track play, report the server's playhead
     // (sent at least once a second) so the HUD shows the room's real time.
@@ -522,6 +549,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (disposed) return;
     disposed = true;
     options.spectrum?.dispose();
+    options.beats?.dispose();
     backend?.dispose();
     backend = undefined;
   }
@@ -531,6 +559,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     isAudible,
     applyMedia,
     getFrequencyData,
+    getBeatStrength,
     getCurrentTime,
     getDuration,
     isPaused,

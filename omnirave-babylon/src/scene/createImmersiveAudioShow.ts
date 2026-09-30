@@ -60,6 +60,12 @@ const MIDS_END = 61;
 // hit; the impulse decays back to zero over PUNCH_DECAY_SECONDS. A STRONG hit
 // (raw over STRONG_PUNCH) additionally fires the venue-wide beat flash and can
 // advance the phrase / jump the palette.
+// Beat-list hits: this strong is a kick (venue-wide flash, counts toward the
+// next laser pattern); flashes stay at least this far apart, so a busy bass
+// line does not strobe; the pattern changes after this many kicks (four bars).
+const STRONG_BEAT = 0.7;
+const STRONG_BEAT_GAP_SECONDS = 0.3;
+const KICKS_PER_PHRASE = 16;
 const PUNCH_RATIO = 1.25;
 const PUNCH_FLOOR = 0.12;
 const PUNCH_DECAY_SECONDS = 0.25;
@@ -117,6 +123,10 @@ export interface ImmersiveAudioShowOptions {
   // closure as the stage visualizer; zero-filled when there is no world
   // connection, i.e. no audio).
   getFrequencyData: (target: Uint8Array) => void;
+  // The strength (0..1) of the strongest bass hit heard since the last call
+  // (0 for none), from the track's beat list. Null, or absent, when there is
+  // no list: the show then detects hits from the spectrum level itself.
+  getBeatStrength?: () => number | null;
 }
 
 // The show only builds when the Main Stage venue is actually present (same
@@ -531,6 +541,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let phraseIndex = 0;
   let phraseTimer = 0;
   let bassEventAccum = 0;
+  let sinceStrongBeat = 0;
 
   // Exposed diagnostics (updated each frame).
   let laserIntensityValue = LASER_IDLE_INTENSITY;
@@ -587,7 +598,22 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     // Punch detection BEFORE smoothing absorbs this frame's hit.
     let punchBurst = false;
     let strongBurst = false;
-    if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
+    // The track's own bass hits when it has a beat list; the level-based
+    // guess below only for a track without one. A loud master keeps the bass
+    // band near its ceiling, so that guess almost never fires.
+    const beatStrength = options.getBeatStrength ? options.getBeatStrength() : null;
+    const beatDriven = beatStrength !== null;
+    sinceStrongBeat += dt;
+    if (beatDriven) {
+      if (audioPresent && beatStrength > 0 && beatStrength >= punch) {
+        punch = beatStrength;
+        punchBurst = true;
+        strongBurst = beatStrength >= STRONG_BEAT && sinceStrongBeat >= STRONG_BEAT_GAP_SECONDS;
+        if (strongBurst) sinceStrongBeat = 0;
+      } else {
+        punch = Math.max(0, punch - dt / PUNCH_DECAY_SECONDS);
+      }
+    } else if (audioPresent && bassRaw > PUNCH_FLOOR && bassRaw > bass * PUNCH_RATIO && punch <= 0.2) {
       punch = 1;
       punchBurst = true;
       strongBurst = bassRaw > STRONG_PUNCH;
@@ -696,11 +722,13 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     // --- laser field: phrase + pattern ---
     // Advance the phrase on accumulated strong-bass events, or every ~8s.
+    // With a beat list the change lands on a kick, every four bars; the
+    // timer is then only for a long passage with no kick.
     phraseTimer += dt;
     if (strongBurst) {
       bassEventAccum += 1;
     }
-    if (bassEventAccum >= 4 || phraseTimer >= 8) {
+    if (bassEventAccum >= (beatDriven ? KICKS_PER_PHRASE : 4) || phraseTimer >= (beatDriven ? 12 : 8)) {
       phraseIndex = nextPhraseIndex(phraseIndex);
       phraseTimer = 0;
       bassEventAccum = 0;

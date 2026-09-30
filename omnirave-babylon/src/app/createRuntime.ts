@@ -220,11 +220,16 @@ export async function createRuntime(host: HTMLElement) {
   let earlyStageMediaPlayer: import('../media/stageMediaPlayer').StageMediaPlayer | undefined;
   // One server clock and one spectrum reader for the stage player, whichever
   // path creates it. The world socket feeds the clock.
-  const [{ createServerClock }, { createTrackSpectrum }] = await Promise.all([
+  const [{ createServerClock }, { createTrackSpectrum }, { createTrackBeats }] = await Promise.all([
     import('../network/serverClock'),
     import('../media/trackSpectrum'),
+    import('../media/trackBeats'),
   ]);
-  const stageMediaOptions = { serverClock: createServerClock(), spectrum: createTrackSpectrum() };
+  const stageMediaOptions = {
+    serverClock: createServerClock(),
+    spectrum: createTrackSpectrum(),
+    beats: createTrackBeats(),
+  };
   let resolvedWorldUrl = perfFlags.worldUrl;
   let resolvedWorldToken = perfFlags.worldToken;
   // Covers three ways the top-right controls can end up in 'account' mode:
@@ -1413,6 +1418,9 @@ export async function createRuntime(host: HTMLElement) {
     const { createImmersiveAudioShow } = await import('../scene/createImmersiveAudioShow');
     immersiveAudioShow = createImmersiveAudioShow(scene, {
       getFrequencyData: getStageFrequencyData,
+      // The lasers fire on the track's own bass hits, at the position this
+      // player hears. One reader: each call reports the hits since the last.
+      getBeatStrength: () => (stageMediaPlayer ? stageMediaPlayer.getBeatStrength() : null),
     });
     const activeImmersiveAudioShow = immersiveAudioShow;
 
