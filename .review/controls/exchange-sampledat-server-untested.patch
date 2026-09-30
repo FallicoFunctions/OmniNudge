@@ -1,0 +1,12 @@
+diff --git a/backend/internal/omnigame/service/session_service.go b/backend/internal/omnigame/service/session_service.go
+index f3a10b835..b598161b3 100644
+--- a/backend/internal/omnigame/service/session_service.go
++++ b/backend/internal/omnigame/service/session_service.go
+@@ -222,7 +222,6 @@ func (s *SessionService) currentZoneMedia(now time.Time) []model.ZoneMediaState
+ 			VideoID:         snapshot.TrackID,
+ 			PlaylistIndex:   snapshot.Index,
+ 			PlayheadSeconds: float64(snapshot.Playhead.Milliseconds()) / 1000,
+-			SampledAtMS:     now.UnixMilli(),
+ 		})
+ 	}
+ 	return zoneMedia

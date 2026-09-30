@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/media/stageMediaPlayer.ts b/omnirave-babylon/src/media/stageMediaPlayer.ts
+index e9f22b606..6ea37ee39 100644
+--- a/omnirave-babylon/src/media/stageMediaPlayer.ts
++++ b/omnirave-babylon/src/media/stageMediaPlayer.ts
+@@ -521,7 +521,6 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
+   function dispose(): void {
+     if (disposed) return;
+     disposed = true;
+-    options.spectrum?.dispose();
+     backend?.dispose();
+     backend = undefined;
+   }

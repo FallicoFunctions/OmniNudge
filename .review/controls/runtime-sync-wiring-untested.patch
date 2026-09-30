@@ -1,0 +1,26 @@
+diff --git a/omnirave-babylon/src/app/createRuntime.ts b/omnirave-babylon/src/app/createRuntime.ts
+index b51f9c376..a582ebcf9 100644
+--- a/omnirave-babylon/src/app/createRuntime.ts
++++ b/omnirave-babylon/src/app/createRuntime.ts
+@@ -270,7 +270,7 @@ export async function createRuntime(host: HTMLElement) {
+       const handoffMedia = exchanged.zoneMedia.find((zone) => zone.zoneId === exchanged.activeZone);
+       if (handoffMedia) {
+         const { createStageMediaPlayer } = await import('../media/stageMediaPlayer');
+-        earlyStageMediaPlayer = createStageMediaPlayer(stageMediaOptions);
++        earlyStageMediaPlayer = createStageMediaPlayer();
+         earlyStageMediaPlayer.applyMedia({ ...handoffMedia, artist: '', title: '', durationSeconds: 0 });
+         earlyStageMediaPlayer.unlock();
+         // Boot timing: note the moment sound starts, even mid-scene-build.
+@@ -768,11 +768,10 @@ export async function createRuntime(host: HTMLElement) {
+       // (see createMainStageScene's setRemotePlayerCollisionSource), so this
+       // is the one-time hookup for local-vs-remote-player collision.
+       reviewRuntime?.setRemotePlayerCollisionSource?.(remotePlayerRigs.collisionTargets);
+-      stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer(stageMediaOptions);
++      stageMediaPlayer = earlyStageMediaPlayer ?? createStageMediaPlayer();
+       worldSocket = createWorldSocket({
+         url: resolvedWorldUrl,
+         token: resolvedWorldToken,
+-        serverClock: stageMediaOptions.serverClock,
+       });
+       const activeWorldSocket = worldSocket;
+ 

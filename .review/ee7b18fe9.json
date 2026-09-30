@@ -1,0 +1,652 @@
+{
+  "schema_version": 2,
+  "head": "048cccde3",
+  "base": "ee7b18fe9",
+  "scope": {
+    "files": [
+      "backend/internal/omnigame/api/handlers/renew_handler.go",
+      "backend/internal/omnigame/api/router.go",
+      "backend/internal/omnigame/model/types.go",
+      "backend/internal/omnigame/service/guest_service.go",
+      "backend/internal/omnigame/service/session_service.go",
+      "backend/internal/omniraveworld/server/ws_handler.go",
+      "backend/internal/omniraveworld/world/protocol.go",
+      "backend/internal/omniraveworld/world/show_control.go",
+      "backend/internal/omniraveworld/world/world.go",
+      "omnirave-babylon/scripts/build-track-spectrum.mjs",
+      "omnirave-babylon/src/app/createRuntime.ts",
+      "omnirave-babylon/src/media/stageMediaPlayer.ts",
+      "omnirave-babylon/src/media/trackSpectrum.ts",
+      "omnirave-babylon/src/network/serverClock.ts",
+      "omnirave-babylon/src/network/sessionExchange.ts",
+      "omnirave-babylon/src/network/worldSessionRenewal.ts",
+      "omnirave-babylon/src/network/worldSocket.ts",
+      "omnirave-babylon/src/player/playerController.ts",
+      "omnirave-babylon/src/scene/createMainStageScene.ts",
+      "omnirave-babylon/src/showControl/createShowControlHud.ts",
+      "omnirave-babylon/src/showControl/showTypes.ts",
+      "frontend/package-lock.json",
+      "omnirave-babylon/package-lock.json",
+      "RUNBOOK.md"
+    ],
+    "boundaries": [
+      "POST /api/v1/omnigame/session/renew (runtime -> omnigame-api)",
+      "world socket client event renew {token}",
+      "world socket client event time_sync {clientTime} and reply {clientTime, serverTime}",
+      "ZoneMediaState.playheadSeconds (float) + sampledAtMs in world snapshots and in the session exchange",
+      "ShowQueueEntry.awaySince in the show state",
+      "<trackId>.spectrum file format: build script -> nginx/Cloudflare Range -> trackSpectrum.ts",
+      "AnalyserNode byte spectrum (the thing the spectrum file imitates)"
+    ]
+  },
+  "prior_ledgers_read": [
+    "cf7bd57a2",
+    "8bc3efc78"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Range ee7b18fe9..HEAD: VIP fall fix (playerController substeps), world-token renewal (renew handler, ws renew event, client renewal loop), 2-minute queue grace (show_control/world), cursor pointer-lock removal, music sync (ms playhead + sampledAtMs, time_sync pings, serverClock, seek-lead/rate correction), global lights (spectrum build script, Range reader), brace-expansion lockfiles, and mid-review the Detail slider direction + Midnight Gold theme rename (d2c12b0eb). Boundaries listed in scope."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Grepped every ledger for the changed files: only cf7bd57a2 (vitest upgrade touching stageMediaPlayer.test) and 8bc3efc78 (OmniRave login key) touch this area; neither has a finding on sync, renewal or the show queue. No prior finding to re-check."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Printed the built messages for two inputs each: world snapshot zoneMedia at t=1060.25 s -> playheadSeconds 60.25, sampledAtMs 1060250, and at a whole second; client pings observed live on prod: {type:time_sync, clientTime:1790745413431} -> reply serverTime 1790745413577.826 (4 replies, 139-155 ms apart); renew event {type:renew, token}. Spectrum Range requests printed live: bytes=0-15 then bytes=28339216-28454415 (window 246 at t=7383 s)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Printed the settings popup markup for the default settings and for {auto off, level 10, midnight-gold}: label 'Detail (1 lowest - 10 highest)', value 6 disabled / value 10 enabled, theme options obsidian-glass:Obsidian Glass, luminous-panels:Luminous Panels, midnight-gold:Midnight Gold. HUD roster ' \u00b7 away' suffix covered by showHud test (mutation M12 failed it)."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "Printed POST /omnigame/session/renew for seven inputs through the real router: guest 200 {worldSessionToken}, account 200, account-mode token without a user 400 'This session cannot be renewed here', expired 401 'World session expired', empty body 400, network-sanctioned guest 403 'Guest access is blocked', account on the sanctioned network 200 (accounts are not network-sanctioned, same as exchange)."
+        },
+        {
+          "id": "B4",
+          "status": "applied",
+          "evidence": "No query or migration changed. Read-only production checks: omnirave_profiles has 1 row, no saved graphicsLevel, uiTheme 'Luminous Panels' -- so the slider meaning change and the theme id rename strand nothing."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "Both sides spell: time_sync/clientTime/serverTime, renew/token, sampledAtMs (Go json tag and TS), awaySince (omitempty, TS optional), worldSessionToken body/response, spectrum header 'OMSP' + u16 fps@4 + u16 bins@6 + u32 frames@8 + 16-byte header in script and reader. Theme id: server has no allowlist (types.go default is a label and the client never reads currentSettings)."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "Client reads message.clientTime/serverTime (numbers) which the server sets; exchange parser reads zone.sampledAtMs which model.ZoneMediaState sets; worldSocket passes zoneMedia through untouched so sampledAtMs reaches the player; HUD reads q.awaySince which ShowQueueEntry.AwaySince sets."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "Playhead lives in two services: omnigame-api and omnirave-world both build MediaState from the playlist's activated_at in the database (playlist_repository_postgres), so they agree; live rate convergence after the handoff confirms. Spectrum script vs AnalyserNode compared differentially (see B5)."
+        },
+        {
+          "id": "C4",
+          "status": "applied",
+          "evidence": "Cloudflare + nginx honour Range on the .spectrum file: curl -r 0-15 -> HTTP/2 206, content-range bytes 0-15/30058896, cf-cache-status DYNAMIC. Vite (local) also returns 206. AnalyserNode contract per the Web Audio spec (Blackman window, |X|/N, smoothing on magnitude, dB map) matched by C3."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "Hand-written readers checked: sessionExchange parseZoneMedia had a sampledAtMs line no test read (finding exchange-sampledat-client-untested); Go structs are encoding/json (tags). worldSocket toWorldSnapshot casts zoneMedia wholesale, so no per-field line."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "Mutated the readers: removing the sampledAtMs read in the exchange parser, the server's SampledAtMS write, and the clock/spectrum wiring each left every suite green (findings 3-5); now each fails a test. The player's sampledAtMs read is covered by 'starts at the server playhead moved forward on the server clock'."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The exchange fixture sent an integer playhead and no sampledAtMs, unlike production; changed to 1343.25 + sampledAtMs. World-side fixture already used a fractional time."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "tokenExpiresAt on a real JWT payload without padding -> 1790745413000; parseSpectrumHeader on a real header -> {fps:30,bins:128,frames:1}; renew with real guest/account tokens -> 200."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "tokenExpiresAt('', 'a.b.c', exp as string, 'x.@@@.y') -> 0; spectrum header short/bad magic/zero fps/HTML body -> null; an HTML 200 served as a spectrum -> fill false, target untouched; renew with an expired or foreign-player token -> 401 / ignored by the world (TestWSHandler_RenewForAnotherPlayerExtendsNothing)."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "fill at NaN, -3, Infinity -> false; seconds past the last frame -> false (falls back to live analysis); playhead clamps at durationSeconds when known; step(0) runs one zero slice as before; frames longer than 1 s clamp to 1 s."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings of the renew route: exchange uses the same middleware chain (4 handlers) and the same GuestIdentityResolver(trustedProxies); runtime auth routes add a rate limiter, exchange does not, renew matches exchange. Siblings of the renewal interval: every other runtime resource is released in cleanupOwnedResources -- the interval was released only in dispose (finding renewal-survives-boot-failure)."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "prepareShow's q.AwaySince check cannot be the deciding condition (away players are always absent from w.players); kept deliberately. No other unreachable branch."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "renewWorldToken returns null on any failure and the loop retries at the next 30 s tick (3 chances before expiry); a sanctioned guest then disconnects at expiry, the intended bound. trackSpectrum failures fall back to the live analyser silently, by design; a 404 stops retrying for that track."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "freshLaunch is import.meta.env.PROD, so in dev an expired token does not relaunch (dev has no launch page flow); documented. The spectrum and clock are created on every path, including dev/review without a world (harmless: nothing fetches until fill)."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "Duplicates: '2 minutes' in the HUD text vs ShowQueueGraceMS; spectrum header size in script and reader; fftSize 256 / smoothing 0.8 in stageMediaPlayer and the build script (both documented in each file's header). Not defects today; noted."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Same shape as the renewal leak (a resource the world block starts that the boot-failure path does not release): the world socket and a non-early stage media player are also not released when the boot fails after connect. Both predate this range; with renewal now stopped the socket ends at its token expiry as before. Reported to the user as out of scope rather than fixed here."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "go test -race on omniraveworld/server, omniraveworld/world, omnigame/api: ok, no DATA RACE (the renew case replaces expiryTimer on the read goroutine; the deferred Stop reads the variable when it runs)."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "Renew half-way: the API mints a token but the socket send fails (socket closed) -> the fresh token is still stored as currentToken and used by the auto-reconnect. Queue: markShowPlayerAway mutates under the world lock with no partial exit."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration in the range (git diff --stat ee7b18fe9..HEAD shows none)."
+        },
+        {
+          "id": "F4",
+          "status": "applied",
+          "evidence": "The spectrum file lives beside the MP3 in /var/www/omnirave-audio outside the deploy tree; RUNBOOK documents building and uploading it with each new track; a missing file falls back to live analysis."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Six controls built, each confirmed to fail as a test (assertion / --- FAIL), and replayed in a clean worktree for the bash runner. Re-printed the artifacts after fixing: drone Preparing.StartsAt equals the slot; runtime passes one serverClock object to both player and socket."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "The world's expiry timer is armed in ServeHTTP for every connection; the renewal loop is started by createRuntime (runtimeRenewalCleanup test fails if the call is removed); the queue grace expiry runs from advanceShows, called by the 100 ms scheduler."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Pass 1: type check and the touched suites ran green after each fix; the full gates run after the last pass (see gates)."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Every finding came from listed instruments (F6, C10). No new technique."
+        },
+        {
+          "id": "B5",
+          "status": "applied",
+          "evidence": "Ran it for real. Two local game tabs: audio positions 67 ms apart at start, 9 ms after 20 s. Production (omninudge.com): time_sync replies arrived, spectrum header + window + prefetch downloaded, playbackRate returned to exactly 1.0 within 20 s (audio within the 20 ms dead band of the server moment). Spectrum file vs a real AnalyserNode (OfflineAudioContext, 20 s clip, 569 frames): mean level 89.7 vs 89.7, mean abs diff 3.21/255. NOT verified: Safari (read-only access) and whether element.currentTime already includes output latency (needs an acoustic measurement); both stated to the user."
+        },
+        {
+          "id": "E7",
+          "status": "applied",
+          "evidence": "Early starts: the handoff starts audio before the socket's clock sync (it then corrects on the first snapshot, measured); the spectrum header fetch starts on the first lights frame even before audio unlock, which is wanted (lights are global). Nothing irreversible starts before a later decision."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The world refuses a renew for another player (M5 mutation turns that test red); the renew route refuses expired and sanctioned tokens (B3)."
+        },
+        {
+          "id": "B6",
+          "status": "applied",
+          "evidence": "The slider label changed from 'Detail (1 sharpest - 10 softest)' to 'Detail (1 lowest - 10 highest)' (shorter, same row); the theme label is the same length class. No new element in a shared bar."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "Process-wide state read lazily: OMNIGAME_API_URL (import.meta.env at module load, fixed per build), World.now defaults to time.Now and is replaced only by tests. Nothing changes them first."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "go test -v over Renew|TimeSync|Show|Away|Drone|ZoneMedia|Exchange with TEST_DATABASE_URL set: 37 PASS, 0 SKIP."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The user's own sentences: '2 minute timer ... lose their place' (expire at >= 120000 ms, tested at 1:59 and 2:00); 'their turn comes up ... go to the next person in line that is present' (tested for fireworks, and now for drones in the same slot); 'lasers ... same for everyone ... account for delays' (spectrum at the heard position; server clock + per-player seek/rate). All kept."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Two starters of a reconnect: the socket's own backoff reconnect and the renewal loop's fresh launch; the loop acts only when status != open and the token has expired, and socket.reconnect cancels the pending backoff timer; busy flag stops overlapping checks."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No fixed overlay, modal or full-screen layer added."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Modules whose exports changed: stageMediaPlayer (mocked in runtimeAppearance, runtimeProfileSave, and the two new runtime tests), worldSocket (mocked in the same), sessionExchange (mocked in runtimeProfileSave), createRuntime; ran all of src/app, src/media, src/network, src/showControl, src/ui: green."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing in the range can cover, block or redirect the site; the game changes stay inside the game canvas and HUD."
+        },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The renew route joins NewRouter, a fixture every omnigame/api test builds; ran the whole package (go test ./internal/omnigame/api/): ok."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Controls were built after the last change to their target files (createRuntime, show_control, session_service, sessionExchange, stageMediaPlayer); all six replayed after the last commit and still fail."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The renewal interval is acquired after an await in the world block; its only release was dispose(), while a boot failure runs cleanupOwnedResources -- finding renewal-survives-boot-failure (fixed d87d1f612)."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No React component or unmount path in the range."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "omnigame-api main wires authService.SetUserRepository(models.NewUserRepository) when a database is configured, so the renew path's ValidateOmniRaveWorldJWTContext re-reads banned/deleted/token_version on the production type; the route test builds NewRouter with the real SessionService."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "Shuffled the six changed game test files over seeds 1-5: 83 passed each time."
+        },
+        {
+          "id": "C9",
+          "status": "applied",
+          "evidence": "Producers of ZoneMediaState to the client: ws_handler currentZoneMedia (snapshots) and SessionService.currentZoneMedia (exchange); grep finds no third. Both now set sampledAtMs and both are tested."
+        },
+        {
+          "id": "C10",
+          "status": "applied",
+          "evidence": "Deleted each added line and ran the tests: M1 exchange SampledAtMS (green -> finding), M2 drone boundary IndexFunc (green -> analysis found the slot slip, finding), M3 markShowPlayerPresent (red), M4 expireAwayQueueEntries call (red), M5 renew same-player check (red), M6 prepareShow AwaySince skip (green: redundant with the w.players check, since an away player is always removed from players; left as documentation of intent), M7 client sampledAtMs (green -> finding), M8 spectrum dispose (green -> finding), M9-M11 clock/spectrum wiring (green -> finding), M12 HUD away (red), M13 stopTimeSync on close (green: the next ping sees status!=open and stops by itself; no behaviour to test)."
+        },
+        {
+          "id": "H7",
+          "status": "na",
+          "why": "No test in the range asserts that something disappears."
+        }
+      ],
+      "findings": [
+        {
+          "id": "renewal-survives-boot-failure",
+          "summary": "A boot that failed after the world socket opened left the renewal interval running, so the leftover socket got a fresh token every 5 minutes and stayed in the world indefinitely instead of ending at its token expiry.",
+          "found_by": "F6",
+          "fix_commit": "d87d1f612",
+          "control": {
+            "patch": ".review/controls/renewal-survives-boot-failure.patch",
+            "runner": "bash",
+            "tests": [
+              "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeRenewalCleanup.test.ts"
+            ],
+            "observed": "FAIL: expected stopRenewal to be called 1 times, but got 0 times (also replayed in a clean worktree)"
+          }
+        },
+        {
+          "id": "drone-slot-slips-after-drop",
+          "summary": "When a drone player dropped while preparing, the queue-grace rule let the next present player's join time move the boundary, so the passed-on turn started up to the preparation time late instead of in the dropped player's slot.",
+          "found_by": "C10",
+          "fix_commit": "db2bf3140",
+          "control": {
+            "patch": ".review/controls/drone-slot-slips-after-drop.patch",
+            "runner": "go",
+            "tests": [
+              "-run '^TestDroneTurnOfAnAwayPlayerPassesOnInTheSameSlot$' ./internal/omniraveworld/world/"
+            ],
+            "observed": "--- FAIL: the passed turn starts at ...011000, not in the slot at ...010000"
+          }
+        },
+        {
+          "id": "exchange-sampledat-server-untested",
+          "summary": "The session exchange's sampledAtMs (the server time of the handoff playhead) was set by a line no test read.",
+          "found_by": "C10",
+          "fix_commit": "048cccde3",
+          "control": {
+            "patch": ".review/controls/exchange-sampledat-server-untested.patch",
+            "runner": "go",
+            "tests": [
+              "-run '^TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServiceRestarts$' ./internal/omnigame/service/"
+            ],
+            "observed": "--- FAIL: TestSessionService_ExchangeLaunchSessionMatchesWorldMediaAcrossSeparateServiceRestarts"
+          }
+        },
+        {
+          "id": "exchange-sampledat-client-untested",
+          "summary": "The client's exchange parser copied sampledAtMs in a line no test read, and the test fixture did not have the production shape (integer playhead, no sampledAtMs).",
+          "found_by": "C10",
+          "fix_commit": "048cccde3",
+          "control": {
+            "patch": ".review/controls/exchange-sampledat-client-untested.patch",
+            "runner": "bash",
+            "tests": [
+              "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/network/__tests__/sessionExchange.test.ts"
+            ],
+            "observed": "Tests 1 failed | 14 passed"
+          }
+        },
+        {
+          "id": "runtime-sync-wiring-untested",
+          "summary": "The runtime lines that hand the server clock to the world socket and the clock and spectrum to the stage player (both creation paths) could each be deleted with every suite green, silently losing delay compensation or global lights.",
+          "found_by": "C10",
+          "fix_commit": "048cccde3",
+          "control": {
+            "patch": ".review/controls/runtime-sync-wiring-untested.patch",
+            "runner": "bash",
+            "tests": [
+              "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeStageMediaWiring.test.ts"
+            ],
+            "observed": "Tests 2 failed; each of the three lines removed alone also fails at least one test"
+          }
+        },
+        {
+          "id": "spectrum-dispose-untested",
+          "summary": "Disposing the stage player disposed the spectrum reader (aborting its downloads) in a line no test read.",
+          "found_by": "C10",
+          "fix_commit": "048cccde3",
+          "control": {
+            "patch": ".review/controls/spectrum-dispose-untested.patch",
+            "runner": "bash",
+            "tests": [
+              "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/media/__tests__/stageMediaPlayer.test.ts -t 'disposed'"
+            ],
+            "observed": "Tests 1 failed | 28 skipped"
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Pass 2 scope: the review's own commits d87d1f612 (renewal stopped in cleanupOwnedResources), db2bf3140 (drone boundary back to first-in-line), 048cccde3 (tests and exchange fixture), plus d2c12b0eb (slider direction, Midnight Gold) re-read as new code."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Pass 1 of this ledger is the prior record; its six findings are fixed and their controls replay."
+        },
+        {
+          "id": "B1",
+          "status": "applied",
+          "evidence": "Re-printed the artifacts the fixes changed: the drone Preparing turn after A drops has StartsAt == the original slot (test output); the runtime hands one serverClock object to both createStageMediaPlayer and createWorldSocket on both paths (wiring test)."
+        },
+        {
+          "id": "B2",
+          "status": "applied",
+          "evidence": "Settings markup unchanged since the pass 1 print (d2c12b0eb is the only UI change): label 'Detail (1 lowest - 10 highest)', Midnight Gold option."
+        },
+        {
+          "id": "B3",
+          "status": "applied",
+          "evidence": "No handler changed in pass 2 code."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No query or migration in the pass 2 code (d87d1f612, db2bf3140, 048cccde3 are a runtime cleanup line, a world rule and tests)."
+        },
+        {
+          "id": "C1",
+          "status": "applied",
+          "evidence": "The drone rule reads JoinedAt, which markShowPlayerAway sets to turn.StartsAt - PreparationMS -- the same PreparationMS field the boundary subtracts."
+        },
+        {
+          "id": "C2",
+          "status": "applied",
+          "evidence": "The wiring test reads the options object the runtime passes (serverClock.now, spectrum.fill) and the socket's serverClock -- the fields the player and socket actually use."
+        },
+        {
+          "id": "C3",
+          "status": "applied",
+          "evidence": "The drone rule and the fireworks rule now both give a passed-on turn the scheduled slot (fireworks by nextFire, drones by the unchanged boundary)."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No external contract touched by the pass 2 code."
+        },
+        {
+          "id": "C5",
+          "status": "applied",
+          "evidence": "No new decoder or struct field in pass 2 code."
+        },
+        {
+          "id": "C6",
+          "status": "applied",
+          "evidence": "The new tests read through the real accessors: SessionService.ExchangeLaunchSession, parseZoneMedia via exchangeLaunchSession, createRuntime's real calls."
+        },
+        {
+          "id": "C7",
+          "status": "applied",
+          "evidence": "The wiring test's handoff zoneMedia has the production shape (fractional playhead, sampledAtMs)."
+        },
+        {
+          "id": "D1",
+          "status": "applied",
+          "evidence": "Slider values 1..10 map to coarsest..sharpest (tests), level 10 renders enabled with value 10 (B2)."
+        },
+        {
+          "id": "D2",
+          "status": "applied",
+          "evidence": "Slider NaN reads as 10, out-of-range clamps (tests); an unknown theme id (old hybrid-premium) resolves to the default (resolveUiThemeId test)."
+        },
+        {
+          "id": "D3",
+          "status": "applied",
+          "evidence": "Slider 0, -5, 42, 6.4 covered by the clamp test."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "The renewal stop now sits with its siblings in cleanupOwnedResources (worldAppearance, avatarProfileSaver, earlyStageMediaPlayer...)."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "The drone rule has no unreachable branch; the boot-failure path is now exercised by two test files."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "The failed-boot path still rethrows the original error after cleanup (test asserts rejects with it)."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "No new flag gating."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "stopWorldSessionRenewal is declared once now (the inner declaration was removed)."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Other resources released only by dispose and not by cleanupOwnedResources (world socket, non-early player, rigs, visualizer) predate this range; reported to the user, not fixed here."
+        },
+        {
+          "id": "F1",
+          "status": "applied",
+          "evidence": "No goroutine or shared state changed in pass 2 (the drone rule runs under the world lock like before)."
+        },
+        {
+          "id": "F2",
+          "status": "applied",
+          "evidence": "The cleanup stops the interval synchronously; no partial state."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No migration."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "Nothing persisted by the pass 2 code."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "All six controls replayed after the last commit (see G4) and fail as tests."
+        },
+        {
+          "id": "G2",
+          "status": "applied",
+          "evidence": "cleanupOwnedResources is called by dispose, the boot-failure catch, and engine.onDisposeObservable."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "Full gates after this pass (see gates)."
+        },
+        {
+          "id": "Z1",
+          "status": "na",
+          "why": "Pass 2 found nothing, so there is no new technique to add."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "The pass 2 fixes change no output of a model or external system: the cleanup line runs only on a failed boot, the drone rule is server-side scheduling covered by its test, and the rest are tests. The live checks from pass 1 still stand for the shipped behaviour (deployed d2c12b0eb includes both fixes)."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "Pass 2 code starts nothing early."
+        },
+        {
+          "id": "G3",
+          "status": "applied",
+          "evidence": "The drone test fails on the slipped slot (control); the renewal test fails when cleanup does not stop renewal (control)."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "Pass 2 code adds nothing to any bar or row."
+        },
+        {
+          "id": "E8",
+          "status": "applied",
+          "evidence": "No lazily cached global read by pass 2 code."
+        },
+        {
+          "id": "H2",
+          "status": "applied",
+          "evidence": "New Go test run with -v: PASS, not SKIP (no database needed)."
+        },
+        {
+          "id": "I1",
+          "status": "applied",
+          "evidence": "The drone fix makes 'go to the next person in line that is present' hold at the scheduled time for drones as well as fireworks."
+        },
+        {
+          "id": "F5",
+          "status": "applied",
+          "evidence": "Only one starter of the renewal (the world block); cleanup and dispose both stop it, and the second call is a no-op (undefined)."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No overlay in the pass 2 code."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "createRuntime changed: ran every test that imports or mocks it (src/app: 9 files)."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "Nothing can cover or redirect the site."
+        },
+        {
+          "id": "H5",
+          "status": "applied",
+          "evidence": "The drone test joins the world package; ran the whole package: ok."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Re-applied every control after the last commit touching their files: all six apply and fail."
+        },
+        {
+          "id": "F6",
+          "status": "applied",
+          "evidence": "The interval acquired after the await is now released on both exits (dispose -> cleanupOwnedResources, and the boot-failure catch)."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No React unmount path."
+        },
+        {
+          "id": "C8",
+          "status": "applied",
+          "evidence": "The runtime tests run the real createRuntime with the real serverClock and trackSpectrum modules (only socket and player are mocked, to read their arguments)."
+        },
+        {
+          "id": "H6",
+          "status": "applied",
+          "evidence": "Shuffled the four runtime test files over seeds 1-3: 6 passed each time."
+        },
+        {
+          "id": "C9",
+          "status": "applied",
+          "evidence": "No new field."
+        },
+        {
+          "id": "C10",
+          "status": "applied",
+          "evidence": "The new cleanup line is the one the renewal control removes (test fails); stopWorldSessionRenewal = undefined only prevents a double stop. The restored drone line is pinned by the drone test (control). Slider: removing the inversion fails 3 adaptiveResolutionMath tests."
+        },
+        {
+          "id": "H7",
+          "status": "na",
+          "why": "No disappearance assertion added."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "build": "omnirave-babylon tsc --noEmit ok; frontend tsc -b ok (lockfile change)",
+    "vet": "go vet omniraveworld/... omnigame/... ok; gofmt clean",
+    "lint": "golangci-lint 0 issues; frontend eslint clean; pre-commit gate 0 failed on every commit",
+    "types": "as build",
+    "tests": "omnirave-babylon full suite 137 files / 1545 passed; Go omniraveworld, omnigame, cmd/omnigame-api, cmd/omnirave-world with TEST_DATABASE_URL: all ok; -race on world/server/api ok"
+  }
+}

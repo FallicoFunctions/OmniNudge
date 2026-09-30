@@ -1,0 +1,13 @@
+diff --git a/omnirave-babylon/src/network/sessionExchange.ts b/omnirave-babylon/src/network/sessionExchange.ts
+index ebb91f9b8..c057487f4 100644
+--- a/omnirave-babylon/src/network/sessionExchange.ts
++++ b/omnirave-babylon/src/network/sessionExchange.ts
+@@ -162,7 +162,7 @@ function parseZoneMedia(value: unknown): ExchangedZoneMedia[] {
+       && typeof zone.playlistIndex === 'number' && typeof zone.playheadSeconds === 'number'
+       ? [{ zoneId: zone.zoneId, trackId: zone.videoId, playlistIndex: zone.playlistIndex,
+         playheadSeconds: zone.playheadSeconds,
+-        ...(typeof zone.sampledAtMs === 'number' ? { sampledAtMs: zone.sampledAtMs } : {}) }]
++        }]
+       : [];
+   });
+ }
