@@ -23,7 +23,6 @@ function createFakeBackend(overrides: Partial<StagePlayerBackend> = {}): StagePl
     getDuration: vi.fn(() => 0),
     isPaused: vi.fn(() => true),
     isReady: vi.fn(() => true),
-    setPlaybackRate: vi.fn(),
     outputLatencySeconds: vi.fn(() => 0),
     setMuted: vi.fn(),
     getFrequencyData: vi.fn(),
@@ -84,7 +83,7 @@ describe('createStageMediaPlayer', () => {
     expect(backend.load).toHaveBeenNthCalledWith(2, 'track-a', 40);
   });
 
-  it('speeds up a little instead of seeking when the track is slightly behind', () => {
+  it('leaves a small drift alone: no seek, and never a speed change', () => {
     const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 11.8), isPaused: vi.fn(() => false) });
     const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
@@ -92,21 +91,34 @@ describe('createStageMediaPlayer', () => {
     player.applyMedia(media({ playheadSeconds: 10 }));
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
 
-    // 0.2 s behind the server: no audible skip, 2% faster until it agrees.
-    player.applyMedia(media({ playheadSeconds: 12 }));
+    // 0.2 s behind the server, on many readings: under the seek threshold.
+    for (let i = 0; i < 5; i++) player.applyMedia(media({ playheadSeconds: 12 }));
 
     expect(backend.load).not.toHaveBeenCalled();
     expect(backend.seek).not.toHaveBeenCalled();
-    expect((backend.setPlaybackRate as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(1.02, 5);
+    // The backend has no speed control at all: Safari cut the sound at each
+    // speed change, and large ones sounded like the music speeding up.
+    expect('setPlaybackRate' in backend).toBe(false);
   });
 
-  it('plays at normal speed when the track is in sync', () => {
-    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 12.01), isPaused: vi.fn(() => false) });
+  it('does not seek on one late reading, only when the next one is off too', () => {
+    let position = 12;
+    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => position), isPaused: vi.fn(() => false) });
     const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
     player.unlock();
-    player.applyMedia(media({ playheadSeconds: 10 }));
     player.applyMedia(media({ playheadSeconds: 12 }));
-    expect(backend.setPlaybackRate).toHaveBeenLastCalledWith(1);
+
+    position = 12.5; // one jittery reading
+    player.applyMedia(media({ playheadSeconds: 12 }));
+    position = 12.02;
+    player.applyMedia(media({ playheadSeconds: 12 }));
+    expect(backend.seek).not.toHaveBeenCalled();
+
+    position = 12.5; // off twice in a row: a real drift
+    player.applyMedia(media({ playheadSeconds: 12 }));
+    player.applyMedia(media({ playheadSeconds: 12 }));
+    expect(backend.seek).toHaveBeenCalledTimes(1);
+    expect(backend.seek).toHaveBeenLastCalledWith(12);
   });
 
   it('seeks the same track when drift exceeds the threshold', () => {
@@ -117,7 +129,10 @@ describe('createStageMediaPlayer', () => {
     player.applyMedia(media({ playheadSeconds: 10 }));
     (backend.load as ReturnType<typeof vi.fn>).mockClear();
 
-    // Local time (5s) drifted more than 0.5s from the reported playhead (30s).
+    // Local time (5s) drifted more than 0.3s from the reported playhead (30s),
+    // on two readings in a row.
+    player.applyMedia(media({ playheadSeconds: 30 }));
+    expect(backend.seek).not.toHaveBeenCalled();
     player.applyMedia(media({ playheadSeconds: 30 }));
 
     expect(backend.load).not.toHaveBeenCalled();
@@ -291,12 +306,14 @@ describe('createStageMediaPlayer', () => {
       player.applyMedia(media({ playheadSeconds: 10 }));
 
       player.applyMedia(media({ playheadSeconds: 30 }));
+      player.applyMedia(media({ playheadSeconds: 30 }));
       expect(backend.seek).toHaveBeenLastCalledWith(30);
       // The seek stalled: once playing again it is 0.4 s behind the server.
       position = 40.6;
       player.applyMedia(media({ playheadSeconds: 41 }));
 
       position = 50;
+      player.applyMedia(media({ playheadSeconds: 60 }));
       player.applyMedia(media({ playheadSeconds: 60 }));
       expect((backend.seek as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(60.4, 5);
     });
@@ -310,6 +327,7 @@ describe('createStageMediaPlayer', () => {
       const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
       player.unlock();
       player.applyMedia(media({ playheadSeconds: 10 }));
+      player.applyMedia(media({ playheadSeconds: 30 }));
       player.applyMedia(media({ playheadSeconds: 30 }));
       expect((backend.seek as ReturnType<typeof vi.fn>).mock.lastCall?.[0]).toBeCloseTo(30.1, 5);
     });
@@ -472,6 +490,7 @@ describe('createStageMediaPlayer', () => {
       expect(player.isManualOverride()).toBe(false);
 
       // Drift exceeds threshold and override is off -> drift-correct.
+      player.applyMedia(media({ playheadSeconds: 40 }));
       player.applyMedia(media({ playheadSeconds: 40 }));
       expect(backend.seek).toHaveBeenCalledWith(40);
     });

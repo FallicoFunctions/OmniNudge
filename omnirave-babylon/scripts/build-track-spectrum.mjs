@@ -102,15 +102,28 @@ const ffmpeg = spawn('ffmpeg', ['-v', 'error', '-i', input, '-f', 'f32le', '-ac'
 });
 let leftover = Buffer.alloc(0);
 let sampleCount = 0;
+// Loudness: the mean power of the mono mix in each LOUDNESS_BLOCK_SECONDS,
+// stored in the beats file (the lights' energy follows it, as a waveform
+// view of the track would show its peaks and valleys).
+const LOUDNESS_BLOCK_SECONDS = 0.25;
+const loudnessBlock = SAMPLE_RATE * LOUDNESS_BLOCK_SECONDS;
+const loudness = [];
+let loudnessSum = 0;
 analyse(); // Frame 0: the time before the first sample.
 ffmpeg.stdout.on('data', (chunk) => {
   const data = leftover.length ? Buffer.concat([leftover, chunk]) : chunk;
   const usable = data.length - (data.length % 8);
   for (let offset = 0; offset < usable; offset += 8) {
     // The Web Audio "speakers" downmix of stereo to mono: (L + R) / 2.
-    ring[ringIndex] = (data.readFloatLE(offset) + data.readFloatLE(offset + 4)) / 2;
+    const mono = (data.readFloatLE(offset) + data.readFloatLE(offset + 4)) / 2;
+    ring[ringIndex] = mono;
     ringIndex = (ringIndex + 1) % FFT_SIZE;
     sampleCount += 1;
+    loudnessSum += mono * mono;
+    if (sampleCount % loudnessBlock === 0) {
+      loudness.push(loudnessSum / loudnessBlock);
+      loudnessSum = 0;
+    }
     if (sampleCount % HOP === 0) analyse();
   }
   leftover = data.subarray(usable);
@@ -240,19 +253,26 @@ function findHits({ energy, hop }, { minGapSeconds, offsetSeconds }) {
 async function writeBeats() {
   const lists = [];
   for (const band of BANDS) lists.push(findHits(await bandEnergy(band), band));
-  // "OMB2", one hit count per band (uint32), then the bands in order, per
-  // hit: seconds and strength (float32).
+  // "OMB3", one hit count per band and the loudness block count (uint32),
+  // then the bands in order, per hit: seconds and strength (float32), then
+  // the mean power of each 0.25 s block (float32).
   const total = lists.reduce((sum, hits) => sum + hits.length, 0);
-  const body = Buffer.alloc(4 + 4 * BANDS.length + total * 8);
-  body.write('OMB2', 0, 'ascii');
+  const header = 4 + 4 * (BANDS.length + 1);
+  const body = Buffer.alloc(header + total * 8 + loudness.length * 4);
+  body.write('OMB3', 0, 'ascii');
   lists.forEach((hits, band) => body.writeUInt32LE(hits.length, 4 + 4 * band));
-  let offset = 4 + 4 * BANDS.length;
+  body.writeUInt32LE(loudness.length, 4 + 4 * BANDS.length);
+  let offset = header;
   for (const hits of lists) {
     for (const hit of hits) {
       body.writeFloatLE(hit.seconds, offset);
       body.writeFloatLE(hit.strength, offset + 4);
       offset += 8;
     }
+  }
+  for (const power of loudness) {
+    body.writeFloatLE(power, offset);
+    offset += 4;
   }
   const beatsOutput = input.replace(/\.[^.]+$/, '.beats');
   writeFileSync(beatsOutput, body);

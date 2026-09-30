@@ -52,7 +52,7 @@ describe('createImmersiveAudioShow', () => {
     show.dispose();
   });
 
-  it('yields the arrival sightline while silent and reserves the sky during the fireworks lead-in', () => {
+  it('yields the arrival sightline while silent and keeps the lasers on through the fireworks lead-in', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
     show.update(0.016);
 
@@ -64,24 +64,24 @@ describe('createImmersiveAudioShow', () => {
     show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
     show.update(0.016);
 
-    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(true);
     expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(true);
     expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(true);
-    expect(show.laserIntensity).toBe(0);
+    expect(show.laserIntensity).toBeGreaterThan(0);
 
     show.dispose();
   });
 
-  it('yields the sky to fireworks and drones while keeping the supporting show active', () => {
+  it('keeps the lasers on during the fireworks and drone show (the owner\'s call)', () => {
     const show = createImmersiveAudioShow(scene, { getFrequencyData: zeroSource });
 
     show.setEventState({ phase: 'active', activeMinute: 2 });
     show.update(0.016);
 
-    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(true);
     expect(scene.getMeshByName('immersive-beam-0')?.isEnabled()).toBe(true);
     expect(scene.getMeshByName('immersive-floor-pulse')?.isEnabled()).toBe(true);
-    expect(show.laserIntensity).toBe(0);
+    expect(show.laserIntensity).toBeGreaterThan(0);
 
     show.setEventState({ phase: 'recovery' });
     show.update(0.016);
@@ -89,7 +89,7 @@ describe('createImmersiveAudioShow', () => {
 
     show.setEventState({ phase: 'lead_in', countdownSeconds: 10 });
     show.update(0.016);
-    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(false);
+    expect(scene.getMeshByName('immersive-laser-beam')?.isEnabled()).toBe(true);
 
     show.dispose();
   });
@@ -154,6 +154,26 @@ describe('createImmersiveAudioShow', () => {
     expect(coneMaterialIntensity()).toBeGreaterThan(note);
     expect(show.beatFlash).toBe(1);
 
+    show.dispose();
+  });
+
+  it('follows the song energy: a drop is fast, bright, all beams at the crowd; a break slow, dim, few beams, lifted', () => {
+    const beat = createStageBeat();
+    const show = createImmersiveAudioShow(scene, { getFrequencyData: loudSource, getBeat: () => beat });
+    const settle = (energy: number) => {
+      beat.energy = energy;
+      for (let i = 0; i < 180; i++) show.update(0.016);
+      return { lit: show.laserBeamsLit, speed: show.laserSpeed, brightness: show.laserIntensity, elevation: show.laserElevation };
+    };
+
+    const drop = settle(1);
+    const pause = settle(0);
+    expect(drop.lit).toBe(show.laserBlades); // every beam on
+    expect(pause.lit).toBeLessThan(show.laserBlades * 0.35); // a quarter on
+    expect(pause.lit).toBeGreaterThan(show.laserBlades * 0.15);
+    expect(drop.speed).toBeGreaterThan(pause.speed * 10);
+    expect(drop.brightness).toBeGreaterThan(pause.brightness * 3);
+    expect(pause.elevation).toBeGreaterThan(drop.elevation + 0.5); // lifted away from the crowd
     show.dispose();
   });
 

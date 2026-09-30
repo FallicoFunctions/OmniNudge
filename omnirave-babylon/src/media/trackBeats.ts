@@ -7,25 +7,45 @@
 // depends only on the track position, so every player sees the same hits,
 // the same kick count and the same drops.
 //
-//   bytes 0-3   "OMB2"
-//   bytes 4-15  hit count of each band (uint32 x 3, little-endian)
+//   bytes 0-3   "OMB3"
+//   bytes 4-19  hit count of each band, then the loudness block count
+//               (uint32 x 4, little-endian)
 //   then        the bands in order; per hit: seconds into the track and
 //               strength 0..1 (float32 each)
+//   then        the mean power of each 0.25 s block of the mix (float32)
 //
-// A two-hour set is about 830 KB, so the whole list is downloaded once.
+// A two-hour set is about 950 KB, so the whole list is downloaded once.
 
 import { publicUrl } from '../app/publicUrl';
 
 const BAND_COUNT = 3;
-const BEATS_HEADER_BYTES = 4 + 4 * BAND_COUNT;
+const BEATS_HEADER_BYTES = 4 + 4 * (BAND_COUNT + 1);
+const LOUDNESS_BLOCK_SECONDS = 0.25;
 const RETRY_AFTER_MS = 30_000;
 // A bass hit this strong is a kick. Kicks are at least this far apart, so a
 // busy bass line does not count (or flash) twice on one beat.
 const KICK_STRENGTH = 0.7;
 const KICK_MIN_GAP_SECONDS = 0.3;
-// The first kick after this long without one is a drop (the kick comes back
-// after a breakdown).
+// A drop: the first kick after this long without one (the kick comes back
+// after a breakdown), when at least DROP_KICKS_AFTER kicks follow within
+// DROP_CHECK_SECONDS. A lone kick inside a breakdown is not a drop.
 const DROP_QUIET_SECONDS = 6;
+const DROP_KICKS_AFTER = 6;
+const DROP_CHECK_SECONDS = 4;
+// Energy, 0 (a break) to 1 (a full drop), from two measures of the music
+// within ENERGY_HALF_WINDOW seconds each side of the moment, each placed
+// between the track's own 10th and 90th percentile:
+//   - how hard it hits: the strength of all hits (kicks and bass notes
+//     count fully, snares and hats half);
+//   - how loud it is: the mean power of the mix, in decibels (the peaks and
+//     valleys a waveform view of the track shows).
+// The window is centred, not trailing, because the whole list is known
+// ahead: the energy rises on the drop, not seconds after it. Stored every
+// ENERGY_STEP_SECONDS.
+const ENERGY_HALF_WINDOW = 2;
+const ENERGY_STEP_SECONDS = LOUDNESS_BLOCK_SECONDS;
+const ENERGY_BAND_WEIGHTS = [1, 0.5, 0.5];
+const ENERGY_HIT_WEIGHT = 0.5;
 
 /** What the lights heard in one frame. Reused objects; read, do not keep. */
 export interface StageBeat {
@@ -40,10 +60,13 @@ export interface StageBeat {
   kickCount: number;
   // The kick in this frame is a drop.
   drop: boolean;
+  // How much is going on in the music around now, 0 (breakdown) to 1 (drop),
+  // relative to the rest of the track.
+  energy: number;
 }
 
 export function createStageBeat(): StageBeat {
-  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false };
+  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0 };
 }
 
 export interface TrackBeats {
@@ -69,14 +92,16 @@ export interface ParsedBeats {
   bands: Band[];
   kickSeconds: Float32Array;
   kickIsDrop: Uint8Array;
+  energy: Float32Array;
 }
 
 export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
   if (bytes.length < BEATS_HEADER_BYTES) return null;
-  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'OMB2') return null;
+  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'OMB3') return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const counts = [view.getUint32(4, true), view.getUint32(8, true), view.getUint32(12, true)];
-  if (bytes.length < BEATS_HEADER_BYTES + (counts[0] + counts[1] + counts[2]) * 8) return null;
+  const loudnessCount = view.getUint32(16, true);
+  if (bytes.length < BEATS_HEADER_BYTES + (counts[0] + counts[1] + counts[2]) * 8 + loudnessCount * 4) return null;
   const bands: Band[] = [];
   let offset = BEATS_HEADER_BYTES;
   for (const count of counts) {
@@ -89,17 +114,74 @@ export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
     }
     bands.push({ seconds, strength });
   }
+  const power = new Float32Array(loudnessCount);
+  for (let i = 0; i < loudnessCount; i += 1) {
+    power[i] = view.getFloat32(offset, true);
+    offset += 4;
+  }
   const kicks: number[] = [];
-  const drops: number[] = [];
   const bass = bands[0];
   for (let i = 0; i < bass.seconds.length; i += 1) {
     if (bass.strength[i] < KICK_STRENGTH) continue;
     const previous = kicks.length ? kicks[kicks.length - 1] : undefined;
     if (previous !== undefined && bass.seconds[i] - previous < KICK_MIN_GAP_SECONDS) continue;
-    drops.push(previous !== undefined && bass.seconds[i] - previous >= DROP_QUIET_SECONDS ? 1 : 0);
     kicks.push(bass.seconds[i]);
   }
-  return { bands, kickSeconds: Float32Array.from(kicks), kickIsDrop: Uint8Array.from(drops) };
+  const kickSeconds = Float32Array.from(kicks);
+  const kickIsDrop = new Uint8Array(kicks.length);
+  for (let i = 1; i < kicks.length; i += 1) {
+    if (kicks[i] - kicks[i - 1] < DROP_QUIET_SECONDS) continue;
+    const following = firstAfter(kickSeconds, kicks[i] + DROP_CHECK_SECONDS) - (i + 1);
+    if (following >= DROP_KICKS_AFTER) kickIsDrop[i] = 1;
+  }
+  return { bands, kickSeconds, kickIsDrop, energy: energyCurve(bands, power) };
+}
+
+// Values placed between their own 10th and 90th percentile, 0..1.
+function spread(values: Float32Array): Float32Array {
+  const sorted = Float32Array.from(values).sort();
+  const low = sorted.length ? sorted[Math.floor(0.1 * (sorted.length - 1))] : 0;
+  const high = sorted.length ? sorted[Math.floor(0.9 * (sorted.length - 1))] : 0;
+  const span = high - low;
+  return values.map((value) => (span > 0 ? Math.min(1, Math.max(0, (value - low) / span)) : 0));
+}
+
+function energyCurve(bands: Band[], power: Float32Array): Float32Array {
+  let end = power.length * LOUDNESS_BLOCK_SECONDS;
+  for (const band of bands) if (band.seconds.length) end = Math.max(end, band.seconds[band.seconds.length - 1]);
+  const steps = Math.floor(end / ENERGY_STEP_SECONDS) + 1;
+  // Running sums of strength, so a window's sum is two lookups per band.
+  const sums = bands.map((band) => {
+    const sum = new Float64Array(band.strength.length + 1);
+    for (let i = 0; i < band.strength.length; i += 1) sum[i + 1] = sum[i] + band.strength[i];
+    return sum;
+  });
+  const raw = new Float32Array(steps);
+  for (let step = 0; step < steps; step += 1) {
+    const at = step * ENERGY_STEP_SECONDS;
+    let total = 0;
+    bands.forEach((band, b) => {
+      const from = firstAfter(band.seconds, at - ENERGY_HALF_WINDOW);
+      const to = firstAfter(band.seconds, at + ENERGY_HALF_WINDOW);
+      total += ENERGY_BAND_WEIGHTS[b] * (sums[b][to] - sums[b][from]);
+    });
+    raw[step] = total;
+  }
+  const hits = spread(raw);
+  if (!power.length) return hits;
+  // Loudness in decibels over the same centred window.
+  const powerSum = new Float64Array(power.length + 1);
+  for (let i = 0; i < power.length; i += 1) powerSum[i + 1] = powerSum[i] + power[i];
+  const half = Math.round(ENERGY_HALF_WINDOW / LOUDNESS_BLOCK_SECONDS);
+  const decibels = new Float32Array(steps);
+  for (let step = 0; step < steps; step += 1) {
+    const from = Math.max(0, Math.min(power.length, step - half));
+    const to = Math.max(from, Math.min(power.length, step + half));
+    const mean = to > from ? (powerSum[to] - powerSum[from]) / (to - from) : 0;
+    decibels[step] = 10 * Math.log10(mean + 1e-12);
+  }
+  const loud = spread(decibels);
+  return hits.map((value, step) => ENERGY_HIT_WEIGHT * value + (1 - ENERGY_HIT_WEIGHT) * loud[step]);
 }
 
 // Index of the first entry later than `seconds`.
@@ -180,6 +262,12 @@ export function createTrackBeats(options: TrackBeatsOptions = {}): TrackBeats {
       for (let i = firstKick; i < kicksUntil; i += 1) {
         if (beats.kickIsDrop[i]) out.drop = true;
       }
+      const position = Math.max(0, toSeconds) / ENERGY_STEP_SECONDS;
+      const step = Math.min(beats.energy.length - 1, Math.floor(position));
+      const next = Math.min(beats.energy.length - 1, step + 1);
+      out.energy = beats.energy.length
+        ? beats.energy[step] + (beats.energy[next] - beats.energy[step]) * Math.min(1, position - step)
+        : 0;
       return true;
     },
     dispose() {

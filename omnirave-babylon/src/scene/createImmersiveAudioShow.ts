@@ -64,6 +64,19 @@ const MIDS_END = 61;
 // With the track's beat list the laser pattern changes on a kick, after this
 // many kicks (four bars).
 const KICKS_PER_PHRASE = 16;
+// With the track's energy (0 = a break, 1 = a full drop) the lasers follow
+// the song, as the owner specified: in a drop fast, bright, every beam on and
+// aimed at the crowd; in a break slow, dim, only some beams on, lifted up and
+// sweeping away from the crowd.
+//   BREAK_LIFT: how far (radians) a beam lifts toward the sky at energy 0.
+//   BREAK_SWEEP: how far (radians) it wanders sideways at energy 0.
+//   BREAK_BEAMS_ON: the share of beams lit at energy 0 (all at energy 1).
+//   BREAK_SPEED / DROP_SPEED: pattern speed at energy 0 and 1.
+const BREAK_LIFT = 0.8;
+const BREAK_SWEEP = 0.9;
+const BREAK_BEAMS_ON = 0.25;
+const BREAK_SPEED = 0.12;
+const DROP_SPEED = 2.1;
 const PUNCH_DECAY_SECONDS = 0.25;
 // Fast attack (~40ms) so a kick reads instantly; decay handled by the impulse.
 const PUNCH_ATTACK_SECONDS = 0.04;
@@ -145,6 +158,11 @@ export interface ImmersiveAudioShow {
   readonly beatFlash: number;
   // Current global laser brightness scalar, for diagnostics/tests.
   readonly laserIntensity: number;
+  // Beams lit at least half way this frame, the laser pattern speed, and the
+  // mean beam elevation (radians, up is positive).
+  readonly laserBeamsLit: number;
+  readonly laserSpeed: number;
+  readonly laserElevation: number;
   // A primitive sampled from the current crossfaded palette (0..1); shifts as
   // the palette cycles/crossfades over time.
   readonly currentColorR: number;
@@ -244,6 +262,9 @@ const NOOP_SHOW: ImmersiveAudioShow = {
   laserBlades: 0,
   beatFlash: 0,
   laserIntensity: 0,
+  laserBeamsLit: 0,
+  laserSpeed: 0,
+  laserElevation: 0,
   currentColorR: 0,
   currentColorG: 0,
   currentColorB: 0,
@@ -407,6 +428,11 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
   const EMITTER_COUNT = emitters.length;
   const BEAM_TOTAL = EMITTER_COUNT * BEAMS_PER_EMITTER;
+  // Each beam's place in the order beams switch on as the energy rises, spread
+  // evenly (golden-ratio steps) so a break keeps a sparse, even spread. Kept
+  // under 5/6 so that the fade (a sixth wide) is complete at full energy and
+  // a drop has every beam fully on.
+  const beamRank = Float32Array.from({ length: BEAM_TOTAL }, (_, g) => ((g * 0.6180339887) % 1) * (5 / 6));
 
   // One base thin box: width 1 (scaled per-instance to the emitter's length),
   // thin in y/z. Baked so the near end sits at local x=0 (the emitter pivot).
@@ -530,12 +556,16 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   let coneSweepPhase = 0;
   let laserPhase = 0;
   let mode: StageVisualizerMode = 'normal';
-  let fireworksSkyOwned = false;
 
   // Phrase switching for the laser patterns.
   let phraseIndex = 0;
   let phraseTimer = 0;
   let bassEventAccum = 0;
+  let musicEnergy = 0;
+  let laserBeamsLitValue = 0;
+  let laserSpeedValue = 0;
+  let laserElevationValue = 0;
+  let elevationSum = 0;
 
   // Exposed diagnostics (updated each frame).
   let laserIntensityValue = LASER_IDLE_INTENSITY;
@@ -622,7 +652,14 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     const idle = !audioPresent && mode === 'normal';
     const active = mode === 'active';
-    const energyOverall = (bass + mids + highs) / 3;
+    // Energy and motion: with a beat list, the track's own energy (0 in a
+    // breakdown, 1 in a full drop), smoothed over about a third of a second.
+    // The spectrum levels sit near their ceiling for the whole of a loud
+    // master, so they gave the lasers the same brightness and speed in a
+    // breakdown as in a drop. Without a list, the spectrum levels as before.
+    if (beat) musicEnergy += (beat.energy - musicEnergy) * Math.min(1, dt * 3);
+    const energyOverall = beat ? musicEnergy : (bass + mids + highs) / 3;
+    const motion = beat ? musicEnergy : mids;
     const flashMul = 1 + beatFlash * BEAT_FLASH_BOOST;
 
     // No track and no scheduled event means this rig has no visual ownership.
@@ -637,12 +674,8 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
       floorMaterial.emissiveIntensity = 0;
       return;
     }
+    // The lasers stay on through the fireworks and drone show (owner's call).
     setLayersEnabled(true);
-    // The fireworks shells and drone swarm own the event sky. Removing the
-    // dense laser mesh entirely during those three minutes avoids both visual
-    // occlusion and an unnecessary 560-instance draw while retaining the
-    // moving stage cones, floor pulse, and atmosphere.
-    beamMesh.setEnabled(!fireworksSkyOwned);
 
     // --- palette timeline ---
     if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
@@ -666,7 +699,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     currentColorB = paletteLut[6 * 3 + 2];
 
     // --- cone beams ---
-    const sweepSpeed = mode === 'lead_in' ? 0.15 : active ? 2.2 : idle ? 0.3 : 0.7 + mids * 1.8;
+    const sweepSpeed = mode === 'lead_in' ? 0.15 : active ? 2.2 : idle ? 0.3 : 0.7 + motion * 1.8;
     coneSweepPhase += dt * sweepSpeed;
     const rotBlend = Math.min(1, dt * (mode === 'lead_in' ? 2 : 7));
     for (let i = 0; i < CONE_COUNT; i++) {
@@ -691,7 +724,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     } else if (idle) {
       coneIntensity = CONE_IDLE_INTENSITY + 0.15 * (0.5 + 0.5 * Math.sin(elapsed * 0.8));
     } else {
-      const base = fireworksSkyOwned ? 1.15 : active ? 3.2 : CONE_BASE_INTENSITY;
+      const base = active ? 3.2 : CONE_BASE_INTENSITY;
       coneIntensity = (base + (CONE_PEAK_INTENSITY - base) * punchEnv) * flashMul;
     }
     coneMaterialA.emissiveIntensity = coneIntensity;
@@ -716,22 +749,31 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     const patternFn = selectPattern(phraseIndex).fn;
 
     // Phase advance: mids drive the sweep speed; idle/lead_in crawl.
-    const laserSpeed = mode === 'lead_in' ? 0.12 : active ? 1.5 : idle ? 0.15 : 0.4 + mids * 1.6;
+    const laserSpeed = beat && !idle
+      ? Math.max(active ? 1.5 : 0, BREAK_SPEED + (DROP_SPEED - BREAK_SPEED) * energyOverall)
+      : mode === 'lead_in' ? 0.12 : active ? 1.5 : idle ? 0.15 : 0.4 + motion * 1.6;
+    // Break shaping: 0 in a full drop (or with no beat list), 1 in a break.
+    const breakAmount = beat && !idle ? 1 - energyOverall : 0;
+    const beamsOn = 1 - (1 - BREAK_BEAMS_ON) * breakAmount;
+    laserSpeedValue = laserSpeed;
+    laserBeamsLitValue = 0;
+    elevationSum = 0;
     laserPhase = advancePhase(laserPhase, dt, laserSpeed);
-    const driftPhase = elapsed * (0.3 + mids * 0.6);
+    const driftPhase = elapsed * (0.3 + motion * 0.6);
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
 
     // Global laser brightness (reactivity amplified, beat-flashed).
-    if (fireworksSkyOwned) {
-      laserIntensityValue = 0;
-    } else if (idle) {
+    if (idle) {
       laserIntensityValue = LASER_IDLE_INTENSITY;
     } else {
-      const base = active ? 1.2 : 0.8;
-      laserIntensityValue = (base + 1.4 * energyOverall + 1.5 * punchEnv) * flashMul;
+      // With the track's energy the range is wider: dim in a breakdown,
+      // full in a drop.
+      laserIntensityValue = beat
+        ? ((active ? 0.8 : 0.45) + 2.2 * energyOverall + 1.5 * punchEnv) * flashMul
+        : ((active ? 1.2 : 0.8) + 1.4 * energyOverall + 1.5 * punchEnv) * flashMul;
     }
 
-    if (!fireworksSkyOwned) {
+    {
       for (let e = 0; e < EMITTER_COUNT; e++) {
         const em = emitters[e];
         const sx = em.length;
@@ -743,13 +785,16 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
             em.baseYaw +
             off.yaw +
             LASER_DRIFT_AMPLITUDE * organicDrift(em.seed + b * 0.21, driftPhase) +
+            BREAK_SWEEP * breakAmount * Math.sin(laserPhase * 0.35 + em.seed * 2.1 + b * 0.05) +
             0.04 * punchEnv * Math.sin(g);
           const pitch =
             em.basePitch +
             off.pitch +
             LASER_DRIFT_AMPLITUDE * organicDrift(em.seed * 1.3 + b * 0.17, driftPhase * 1.1) +
+            BREAK_LIFT * breakAmount +
             0.03 * punchEnv * Math.cos(g);
 
+          elevationSum += pitch;
           const cosy = Math.cos(yaw);
           const siny = Math.sin(yaw);
           const cosp = Math.cos(pitch);
@@ -774,14 +819,17 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
           if (lutIdx < 0) lutIdx = 0;
           else if (lutIdx > PALETTE_LUT_SIZE - 1) lutIdx = PALETTE_LUT_SIZE - 1;
           // Idle keeps only ~1/3 of the beams meaningfully lit (calm but alive).
-          const gate = idle ? (g % 3 === 0 ? 1 : 0.05) : 1;
+          // Beams fade in and out in a fixed order as the energy changes.
+          const gate = idle ? (g % 3 === 0 ? 1 : 0.05) : Math.min(1, Math.max(0, (beamsOn - beamRank[g]) * 6));
           const factor = laserIntensityValue * gate;
+          if (gate >= 0.5) laserBeamsLitValue += 1;
           const co = g * 4;
           beamColors[co + 0] = paletteLut[lutIdx * 3 + 0] * factor;
           beamColors[co + 1] = paletteLut[lutIdx * 3 + 1] * factor;
           beamColors[co + 2] = paletteLut[lutIdx * 3 + 2] * factor;
         }
       }
+      laserElevationValue = elevationSum / BEAM_TOTAL;
       beamMesh.thinInstanceBufferUpdated('matrix');
       beamMesh.thinInstanceBufferUpdated('color');
     }
@@ -827,6 +875,15 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     get beatFlash() {
       return beatFlash;
     },
+    get laserBeamsLit() {
+      return laserBeamsLitValue;
+    },
+    get laserSpeed() {
+      return laserSpeedValue;
+    },
+    get laserElevation() {
+      return laserElevationValue;
+    },
     get laserIntensity() {
       return laserIntensityValue;
     },
@@ -849,8 +906,6 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
         jumpPalette();
       }
       mode = next;
-      const minute = state?.activeMinute ?? 0;
-      fireworksSkyOwned = next === 'lead_in' || (next === 'active' && minute >= 1 && minute <= 3);
     },
     dispose() {
       airParticles.dispose();

@@ -27,16 +27,18 @@ function resolveTrackUrl(trackId: string): string {
 
 // Every player must hear the same moment of the track at the same time.
 // The player compares its audio position with the server's playhead, moved
-// forward to "now" on the server's clock (see serverClock.ts):
-// - More than SEEK_THRESHOLD off: seek. A seek stalls while the new part
-//   downloads, so the player learns that stall and seeks that far ahead.
-// - Less than that: change the speed by a few percent until the position
-//   agrees. The browser keeps the pitch, and there is no audible skip.
-const SEEK_THRESHOLD_SECONDS = 0.5;
-const IN_SYNC_SECONDS = 0.02;
-// Speed change per second of drift, and the largest speed change.
-const RATE_PER_DRIFT_SECOND = 0.1;
-const MAX_RATE_CHANGE = 0.03;
+// forward to "now" on the server's clock (see serverClock.ts). When it is
+// more than SEEK_THRESHOLD off on SEEK_AFTER_READINGS readings in a row, it
+// seeks. A seek stalls while the new part downloads, so the player learns
+// that stall and seeks that far ahead the next time.
+//
+// It never changes the playback speed. Small speed changes (up to 3%) kept
+// the players within a few milliseconds, but Safari made a short gap in the
+// sound at each change, and the larger ones could be heard as the music
+// speeding up. One reading over the threshold is not enough to seek, so a
+// single late or jittery position reading does not cut the music.
+const SEEK_THRESHOLD_SECONDS = 0.3;
+const SEEK_AFTER_READINGS = 2;
 const MAX_SEEK_LEAD_SECONDS = 3;
 // The lights see a bass hit this long before the player hears it, so their
 // brightness (which takes about this long to rise) peaks on the hit.
@@ -58,7 +60,6 @@ export interface StagePlayerBackend {
   // True when playback runs without a stall: not seeking, and enough audio
   // is downloaded to continue.
   isReady(): boolean;
-  setPlaybackRate(rate: number): void;
   // Seconds from the decoded position to the speakers (0 when unknown).
   outputLatencySeconds(): number;
   setMuted(muted: boolean): void;
@@ -139,7 +140,6 @@ function createNoopBackend(): StagePlayerBackend {
     isReady() {
       return false;
     },
-    setPlaybackRate() {},
     outputLatencySeconds() {
       return 0;
     },
@@ -310,9 +310,6 @@ function createAudioBackend(): StagePlayerBackend {
       // HAVE_FUTURE_DATA (3): playback can continue past the current frame.
       return !element.seeking && element.readyState >= 3;
     },
-    setPlaybackRate(rate) {
-      if (element.playbackRate !== rate) element.playbackRate = rate;
-    },
     outputLatencySeconds() {
       const latency = (audioContext?.baseLatency ?? 0) + (audioContext?.outputLatency ?? 0);
       return Number.isFinite(latency) ? latency : 0;
@@ -362,6 +359,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   // How far ahead of the target a seek lands on the target, after the stall.
   let seekLead = 0;
   let measureSeekLead = false;
+  let readingsOff = 0;
   let beatTrackId: string | undefined;
   let beatSeconds = 0;
   let currentTrackId: string | undefined;
@@ -395,7 +393,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
       currentTrackId = media.trackId;
       currentPlaylistIndex = media.playlistIndex;
       measureSeekLead = false;
-      activeBackend.setPlaybackRate(1);
+      readingsOff = 0;
       activeBackend.load(media.trackId, expectedPlayhead(media));
       activeBackend.setMuted(false);
       activeBackend.play();
@@ -410,19 +408,17 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (activeBackend.isPaused() || !activeBackend.isReady()) return;
     const target = expectedPlayhead(media) + activeBackend.outputLatencySeconds();
     const drift = activeBackend.getCurrentTime() - target;
-    if (Math.abs(drift) > SEEK_THRESHOLD_SECONDS) {
-      activeBackend.setPlaybackRate(1);
-      activeBackend.seek(target + seekLead);
-      measureSeekLead = true;
-      return;
-    }
     if (measureSeekLead) {
       // The first reading after a seek shows how far the stall put it behind.
       measureSeekLead = false;
       seekLead = Math.min(MAX_SEEK_LEAD_SECONDS, Math.max(0, seekLead - drift));
     }
-    const rateChange = Math.min(MAX_RATE_CHANGE, Math.max(-MAX_RATE_CHANGE, -drift * RATE_PER_DRIFT_SECOND));
-    activeBackend.setPlaybackRate(Math.abs(drift) <= IN_SYNC_SECONDS ? 1 : 1 + rateChange);
+    readingsOff = Math.abs(drift) > SEEK_THRESHOLD_SECONDS ? readingsOff + 1 : 0;
+    if (readingsOff >= SEEK_AFTER_READINGS) {
+      readingsOff = 0;
+      activeBackend.seek(target + seekLead);
+      measureSeekLead = true;
+    }
   }
 
   // The track position this player hears now.

@@ -3,24 +3,32 @@ import { createStageBeat, createTrackBeats, parseBeats } from '../trackBeats';
 
 type Hit = [seconds: number, strength: number];
 
-function beatsFile(bass: Hit[], mids: Hit[] = [], highs: Hit[] = []): Uint8Array {
+function beatsFile(bass: Hit[], mids: Hit[] = [], highs: Hit[] = [], loudness: number[] = []): Uint8Array {
   const bands = [bass, mids, highs];
-  const bytes = new Uint8Array(16 + bands.reduce((sum, band) => sum + band.length, 0) * 8);
-  bytes.set([79, 77, 66, 50]); // "OMB2"
+  const bytes = new Uint8Array(20 + bands.reduce((sum, band) => sum + band.length, 0) * 8 + loudness.length * 4);
+  bytes.set([79, 77, 66, 51]); // "OMB3"
   const view = new DataView(bytes.buffer);
   bands.forEach((band, i) => view.setUint32(4 + 4 * i, band.length, true));
-  let offset = 16;
+  view.setUint32(16, loudness.length, true);
+  let offset = 20;
   for (const [seconds, strength] of bands.flat()) {
     view.setFloat32(offset, seconds, true);
     view.setFloat32(offset + 4, strength, true);
     offset += 8;
   }
+  for (const power of loudness) {
+    view.setFloat32(offset, power, true);
+    offset += 4;
+  }
   return bytes;
 }
 
 // Kicks at 1, 1.5 and 2 with a bass note between; a breakdown; the kick
-// comes back at 10 (a drop), with a double hit 0.1 s later that is one kick.
-const BASS: Hit[] = [[1, 1], [1.25, 0.5], [1.5, 1], [2, 0.75], [10, 1], [10.1, 0.9], [10.5, 1]];
+// comes back at 10 and keeps going to 13.5 (a drop), with a double hit 0.1 s
+// after it that is one kick; then a lone kick at 20, after another quiet
+// passage, with nothing after it (not a drop).
+const STEADY: Hit[] = [10.5, 11, 11.5, 12, 12.5, 13, 13.5].map((seconds) => [seconds, 1]);
+const BASS: Hit[] = [[1, 1], [1.25, 0.5], [1.5, 1], [2, 0.75], [10, 1], [10.1, 0.9], ...STEADY, [20, 1]];
 const MIDS: Hit[] = [[1.5, 0.75]];
 const HIGHS: Hit[] = [[1.25, 0.5], [1.75, 1]];
 
@@ -53,7 +61,7 @@ describe('createTrackBeats', () => {
     expect(read(1, 1.1)).toMatchObject({ bass: 0, mids: 0, highs: 0 }); // and is not counted again
     expect(read(1.1, 1.3)).toMatchObject({ bass: 0.5, mids: 0, highs: 0.5 });
     expect(read(1.1, 2)).toMatchObject({ bass: 1, mids: 0.75, highs: 1 }); // strongest of several
-    expect(read(20, 50)).toMatchObject({ bass: 0, mids: 0, highs: 0, kick: false }); // after the last hit
+    expect(read(30, 50)).toMatchObject({ bass: 0, mids: 0, highs: 0, kick: false }); // after the last hit
   });
 
   it('counts kicks for the whole track, so every player gets the same count', async () => {
@@ -69,12 +77,46 @@ describe('createTrackBeats', () => {
     expect(read(10.2, 10.6)).toMatchObject({ kick: true, kickCount: 5 });
   });
 
-  it('marks the first kick after a passage with no kick as a drop', async () => {
+  it('counts loudness as well as hits: a loud passage with no hits reads half way', async () => {
+    // 60 s: the first half loud with no hits, the second loud with steady kicks.
+    const power = Array.from({ length: 240 }, (_, block) => (block < 20 ? 0.001 : 0.1));
+    const kicks: Hit[] = Array.from({ length: 60 }, (_, k) => [30 + k * 0.5, 1]);
+    const fetchImpl = vi.fn(async () => new Response(beatsFile(kicks, [], [], power).slice(), { status: 200 }));
+    const beats = createTrackBeats({ fetchImpl });
+    const out = createStageBeat();
+    beats.read('set', 0, 1, out);
+    await settle();
+    beats.read('set', 15, 15, out);
+    expect(out.energy).toBeGreaterThan(0.4);
+    expect(out.energy).toBeLessThan(0.6);
+  });
+
+  it('marks the first kick after a passage with no kick as a drop, when steady kicks follow', async () => {
     const { read } = await loaded();
     expect(read(0.9, 1).drop).toBe(false); // the first kick of the track is not a drop
     expect(read(1.4, 1.5).drop).toBe(false);
     expect(read(9.9, 10).drop).toBe(true);
     expect(read(10.4, 10.5).drop).toBe(false);
+    expect(read(19.9, 20)).toMatchObject({ kick: true, drop: false }); // a lone kick in a break
+  });
+
+  it('reads the energy low in a quiet break and high in a loud, busy drop', async () => {
+    // 60 s: a quiet break with no hits, then a loud part with steady kicks.
+    const power = Array.from({ length: 240 }, (_, block) => (block < 120 ? 0.001 : 0.1));
+    const kicks: Hit[] = Array.from({ length: 60 }, (_, k) => [30 + k * 0.5, 1]);
+    const hats: Hit[] = Array.from({ length: 120 }, (_, k) => [30 + k * 0.25, 0.6]);
+    const fetchImpl = vi.fn(async () => new Response(beatsFile(kicks, [], hats, power).slice(), { status: 200 }));
+    const beats = createTrackBeats({ fetchImpl });
+    const out = createStageBeat();
+    beats.read('set', 0, 1, out);
+    await settle();
+    beats.read('set', 10, 10, out);
+    expect(out.energy).toBeLessThan(0.1);
+    beats.read('set', 45, 45, out);
+    expect(out.energy).toBeGreaterThan(0.9);
+    // Centred: already rising at the drop itself, not seconds after it.
+    beats.read('set', 30, 30, out);
+    expect(out.energy).toBeGreaterThan(0.2);
   });
 
   it('gives false, and stops asking, for a track with no beats file', async () => {
@@ -93,8 +135,9 @@ describe('createTrackBeats', () => {
     expect(parseBeats(new TextEncoder().encode('<!doctype html><html>'))).toBeNull();
     expect(parseBeats(beatsFile(BASS).slice(0, 30))).toBeNull(); // shorter than its counts say
     expect(parseBeats(new Uint8Array(3))).toBeNull();
-    // The first format, one band under "OMBT": refused, not misread.
-    expect(parseBeats(Uint8Array.from([79, 77, 66, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBeNull();
+    // Earlier formats ("OMBT", "OMB2"): refused, not misread.
+    expect(parseBeats(Uint8Array.from([79, 77, 66, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBeNull();
+    expect(parseBeats(Uint8Array.from([79, 77, 66, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBeNull();
     expect(parseBeats(beatsFile([]))?.kickSeconds.length).toBe(0);
   });
 
