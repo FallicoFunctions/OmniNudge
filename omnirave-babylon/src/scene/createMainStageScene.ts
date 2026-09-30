@@ -53,6 +53,7 @@ import { trimMeshLightBudget } from './trimMeshLightBudget';
 import { parsePerfFlags } from '../app/perfFlags';
 import { createMainStageProductionSurfaces } from './createMainStageProductionSurfaces';
 import { loadMainStageAssets } from './loadMainStageAssets';
+import { markBootPhase } from '../app/bootTiming';
 import { BACK_PLAZA_SPAWN, MAIN_STAGE_REVIEW_ROUTE } from './reviewRouteData';
 
 // Gameplay starts with the same player-centred framing used after travel.
@@ -87,6 +88,9 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
   scene.fogColor = new Color3(0.11, 0.14, 0.21);
 
   const stageAssets = await loadMainStageAssets(scene);
+  // Boot timing inside the scene build (see app/bootTiming.ts): one mark per
+  // large step, so a slow start in a player's browser shows which step it is.
+  markBootPhase('scene_assets');
   const perfFlags = parsePerfFlags(typeof window === 'undefined' ? '' : window.location.search);
   const venuePerformanceBaseline = perfFlags.debug && typeof window !== 'undefined'
     && ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -160,9 +164,11 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     }
   }
 
+  markBootPhase('scene_merged');
   const collisionMeshSet = new Set(stageAssets.collisionMeshes);
   stageAssets.mainMeshes = scene.meshes.filter((mesh) => !collisionMeshSet.has(mesh));
   stageAssets.solidCollisionMeshes = createMainStageCollisionBlockers(scene, stageAssets.mainMeshes);
+  markBootPhase('scene_collision');
 
   // VIP gating: the outboard half of the spawn-pylon boundary opens for
   // signed-in players and stays a wall for guests. Built here, immediately
@@ -178,6 +184,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
 
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
+  markBootPhase('scene_lighting');
   const input = createInputMap(window);
   const playerRig = createPlayerRig(
     scene,
@@ -235,6 +242,7 @@ export async function createMainStageScene(engine: AbstractEngine, launchCharact
     previewLuxury,
     previewMaleV2,
   });
+  markBootPhase('scene_avatar');
   // Both authored review assets already contain material separation that the
   // broad procedural colorway pass would flatten. The AvatarDefinition below
   // still controls the modular lean wardrobe, hair, skin, and shoes; skipping
