@@ -338,12 +338,18 @@ export async function createRuntime(host: HTMLElement) {
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
   let disposed = false;
+  // Stops the world token renewal. Owned here, not by the world block, so a
+  // boot that fails after the socket opened stops renewing too: a leftover
+  // socket then ends at its token's expiry instead of living on.
+  let stopWorldSessionRenewal: (() => void) | undefined;
 
   const cleanupOwnedResources = () => {
     if (disposed) {
       return;
     }
     disposed = true;
+    stopWorldSessionRenewal?.();
+    stopWorldSessionRenewal = undefined;
     worldAppearance?.dispose();
     avatarProfileSaver?.dispose();
     resolvedProfileToken = undefined;
@@ -603,7 +609,6 @@ export async function createRuntime(host: HTMLElement) {
       if (disposed) {
         return;
       }
-      stopWorldSessionRenewal?.();
       worldSocket?.dispose();
       remotePlayerRigs?.dispose();
       localChatBubbles?.dispose();
@@ -625,7 +630,6 @@ export async function createRuntime(host: HTMLElement) {
     // outbound moves internally; the render loop just offers the freshest
     // position each frame.
     let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
-    let stopWorldSessionRenewal: (() => void) | undefined;
     let worldSpawnInitialized = false;
     let restoringAppearance = false;
     let appearanceRevision = 0;
