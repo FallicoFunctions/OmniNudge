@@ -100,6 +100,10 @@ export interface CreatePlayerControllerOptions {
 const GRAVITY_METERS_PER_SECOND = 18;
 const JUMP_VELOCITY_METERS_PER_SECOND = 6.4;
 const MAX_FALL_SPEED_METERS_PER_SECOND = -32;
+/** Longest single physics step; a longer frame is split into steps this size. */
+const MAX_STEP_SECONDS = 0.1;
+/** A frame longer than this (a backgrounded tab) is simulated as this long. */
+const MAX_FRAME_SECONDS = 1;
 const GROUND_SNAP_EPSILON = 0.06;
 const COLLISION_SURFACE_EPSILON = 0.001;
 // The venue now has WALKABLE architecture above walkable ground (the VIP
@@ -171,178 +175,194 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
       controller.ghosting = true;
       ghostOrigin.copyFrom(options.playerRig.root.position);
     },
-    step(deltaSeconds: number) {
-      if(operatingPosition){
-        options.playerRig.root.position.copyFrom(operatingPosition);options.avatarRoot.rotation.y=0;
-        controller.animationState='idle';controller.currentSpeedMetersPerSecond=0;
-        controller.verticalVelocityMetersPerSecond=0;controller.grounded=true;controller.onLadder=false;jumpQueued=false;return;
-      }
-      const position = options.playerRig.root.position;
-      const ladders = options.ladders ?? [];
-      const remotePlayers = options.getRemotePlayerCollisionTargets?.() ?? [];
-      // Sec 8.2: ghosting suppresses solid + player collision only, never
-      // ground contact - clears once the player has walked clear.
-      if (ghostActive && Vector3.Distance(position, ghostOrigin) >= GHOST_CLEAR_DISTANCE_METERS) {
-        ghostActive = false;
-        controller.ghosting = false;
-      }
-
-      // Set below whenever this step already handled ladder climbing/
-      // detaching, so the attach check further down never fires in the same
-      // frame a jump-off or step-off just ran - otherwise a still-held
-      // forward/jump input would reattach instantly and the detach would
-      // never actually take.
-      let ladderHandledThisFrame = false;
-
-      if (onLadder && activeLadder) {
-        ladderHandledThisFrame = true;
-        const jumpedOff = stepLadderClimb(options, activeLadder, deltaSeconds, controller);
-        const feetY = position.y - options.playerRig.eyeHeightMeters;
-        if (jumpedOff || !isWithinLadder(activeLadder, position.x, position.z, feetY)) {
-          onLadder = false;
-          activeLadder = null;
-          controller.onLadder = false;
-        } else {
-          controller.currentSpeedMetersPerSecond = Math.abs(controller.verticalVelocityMetersPerSecond);
-          controller.animationState = resolveAvatarAnimationState(controller.currentSpeedMetersPerSecond);
-          options.avatarRoot.metadata = {
-            ...options.avatarRoot.metadata,
-            animationState: controller.animationState,
-            grounded: false,
-          };
-          return;
-        }
-      }
-
-      const groundHeight = resolveGroundHeight(
-        options.collisionMeshes,
-        position,
-        groundRay,
-        position.y - options.playerRig.eyeHeightMeters,
-        ghostActive ? [] : remotePlayers,
-        options.playerRig.radiusMeters,
-      );
-      const groundedEyeHeight = groundHeight === null ? null : groundHeight + options.playerRig.eyeHeightMeters;
-      const distanceToGround = groundedEyeHeight === null
-        ? Number.POSITIVE_INFINITY
-        : position.y - groundedEyeHeight;
-      controller.grounded = distanceToGround <= GROUND_SNAP_EPSILON && controller.verticalVelocityMetersPerSecond <= 0;
-
-      // Sec 8.2: only walk/sprint are enabled while ghosted - no jump.
-      if (options.input.jump && !ghostActive) {
-        jumpQueued = true;
-        options.input.jump = false;
-      } else if (options.input.jump) {
-        options.input.jump = false;
-      }
-
-      const attemptedJumpThisFrame = jumpQueued;
-      if (jumpQueued && controller.grounded) {
-        controller.verticalVelocityMetersPerSecond = JUMP_VELOCITY_METERS_PER_SECOND;
-        controller.grounded = false;
-      }
-      jumpQueued = false;
-
-      // Sec 8.2: no crouch while ghosted.
-      const crouchActive = Boolean(options.input.crouch) && !ghostActive;
-      options.playerRig.setCrouched(crouchActive);
-
-      resolveCameraForward(options.camera, cameraForward);
-      const move = resolveCameraRelativeMoveVector(options.input, cameraForward);
-      // Sec 7.5: crouch overrides sprint, so stamina only drains for sprint
-      // that is actually being applied as speed - and only while moving.
-      const sprintEngaged = options.input.sprint && !crouchActive && move.magnitude > 0;
-      const sprintAllowed = stepStamina(staminaState, sprintEngaged, deltaSeconds);
-      controller.stamina0to1 = staminaState.stamina;
-      const speed = resolvePlayerSpeed(options.playerRig.speedMetersPerSecond, sprintAllowed, crouchActive);
-      const horizontalSpeed = move.magnitude > 0 ? speed : 0;
-
-      // Sec 7.7: approaching a ladder's footprint while walking/sprinting/
-      // jumping toward it attaches instead of colliding with it as a wall.
-      if (!ladderHandledThisFrame && !ghostActive && ladders.length > 0) {
-        const candidate = resolveLadderZone(ladders, position.x, position.z, position.y - options.playerRig.eyeHeightMeters);
-        if (candidate && (move.magnitude > 0 || attemptedJumpThisFrame)) {
-          onLadder = true;
-          activeLadder = candidate;
-          controller.onLadder = true;
-          controller.verticalVelocityMetersPerSecond = 0;
-          position.x = (candidate.minX + candidate.maxX) / 2;
-          position.z = (candidate.minZ + candidate.maxZ) / 2;
-          options.avatarRoot.rotation.y = candidate.facingYaw;
-          controller.currentSpeedMetersPerSecond = 0;
-          controller.animationState = 'idle';
-          return;
-        }
-      }
-
-      const previousX = position.x;
-      position.x += move.x * horizontalSpeed * deltaSeconds;
-      if (!ghostActive) {
-        resolveHorizontalCollision(
-          options.solidCollisionMeshes ?? [],
-          position,
-          previousX,
-          'x',
-          options.playerRig.eyeHeightMeters,
-          options.playerRig.radiusMeters,
-        );
-      }
-      const previousZ = position.z;
-      position.z += move.z * horizontalSpeed * deltaSeconds;
-      if (!ghostActive) {
-        resolveHorizontalCollision(
-          options.solidCollisionMeshes ?? [],
-          position,
-          previousZ,
-          'z',
-          options.playerRig.eyeHeightMeters,
-          options.playerRig.radiusMeters,
-        );
-      }
-
-      // Sec 7.8: soft radial push-out against other players, never a shove -
-      // only the local position moves. Ghosting skips this entirely (no
-      // "standing on/colliding with other players" while ghosted).
-      if (!ghostActive && remotePlayers.length > 0) {
-        resolveRemotePlayerHorizontalCollision(remotePlayers, position, options.playerRig.radiusMeters);
-      }
-
-      if (move.magnitude > 0) {
-        options.avatarRoot.rotation.y = Math.atan2(move.x, move.z);
-      }
-
-      controller.verticalVelocityMetersPerSecond = Math.max(
-        MAX_FALL_SPEED_METERS_PER_SECOND,
-        controller.verticalVelocityMetersPerSecond - GRAVITY_METERS_PER_SECOND * deltaSeconds,
-      );
-      position.y += controller.verticalVelocityMetersPerSecond * deltaSeconds;
-
-      const updatedGroundHeight = resolveGroundHeight(
-        options.collisionMeshes,
-        position,
-        groundRay,
-        position.y - options.playerRig.eyeHeightMeters,
-        ghostActive ? [] : remotePlayers,
-        options.playerRig.radiusMeters,
-      );
-      if (updatedGroundHeight !== null) {
-        const updatedGroundedEyeHeight = updatedGroundHeight + options.playerRig.eyeHeightMeters;
-        if (position.y <= updatedGroundedEyeHeight && controller.verticalVelocityMetersPerSecond <= 0) {
-          position.y = updatedGroundedEyeHeight;
-          controller.verticalVelocityMetersPerSecond = 0;
-          controller.grounded = true;
-        }
-      }
-
-      controller.currentSpeedMetersPerSecond = horizontalSpeed;
-      controller.animationState = resolveAvatarAnimationState(horizontalSpeed);
-      options.avatarRoot.metadata = {
-        ...options.avatarRoot.metadata,
-        animationState: controller.animationState,
-        grounded: controller.grounded,
-      };
+    step(frameSeconds: number) {
+      // A long frame (a hitch while something loads, a tab switch) runs as
+      // several short steps. One big step let gravity carry a standing player
+      // more than GROUND_MAX_RISE below an elevated deck, where the ground ray
+      // no longer counted it as the floor, and they dropped to the ground.
+      let remaining = Math.min(frameSeconds, MAX_FRAME_SECONDS);
+      do {
+        const slice = Math.min(remaining, MAX_STEP_SECONDS);
+        remaining -= slice;
+        stepSlice(slice);
+      } while (remaining > 1e-6);
     },
   };
+
+  function stepSlice(deltaSeconds: number) {
+    if(operatingPosition){
+      options.playerRig.root.position.copyFrom(operatingPosition);options.avatarRoot.rotation.y=0;
+      controller.animationState='idle';controller.currentSpeedMetersPerSecond=0;
+      controller.verticalVelocityMetersPerSecond=0;controller.grounded=true;controller.onLadder=false;jumpQueued=false;return;
+    }
+    const position = options.playerRig.root.position;
+    const ladders = options.ladders ?? [];
+    const remotePlayers = options.getRemotePlayerCollisionTargets?.() ?? [];
+    // Sec 8.2: ghosting suppresses solid + player collision only, never
+    // ground contact - clears once the player has walked clear.
+    if (ghostActive && Vector3.Distance(position, ghostOrigin) >= GHOST_CLEAR_DISTANCE_METERS) {
+      ghostActive = false;
+      controller.ghosting = false;
+    }
+
+    // Set below whenever this step already handled ladder climbing/
+    // detaching, so the attach check further down never fires in the same
+    // frame a jump-off or step-off just ran - otherwise a still-held
+    // forward/jump input would reattach instantly and the detach would
+    // never actually take.
+    let ladderHandledThisFrame = false;
+
+    if (onLadder && activeLadder) {
+      ladderHandledThisFrame = true;
+      const jumpedOff = stepLadderClimb(options, activeLadder, deltaSeconds, controller);
+      const feetY = position.y - options.playerRig.eyeHeightMeters;
+      if (jumpedOff || !isWithinLadder(activeLadder, position.x, position.z, feetY)) {
+        onLadder = false;
+        activeLadder = null;
+        controller.onLadder = false;
+      } else {
+        controller.currentSpeedMetersPerSecond = Math.abs(controller.verticalVelocityMetersPerSecond);
+        controller.animationState = resolveAvatarAnimationState(controller.currentSpeedMetersPerSecond);
+        options.avatarRoot.metadata = {
+          ...options.avatarRoot.metadata,
+          animationState: controller.animationState,
+          grounded: false,
+        };
+        return;
+      }
+    }
+
+    const groundHeight = resolveGroundHeight(
+      options.collisionMeshes,
+      position,
+      groundRay,
+      position.y - options.playerRig.eyeHeightMeters,
+      ghostActive ? [] : remotePlayers,
+      options.playerRig.radiusMeters,
+    );
+    const groundedEyeHeight = groundHeight === null ? null : groundHeight + options.playerRig.eyeHeightMeters;
+    const distanceToGround = groundedEyeHeight === null
+      ? Number.POSITIVE_INFINITY
+      : position.y - groundedEyeHeight;
+    controller.grounded = distanceToGround <= GROUND_SNAP_EPSILON && controller.verticalVelocityMetersPerSecond <= 0;
+
+    // Sec 8.2: only walk/sprint are enabled while ghosted - no jump.
+    if (options.input.jump && !ghostActive) {
+      jumpQueued = true;
+      options.input.jump = false;
+    } else if (options.input.jump) {
+      options.input.jump = false;
+    }
+
+    const attemptedJumpThisFrame = jumpQueued;
+    if (jumpQueued && controller.grounded) {
+      controller.verticalVelocityMetersPerSecond = JUMP_VELOCITY_METERS_PER_SECOND;
+      controller.grounded = false;
+    }
+    jumpQueued = false;
+
+    // Sec 8.2: no crouch while ghosted.
+    const crouchActive = Boolean(options.input.crouch) && !ghostActive;
+    options.playerRig.setCrouched(crouchActive);
+
+    resolveCameraForward(options.camera, cameraForward);
+    const move = resolveCameraRelativeMoveVector(options.input, cameraForward);
+    // Sec 7.5: crouch overrides sprint, so stamina only drains for sprint
+    // that is actually being applied as speed - and only while moving.
+    const sprintEngaged = options.input.sprint && !crouchActive && move.magnitude > 0;
+    const sprintAllowed = stepStamina(staminaState, sprintEngaged, deltaSeconds);
+    controller.stamina0to1 = staminaState.stamina;
+    const speed = resolvePlayerSpeed(options.playerRig.speedMetersPerSecond, sprintAllowed, crouchActive);
+    const horizontalSpeed = move.magnitude > 0 ? speed : 0;
+
+    // Sec 7.7: approaching a ladder's footprint while walking/sprinting/
+    // jumping toward it attaches instead of colliding with it as a wall.
+    if (!ladderHandledThisFrame && !ghostActive && ladders.length > 0) {
+      const candidate = resolveLadderZone(ladders, position.x, position.z, position.y - options.playerRig.eyeHeightMeters);
+      if (candidate && (move.magnitude > 0 || attemptedJumpThisFrame)) {
+        onLadder = true;
+        activeLadder = candidate;
+        controller.onLadder = true;
+        controller.verticalVelocityMetersPerSecond = 0;
+        position.x = (candidate.minX + candidate.maxX) / 2;
+        position.z = (candidate.minZ + candidate.maxZ) / 2;
+        options.avatarRoot.rotation.y = candidate.facingYaw;
+        controller.currentSpeedMetersPerSecond = 0;
+        controller.animationState = 'idle';
+        return;
+      }
+    }
+
+    const previousX = position.x;
+    position.x += move.x * horizontalSpeed * deltaSeconds;
+    if (!ghostActive) {
+      resolveHorizontalCollision(
+        options.solidCollisionMeshes ?? [],
+        position,
+        previousX,
+        'x',
+        options.playerRig.eyeHeightMeters,
+        options.playerRig.radiusMeters,
+      );
+    }
+    const previousZ = position.z;
+    position.z += move.z * horizontalSpeed * deltaSeconds;
+    if (!ghostActive) {
+      resolveHorizontalCollision(
+        options.solidCollisionMeshes ?? [],
+        position,
+        previousZ,
+        'z',
+        options.playerRig.eyeHeightMeters,
+        options.playerRig.radiusMeters,
+      );
+    }
+
+    // Sec 7.8: soft radial push-out against other players, never a shove -
+    // only the local position moves. Ghosting skips this entirely (no
+    // "standing on/colliding with other players" while ghosted).
+    if (!ghostActive && remotePlayers.length > 0) {
+      resolveRemotePlayerHorizontalCollision(remotePlayers, position, options.playerRig.radiusMeters);
+    }
+
+    if (move.magnitude > 0) {
+      options.avatarRoot.rotation.y = Math.atan2(move.x, move.z);
+    }
+
+    controller.verticalVelocityMetersPerSecond = Math.max(
+      MAX_FALL_SPEED_METERS_PER_SECOND,
+      controller.verticalVelocityMetersPerSecond - GRAVITY_METERS_PER_SECOND * deltaSeconds,
+    );
+    const feetBeforeFall = position.y - options.playerRig.eyeHeightMeters;
+    position.y += controller.verticalVelocityMetersPerSecond * deltaSeconds;
+
+    // Measured from the higher of the feet before and after this step, so a
+    // floor the player passed through while falling still catches them.
+    const updatedGroundHeight = resolveGroundHeight(
+      options.collisionMeshes,
+      position,
+      groundRay,
+      Math.max(feetBeforeFall, position.y - options.playerRig.eyeHeightMeters),
+      ghostActive ? [] : remotePlayers,
+      options.playerRig.radiusMeters,
+    );
+    if (updatedGroundHeight !== null) {
+      const updatedGroundedEyeHeight = updatedGroundHeight + options.playerRig.eyeHeightMeters;
+      if (position.y <= updatedGroundedEyeHeight && controller.verticalVelocityMetersPerSecond <= 0) {
+        position.y = updatedGroundedEyeHeight;
+        controller.verticalVelocityMetersPerSecond = 0;
+        controller.grounded = true;
+      }
+    }
+
+    controller.currentSpeedMetersPerSecond = horizontalSpeed;
+    controller.animationState = resolveAvatarAnimationState(horizontalSpeed);
+    options.avatarRoot.metadata = {
+      ...options.avatarRoot.metadata,
+      animationState: controller.animationState,
+      grounded: controller.grounded,
+    };
+  }
 
   return controller;
 }

@@ -336,6 +336,33 @@ describe('createPlayerController', () => {
     expect(controller.stamina0to1).toBe(1);
   });
 
+  it('keeps a standing player on an elevated deck through a long frame', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('collision-ground', { width: 500, height: 500 }, scene);
+    const deck = MeshBuilder.CreateBox('deck', { width: 16, height: 0.4, depth: 9 }, scene);
+    deck.position.set(39, 8.4, 0);
+    deck.checkCollisions = true;
+    deck.computeWorldMatrix(true);
+    const rig = createPlayerRig(scene, new Vector3(39, 8.6 + 1.65, 0));
+    const avatarRoot = new TransformNode('avatar-root', scene);
+    const camera = new FreeCamera('camera', new Vector3(39, 11, -5), scene);
+    const controller = createPlayerController({
+      avatarRoot,
+      camera,
+      collisionMeshes: [ground, deck],
+      input: createInput(),
+      playerRig: rig,
+    });
+
+    controller.step(1 / 60);
+    // A hitch: one frame long enough that a single gravity step used to carry
+    // the feet more than a step height under the deck.
+    controller.step(0.5);
+    expect(rig.root.position.y - rig.eyeHeightMeters).toBeCloseTo(8.6, 2);
+    expect(controller.grounded).toBe(true);
+  });
+
   it('does not drain sprint stamina while the sprint key is held standing still', () => {
     engine = new NullEngine();
     const scene = new Scene(engine);
