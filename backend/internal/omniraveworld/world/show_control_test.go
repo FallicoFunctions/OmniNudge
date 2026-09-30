@@ -348,3 +348,32 @@ func TestAwayPlayerKeepsPlaceWhileTheTurnPassesToThePresentPlayer(t *testing.T) 
 		t.Fatal("the returning player did not get the next turn", f.Preparing)
 	}
 }
+
+func TestDroneTurnOfAnAwayPlayerPassesOnInTheSameSlot(t *testing.T) {
+	w := NewWorld(DefaultConfig())
+	start := time.Date(2026, 9, 17, 20, 30, 0, 0, time.UTC)
+	a := w.AddPlayer(PlayerSession{PlayerID: "a"})
+	b := w.AddPlayer(PlayerSession{PlayerID: "b"})
+	if r := w.ApplyShowCommand(a.ID, a, ShowCommand{RequestID: "a", Panel: "drones", Action: "join"}, start); !r.OK {
+		t.Fatal(r)
+	}
+	d := &w.show.Drones
+	if d.Preparing == nil || d.Preparing.PlayerID != a.ID {
+		t.Fatal("the first drone player is not preparing", d.Preparing)
+	}
+	slot := d.Preparing.StartsAt
+	if r := w.ApplyShowCommand(b.ID, b, ShowCommand{RequestID: "b", Panel: "drones", Action: "join"}, start.Add(time.Second)); !r.OK {
+		t.Fatal(r)
+	}
+
+	// A drops during preparation: B takes the turn A had, at the same time.
+	w.now = func() time.Time { return start.Add(2 * time.Second) }
+	w.RemovePlayer(a.ID, a)
+	w.AdvanceShows(start.Add(2 * time.Second))
+	if d.Preparing == nil || d.Preparing.PlayerID != b.ID {
+		t.Fatal("the turn did not pass to the present player", d.Preparing)
+	}
+	if d.Preparing.StartsAt != slot {
+		t.Fatalf("the passed turn starts at %d, not in the slot at %d", d.Preparing.StartsAt, slot)
+	}
+}

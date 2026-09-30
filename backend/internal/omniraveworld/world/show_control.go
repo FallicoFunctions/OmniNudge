@@ -365,9 +365,11 @@ func (w *World) advanceShows(now int64) bool {
 			next = now + s.PreparationMS
 		}
 		s.lastDroneBoundary = next
-		// Only a present player's arrival can shift the next drone boundary.
-		if i := slices.IndexFunc(s.Drones.Queue, func(q ShowQueueEntry) bool { return q.AwaySince == 0 }); s.Drones.Active == nil && i >= 0 && s.Drones.Queue[i].JoinedAt > next-s.PreparationMS {
-			s.lastDroneBoundary = s.Drones.Queue[i].JoinedAt + s.PreparationMS
+		// A player who drops while preparing goes back to the front with the
+		// slot's preparation start as JoinedAt, so the slot does not move and
+		// the next present player takes it on time.
+		if s.Drones.Active == nil && len(s.Drones.Queue) > 0 && s.Drones.Queue[0].JoinedAt > next-s.PreparationMS {
+			s.lastDroneBoundary = s.Drones.Queue[0].JoinedAt + s.PreparationMS
 			next = s.lastDroneBoundary
 		}
 		w.prepareShow(&s.Drones, next, now)
