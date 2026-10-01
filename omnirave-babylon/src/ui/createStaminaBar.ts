@@ -1,9 +1,8 @@
 // Sprint stamina HUD (design doc sec 9.4 "bottom HUD" + sec 7.4 sprint
-// stamina rules). Bottom-CENTER of the HUD region, where sec 7.6's emote bar
-// will also eventually live - that bar is a separate task's responsibility
-// and is NOT built here; this element sits slightly above center so an emote
-// bar can dock at the very bottom edge later without the two overlapping
-// (see `.stamina-bar` bottom offset in styles.css).
+// stamina rules). Bottom-CENTER, flush with the bottom edge (owner's call).
+// Where the chat or now-playing panel reaches under its width (a narrow
+// window), it rises just above them, and follows their size as it changes.
+// Sec 7.6's emote bar is not built here.
 //
 // Pure DOM: no Babylon imports, safe under jsdom. Reads the same
 // `--hud-*` theme tokens as createPlayerHud.ts so it re-themes for free when
@@ -24,7 +23,31 @@ export interface StaminaBarState {
 export interface StaminaBar {
   element: HTMLElement;
   update: (state: StaminaBarState) => void;
+  /** Places the bar again (done by itself on a resize of the window or a panel). */
+  relayout: () => void;
   dispose: () => void;
+}
+
+export interface StaminaBarOptions {
+  /** The bottom panels the bar must not cover: the chat and the now-playing block. */
+  avoid?: () => readonly (Element | null | undefined)[];
+}
+
+interface Box { left: number; right: number; top: number; bottom: number }
+const LIFT_GAP_PX = 8;
+
+/**
+ * How far above the bottom edge the bar sits: 0 when no visible panel reaches
+ * under its width, else just above the tallest one that does.
+ */
+export function staminaLift(bar: Box, panels: readonly Box[], viewportHeight: number): number {
+  let lift = 0;
+  for (const panel of panels) {
+    if (panel.right <= panel.left || panel.bottom <= panel.top) continue; // hidden
+    if (panel.right <= bar.left || panel.left >= bar.right) continue; // beside the bar
+    lift = Math.max(lift, viewportHeight - panel.top + LIFT_GAP_PX);
+  }
+  return Math.round(lift);
 }
 
 /** Clamps + guards NaN/Infinity so a bad readout can't render a broken bar. */
@@ -35,7 +58,7 @@ export function clampStamina0to1(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-export function createStaminaBar(host: HTMLElement): StaminaBar {
+export function createStaminaBar(host: HTMLElement, options: StaminaBarOptions = {}): StaminaBar {
   const container = document.createElement('div');
   container.dataset.testid = 'stamina-bar';
   container.className = 'stamina-bar';
@@ -77,10 +100,24 @@ export function createStaminaBar(host: HTMLElement): StaminaBar {
     }
   }
 
+  function relayout(): void {
+    const panels = (options.avoid?.() ?? []).filter((panel): panel is Element => Boolean(panel));
+    const lift = staminaLift(container.getBoundingClientRect(), panels.map((panel) => panel.getBoundingClientRect()), window.innerHeight);
+    const bottom = lift > 0 ? `${lift}px` : '';
+    if (container.style.bottom !== bottom) container.style.bottom = bottom;
+  }
+  const resizes = typeof ResizeObserver === 'function' ? new ResizeObserver(relayout) : undefined;
+  for (const panel of options.avoid?.() ?? []) if (panel) resizes?.observe(panel);
+  window.addEventListener('resize', relayout);
+  relayout();
+
   return {
     element: container,
     update,
+    relayout,
     dispose() {
+      resizes?.disconnect();
+      window.removeEventListener('resize', relayout);
       container.remove();
     },
   };

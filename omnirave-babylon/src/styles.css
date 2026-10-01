@@ -904,8 +904,9 @@ body,
 }
 
 /* Sprint stamina bar (sec 9.4 bottom-center, sec 7.4), flush with the bottom
-   edge. The emote bar that would dock under it is not built at present; if
-   it returns, it needs its own place. */
+   edge. createStaminaBar lifts it (inline bottom) above the chat or
+   now-playing panel where one reaches under it in a narrow window. The emote
+   bar that would dock under it is not built at present. */
 .stamina-bar {
   position: absolute;
   left: 50%;

@@ -1075,7 +1075,9 @@ export async function createRuntime(host: HTMLElement) {
     // read as responsive while sprinting.
     {
       const [, { createStaminaBar }] = await uiModules;
-      staminaBar = createStaminaBar(host);
+      // Flush with the bottom edge unless the chat or now-playing panel
+      // reaches under it (a narrow window): then just above them.
+      staminaBar = createStaminaBar(host, { avoid: () => [chatPanel?.element, playerHud?.element] });
     }
 
     // Sec 9.4/9.7 emote bar: DELIBERATELY NOT MOUNTED yet. Owner decision
