@@ -30,7 +30,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       github-actions:
         patterns: ['*']
@@ -45,7 +45,7 @@ updates:
   - package-ecosystem: gomod
     directory: /backend
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       go-dependencies:
         patterns: ['*']
@@ -60,13 +60,17 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: daily
     # TypeScript 7 cannot install beside typescript-eslint 8, which accepts
     # TypeScript below 6.1: npm refuses the install outright, so even the majors
     # group could never run with it inside. Remove this once typescript-eslint
     # supports TypeScript 7.
     ignore:
       - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # The CSS directives, PostCSS plugin and style regression tests use v3.
+      # A v4 upgrade needs a coordinated CSS migration, not a manifest bump.
+      - dependency-name: tailwindcss
         update-types: ['version-update:semver-major']
     groups:
       frontend-dependencies:
@@ -88,7 +92,7 @@ updates:
   - package-ecosystem: npm
     directory: /omnirave-babylon
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       omnirave-babylon-dependencies:
         patterns: ['*']
@@ -106,7 +110,12 @@ updates:
   - package-ecosystem: pip
     directory: /infra/runpod/image-worker
     schedule:
-      interval: weekly
+      interval: daily
+    # OpenCV 5 removes cv2.data.haarcascades, used for identity face crops.
+    # Keep taking fixes on v4 until the detector has a replacement asset.
+    ignore:
+      - dependency-name: opencv-python-headless
+        update-types: ['version-update:semver-major']
     groups:
       image-worker-dependencies:
         patterns: ['*']
@@ -121,7 +130,7 @@ updates:
   - package-ecosystem: pip
     directory: /infra/runpod/video-worker
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       video-worker-dependencies:
         patterns: ['*']
@@ -136,7 +145,11 @@ updates:
   - package-ecosystem: pip
     directory: /infra/avatar-worker
     schedule:
-      interval: weekly
+      interval: daily
+    # Match the Python 3.11 base image until that container is migrated.
+    ignore:
+      - dependency-name: numpy
+        versions: ['>=2.5']
     groups:
       avatar-worker-dependencies:
         patterns: ['*']

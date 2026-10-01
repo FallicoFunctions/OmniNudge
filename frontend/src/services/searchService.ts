@@ -94,7 +94,7 @@ export async function siteWideSearch(
   type SubredditSearchResponse = { subreddits: SubredditSuggestion[]; after?: string | null };
   type SubredditAutocompleteResponse = { suggestions: SubredditSuggestion[] };
 
-  let subredditsSearch: SubredditSearchResponse | null = null;
+  let subredditsSearch: SubredditSearchResponse | null;
 
   const platformCursor = opts?.platformCursor
     ? `&cursor=${encodeURIComponent(opts.platformCursor)}`

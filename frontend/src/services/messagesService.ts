@@ -358,7 +358,7 @@ export const messagesService = {
         : (await this.getConversation(data.conversation_id)).other_user?.id;
 
     let encryptedContent = data.content;
-    let senderEncryptedContent = data.content;
+    let senderEncryptedContent: string;
     let encryptionVersion = 'plaintext';
 
     const ownKeys = await getOwnKeys();

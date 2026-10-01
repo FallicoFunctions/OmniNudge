@@ -18,6 +18,11 @@ import './App.css';
 import { OMNICHAT_ENABLED } from './config/featureFlags';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+// Fetch the landing route while translations initialize. Waiting until the
+// first render creates another script waterfall before any page content paints.
+if (window.location.pathname === '/') {
+  void import('./pages/HomePage');
+}
 const ThemesPage = lazy(() => import('./pages/ThemesPage'));
 const SubredditPage = lazy(() => import('./pages/SubredditPage'));
 const RedditPostWrapper = lazy(() => import('./pages/RedditPostWrapper'));

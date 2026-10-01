@@ -68,8 +68,8 @@ export default function OmniChatMediaAssetView({
 
   // A URL the API did not mint, or one pointing at another origin, is refused
   // rather than assigned: the resolvers throw on both.
-  let contentSrc: string | null = null;
-  let thumbnailSrc: string | null = null;
+  let contentSrc: string | null;
+  let thumbnailSrc: string | null;
   try {
     contentSrc = mediaAssetContentUrl(asset.id, asset.content_url);
     thumbnailSrc = thumbnailPath ? mediaAssetThumbnailUrl(asset.id, thumbnailPath) : null;

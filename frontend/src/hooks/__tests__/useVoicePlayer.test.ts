@@ -68,7 +68,9 @@ describe('useVoicePlayer', () => {
   });
 
   it('still frees the blob URL it made for a fetched recording', async () => {
-    vi.mocked(authenticatedFetch).mockResolvedValue(new Response(new Blob(['audio'])));
+    vi.mocked(authenticatedFetch).mockResolvedValue(
+      new Response('audio', { headers: { 'Content-Type': 'audio/webm' } })
+    );
     const { result } = renderHook(() => useVoicePlayer());
     act(() => result.current.play('http://localhost:8080/api/v1/voice/5/download'));
     await waitFor(() => expect(FakeAudio.made).toHaveLength(1));

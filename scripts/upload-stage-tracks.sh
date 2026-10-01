@@ -34,7 +34,7 @@ fail() {
   exit 1
 }
 
-file_size() { stat -f %z "$1" 2>/dev/null || stat -c %s "$1"; }
+file_size() { wc -c < "$1" | tr -d '[:space:]'; }
 
 # The first four bytes of a file, as text.
 file_tag() { head -c 4 "$1"; }

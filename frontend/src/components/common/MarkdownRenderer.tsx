@@ -198,7 +198,6 @@ function convertMarkdown(
   let inBlockquote = false;
   let inCode = false;
   let inFence = false;
-  let fenceLanguage = '';
 
   const closeList = () => {
     if (inList) {
@@ -225,7 +224,6 @@ function convertMarkdown(
     if (inFence) {
       html.push('</code></pre>');
       inFence = false;
-      fenceLanguage = '';
     }
   };
 
@@ -264,7 +262,7 @@ function convertMarkdown(
       closeList();
       closeBlockquote();
       if (!inFence) {
-        fenceLanguage = trimmed.slice(3).trim();
+        const fenceLanguage = trimmed.slice(3).trim();
         const languageClass = fenceLanguage ? ` class="language-${escapeHtml(fenceLanguage)}"` : '';
         html.push(`<pre><code${languageClass}>`);
         inFence = true;

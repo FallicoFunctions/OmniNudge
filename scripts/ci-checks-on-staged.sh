@@ -67,5 +67,12 @@ if [ -n "$frontend_files" ]; then
   fi
 fi
 
+if printf '%s\n' "$files" | grep -qE '^\.github/(scripts/|workflows/)'; then
+  if ! node --test .github/scripts/*.test.cjs; then
+    echo "FAIL: dependency auto-merge policy controls"
+    failed=$((failed+1))
+  fi
+fi
+
 echo "$failed failed (CI checks on the commit)"
 [ "$failed" -eq 0 ]

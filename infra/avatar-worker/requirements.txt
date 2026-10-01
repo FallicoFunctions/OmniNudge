@@ -1,5 +1,6 @@
-livekit==1.1.18
+livekit==1.1.19
 kokoro==0.9.4
 Pillow==12.3.0
-numpy==2.5.3
+# The PyTorch container uses Python 3.11; NumPy 2.5 requires Python 3.12.
+numpy==2.4.6
 soundfile==0.14.0
