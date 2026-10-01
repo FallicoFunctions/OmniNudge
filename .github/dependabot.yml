@@ -31,13 +31,17 @@ updates:
     directory: /
     schedule:
       interval: daily
+    # Major action upgrades can change runner behavior and security semantics
+    # (for example checkout's pull-request safety defaults). Keep them out of
+    # the unattended queue; minor, patch, and security updates are validated and
+    # merged by the repository policy workflow.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       github-actions:
         patterns: ['*']
         update-types: ['minor', 'patch']
-      github-actions-majors:
-        patterns: ['*']
-        update-types: ['major']
       github-actions-security:
         applies-to: security-updates
         patterns: ['*']
