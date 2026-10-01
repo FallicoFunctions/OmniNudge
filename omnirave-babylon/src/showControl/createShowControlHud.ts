@@ -25,8 +25,8 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
     const leave=button(`Leave ${name} queue`,()=>command(name,'leave'));section.append(status,progress,roster,join,leave);queue.append(section);queueSections.set(name,{status,roster,progress,place,wait,help,join,leave});
   }
   const board=element('section','show-board');board.hidden=true;board.setAttribute('aria-label','Show control panel');root.append(board);
-  const heading=element('header','show-board-heading'),title=element('strong'),timer=element('span','show-turn-clock');
-  const exit=button('End turn',()=>{if(panel&&turn)command(panel,'leave',{turnId:turn.id});});heading.append(title,timer,exit);board.append(heading);
+  const heading=element('header','show-board-heading'),timer=element('span','show-turn-clock');
+  const exit=button('End turn',()=>{if(panel&&turn)command(panel,'leave',{turnId:turn.id});});heading.append(timer,exit);board.append(heading);
   const body=element('div','show-board-body'),grid=element('div','show-icon-grid'),side=element('aside','show-launch-options');body.append(grid,side);board.append(body);
   const hint=element('div','show-hint');board.append(hint);
   const message=element('div','show-message');message.setAttribute('role','status');root.append(message);
@@ -55,10 +55,9 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   function buildBoard(){
     grid.replaceChildren();side.replaceChildren();tiles.clear();bankButtons.clear();multi=launch=undefined;selection=undefined;
     if(!panel||!turn)return;
-    title.hidden=panel==='fireworks';
-    title.textContent=panel==='fireworks'?'':`${label(panel)} · Live`;
+    board.setAttribute('aria-label',`${label(panel)} control panel`);
     board.dataset.panel=panel;
-    const items=panel==='fireworks'?FIREWORK_CATALOGUE.map(f=>({id:f.id,name:f.name,description:f.description})):SHOW_RULES.drones.map(d=>({id:d.id,name:label(d.id),description:`${label(d.id)} movement`}));
+    const items=panel==='fireworks'?FIREWORK_CATALOGUE.map(f=>({id:f.id,name:f.name,description:f.description})):SHOW_RULES.drones.map(d=>({id:d.id,name:d.id==='wordmark'?'OMNIRAVE':label(d.id),description:`${label(d.id)} movement`}));
     for(const item of items){
       const tile=button('',()=>{if(panel==='fireworks')selectFirework(item.id);else if(turn){void audio.unlock?.();command('drones','movement',{turnId:turn.id,clip:item.id});}},'show-tile');
       tile.title=item.description;tile.setAttribute('aria-label',item.name);
@@ -80,9 +79,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
       const clear=button('Clear selection',()=>{selected=[];selectionRevision++;});side.append(clear);
       hint.textContent='';
     }else{
-      side.append(element('p','show-option-hint','Choose the next movement. Tap the active icon to repeat it.'));
-      side.append(element('p','show-option-hint','◆ Queued'));
-      hint.textContent='Drag the sky to look around.';
+      hint.textContent='';
     }
     hint.hidden=!hint.textContent;
   }

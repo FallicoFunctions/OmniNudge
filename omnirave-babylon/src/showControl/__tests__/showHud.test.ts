@@ -38,7 +38,7 @@ describe('show control HUD',()=>{
   expect(board.hasAttribute('hidden')).toBe(false);
   expect(board.textContent).toContain('Time left 2:30');
   expect(board.textContent).not.toContain('Prepare');
-  if(name==='fireworks')expect(board.querySelector('.show-board-heading strong')?.textContent).toBe('');
+  expect(board.querySelector('.show-board-heading strong')).toBeNull();
   click(name==='fireworks'?'Ruby Peony':'Wave');
   expect(sent.at(-1)).toMatchObject({panel:name,action:name==='fireworks'?'launch':'movement',turnId:'turn-a'});
   s[name].active=null;s[name].preparing={...turn,id:'next-turn',startsAt:170000,endsAt:320000};hud.apply(s,'a');
