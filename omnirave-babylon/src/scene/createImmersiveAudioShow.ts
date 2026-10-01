@@ -21,7 +21,7 @@ import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import type { StageBeat } from '../media/trackBeats';
-import type { ShowPhrase } from '../media/showTimeline';
+import { windowSum, type ShowPhrase } from '../media/showTimeline';
 import { stepBassPunch } from './stagePunch';
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
@@ -85,6 +85,13 @@ const DROP_SPEED = 2.1;
 //   BUILD_LIFT: how far (radians) the beams have climbed at the drop.
 //   BUILD_GATHER: how much of the fan's spread is gathered in at the drop.
 const BUILD_SPEED = 2.8;
+// During the fireworks show the lasers run at least this fast, rising with
+// the energy to the drop speed (1.5 + 0.6 = 2.1).
+const SHOW_LASER_SPEED = 1.5;
+const SHOW_LASER_ENERGY_SPEED = 0.6;
+// The cone sweep in the fireworks lead-in (a held breath) and the show.
+const LEAD_IN_SWEEP_SPEED = 0.15;
+const SHOW_SWEEP_SPEED = 2.2;
 const BUILD_LIFT = 1.1;
 const BUILD_GATHER = 0.8;
 const PUNCH_DECAY_SECONDS = 0.25;
@@ -651,8 +658,9 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     const timeline = beat?.timeline ?? null;
     const showAt = beat ? beat.seconds : 0;
     const energyArea = timeline ? timeline.energyArea(showAt) : 0;
-    const rampArea = timeline ? timeline.rampArea(showAt) : 0;
-    const energyRampArea = timeline ? timeline.energyRampArea(showAt) : 0;
+    // The fireworks lead-in and show inside this track, from the server's
+    // schedule: their own speeds replace the music's inside them.
+    const events = beat?.events ?? null;
     const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
     punch = punchStep.punch;
     punchBurst = punchStep.hit;
@@ -706,7 +714,9 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     // --- palette timeline ---
     if (timeline) {
-      paletteClock = timeline.paletteClock(showAt, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS, PALETTE_JUMP_COOLDOWN);
+      // Entering the show jumps the palette, as it always did.
+      paletteClock = timeline.paletteClock(showAt, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS, PALETTE_JUMP_COOLDOWN,
+        events?.activeStarts);
     } else if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
       // Big bass event (or entering active) jumps to the next palette.
       if (strongBurst) {
@@ -728,10 +738,22 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     currentColorB = paletteLut[6 * 3 + 2];
 
     // --- cone beams ---
-    const sweepSpeed = mode === 'lead_in' ? 0.15 : active ? 2.2 : idle ? 0.3 : 0.7 + motion * 1.8;
-    // The timeline's sweep: 0.7 + 1.8 x energy, summed from the track start.
-    coneSweepPhase = timeline ? 0.7 * showAt + 1.8 * energyArea : coneSweepPhase + dt * sweepSpeed;
-    const rotBlend = Math.min(1, dt * (mode === 'lead_in' ? 2 : 7));
+    const sweepSpeed = mode === 'lead_in' ? LEAD_IN_SWEEP_SPEED : active ? SHOW_SWEEP_SPEED : idle ? 0.3 : 0.7 + motion * 1.8;
+    // The timeline's sweep: 0.7 + 1.8 x energy, summed from the track start,
+    // with the lead-in's and the show's own speeds inside them.
+    if (timeline) {
+      const sweep = (seconds: number) => 0.7 * seconds + 1.8 * timeline.energyArea(seconds);
+      coneSweepPhase = sweep(showAt);
+      if (events) {
+        coneSweepPhase += windowSum(events.leadIns, showAt, (from, to) => LEAD_IN_SWEEP_SPEED * (to - from) - (sweep(to) - sweep(from)))
+          + windowSum(events.actives, showAt, (from, to) => SHOW_SWEEP_SPEED * (to - from) - (sweep(to) - sweep(from)));
+      }
+    } else {
+      coneSweepPhase += dt * sweepSpeed;
+    }
+    // An exact exponential step: the cones lag their aim by the same amount
+    // at any frame rate, so every player sees them at the same angle.
+    const rotBlend = 1 - Math.exp(-dt * (mode === 'lead_in' ? 2 : 7));
     for (let i = 0; i < CONE_COUNT; i++) {
       let targetX: number;
       let targetZ: number;
@@ -802,9 +824,19 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     // The timeline's laser phase is the same speed summed from the track
     // start. BUILD_SPEED is above DROP_SPEED, so the speed is
     // break(1 - ramp) + (drop - break) x energy x (1 - ramp) + build x ramp.
-    laserPhase = timeline
-      ? BREAK_SPEED * (showAt - rampArea) + (DROP_SPEED - BREAK_SPEED) * (energyArea - energyRampArea) + BUILD_SPEED * rampArea
-      : advancePhase(laserPhase, dt, laserSpeed);
+    // Inside the fireworks show the show's speed replaces it.
+    if (timeline) {
+      const travel = (seconds: number) => BREAK_SPEED * (seconds - timeline.rampArea(seconds))
+        + (DROP_SPEED - BREAK_SPEED) * (timeline.energyArea(seconds) - timeline.energyRampArea(seconds))
+        + BUILD_SPEED * timeline.rampArea(seconds);
+      laserPhase = travel(showAt);
+      if (events) {
+        laserPhase += windowSum(events.actives, showAt, (from, to) => SHOW_LASER_SPEED * (to - from)
+          + SHOW_LASER_ENERGY_SPEED * (timeline.energyArea(to) - timeline.energyArea(from)) - (travel(to) - travel(from)));
+      }
+    } else {
+      laserPhase = advancePhase(laserPhase, dt, laserSpeed);
+    }
     const driftPhase = timeline ? 0.3 * showAt + 0.6 * energyArea : elapsed * (0.3 + motion * 0.6);
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
 

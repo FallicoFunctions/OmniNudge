@@ -41,6 +41,8 @@ import {
 import { BACK_PLAZA_SPAWN } from '../scene/reviewRouteData';
 import { normalizeLaunchAvatarLoadout, parseCompleteAvatarLoadout, readGuestCharacter, saveGuestCharacter, serializeRenderedAvatarLoadout } from '../player/completeAvatarLoadout';
 import { createInitialWorldSpawn } from '../network/initialWorldSpawn';
+import { eventWindows, readEventSchedule, scheduledEventState, type EventSchedule } from '../media/eventSchedule';
+import type { ShowEventWindows } from '../media/showTimeline';
 import { createInitialWorldAppearance } from '../network/initialWorldAppearance';
 import { createAvatarProfileSaver } from '../network/avatarProfileSave';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
@@ -770,6 +772,27 @@ export async function createRuntime(host: HTMLElement) {
     };
     let latestShowSnapshot: import('../network/worldSocket').WorldSnapshot | undefined;
     let latestWorldEventState: StageEventStateInput | null = null;
+    // The Main Stage schedule from the server, read on the synced server clock
+    // each frame (see eventSchedule.ts); null from an older server.
+    let mainStageSchedule: EventSchedule | null = null;
+    let appliedEventKey = '';
+    // The state the show runs on: a debug preview, else the schedule at the
+    // server time now, else the last snapshot's.
+    const currentStageEventState = (): StageEventStateInput | null => {
+      if (debugEventOverride !== undefined) return debugEventOverride;
+      const serverNow = stageMediaOptions.serverClock.now();
+      if (latestWorldEventState && mainStageSchedule && serverNow !== undefined) {
+        return scheduledEventState(mainStageSchedule, serverNow);
+      }
+      return latestWorldEventState;
+    };
+    const syncStageEventState = () => {
+      const state = currentStageEventState();
+      const key = state ? `${state.phase}:${state.countdownSeconds ?? ''}:${state.activeMinute ?? ''}` : '';
+      if (key === appliedEventKey) return;
+      appliedEventKey = key;
+      applyStageEventState(state);
+    };
     // Undefined follows the server. A concrete state is a debug-only local
     // preview override; it never mutates or broadcasts authoritative state.
     let debugEventOverride: StageEventStateInput | null | undefined;
@@ -953,7 +976,8 @@ export async function createRuntime(host: HTMLElement) {
               activeMinute: activeEvent.activeMinute,
             }
           : null;
-        applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
+        mainStageSchedule = readEventSchedule(activeEvent);
+        syncStageEventState();
       });
       // The handshake ran while the scene loaded. Apply its latest state only
       // after spawn, appearance, chat and remote-avatar handlers all exist.
@@ -1460,10 +1484,28 @@ export async function createRuntime(host: HTMLElement) {
     const stageBeat = createStageBeat();
     let stageBeatFrame: number | undefined = -1;
     let stageBeatKnown = false;
+    // The scheduled events placed in the current track, rebuilt only when the
+    // schedule or the track's start on the server clock changes.
+    let showEvents: ShowEventWindows | null = null;
+    let showEventsKey = '';
+    const currentShowEvents = (): ShowEventWindows | null => {
+      const trackStartMs = stageMediaPlayer?.getTrackStartServerMs();
+      if (debugEventOverride !== undefined || !latestWorldEventState || !mainStageSchedule || trackStartMs === undefined) return null;
+      const period = mainStageSchedule.periodSeconds * 1000;
+      const key = [((mainStageSchedule.activeStartMs % period) + period) % period, period, mainStageSchedule.leadInSeconds,
+        mainStageSchedule.activeSeconds, Math.round(trackStartMs)].join(':');
+      if (key !== showEventsKey) {
+        showEventsKey = key;
+        // A set runs a few hours at most.
+        showEvents = eventWindows(mainStageSchedule, trackStartMs, trackStartMs, trackStartMs + 6 * 3600_000);
+      }
+      return showEvents;
+    };
     const getStageBeat = () => {
       if (activeEngine.frameId !== stageBeatFrame) {
         stageBeatFrame = activeEngine.frameId;
         stageBeatKnown = stageMediaPlayer ? stageMediaPlayer.readBeat(stageBeat) : false;
+        if (stageBeatKnown) stageBeat.events = currentShowEvents();
       }
       return stageBeatKnown ? stageBeat : null;
     };
@@ -1557,7 +1599,10 @@ export async function createRuntime(host: HTMLElement) {
 
     // A snapshot can arrive while these lazily imported show modules are still
     // building. Re-apply the retained state once every recipient exists.
-    applyStageEventState(debugEventOverride === undefined ? latestWorldEventState : debugEventOverride);
+    // The effects exist now: give them the current state even when it was
+    // already applied (to nothing) during the boot.
+    appliedEventKey = '';
+    syncStageEventState();
 
     const runtime = {
       canvas,
@@ -1650,6 +1695,8 @@ export async function createRuntime(host: HTMLElement) {
         );
       }
       stageAudioDevControls?.update();
+      // Phase changes on the server clock, the same moment for every player.
+      syncStageEventState();
       activeStageVisualizer.update(deltaSeconds);
       activeImmersiveAudioShow.update(deltaSeconds);
       activeCrownEffects.update(deltaSeconds);

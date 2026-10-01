@@ -17,7 +17,7 @@
 // A two-hour set is about 950 KB, so the whole list is downloaded once.
 
 import { publicUrl } from '../app/publicUrl';
-import { buildUpAt, createShowTimeline, type ShowTimeline } from './showTimeline';
+import { buildUpAt, createShowTimeline, type ShowEventWindows, type ShowTimeline } from './showTimeline';
 
 const BAND_COUNT = 3;
 const BEATS_HEADER_BYTES = 4 + 4 * (BAND_COUNT + 1);
@@ -93,10 +93,13 @@ export interface StageBeat {
   // it (see showTimeline.ts): the same for every player at the same moment.
   seconds: number;
   timeline: ShowTimeline | null;
+  // The scheduled events in this track, set by the runtime from the server's
+  // schedule; null when it is not known.
+  events: ShowEventWindows | null;
 }
 
 export function createStageBeat(): StageBeat {
-  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0, seconds: 0, timeline: null };
+  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0, seconds: 0, timeline: null, events: null };
 }
 
 export interface TrackBeats {

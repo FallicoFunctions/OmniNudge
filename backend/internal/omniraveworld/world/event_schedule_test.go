@@ -84,3 +84,24 @@ func TestEventSchedule_SnapshotReturnsAllZones(t *testing.T) {
 	require.Equal(t, ZonePlurrPartay, snapshot[2].ZoneID)
 	require.Equal(t, EventPhaseLeadIn, snapshot[2].Phase)
 }
+
+func TestEventSchedule_SendsTheScheduleForClientClocks(t *testing.T) {
+	schedule := NewEventSchedule()
+
+	for _, now := range []time.Time{
+		time.Date(2026, 6, 4, 14, 59, 52, 0, time.UTC), // lead-in: the show starts in the next hour
+		time.Date(2026, 6, 4, 15, 1, 0, 0, time.UTC),   // active
+		time.Date(2026, 6, 4, 15, 20, 0, 0, time.UTC),  // none
+	} {
+		main := schedule.StateFor(ZoneMainStage, now)
+		hourStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, time.UTC)
+		require.Equal(t, hourStart.UnixMilli(), main.ActiveStartMs, now)
+		require.Equal(t, int64(3600), main.PeriodSeconds)
+		require.Equal(t, int64(10), main.LeadInSeconds)
+		require.Equal(t, int64(300), main.ActiveSeconds)
+	}
+
+	underground := schedule.StateFor(ZoneUnderground, time.Date(2026, 6, 4, 15, 20, 0, 0, time.UTC))
+	require.Equal(t, time.Date(2026, 6, 4, 15, 30, 0, 0, time.UTC).UnixMilli(), underground.ActiveStartMs)
+	require.Equal(t, int64(0), underground.LeadInSeconds)
+}

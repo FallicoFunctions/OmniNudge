@@ -20,6 +20,15 @@ type ZoneEventState struct {
 	CountdownSeconds int64      `json:"countdownSeconds,omitempty"`
 	RecoverySeconds  int64      `json:"recoverySeconds,omitempty"`
 	ActiveMinute     int        `json:"activeMinute,omitempty"`
+	// The schedule itself, so each client places every lead-in and active
+	// window on its own synced server clock instead of on the arrival of a
+	// snapshot (the lights must change at the same moment for every player):
+	// the active start in the current hour (Unix ms), the cycle length, and
+	// the lead-in and active lengths, in seconds.
+	ActiveStartMs int64 `json:"activeStartMs,omitempty"`
+	PeriodSeconds int64 `json:"periodSeconds,omitempty"`
+	LeadInSeconds int64 `json:"leadInSeconds,omitempty"`
+	ActiveSeconds int64 `json:"activeSeconds,omitempty"`
 }
 
 type EventSchedule struct {
@@ -68,6 +77,15 @@ func (s EventSchedule) StateFor(zone ZoneID, now time.Time) ZoneEventState {
 	if !ok {
 		return ZoneEventState{ZoneID: zone, Phase: EventPhaseNone}
 	}
+	state := rule.phaseAt(zone, now)
+	state.ActiveStartMs = now.UTC().Truncate(time.Hour).UnixMilli() + rule.activeStart*1000
+	state.PeriodSeconds = secondsPerHour
+	state.LeadInSeconds = rule.leadInDuration
+	state.ActiveSeconds = rule.activeDuration
+	return state
+}
+
+func (rule eventScheduleRule) phaseAt(zone ZoneID, now time.Time) ZoneEventState {
 
 	secondOfHour := int64(now.UTC().Minute()*60 + now.UTC().Second())
 

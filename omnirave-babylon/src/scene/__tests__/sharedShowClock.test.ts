@@ -1,6 +1,7 @@
 import { Mesh, MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createStageBeat, createTrackBeats, type StageBeat } from '../../media/trackBeats';
+import { inWindows, type ShowEventWindows } from '../../media/showTimeline';
 import { createImmersiveAudioShow } from '../createImmersiveAudioShow';
 import { createCrownEffects } from '../createCrownEffects';
 import { createCascadeCourtLightFloor } from '../createCascadeCourtLightFloor';
@@ -60,6 +61,7 @@ interface Snapshot {
   beams: Float32Array;
   cones: number[];
   tracery: Float32Array;
+  pulse: number;
   floor: Float32Array;
   hologram: (string | number)[];
 }
@@ -67,8 +69,17 @@ interface Snapshot {
 let engine: NullEngine | undefined;
 afterEach(() => engine?.dispose());
 
+// A fireworks lead-in at 120-130 s and a show from 130 s, in track seconds,
+// as the runtime places the server's schedule.
+const show = (activeEnd: number): ShowEventWindows => ({
+  leadIns: Float64Array.of(120, 130), actives: Float64Array.of(130, activeEnd), activeStarts: Float64Array.of(130),
+});
+
 // One player from `joinAt` at `fps`, returning the show at each sample time.
-async function player(joinAt: number, fps: number, samples: number[], useTimeline = true): Promise<Snapshot[]> {
+// With `events` the effects also get the event phase each frame, as the
+// runtime sets it from the schedule.
+async function player(joinAt: number, fps: number, samples: number[], useTimeline = true,
+  events: ShowEventWindows | null = null): Promise<Snapshot[]> {
   engine ??= new NullEngine();
   const scene = new Scene(engine);
   MeshBuilder.CreatePlane('main-stage-hero-screen-panel-l', { size: 1 }, scene);
@@ -88,12 +99,23 @@ async function player(joinAt: number, fps: number, samples: number[], useTimelin
   const hologram = createHologramGrid(scene, options);
   const snapshots: Snapshot[] = [];
   const end = samples[samples.length - 1];
+  let phase = '';
   for (let frame = 1; joinAt + frame / fps <= end + 1e-9; frame += 1) {
     now = joinAt + frame / fps;
     spectrum = spectrumAt(now);
     known = beats.read('track', readFrom, now, beat);
     readFrom = now;
     if (!useTimeline) beat.timeline = null;
+    beat.events = events;
+    if (events) {
+      const state = inWindows(events.actives, now) ? { phase: 'active', activeMinute: Math.floor((now - events.actives[0]) / 60) + 1 }
+        : inWindows(events.leadIns, now) ? { phase: 'lead_in', countdownSeconds: Math.ceil(events.leadIns[1] - now) } : { phase: 'none' };
+      const key = JSON.stringify(state);
+      if (key !== phase) {
+        phase = key;
+        for (const effect of [lasers, crown, floor, hologram]) effect.setEventState(state);
+      }
+    }
     lasers.update(1 / fps);
     crown.update(1 / fps);
     floor.update(1 / fps);
@@ -102,8 +124,11 @@ async function player(joinAt: number, fps: number, samples: number[], useTimelin
       snapshots.push({
         colour: [lasers.currentColorR, lasers.currentColorG, lasers.currentColorB],
         beams: Float32Array.from((scene.getMeshByName('immersive-laser-beam') as Mesh)._thinInstanceDataStorage.matrixData!),
-        cones: Array.from({ length: lasers.beams }, (_, i) => scene.getMeshByName(`immersive-beam-${i}`)!.rotation.z),
+        // Each cone turns on its mount: the aim across (z) and up (x).
+        cones: Array.from({ length: lasers.beams }, (_, i) => scene.getTransformNodeByName(`immersive-beam-mount-${i}`)!.rotation)
+          .flatMap((rotation) => [rotation.x, rotation.z]),
         tracery: Float32Array.from((scene.getMeshByName('crown-fx-tracery') as Mesh)._userThinInstanceBuffersStorage.data.instanceColor),
+        pulse: crown.pulsePosition,
         floor: Float32Array.from((scene.getMeshByName('cascade-court-light-floor') as Mesh)._userThinInstanceBuffersStorage.data.instanceColor),
         hologram: [hologram.currentShape, hologram.previousShape, hologram.morphProgress, hologram.peakColorR, hologram.peakColorG, hologram.peakColorB],
       });
@@ -174,6 +199,39 @@ describe('the shared show clock', () => {
       expect(meanDifference(a.floor, b.floor)).toBeLessThan(0.05);
       expect(b.hologram.slice(0, 3)).toEqual(a.hologram.slice(0, 3));
     }
+  }, 120_000);
+
+  it('shows the same show to a player who joined after a fireworks show earlier in the track', async () => {
+    const early = await player(100, 60, SAMPLES, true, show(170));
+    const late = await player(200, 60, SAMPLES, true, show(170));
+    for (let s = 0; s < SAMPLES.length; s += 1) {
+      expect(largestDifference(early[s].colour, late[s].colour)).toBeLessThan(1e-6);
+      expect(largestBeamAngle(early[s].beams, late[s].beams)).toBeLessThan(1e-4);
+      expect(largestDifference(early[s].cones, late[s].cones)).toBeLessThan(1e-4);
+      expect(largestDifference(early[s].tracery, late[s].tracery)).toBeLessThan(1e-4);
+      expect(late[s].hologram.slice(0, 3)).toEqual(early[s].hologram.slice(0, 3));
+    }
+  }, 120_000);
+
+  it('shows the same fireworks show to a player who joined in the middle of it, with its own speeds', async () => {
+    const early = await player(100, 60, SAMPLES, true, show(400));
+    const late = await player(200, 60, SAMPLES, true, show(400));
+    const withoutShow = await player(200, 60, SAMPLES, true, null);
+    for (let s = 0; s < SAMPLES.length; s += 1) {
+      expect(largestDifference(early[s].colour, late[s].colour)).toBeLessThan(1e-6);
+      expect(largestBeamAngle(early[s].beams, late[s].beams)).toBeLessThan(1e-4);
+      expect(largestDifference(early[s].cones, late[s].cones)).toBeLessThan(1e-4);
+      expect(largestDifference(early[s].tracery, late[s].tracery)).toBeLessThan(1e-4);
+      expect(Math.abs(early[s].pulse - late[s].pulse)).toBeLessThan(1e-6);
+      expect(late[s].hologram.slice(0, 3)).toEqual(early[s].hologram.slice(0, 3));
+    }
+    // The show's own laser, cone and spire speeds are in: without the show
+    // windows the same moment looks different.
+    expect(Math.max(...SAMPLES.map((_, s) => largestBeamAngle(late[s].beams, withoutShow[s].beams)))).toBeGreaterThan(0.2);
+    expect(Math.max(...SAMPLES.map((_, s) => largestDifference(late[s].cones, withoutShow[s].cones)))).toBeGreaterThan(0.1);
+    expect(Math.max(...SAMPLES.map((_, s) => Math.abs(late[s].pulse - withoutShow[s].pulse)))).toBeGreaterThan(0.05);
+    // The show's shorter hologram holds.
+    expect(SAMPLES.some((_, s) => late[s].hologram[0] !== withoutShow[s].hologram[0] || late[s].hologram[2] !== withoutShow[s].hologram[2])).toBe(true);
   }, 120_000);
 
   it('without the timeline the same two players see different lasers (the reported fault)', async () => {

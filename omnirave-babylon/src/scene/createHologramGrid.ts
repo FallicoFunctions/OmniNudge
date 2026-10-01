@@ -1068,9 +1068,11 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     if (beat?.timeline) {
       // The same sequence read at the track position: a formation morphs in,
       // holds at least MIN_HOLD_SECONDS, and moves on at the PHRASE_KICKS-th
-      // kick (or after HOLD_SECONDS), for every player alike.
+      // kick (or after HOLD_SECONDS; during a fireworks show the shorter
+      // active hold), for every player alike.
       const phrase = beat.timeline.phrase(beat.seconds, PHRASE_KICKS,
-        MORPH_SECONDS + MIN_HOLD_SECONDS, MORPH_SECONDS + HOLD_SECONDS, phraseScratch);
+        MORPH_SECONDS + MIN_HOLD_SECONDS, MORPH_SECONDS + HOLD_SECONDS, phraseScratch,
+        beat.events?.actives, MORPH_SECONDS + HOLD_SECONDS * HOLD_ACTIVE_SCALE);
       shapeIndex = phrase.index % SHAPE_ORDER.length;
       previousShapeIndex = phrase.index > 0 ? (phrase.index - 1) % SHAPE_ORDER.length : shapeIndex;
       morphTimer = Math.min(MORPH_SECONDS, phrase.since);

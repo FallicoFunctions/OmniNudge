@@ -156,11 +156,12 @@ export const PALETTE_JUMP_COOLDOWN_SECONDS = 3;
 
 /**
  * The palette clock every light effect shares: the track timeline's (the
- * same for every player at the same moment), else the effect's own clock
- * for a track without a beat list.
+ * same for every player at the same moment), with a jump at the start of
+ * each fireworks show; else the effect's own clock for a track without a
+ * beat list.
  */
 export function showPaletteClock(beat: StageBeat | null, ownClock: number, cycleSeconds: number, fadeSeconds: number): number {
   return beat?.timeline
-    ? beat.timeline.paletteClock(beat.seconds, cycleSeconds, fadeSeconds, PALETTE_JUMP_COOLDOWN_SECONDS)
+    ? beat.timeline.paletteClock(beat.seconds, cycleSeconds, fadeSeconds, PALETTE_JUMP_COOLDOWN_SECONDS, beat.events?.activeStarts)
     : ownClock;
 }

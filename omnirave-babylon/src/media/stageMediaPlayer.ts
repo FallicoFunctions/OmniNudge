@@ -107,6 +107,10 @@ export interface StageMediaPlayer {
   // player at the same moment. Undefined before the server clock is known
   // and with no track.
   getShowSeconds: () => number | undefined;
+  // The server time (Unix ms) at position 0 of the current track, from the
+  // server's own playhead reading: the same for every player. Undefined
+  // without a track or a server reading, and in manual (dev) control.
+  getTrackStartServerMs: () => number | undefined;
   // Dev control surface (used by the debug-only audio scrubber). All safe
   // no-ops before unlock, when there is no backend yet.
   getCurrentTime: () => number;
@@ -515,6 +519,11 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     return serverNow === undefined ? undefined : serverNow / 1000;
   }
 
+  function getTrackStartServerMs(): number | undefined {
+    if (manualOverride || !desiredMedia || typeof desiredMedia.sampledAtMs !== 'number') return undefined;
+    return desiredMedia.sampledAtMs - desiredMedia.playheadSeconds * 1000;
+  }
+
   function getCurrentTime(): number {
     // Until the browser lets the track play, report the server's playhead
     // (sent at least once a second) so the HUD shows the room's real time.
@@ -568,6 +577,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     getFrequencyData,
     readBeat,
     getShowSeconds,
+    getTrackStartServerMs,
     getCurrentTime,
     getDuration,
     isPaused,

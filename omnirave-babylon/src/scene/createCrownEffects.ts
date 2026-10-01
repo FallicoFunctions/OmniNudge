@@ -19,6 +19,7 @@ import type { StageEventStateInput, StageVisualizerMode } from './createStageVis
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 import type { StageBeat } from '../media/trackBeats';
+import { windowSum } from '../media/showTimeline';
 import { stepBassPunch } from './stagePunch';
 
 // Signature figurehead effects for the Main Stage crown spire. The crown is the
@@ -53,6 +54,9 @@ const PUNCH_ATTACK_SECONDS = 0.04;
 
 // --- Palette cycling (same cadence as the immersive show so the crown stays
 // color-coherent with the venue) --------------------------------------------
+// The spire pulse's speed in the fireworks lead-in and show.
+const LEAD_IN_TRAVEL_SPEED = 0.7;
+const SHOW_TRAVEL_SPEED = 1.1;
 const PALETTE_CYCLE_SECONDS = 22;
 const PALETTE_FADE_SECONDS = 2;
 const PALETTE_PHASE_SPEED = 0.03;
@@ -113,6 +117,8 @@ export interface CrownEffects {
   readonly crystalIntensity: number;
   // Current sky-beacon emissive intensity, for diagnostics/tests.
   readonly beaconIntensity: number;
+  // Where the pulse is on the spire, 0 (base) to 1 (top), for diagnostics/tests.
+  readonly pulsePosition: number;
   // Total LED tracery segments in the field.
   readonly traceryInstances: number;
 }
@@ -123,6 +129,7 @@ const NOOP_EFFECTS: CrownEffects = {
   dispose() {},
   crystalIntensity: 0,
   beaconIntensity: 0,
+  pulsePosition: 0,
   traceryInstances: 0,
 };
 
@@ -381,12 +388,21 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     // --- Effect 1: LED tracery -----------------------------------------------
     // Pulse climbs the spire; travel speed rides mids and the mode. Overall
     // brightness rides bass; the traveling band adds a bright accent on beats.
-    const travelSpeed = leadIn ? 0.7 : active ? 1.1 : idle ? 0.08 : 0.35 + mids * 0.9;
+    const travelSpeed = leadIn ? LEAD_IN_TRAVEL_SPEED : active ? SHOW_TRAVEL_SPEED : idle ? 0.08 : 0.35 + mids * 0.9;
     // With the track's timeline the pulse rides the track's energy, summed
-    // from the track start, so it is at the same height for every player.
-    travelPhase = beat?.timeline
-      ? 0.35 * beat.seconds + 0.9 * beat.timeline.energyArea(beat.seconds)
-      : travelPhase + dt * travelSpeed;
+    // from the track start, with the fireworks lead-in's and show's own
+    // speeds inside them, so it is at the same height for every player.
+    const timeline = beat?.timeline;
+    if (beat && timeline) {
+      const travel = (seconds: number) => 0.35 * seconds + 0.9 * timeline.energyArea(seconds);
+      travelPhase = travel(beat.seconds);
+      if (beat.events) {
+        travelPhase += windowSum(beat.events.leadIns, beat.seconds, (from, to) => LEAD_IN_TRAVEL_SPEED * (to - from) - (travel(to) - travel(from)))
+          + windowSum(beat.events.actives, beat.seconds, (from, to) => SHOW_TRAVEL_SPEED * (to - from) - (travel(to) - travel(from)));
+      }
+    } else {
+      travelPhase += dt * travelSpeed;
+    }
     const pulsePos = travelPhase - Math.floor(travelPhase); // 0..1 up the spire
     const baseBright = idle
       ? 0.14 + 0.05 * (0.5 + 0.5 * Math.sin(elapsed * 0.6))
@@ -470,6 +486,9 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     },
     get beaconIntensity() {
       return beaconIntensityValue;
+    },
+    get pulsePosition() {
+      return travelPhase - Math.floor(travelPhase);
     },
     traceryInstances: TRACERY_COUNT,
     update,

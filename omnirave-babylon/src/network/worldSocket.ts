@@ -54,6 +54,13 @@ export interface ZoneEventState {
   countdownSeconds?: number;
   recoverySeconds?: number;
   activeMinute?: number;
+  // The schedule itself (see event_schedule.go): the active start in the
+  // current hour (Unix ms), the cycle length, and the lead-in and active
+  // lengths in seconds. Absent from an older server.
+  activeStartMs?: number;
+  periodSeconds?: number;
+  leadInSeconds?: number;
+  activeSeconds?: number;
 }
 
 export interface WorldSnapshot {
