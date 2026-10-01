@@ -82,8 +82,9 @@ body,
 }
 
 .hud-controls--top-left {
-  left: 24px;
-  top: 24px;
+  /* Flush with the corner, like every player HUD block (owner's call). */
+  left: 0;
+  top: 0;
   align-items: flex-start;
 }
 
@@ -97,8 +98,8 @@ body,
 }
 
 .hud-controls--top-right {
-  right: 24px;
-  top: 24px;
+  right: 0;
+  top: 0;
   align-items: flex-end;
 }
 
@@ -491,8 +492,9 @@ body,
 
 .hud-notice {
   position: absolute;
-  right: 24px;
-  top: 76px;
+  /* Flush right, just under the top-right buttons. */
+  right: 0;
+  top: 44px;
   z-index: 5;
   max-width: 260px;
   margin: 0;
@@ -837,8 +839,8 @@ body,
    perf pill when the debug chrome is on screen. */
 .player-hud {
   position: absolute;
-  right: 24px;
-  bottom: 24px;
+  right: 0;
+  bottom: 0;
   z-index: 4;
   min-width: 190px;
   max-width: 320px;
@@ -901,13 +903,13 @@ body,
   display: none;
 }
 
-/* Sprint stamina bar (sec 9.4 bottom-center, sec 7.4). Sits above dead
-   center-bottom so a future emote bar can dock at the true bottom edge
-   without overlapping this one. */
+/* Sprint stamina bar (sec 9.4 bottom-center, sec 7.4), flush with the bottom
+   edge. The emote bar that would dock under it is not built at present; if
+   it returns, it needs its own place. */
 .stamina-bar {
   position: absolute;
   left: 50%;
-  bottom: 96px;
+  bottom: 0;
   transform: translateX(-50%);
   z-index: 4;
   width: 220px;
@@ -1264,8 +1266,8 @@ body,
    lifts above it exactly like the venue block clears the perf pill. */
 .chat-panel {
   position: absolute;
-  left: 24px;
-  bottom: 24px;
+  left: 0;
+  bottom: 0;
   z-index: 5;
   display: flex;
   flex-direction: column;
