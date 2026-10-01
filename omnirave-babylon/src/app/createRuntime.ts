@@ -196,6 +196,10 @@ async function createBabylonEngine(canvas: HTMLCanvasElement, forceWebGl: boolea
   return createWebGlEngine(canvas);
 }
 
+// The longest the loading card waits for the venue's GPU programs after the
+// first frame (see the render loop).
+const VENUE_READY_CAP_MS = 20_000;
+
 export async function createRuntime(host: HTMLElement) {
   markBootPhase('runtime');
   let canvas = document.createElement('canvas');
@@ -1574,6 +1578,7 @@ export async function createRuntime(host: HTMLElement) {
     }
     markBootPhase('render_ready');
     let firstFrame = true;
+    let firstFrameAt = 0;
 
     activeEngine.runRenderLoop(() => {
       if (firstFrame) markBootPhase('frame_started');
@@ -1592,10 +1597,24 @@ export async function createRuntime(host: HTMLElement) {
       scene.render();
       if (firstFrame) {
         firstFrame = false;
-        // Include the first frame's shader/texture setup in boot timing.
-        // Removing the overlay before render() hid that cost behind a blank canvas.
-        loadingOverlay?.remove();
-        markBootPhase('visible');
+        firstFrameAt = performance.now();
+        markBootPhase('first_frame');
+        const copy = loadingOverlay?.querySelector('.runtime-loading-overlay__copy');
+        if (copy) copy.textContent = 'Preparing the graphics.';
+      }
+      // Babylon draws a mesh only once its GPU program is compiled, so the
+      // first frames show the interface over an empty sky (Firefox) or a
+      // black screen (Safari) while the venue compiles. The loading card
+      // stays until the whole scene is ready, or VENUE_READY_CAP_MS after
+      // the first frame, so one material that never compiles cannot keep a
+      // player out.
+      if (loadingOverlay) {
+        const ready = scene.isReady(false);
+        if (ready || performance.now() - firstFrameAt > VENUE_READY_CAP_MS) {
+          loadingOverlay.remove();
+          loadingOverlay = undefined;
+          markBootPhase('visible', ready ? undefined : 'cap');
+        }
       }
       const renderEnd = measuringFrame ? performance.now() : 0;
       const playerRuntime = scene.metadata?.reviewRuntime;

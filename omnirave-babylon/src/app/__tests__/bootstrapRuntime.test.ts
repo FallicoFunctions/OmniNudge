@@ -156,6 +156,7 @@ describe('createRuntime', () => {
       metadata: {},
       getMeshByName: () => null,
       pick: vi.fn(() => null),
+      isReady: () => true,
       render: vi.fn(),
     };
 
@@ -222,6 +223,7 @@ describe('createRuntime', () => {
       metadata: {},
       getMeshByName: () => null,
       pick: scenePick,
+      isReady: () => true,
       render: vi.fn(),
     };
 
@@ -276,7 +278,7 @@ describe('createRuntime', () => {
     const createScene = vi.fn(async () => {
       // Timing must be enabled before render targets allocate their counters.
       expect(engine.enableGPUTimingMeasurements).toBe(test.timestamps && test.supported);
-      return { metadata: {}, getMeshByName: () => null, pick: vi.fn(() => null), render: vi.fn() };
+      return { metadata: {}, getMeshByName: () => null, pick: vi.fn(() => null), isReady: () => true, render: vi.fn() };
     });
     vi.doMock('../../scene/createMainStageScene', () => ({ createMainStageScene: createScene }));
     const { createRuntime } = await import('../createRuntime');
@@ -310,6 +312,7 @@ describe('createRuntime', () => {
       metadata: {},
       getMeshByName: () => null,
       pick: vi.fn(() => null),
+      isReady: () => true,
       render: vi.fn(() => frameEvents.push('render')),
       textures: [],
     };
@@ -376,6 +379,7 @@ describe('createRuntime', () => {
         metadata: {},
         getMeshByName: () => null,
         pick: vi.fn(() => null),
+        isReady: () => true,
         render: vi.fn(),
       })),
     }));
@@ -448,6 +452,7 @@ describe('createRuntime', () => {
     const scene = {
       getMeshByName: () => null,
       pick: scenePick,
+      isReady: () => true,
       render: sceneRender,
       onAfterRenderObservable: {
         // The runtime defers checkpoint camera application by one frame;
@@ -639,7 +644,7 @@ describe('createRuntime', () => {
     runtime.dispose();
   });
 
-  it('keeps the loading overlay and visible timing pending until the first frame finishes', async () => {
+  it('keeps the loading overlay until the first frame and a ready scene, then marks visible once', async () => {
     const engineDispose = vi.fn();
     const engineRunRenderLoop = vi.fn();
     const engineResize = vi.fn();
@@ -647,8 +652,10 @@ describe('createRuntime', () => {
       metadata: { reviewRuntime: Record<string, never> };
       getMeshByName: () => null;
       pick: ReturnType<typeof vi.fn>;
+      isReady: () => boolean;
       render: ReturnType<typeof vi.fn>;
     }>();
+    let sceneReady = false;
     const showModuleRequested = vi.fn();
     const deferredShowModule = createDeferredPromise<void>();
     vi.doMock('../../scene/createCrownEffects', async importOriginal => {
@@ -690,6 +697,7 @@ describe('createRuntime', () => {
       metadata: { reviewRuntime: {} },
       getMeshByName: () => null,
       pick: vi.fn(() => null),
+      isReady: () => sceneReady,
       render: vi.fn(),
     });
     deferredShowModule.resolve();
@@ -701,13 +709,64 @@ describe('createRuntime', () => {
     expect(mark).toHaveBeenCalledWith('render_ready');
     expect(mark).not.toHaveBeenCalledWith('visible');
     const renderFrame = engineRunRenderLoop.mock.calls[0][0] as () => void;
+    // The first frame drew, but the venue's GPU programs are still compiling.
+    renderFrame();
+    expect(mark).toHaveBeenCalledWith('first_frame');
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    expect(host.textContent).toContain('Preparing the graphics.');
+    expect(mark).not.toHaveBeenCalledWith('visible', undefined);
+    renderFrame();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    sceneReady = true;
     renderFrame();
     expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
-    expect(mark).toHaveBeenCalledWith('visible');
+    expect(mark).toHaveBeenCalledWith('visible', undefined);
     renderFrame();
     expect(mark.mock.calls.filter(([phase]) => phase === 'visible')).toHaveLength(1);
     expect(engineDispose).not.toHaveBeenCalled();
 
+    runtime.dispose();
+    mark.mockRestore();
+  });
+
+  it('removes the loading overlay at the cap when the scene never becomes ready', async () => {
+    const engineRunRenderLoop = vi.fn();
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({
+      Engine: constructible(() => ({
+        dispose: vi.fn(),
+        getDeltaTime: vi.fn(() => 16),
+        getHardwareScalingLevel: vi.fn(() => 1),
+        onDisposeObservable: { addOnce: vi.fn() },
+        runRenderLoop: engineRunRenderLoop,
+        resize: vi.fn(),
+        setHardwareScalingLevel: vi.fn(),
+      })),
+    }));
+    vi.doMock('../../scene/createMainStageScene', () => ({
+      createMainStageScene: vi.fn(async () => ({
+        metadata: { reviewRuntime: {} }, getMeshByName: () => null, pick: vi.fn(() => null),
+        isReady: () => false, render: vi.fn(),
+      })),
+    }));
+    const bootTiming = await import('../bootTiming');
+    const mark = vi.spyOn(bootTiming, 'markBootPhase').mockImplementation(() => {});
+    const { createRuntime } = await import('../createRuntime');
+    const host = document.createElement('div');
+    const runtime = await createRuntime(host);
+    const renderFrame = engineRunRenderLoop.mock.calls[0][0] as () => void;
+    let now = 1_000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+
+    renderFrame();
+    now += 19_000;
+    renderFrame();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).not.toBeNull();
+    now += 2_000; // past the 20 s cap
+    renderFrame();
+    expect(host.querySelector('[data-testid="runtime-loading-overlay"]')).toBeNull();
+    expect(mark).toHaveBeenCalledWith('visible', 'cap');
+
+    clock.mockRestore();
     runtime.dispose();
     mark.mockRestore();
   });
@@ -756,6 +815,7 @@ describe('createRuntime', () => {
       metadata: {},
       getMeshByName: () => null,
       pick: scenePick,
+      isReady: () => true,
       render: vi.fn(),
     };
 
