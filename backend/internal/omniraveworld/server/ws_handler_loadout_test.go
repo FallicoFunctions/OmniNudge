@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -51,19 +52,16 @@ func TestWSHandler_LoadoutEventPublishesAvatarToOtherConnections(t *testing.T) {
 		},
 	}))
 
-	_ = secondConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	var broadcast map[string]any
-	require.NoError(t, secondConn.ReadJSON(&broadcast))
-	require.Equal(t, "world_snapshot", broadcast["type"])
-	require.Equal(t, map[string]any{
-		"av": "1",
-		"bb": "f",
-		"ht": "68",
-		"tp": "mesh-neon",
-		"cv": "1",
-		"cp": "female",
-		"cw": "010111",
-	}, playerLoadoutForID(t, broadcast, "guest-1"))
+	wantLoadout := map[string]any{
+		"av": "1", "bb": "f", "ht": "68", "tp": "mesh-neon",
+		"cv": "1", "cp": "female", "cw": "010111",
+	}
+	// A join or periodic snapshot may already be queued before the loadout
+	// event is processed. Wait for the published state under one deadline.
+	broadcast := readWorldSnapshotUntil(t, secondConn, func(snapshot map[string]any) bool {
+		return reflect.DeepEqual(wantLoadout, playerLoadoutForID(t, snapshot, "guest-1"))
+	})
+	require.Equal(t, wantLoadout, playerLoadoutForID(t, broadcast, "guest-1"))
 
 	// The sender's own world state carries the same avatar it published.
 	require.Equal(t, world.Loadout{"av": "1", "bb": "f", "ht": "68", "tp": "mesh-neon", "cv": "1", "cp": "female", "cw": "010111"}, worldState.Player("guest-1").Loadout)

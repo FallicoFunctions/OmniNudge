@@ -14,16 +14,21 @@ function contents(repository, filename, sha) {
   return Buffer.from(file.content, 'base64').toString('utf8');
 }
 
-const REBASE_MARKER = '<!-- dependabot-automerge-rebase -->';
+function rebaseMarker(pr) { return `<!-- dependabot-automerge-rebase:${pr.head.sha} -->`; }
 
 function requestRebase(repository, pr) {
+  const marker = rebaseMarker(pr);
+  if (process.env.DEPENDABOT_DRY_RUN === '1') {
+    console.log(`#${pr.number}: would request Dependabot rebase`);
+    return;
+  }
   const comments = pages(`repos/${repository}/issues/${pr.number}/comments?per_page=100`);
-  if (comments.some(comment => typeof comment.body === 'string' && comment.body.includes(REBASE_MARKER))) {
+  if (comments.some(comment => typeof comment.body === 'string' && comment.body.includes(marker))) {
     console.log(`#${pr.number}: waiting for Dependabot's requested rebase`);
     return;
   }
   execFileSync('gh', ['pr', 'comment', String(pr.number), '--repo', repository,
-    '--body', `${REBASE_MARKER}\n@dependabot rebase`], { stdio: 'inherit' });
+    '--body', `${marker}\n@dependabot rebase`], { stdio: 'inherit' });
   console.log(`#${pr.number}: requested Dependabot rebase`);
 }
 
@@ -39,24 +44,25 @@ function run(repository) {
       if (!trustedPullRequest(pr, repository) || !trustedChanges(pr, files, commits)) {
         console.log(`#${pr.number}: requires review (identity or changed files)`); continue;
       }
-      const comparison = api(`repos/${repository}/compare/${pr.base.sha}...${pr.head.sha}`);
+      const mainSha = api(`repos/${repository}/git/ref/heads/main`).object.sha;
+      const comparison = api(`repos/${repository}/compare/${mainSha}...${pr.head.sha}`);
       const base = comparison.merge_base_commit.sha;
       const compatible = files.every(file => compatibleManifest(file.filename,
         contents(repository, file.filename, base), contents(repository, file.filename, pr.head.sha)));
       if (!compatible) {
         console.log(`#${pr.number}: requires review (major or manifest configuration change)`); continue;
       }
-      const { statusCheckRollup: checks } = gh(['pr', 'view', String(pr.number), '--repo', repository,
-        '--json', 'statusCheckRollup']);
-      if (!checksPassed(checks)) { console.log(`#${pr.number}: waiting for all checks`); continue; }
-      // Strict protection would leave otherwise green updates perpetually
-      // behind main. Ask Dependabot to refresh the branch once, then let the
-      // next workflow run validate the new head and checks.
+      // Rebase against the current default-branch ref, which can advance before
+      // GitHub refreshes the pull request's cached base SHA. Stale check failures
+      // must not prevent refreshing the branch and validating it again.
       if (comparison.behind_by > 0) {
         requestRebase(repository, pr); continue;
       }
+      const { statusCheckRollup: checks } = gh(['pr', 'view', String(pr.number), '--repo', repository,
+        '--json', 'statusCheckRollup']);
+      if (!checksPassed(checks)) { console.log(`#${pr.number}: waiting for all checks`); continue; }
       const fresh = api(`repos/${repository}/pulls/${pr.number}`);
-      if (!trustedPullRequest(fresh, repository) || fresh.head.sha !== pr.head.sha || fresh.base.sha !== pr.base.sha) {
+      if (!trustedPullRequest(fresh, repository) || fresh.head.sha !== pr.head.sha || api(`repos/${repository}/git/ref/heads/main`).object.sha !== mainSha) {
         console.log(`#${pr.number}: changed during validation; retry next run`); continue;
       }
       if (process.env.DEPENDABOT_DRY_RUN === '1') {

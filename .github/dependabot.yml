@@ -33,8 +33,8 @@ updates:
       interval: daily
     # Major action upgrades can change runner behavior and security semantics
     # (for example checkout's pull-request safety defaults). Keep them out of
-    # the unattended queue; minor, patch, and security updates are validated and
-    # merged by the repository policy workflow.
+    # the unattended queue; minor, patch, and security updates still open PRs
+    # for review because workflow edits require explicit validation.
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
