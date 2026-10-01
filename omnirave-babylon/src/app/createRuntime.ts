@@ -380,7 +380,8 @@ export async function createRuntime(host: HTMLElement) {
   let authPopup: import('../ui/createAuthPopup').AuthPopup | undefined;
   // A guest pressed Join on a show queue and got the sign-up window: the
   // queue to join once the account's own world session is connected (its
-  // player id is set when the sign-up or log-in succeeds).
+  // player id is set when the sign-up or log-in succeeds). Every other way of
+  // opening the window clears it, so closing it needs nothing here.
   let joinAfterSignIn: { panel: import('../showControl/showTypes').PanelName; playerId?: string } | undefined;
   // Sec 11.2: what the auth window turns into after a successful login/signup.
   let welcomeCard: import('../ui/createWelcomeCard').WelcomeCard | undefined;
@@ -1362,8 +1363,6 @@ export async function createRuntime(host: HTMLElement) {
           // survives walking away. Sec 12's "stays closed until they leave
           // the radius and return" is the GATE's own re-arm, not this flag.
           vipGateOpenedAuthPopup = false;
-          // Closed without signing up: no queue join afterwards.
-          joinAfterSignIn = undefined;
         },
         async onSubmit(mode, fields) {
           const action = ++authActionRevision;
