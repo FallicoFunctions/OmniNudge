@@ -64,7 +64,8 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   function buildBoard(){
     grid.replaceChildren();side.replaceChildren();tiles.clear();bankButtons.clear();multi=launch=undefined;selection=undefined;
     if(!panel||!turn)return;
-    title.textContent=`${label(panel)} · ${preparing?'Prepare':'Live'}`;exit.textContent=preparing?'Leave queue':'End turn';
+    title.hidden=panel==='fireworks';
+    title.textContent=panel==='fireworks'?'':`${label(panel)} · ${preparing?'Prepare':'Live'}`;exit.textContent=preparing?'Leave queue':'End turn';
     board.dataset.panel=panel;
     const items=panel==='fireworks'?FIREWORK_CATALOGUE.map(f=>({id:f.id,name:f.name,description:f.description})):SHOW_RULES.drones.map(d=>({id:d.id,name:label(d.id),description:`${label(d.id)} movement`}));
     for(const item of items){
