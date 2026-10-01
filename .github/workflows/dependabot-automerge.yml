@@ -1,0 +1,37 @@
+name: Dependabot auto-merge
+
+on:
+  workflow_run:
+    workflows: ['CI', 'Security Scan', 'Performance Budget Check', 'i18n Verify']
+    types: [completed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # This privileged workflow only runs our default-branch policy. Never
+      # check out PR code, install its packages or consume its artifacts here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Merge validated dependency updates
+        run: node .github/scripts/dependabot-automerge.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}

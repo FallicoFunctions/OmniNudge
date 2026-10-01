@@ -905,7 +905,7 @@ export default function RedditPage() {
       return merged;
     };
 
-    let merged: CrosspostSource[] = [];
+    let merged: CrosspostSource[];
 
     if (sort === 'hot') {
       const stickiedPosts = redditItems.filter((item) => item.post.stickied);

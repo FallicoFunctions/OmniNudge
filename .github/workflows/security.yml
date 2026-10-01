@@ -95,4 +95,4 @@ jobs:
         run: npm ci
       - name: Audit all dependencies
         working-directory: frontend
-        run: npm audit --all --audit-level=high
+        run: npm audit --all --audit-level=low

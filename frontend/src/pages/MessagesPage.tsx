@@ -1318,7 +1318,7 @@ export default function MessagesPage() {
           );
         }
 
-        let plaintext = '';
+        let plaintext: string;
         if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
           const encryptedKey = message.recipient_keys[user.id];
           if (!encryptedKey) {
