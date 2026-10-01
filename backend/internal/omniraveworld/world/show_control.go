@@ -543,6 +543,11 @@ func (w *World) ApplyShowCommand(playerID string, session *Player, c ShowCommand
 		}
 		switch c.Action {
 		case "join":
+			// The fireworks and drone queues are for accounts; the client
+			// offers a guest the sign-up window instead of sending this.
+			if session.Mode == SessionModeGuest {
+				return "Sign up or log in to join a queue."
+			}
 			for _, other := range []*ShowPanel{&s.Fireworks, &s.Drones} {
 				if other.Active != nil && other.Active.PlayerID == playerID || other.Preparing != nil && other.Preparing.PlayerID == playerID || slices.ContainsFunc(other.Queue, func(q ShowQueueEntry) bool { return q.PlayerID == playerID }) {
 					return "You already have a place or a turn."

@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/gorilla/websocket"
+	omnigamemodel "github.com/omninudge/backend/internal/omnigame/model"
 	"github.com/omninudge/backend/internal/omniraveworld/world"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,9 @@ func TestWSHandlerLateJoinOpensPreparationAndStartsOnTime(t *testing.T) {
 	h.setNow(func() time.Time { return time.UnixMilli(at.Load()) })
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	c, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(srv.URL, newGuestWorldSessionToken(t, auth, "late", "Late", nil), ""), worldDialHeader("http://127.0.0.1:4175"))
+	// The queues are for accounts.
+	token := newWorldSessionTokenWithMode(t, auth, "late", "Late", "account", omnigamemodel.SubjectKindAccount)
+	c, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(srv.URL, token, ""), worldDialHeader("http://127.0.0.1:4175"))
 	require.NoError(t, err)
 	defer func() { _ = c.Close() }()
 	readState := func() *world.ShowState {
@@ -76,4 +79,46 @@ func TestWSHandlerLateJoinOpensPreparationAndStartsOnTime(t *testing.T) {
 	require.Equal(t, prepared.Fireworks.Preparing.ID, live.Fireworks.Active.ID)
 	require.Equal(t, int64(150000), live.Fireworks.Active.EndsAt-live.Fireworks.Active.StartsAt)
 	require.Empty(t, live.Fireworks.Queue)
+}
+
+func TestWSHandlerShowControlRefusesAGuestJoin(t *testing.T) {
+	w := world.NewWorld(world.DefaultConfig())
+	auth := services.NewAuthService("review-only-not-production-secret", "OmniRaveWorld/1.0", "")
+	h := NewWSHandler(w, world.NewMediaState(), auth, []string{"http://127.0.0.1:4175"})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	c, _, err := websocket.DefaultDialer.Dial(buildWorldWSURL(srv.URL, newGuestWorldSessionToken(t, auth, "guest", "Guest", nil), ""), worldDialHeader("http://127.0.0.1:4175"))
+	require.NoError(t, err)
+	defer func() { _ = c.Close() }()
+	var initial map[string]any
+	require.NoError(t, c.ReadJSON(&initial))
+	require.NoError(t, c.WriteJSON(world.ClientEvent{Type: "show_control", Show: &world.ShowCommand{RequestID: "guest-join", Panel: "drones", Action: "join"}}))
+	require.NoError(t, c.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var reply map[string]any
+		require.NoError(t, c.ReadJSON(&reply))
+		if reply["type"] != "show_result" {
+			continue
+		}
+		r := reply["result"].(map[string]any)
+		require.Equal(t, "guest-join", r["requestId"])
+		require.Equal(t, false, r["ok"])
+		require.Equal(t, "Sign up or log in to join a queue.", r["message"])
+		break
+	}
+	// The snapshot after the command: the guest is not in the line.
+	for {
+		var frame struct {
+			Type  string           `json:"type"`
+			State *world.ShowState `json:"showControl"`
+		}
+		require.NoError(t, c.ReadJSON(&frame))
+		if frame.Type != "world_snapshot" {
+			continue
+		}
+		require.NotNil(t, frame.State)
+		require.Empty(t, frame.State.Drones.Queue)
+		require.Nil(t, frame.State.Drones.Preparing)
+		break
+	}
 }
