@@ -59,3 +59,16 @@ it('invalidates title changes, event transitions and every pulsing countdown fra
   visualizer.update(.1); visualizer.update(.1);
   expect(upload).toHaveBeenCalledTimes(6);
 });
+
+it('fades the wordmark on the shared show clock, not on this page\'s own time', () => {
+  const upload = vi.spyOn(DynamicTexture.prototype, 'update').mockImplementation(() => {});
+  let show = 7.8; // the blank part of the 24 s wordmark cycle
+  const visualizer = createStageVisualizer(scene, { getFrequencyData: target => target.fill(0), getShowSeconds: () => show });
+  visualizer.update(.1);
+  upload.mockClear();
+  show = 7.9; visualizer.update(.1);
+  expect(upload).not.toHaveBeenCalled();
+  show = 24.3; visualizer.update(.1); // the next fade, at the same moment for everyone
+  show = 24.4; visualizer.update(.1);
+  expect(upload).toHaveBeenCalledTimes(2);
+});

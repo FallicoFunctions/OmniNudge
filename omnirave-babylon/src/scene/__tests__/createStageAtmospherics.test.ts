@@ -268,4 +268,35 @@ describe('createStageAtmospherics', () => {
     expect(nozzleAfter(3)).toEqual(late);
     expect(nozzleAfter(5)).toEqual(late);
   });
+
+  it('starts the flame cascade at the mount the track kick count names, whatever this page fired before', () => {
+    const firstMountAfter = (earlierArms: number) => {
+      const own = new Scene(engine);
+      MeshBuilder.CreatePlane('main-stage-hero-screen-panel-l', { size: 1 }, own);
+      const beat = createStageBeat();
+      const atmo = createStageAtmospherics(own, { getFrequencyData: loudSource, getBeat: () => beat });
+      const kick = (count: number) => {
+        beat.kick = true; beat.bass = 1; beat.kickCount = count;
+        atmo.update(0.05);
+        beat.kick = false; beat.bass = 0;
+      };
+      // This page's own history: earlier flame phrases, each long cooled.
+      for (let k = 1; k <= earlierArms; k++) {
+        kick(32 * k);
+        for (let i = 0; i < 120; i++) atmo.update(0.05);
+      }
+      kick(32 * 7 + 3 * 32);
+      const fired = own.particleSystems
+        .filter((system) => system.name.startsWith('stage-atmo-flame-') && system.emitRate > 0)
+        .map((system) => system.name);
+      atmo.dispose();
+      own.dispose();
+      return fired;
+    };
+    const late = firstMountAfter(0);
+    expect(late).toHaveLength(1);
+    expect(firstMountAfter(1)).toEqual(late);
+    expect(firstMountAfter(2)).toEqual(late);
+  });
 });
+

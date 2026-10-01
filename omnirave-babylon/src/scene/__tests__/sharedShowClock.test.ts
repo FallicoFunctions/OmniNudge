@@ -235,6 +235,8 @@ describe('the shared show clock', () => {
     expect(Math.max(...SAMPLES.map((_, s) => largestDifference(late[s].cones, withoutShow[s].cones)))).toBeGreaterThan(0.1);
     expect(Math.max(...SAMPLES.map((_, s) => Math.abs(late[s].pulse - withoutShow[s].pulse)))).toBeGreaterThan(0.05);
     expect(Math.max(...SAMPLES.map((_, s) => Math.abs(late[s].beacon[0] - withoutShow[s].beacon[0])))).toBeGreaterThan(0.1);
+    // The palette jumped when the show started.
+    expect(Math.max(...SAMPLES.map((_, s) => largestDifference(late[s].colour, withoutShow[s].colour)))).toBeGreaterThan(0.05);
     // The show's shorter hologram holds.
     expect(SAMPLES.some((_, s) => late[s].hologram[0] !== withoutShow[s].hologram[0] || late[s].hologram[2] !== withoutShow[s].hologram[2])).toBe(true);
   }, 120_000);

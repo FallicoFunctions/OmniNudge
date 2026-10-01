@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from '../ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from '../ravePalettes';
+import { createStageBeat } from '../../media/trackBeats';
+import { createShowTimeline } from '../../media/showTimeline';
 
 describe('ravePalettes', () => {
   it('exposes the four named festival palettes, each with multiple saturated stops', () => {
@@ -78,3 +80,18 @@ describe('ravePalettes', () => {
     expect(paletteCrossfade(cycle * count + 1, cycle, 2, count).fromIndex).toBe(0);
   });
 });
+
+describe('showPaletteClock', () => {
+  it('reads the track timeline, with a jump at the start of each fireworks show, else the effect\'s own clock', () => {
+    const beat = createStageBeat();
+    expect(showPaletteClock(beat, 7, 22, 2)).toBe(7); // no beat list: the effect's own clock
+    beat.timeline = createShowTimeline(Float32Array.of(1), new Float32Array(160), 0.25, new Float32Array(), new Float32Array());
+    beat.seconds = 4;
+    // The kick at 1 s jumps the track clock to the crossfade at 20.01.
+    expect(showPaletteClock(beat, 7, 22, 2)).toBeCloseTo(23.01, 6);
+    // A show that started at 3.5 s jumps it on to the next crossfade.
+    beat.events = { leadIns: Float64Array.of(), actives: Float64Array.of(3.5, 303.5), activeStarts: Float64Array.of(3.5) };
+    expect(showPaletteClock(beat, 7, 22, 2)).toBeCloseTo(42.51, 6);
+  });
+});
+

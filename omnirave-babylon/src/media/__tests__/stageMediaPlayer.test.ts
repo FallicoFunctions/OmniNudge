@@ -285,6 +285,15 @@ describe('createStageMediaPlayer', () => {
       expect(player.getShowSeconds()).toBe(2003);
     });
 
+    it('gives the server time at position 0 of the track, the same for every player', () => {
+      const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => createFakeBackend() });
+      expect(player.getTrackStartServerMs()).toBeUndefined();
+      player.applyMedia(media({ playheadSeconds: 10 }));
+      expect(player.getTrackStartServerMs()).toBeUndefined(); // no server reading
+      player.applyMedia(media({ playheadSeconds: 10.5, sampledAtMs: 2_000_000 }));
+      expect(player.getTrackStartServerMs()).toBe(1_989_500);
+    });
+
     it('counts from the arrival time before the server clock is known', () => {
       let localMs = 5000;
       const backend = createFakeBackend();
