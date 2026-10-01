@@ -145,7 +145,7 @@ describe('createCrownEffects', () => {
       own.dispose();
       return tilt;
     };
-    expect(Math.abs(tiltAfter(24) - tiltAfter(60))).toBeLessThan(1e-3);
+    expect(Math.abs(tiltAfter(24) - tiltAfter(60))).toBeLessThan(1e-5);
   });
 });
 
