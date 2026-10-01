@@ -5,90 +5,199 @@ const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const { REQUIRED_CHECKS } = require('./dependabot-policy.cjs');
 
-test('merger reaches exact-commit merge only with a fully validated current PR', () => {
-  const repository = 'FallicoFunctions/OmniNudge';
-  const bot = { login: 'dependabot[bot]', id: 49699333, type: 'Bot' };
+const repository = 'FallicoFunctions/OmniNudge';
+const bot = { login: 'dependabot[bot]', id: 49699333, type: 'Bot' };
+const actions = { login: 'github-actions[bot]', id: 41898282, type: 'Bot' };
+const label = 'dependabot-refresh-in-progress';
+function fixture(options = {}) {
   const original = childProcess.execFileSync;
-  let behind = 0, changedHead = false, failure = false, mainSha = 'base', advanceMain = false;
-  let mainReads = 0;
-  const merges = [];
-  const comments = [];
-  let reads = 0;
+  const originalClock = Date.now;
+  const originalExitCode = process.exitCode;
+  const originalDryRun = process.env.DEPENDABOT_DRY_RUN;
+  const observed = { calls: [], comments: [], events: [], merges: [], labels: [], messages: [] };
   const pr = { number: 1, state: 'open', draft: false, user: bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: 'dependabot/pip/image/update', repo: { full_name: repository } },
     base: { sha: 'base', ref: 'main', repo: { full_name: repository } } };
+  Object.defineProperty(pr, 'labels', { enumerable: true, get: () => observed.labels.map(name => ({ name })) });
+  const state = { behind: 0, main: 'base', time: Date.parse('2026-10-01T00:00:00Z'),
+    mainReads: 0, prReads: 0, ...options };
+  Date.now = () => state.time;
   childProcess.execFileSync = (command, args) => {
     assert.equal(command, 'gh');
+    observed.calls.push(args);
+    if (args[0] === 'label') return '';
     if (args[0] === 'pr') {
-      if (args[1] === 'merge') { merges.push(args); return ''; }
-      if (args[1] === 'comment') { comments.push(args); return ''; }
+      if (args[1] === 'merge') { observed.merges.push(args); return ''; }
+      if (args[1] === 'comment') {
+        observed.comments.push({ body: args.at(-1), user: actions, created_at: new Date(state.time).toISOString() });
+        return '';
+      }
       return JSON.stringify({ statusCheckRollup: REQUIRED_CHECKS.map(name => ({ name,
-        status: 'COMPLETED', conclusion: failure ? 'FAILURE' : 'SUCCESS' })) });
+        status: 'COMPLETED', conclusion: state.failure ? 'FAILURE' : 'SUCCESS' })) });
     }
-    const endpoint = args.at(-1);
+    const endpoint = args.find(arg => arg.startsWith('repos/'));
+    const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
     let result;
-    if (endpoint.endsWith('/git/ref/heads/main')) {
-      mainReads++;
-      result = { object: { sha: advanceMain && mainReads % 2 === 0 ? 'new-main' : mainSha } };
+    if (endpoint.includes('/issues?')) {
+      assert.ok(endpoint.includes(`state=closed&labels=${label}`));
+      result = [pr.state === 'closed' && observed.labels.includes(label) ? [{ number: 1, pull_request: {} }] : []];
+    } else if (endpoint.endsWith('/git/ref/heads/main')) {
+      state.mainReads++;
+      result = { object: { sha: state.advanceMain && state.mainReads % 2 === 0 ? 'new-main' : state.main } };
     } else if (endpoint.includes('/contents/')) {
       result = { type: 'file', encoding: 'base64', content: Buffer.from('boto3==1.43.100\n').toString('base64') };
     } else if (endpoint.includes('/compare/')) {
-      assert.equal(endpoint, `repos/${repository}/compare/${mainSha}...${pr.head.sha}`);
-      result = { merge_base_commit: { sha: 'base' }, behind_by: behind };
+      assert.equal(endpoint, `repos/${repository}/compare/${state.main}...${pr.head.sha}`);
+      result = { merge_base_commit: { sha: 'base' }, behind_by: state.behind };
     } else if (endpoint.includes('/files?')) {
       result = [[{ filename: 'infra/runpod/image-worker/requirements.txt', status: 'modified' }]];
     } else if (endpoint.includes('/commits?')) {
       result = [[{ sha: pr.head.sha, author: bot, commit: { verification: { verified: true } } }]];
-    } else if (endpoint.includes('/issues/1/comments?')) {
-      result = [comments.map(args => ({ body: args.at(-1) }))];
+    } else if (endpoint.includes('/comments?')) {
+      result = [observed.comments];
+    } else if (endpoint.includes('/events?')) {
+      result = [observed.events];
+    } else if (endpoint.includes('/labels')) {
+      assert.ok(['POST', 'DELETE'].includes(method));
+      if (method === 'POST') observed.labels.push(label);
+      else observed.labels = [];
+      result = [];
     } else if (endpoint.includes('/pulls?')) {
-      result = [[pr]];
+      result = [pr.state === 'open' ? [pr] : []];
+    } else if (method === 'PATCH') {
+      const next = args.find(arg => arg.startsWith('state=')).split('=')[1];
+      if (next === 'open' && state.failReopen) throw new Error('reopen unavailable');
+      pr.state = next;
+      observed.events.push({ event: next === 'open' ? 'reopened' : 'closed', actor: actions, created_at: new Date(state.time).toISOString() });
+      result = pr;
+      if (next === 'open' && state.lostReopenResponse) throw new Error('lost reopen response');
+      if (next === 'closed' && state.lostCloseResponse) throw new Error('lost close response');
     } else {
-      reads++;
-      result = changedHead && reads % 2 === 0 ? { ...pr, head: { ...pr.head, sha: 'changed' } } : pr;
+      state.prReads++;
+      result = state.changedHead && state.prReads % 2 === 0 ? { ...pr, head: { ...pr.head, sha: 'changed' } } : pr;
     }
     return JSON.stringify(result);
   };
-  try {
-    delete require.cache[require.resolve('./dependabot-automerge.cjs')];
-    const { run } = require('./dependabot-automerge.cjs');
-    run(repository);
-    assert.equal(merges.length, 1);
-    assert.deepEqual(merges[0].slice(-4), ['--auto', '--squash', '--match-head-commit', 'abc']);
-    behind = 1;
-    run(repository);
-    assert.equal(merges.length, 1, 'outdated branches must wait for rebase and new checks');
-    assert.equal(comments.length, 1, 'outdated branches request one Dependabot rebase');
-    run(repository);
-    assert.equal(comments.length, 1, 'outdated branches do not spam rebase requests');
-    failure = true;
-    pr.head.sha = 'rebased';
-    process.env.DEPENDABOT_DRY_RUN = '1';
-    run(repository);
-    assert.equal(comments.length, 1, 'dry runs never post comments');
-    delete process.env.DEPENDABOT_DRY_RUN;
-    // Fixture commits must follow the refreshed bot head.
-    pr.head.sha = 'abc';
-    mainSha = 'advanced';
-    // A cached PR base must not hide that current main has moved.
-    run(repository);
-    assert.equal(comments.length, 1);
-    pr.head.sha = 'rebased';
-    run(repository);
-    assert.equal(comments.length, 2, 'a new stale head requests another rebase even with failed old checks');
-    pr.head.sha = 'abc';
-    behind = 0; failure = true;
-    run(repository);
-    assert.equal(merges.length, 1, 'failed checks must never merge');
-    failure = false; advanceMain = true; mainReads = 0;
-    run(repository);
-    assert.equal(merges.length, 1, 'main advancing during validation must retry');
-    advanceMain = false; changedHead = true; reads = 0;
-    run(repository);
-    assert.equal(merges.length, 1, 'a changed head must be revalidated');
-  } finally {
-    delete process.env.DEPENDABOT_DRY_RUN;
+  delete require.cache[require.resolve('./dependabot-automerge.cjs')];
+  const { run } = require('./dependabot-automerge.cjs');
+  return { pr, state, observed, run: () => run(repository), close: () => {
     childProcess.execFileSync = original;
+    Date.now = originalClock;
+    process.exitCode = originalExitCode;
+    if (originalDryRun === undefined) delete process.env.DEPENDABOT_DRY_RUN;
+    else process.env.DEPENDABOT_DRY_RUN = originalDryRun;
     delete require.cache[require.resolve('./dependabot-automerge.cjs')];
-  }
+  } };
+}
+function withFixture(options, body) {
+  const f = fixture(options);
+  try { body(f); } finally { f.close(); }
+}
+
+test('exact-head merge requires successful checks and unchanged actual main and head', () => {
+  withFixture({}, f => {
+    f.run();
+    assert.deepEqual(f.observed.merges[0].slice(-4), ['--auto', '--squash', '--match-head-commit', 'abc']);
+    f.state.failure = true; f.run();
+    assert.equal(f.observed.merges.length, 1, 'failed checks must never merge');
+    f.state.failure = false; f.state.advanceMain = true; f.state.mainReads = 0; f.run();
+    assert.equal(f.observed.merges.length, 1, 'main advancing during validation must retry');
+    f.state.advanceMain = false; f.state.changedHead = true; f.state.prReads = 0; f.run();
+    assert.equal(f.observed.merges.length, 1, 'a changed head must be revalidated');
+  });
+});
+
+test('stale branches use native close/reopen events, not rejected Dependabot commands', () => {
+  withFixture({ behind: 1, failure: true, main: 'advanced' }, f => {
+    f.run();
+    assert.deepEqual(f.observed.events.map(event => event.event), ['closed', 'reopened']);
+    assert.equal(f.pr.state, 'open');
+    assert.equal(f.observed.merges.length, 0);
+    assert.deepEqual(f.observed.labels, []);
+    assert.equal(f.observed.comments[0].body, '<!-- dependabot-automerge-refresh:abc -->');
+    assert.ok(!f.observed.comments[0].body.includes('@dependabot'));
+    assert.ok(f.observed.calls.filter(args => args.includes('PATCH')).every(args => args.includes(`repos/${repository}/pulls/1`)));
+    f.run();
+    assert.equal(f.observed.events.length, 2, 'wait for a pending refresh');
+    f.pr.head.sha = 'rebased'; f.run();
+    assert.equal(f.observed.events.length, 4, 'a new stale head can refresh again');
+  });
+});
+
+test('a stalled native refresh retries after the bounded wait', () => {
+  withFixture({ behind: 1 }, f => {
+    f.run(); f.state.time += 30 * 60 * 1000 - 1; f.run();
+    assert.equal(f.observed.events.length, 2);
+    f.state.time++; f.run();
+    assert.equal(f.observed.events.length, 4, 'retry instead of waiting indefinitely');
+  });
+});
+
+test('a lost close response still reopens the PR and reports failure', () => {
+  withFixture({ behind: 1, lostCloseResponse: true }, f => {
+    f.run();
+    assert.equal(f.pr.state, 'open', 'finally must recover a close that reached GitHub');
+    assert.equal(process.exitCode, 1);
+    assert.deepEqual(f.observed.events.map(event => event.event), ['closed', 'reopened']);
+  });
+});
+
+test('interrupted refreshes recover next run; intentional human closures remain closed', () => {
+  withFixture({ behind: 1, failReopen: true }, f => {
+    f.run();
+    assert.equal(f.pr.state, 'closed');
+    assert.ok(f.observed.labels.includes(label));
+    assert.equal(process.exitCode, 1, 'reopen errors must reach workflow exit');
+    f.state.failReopen = false; f.run();
+    assert.equal(f.pr.state, 'open', 'closed recovery must discover marked PRs');
+    assert.deepEqual(f.observed.labels, []);
+  });
+  withFixture({ behind: 1, failReopen: true }, f => {
+    f.run(); f.state.failReopen = false;
+    f.observed.events.at(-1).actor = { login: 'owner', id: 123, type: 'User' };
+    f.run();
+    assert.equal(f.pr.state, 'closed', 'a human closure must never be undone');
+  });
+});
+
+test('unauthenticated markers and closed recovery dry runs never cause writes', () => {
+  withFixture({ behind: 1 }, f => {
+    f.observed.comments.push({ body: '<!-- dependabot-automerge-refresh:abc -->', user: { ...actions, id: 1 }, created_at: new Date(f.state.time).toISOString() });
+    f.observed.events.push({ event: 'reopened', actor: actions, created_at: new Date(f.state.time).toISOString() });
+    f.run();
+    assert.equal(f.observed.events.length, 3, 'a forged marker cannot suppress a refresh');
+    f.pr.state = 'closed'; f.observed.labels.push(label);
+    f.observed.events.push({ event: 'closed', actor: actions, created_at: new Date(f.state.time).toISOString() });
+    process.env.DEPENDABOT_DRY_RUN = '1';
+    const count = f.observed.calls.length; f.run();
+    assert.ok(f.observed.calls.slice(count).every(args => args[0] === 'api' && !args.includes('--method')));
+    assert.equal(f.pr.state, 'closed');
+  });
+  withFixture({ behind: 1 }, f => {
+    process.env.DEPENDABOT_DRY_RUN = '1'; f.run();
+    assert.equal(f.observed.comments.length, 0);
+    assert.equal(f.observed.events.length, 0);
+    assert.equal(f.observed.merges.length, 0);
+  });
+});
+
+test('a head change before refresh prevents closing the new head', () => {
+  withFixture({ behind: 1, changedHead: true }, f => {
+    f.run();
+    assert.equal(f.observed.events.length, 0);
+    assert.equal(f.observed.comments.length, 0);
+  });
+});
+
+
+test('a lost reopen response leaves the PR open and next run clears orphan bookkeeping', () => {
+  withFixture({ behind: 1, lostReopenResponse: true }, f => {
+    f.run();
+    assert.equal(f.pr.state, 'open');
+    assert.deepEqual(f.observed.labels, [label]);
+    assert.equal(process.exitCode, 1);
+    f.state.lostReopenResponse = false; f.run();
+    assert.deepEqual(f.observed.labels, [], 'open recovery labels cannot linger indefinitely');
+    assert.equal(f.observed.events.length, 2, 'do not close a branch whose refresh is already pending');
+  });
 });

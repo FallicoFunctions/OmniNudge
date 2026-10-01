@@ -122,4 +122,4 @@ function checksPassed(checks) {
       && ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion));
 }
 
-module.exports = { REQUIRED_CHECKS, trustedPullRequest, trustedChanges, compatibleVersion, compatibleManifest, checksPassed };
+module.exports = { DEPENDENCY_FILES: FILES, REQUIRED_CHECKS, trustedPullRequest, trustedChanges, compatibleVersion, compatibleManifest, checksPassed };
