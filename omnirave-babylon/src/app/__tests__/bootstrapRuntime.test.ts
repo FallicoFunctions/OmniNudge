@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockShowControlRuntime } from './mockShowControlRuntime';
 
+let displayTargetFps = 60;
+const disposeDisplayRefresh = vi.fn();
+
 // Vitest 5 cannot call a mock built on an arrow function with `new`, and the
 // runtime constructs Babylon's engines and the browser's Audio with `new`. A
 // regular function can be constructed, returns what make() returns, and the
@@ -112,6 +115,10 @@ describe('createRuntime', () => {
     delete window.__OMNIRAVE_RUNTIME__;
     vi.resetModules();
     vi.clearAllMocks();
+    displayTargetFps = 60;
+    vi.doMock('../displayRefreshRate', () => ({
+      createDisplayRefreshMonitor: () => ({ get targetFps() { return displayTargetFps; }, dispose: disposeDisplayRefresh }),
+    }));
     vi.doUnmock('../createRuntime');
     vi.doUnmock('../../scene/createMainStageScene');
     vi.doUnmock('@babylonjs/core/Engines/engine');
@@ -124,7 +131,10 @@ describe('createRuntime', () => {
     window.history.replaceState(null, '', '/?debug=1');
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Failed boots can leave preloaded modules in flight. Drain them before
+    // the next test resets the module cache and replaces its engine/scene.
+    await vi.dynamicImportSettled();
     window.history.replaceState(null, '', '/');
     vi.useRealTimers();
     vi.doUnmock('../../scene/createCrownEffects');
@@ -273,6 +283,7 @@ describe('createRuntime', () => {
     expect(engineDispose).toHaveBeenCalledTimes(1);
     expect(window.__OMNIRAVE_RUNTIME__).toBeUndefined();
     expect(host.children).toHaveLength(0);
+    expect(disposeDisplayRefresh).toHaveBeenCalledTimes(1);
 
     window.dispatchEvent(new Event('resize'));
     canvas.dispatchEvent(new MouseEvent('click'));
@@ -314,13 +325,15 @@ describe('createRuntime', () => {
     runtime.dispose();
   });
 
-  it('applies adaptive resolution before the next render instead of invalidating the submitted WebGPU frame', async () => {
+  it.each([{ target: 60, fps: 30 }, { target: 120, fps: 80 }, { target: 144, fps: 90 }, { target: 240, fps: 120 }])('adapts for $target Hz before the next render without invalidating the submitted frame', async ({ target, fps }) => {
+    displayTargetFps = target;
     const frameEvents: string[] = [];
     let renderFrame: (() => void) | undefined;
     const setHardwareScalingLevel = vi.fn(() => frameEvents.push('scale'));
     const engine = {
       dispose: vi.fn(),
-      getFps: vi.fn(() => 30),
+      maxFPS: 60 as number | undefined,
+      getFps: vi.fn(() => fps),
       getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1 / 1.5),
       onDisposeObservable: { addOnce: vi.fn() },
@@ -355,6 +368,7 @@ describe('createRuntime', () => {
     const { createRuntime } = await import('../createRuntime');
     const runtime = await createRuntime(document.createElement('div'));
 
+    expect(engine.maxFPS).toBeUndefined();
     expect(renderFrame).toBeTypeOf('function');
     // The controller reads the clock every 30 frames: low FPS first seen at 0,
     // still low 2 s later, so the next frame must scale before it renders.
@@ -373,6 +387,7 @@ describe('createRuntime', () => {
     expect(frameEvents.slice(0, 2)).toEqual(['scale', 'render']);
     expect(setHardwareScalingLevel).toHaveBeenCalledTimes(1);
     runtime.dispose();
+    expect(disposeDisplayRefresh).toHaveBeenCalledTimes(1);
     now.mockRestore();
   });
 
@@ -449,6 +464,7 @@ describe('createRuntime', () => {
 
     expect(engineDispose).toHaveBeenCalledTimes(1);
     expect(engineRunRenderLoop).not.toHaveBeenCalled();
+    expect(disposeDisplayRefresh).toHaveBeenCalledTimes(1);
     expect(host.querySelector('canvas[data-testid="babylon-render-canvas"]')).toBeNull();
     expect(host.querySelector('[data-testid="review-hud"]')).toBeNull();
     expect(host.querySelector('[data-testid="perf-overlay"]')).toBeNull();

@@ -4,11 +4,29 @@ import type { AdaptiveResolutionState } from '../adaptiveResolutionMath';
 import {
   ADAPTIVE_RESOLUTION_DEFAULTS,
   createAdaptiveResolutionState,
+  resolveAdaptiveResolutionConfig,
   resolveManualHardwareScalingLevel,
   stepAdaptiveResolution,
 } from '../adaptiveResolutionMath';
 
 const cfg = ADAPTIVE_RESOLUTION_DEFAULTS;
+
+describe('display-aware adaptive resolution', () => {
+  it.each([120, 144, 240])('trades resolution for %s FPS rather than treating 60 FPS as comfortable', target => {
+    const config = resolveAdaptiveResolutionConfig(target);
+    let state = createAdaptiveResolutionState(config);
+    state = stepAdaptiveResolution(state, config, 60, 0);
+    state = stepAdaptiveResolution(state, config, 60, 1600);
+    expect(state.level).toBeCloseTo(config.sharpestLevel + config.stepSize);
+    state = stepAdaptiveResolution(state, config, target, 2000);
+    state = stepAdaptiveResolution(state, config, target, 6100);
+    expect(state.level).toBeCloseTo(config.sharpestLevel);
+  });
+
+  it.each([60, 30, Number.NaN, Infinity])('preserves the 60 FPS defaults for %s', target => {
+    expect(resolveAdaptiveResolutionConfig(target)).toEqual(cfg);
+  });
+});
 
 describe('resolveManualHardwareScalingLevel', () => {
   it('maps the settings slider 1 (lowest detail) .. 10 (highest) across the controller bounds', () => {

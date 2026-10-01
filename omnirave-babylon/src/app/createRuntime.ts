@@ -23,9 +23,11 @@ import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import {
   ADAPTIVE_RESOLUTION_DEFAULTS,
   createAdaptiveResolutionState,
+  resolveAdaptiveResolutionConfig,
   resolveManualHardwareScalingLevel,
   stepAdaptiveResolution,
 } from './adaptiveResolutionMath';
+import { createDisplayRefreshMonitor, type DisplayRefreshMonitor } from './displayRefreshRate';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import type { createMainStageScene } from '../scene/createMainStageScene';
 import { resolveTravelCameraOffsets, TRAVEL_CAMERA_DISTANCE } from '../player/cameraRigMath';
@@ -389,6 +391,7 @@ export async function createRuntime(host: HTMLElement) {
   let hudNotice: import('../ui/createHudNotice').HudNotice | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
   let handleResize: (() => void) | undefined;
+  let displayRefresh: DisplayRefreshMonitor | undefined;
   let disposed = false;
   let worldSocket: import('../network/worldSocket').WorldSocket | undefined;
   // Stops the world token renewal. Owned here, not by the world block, so a
@@ -405,6 +408,7 @@ export async function createRuntime(host: HTMLElement) {
       return;
     }
     disposed = true;
+    displayRefresh?.dispose();
     stopWorldSessionRenewal?.();
     stopWorldSessionRenewal = undefined;
     worldSocket?.dispose();
@@ -460,6 +464,7 @@ export async function createRuntime(host: HTMLElement) {
   };
 
   try {
+    displayRefresh = createDisplayRefreshMonitor();
     loadingOverlay = createRuntimeLoadingOverlay(host);
     markBootPhase('loading_panel');
     const worldConnection = preloadModule((async () => {
@@ -499,6 +504,8 @@ export async function createRuntime(host: HTMLElement) {
       backbufferAntialias: perfFlags.noPost || localDebugParams?.get('backbufferMsaa') === '1',
     });
     const activeEngine = engine;
+    // Render on every browser animation frame, including 120/144/240 Hz.
+    activeEngine.maxFPS = undefined;
     markBootPhase('engine', activeEngine.isWebGPU ? 'webgpu' : 'webgl');
 
     // Cap the effective render density: full retina (2x) quadruples the pixel
@@ -1794,7 +1801,8 @@ export async function createRuntime(host: HTMLElement) {
         // sharp when the GPU can afford it, gracefully coarser when not. Skipped
         // entirely while the player pinned a manual Graphics level (sec 9.6).
         if (graphicsAutoEnabled && !venuePerformance?.isRunning()) {
-          const nextState = stepAdaptiveResolution(adaptiveState, ADAPTIVE_RESOLUTION_DEFAULTS, fps, performance.now());
+          const config = resolveAdaptiveResolutionConfig(displayRefresh?.targetFps ?? 60);
+          const nextState = stepAdaptiveResolution(adaptiveState, config, fps, performance.now());
           if (nextState.level !== adaptiveState.level) {
             pendingHardwareScalingLevel = nextState.level;
           }

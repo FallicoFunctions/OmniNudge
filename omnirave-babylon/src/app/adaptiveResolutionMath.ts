@@ -28,6 +28,15 @@ export const ADAPTIVE_RESOLUTION_DEFAULTS: AdaptiveResolutionConfig = {
   raiseAfterMs: 4000,
 };
 
+export function resolveAdaptiveResolutionConfig(targetFps: number): AdaptiveResolutionConfig {
+  const target = Number.isFinite(targetFps) ? Math.max(60, targetFps) : 60;
+  return {
+    ...ADAPTIVE_RESOLUTION_DEFAULTS,
+    lowerFpsThreshold: target * (45 / 60),
+    raiseFpsThreshold: target * (56 / 60),
+  };
+}
+
 // Manual graphics slider (design doc sec 9.6 `Graphics`: `Auto` plus a manual
 // 1-10 slider on the row below).
 //
