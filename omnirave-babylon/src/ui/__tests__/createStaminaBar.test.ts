@@ -43,4 +43,35 @@ describe('createStaminaBar placement', () => {
     expect(bar.element.style.bottom).toBe('');
     bar.dispose();
   });
+
+  it('follows a panel that grows, and lets go of the window and the panels when disposed', () => {
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(1024);
+    const observed: Element[] = [];
+    let onResize: (() => void) | undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { onResize = callback; }
+      observe(element: Element) { observed.push(element); }
+      disconnect() { disconnect(); }
+    });
+    const chat = document.createElement('div');
+    let chatTop = 1024; // empty at first: nothing under the bar
+    vi.spyOn(chat, 'getBoundingClientRect').mockImplementation(() => box(0, chatTop, 314, 1024) as DOMRect);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return (this.dataset.testid === 'stamina-bar' ? box(265, 1002, 503, 1024) : box(0, 0, 0, 0)) as DOMRect;
+    });
+    const bar = createStaminaBar(document.body, { avoid: () => [chat] });
+    expect(observed).toEqual([chat]);
+    expect(bar.element.style.bottom).toBe('');
+    chatTop = 925; // messages arrive: the panel grows under the bar
+    onResize!();
+    expect(bar.element.style.bottom).toBe('107px');
+    bar.dispose();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    chatTop = 744;
+    window.dispatchEvent(new Event('resize'));
+    expect(bar.element.style.bottom).toBe('107px'); // no longer listening
+    vi.unstubAllGlobals();
+  });
 });
+

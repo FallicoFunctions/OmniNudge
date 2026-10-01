@@ -131,4 +131,21 @@ describe('createCrownEffects', () => {
     expect(effects.crystalIntensity).toBeGreaterThan(settled + 0.5);
     effects.dispose();
   });
+
+  it('tilts the sky beacon into the show by the same amount at any frame rate', () => {
+    const tiltAfter = (fps: number) => {
+      const own = new Scene(engine);
+      MeshBuilder.CreatePlane('main-stage-hero-screen-panel-l', { size: 1 }, own);
+      const effects = createCrownEffects(own, { getFrequencyData: loudSource });
+      for (let i = 0; i < fps * 3; i++) effects.update(1 / fps); // settled
+      effects.setEventState({ phase: 'active' });
+      for (let i = 0; i < fps / 2; i++) effects.update(1 / fps); // half a second into the show
+      const tilt = own.getTransformNodeByName('crown-fx-beacon-pivot')!.rotation.z;
+      effects.dispose();
+      own.dispose();
+      return tilt;
+    };
+    expect(Math.abs(tiltAfter(24) - tiltAfter(60))).toBeLessThan(1e-3);
+  });
 });
+
