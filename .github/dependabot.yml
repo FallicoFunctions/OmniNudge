@@ -146,6 +146,10 @@ updates:
     directory: /infra/avatar-worker
     schedule:
       interval: daily
+    # Match the Python 3.11 base image until that container is migrated.
+    ignore:
+      - dependency-name: numpy
+        versions: ['>=2.5']
     groups:
       avatar-worker-dependencies:
         patterns: ['*']

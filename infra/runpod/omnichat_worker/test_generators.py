@@ -933,7 +933,11 @@ class VideoPreviewTests(unittest.TestCase):
 
         # The input-host allowlist is ambient environment, and another test in
         # this package sets it. Pin it rather than inherit whatever ran first.
-        with patch.dict(os.environ, {"OMNICHAT_INPUT_HOSTS": "storage.googleapis.com"}):
+        with patch.dict(os.environ, {
+            "OMNICHAT_INPUT_HOSTS": "storage.googleapis.com",
+            "OMNICHAT_VIDEO_MAX_FRAMES": "145",
+            "OMNICHAT_VIDEO_FPS": "24",
+        }):
             output = render({
                 "kind": "video",
                 "mode": "image_to_video",
@@ -942,7 +946,7 @@ class VideoPreviewTests(unittest.TestCase):
                 "source_image_url": "https://storage.googleapis.com/omnichat/still.png",
             })
         self.assertIn("she leans in", output)
-        self.assertIn("121 frames at 24fps", output)
+        self.assertIn("145 frames at 24fps", output)
         self.assertIn("clamped to the trained clip length", output)
         self.assertNotIn("photorealistic", output)
 
