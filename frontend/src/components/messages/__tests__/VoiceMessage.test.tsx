@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.mocked(voiceMessagesService.getVoiceMessage).mockResolvedValue(record);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(new Blob(['audio'])))
+    vi.fn(async () => new Response('audio', { headers: { 'Content-Type': 'audio/webm' } }))
   );
 });
 

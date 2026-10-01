@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
+import englishTranslations from '../../public/locales/en.json';
 import { SUPPORTED_LANGUAGES, syncDocumentLanguageAttributes } from './languageUtils';
 
 const isDev = import.meta.env.DEV;
@@ -43,6 +44,10 @@ export const i18nReady: Promise<typeof i18n> = i18n.isInitialized
       .use(LanguageDetector) // Detect user language
       .use(initReactI18next) // Pass i18n instance to react-i18next
       .init({
+        // The fallback locale is needed before the first render. Shipping it
+        // with the app removes a blocking request; other locales stay lazy.
+        resources: { en: { translation: englishTranslations } },
+        partialBundledLanguages: true,
         fallbackLng: 'en',
         supportedLngs: [...SUPPORTED_LANGUAGES],
         nonExplicitSupportedLngs: true,

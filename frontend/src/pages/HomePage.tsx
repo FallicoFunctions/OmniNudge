@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   useQuery,
@@ -12,8 +12,6 @@ import { feedService, type HomeFeedResponse, type RedditPost } from '../services
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { PlatformPost } from '../types/posts';
-import { RedditPostCard } from '../components/reddit/RedditPostCard';
-import { HubPostCard } from '../components/hubs/HubPostCard';
 import { savedService } from '../services/savedService';
 import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
@@ -44,10 +42,29 @@ import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY, FEED_SCOPE_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
-import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
-import { OmniScrollView } from '../components/feed/OmniScrollView';
-import { StandardScroll } from '../components/feed/StandardScroll';
+
+// Post rendering and alternate feed views are not needed to paint the landing
+// page. Load them when there are posts or the user opens the corresponding view.
+const RedditPostCard = lazy(() =>
+  import('../components/reddit/RedditPostCard').then((module) => ({
+    default: module.RedditPostCard,
+  }))
+);
+const HubPostCard = lazy(() =>
+  import('../components/hubs/HubPostCard').then((module) => ({ default: module.HubPostCard }))
+);
+const RedditPostSlideshow = lazy(() =>
+  import('../components/slideshow/RedditPostSlideshow').then((module) => ({
+    default: module.RedditPostSlideshow,
+  }))
+);
+const OmniScrollView = lazy(() =>
+  import('../components/feed/OmniScrollView').then((module) => ({ default: module.OmniScrollView }))
+);
+const StandardScroll = lazy(() =>
+  import('../components/feed/StandardScroll').then((module) => ({ default: module.StandardScroll }))
+);
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
@@ -811,12 +828,20 @@ export default function HomePage() {
 
   // OmniScroll view mode
   if (multiColumnState.viewMode === 'omniscroll') {
-    return <OmniScrollView />;
+    return (
+      <Suspense fallback={<PostCardSkeleton />}>
+        <OmniScrollView />
+      </Suspense>
+    );
   }
 
   // Standard scroll view mode
   if (multiColumnState.viewMode === 'standard-scroll') {
-    return <StandardScroll onClose={() => setViewMode('standard')} />;
+    return (
+      <Suspense fallback={<PostCardSkeleton />}>
+        <StandardScroll onClose={() => setViewMode('standard')} />
+      </Suspense>
+    );
   }
 
   // Standard view mode
@@ -1178,21 +1203,25 @@ export default function HomePage() {
 
               return (
                 <div key={`hub-${post.id}`}>
-                  <HubPostCard
-                    post={post}
-                    useRelativeTime={useRelativeTime}
-                    currentUserId={user?.id}
-                    currentUserRole={user?.role}
-                    hubDisplayTitle={post.hub_display_title ?? null}
-                    isSaved={isSaved}
-                    isSavePending={isSavePending}
-                    isHiding={isHiding}
-                    isDeleting={isDeleting}
-                    onShare={() => handleSharePost(post.id)}
-                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave, post)}
-                    onHide={() => handleHidePost(post)}
-                    onDelete={() => handleDeletePost(post)}
-                  />
+                  <Suspense fallback={<PostCardSkeleton />}>
+                    <HubPostCard
+                      post={post}
+                      useRelativeTime={useRelativeTime}
+                      currentUserId={user?.id}
+                      currentUserRole={user?.role}
+                      hubDisplayTitle={post.hub_display_title ?? null}
+                      isSaved={isSaved}
+                      isSavePending={isSavePending}
+                      isHiding={isHiding}
+                      isDeleting={isDeleting}
+                      onShare={() => handleSharePost(post.id)}
+                      onToggleSave={(shouldSave) =>
+                        handleToggleSavePost(post.id, !shouldSave, post)
+                      }
+                      onHide={() => handleHidePost(post)}
+                      onDelete={() => handleDeletePost(post)}
+                    />
+                  </Suspense>
                 </div>
               );
             }
@@ -1206,20 +1235,22 @@ export default function HomePage() {
 
             return (
               <div key={`reddit-${post.id}`}>
-                <RedditPostCard
-                  post={post}
-                  useRelativeTime={useRelativeTime}
-                  isSaved={isSaved}
-                  isSaveActionPending={isSaveActionPending}
-                  pendingShouldSave={pendingShouldSave}
-                  onShare={() => handleShareRedditPost(post)}
-                  onToggleSave={(shouldSave) =>
-                    toggleSaveRedditPostMutation.mutate({ post, shouldSave })
-                  }
-                  onHide={() => handleHideRedditPost(post)}
-                  onCrosspost={() => handleCrosspostRedditPost(post)}
-                  linkState={originState}
-                />
+                <Suspense fallback={<PostCardSkeleton />}>
+                  <RedditPostCard
+                    post={post}
+                    useRelativeTime={useRelativeTime}
+                    isSaved={isSaved}
+                    isSaveActionPending={isSaveActionPending}
+                    pendingShouldSave={pendingShouldSave}
+                    onShare={() => handleShareRedditPost(post)}
+                    onToggleSave={(shouldSave) =>
+                      toggleSaveRedditPostMutation.mutate({ post, shouldSave })
+                    }
+                    onHide={() => handleHideRedditPost(post)}
+                    onCrosspost={() => handleCrosspostRedditPost(post)}
+                    linkState={originState}
+                  />
+                </Suspense>
               </div>
             );
           })}
@@ -1439,11 +1470,13 @@ export default function HomePage() {
 
       {/* Slideshow */}
       {slideshowOpen && displayedPosts.length > 0 && (
-        <RedditPostSlideshow
-          posts={displayedPosts.map((item) => item.post)}
-          onClose={() => setSlideshowOpen(false)}
-          includeTextPosts={includeTextPostsInSlideshow}
-        />
+        <Suspense fallback={null}>
+          <RedditPostSlideshow
+            posts={displayedPosts.map((item) => item.post)}
+            onClose={() => setSlideshowOpen(false)}
+            includeTextPosts={includeTextPostsInSlideshow}
+          />
+        </Suspense>
       )}
     </div>
   );
