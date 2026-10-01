@@ -1590,6 +1590,14 @@ export async function createRuntime(host: HTMLElement) {
     showControls = createShowControlRuntime({
       host,scene,socket:worldSocket,playerRig:reviewRuntime?.playerRig,
       playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
+      // The fireworks and drone queues are for accounts: a guest who presses
+      // Join gets the sign-up window (with its log-in switch) instead.
+      askForAccount() {
+        if (resolvedSessionMode !== 'guest' || !authPopup) return false;
+        welcomeCard?.dismiss();
+        authPopup.open('signup');
+        return true;
+      },
     });
     if(latestShowSnapshot)showControls.applySnapshot(latestShowSnapshot);
     if (fireworksAudioUnlocked) {
