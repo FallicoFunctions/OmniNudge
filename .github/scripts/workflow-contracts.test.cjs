@@ -2,12 +2,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
+const { readFileSync, existsSync } = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 // CI installs this small parser independently; local hooks reuse the locked
 // frontend dependency, without installing or executing any PR dependencies.
 const { parse } = require(require.resolve('yaml', { paths: [process.env.POLICY_NODE_MODULES || resolve(__dirname, '../../frontend/node_modules')] }));
-const { REQUIRED_CHECKS } = require('./dependabot-policy.cjs');
+const { REQUIRED_CHECKS, DEPENDENCY_FILES } = require('./dependabot-policy.cjs');
 const workflows = resolve(__dirname, '../workflows');
 const read = name => parse(readFileSync(resolve(workflows, name), 'utf8'));
 
@@ -34,4 +35,18 @@ test('privileged merger checks out only main and never installs or runs PR code'
   assert.equal(workflow.permissions.contents, 'write');
   assert.equal(workflow.permissions['pull-requests'], 'write');
   assert.equal(workflow.on.schedule.length, 1);
+});
+
+
+test('every active dependency manifest has Dependabot coverage and a merge policy', () => {
+  const root = resolve(__dirname, '../..');
+  const active = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+    .split('\0').filter(name => /(?:^|\/)(?:package(?:-lock)?\.json|go\.(?:mod|sum)|requirements\.txt)$/.test(name)
+      && existsSync(resolve(root, name)));
+  const files = { npm: ['package.json', 'package-lock.json'], gomod: ['go.mod', 'go.sum'], pip: ['requirements.txt'] };
+  const configured = parse(readFileSync(resolve(root, '.github/dependabot.yml'), 'utf8')).updates
+    .flatMap(update => (files[update['package-ecosystem']] || []).map(name =>
+      `${update.directory.replace(/^\/|\/$/g, '')}/${name}`.replace(/^\//, '')));
+  assert.deepEqual([...new Set(active)].sort(), configured.sort(), 'active manifests must have an update path; archive retired install inputs');
+  assert.deepEqual([...DEPENDENCY_FILES].sort(), [...new Set(active)].sort(), 'merge policy must cover every active dependency file');
 });
