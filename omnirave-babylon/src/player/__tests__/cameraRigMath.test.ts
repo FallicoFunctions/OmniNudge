@@ -54,9 +54,9 @@ describe('resolveZoomState', () => {
     expect(resolveZoomState(500).distance).toBe(140);
   });
 
-  it('fades the shoulder framing as the camera reaches first-person', () => {
+  it('keeps the body opaque over the shoulder and hides it only in first-person', () => {
     expect(resolveZoomState(6).shoulderOpacity).toBe(1);
-    expect(resolveZoomState(2.5).shoulderOpacity).toBeCloseTo(0.45, 5);
+    expect(resolveZoomState(2.5).shoulderOpacity).toBe(1);
     expect(resolveZoomState(0.1).shoulderOpacity).toBe(0);
   });
 });

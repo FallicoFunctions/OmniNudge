@@ -26,6 +26,9 @@ it.each([[false, true], [true, true], [false, false], [true, false]])(
   panels[0].material = foil;
   const top = MeshBuilder.CreateBox('top', {}, scene);
   top.metadata = { gltf: { extras: { avatarSlot: 'top' } } };
+  const iris = new PBRMaterial('Launch female iris', scene);
+  iris.clearCoat.isEnabled = true; iris.clearCoat.intensity = .7;
+  top.material = iris;
   const hair = MeshBuilder.CreateBox('hair', {}, scene);
   hair.metadata = { gltf: { extras: { avatarSlot: 'hair' } } };
   const fibers = new PBRMaterial('PLURR hair strands', scene);
@@ -71,6 +74,10 @@ it.each([[false, true], [true, true], [false, false], [true, false]])(
   expect(foil.allowShaderHotSwapping).toBe(!webgpu);
   expect(top.metadata.avatarSlot).toBe('top');
   expect(fibers.alphaCutOff).toBe(.32);
+  // The clear coat mirrored venue lights as a streak across the pupil.
+  expect(iris.clearCoat.isEnabled).toBe(false);
+  expect(iris.environmentIntensity).toBe(.2);
+  expect(foil.clearCoat.isEnabled).toBe(false);
   expect(fibers.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHATEST);
   avatar.wardrobe!.setVisible('jacket', false);
   expect(panels.every(panel => !panel.isEnabled())).toBe(true);

@@ -26,7 +26,10 @@ export function resolveZoomState(distance: number): ZoomState {
     return {
       distance: clampedDistance,
       mode: 'over_shoulder',
-      shoulderOpacity: 0.45,
+      // Opaque: a partly transparent body draws the layered hair cards with
+      // holes and lets the scene show through the eye whites (player-flagged
+      // 2026-09-30 as invisible hair and a mark through the left eye).
+      shoulderOpacity: 1,
     };
   }
 

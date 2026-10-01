@@ -169,8 +169,11 @@ export function createCompleteAvatarCrowd(scene: Scene) {
       let fullTransmission = fullQualityTransmission || mode === 'full' || actors.length === 0;
       for (const actor of actors) {
         actor.elapsed += Math.max(0, Math.min(deltaSeconds, .2));
-        const desired = mode === 'full' ? 0 : resolveCompleteAvatarDetail(Vector3.Distance(cameraPosition, actor.root.position), actor.detail);
-        if (desired === 0 || actor.detail === 0) fullTransmission = true;
+        const distance = Vector3.Distance(cameraPosition, actor.root.position);
+        const desired = mode === 'full' ? 0 : resolveCompleteAvatarDetail(distance, actor.detail);
+        // Adaptive detail stops at 1 (as in the venue); a close body still
+        // gets full-quality transmission.
+        if (desired === 0 || actor.detail === 0 || distance < 6) fullTransmission = true;
         if (desired !== actor.detail && desired !== actor.pending) void replace(actor, desired);
         else if (desired === actor.detail && actor.pending !== undefined) { actor.revision++; actor.pending = undefined; }
         pose(actor);

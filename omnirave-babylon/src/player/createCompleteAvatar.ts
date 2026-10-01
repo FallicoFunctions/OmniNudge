@@ -102,6 +102,13 @@ export function createCompleteAvatarFromAssets(
         }
         // Shared illumination and film response also work on the venue path.
         material.environmentIntensity = 0.75;
+        // The iris clear coat mirrors the venue's bright lights as a sharp
+        // streak across the pupil (player-flagged 2026-09-30 as a cut through
+        // the eye). Keep the iris's own soft gloss without the mirror layer.
+        if (/\biris$/i.test(material.name)) {
+          material.clearCoat.isEnabled = false;
+          material.environmentIntensity = 0.2;
+        }
         if (/groom fibers|hair strands|fine hair|scalp strands|swept strands/.test(material.name)) {
           material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
           // Retain authored fiber coverage; a low forced threshold turns the

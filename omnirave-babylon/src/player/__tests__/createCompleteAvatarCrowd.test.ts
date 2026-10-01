@@ -90,12 +90,12 @@ it('releases old morph managers when moving from far detail to close detail', as
   }
   const previous = scene.meshes.map(mesh => mesh.morphTargetManager).filter(Boolean);
   pool.update(.1, new Vector3(0, 1, 0));
-  await vi.waitFor(() => expect(pool.stats().detailCounts).toEqual([2, 0, 0]));
+  await vi.waitFor(() => expect(pool.stats().detailCounts).toEqual([0, 2, 0]));
   for (const manager of previous) expect(scene.morphTargetManagers).not.toContain(manager);
   expect(scene.skeletons).toHaveLength(2);
   expect(pool.stats().pending).toBe(0);
   expect(pool.stats().cachedAssets).toBe(4);
-  const close = scene.getMeshByName('0:male.glb-mesh')!;
+  const close = scene.getMeshByName('0:male-lod1.glb-mesh')!;
   expect((close.material as PBRMaterial).iridescence.isEnabled).toBe(true);
   expect((close.material as PBRMaterial).iridescence.maximumThickness).toBe(620);
   expect(close.morphTargetManager!.getTarget(2).influence).toBeGreaterThan(0);
@@ -125,7 +125,7 @@ it('restores transmission quality for a close camera, explicit comparison and an
   expect(background.getSize().width).toBe(512);
   pool.update(.1, near);
   expect(background.getSize().width).toBe(1024); expect(samples).toBe(4);
-  await vi.waitFor(() => expect(pool.stats().detailCounts).toEqual([2, 0, 0]));
+  await vi.waitFor(() => expect(pool.stats().detailCounts).toEqual([0, 2, 0]));
   pool.update(.1, far);
   await vi.waitFor(() => expect(pool.stats().detailCounts).toEqual([0, 0, 2]));
   pool.update(.1, far);
