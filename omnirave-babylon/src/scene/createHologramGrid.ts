@@ -82,6 +82,11 @@ const VOLUME_DEPTH = VOLUME_MAX_Z - VOLUME_MIN_Z; // 32
 const CENTER_X = (VOLUME_MIN_X + VOLUME_MAX_X) / 2; // 0
 const CENTER_Y = (VOLUME_MIN_Y + VOLUME_MAX_Y) / 2; // 28
 const CENTER_Z = (VOLUME_MIN_Z + VOLUME_MAX_Z) / 2; // -46
+// Move the large volume formations toward the stage so their upper, rear
+// points clear the sound-booth canopy. This airspace remains above the line
+// arrays and in front of the stage shell. Text and the celestial crown/orbit
+// already have their own staging and keep their existing positions.
+const VOLUME_FORMATION_STAGE_OFFSET_Z = 12;
 
 // --- DENSITY: the single tunable ------------------------------------------
 // points = round(34/s) * round(20/s) * round(32/s).
@@ -423,7 +428,7 @@ const shapeCube: ShapeFn = (ctx, i, out) => {
   const breathe = 1 + 0.03 * Math.sin(ctx.time * 0.5 + ctx.homeY[i] * 0.2) + 0.05 * ctx.bass;
   out.x = CENTER_X + (ctx.homeX[i] - CENTER_X) * breathe;
   out.y = CENTER_Y + (ctx.homeY[i] - CENTER_Y) * breathe;
-  out.z = CENTER_Z + (ctx.homeZ[i] - CENTER_Z) * breathe;
+  out.z = CENTER_Z + VOLUME_FORMATION_STAGE_OFFSET_Z + (ctx.homeZ[i] - CENTER_Z) * breathe;
   out.w = 1;
   out.hue = (ctx.homeY[i] - VOLUME_MIN_Y) / VOLUME_HEIGHT;
 };
@@ -436,7 +441,7 @@ const shapeSphere: ShapeFn = (ctx, i, out) => {
   const radius = SPHERE_RADIUS * (1 + SPHERE_BASS_SWELL * ctx.bass) * ripple;
   out.x = CENTER_X + ctx.sphereX[i] * radius;
   out.y = CENTER_Y + dy * radius;
-  out.z = CENTER_Z + ctx.sphereZ[i] * radius;
+  out.z = CENTER_Z + VOLUME_FORMATION_STAGE_OFFSET_Z + ctx.sphereZ[i] * radius;
   out.w = 1;
   out.hue = 0.5 + 0.5 * dy;
 };
@@ -450,7 +455,7 @@ const shapeHelix: ShapeFn = (ctx, i, out) => {
   const radius = HELIX_RADIUS * (1 + 0.12 * ctx.mids);
   out.x = CENTER_X + Math.cos(angle) * radius;
   out.y = VOLUME_MIN_Y + 2 + u * (VOLUME_HEIGHT - 4);
-  out.z = CENTER_Z + Math.sin(angle) * radius;
+  out.z = CENTER_Z + VOLUME_FORMATION_STAGE_OFFSET_Z + Math.sin(angle) * radius;
   out.w = 1;
   out.hue = u;
 };
@@ -468,7 +473,7 @@ const shapeWave: ShapeFn = (ctx, i, out) => {
   const layer = ctx.idxY[i] - (ctx.ny - 1) / 2;
   out.x = ctx.homeX[i];
   out.y = height + layer * WAVE_LAYER_GAP;
-  out.z = ctx.homeZ[i];
+  out.z = ctx.homeZ[i] + VOLUME_FORMATION_STAGE_OFFSET_Z;
   const half = ctx.ny > 1 ? (ctx.ny - 1) / 2 : 1;
   out.w = 1 - 0.75 * Math.min(1, Math.abs(layer) / half);
   out.hue = 0.5 + 0.5 * ripple;
@@ -618,7 +623,7 @@ const shapeCylinder: ShapeFn = (ctx,i,out) => {
   const angle=(i%perRing)/perRing*Math.PI*2+ctx.time*.16;
   const radius=12+Math.sin(ring*.4+ctx.time*.65)*.8;
   out.x=CENTER_X+Math.cos(angle)*radius;out.y=CENTER_Y-9+ring/(rings-1)*18;
-  out.z=CENTER_Z+Math.sin(angle)*radius;out.w=1;out.hue=ring/rings;
+  out.z=CENTER_Z+VOLUME_FORMATION_STAGE_OFFSET_Z+Math.sin(angle)*radius;out.w=1;out.hue=ring/rings;
 };
 const SHAPE_ORDER: readonly HologramShapeName[] = ['cube', 'sphere', 'helix', 'wave', 'wordmark'];
 const SHAPE_FNS: Readonly<Record<HologramShapeName, ShapeFn>> = {
