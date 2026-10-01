@@ -43,6 +43,34 @@ function setup(options: CreateChatPanelOptions = {}) {
 }
 
 describe('createChatPanel', () => {
+  it('suppresses chat focus and shortcuts during show control while preserving history, draft and preferences', () => {
+    const onSend = vi.fn(), onOpenChange = vi.fn(), onTextEntryActiveChange = vi.fn();
+    const { panel, input, lines } = setup({ open: false, onSend, onOpenChange, onTextEntryActiveChange });
+    input.value = 'unsent draft';
+    panel.focusInput();
+    expect(panel.isTextEntryActive()).toBe(true);
+    panel.setSuppressed(true);
+    expect(panel.element.hidden).toBe(true);
+    expect(panel.isTextEntryActive()).toBe(false);
+    expect(document.activeElement).not.toBe(input);
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    window.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(false);
+    panel.focusInput();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(document.activeElement).not.toBe(input);
+    expect(onSend).not.toHaveBeenCalled();
+    panel.appendMessage(chat());
+    expect(lines()).toHaveLength(1);
+    panel.setSuppressed(false);
+    expect(panel.element.hidden).toBe(false);
+    expect(panel.isOpen()).toBe(false);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('unsent draft');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(input);
+    panel.dispose();
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 4, 17, 34, 32));

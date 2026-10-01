@@ -3,6 +3,8 @@
 .show-queue-progress{margin:12px 0;padding:12px;border-left:2px solid #e4bd78;background:#e4bd780a;border-radius:0 5px 5px 0}.show-queue-section .show-queue-place{font-size:14px;color:#f4cb80}.show-queue-section .show-queue-wait{color:#edf4f5;font-variant-numeric:tabular-nums}.show-queue-section .show-queue-help{font-size:12px;line-height:1.5}
 
 /* Use the screen width before adding height to the fireworks controls. */
+.show-controls--operating .show-queue-toggle,
+.show-controls--operating .show-queue{display:none!important}
 .show-board[data-panel=fireworks]{
   box-sizing:border-box;
   bottom:0;

@@ -21,7 +21,8 @@ function account(playerId = 'alice', cp = 'female', sessionToken = 'profile-alic
 
 async function setup(preview = false, initialMode: RuntimeAuthSession['mode'] = 'account') {
   vi.resetModules(); window.history.replaceState(null, '', '/?perf=webgl&mode=account&handoff=fixture');
-  mockShowControlRuntime();
+  let setControlling: ((controlling: boolean) => void) | undefined;
+  mockShowControlRuntime(options => { setControlling = options.onControlVisibilityChange; });
   const first = account();
   first.mode = initialMode;
   vi.doMock('../../network/sessionExchange', () => ({
@@ -78,8 +79,25 @@ async function setup(preview = false, initialMode: RuntimeAuthSession['mode'] = 
   // Outfit edits reach the saver through the wardrobe itself; the venue panel
   // no longer has part checkboxes.
   const toggle = (slot: 'jacket' | 'hair') => avatar.wardrobe!.setVisible(slot, !avatar.wardrobe!.isVisible(slot));
-  return {fetchMock,login,signup,toggle,restore,socket,emit};
+  return {fetchMock,login,signup,toggle,restore,socket,emit,host,setControlling};
 }
+
+it('hides the surrounding HUDs and releases chat focus during show control, then restores them', async () => {
+  const app = await setup();
+  const input = app.host.querySelector<HTMLTextAreaElement>('[data-testid="chat-input"]')!;
+  input.value = 'draft'; input.focus();
+  expect(app.setControlling).toBeTypeOf('function');
+  app.setControlling!(true);
+  expect(app.host.classList.contains('babylon-runtime-host--show-control')).toBe(true);
+  expect(app.host.querySelector<HTMLElement>('[data-testid="chat-panel"]')!.hidden).toBe(true);
+  expect(document.activeElement).not.toBe(input);
+  app.emit();
+  expect(app.host.classList.contains('babylon-runtime-host--show-control')).toBe(true);
+  app.setControlling!(false);
+  expect(app.host.classList.contains('babylon-runtime-host--show-control')).toBe(false);
+  expect(app.host.querySelector<HTMLElement>('[data-testid="chat-panel"]')!.hidden).toBe(false);
+  expect(input.value).toBe('draft');
+},20_000);
 
 it.each(['login','signup'] as const)('closes successful %s directly back to the venue without a welcome popup', async mode => {
   const app = await setup(false, 'guest');

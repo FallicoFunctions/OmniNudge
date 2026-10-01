@@ -6,6 +6,23 @@ const turn:ShowTurn={id:'turn-a',playerId:'a',playerName:'<img src=x onerror=ale
 const state=():ShowState=>({version:1,serverAt:0,eventStartsAt:10000,eventEndsAt:310000,turnMs:150000,preparationMs:10000,fireworks:{active:null,preparing:null,queue:[],nextAt:10000},drones:{active:null,preparing:null,queue:[],nextAt:10000},launches:[],cooldowns:{},banks:{},drone:{clip:'wave',startsAt:10000,endsAt:24000,transitionMs:2500,from:[{clip:'cube',weight:1}],next:''}});
 const click=(name:string)=>{const b=Array.from(document.querySelectorAll('button')).find(b=>(b.getAttribute('aria-label')??b.textContent)===name);expect(b,name).toBeDefined();b!.click();};
 describe('show control HUD',()=>{
+ it.each(['fireworks','drones'] as const)('suppresses surrounding HUDs only during the local %s turn and restores them on release',name=>{
+  const changes=vi.fn(),hud=createShowControlHud(document.body,()=>{},{},undefined,changes),s=state();
+  s[name].preparing={...turn};hud.apply(s,'a');expect(changes).not.toHaveBeenCalled();
+  s[name].preparing=null;s[name].active={...turn};hud.apply(s,'a');
+  expect(changes.mock.calls).toEqual([[true]]);
+  expect(document.querySelector('.show-controls')?.classList.contains('show-controls--operating')).toBe(true);
+  hud.update(11000);expect(changes).toHaveBeenCalledTimes(1);
+  hud.status(false);expect(changes).toHaveBeenLastCalledWith(false);
+  hud.status(true);expect(changes).toHaveBeenLastCalledWith(true);
+  s[name].active=null;hud.apply(s,'a');expect(changes).toHaveBeenLastCalledWith(false);
+  expect(document.querySelector('.show-controls')?.classList.contains('show-controls--operating')).toBe(false);
+  expect(document.querySelector('.show-queue')?.hasAttribute('hidden')).toBe(false);
+  s[name].active={...turn,playerId:'b'};hud.apply(s,'a');expect(changes).toHaveBeenCalledTimes(4);
+  click('Hide queues');s[name].active={...turn};hud.apply(s,'a');hud.dispose();
+  expect(changes).toHaveBeenLastCalledWith(false);
+  expect(localStorage.getItem('omnirave.showQueuesHidden')).toBe('true');
+ });
  it('holds a queued place on disconnect and marks away players in the line',()=>{
   const hud=createShowControlHud(document.body,()=>{},{}),s=state();
   s.fireworks.queue=[{playerId:'b',playerName:'Bea',joinedAt:1,awaySince:5},{playerId:'a',playerName:'Ace',joinedAt:2}];

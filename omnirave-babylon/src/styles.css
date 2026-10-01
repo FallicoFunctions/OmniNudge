@@ -1022,13 +1022,6 @@ body,
   }
 }
 
-/* Sec 11.2's auto-dismiss fade. Duration is mirrored by
-   WELCOME_CARD_FADE_MS in createWelcomeCard.ts - keep the two in step. */
-.venue-window--fading {
-  opacity: 0;
-  transition: opacity 450ms ease-out;
-}
-
 .venue-window[hidden] {
   display: none;
 }
@@ -1464,4 +1457,11 @@ body,
 .chat-panel__input:focus-visible {
   border-color: var(--hud-accent);
   outline: none;
+}
+
+/* Keep the sky clear while the local player controls a show. */
+.babylon-runtime-host--show-control .player-hud,
+.babylon-runtime-host--show-control .stamina-bar,
+.chat-panel[hidden] {
+  display: none !important;
 }

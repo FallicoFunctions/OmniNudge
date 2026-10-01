@@ -10,7 +10,7 @@ function button(text:string,click:()=>void,cls=''){const b=element('button',cls,
 
 // askForAccount: called before a join; true when it asked the player to sign
 // up or log in instead (a guest), and the join is then not sent.
-export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:(panel:PanelName)=>boolean){
+export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:(panel:PanelName)=>boolean,onControlVisibilityChange?:(controlling:boolean)=>void){
   const root=element('div','show-controls');host.append(root);
   const toggle=button('Show queues',()=>{hidden=!hidden;try{localStorage.setItem('omnirave.showQueuesHidden',String(hidden));}catch{}updateVisibility();if(!hidden)render();},'show-queue-toggle');root.append(toggle);
   const queue=element('section','show-queue');queue.setAttribute('aria-label','Show queues');root.append(queue);
@@ -33,6 +33,14 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   let messageUntil=0,state:ShowState|undefined,playerId='',now=0,connected=false,panel:PanelName|null=null,turn:ShowTurn|null=null;
   let selected:ShowShot[]=[],bank=3,multiple=false,viewKey='',rosterKey='';
   let pendingLaunch:{requestId:string;shots:ShowShot[];selectionRevision:number}|undefined,selectionRevision=0;
+  let controlling=false;
+  function setControlling(next:boolean){
+    board.hidden=!next;
+    if(next===controlling)return;
+    controlling=next;
+    root.classList.toggle('show-controls--operating',next);
+    onControlVisibilityChange?.(next);
+  }
   const tiles=new Map<string,{button:HTMLButtonElement;cover:HTMLElement;count:HTMLElement;marker:HTMLElement}>();
   const bankButtons=new Map<number,HTMLButtonElement>();let multi:HTMLButtonElement|undefined,launch:HTMLButtonElement|undefined,selection:HTMLElement|undefined;
   function notify(text:string){message.textContent=text;messageUntil=performance.now()+4000;}
@@ -89,7 +97,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
     if(connected)for(const name of ['fireworks','drones'] as const){const p=state[name];if(p.active?.playerId===playerId){nextPanel=name;nextTurn=p.active;}}
     const key=`${nextPanel}:${nextTurn?.id}`;panel=nextPanel;turn=nextTurn;
     if(key!==viewKey){viewKey=key;selected=[];selectionRevision++;pendingLaunch=undefined;multiple=false;bank=3;buildBoard();}
-    board.hidden=!panel;
+    setControlling(!!panel);
     if(turn){timer.textContent=`Time left ${countdown(turn.endsAt-now)}`;}
     // Movement snapshots keep arriving while this panel is hidden. Retain the
     // latest state, then refresh the queue synchronously when it is reopened.
@@ -146,7 +154,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
       if(!result.ok)notify(result.message);
       render();
     },
-    status(open:boolean){connected=open;rosterKey='';if(!open){board.hidden=true;if(state&&(['fireworks','drones'] as const).some(n=>state![n].queue.some(q=>q.playerId===playerId)||state![n].preparing?.playerId===playerId))notify('Connection lost. Your queue place is held for 2 minutes.');}else{message.textContent='';render();}},
-    dispose(){root.remove();},
+    status(open:boolean){connected=open;rosterKey='';if(!open){setControlling(false);if(state&&(['fireworks','drones'] as const).some(n=>state![n].queue.some(q=>q.playerId===playerId)||state![n].preparing?.playerId===playerId))notify('Connection lost. Your queue place is held for 2 minutes.');}else{message.textContent='';render();}},
+    dispose(){setControlling(false);root.remove();},
   };
 }

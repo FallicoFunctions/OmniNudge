@@ -455,7 +455,7 @@ export async function createRuntime(host: HTMLElement) {
       fireworksPreviewTimer = undefined;
     }
     applyFireworksPreview = undefined;
-    host.classList.remove('babylon-runtime-host--capture');
+    host.classList.remove('babylon-runtime-host--capture', 'babylon-runtime-host--show-control');
     canvas.remove();
   };
 
@@ -1584,6 +1584,11 @@ export async function createRuntime(host: HTMLElement) {
     showControls = createShowControlRuntime({
       host,scene,socket:worldSocket,playerRig:reviewRuntime?.playerRig,
       playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
+      onControlVisibilityChange(controlling) {
+        host.classList.toggle('babylon-runtime-host--show-control', controlling);
+        chatPanel?.setSuppressed(controlling);
+        if (!controlling) staminaBar?.relayout();
+      },
       // The fireworks and drone queues are for accounts: a guest who presses
       // Join gets the sign-up window (with its log-in switch) instead.
       askForAccount(panel) {

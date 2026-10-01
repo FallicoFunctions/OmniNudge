@@ -93,6 +93,8 @@ export interface ChatPanel {
   clearHistory: () => void;
   isOpen: () => boolean;
   setOpen: (open: boolean) => void;
+  /** Temporarily hides chat and disables its shortcuts without changing preferences. */
+  setSuppressed: (suppressed: boolean) => void;
   /** True while the body (history or muted view) is on screen. */
   isBodyVisible: () => boolean;
   isHistoryVisible: () => boolean;
@@ -176,6 +178,7 @@ export function createChatPanel(
 
   const muted = new Map<string, string>();
   const lines: RenderedLine[] = [];
+  let suppressed = false;
 
   // ---- DOM ------------------------------------------------------------
   const element = document.createElement('section');
@@ -555,6 +558,7 @@ export function createChatPanel(
   };
 
   const handleInputKeyDown = (event: KeyboardEvent) => {
+    if (suppressed) return;
     if (event.key === 'Enter') {
       if (event.shiftKey) {
         // Sec 10.3: Shift+Enter is a newline - let the textarea do it.
@@ -575,6 +579,7 @@ export function createChatPanel(
   };
 
   const handleFocus = () => {
+    if (suppressed) { input.blur(); return; }
     // Focusing the input alone does NOT open the window (sec 9.8).
     setTextEntryActive(true);
   };
@@ -584,6 +589,7 @@ export function createChatPanel(
   };
 
   const handleGlobalKeyDown = (event: KeyboardEvent) => {
+    if (suppressed) return;
     if (event.key !== 'Enter' || event.ctrlKey || event.metaKey || event.altKey || event.repeat) {
       return;
     }
@@ -679,6 +685,14 @@ export function createChatPanel(
     clearHistory,
     isOpen: () => openPreference,
     setOpen,
+    setSuppressed(next) {
+      suppressed = next;
+      if (next) {
+        input.blur();
+        setTextEntryActive(false);
+      }
+      element.hidden = next;
+    },
     isBodyVisible: () => bodyVisible(),
     isHistoryVisible: () => bodyVisible() && !mutedViewOpen,
     isMutedViewOpen: () => mutedViewOpen,
@@ -692,7 +706,7 @@ export function createChatPanel(
     mutedUsers: () =>
       Array.from(muted, ([playerId, playerName]) => ({ playerId, playerName })),
     isTextEntryActive: () => textEntryActive,
-    focusInput: () => input.focus(),
+    focusInput: () => { if (!suppressed) input.focus(); },
     // Sec 8.3: manual respawn "clears typed chat input text" - a draft the
     // player never sent should not survive a respawn.
     clearDraft: () => {
