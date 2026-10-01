@@ -248,6 +248,12 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
   const lightingRig = createLightingRig(scene, perfFlags);
   const atmosphereRig = createAtmosphereRig(scene);
   markBootPhase('scene_lighting');
+  // Start compiling the venue's GPU programs now: its materials and lights
+  // are final from here. Where the browser compiles in the background
+  // (parallel shader compilation), this runs while the avatar and the rest
+  // of the scene are built, instead of after the first frame.
+  if (localPerformanceParams.get('prewarm') !== '0') scene.isReady(false);
+  markBootPhase('scene_prewarm');
   const input = createInputMap(window);
   const playerRig = createPlayerRig(
     scene,

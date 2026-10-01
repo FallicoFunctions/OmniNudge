@@ -159,6 +159,25 @@ describe('createMainStageScene', () => {
     expect(scene.effectLayers).toHaveLength(0);
   });
 
+  it('starts compiling the venue programs once its lights exist, also where no shadow check runs (WebGPU)', async () => {
+    engine = new NullEngine();
+    Object.defineProperty(engine, 'isWebGPU', { value: true });
+    const { createMainStageScene } = await loadCreateMainStageScene(() => {});
+    const { Scene: BabylonScene } = await import('@babylonjs/core');
+    const lightsAtCheck: number[] = [];
+    const isReady = vi.spyOn(BabylonScene.prototype, 'isReady').mockImplementation(function (this: Scene) {
+      lightsAtCheck.push(this.lights.length);
+      return false;
+    });
+    try {
+      await createMainStageScene(engine);
+    } finally {
+      isReady.mockRestore();
+    }
+    expect(lightsAtCheck.length).toBeGreaterThan(0);
+    expect(lightsAtCheck[0]).toBeGreaterThan(0);
+  });
+
   it('disposes a partially built scene and restores material invalidation after a load failure', async () => {
     engine = new NullEngine();
     let failedScene: Scene | undefined;
