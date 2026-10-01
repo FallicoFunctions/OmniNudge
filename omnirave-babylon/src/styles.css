@@ -130,6 +130,10 @@ body,
   font-weight: 700;
 }
 
+.hud-controls__row > .hud-button {
+  border-radius: var(--hud-radius);
+}
+
 .hud-button:hover,
 .hud-button:focus-visible {
   border-color: var(--hud-accent);
