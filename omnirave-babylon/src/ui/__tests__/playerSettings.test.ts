@@ -30,7 +30,7 @@ function createMemoryStorage(seed: Record<string, string> = {}): Storage {
 describe('playerSettings', () => {
   it('defaults to the spec theme and sensible control modes', () => {
     expect(DEFAULT_PLAYER_SETTINGS.uiTheme).toBe('luminous-panels');
-    expect(DEFAULT_PLAYER_SETTINGS.cameraFollow).toBe('free');
+    expect(DEFAULT_PLAYER_SETTINGS.cameraFollow).toBe('follow');
     expect(DEFAULT_PLAYER_SETTINGS.graphicsAuto).toBe(true);
     expect(DEFAULT_PLAYER_SETTINGS.displayNames).toBe(true);
     expect(DEFAULT_PLAYER_SETTINGS.crouchMode).toBe('hold');
@@ -42,6 +42,29 @@ describe('playerSettings', () => {
     expect(clampGraphicsLevel(4.4)).toBe(4);
     expect(clampGraphicsLevel('7')).toBe(7);
     expect(clampGraphicsLevel(Number.NaN)).toBe(DEFAULT_PLAYER_SETTINGS.graphicsLevel);
+  });
+
+  it('defaults missing or invalid camera preferences to Auto-Follow', () => {
+    for (const raw of [null, {}, { cameraFollow: 'bad' }]) {
+      expect(normalizePlayerSettings(raw).cameraFollow).toBe('follow');
+    }
+    expect(loadPlayerSettings(createMemoryStorage()).cameraFollow).toBe('follow');
+  });
+
+  it('migrates the old camera default once while keeping the other preferences', () => {
+    const storage = createMemoryStorage({
+      'omnirave.guestSettings.v1': JSON.stringify({
+        ...DEFAULT_PLAYER_SETTINGS, cameraFollow: 'free', uiTheme: 'midnight-gold',
+        graphicsAuto: false, graphicsLevel: 8, chatOpen: false,
+      }),
+    });
+    const migrated = loadPlayerSettings(storage);
+    expect(migrated).toMatchObject({
+      cameraFollow: 'follow', uiTheme: 'midnight-gold', graphicsAuto: false,
+      graphicsLevel: 8, chatOpen: false,
+    });
+    savePlayerSettings({ ...migrated, cameraFollow: 'free' }, storage);
+    expect(loadPlayerSettings(storage).cameraFollow).toBe('free');
   });
 
   it('normalizes a partially corrupt blob field by field', () => {

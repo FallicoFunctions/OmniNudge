@@ -71,8 +71,6 @@ describe('createFollowCameraRig', () => {
     const target = new TransformNode('player-root', scene);
     target.position.set(5, 2, -8);
     const rig = createFollowCameraRig(scene, target);
-    // Sec 7's Free Camera default doesn't re-anchor to the target; this test
-    // is about focus-settle math under Auto-Follow, so opt into it explicitly.
     rig.setFollowMode('follow');
     rig.applyCheckpointView({
       alpha: 0,
@@ -383,7 +381,8 @@ describe('createFollowCameraRig', () => {
     target.position.set(0, 1.7, 0);
     const rig = createFollowCameraRig(scene, target);
 
-    expect(rig.followMode()).toBe('free');
+    expect(rig.followMode()).toBe('follow');
+    rig.setFollowMode('free');
     target.position.set(10, 1.7, 4);
     const freeState = rig.syncZoomState();
     expect(rig.targetAnchor.position.x).toBeCloseTo(10);

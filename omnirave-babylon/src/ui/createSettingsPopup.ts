@@ -31,9 +31,10 @@ import {
 } from './playerSettings';
 import { UI_THEMES, resolveUiThemeId, type UiThemeId } from './uiTheme';
 
-// Verbatim from sec 9.6 "Controls help list".
+// Controls help list from sec 9.6, updated for the current keyboard bindings.
 export const CONTROLS_HELP_LINES: readonly string[] = [
-  'WASD / Arrow Keys: Move',
+  'WASD / Up & Down Arrows: Move',
+  'Left & Right Arrows: Turn camera',
   'Right Click + Drag: Camera',
   'Mouse Wheel: Zoom',
   'Shift: Sprint',

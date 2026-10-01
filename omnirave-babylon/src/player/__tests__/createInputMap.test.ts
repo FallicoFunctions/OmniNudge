@@ -4,10 +4,29 @@ import { createInputMap } from '../createInputMap';
 
 describe('createInputMap', () => {
   it.each([
+    ['ArrowLeft', 'cameraLeft', 'KeyA', 'left'],
+    ['ArrowRight', 'cameraRight', 'KeyD', 'right'],
+  ] as const)('uses %s for camera look independently of movement', (arrow, cameraKey, letter, movementKey) => {
+    const input = createInputMap(window);
+    try {
+      const press = new KeyboardEvent('keydown', { code: arrow, cancelable: true });
+      window.dispatchEvent(press);
+      expect(press.defaultPrevented).toBe(true);
+      expect(input.state[cameraKey]).toBe(true);
+      expect(input.state.left).toBe(false);
+      expect(input.state.right).toBe(false);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: letter }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: arrow }));
+      expect(input.state[cameraKey]).toBe(false);
+      expect(input.state[movementKey]).toBe(true);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: letter }));
+      expect(input.state[movementKey]).toBe(false);
+    } finally { input.dispose(); }
+  });
+
+  it.each([
     ['ArrowUp', 'KeyW', 'forward'],
     ['ArrowDown', 'KeyS', 'backward'],
-    ['ArrowLeft', 'KeyA', 'left'],
-    ['ArrowRight', 'KeyD', 'right'],
   ] as const)('moves with %s without scrolling or releasing a held WASD alias', (arrow, letter, direction) => {
     const input = createInputMap(window);
     const press = new KeyboardEvent('keydown', { code: arrow, cancelable: true });
@@ -27,13 +46,15 @@ describe('createInputMap', () => {
     const field = document.createElement('input');
     document.body.append(field);
     field.focus();
-    for (const code of ['KeyW', 'ArrowUp', 'Space']) {
+    for (const code of ['KeyW', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space']) {
       const event = new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true });
       field.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(false);
     }
     expect(input.state.forward).toBe(false);
     expect(input.state.jump).toBe(false);
+    expect(input.state.cameraLeft).toBe(false);
+    expect(input.state.cameraRight).toBe(false);
     field.remove();
     input.dispose();
   });
@@ -51,6 +72,8 @@ describe('createInputMap', () => {
       up: false,
       down: false,
       crouch: false,
+      cameraLeft: false,
+      cameraRight: false,
     });
 
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
@@ -71,6 +94,8 @@ describe('createInputMap', () => {
       up: false,
       down: true,
       crouch: false,
+      cameraLeft: false,
+      cameraRight: false,
     });
 
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
@@ -89,6 +114,8 @@ describe('createInputMap', () => {
       up: false,
       down: false,
       crouch: false,
+      cameraLeft: false,
+      cameraRight: false,
     });
 
     input.dispose();
@@ -107,6 +134,9 @@ describe('createInputMap', () => {
     expect(input.state.sprint).toBe(true);
     expect(input.state.jump).toBe(true);
 
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight' }));
+    expect(input.state.cameraRight).toBe(true);
+
     // Simulate alt-tab: the keyup for KeyW/ShiftLeft never arrives.
     window.dispatchEvent(new Event('blur'));
 
@@ -120,6 +150,8 @@ describe('createInputMap', () => {
       up: false,
       down: false,
       crouch: false,
+      cameraLeft: false,
+      cameraRight: false,
     });
 
     input.dispose();
@@ -183,6 +215,9 @@ describe('createInputMap', () => {
     expect(input.textEntryActive()).toBe(true);
     expect(input.state.forward).toBe(false);
 
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight' }));
+
     // Typing WASD/Space/Shift/Ctrl now moves nothing.
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }));
@@ -200,6 +235,8 @@ describe('createInputMap', () => {
       up: false,
       down: false,
       crouch: false,
+      cameraLeft: false,
+      cameraRight: false,
     });
 
     input.dispose();

@@ -280,6 +280,94 @@ describe('createMainStageScene', () => {
     expect(player.position.z - start.z).toBeCloseTo(traveled);
   });
 
+  it.each(['blur', 'lostpointercapture'])('resumes Auto-Follow after a camera drag is interrupted by %s', async interruption => {
+    engine = new NullEngine();
+    vi.spyOn(engine, 'getDeltaTime').mockReturnValue(1000 / 60);
+    const canvas = document.createElement('canvas');
+    canvas.setPointerCapture = vi.fn();
+    canvas.hasPointerCapture = vi.fn(() => true);
+    canvas.releasePointerCapture = vi.fn();
+    document.body.append(canvas);
+    vi.spyOn(engine, 'getRenderingCanvas').mockReturnValue(canvas);
+    const { createMainStageScene } = await loadCreateMainStageScene((scene, assets) => {
+      assets.collisionMeshes.push(MeshBuilder.CreateGround('test-ground', { width: 300, height: 300 }, scene));
+    });
+    const scene = await createMainStageScene(engine);
+    const cameraRig = scene.metadata.reviewRuntime.cameraRig;
+    const player = scene.getTransformNodeByName('player-root')!;
+    cameraRig.applyCheckpointView({ alpha: -Math.PI / 2, beta: 1.1, radius: 6, focusOffset: { x: 0, y: 0, z: 0 } });
+    scene.render();
+    const pointer = (type: string, x: number) => {
+      const event = new MouseEvent(type, { button: 0, clientX: x, clientY: 100, cancelable: true });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      canvas.dispatchEvent(event);
+    };
+    try {
+      pointer('pointerdown', 100);
+      if (interruption === 'blur') window.dispatchEvent(new Event('blur'));
+      else pointer('lostpointercapture', 100);
+      const alpha = cameraRig.camera.alpha;
+      pointer('pointermove', 150);
+      expect(cameraRig.camera.alpha).toBeCloseTo(alpha);
+      for (let frame = 0; frame < 120; frame++) {
+        player.position.x += 0.075;
+        scene.render();
+      }
+      expect(cameraRig.camera.getForwardRay().direction.x).toBeGreaterThan(0.88);
+      scene.dispose();
+      // A disposed scene no longer owns global focus-loss callbacks.
+      const setManualLookActive = vi.spyOn(cameraRig, 'setManualLookActive');
+      window.dispatchEvent(new Event('blur'));
+      expect(setManualLookActive).not.toHaveBeenCalled();
+    } finally { scene.dispose(); canvas.remove(); }
+  });
+
+  it.each([false, true].flatMap(operating => ['ArrowLeft', 'ArrowRight'].map(code => ({ operating, code }))))(
+    'turns the camera without moving on held $code in operator view $operating', async ({ operating, code }) => {
+      engine = new NullEngine();
+      vi.spyOn(engine, 'getDeltaTime').mockReturnValue(1000 / 60);
+      const { createMainStageScene } = await loadCreateMainStageScene((scene, assets) => {
+        assets.collisionMeshes.push(MeshBuilder.CreateGround('test-ground', { width: 200, height: 200 }, scene));
+      });
+      const scene = await createMainStageScene(engine);
+      const camera = scene.activeCamera as ArcRotateCamera;
+      const runtime = scene.metadata.reviewRuntime;
+      const player = scene.getTransformNodeByName('player-root')!;
+      if (operating) {
+        runtime.playerController.setOperatingPosition(player.position.clone());
+        runtime.cameraRig.setOperatorView(true);
+      }
+      scene.render();
+      const start = player.position.clone();
+      const alpha = camera.alpha, beta = camera.beta, radius = camera.radius;
+      try {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+        for (let frame = 0; frame < 30; frame++) scene.render();
+        const firstTurn = camera.alpha;
+        for (let frame = 0; frame < 30; frame++) scene.render();
+        const direction = code === 'ArrowLeft' ? 1 : -1;
+        const yawDelta = (after: number, before: number) => Math.atan2(Math.sin(after - before), Math.cos(after - before));
+        expect(yawDelta(firstTurn, alpha) * direction).toBeCloseTo(Math.PI / 4, 2);
+        expect(yawDelta(camera.alpha, firstTurn) * direction).toBeCloseTo(Math.PI / 4, 2);
+        // Gravity may finish settling the player's feet; arrows cause no walking.
+        expect(Math.hypot(player.position.x - start.x, player.position.z - start.z)).toBeLessThan(0.001);
+        expect(camera.beta).toBeCloseTo(beta);
+        expect(camera.radius).toBeCloseTo(radius);
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: code === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft' }));
+        const bothHeldAlpha = camera.alpha;
+        for (let frame = 0; frame < 10; frame++) scene.render();
+        expect(camera.alpha).toBeCloseTo(bothHeldAlpha);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowLeft' }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowRight' }));
+        for (let frame = 0; frame < 10; frame++) scene.render();
+        expect(camera.alpha).toBeCloseTo(bothHeldAlpha);
+      } finally {
+        window.dispatchEvent(new Event('blur'));
+        scene.dispose();
+      }
+    },
+  );
+
   it.each([
     { operating: false, button: 0 }, { operating: false, button: 2 },
     { operating: true, button: 0 }, { operating: true, button: 2 },

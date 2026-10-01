@@ -7,6 +7,8 @@ export interface MovementInput {
   sprint: boolean;
   up: boolean;
   down: boolean;
+  cameraLeft?: boolean;
+  cameraRight?: boolean;
   // Set by the input map (sec 9.6 crouch `Hold` / `Toggle`). Optional so the
   // many hand-built MovementInput literals in tests and callers stay valid.
   crouch?: boolean;

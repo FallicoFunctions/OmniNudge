@@ -25,6 +25,8 @@ import {
 import { resolveTravelCameraOffsets } from '../player/cameraRigMath';
 import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
+import { updateKeyboardCamera } from '../player/updateKeyboardCamera';
+import { attachCameraDragControls } from '../player/attachCameraDragControls';
 import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarget } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
@@ -466,6 +468,7 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
   const playerController = createPlayerController({
     get avatarRoot() { return reviewAvatar.root; },
     camera: cameraRig.camera,
+    cameraRig,
     collisionMeshes: stageAssets.collisionMeshes,
     getRemotePlayerCollisionTargets: () => remotePlayerCollisionSource?.() ?? [],
     input: input.state,
@@ -499,9 +502,6 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
   let wasRouteComplete = routeProgress.complete;
   const canvas = engine.getRenderingCanvas?.();
   let avatarElapsedSeconds = 0;
-  let activeCameraPointerId: number | undefined;
-  let lastCameraPointerX = 0;
-  let lastCameraPointerY = 0;
   const handleCameraWheel = (event: WheelEvent) => {
     event.preventDefault();
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1);
@@ -509,56 +509,15 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
     const factor = Math.exp(Math.max(-0.8, Math.min(0.8, pixels * rate)));
     cameraRig.zoom(cameraRig.camera.radius * (factor - 1));
   };
-  const handleCameraPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 && event.button !== 2) {
-      return;
-    }
-
-    event.preventDefault();
-    canvas?.focus({ preventScroll: true });
-    activeCameraPointerId = event.pointerId;
-    lastCameraPointerX = event.clientX;
-    lastCameraPointerY = event.clientY;
-    canvas?.setPointerCapture(event.pointerId);
-  };
-  const handleCameraPointerMove = (event: PointerEvent) => {
-    if (activeCameraPointerId !== event.pointerId) {
-      return;
-    }
-
-    event.preventDefault();
-    const deltaX = event.clientX - lastCameraPointerX;
-    const deltaY = event.clientY - lastCameraPointerY;
-    lastCameraPointerX = event.clientX;
-    lastCameraPointerY = event.clientY;
-    // Owner-set direction: dragging right turns the view the other way from
-    // the camera angle's natural increase.
-    cameraRig.orbit(
-      -deltaX * POINTER_CAMERA_YAW_SENSITIVITY,
-      -deltaY * POINTER_CAMERA_PITCH_SENSITIVITY,
-    );
-  };
-  const handleCameraPointerEnd = (event: PointerEvent) => {
-    if (activeCameraPointerId !== event.pointerId) {
-      return;
-    }
-
-    activeCameraPointerId = undefined;
-    if (canvas?.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId);
-    }
-  };
+  const disposeCameraDrag = canvas ? attachCameraDragControls(canvas, cameraRig, {
+    yawSensitivity: POINTER_CAMERA_YAW_SENSITIVITY,
+    pitchSensitivity: POINTER_CAMERA_PITCH_SENSITIVITY,
+  }) : undefined;
 
   const handleCameraContextMenu = (event: Event) => event.preventDefault();
   if (canvas) {
-    canvas.tabIndex = 0;
     canvas.addEventListener('contextmenu', handleCameraContextMenu);
-    canvas.style.touchAction = 'none';
     canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
-    canvas.addEventListener('pointerdown', handleCameraPointerDown);
-    canvas.addEventListener('pointermove', handleCameraPointerMove);
-    canvas.addEventListener('pointerup', handleCameraPointerEnd);
-    canvas.addEventListener('pointercancel', handleCameraPointerEnd);
   }
 
   scene.onBeforeRenderObservable.add(() => {
@@ -566,6 +525,7 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
     const localDetail = scene.metadata?.localAvatarDetailBaseline ? 0 : resolveLocalAvatarDetail(
       Vector3.Distance(cameraRig.camera.globalPosition, playerRig.root.position), localAppearance.detail);
     localAppearance.updateDetail(localDetail);
+    updateKeyboardCamera(cameraRig, input.state, deltaSeconds);
     playerController.step(deltaSeconds);
     // After the move: a guest who just walked into the VIP wall gets the log
     // in / sign up popup this frame, and a pending re-lock (logout) closes
@@ -660,10 +620,7 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
     wingBridge.dispose();
     canvas?.removeEventListener('contextmenu', handleCameraContextMenu);
     canvas?.removeEventListener('wheel', handleCameraWheel);
-    canvas?.removeEventListener('pointerdown', handleCameraPointerDown);
-    canvas?.removeEventListener('pointermove', handleCameraPointerMove);
-    canvas?.removeEventListener('pointerup', handleCameraPointerEnd);
-    canvas?.removeEventListener('pointercancel', handleCameraPointerEnd);
+    disposeCameraDrag?.();
     input.dispose();
     cameraRig.camera.detachControl();
   });

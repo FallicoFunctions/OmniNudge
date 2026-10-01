@@ -39,8 +39,7 @@ export const GRAPHICS_LEVEL_MAX = 10;
 
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   uiTheme: DEFAULT_UI_THEME,
-  // Sec 7: default camera mode is Free Camera; Auto-Follow is opt-in.
-  cameraFollow: 'free',
+  cameraFollow: 'follow',
   graphicsAuto: true,
   graphicsLevel: 6,
   displayNames: true,
@@ -48,7 +47,8 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   chatOpen: true,
 };
 
-export const PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v1';
+export const PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v2';
+const LEGACY_PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v1';
 
 export function clampGraphicsLevel(value: unknown): number {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -64,7 +64,7 @@ export function normalizePlayerSettings(raw: unknown): PlayerSettings {
   const source = (raw ?? {}) as Partial<Record<keyof PlayerSettings, unknown>>;
   return {
     uiTheme: resolveUiThemeId(source.uiTheme),
-    cameraFollow: source.cameraFollow === 'follow' ? 'follow' : 'free',
+    cameraFollow: source.cameraFollow === 'free' ? 'free' : 'follow',
     graphicsAuto: source.graphicsAuto === undefined ? true : source.graphicsAuto !== false,
     graphicsLevel: clampGraphicsLevel(source.graphicsLevel),
     displayNames: source.displayNames === undefined ? true : source.displayNames !== false,
@@ -92,7 +92,16 @@ export function loadPlayerSettings(storage?: Storage | null): PlayerSettings {
   }
   try {
     const raw = store.getItem(PLAYER_SETTINGS_STORAGE_KEY);
-    return normalizePlayerSettings(raw ? JSON.parse(raw) : null);
+    if (raw) return normalizePlayerSettings(JSON.parse(raw));
+    const legacy = store.getItem(LEGACY_PLAYER_SETTINGS_STORAGE_KEY);
+    if (!legacy) return { ...DEFAULT_PLAYER_SETTINGS };
+    // The old default was persisted as "free" even though both modes behaved
+    // identically. Start the working Auto-Follow mode once, preserving all
+    // other preferences. Choices made in v2, including Free Camera, persist.
+    const migrated = normalizePlayerSettings(JSON.parse(legacy));
+    migrated.cameraFollow = 'follow';
+    savePlayerSettings(migrated, store);
+    return migrated;
   } catch {
     return { ...DEFAULT_PLAYER_SETTINGS };
   }

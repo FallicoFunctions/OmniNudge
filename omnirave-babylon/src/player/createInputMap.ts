@@ -25,8 +25,8 @@ const KEY_BINDINGS: Record<string, keyof MovementInput> = {
   KeyD: 'right',
   KeyS: 'backward',
   KeyW: 'forward',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
+  ArrowLeft: 'cameraLeft',
+  ArrowRight: 'cameraRight',
   ArrowDown: 'backward',
   ArrowUp: 'forward',
   ShiftLeft: 'sprint',
@@ -49,6 +49,8 @@ export function createInputMap(target: Window): InputMap {
     sprint: false,
     up: false,
     down: false,
+    cameraLeft: false,
+    cameraRight: false,
     crouch: false,
   };
   const heldCodes = new Set<string>();

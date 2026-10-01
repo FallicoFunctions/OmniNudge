@@ -6,6 +6,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 
 import { resolveAvatarAnimationState, type AvatarAnimationState } from './avatarAnimationState';
 import type { PlayerRig } from './createPlayerRig';
+import type { FollowCameraRig } from './createFollowCameraRig';
 import type { MovementInput, StaminaState } from './movementMath';
 import {
   createStaminaState,
@@ -83,6 +84,7 @@ export interface PlayerController {
 export interface CreatePlayerControllerOptions {
   avatarRoot: TransformNode;
   camera: Camera;
+  cameraRig?: Pick<FollowCameraRig, 'followMode' | 'lookRevision'>;
   collisionMeshes: AbstractMesh[];
   input: MovementInput;
   /** Sec 7.7. Defaults to none - most scenes have no ladders. */
@@ -145,6 +147,9 @@ const PLAYER_COLLISION_MIN_DISTANCE_SQUARED = 1e-6;
 export function createPlayerController(options: CreatePlayerControllerOptions): PlayerController {
   const groundRay = new Ray(Vector3.Zero(), Vector3.Down(), 256);
   const cameraForward = new Vector3();
+  const movementCameraForward = new Vector3();
+  let movementInputMask = -1;
+  let movementLookRevision = -1;
   let jumpQueued = false;
   let operatingPosition:Vector3|null=null;
   const staminaState: StaminaState = createStaminaState();
@@ -265,7 +270,20 @@ export function createPlayerController(options: CreatePlayerControllerOptions): 
     const crouchActive = Boolean(options.input.crouch) && !ghostActive;
     options.playerRig.setCrouched(crouchActive);
 
-    resolveCameraForward(options.camera, cameraForward);
+    const inputMask = Number(options.input.forward) | (Number(options.input.backward) << 1)
+      | (Number(options.input.left) << 2) | (Number(options.input.right) << 3);
+    const lookRevision = options.cameraRig?.lookRevision ?? 0;
+    const lateralInput = options.input.left !== options.input.right;
+    // Lateral input follows the current view on every step, so holding left
+    // or right keeps turning as Auto-Follow rotates behind the avatar. Pure
+    // forward/backward travel keeps its heading until new keys/manual look.
+    if (options.cameraRig?.followMode() !== 'follow' || inputMask !== movementInputMask
+      || lookRevision !== movementLookRevision || lateralInput) {
+      resolveCameraForward(options.camera, movementCameraForward);
+    }
+    movementInputMask = inputMask;
+    movementLookRevision = lookRevision;
+    cameraForward.copyFrom(movementCameraForward);
     const move = resolveCameraRelativeMoveVector(options.input, cameraForward);
     // Sec 7.5: crouch overrides sprint, so stamina only drains for sprint
     // that is actually being applied as speed - and only while moving.

@@ -5,7 +5,7 @@ import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { MAX_ZOOM_DISTANCE, MIN_ZOOM_DISTANCE, resolveZoomState } from './cameraRigMath';
+import { FIRST_PERSON_DISTANCE, MAX_ZOOM_DISTANCE, MIN_ZOOM_DISTANCE, resolveZoomState } from './cameraRigMath';
 import type { ReviewCheckpointCamera } from '../scene/reviewRouteData';
 
 // Stop only 0.006 degrees short of vertical so the view direction never
@@ -14,6 +14,8 @@ const CAMERA_POLE_MARGIN = 0.0001;
 const MIN_ORBIT_BETA = CAMERA_POLE_MARGIN;
 const MAX_ORBIT_BETA = Math.PI - CAMERA_POLE_MARGIN;
 const MAX_OPERATOR_PITCH = Math.PI / 2 - CAMERA_POLE_MARGIN;
+const AUTO_FOLLOW_RESPONSE = 5;
+const MANUAL_LOOK_HOLD_SECONDS = 0.6;
 
 // Design doc sec 7.2: "camera collision pushes inward when blocked... camera
 // returns to chosen zoom when space opens up again". How far back from a
@@ -31,17 +33,10 @@ const CAMERA_COLLISION_EASE_BACK_SPEED = 24;
  * `follow` - Auto-Follow.
  * `free`   - Free Camera.
  *
- * Both modes track the player's world POSITION every frame - sec 7.2's
- * "medium third-person" default and "player can look around while standing
- * still or moving" only make sense if the player never leaves frame, in
- * either mode. Earlier versions of this rig had `free` stop tracking
- * entirely (camera frozen in place while the player walked away) - that read
- * as a broken camera the instant Free Camera became the sec 7.2 default,
- * not a real feature, so it was removed. The distinction this type still
- * exists for is future: Auto-Follow auto-recentering the ORBIT ANGLE behind
- * the player's facing after a period with no manual orbit input, which
- * Free Camera would not do. That recenter behavior is not implemented yet -
- * today both modes behave identically beyond position tracking.
+ * Both modes track the player's position. Auto-Follow also eases the orbit
+ * behind their horizontal travel direction while moving, retaining pitch and
+ * zoom. Manual look takes priority, and first-person/operator views keep
+ * their own look direction. Free Camera keeps its chosen orbit angle.
  */
 export type CameraFollowMode = 'follow' | 'free';
 
@@ -51,6 +46,8 @@ export interface FollowCameraRig {
   setOperatorView: (enabled:boolean) => void;
   followMode: () => CameraFollowMode;
   setFollowMode: (mode: CameraFollowMode) => void;
+  readonly lookRevision: number;
+  setManualLookActive: (active: boolean) => void;
   orbit: (deltaYaw: number, deltaPitch: number) => ReturnType<typeof resolveZoomState>;
   settleFocus: (strength: number) => void;
   // deltaSeconds defaults to the scene engine's own frame delta; production
@@ -100,6 +97,11 @@ export function createFollowCameraRig(
   const activeFocusOffset = new Vector3(0, 0, 0);
   const activePositionOffset = new Vector3(0, 0, 0);
   let hasActivePositionOffset = false;
+  target.computeWorldMatrix(true);
+  const previousFollowPosition = target.getAbsolutePosition().clone();
+  let manualLookActive = false;
+  let manualLookHold = 0;
+  let lookRevision = 0;
   let operator=false,operatorYaw=0,operatorPitch=.70;
   let savedView:{alpha:number;beta:number;radius:number;focus:Vector3;offset:Vector3;hasOffset:boolean}|null=null;
 
@@ -256,6 +258,7 @@ export function createFollowCameraRig(
   camera.minZ = 0.18;
 
   const applyCheckpointView = (view: ReviewCheckpointCamera) => {
+    lookRevision++;
     // Kill residual inertial motion: a teleporting checkpoint jump must land
     // exactly, not drift through nearby geometry for the first frames.
     camera.inertialAlphaOffset = 0;
@@ -265,6 +268,7 @@ export function createFollowCameraRig(
     camera.inertialPanningY = 0;
     activeFocusOffset.set(view.focusOffset.x, view.focusOffset.y, view.focusOffset.z);
     target.computeWorldMatrix(true);
+    previousFollowPosition.copyFrom(target.getAbsolutePosition());
     checkpointWorldTarget.copyFrom(target.getAbsolutePosition());
     checkpointWorldTarget.addInPlace(activeFocusOffset);
     targetAnchor.position.copyFrom(checkpointWorldTarget);
@@ -301,14 +305,16 @@ export function createFollowCameraRig(
     return zoomState;
   };
 
-  // Sec 7: default camera mode is Free Camera; Auto-Follow is opt-in.
-  let followMode: CameraFollowMode = 'free';
+  let followMode: CameraFollowMode = 'follow';
 
   return {
     applyCheckpointView,
     camera,
     setOperatorView(enabled){
       if(enabled===operator)return;
+      lookRevision++;
+      target.computeWorldMatrix(true);
+      previousFollowPosition.copyFrom(target.getAbsolutePosition());
       if(enabled){savedView={alpha:camera.alpha,beta:camera.beta,radius:camera.radius,focus:activeFocusOffset.clone(),offset:activeTargetToCameraOffset.clone(),hasOffset:hasActivePositionOffset};operatorYaw=0;operatorPitch=.70;}
       else if(savedView){camera.alpha=savedView.alpha;camera.beta=savedView.beta;camera.radius=savedView.radius;
         activeFocusOffset.copyFrom(savedView.focus);activeTargetToCameraOffset.copyFrom(savedView.offset);hasActivePositionOffset=savedView.hasOffset;savedView=null;}
@@ -316,9 +322,19 @@ export function createFollowCameraRig(
     },
     followMode: () => followMode,
     setFollowMode(mode) {
+      if (mode !== followMode) lookRevision++;
       followMode = mode;
     },
+    get lookRevision() { return lookRevision; },
+    setManualLookActive(active) {
+      manualLookActive = active;
+      manualLookHold = MANUAL_LOOK_HOLD_SECONDS;
+    },
     orbit(deltaYaw, deltaPitch) {
+      if (deltaYaw !== 0 || deltaPitch !== 0) {
+        lookRevision++;
+        manualLookHold = MANUAL_LOOK_HOLD_SECONDS;
+      }
       // The booth's look vector and the normal orbit angle use opposite yaw
       // conventions. Preserve the same drag direction when entering a turn.
       if(operator){operatorYaw-=deltaYaw;operatorPitch=Math.max(-MAX_OPERATOR_PITCH,Math.min(MAX_OPERATOR_PITCH,operatorPitch+deltaPitch));return this.syncZoomState();}
@@ -340,18 +356,39 @@ export function createFollowCameraRig(
     },
     syncZoomState(deltaSeconds) {
       if(operator){
+        target.computeWorldMatrix(true);
+        previousFollowPosition.copyFrom(target.getAbsolutePosition());
         followWorldPosition.copyFrom(target.position);
         followWorldTarget.set(Math.sin(operatorYaw)*Math.cos(operatorPitch),Math.sin(operatorPitch),Math.cos(operatorYaw)*Math.cos(operatorPitch)).addInPlace(followWorldPosition);
         targetAnchor.position.copyFrom(followWorldTarget);targetAnchor.computeWorldMatrix(true);applyPositionOffsetCamera(followWorldPosition,followWorldTarget);
         return resolveZoomState(MIN_ZOOM_DISTANCE);
       }
       const resolvedDeltaSeconds = deltaSeconds ?? scene.getEngine().getDeltaTime() / 1000;
-      // Both modes re-anchor to the player's live position every frame so
-      // WASD movement keeps the camera attached instead of leaving it
-      // behind - see the CameraFollowMode doc comment above for why `free`
-      // no longer skips this.
+      const followDelta = Math.max(0, Math.min(0.1, resolvedDeltaSeconds));
+      manualLookHold = Math.max(0, manualLookHold - followDelta);
       target.computeWorldMatrix(true);
-      followWorldTarget.copyFrom(target.getAbsolutePosition());
+      const playerPosition = target.getAbsolutePosition();
+      const moveX = playerPosition.x - previousFollowPosition.x;
+      const moveZ = playerPosition.z - previousFollowPosition.z;
+      const movedSquared = moveX * moveX + moveZ * moveZ;
+      previousFollowPosition.copyFrom(playerPosition);
+      const requestedZoom = hasActivePositionOffset ? activeTargetToCameraOffset.length() : camera.radius;
+      // Ignore position corrections/teleports, vertical-only motion, and
+      // stationary turns. Rotating the orbit never changes chosen pitch/zoom.
+      if (followMode === 'follow' && !manualLookActive && manualLookHold === 0
+        && requestedZoom > FIRST_PERSON_DISTANCE && movedSquared > 1e-8
+        && movedSquared < Math.max(2, resolvedDeltaSeconds * 30) ** 2) {
+        if (!hasActivePositionOffset) syncActiveOffsetFromCamera();
+        const alpha = Math.atan2(activeTargetToCameraOffset.z, activeTargetToCameraOffset.x);
+        const behind = Math.atan2(-moveZ, -moveX);
+        const difference = Math.atan2(Math.sin(behind - alpha), Math.cos(behind - alpha));
+        const turn = difference * (1 - Math.exp(-AUTO_FOLLOW_RESPONSE * followDelta));
+        const cos = Math.cos(turn), sin = Math.sin(turn);
+        const x = activeTargetToCameraOffset.x, z = activeTargetToCameraOffset.z;
+        activeTargetToCameraOffset.x = x * cos - z * sin;
+        activeTargetToCameraOffset.z = x * sin + z * cos;
+      }
+      followWorldTarget.copyFrom(playerPosition);
       followWorldTarget.addInPlace(activeFocusOffset);
 
       targetAnchor.position.copyFrom(followWorldTarget);
