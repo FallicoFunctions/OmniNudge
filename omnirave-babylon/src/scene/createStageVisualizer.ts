@@ -205,6 +205,10 @@ export interface StageVisualizerOptions {
   // audio).
   getFrequencyData: (target: Uint8Array) => void;
   heroScreenMeshNames?: readonly string[];
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds), so
+  // the screens' motion is the same for every player; absent or undefined:
+  // this page's own clock.
+  getShowSeconds?: () => number | undefined;
   // §13.3.1 fireworks event: "a special pre-authored visualizer VIDEO for the
   // fireworks" instead of the procedural branding draw below. NO video asset
   // has been authored/sourced yet - this option is plumbing only. When (and
@@ -999,7 +1003,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
     update(dtSeconds) {
       // Guard against NaN/negative deltas from a stalled first frame.
       const dt = dtSeconds > 0 ? dtSeconds : 0;
-      elapsed += dt;
+      elapsed = options.getShowSeconds?.() ?? elapsed + dt;
       if (titleCardRemaining > 0) {
         titleCardRemaining = Math.max(0, titleCardRemaining - dt);
       }

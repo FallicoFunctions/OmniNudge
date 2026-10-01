@@ -8,6 +8,8 @@
 // across a track. Every stop channel is a saturated 0..1 float; sampling is
 // guaranteed to stay in range so downstream color buffers never go negative.
 
+import type { StageBeat } from '../media/trackBeats';
+
 export interface RaveColor {
   r: number;
   g: number;
@@ -147,4 +149,18 @@ export function paletteCrossfade(
     mix = (within - (cycle - fade)) / fade; // 0..1
   }
   return { fromIndex, toIndex, mix: clamp01(mix) };
+}
+
+// Palette jumps on a kick are at least this far apart.
+export const PALETTE_JUMP_COOLDOWN_SECONDS = 3;
+
+/**
+ * The palette clock every light effect shares: the track timeline's (the
+ * same for every player at the same moment), else the effect's own clock
+ * for a track without a beat list.
+ */
+export function showPaletteClock(beat: StageBeat | null, ownClock: number, cycleSeconds: number, fadeSeconds: number): number {
+  return beat?.timeline
+    ? beat.timeline.paletteClock(beat.seconds, cycleSeconds, fadeSeconds, PALETTE_JUMP_COOLDOWN_SECONDS)
+    : ownClock;
 }

@@ -16,7 +16,7 @@ import { scopeMaterialDirtyChecks } from './scopeMaterialDirtyChecks';
 
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 import type { StageBeat } from '../media/trackBeats';
 import { stepBassPunch } from './stagePunch';
@@ -95,6 +95,9 @@ export interface CrownEffectsOptions {
   // null (or absent) when the track has none, and the effect then detects
   // hits from the spectrum level itself.
   getBeat?: () => StageBeat | null;
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds);
+  // absent or undefined: this page's own clock.
+  getShowSeconds?: () => number | undefined;
 }
 
 // The effects only build when the Main Stage venue is actually present (same
@@ -318,7 +321,7 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
-    elapsed += dt;
+    elapsed = options.getShowSeconds?.() ?? elapsed + dt;
     paletteClock += dt;
 
     // --- spectrum + band split ---
@@ -344,6 +347,7 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     // Punch detection BEFORE smoothing absorbs this frame's hit.
     // The track's real bass hits when it has a beat list (see stagePunch.ts).
     const beat = options.getBeat ? options.getBeat() : null;
+    paletteClock = showPaletteClock(beat, paletteClock, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS);
     punch = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS).punch;
     // Attack-smoothed envelope: chase punch up quickly (~40ms), follow it down.
     if (punch > punchEnv) {
@@ -378,7 +382,11 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     // Pulse climbs the spire; travel speed rides mids and the mode. Overall
     // brightness rides bass; the traveling band adds a bright accent on beats.
     const travelSpeed = leadIn ? 0.7 : active ? 1.1 : idle ? 0.08 : 0.35 + mids * 0.9;
-    travelPhase += dt * travelSpeed;
+    // With the track's timeline the pulse rides the track's energy, summed
+    // from the track start, so it is at the same height for every player.
+    travelPhase = beat?.timeline
+      ? 0.35 * beat.seconds + 0.9 * beat.timeline.energyArea(beat.seconds)
+      : travelPhase + dt * travelSpeed;
     const pulsePos = travelPhase - Math.floor(travelPhase); // 0..1 up the spire
     const baseBright = idle
       ? 0.14 + 0.05 * (0.5 + 0.5 * Math.sin(elapsed * 0.6))

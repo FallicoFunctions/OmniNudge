@@ -102,6 +102,11 @@ export interface StageMediaPlayer {
   // when the track has no beat list (or it is not downloaded yet): the lights
   // then detect hits themselves. One reader: each call moves the window on.
   readBeat: (out: StageBeat) => boolean;
+  // The light show's clock, in seconds: the track position this player hears
+  // while a track is current, else the server's time. The same for every
+  // player at the same moment. Undefined before the server clock is known
+  // and with no track.
+  getShowSeconds: () => number | undefined;
   // Dev control surface (used by the debug-only audio scrubber). All safe
   // no-ops before unlock, when there is no backend yet.
   getCurrentTime: () => number;
@@ -503,6 +508,13 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     return options.beats.read(trackId, continues ? from : until, until, out);
   }
 
+  function getShowSeconds(): number | undefined {
+    const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
+    if (trackId) return heardSeconds();
+    const serverNow = options.serverClock?.now();
+    return serverNow === undefined ? undefined : serverNow / 1000;
+  }
+
   function getCurrentTime(): number {
     // Until the browser lets the track play, report the server's playhead
     // (sent at least once a second) so the HUD shows the room's real time.
@@ -555,6 +567,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     applyMedia,
     getFrequencyData,
     readBeat,
+    getShowSeconds,
     getCurrentTime,
     getDuration,
     isPaused,

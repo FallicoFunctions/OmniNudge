@@ -17,6 +17,7 @@
 // A two-hour set is about 950 KB, so the whole list is downloaded once.
 
 import { publicUrl } from '../app/publicUrl';
+import { buildUpAt, createShowTimeline, type ShowTimeline } from './showTimeline';
 
 const BAND_COUNT = 3;
 const BEATS_HEADER_BYTES = 4 + 4 * (BAND_COUNT + 1);
@@ -88,10 +89,14 @@ export interface StageBeat {
   // Progress through a build-up into a drop: 0 at its start, rising to 1 at
   // the drop; 0 outside a build-up.
   buildUp: number;
+  // The track position of this reading, and the show state as a function of
+  // it (see showTimeline.ts): the same for every player at the same moment.
+  seconds: number;
+  timeline: ShowTimeline | null;
 }
 
 export function createStageBeat(): StageBeat {
-  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0 };
+  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0, seconds: 0, timeline: null };
 }
 
 export interface TrackBeats {
@@ -121,6 +126,7 @@ export interface ParsedBeats {
   // Each drop with a build-up: its time, and when its build-up starts.
   buildDrops: Float32Array;
   buildStarts: Float32Array;
+  timeline: ShowTimeline;
 }
 
 export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
@@ -164,7 +170,9 @@ export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
   }
   const dropSeconds = kicks.filter((_, i) => kickIsDrop[i] === 1);
   const builds = buildUps(bands, power, dropSeconds);
-  return { bands, kickSeconds, kickIsDrop, energy: energyCurve(bands, power), ...builds };
+  const energy = energyCurve(bands, power);
+  const timeline = createShowTimeline(kickSeconds, energy, ENERGY_STEP_SECONDS, builds.buildStarts, builds.buildDrops);
+  return { bands, kickSeconds, kickIsDrop, energy, ...builds, timeline };
 }
 
 // Centred moving average over `width` steps.
@@ -380,12 +388,9 @@ export function createTrackBeats(options: TrackBeatsOptions = {}): TrackBeats {
       out.energy = beats.energy.length
         ? beats.energy[step] + (beats.energy[next] - beats.energy[step]) * Math.min(1, position - step)
         : 0;
-      const nextDrop = firstAfter(beats.buildDrops, toSeconds);
-      out.buildUp = 0;
-      if (nextDrop < beats.buildDrops.length && toSeconds >= beats.buildStarts[nextDrop]) {
-        const length = beats.buildDrops[nextDrop] - beats.buildStarts[nextDrop];
-        out.buildUp = length > 0 ? Math.min(1, (toSeconds - beats.buildStarts[nextDrop]) / length) : 0;
-      }
+      out.buildUp = buildUpAt(beats.buildStarts, beats.buildDrops, toSeconds);
+      out.seconds = toSeconds;
+      out.timeline = beats.timeline;
       return true;
     },
     dispose() {

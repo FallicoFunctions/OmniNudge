@@ -15,6 +15,10 @@ export interface StageShow extends StageShowSummary {
   // null to fall back to the estimated 126BPM beat clock. Called per-frame by
   // the runtime when the immersive audio show has live spectrum data.
   setAudioEnergy: (bass: number | null) => void;
+  // The shared show clock, called per frame: the track's kicks as a beat
+  // position (kicks so far plus the way to the next), else the show seconds.
+  // Both undefined: this page's own 126BPM clock.
+  setShowClock: (seconds: number | undefined, beatPosition: number | undefined) => void;
 }
 
 const BPM = 126;
@@ -69,6 +73,8 @@ export function createStageShow(scene: Scene): StageShow {
   // Live audio bass level (0..1) or null; when set, it replaces the estimated
   // beat clock for the spill-light pulse only.
   let audioEnergy: number | null = null;
+  let showSeconds: number | undefined;
+  let showBeat: number | undefined;
 
   const summary: StageShow = {
     screens: heroScreens.length,
@@ -76,6 +82,10 @@ export function createStageShow(scene: Scene): StageShow {
     ledDecks: ledDeckMeshes.length,
     setAudioEnergy(bass) {
       audioEnergy = bass;
+    },
+    setShowClock(seconds, beatPosition) {
+      showSeconds = seconds;
+      showBeat = beatPosition;
     },
   };
 
@@ -108,9 +118,11 @@ export function createStageShow(scene: Scene): StageShow {
   let elapsed = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = (scene.getEngine().getDeltaTime() || 16.7) / 1000;
-    elapsed += dt;
+    elapsed = showSeconds ?? elapsed + dt;
 
-    const beatPosition = elapsed / BEAT_SECONDS;
+    // The colour cycle counts the track's kicks when it has a beat list, so
+    // it changes on the music and at the same moment for every player.
+    const beatPosition = showBeat ?? elapsed / BEAT_SECONDS;
     const beatPhase = beatPosition % 1;
     const curve = beatCurve(beatPhase);
 

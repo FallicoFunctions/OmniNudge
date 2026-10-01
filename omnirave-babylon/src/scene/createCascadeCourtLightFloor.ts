@@ -15,9 +15,10 @@ import { PAVING_TOP_Y, planCascadeCourtPaving } from './createCascadeCourtPaving
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
 import { FOUNTAIN_ELLIPSE } from './mainStageVenueBounds';
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 import type { StageBeat } from '../media/trackBeats';
+import type { ShowPhrase } from '../media/showTimeline';
 import { stepBassPunch } from './stagePunch';
 
 // Music-reactive LIGHT LAYER for the Cascade Court flank paving. The pearl
@@ -161,6 +162,9 @@ export interface CascadeCourtLightFloorOptions {
   // null (or absent) when the track has none, and the effect then detects
   // hits from the spectrum level itself.
   getBeat?: () => StageBeat | null;
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds);
+  // absent or undefined: this page's own clock.
+  getShowSeconds?: () => number | undefined;
 }
 
 // The light floor only builds when the Main Stage venue is actually present
@@ -339,6 +343,7 @@ export function createCascadeCourtLightFloor(
 
   // Phrase switching state.
   let phraseMode = 0;
+  const phraseScratch: ShowPhrase = { index: 0, since: 0 };
   let phraseTimer = 0;
   let kickAccum = 0;
 
@@ -352,7 +357,7 @@ export function createCascadeCourtLightFloor(
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
-    elapsed += dt;
+    elapsed = options.getShowSeconds?.() ?? elapsed + dt;
     paletteClock += dt;
 
     // --- spectrum + band split ---
@@ -382,6 +387,7 @@ export function createCascadeCourtLightFloor(
     // (kicks, snares, hats); the level-based guesses are only for a track
     // without one (see stagePunch.ts).
     const beat = options.getBeat ? options.getBeat() : null;
+    paletteClock = showPaletteClock(beat, paletteClock, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS);
     const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, bandPulse[0], dt, PUNCH_DECAY_SECONDS);
     bandPulse[0] = punchStep.punch;
     const strongBurst = punchStep.kick;
@@ -421,12 +427,16 @@ export function createCascadeCourtLightFloor(
     }
 
     // --- phrase timeline ---
-    phraseTimer += dt;
-    if (strongBurst) kickAccum += 1;
-    if (kickAccum >= PHRASE_KICKS || phraseTimer >= PHRASE_SECONDS) {
-      phraseMode = (phraseMode + 1) % PHRASE_MODES;
-      phraseTimer = 0;
-      kickAccum = 0;
+    if (beat?.timeline) {
+      phraseMode = beat.timeline.phrase(beat.seconds, PHRASE_KICKS, 0, PHRASE_SECONDS, phraseScratch).index % PHRASE_MODES;
+    } else {
+      phraseTimer += dt;
+      if (strongBurst) kickAccum += 1;
+      if (kickAccum >= PHRASE_KICKS || phraseTimer >= PHRASE_SECONDS) {
+        phraseMode = (phraseMode + 1) % PHRASE_MODES;
+        phraseTimer = 0;
+        kickAccum = 0;
+      }
     }
     // Emphasis weights per phrase: every trigger source stays alive (so the
     // floor is always varied), but the dominant one changes the macro look.

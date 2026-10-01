@@ -1467,6 +1467,10 @@ export async function createRuntime(host: HTMLElement) {
       }
       return stageBeatKnown ? stageBeat : null;
     };
+    // The show's shared clock: every effect reads its time here (and its
+    // palette, patterns and phases from the beat's track timeline), so all
+    // players see the same lights at the same moment of the music.
+    const getShowSeconds = () => stageMediaPlayer?.getShowSeconds();
     markBootPhase('ui_ready');
     const [{ createStageVisualizer }, { createImmersiveAudioShow }, { createCrownEffects },
       { createCascadeCourtLightFloor }, { createHologramGrid }, { createStageAtmospherics },
@@ -1474,6 +1478,7 @@ export async function createRuntime(host: HTMLElement) {
     markBootPhase('show_modules_ready');
     stageVisualizer = createStageVisualizer(scene, {
       getFrequencyData: getStageFrequencyData,
+      getShowSeconds,
     });
     const activeStageVisualizer = stageVisualizer;
 
@@ -1484,6 +1489,7 @@ export async function createRuntime(host: HTMLElement) {
     immersiveAudioShow = createImmersiveAudioShow(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
+      getShowSeconds,
     });
     const activeImmersiveAudioShow = immersiveAudioShow;
 
@@ -1494,6 +1500,7 @@ export async function createRuntime(host: HTMLElement) {
     crownEffects = createCrownEffects(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
+      getShowSeconds,
     });
     const activeCrownEffects = crownEffects;
 
@@ -1506,6 +1513,7 @@ export async function createRuntime(host: HTMLElement) {
     cascadeCourtLightFloor = createCascadeCourtLightFloor(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
+      getShowSeconds,
     });
     const activeCascadeCourtLightFloor = cascadeCourtLightFloor;
 
@@ -1520,6 +1528,7 @@ export async function createRuntime(host: HTMLElement) {
     hologramGrid = createHologramGrid(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
+      getShowSeconds,
     });
     const activeHologramGrid = hologramGrid;
 
@@ -1530,6 +1539,7 @@ export async function createRuntime(host: HTMLElement) {
     stageAtmospherics = createStageAtmospherics(scene, {
       getFrequencyData: getStageFrequencyData,
       getBeat: getStageBeat,
+      getShowSeconds,
     });
     const activeStageAtmospherics = stageAtmospherics;
 
@@ -1654,6 +1664,9 @@ export async function createRuntime(host: HTMLElement) {
       // Feed the stage show's spill-light pulse real bass energy when audio is
       // live; null keeps it on its estimated 126BPM beat clock.
       playerRuntime?.stageShow?.setAudioEnergy?.(activeImmersiveAudioShow.bassLevel);
+      const showBeat = getStageBeat();
+      playerRuntime?.stageShow?.setShowClock?.(getShowSeconds(),
+        showBeat?.timeline ? showBeat.timeline.beatPosition(showBeat.seconds) : undefined);
       const playerController = playerRuntime?.playerController;
       if (playerController) {
         staminaBar?.update({ stamina0to1: playerController.stamina0to1 });

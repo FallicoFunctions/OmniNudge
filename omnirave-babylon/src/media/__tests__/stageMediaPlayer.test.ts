@@ -272,6 +272,19 @@ describe('createStageMediaPlayer', () => {
       expect(backend.load).toHaveBeenCalledWith('main-stage-set-01', 11.5);
     });
 
+    it('gives the light show the track position during a track and the server time between tracks', () => {
+      let serverMs: number | undefined;
+      const player = createStageMediaPlayer({ now: () => 0, serverClock: { now: () => serverMs }, backendFactory: () => createFakeBackend() });
+      expect(player.getShowSeconds()).toBeUndefined();
+      serverMs = 2_000_000;
+      expect(player.getShowSeconds()).toBe(2000);
+      player.applyMedia(media({ playheadSeconds: 10, sampledAtMs: 2_000_000 }));
+      serverMs = 2_003_000;
+      expect(player.getShowSeconds()).toBe(13);
+      player.applyMedia(null);
+      expect(player.getShowSeconds()).toBe(2003);
+    });
+
     it('counts from the arrival time before the server clock is known', () => {
       let localMs = 5000;
       const backend = createFakeBackend();

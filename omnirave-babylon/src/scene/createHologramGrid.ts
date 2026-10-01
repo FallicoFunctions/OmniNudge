@@ -15,9 +15,10 @@ import type { Scene } from '@babylonjs/core/scene';
 
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 import type { StageBeat } from '../media/trackBeats';
+import type { ShowPhrase } from '../media/showTimeline';
 import { stepBassPunch } from './stagePunch';
 
 // A floating 3D LIGHT GRID - a drone-show hologram volume - hanging above the
@@ -281,6 +282,9 @@ export interface HologramGridOptions {
   // null (or absent) when the track has none, and the effect then detects
   // hits from the spectrum level itself.
   getBeat?: () => StageBeat | null;
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds);
+  // absent or undefined: this page's own clock.
+  getShowSeconds?: () => number | undefined;
 }
 
 // The grid only builds when the Main Stage venue is actually present (same
@@ -972,6 +976,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   let previousShapeIndex = 0;
   let holdTimer = 0;
   let morphTimer = MORPH_SECONDS; // start settled on the cube
+  const phraseScratch: ShowPhrase = { index: 0, since: 0 };
   let kickAccum = 0;
 
   let peakBrightnessValue = 0;
@@ -996,7 +1001,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
-    elapsed += dt;
+    elapsed = options.getShowSeconds?.() ?? elapsed + dt;
     paletteClock += dt;
     if(control){elapsed=controlNow/1000;paletteClock=elapsed;}
 
@@ -1023,6 +1028,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     // --- punch detection (BEFORE smoothing absorbs this frame's hit) ---
     // The track's real bass hits when it has a beat list (see stagePunch.ts).
     const beat = options.getBeat ? options.getBeat() : null;
+    if (!control) paletteClock = showPaletteClock(beat, paletteClock, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS);
     const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
     punch = punchStep.punch;
     const strongKick = punchStep.kick;
@@ -1059,25 +1065,38 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
     // --- choreography sequencer ---
     // Hold a formation, then morph. Advance on musical phrase (accumulated
     // strong kicks) once past the minimum hold, else on the hold timer.
-    if (strongKick) {
-      kickAccum += 1;
-    }
-    const holdLimit = HOLD_SECONDS * (active ? HOLD_ACTIVE_SCALE : idle ? HOLD_IDLE_SCALE : 1);
-    if (morphTimer < MORPH_SECONDS) {
-      morphTimer += dt;
-      if (morphTimer >= MORPH_SECONDS) {
-        morphTimer = MORPH_SECONDS;
-        previousShapeIndex = shapeIndex;
-      }
+    if (beat?.timeline) {
+      // The same sequence read at the track position: a formation morphs in,
+      // holds at least MIN_HOLD_SECONDS, and moves on at the PHRASE_KICKS-th
+      // kick (or after HOLD_SECONDS), for every player alike.
+      const phrase = beat.timeline.phrase(beat.seconds, PHRASE_KICKS,
+        MORPH_SECONDS + MIN_HOLD_SECONDS, MORPH_SECONDS + HOLD_SECONDS, phraseScratch);
+      shapeIndex = phrase.index % SHAPE_ORDER.length;
+      previousShapeIndex = phrase.index > 0 ? (phrase.index - 1) % SHAPE_ORDER.length : shapeIndex;
+      morphTimer = Math.min(MORPH_SECONDS, phrase.since);
+      holdTimer = 0;
+      kickAccum = 0;
     } else {
-      holdTimer += dt;
-      const phraseReady = kickAccum >= PHRASE_KICKS && holdTimer >= MIN_HOLD_SECONDS;
-      if (phraseReady || holdTimer >= holdLimit) {
-        previousShapeIndex = shapeIndex;
-        shapeIndex = (shapeIndex + 1) % SHAPE_ORDER.length;
-        holdTimer = 0;
-        kickAccum = 0;
-        morphTimer = 0;
+      if (strongKick) {
+        kickAccum += 1;
+      }
+      const holdLimit = HOLD_SECONDS * (active ? HOLD_ACTIVE_SCALE : idle ? HOLD_IDLE_SCALE : 1);
+      if (morphTimer < MORPH_SECONDS) {
+        morphTimer += dt;
+        if (morphTimer >= MORPH_SECONDS) {
+          morphTimer = MORPH_SECONDS;
+          previousShapeIndex = shapeIndex;
+        }
+      } else {
+        holdTimer += dt;
+        const phraseReady = kickAccum >= PHRASE_KICKS && holdTimer >= MIN_HOLD_SECONDS;
+        if (phraseReady || holdTimer >= holdLimit) {
+          previousShapeIndex = shapeIndex;
+          shapeIndex = (shapeIndex + 1) % SHAPE_ORDER.length;
+          holdTimer = 0;
+          kickAccum = 0;
+          morphTimer = 0;
+        }
       }
     }
     const morphing = morphTimer < MORPH_SECONDS;

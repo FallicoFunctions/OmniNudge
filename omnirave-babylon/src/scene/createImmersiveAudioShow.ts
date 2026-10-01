@@ -21,6 +21,7 @@ import { VertexBuffer } from '@babylonjs/core/Buffers/buffer.js';
 import type { Scene } from '@babylonjs/core/scene';
 
 import type { StageBeat } from '../media/trackBeats';
+import type { ShowPhrase } from '../media/showTimeline';
 import { stepBassPunch } from './stagePunch';
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
@@ -31,7 +32,7 @@ import {
   organicDrift,
   selectPattern,
 } from './laserPatterns';
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, PALETTE_JUMP_COOLDOWN_SECONDS } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 
 // The venue-wide IMMERSIVE audio show: where createStageVisualizer is a
@@ -132,8 +133,8 @@ const PALETTE_CYCLE_SECONDS = 22;
 const PALETTE_FADE_SECONDS = 2;
 // Slow rotation of the palette sampling window so a single palette still drifts.
 const PALETTE_PHASE_SPEED = 0.03;
-// Debounce palette jumps triggered by strong bass hits.
-const PALETTE_JUMP_COOLDOWN = 3;
+// Debounce palette jumps triggered by strong bass hits (shared by every effect).
+const PALETTE_JUMP_COOLDOWN = PALETTE_JUMP_COOLDOWN_SECONDS;
 
 export interface ImmersiveAudioShowOptions {
   // Fills the passed array with the current byte frequency spectrum (same
@@ -144,6 +145,9 @@ export interface ImmersiveAudioShowOptions {
   // null (or absent) when the track has none, and the effect then detects
   // hits from the spectrum level itself.
   getBeat?: () => StageBeat | null;
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds);
+  // absent or undefined: this page's own clock.
+  getShowSeconds?: () => number | undefined;
 }
 
 // The show only builds when the Main Stage venue is actually present (same
@@ -571,6 +575,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
   // Phrase switching for the laser patterns.
   let phraseIndex = 0;
+  const phraseScratch: ShowPhrase = { index: 0, since: 0 };
   let phraseTimer = 0;
   let bassEventAccum = 0;
   let musicEnergy = 0;
@@ -607,7 +612,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
-    elapsed += dt;
+    elapsed = options.getShowSeconds?.() ?? elapsed + dt;
     paletteClock += dt;
     if (paletteJumpCooldown > 0) {
       paletteJumpCooldown = Math.max(0, paletteJumpCooldown - dt);
@@ -640,6 +645,14 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     // guess only for a track without one (see stagePunch.ts).
     const beat = options.getBeat ? options.getBeat() : null;
     const beatDriven = beat !== null;
+    // With the track's timeline every frame-history state below (palette,
+    // pattern, beam angles) is read at the track position instead, so every
+    // player sees the same show at the same moment (see showTimeline.ts).
+    const timeline = beat?.timeline ?? null;
+    const showAt = beat ? beat.seconds : 0;
+    const energyArea = timeline ? timeline.energyArea(showAt) : 0;
+    const rampArea = timeline ? timeline.rampArea(showAt) : 0;
+    const energyRampArea = timeline ? timeline.energyRampArea(showAt) : 0;
     const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
     punch = punchStep.punch;
     punchBurst = punchStep.hit;
@@ -692,7 +705,9 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     setLayersEnabled(true);
 
     // --- palette timeline ---
-    if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
+    if (timeline) {
+      paletteClock = timeline.paletteClock(showAt, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS, PALETTE_JUMP_COOLDOWN);
+    } else if ((strongBurst && paletteJumpCooldown <= 0) || (active && paletteJumpCooldown <= 0 && bassEventAccum === 0)) {
       // Big bass event (or entering active) jumps to the next palette.
       if (strongBurst) {
         jumpPalette();
@@ -714,7 +729,8 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
 
     // --- cone beams ---
     const sweepSpeed = mode === 'lead_in' ? 0.15 : active ? 2.2 : idle ? 0.3 : 0.7 + motion * 1.8;
-    coneSweepPhase += dt * sweepSpeed;
+    // The timeline's sweep: 0.7 + 1.8 x energy, summed from the track start.
+    coneSweepPhase = timeline ? 0.7 * showAt + 1.8 * energyArea : coneSweepPhase + dt * sweepSpeed;
     const rotBlend = Math.min(1, dt * (mode === 'lead_in' ? 2 : 7));
     for (let i = 0; i < CONE_COUNT; i++) {
       let targetX: number;
@@ -751,14 +767,18 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     // Advance the phrase on accumulated strong-bass events, or every ~8s.
     // With a beat list the change lands on a kick, every four bars; the
     // timer is then only for a long passage with no kick.
-    phraseTimer += dt;
-    if (strongBurst) {
-      bassEventAccum += 1;
-    }
-    if (bassEventAccum >= (beatDriven ? KICKS_PER_PHRASE : 4) || phraseTimer >= (beatDriven ? 12 : 8)) {
-      phraseIndex = nextPhraseIndex(phraseIndex);
-      phraseTimer = 0;
-      bassEventAccum = 0;
+    if (timeline) {
+      phraseIndex = timeline.phrase(showAt, KICKS_PER_PHRASE, 0, 12, phraseScratch).index;
+    } else {
+      phraseTimer += dt;
+      if (strongBurst) {
+        bassEventAccum += 1;
+      }
+      if (bassEventAccum >= (beatDriven ? KICKS_PER_PHRASE : 4) || phraseTimer >= (beatDriven ? 12 : 8)) {
+        phraseIndex = nextPhraseIndex(phraseIndex);
+        phraseTimer = 0;
+        bassEventAccum = 0;
+      }
     }
     const patternFn = selectPattern(phraseIndex).fn;
 
@@ -779,8 +799,13 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     laserBeamsLitValue = 0;
     elevationSum = 0;
     spreadSum = 0;
-    laserPhase = advancePhase(laserPhase, dt, laserSpeed);
-    const driftPhase = elapsed * (0.3 + motion * 0.6);
+    // The timeline's laser phase is the same speed summed from the track
+    // start. BUILD_SPEED is above DROP_SPEED, so the speed is
+    // break(1 - ramp) + (drop - break) x energy x (1 - ramp) + build x ramp.
+    laserPhase = timeline
+      ? BREAK_SPEED * (showAt - rampArea) + (DROP_SPEED - BREAK_SPEED) * (energyArea - energyRampArea) + BUILD_SPEED * rampArea
+      : advancePhase(laserPhase, dt, laserSpeed);
+    const driftPhase = timeline ? 0.3 * showAt + 0.6 * energyArea : elapsed * (0.3 + motion * 0.6);
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
 
     // Global laser brightness (reactivity amplified, beat-flashed).

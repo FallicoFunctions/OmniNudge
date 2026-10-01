@@ -168,4 +168,25 @@ describe('createStageShow', () => {
     expect(summary.ledDecks).toBe(0);
     expect(() => scene.render()).not.toThrow();
   });
+
+  it('takes the spill colours from the shared show clock, whatever the page ran before', () => {
+    const colourAfter = (localFrames: number) => {
+      const scene = buildStageScene();
+      const show = createStageShow(scene);
+      for (let i = 0; i < localFrames; i++) scene.render();
+      // Half way through the 8th beat of a cycle: half way from magenta to cyan.
+      show.setShowClock(100, 7.5);
+      scene.render();
+      const light = scene.getLightByName('main-stage-hero-screen-panel-l-spill') as PointLight;
+      const colour = [light.diffuse.r, light.diffuse.g, light.diffuse.b];
+      engine?.dispose();
+      engine = undefined;
+      return colour;
+    };
+    const joinedEarly = colourAfter(400);
+    const joinedLate = colourAfter(3);
+    expect(joinedLate).toEqual(joinedEarly);
+    expect(joinedEarly[0]).toBeCloseTo((0.72 + 0.16) / 2, 6);
+    expect(joinedEarly[2]).toBeCloseTo((0.85 + 0.95) / 2, 6);
+  });
 });

@@ -234,4 +234,38 @@ describe('createStageAtmospherics', () => {
       atmo.dispose();
     });
   });
+
+  it('fires the CO2 nozzle the track kick count names, whatever this page fired before', () => {
+    const nozzleAfter = (earlierKicks: number) => {
+      const own = new Scene(engine);
+      MeshBuilder.CreatePlane('main-stage-hero-screen-panel-l', { size: 1 }, own);
+      const beat = createStageBeat();
+      const atmo = createStageAtmospherics(own, { getFrequencyData: loudSource, getBeat: () => beat });
+      const kick = (count: number) => {
+        beat.kick = true; beat.bass = 1; beat.kickCount = count;
+        atmo.update(0.05);
+        beat.kick = false; beat.bass = 0;
+      };
+      // This page's own history: some earlier CO2 kicks, long enough ago for
+      // every nozzle to have cooled down.
+      for (let k = 1; k <= earlierKicks; k++) {
+        kick(16 * k);
+        for (let i = 0; i < 80; i++) atmo.update(0.05);
+      }
+      // A test scene never renders, so mark the earlier bursts as emitted.
+      const nozzles = own.particleSystems.filter((system) => system.name.startsWith('stage-atmo-co2-'));
+      for (const nozzle of nozzles) nozzle.manualEmitCount = -1;
+      kick(16 * 7);
+      const fired = own.particleSystems
+        .filter((system) => system.name.startsWith('stage-atmo-co2-') && system.manualEmitCount > 0)
+        .map((system) => system.name);
+      atmo.dispose();
+      own.dispose();
+      return fired;
+    };
+    const late = nozzleAfter(0);
+    expect(late).toHaveLength(1);
+    expect(nozzleAfter(3)).toEqual(late);
+    expect(nozzleAfter(5)).toEqual(late);
+  });
 });

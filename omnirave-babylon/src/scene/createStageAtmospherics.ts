@@ -12,7 +12,7 @@ import type { Scene } from '@babylonjs/core/scene';
 
 import { resolveVisualizerMode } from './createStageVisualizer';
 import type { StageEventStateInput, StageVisualizerMode } from './createStageVisualizer';
-import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor } from './ravePalettes';
+import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, showPaletteClock } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
 import type { StageBeat } from '../media/trackBeats';
 import { stepBassPunch } from './stagePunch';
@@ -116,6 +116,9 @@ export interface StageAtmosphericsOptions {
   // null (or absent) when the track has none, and the effect then detects
   // hits from the spectrum level itself.
   getBeat?: () => StageBeat | null;
+  // The shared show clock in seconds (see StageMediaPlayer.getShowSeconds);
+  // absent or undefined: this page's own clock.
+  getShowSeconds?: () => number | undefined;
 }
 
 // The effects only build when the Main Stage venue is actually present (same
@@ -423,7 +426,7 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
 
   function update(dtSeconds: number): void {
     const dt = dtSeconds > 0 ? dtSeconds : 0;
-    elapsed += dt;
+    elapsed = options.getShowSeconds?.() ?? elapsed + dt;
     paletteClock += dt;
 
     // --- spectrum + band split ---
@@ -449,6 +452,7 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     // Punch detection BEFORE smoothing absorbs this frame's hit.
     // The track's real bass hits when it has a beat list (see stagePunch.ts).
     const beat = options.getBeat ? options.getBeat() : null;
+    paletteClock = showPaletteClock(beat, paletteClock, PALETTE_CYCLE_SECONDS, PALETTE_FADE_SECONDS);
     const punchStep = stepBassPunch(beat, audioPresent, bassRaw, bass, punch, dt, PUNCH_DECAY_SECONDS);
     punch = punchStep.punch;
     const punchBurst = punchStep.hit;
@@ -508,6 +512,9 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
       ? drop || onKick(CO2_KICK_INTERVAL) || (active && strongBurst)
       : strongBurst || (active && punchBurst));
     if (co2Fire) {
+      // With a beat list the round starts at the track's kick count, so the
+      // same nozzle fires for every player.
+      if (beat) co2NextIndex = beat.kickCount % co2Systems.length;
       // Round-robin from the next nozzle, skipping any still cooling down.
       for (let scan = 0; scan < co2Systems.length; scan++) {
         const idx = (co2NextIndex + scan) % co2Systems.length;
@@ -536,6 +543,8 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
     if (drop) flameArmSeconds = FLAME_DROP_SECONDS;
     else if (onKick(FLAME_KICK_INTERVAL)) flameArmSeconds = Math.max(flameArmSeconds, FLAME_PHRASE_SECONDS);
     else flameArmSeconds = Math.max(0, flameArmSeconds - dt);
+    // The cascade starts at the track's kick count, the same mount for everyone.
+    if (beat && (drop || onKick(FLAME_KICK_INTERVAL))) flameNextIndex = beat.kickCount % flameSystems.length;
     const flameArmed = beat ? flameArmSeconds > 0 : bassSlow > FLAME_THRESHOLD;
     if (!leadIn && !idle && flameArmed && flameFireGap <= 0) {
       for (let scan = 0; scan < flameSystems.length; scan++) {
