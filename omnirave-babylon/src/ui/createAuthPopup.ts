@@ -13,10 +13,10 @@
 //   - switching login <-> signup keeps what the player already typed; CLOSING
 //     is what discards it
 //
-// Sec 9.5 "venue-styled exceptions": this window and the welcome card it
-// becomes are venue-FIXED. They consume the `--venue-*` tokens in styles.css
+// Sec 9.5 "venue-styled exceptions": this window is venue-FIXED.
+// It consumes the `--venue-*` tokens in styles.css
 // rather than the `--hud-*` theme tokens, so the player's UI theme selector
-// deliberately does not restyle them.
+// deliberately does not restyle it.
 //
 // Pure DOM: no Babylon imports, safe under jsdom. Holds no network logic -
 // onSubmit is supplied by the caller (createRuntime), which is what actually
@@ -239,8 +239,7 @@ export function createAuthPopup(options: CreateAuthPopupOptions): AuthPopup {
       if (!result.ok) {
         showError(result.message);
       }
-      // On success the caller closes this window and raises the welcome card
-      // (sec 11.2) - there is nothing further to render here.
+      // On success the caller closes this window and resumes the venue.
     } finally {
       submitting = false;
       render();

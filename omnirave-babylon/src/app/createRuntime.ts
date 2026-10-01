@@ -61,7 +61,6 @@ import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
 import { createTopRightControls } from '../ui/createTopRightControls';
 import { createAuthPopup } from '../ui/createAuthPopup';
-import { createWelcomeCard } from '../ui/createWelcomeCard';
 import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
 import { applyUiTheme } from '../ui/uiTheme';
 import { RUNTIME_CONFIG } from './runtimeConfig';
@@ -385,8 +384,6 @@ export async function createRuntime(host: HTMLElement) {
   // player id is set when the sign-up or log-in succeeds). Every other way of
   // opening the window clears it, so closing it needs nothing here.
   let joinAfterSignIn: { panel: import('../showControl/showTypes').PanelName; playerId?: string } | undefined;
-  // Sec 11.2: what the auth window turns into after a successful login/signup.
-  let welcomeCard: import('../ui/createWelcomeCard').WelcomeCard | undefined;
   let settingsPopup: import('../ui/createSettingsPopup').SettingsPopup | undefined;
   let hudNotice: import('../ui/createHudNotice').HudNotice | undefined;
   let handleCanvasPick: ((event: MouseEvent) => void) | undefined;
@@ -452,7 +449,6 @@ export async function createRuntime(host: HTMLElement) {
     topLeftControls?.dispose();
     topRightControls?.dispose();
     authPopup?.dispose();
-    welcomeCard?.dispose();
     hudNotice?.dispose();
     if (fireworksPreviewTimer !== undefined) {
       window.clearInterval(fireworksPreviewTimer);
@@ -1268,9 +1264,6 @@ export async function createRuntime(host: HTMLElement) {
           if (panel === null) {
             return;
           }
-          // Sec 11.2: a direct top-level UI action closes the welcome card and
-          // then proceeds - the card never swallows the click.
-          welcomeCard?.dismiss();
           // Historical prototype avatars retain their signup entry point.
           if (panel === 'avatar' && resolvedSessionMode === 'guest' && !reviewRuntime?.reviewAvatar?.wardrobe) {
             topLeftControls?.openPanel(null);
@@ -1349,17 +1342,6 @@ export async function createRuntime(host: HTMLElement) {
         // A no-op when already closed (e.g. the logout call site below).
         vipGateOpenedAuthPopup = false;
         authPopup?.close();
-        if (nextMode === 'account') {
-          // Sec 11.2: the auth window "transforms directly into the
-          // venue-styled welcome card" - same size, same place, so closing one
-          // and showing the other in its slot IS the transform.
-          welcomeCard?.show(session.playerName);
-        } else {
-          // Sec 11.4 logout: "no extra message, no welcome card". The visible
-          // confirmation is the top-right controls flipping back to Log In /
-          // Sign Up, plus the new guest name and look.
-          welcomeCard?.dismiss();
-        }
         return true;
       };
 
@@ -1420,16 +1402,7 @@ export async function createRuntime(host: HTMLElement) {
           reviewRuntime?.input?.setTextEntryActive?.(active);
         },
       });
-      // Sec 11.1: near bottom-center, rising out of the emote HUD area - so
-      // both venue windows mount on the host itself rather than inside a
-      // corner control block's slot. Sec 11.2's card takes the same slot on
-      // screen, which is what makes the transform read as one window.
-      welcomeCard = createWelcomeCard({
-        onEditAvatar() {
-          topLeftControls?.openPanel('avatar');
-        },
-      });
-      host.append(authPopup.element, welcomeCard.element);
+      host.append(authPopup.element);
 
       // Sec 12 guest upgrade prompts: "VIP block opens venue-styled signup
       // window immediately", it auto-closes once the player walks 15 feet off
@@ -1456,13 +1429,10 @@ export async function createRuntime(host: HTMLElement) {
       topRightControls = createTopRightControls(host, {
         mode: resolvedSessionMode,
         onLogIn() {
-          // Sec 11.2: a direct top-level action closes the card and proceeds.
-          welcomeCard?.dismiss();
           joinAfterSignIn = undefined;
           authPopup?.open('login');
         },
         onSignUp() {
-          welcomeCard?.dismiss();
           joinAfterSignIn = undefined;
           authPopup?.open('signup');
         },
@@ -1618,7 +1588,6 @@ export async function createRuntime(host: HTMLElement) {
       // Join gets the sign-up window (with its log-in switch) instead.
       askForAccount(panel) {
         if (resolvedSessionMode !== 'guest' || !authPopup) return false;
-        welcomeCard?.dismiss();
         // Joined automatically once the sign-up or log-in succeeds.
         joinAfterSignIn = { panel };
         authPopup.open('signup');

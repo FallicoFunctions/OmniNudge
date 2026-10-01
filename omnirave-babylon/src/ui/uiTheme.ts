@@ -8,9 +8,8 @@
 // `--hud-accent`, `--hud-blur`, `--hud-shadow`), so the change is instant and
 // nothing has to be re-rendered.
 //
-// Venue-styled exceptions in sec 9.5 (auth popup, post-auth welcome card) do
-// NOT follow this selector. Neither exists yet, and nothing outside the core
-// player HUD consumes these tokens.
+// The venue-styled auth popup does not follow this selector; it uses its
+// own venue tokens.
 //
 // Pure DOM: no Babylon imports, safe under jsdom.
 

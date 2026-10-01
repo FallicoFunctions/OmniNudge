@@ -30,7 +30,7 @@ body,
    The unthemed defaults duplicate `Luminous Panels`, the spec default, so the
    HUD is never unstyled between boot and the first applyUiTheme() call.
 
-   Venue-styled exceptions (auth window, post-auth welcome card) do NOT consume
+   Venue-styled exceptions (auth window) do NOT consume
    these tokens: they read the `--venue-*` set further down instead.
    =========================================================================== */
 .babylon-runtime-host,
@@ -962,11 +962,10 @@ body,
 }
 
 /* ===========================================================================
-   Venue windows: the auth window (sec 11.1) and the welcome card it becomes
-   (sec 11.2).
+   Venue auth window (sec 11.1).
 
-   Sec 9.5 lists both as "venue-styled exceptions" that do NOT follow the core
-   UI theme selector, so they consume these `--venue-*` tokens instead of the
+   This venue-styled exception does not follow the core
+   UI theme selector, so it consumes these `--venue-*` tokens instead of the
    `--hud-*` ones every other surface reads. Main Stage's palette is taken
    from the venue's own materials - V19_GatewayPearlIvory,
    V19_ArrivalBrushedGold and V19_ArrivalCyanGlow - so the window reads as
@@ -977,9 +976,8 @@ body,
    =========================================================================== */
 .babylon-runtime-host {
   --venue-window-width: 520px;
-  /* Sec 11.1 "fixed size", sec 11.2 "same size and position as auth window":
-     one box for login, signup AND the welcome card, so switching modes or
-     transforming into the card never resizes the window under the player.
+  /* Sec 11.1 "fixed size": one box for login and signup, so switching modes
+     never resizes the window under the player.
      Sized to the tallest content (signup, with its email + two consents). */
   --venue-window-height: 232px;
   --venue-pearl: #f4efe2;
@@ -1180,34 +1178,6 @@ body,
 
 .venue-auth-error[hidden] {
   display: none;
-}
-
-/* Sec 11.2: equal focus on `Edit Avatar` and `Enter VIP` - same row, same
-   width, same weight. Only the first is clickable. */
-.venue-welcome__items {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: 18px;
-  margin-top: auto;
-  padding-top: 16px;
-}
-
-.venue-welcome__item {
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.venue-welcome__item--informational {
-  border: 1px solid rgba(104, 216, 255, 0.4);
-  color: var(--venue-cyan);
-  background: rgba(104, 216, 255, 0.12);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .stage-audio-dev-controls {

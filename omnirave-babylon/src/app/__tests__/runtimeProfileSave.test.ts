@@ -19,16 +19,18 @@ function account(playerId = 'alice', cp = 'female', sessionToken = 'profile-alic
     worldSessionToken:`world-${playerId}`,activeZone:'main_stage',loadout:{av:'1',cv:'1',cp,cw:'110111'}};
 }
 
-async function setup(preview = false) {
+async function setup(preview = false, initialMode: RuntimeAuthSession['mode'] = 'account') {
   vi.resetModules(); window.history.replaceState(null, '', '/?perf=webgl&mode=account&handoff=fixture');
   mockShowControlRuntime();
   const first = account();
+  first.mode = initialMode;
   vi.doMock('../../network/sessionExchange', () => ({
     parseSessionExchangeParams: () => ({mode:'account',handoff:'fixture'}), exchangeLaunchSession:async () => ({...first,zoneMedia:[]}),
   }));
   const login = vi.fn().mockResolvedValue(account('alice','female','renewed-alice'));
+  const signup = vi.fn().mockResolvedValue(account('alice','female','renewed-alice'));
   vi.doMock('../../network/runtimeAuth', () => ({
-    RuntimeAuthError:class extends Error {}, runtimeLogin:login, runtimeSignup:vi.fn(), runtimeLogout:vi.fn(),
+    RuntimeAuthError:class extends Error {}, runtimeLogin:login, runtimeSignup:signup, runtimeLogout:vi.fn(),
   }));
   const snapshots: ((snapshot: WorldSnapshot) => void)[] = [];
   const statuses: ((status: WorldSocketStatus) => void)[] = [];
@@ -76,8 +78,27 @@ async function setup(preview = false) {
   // Outfit edits reach the saver through the wardrobe itself; the venue panel
   // no longer has part checkboxes.
   const toggle = (slot: 'jacket' | 'hair') => avatar.wardrobe!.setVisible(slot, !avatar.wardrobe!.isVisible(slot));
-  return {fetchMock,login,toggle,restore,socket,emit};
+  return {fetchMock,login,signup,toggle,restore,socket,emit};
 }
+
+it.each(['login','signup'] as const)('closes successful %s directly back to the venue without a welcome popup', async mode => {
+  const app = await setup(false, 'guest');
+  const control = mode === 'login' ? 'log-in' : 'sign-up';
+  document.querySelector<HTMLButtonElement>(`[data-hud-control="${control}"]`)!.click();
+  const popup = document.querySelector<HTMLElement>('[data-testid="auth-popup"]')!;
+  const field = (name: string) => popup.querySelector<HTMLInputElement>(`[data-auth-field="${name}"]`)!;
+  field('username').value = 'alice'; field('password').value = 'fixture-password';
+  if (mode === 'signup') {
+    field('email').value = 'alice@example.test';
+    field('accept-terms').checked = true; field('accept-privacy').checked = true;
+  }
+  popup.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(app.socket.reconnect).toHaveBeenCalledTimes(1));
+  expect(mode === 'login' ? app.login : app.signup).toHaveBeenCalledTimes(1);
+  expect(popup.hidden).toBe(true);
+  expect(document.querySelector('[data-testid="welcome-card"]')).toBeNull();
+  expect(document.querySelector('[data-hud-control="logout"]')?.hasAttribute('hidden')).toBe(false);
+},20_000);
 
 it('saves an outfit edit to the account and never the restored state', async () => {
   const app = await setup(); expect(app.fetchMock).not.toHaveBeenCalled();
