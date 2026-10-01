@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/scene/createStageAtmospherics.ts b/omnirave-babylon/src/scene/createStageAtmospherics.ts
+index 993c1830e..219a7f2be 100644
+--- a/omnirave-babylon/src/scene/createStageAtmospherics.ts
++++ b/omnirave-babylon/src/scene/createStageAtmospherics.ts
+@@ -544,7 +544,6 @@ export function createStageAtmospherics(scene: Scene, options: StageAtmospherics
+     else if (onKick(FLAME_KICK_INTERVAL)) flameArmSeconds = Math.max(flameArmSeconds, FLAME_PHRASE_SECONDS);
+     else flameArmSeconds = Math.max(0, flameArmSeconds - dt);
+     // The cascade starts at the track's kick count, the same mount for everyone.
+-    if (beat && (drop || onKick(FLAME_KICK_INTERVAL))) flameNextIndex = beat.kickCount % flameSystems.length;
+     const flameArmed = beat ? flameArmSeconds > 0 : bassSlow > FLAME_THRESHOLD;
+     if (!leadIn && !idle && flameArmed && flameFireGap <= 0) {
+       for (let scan = 0; scan < flameSystems.length; scan++) {

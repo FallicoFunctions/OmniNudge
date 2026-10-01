@@ -1,0 +1,13 @@
+diff --git a/omnirave-babylon/src/media/stageMediaPlayer.ts b/omnirave-babylon/src/media/stageMediaPlayer.ts
+index 1c1d6c1b4..a753978b5 100644
+--- a/omnirave-babylon/src/media/stageMediaPlayer.ts
++++ b/omnirave-babylon/src/media/stageMediaPlayer.ts
+@@ -521,7 +521,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
+ 
+   function getTrackStartServerMs(): number | undefined {
+     if (manualOverride || !desiredMedia || typeof desiredMedia.sampledAtMs !== 'number') return undefined;
+-    return desiredMedia.sampledAtMs - desiredMedia.playheadSeconds * 1000;
++    return desiredMedia.sampledAtMs;
+   }
+ 
+   function getCurrentTime(): number {

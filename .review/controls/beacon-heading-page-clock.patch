@@ -1,0 +1,13 @@
+diff --git a/omnirave-babylon/src/scene/createCrownEffects.ts b/omnirave-babylon/src/scene/createCrownEffects.ts
+index 7740bc3db..c0ea622df 100644
+--- a/omnirave-babylon/src/scene/createCrownEffects.ts
++++ b/omnirave-babylon/src/scene/createCrownEffects.ts
+@@ -467,7 +467,7 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions):
+     // With the track's timeline the beacon's heading is that speed summed
+     // from the track start (the lead-in's and show's own inside them), so it
+     // points the same way for every player.
+-    if (beat?.timeline) {
++    if (false && beat?.timeline) {
+       beaconPivot.rotation.y = PRECESS_SPEED * beat.seconds + (beat.events
+         ? windowSum(beat.events.leadIns, beat.seconds, (from, to) => (LEAD_IN_PRECESS_SPEED - PRECESS_SPEED) * (to - from))
+           + windowSum(beat.events.actives, beat.seconds, (from, to) => (SHOW_PRECESS_SPEED - PRECESS_SPEED) * (to - from))

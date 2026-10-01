@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/app/createRuntime.ts b/omnirave-babylon/src/app/createRuntime.ts
+index a7f4e9546..a0c710737 100644
+--- a/omnirave-babylon/src/app/createRuntime.ts
++++ b/omnirave-babylon/src/app/createRuntime.ts
+@@ -1723,7 +1723,6 @@ export async function createRuntime(host: HTMLElement) {
+       }
+       stageAudioDevControls?.update();
+       // Phase changes on the server clock, the same moment for every player.
+-      syncStageEventState();
+       activeStageVisualizer.update(deltaSeconds);
+       activeImmersiveAudioShow.update(deltaSeconds);
+       activeCrownEffects.update(deltaSeconds);

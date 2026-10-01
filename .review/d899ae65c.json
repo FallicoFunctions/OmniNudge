@@ -1,0 +1,1019 @@
+{
+ "schema_version": 2,
+ "head": "df6604e78",
+ "base": "d899ae65c",
+ "scope": {
+  "files": [
+   "backend/internal/omniraveworld/world/event_schedule.go",
+   "backend/internal/omniraveworld/world/show_control.go",
+   "backend/internal/omniraveworld/server/ws_handler_show_test.go",
+   "omnirave-babylon/src/app/createRuntime.ts",
+   "omnirave-babylon/src/media/showTimeline.ts",
+   "omnirave-babylon/src/media/eventSchedule.ts",
+   "omnirave-babylon/src/media/trackBeats.ts",
+   "omnirave-babylon/src/media/stageMediaPlayer.ts",
+   "omnirave-babylon/src/network/worldSocket.ts",
+   "omnirave-babylon/src/scene/createImmersiveAudioShow.ts",
+   "omnirave-babylon/src/scene/createCrownEffects.ts",
+   "omnirave-babylon/src/scene/createCascadeCourtLightFloor.ts",
+   "omnirave-babylon/src/scene/createHologramGrid.ts",
+   "omnirave-babylon/src/scene/createStageAtmospherics.ts",
+   "omnirave-babylon/src/scene/createStageShow.ts",
+   "omnirave-babylon/src/scene/createStageVisualizer.ts",
+   "omnirave-babylon/src/scene/ravePalettes.ts",
+   "omnirave-babylon/src/showControl/createShowControlHud.ts",
+   "omnirave-babylon/src/showControl/createShowControlRuntime.ts",
+   "omnirave-babylon/src/showControl/showControl.css",
+   "omnirave-babylon/src/styles.css"
+  ],
+  "boundaries": [
+   "world server ZoneEventState JSON -> client ZoneEventState (world snapshot)",
+   "world server show_result for a guest join -> show HUD",
+   "server media state (playhead, sampledAtMs) -> client track start",
+   "track beat file -> StageBeat.timeline -> every light effect",
+   "runtime -> show HUD join path -> world socket",
+   "runtime auth window -> session upgrade -> queued join",
+   "stylesheets -> rendered HUD layout"
+  ]
+ },
+ "prior_ledgers_read": [
+  ".review/ee7b18fe9.json",
+  ".review/cf7bd57a2.json"
+ ],
+ "passes": [
+  {
+   "pass": 1,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "d899ae65c..HEAD: shared show clock (showTimeline, beat timeline, show seconds, six light modules + spill lights), fireworks schedule (Go ZoneEventState schedule fields, eventSchedule.ts, per-frame phase sync, event windows in the timeline), HUD flush to edges (styles.css, showControl.css), guest Join -> sign-up (HUD askForAccount), server guest guard, auto-join after sign-up. Boundaries listed in scope."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Read ee7b18fe9 (renewal, queue grace, music sync; 4 of 6 findings were wiring lines no test read) and cf7bd57a2 (no findings). Took the lesson: C10 on every runtime wiring line, C7 on fixtures."
+    },
+    {
+     "id": "B1",
+     "status": "applied",
+     "evidence": "Printed the world socket zone event as the local world server sends it (browser WS capture: {\"zoneId\":\"main_stage\",\"phase\":\"none\",\"eventName\":\"\",\"activeStartMs\":1790830800000,\"periodSeconds\":3600,\"leadInSeconds\":10,\"activeSeconds\":300}) and the Go StateFor fields for lead-in, active and none (event_schedule_test). Printed the join frames: none for a guest Join, one {\"panel\":\"drones\",\"action\":\"join\"} after sign-up, and show_result {\"ok\":false,\"message\":\"Sign up or log in to join a queue.\"} for a guest join (Go test)."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Screenshots of the HUD before/after at 1280x800 (every block at its edges, rounded corners kept) and of the sign-up window opened from Join fireworks; markup of the Join buttons and progressbar unchanged."
+    },
+    {
+     "id": "B3",
+     "status": "applied",
+     "evidence": "No HTTP handler changed. The WebSocket show_result body for a refused guest join was read in TestWSHandlerShowControlRefusesAGuestJoin: type show_result, ok false, message \"Sign up or log in to join a queue.\", and the next snapshot has an empty drone queue."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query, migration or stored row changed."
+    },
+    {
+     "id": "C1",
+     "status": "applied",
+     "evidence": "Go json tags activeStartMs/periodSeconds/leadInSeconds/activeSeconds match the TS ZoneEventState fields and readEventSchedule; phase strings lead_in/active/none and panels fireworks/drones match on both sides."
+    },
+    {
+     "id": "C2",
+     "status": "applied",
+     "evidence": "The runtime reads snapshot.zoneEvents[main_stage] and hands the object to readEventSchedule; the fields arrived in the real browser over the world socket (B1)."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "Two differentials. (1) The old frame-by-frame rules at 60 fps vs the timeline over 300 s of kicks with breaks: laser phrases identical; palette clock within 0.017 s (frame rounding); floor phrases 15 frames apart in 300 s (one frame per change); hologram identical in shape and morph except frame drift of the old loop and the chosen start state (the first phrase of a track includes the morph). (2) Go StateFor vs TS scheduledEventState every 1.3 s over a whole day: 66462 samples, 0 mismatches (recovery reads as none on the client, unused)."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker or external provider contract changed."
+    },
+    {
+     "id": "C5",
+     "status": "applied",
+     "evidence": "ZoneEventState is marshalled by encoding/json from the struct tags (no hand-written encoder); the new fields arrived over the real socket. The omnigame handoff has its own ZoneEventState copy without the schedule (session_service.currentZoneEvents) but the client reads events only from world snapshots."
+    },
+    {
+     "id": "C6",
+     "status": "applied",
+     "evidence": "Broke the reader (readEventSchedule took activeSeconds from a misspelt key): 6 tests failed across runtimeShowWiring, runtimeStageMediaWiring and eventSchedule."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "Fixtures built as production builds them: zone event with activeStartMs at the hour start like Go Truncate(Hour); zoneMedia with integer sampledAtMs and a playhead; the beat reading through the real createTrackBeats on an OMB3 file; account tokens from the same helper the session tests use."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "readEventSchedule accepts the server values (3600/10/300, the hour start); leadInSeconds absent reads as 0 (zones without a lead-in)."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "readEventSchedule refuses {} / null / non-finite activeStartMs / period or active <= 0 (eventSchedule.test). The server refuses a join from mode guest; persona and account join; an unknown mode is refused at connect (existing session-mode test)."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Countdown and active-minute edges at 14:59:49/50, 15:00:00, 15:05:00 match the Go test moments; windows that start before the track (negative seconds) are clamped by windowSum and skipped as forced palette jumps."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "Grepped every per-frame accumulator left in the show modules: the crown sky beacon heading still added up from page load (finding beacon-heading-page-clock). The rest are the no-beat-list fallbacks, the kick-burst ring and band pulses (reset on every hit), and avatar time (not show state)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The frame-by-frame branches remain reachable for a track without a beat list; the timeline branches for one with it; nothing unreachable added."
+    },
+    {
+     "id": "E3",
+     "status": "applied",
+     "evidence": "A refused join (guest, full queue, already queued) reaches the player through the HUD result notice (notify on !ok); the auto-join sends through the same command path."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "Event windows and the schedule apply only with the main_stage zone event and no debug preview override; askForAccount only with the auth window (world path). The no-world dev path keeps the old behaviour by design."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The phase rule now exists in Go and TS; the server sends the schedule parameters and the C3 differential found no drift. The per-module palette constants (22/2/0.03) were already duplicated; the jump cooldown is now one shared constant."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "After the beacon finding, grepped rotation/position/angle \"+=\" in scene, player, showControl and fireworks: the beacon was the only show angle."
+    },
+    {
+     "id": "F1",
+     "status": "applied",
+     "evidence": "go test -race on omniraveworld/world and /server: ok."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction or queue-store change; the guest guard returns before any queue mutation."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "applied",
+     "evidence": "A queued join is dropped when the window opens another way; the server-side queue is unchanged by a refused guest join (next snapshot empty)."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Every finding has a control patch that reverts its fix; each was run by hand and failed as a test (not a build error). The artifacts were printed again after the fixes: layout re-measured at six widths, two real browsers compared again."
+    },
+    {
+     "id": "G2",
+     "status": "applied",
+     "evidence": "The server guest guard is reached through ws_handler show_control -> ApplyShowCommand; the client guard through the Join button in the HUD (browser run)."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b clean; go build/vet clean, gofmt clean; changed packages tested (see gates)."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 1 findings came from E1, B6 and C10, all listed instruments; no new technique."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Two real browsers on the local stack, joined 30 s apart, sampled at the same moments: cone colours within 0.014, beams within 0.029 rad, cone mounts within 0.029, beacon within 0.011 (before the fix it was off by radians); guest Join -> sign-up -> the account in the drone queue; Join -> top-right sign-up -> no join. A live fireworks lead-in and show (07:00 UTC) is checked in pass 2."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The queued join gets its player id before the session upgrade decides; on a failed upgrade it stays armed, but every later way of opening the window clears or replaces it and only a snapshot of that account sends it, so nothing stale can fire."
+    },
+    {
+     "id": "G3",
+     "status": "applied",
+     "evidence": "Fed the guard a guest join: refused, nothing queued (Go test and browser)."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "Measured 360/375/390/768/1024/1280 px: the sprint bar lay under the chat panel up to ~960 px (finding sprint-bar-under-panels); after the fix no overlap of the bar at any width. Chat and now-playing touch at 360/375 (pre-existing, less than before: 19 px vs 67 px)."
+    },
+    {
+     "id": "E8",
+     "status": "applied",
+     "evidence": "The timeline caches phrase starts and palette jumps per event-window array (WeakMap); the runtime rebuilds the windows only when the schedule or the track start changes, so a new array always means new caches."
+    },
+    {
+     "id": "H2",
+     "status": "applied",
+     "evidence": "go test -v for the event-schedule and show tests: 7 PASS, 0 SKIP (no database needed)."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "Against the approved proposals: one show clock and timeline (palette, patterns, angles), spill lights on kicks, hologram/floor phrases, fireworks speeds moved onto the clock (not removed), HUD flush with rounded corners kept, Join prompts sign-up/log-in not the toggle, server check, auto-join. The sprint bar leaves the bottom edge only where a panel would cover it (said to the owner)."
+    },
+    {
+     "id": "F5",
+     "status": "applied",
+     "evidence": "The auto-join and a manual Join right after signing up can both send; the server refuses the second (\"You already have a place or a turn.\") and the HUD shows it: no double place."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "Opened the sign-up window from Join with the queue panel open and asked elementFromPoint at each of its controls: nothing covers it at 768-1280 px. At 360-390 px the 520 px window starts off screen (pre-existing, reported)."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "Ran every test folder that imports or mocks a changed module: src/app, scene, media, showControl, ui, network: 90 files, 1193 tests passed."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No new screen-wide layer: the auth window already existed and opens only on a click; the Playwright specs in frontend/ do not load the game."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared test fixture or router changed."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "All controls of this review were written after the last change to the files they target, and were re-run."
+    },
+    {
+     "id": "F6",
+     "status": "applied",
+     "evidence": "onSubmit acquires nothing after its awaits; the sprint bar ResizeObserver and window listener are released in dispose."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No React component; the runtime disposes the sprint bar with the rest."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The two-player test runs the real createTrackBeats and modules; runtime tests use the real createServerClock and createStaminaBar; the show-control pass-through is tested on the real createShowControlRuntime (runtimeLifecycle), since the runtime test mocks it."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "13 changed test files with --sequence.shuffle, seeds 1-5: 114/114 each time; Go -shuffle=on ok. Fixed the two-player test keeping a disposed engine between tests."
+    },
+    {
+     "id": "C9",
+     "status": "applied",
+     "evidence": "Producers of ZoneEventState: world snapshot (has the schedule) and the omnigame launch handoff (does not); no client path reads the handoff events, so nothing receives a copy without the fields."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each added line on its own and ran the tests that should notice: 9 runtime lines and 7 module lines were noticed by nothing (findings below); clearing the queued join on Close had no effect at all and was removed. After the fixes every removal fails a test (beat seconds/timeline already did)."
+    },
+    {
+     "id": "H7",
+     "status": "applied",
+     "evidence": "The \"not joined\" checks run synchronously after the snapshot; the Go guest test waits for a positive sign (the next snapshot) before asserting the empty queue."
+    },
+    {
+     "id": "C11",
+     "status": "na",
+     "why": "Added to the list in pass 2 (ratchet); applied from pass 2 on."
+    }
+   ],
+   "findings": [
+    {
+     "id": "beacon-heading-page-clock",
+     "summary": "The crown sky beacon heading still added its turn up from page load, so players pointed it different ways.",
+     "found_by": "E1",
+     "fix_commit": "dc0813536",
+     "control": {
+      "patch": ".review/controls/beacon-heading-page-clock.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/scene/__tests__/sharedShowClock.test.ts -t \"joined 40 s apart\""
+      ],
+      "observed": "1 failed: beacon heading 14 rad apart between the two players."
+     }
+    },
+    {
+     "id": "sprint-bar-under-panels",
+     "summary": "With the sprint bar flush at the bottom, the chat panel lay over it below ~960 px (at 768 px over the input line), and the now-playing panel on phones.",
+     "found_by": "B6",
+     "fix_commit": "2faf9a26d",
+     "control": {
+      "patch": ".review/controls/sprint-bar-under-panels.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/ui/__tests__/createStaminaBar.test.ts -t \"places itself\""
+      ],
+      "observed": "1 failed: expected 107px, got \"\" (bar left under the chat)."
+     }
+    },
+    {
+     "id": "show-clock-wiring-untested",
+     "summary": "The runtime lines giving the stage screens and each light effect the shared show clock could be removed with every suite green.",
+     "found_by": "C10",
+     "fix_commit": "081b4c7df",
+     "control": {
+      "patch": ".review/controls/show-clock-wiring-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeShowWiring.test.ts -t \"stage screens and every light effect\""
+      ],
+      "observed": "1 failed: visualizer getShowSeconds undefined."
+     }
+    },
+    {
+     "id": "event-phase-frame-untested",
+     "summary": "The per-frame event sync (and the sync after the effects exist, and the spill-light show clock) were read by no test.",
+     "found_by": "C10",
+     "fix_commit": "081b4c7df",
+     "control": {
+      "patch": ".review/controls/event-phase-frame-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeShowWiring.test.ts -t \"each frame\""
+      ],
+      "observed": "1 failed: lasers stayed in lead_in after the show started."
+     }
+    },
+    {
+     "id": "queued-join-runtime-untested",
+     "summary": "The runtime lines that queue the join on Join and send it with the account's first snapshot were read by no test.",
+     "found_by": "C10",
+     "fix_commit": "081b4c7df",
+     "control": {
+      "patch": ".review/controls/queued-join-runtime-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeShowWiring.test.ts -t \"connected the account\""
+      ],
+      "observed": "1 failed: join never called."
+     }
+    },
+    {
+     "id": "sprint-avoid-wiring-untested",
+     "summary": "The runtime giving the sprint bar the chat and now-playing panels was read by no test.",
+     "found_by": "C10",
+     "fix_commit": "081b4c7df",
+     "control": {
+      "patch": ".review/controls/sprint-avoid-wiring-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/app/__tests__/runtimeShowWiring.test.ts -t \"sprint bar\""
+      ],
+      "observed": "1 failed: avoid list empty."
+     }
+    },
+    {
+     "id": "player-track-start-untested",
+     "summary": "The player's server time at track position 0 (the anchor of every event window) was read by no test; the runtime tests mock it.",
+     "found_by": "C10",
+     "fix_commit": "8b975fc40",
+     "control": {
+      "patch": ".review/controls/player-track-start-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/media/__tests__/stageMediaPlayer.test.ts -t \"position 0 of the track\""
+      ],
+      "observed": "1 failed: 2000000 instead of 1989500."
+     }
+    },
+    {
+     "id": "flame-start-mount-untested",
+     "summary": "Starting the flame cascade at the track kick count was read by no test.",
+     "found_by": "C10",
+     "fix_commit": "8b975fc40",
+     "control": {
+      "patch": ".review/controls/flame-start-mount-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/scene/__tests__/createStageAtmospherics.test.ts -t \"flame cascade\""
+      ],
+      "observed": "1 failed: another mount fired after a different history."
+     }
+    },
+    {
+     "id": "screens-show-clock-untested",
+     "summary": "The stage screens reading the shared show clock was read by no test.",
+     "found_by": "C10",
+     "fix_commit": "8b975fc40",
+     "control": {
+      "patch": ".review/controls/screens-show-clock-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/scene/__tests__/stageVisualizerTextureUpdates.test.ts -t \"shared show clock\""
+      ],
+      "observed": "1 failed: the wordmark faded on the page clock."
+     }
+    },
+    {
+     "id": "show-start-palette-jump-untested",
+     "summary": "The palette jump at a fireworks show start (shared helper and laser show) was read by no test.",
+     "found_by": "C10",
+     "fix_commit": "8b975fc40",
+     "control": {
+      "patch": ".review/controls/show-start-palette-jump-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/scene/__tests__/ravePalettes.test.ts -t \"showPaletteClock\""
+      ],
+      "observed": "1 failed: 23.51 instead of 42.51."
+     }
+    },
+    {
+     "id": "show-runtime-passthrough-untested",
+     "summary": "The show-control runtime passing askForAccount to the HUD (and the join back) was read by no test.",
+     "found_by": "C10",
+     "fix_commit": "8b975fc40",
+     "control": {
+      "patch": ".review/controls/show-runtime-passthrough-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/showControl/__tests__/runtimeLifecycle.test.ts -t \"asks for an account\""
+      ],
+      "observed": "1 failed: the guest Join sent a join."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 2,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Scope of pass 2: the pass-1 fixes (beacon heading on the timeline + exact tilt step; sprint bar relayout with ResizeObserver and window resize; runtime avoid wiring; removal of the no-effect Close clear; the new runtime, player, flame, screen, palette and pass-through tests)."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-read this ledger's pass 1 so no finding is re-discovered; prior ledgers already read."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "The pass-1 fixes assemble no payload or message."
+    },
+    {
+     "id": "B2",
+     "status": "applied",
+     "evidence": "Re-measured the HUD after the sprint-bar fix at 360-1280 px (no overlap of the bar; screenshot at 768 px shows it just above the chat)."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "No handler changed in pass 1."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "No query or row."
+    },
+    {
+     "id": "C1",
+     "status": "na",
+     "why": "No new constant crosses a seam; the beacon speeds are local to the crown."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "No boundary shape changed in pass 1."
+    },
+    {
+     "id": "C3",
+     "status": "applied",
+     "evidence": "The beacon heading formula matches the old accumulation at constant speed (0.35 x t) and inside the windows; shown equal for players 40 s apart and different from a run without the show (sharedShowClock)."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "No worker contract."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "No struct crossing a boundary changed."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "No new accessor across a boundary."
+    },
+    {
+     "id": "C7",
+     "status": "applied",
+     "evidence": "The sprint-bar tests use real panel geometry measured in the browser (chat 314 px wide, 99 px / 280 px tall at 768 x 1024); the runtime test fixtures are the server shapes."
+    },
+    {
+     "id": "D1",
+     "status": "applied",
+     "evidence": "staminaLift with the real panel sizes: beside (0), under (107 px), tall chat (288 px)."
+    },
+    {
+     "id": "D2",
+     "status": "applied",
+     "evidence": "A hidden panel (zero size) and a panel beside the bar are ignored."
+    },
+    {
+     "id": "D3",
+     "status": "applied",
+     "evidence": "Edge: a panel exactly touching the bar edge (right == bar.left) counts as beside; collapsed chat returns the bar to the edge."
+    },
+    {
+     "id": "E1",
+     "status": "applied",
+     "evidence": "The sprint bar now avoids the chat and now-playing panels; the queue panel and the auth window sit elsewhere (top-right; the auth window above it by z-index)."
+    },
+    {
+     "id": "E2",
+     "status": "applied",
+     "evidence": "The Close clear was unreachable in effect and was removed; nothing else made unreachable."
+    },
+    {
+     "id": "E3",
+     "status": "na",
+     "why": "No error path added."
+    },
+    {
+     "id": "E4",
+     "status": "applied",
+     "evidence": "The sprint-bar lift applies in every mode, including ?debug=1 (it measures the offset panels)."
+    },
+    {
+     "id": "E5",
+     "status": "applied",
+     "evidence": "The beacon speeds are named once; no duplicate."
+    },
+    {
+     "id": "E6",
+     "status": "applied",
+     "evidence": "Other per-frame chase steps (min(1, dt x k)) in the show modules settle on steady targets; the two that set show sameness (cone aim, beacon tilt) now use exact steps."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "No goroutine or shared state."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "No transaction."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "No migration."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Nothing persisted."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Both pass-2 findings have controls that fail as tests; the beacon-tilt control first passed (blind test at 1e-3) and the test was tightened to 1e-5 until it failed."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b clean; go build, go vet, gofmt clean."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 2 found the jsdom-missing-API gap: added instrument C11 for it."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "Live fireworks at 07:00 UTC on the local stack: two players joined 50 s apart matched in the lead-in (cones straight up, 0 rad apart) and in the show (beams 0.001, cones 0.004, beacon 0); players joining mid-show matched from about 5 s after joining (beams 0.006, cones 0.011, beacon 0.008), the first seconds being the aim and tilt settling and the beat file arriving."
+    },
+    {
+     "id": "E7",
+     "status": "applied",
+     "evidence": "The sprint bar places itself at creation, before the first frame; nothing starts before its decision."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "No guard added."
+    },
+    {
+     "id": "B6",
+     "status": "applied",
+     "evidence": "Re-measured 360-1280 px after the fix: no overlap of the sprint bar at any width."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "No process-wide state read lazily."
+    },
+    {
+     "id": "H2",
+     "status": "na",
+     "why": "No skipping test added."
+    },
+    {
+     "id": "I1",
+     "status": "applied",
+     "evidence": "The sprint bar leaves the bottom edge only where a panel would cover it, a necessary exception to \"the sprint bar goes to the bottom\", reported to the owner."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "No side effect with two entry points added."
+    },
+    {
+     "id": "B7",
+     "status": "applied",
+     "evidence": "At 768 px the lifted bar sits under the auth window only when both are open with a tall chat; the window is above it (z-index 6 vs 4), so the window stays usable."
+    },
+    {
+     "id": "H3",
+     "status": "applied",
+     "evidence": "The changed test files plus src/app/scene/media/showControl/ui/network ran green in pass 1 after the fixes (1193 tests)."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "No screen-wide layer."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "No shared fixture."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "Replayed all 11 pass-1 controls after the pass-2 changes: each still fails."
+    },
+    {
+     "id": "F6",
+     "status": "applied",
+     "evidence": "The sprint bar's ResizeObserver and window listener are released in dispose, which the runtime calls; now tested."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "No React component."
+    },
+    {
+     "id": "C8",
+     "status": "applied",
+     "evidence": "The runtime test uses the real createStaminaBar and createServerClock; the show-control pass-through test uses the real createShowControlRuntime."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "createStaminaBar and createCrownEffects tests shuffled, seeds 11-13: 13/13."
+    },
+    {
+     "id": "C9",
+     "status": "na",
+     "why": "No new field reaching a client."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "Removed each line the pass-1 fixes added: the ResizeObserver observe and its release were noticed by no test (jsdom has no ResizeObserver: finding sprint-bar-observer-untested); the beacon tilt step was noticed by no test (finding beacon-tilt-step-untested; its first test was blind at a 1e-3 tolerance and was tightened before recording)."
+    },
+    {
+     "id": "H7",
+     "status": "na",
+     "why": "No \"goes away\" assertion added."
+    },
+    {
+     "id": "C11",
+     "status": "applied",
+     "evidence": "Found that the sprint bar's ResizeObserver branch runs in no jsdom test (the code feature-detects it); now stubbed in a test that drives the real branch and its release."
+    }
+   ],
+   "findings": [
+    {
+     "id": "sprint-bar-observer-untested",
+     "summary": "The sprint bar's ResizeObserver (following the chat as it grows) and its release on dispose ran in no test: jsdom has no ResizeObserver, so the feature-detected branch never executed.",
+     "found_by": "C11",
+     "fix_commit": "f3517fbc0",
+     "control": {
+      "patch": ".review/controls/sprint-bar-observer-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/ui/__tests__/createStaminaBar.test.ts -t \"follows a panel that grows\""
+      ],
+      "observed": "1 failed: observed [] instead of [chat]."
+     }
+    },
+    {
+     "id": "beacon-tilt-step-untested",
+     "summary": "The beacon's exact tilt step (the same tilt at any frame rate) was compared at no two frame rates; its first test was blind at a 1e-3 tolerance.",
+     "found_by": "C10",
+     "fix_commit": "df6604e78",
+     "control": {
+      "patch": ".review/controls/beacon-tilt-step-untested.patch",
+      "runner": "bash",
+      "tests": [
+       "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/scene/__tests__/createCrownEffects.test.ts -t \"any frame rate\""
+      ],
+      "observed": "1 failed: 24 vs 60 fps tilt 8.6e-4 apart, above 1e-5."
+     }
+    }
+   ]
+  },
+  {
+   "pass": 3,
+   "instruments": [
+    {
+     "id": "A1",
+     "status": "applied",
+     "evidence": "Scope of pass 3: the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance)."
+    },
+    {
+     "id": "A2",
+     "status": "applied",
+     "evidence": "Re-read passes 1-2 of this ledger."
+    },
+    {
+     "id": "B1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "B2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "B3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "B4",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "C1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C4",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C5",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C6",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C7",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "D1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no validation change."
+    },
+    {
+     "id": "D2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no validation change."
+    },
+    {
+     "id": "D3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no validation change."
+    },
+    {
+     "id": "E1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "E2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "E3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "E4",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "E5",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "E6",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "F1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "F2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "F3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "F4",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "G1",
+     "status": "applied",
+     "evidence": "Replayed both pass-2 controls: each fails as a test (1 failed | 12 passed)."
+    },
+    {
+     "id": "G2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no relevant change."
+    },
+    {
+     "id": "H1",
+     "status": "applied",
+     "evidence": "tsc -b clean."
+    },
+    {
+     "id": "Z1",
+     "status": "applied",
+     "evidence": "Pass 3 found nothing."
+    },
+    {
+     "id": "B5",
+     "status": "applied",
+     "evidence": "No production behaviour changed in pass 2; the pass-2 live show results stand."
+    },
+    {
+     "id": "E7",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "G3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no relevant change."
+    },
+    {
+     "id": "B6",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "E8",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no production path change."
+    },
+    {
+     "id": "H2",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no gate change change."
+    },
+    {
+     "id": "I1",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no relevant change."
+    },
+    {
+     "id": "F5",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "B7",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no payload or layout change."
+    },
+    {
+     "id": "H3",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no gate change change."
+    },
+    {
+     "id": "H4",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no gate change change."
+    },
+    {
+     "id": "H5",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no gate change change."
+    },
+    {
+     "id": "G4",
+     "status": "applied",
+     "evidence": "All 13 controls replayed after the last change: each fails."
+    },
+    {
+     "id": "F6",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "F7",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no concurrency, persistence or resource change."
+    },
+    {
+     "id": "C8",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "H6",
+     "status": "applied",
+     "evidence": "The two changed test files shuffled with seeds 11-13: 13/13."
+    },
+    {
+     "id": "C9",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no boundary change."
+    },
+    {
+     "id": "C10",
+     "status": "applied",
+     "evidence": "The pass-2 changes add no production line; every test line they add is asserted on."
+    },
+    {
+     "id": "H7",
+     "status": "na",
+     "why": "Pass 3 covers only the pass-2 changes (sprint-bar ResizeObserver test, beacon tilt test and its tolerance): test code with no gate change change."
+    },
+    {
+     "id": "C11",
+     "status": "applied",
+     "evidence": "The stubbed ResizeObserver test drives the real branch (observe, callback, disconnect)."
+    }
+   ],
+   "findings": []
+  }
+ ],
+ "gates": {
+  "build": "omnirave-babylon tsc -b clean; go build ./... ok",
+  "vet": "go vet omniraveworld/... omnigame/... ok; gofmt clean",
+  "lint": "pre-commit gate 0 failed on every commit; omnirave-babylon has no eslint config",
+  "types": "tsc -b clean",
+  "tests": "omnirave-babylon full suite 147 files / 1643 passed; Go omniraveworld (world, server, repository), omnigame (api, handlers, model, repository, service), cmd/omnirave-world, cmd/omnigame-api ok; -race on world/server ok; shuffled orders ok"
+ }
+}

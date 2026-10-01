@@ -301,6 +301,12 @@
       "name": "Does a 'goes away' assertion wait for the screen to settle?",
       "trigger": "a test asserts that something disappears -- inside waitFor, or right after a refetch or a state change",
       "asks": "A negative check inside waitFor passes at the first moment the element is missing, and a reloading screen is briefly empty whether or not the change worked. Wait first for a positive sign that the new state has settled (the reloaded list, the new row), then assert the absence once. Remove the fix and require the test to fail. The phone test for a group that drops out passed with its close step removed, because the chat header vanished for one frame during the list refetch."
+    },
+    {
+      "id": "C11",
+      "name": "Does the test environment run the guarded branch?",
+      "trigger": "code feature-detects a browser API (typeof X === 'function', 'X' in window, a missing-API fallback) -- ResizeObserver, IntersectionObserver, matchMedia, canvas contexts, WebGPU, AudioContext",
+      "asks": "jsdom lacks most of these, so the real-browser branch runs in no vitest test and every test passes on the fallback. The sprint bar's ResizeObserver (follow the chat as it grows, release on dispose) could be deleted with every suite green. Stub the API in a test and drive the real branch, or run it in a real browser -- and record which."
     }
   ],
   "termination": "A review is not one pass. It repeats until a full pass over every instrument finds nothing. A pass that finds something is evidence the previous pass was not finished -- the fix is new code nobody has reviewed, and the technique that found it may find more. There is no iteration budget: if it takes twenty passes, it takes twenty passes."

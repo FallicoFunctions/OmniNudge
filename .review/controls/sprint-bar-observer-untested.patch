@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/ui/createStaminaBar.ts b/omnirave-babylon/src/ui/createStaminaBar.ts
+index 1c0ec3e20..e06e6d1a5 100644
+--- a/omnirave-babylon/src/ui/createStaminaBar.ts
++++ b/omnirave-babylon/src/ui/createStaminaBar.ts
+@@ -107,7 +107,6 @@ export function createStaminaBar(host: HTMLElement, options: StaminaBarOptions =
+     if (container.style.bottom !== bottom) container.style.bottom = bottom;
+   }
+   const resizes = typeof ResizeObserver === 'function' ? new ResizeObserver(relayout) : undefined;
+-  for (const panel of options.avoid?.() ?? []) if (panel) resizes?.observe(panel);
+   window.addEventListener('resize', relayout);
+   relayout();
+ 

@@ -1,0 +1,13 @@
+diff --git a/omnirave-babylon/src/app/createRuntime.ts b/omnirave-babylon/src/app/createRuntime.ts
+index a7f4e9546..cef0c0cb0 100644
+--- a/omnirave-babylon/src/app/createRuntime.ts
++++ b/omnirave-babylon/src/app/createRuntime.ts
+@@ -1078,7 +1078,7 @@ export async function createRuntime(host: HTMLElement) {
+       const [, { createStaminaBar }] = await uiModules;
+       // Flush with the bottom edge unless the chat or now-playing panel
+       // reaches under it (a narrow window): then just above them.
+-      staminaBar = createStaminaBar(host, { avoid: () => [chatPanel?.element, playerHud?.element] });
++      staminaBar = createStaminaBar(host);
+     }
+ 
+     // Sec 9.4/9.7 emote bar: DELIBERATELY NOT MOUNTED yet. Owner decision

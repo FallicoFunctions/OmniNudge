@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/scene/ravePalettes.ts b/omnirave-babylon/src/scene/ravePalettes.ts
+index 941a434db..72aefa8ce 100644
+--- a/omnirave-babylon/src/scene/ravePalettes.ts
++++ b/omnirave-babylon/src/scene/ravePalettes.ts
+@@ -162,6 +162,6 @@ export const PALETTE_JUMP_COOLDOWN_SECONDS = 3;
+  */
+ export function showPaletteClock(beat: StageBeat | null, ownClock: number, cycleSeconds: number, fadeSeconds: number): number {
+   return beat?.timeline
+-    ? beat.timeline.paletteClock(beat.seconds, cycleSeconds, fadeSeconds, PALETTE_JUMP_COOLDOWN_SECONDS, beat.events?.activeStarts)
++    ? beat.timeline.paletteClock(beat.seconds, cycleSeconds, fadeSeconds, PALETTE_JUMP_COOLDOWN_SECONDS)
+     : ownClock;
+ }

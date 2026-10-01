@@ -1,0 +1,13 @@
+diff --git a/omnirave-babylon/src/scene/createStageVisualizer.ts b/omnirave-babylon/src/scene/createStageVisualizer.ts
+index 7d3ae54f9..b58cf7ed7 100644
+--- a/omnirave-babylon/src/scene/createStageVisualizer.ts
++++ b/omnirave-babylon/src/scene/createStageVisualizer.ts
+@@ -1003,7 +1003,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
+     update(dtSeconds) {
+       // Guard against NaN/negative deltas from a stalled first frame.
+       const dt = dtSeconds > 0 ? dtSeconds : 0;
+-      elapsed = options.getShowSeconds?.() ?? elapsed + dt;
++      elapsed += dt;
+       if (titleCardRemaining > 0) {
+         titleCardRemaining = Math.max(0, titleCardRemaining - dt);
+       }
