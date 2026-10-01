@@ -50,3 +50,11 @@ test('every active dependency manifest has Dependabot coverage and a merge polic
   assert.deepEqual([...new Set(active)].sort(), configured.sort(), 'active manifests must have an update path; archive retired install inputs');
   assert.deepEqual([...DEPENDENCY_FILES].sort(), [...new Set(active)].sort(), 'merge policy must cover every active dependency file');
 });
+
+test('backend coverage uses the fail-closed aggregate checker', () => {
+  const steps = read('ci.yml').jobs.backend.steps;
+  assert.equal(steps.find(step => step.name === 'Check coverage threshold').run,
+    'node ../.github/scripts/go-coverage.cjs coverage.out');
+  assert.ok(steps.some(step => step.uses?.startsWith('actions/setup-node@')
+    && step.with?.['node-version'] === '22'));
+});
