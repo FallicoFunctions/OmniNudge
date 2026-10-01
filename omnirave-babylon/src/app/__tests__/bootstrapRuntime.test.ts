@@ -200,6 +200,29 @@ describe('createRuntime', () => {
     runtime.dispose();
   });
 
+  it('uses WebGL in Firefox even when WebGPU is offered', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:157.0) Gecko/20100101 Firefox/157.0');
+    const WebGPUEngineMock = Object.assign(constructible(() => ({ dispose: vi.fn(), initAsync: vi.fn(async () => {}) })),
+      { IsSupportedAsync: Promise.resolve(true) });
+    const webglEngine = {
+      dispose: vi.fn(), getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
+      onDisposeObservable: { addOnce: vi.fn() }, resize: vi.fn(), runRenderLoop: vi.fn(), setHardwareScalingLevel: vi.fn(),
+    };
+    const EngineMock = constructible(() => webglEngine);
+    vi.doMock('@babylonjs/core/Engines/webgpuEngine', () => ({ WebGPUEngine: WebGPUEngineMock }));
+    vi.doMock('@babylonjs/core/Engines/engine', () => ({ Engine: EngineMock }));
+    vi.doMock('../../scene/createMainStageScene', () => ({ createMainStageScene: vi.fn(async () => ({
+      metadata: {}, getMeshByName: () => null, pick: vi.fn(() => null), isReady: () => true, render: vi.fn(),
+    })) }));
+    const { createRuntime } = await import('../createRuntime');
+    const runtime = await createRuntime(document.createElement('div'));
+    expect(WebGPUEngineMock).not.toHaveBeenCalled();
+    expect(runtime.engine === (webglEngine as unknown)).toBe(true);
+    runtime.dispose();
+    vi.restoreAllMocks();
+  });
+
   it('disposes a successful runtime and removes all owned resources', async () => {
     let notifyEngineDisposed: (() => void) | undefined;
     const engineDispose = vi.fn(() => notifyEngineDisposed?.());

@@ -475,7 +475,11 @@ export async function createRuntime(host: HTMLElement) {
       stopWorldSessionRenewal = keepWorldSessionAlive(worldSocket, { freshLaunch: import.meta.env.PROD });
       return worldSocket;
     })());
-    engine = await createBabylonEngine(canvas, perfFlags.webgl, () => {
+    // Firefox's WebGPU grows its GPU process without limit on this venue
+    // (measured 2.1 GB to 8.8 GB in ten minutes, all of it browser-side
+    // allocations); its WebGL stays flat at about 2 GB.
+    const firefox = /Firefox\//.test(navigator.userAgent);
+    engine = await createBabylonEngine(canvas, perfFlags.webgl || firefox, () => {
       const replacement = canvas.cloneNode(false) as HTMLCanvasElement;
       canvas.replaceWith(replacement);
       canvas = replacement;

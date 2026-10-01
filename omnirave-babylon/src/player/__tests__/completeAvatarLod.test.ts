@@ -16,39 +16,35 @@ it('projects body height with the actual camera, including pitch and lateral pos
     .toBeCloseTo(projectedAvatarHeightPixels(new Vector3(8, 1.6, 2), level.m, 720, 1.6), 5);
 });
 
-it('keeps projected detail stable at both pixel thresholds', () => {
+it('keeps projected detail stable at the pixel threshold and never picks detail 0', () => {
   expect(resolveProjectedAvatarDetail(200, undefined, 200)).toBe(2);
   expect(resolveProjectedAvatarDetail(176, 1, 200)).toBe(1);
   expect(resolveProjectedAvatarDetail(175, 1, 200)).toBe(2);
   expect(resolveProjectedAvatarDetail(225, 2, 200)).toBe(2);
   expect(resolveProjectedAvatarDetail(226, 2, 200)).toBe(1);
-  expect(resolveProjectedAvatarDetail(441, 1, 200)).toBe(0);
-  expect(resolveProjectedAvatarDetail(361, 0, 200)).toBe(0);
-  expect(resolveProjectedAvatarDetail(360, 0, 200)).toBe(1);
+  expect(resolveProjectedAvatarDetail(2000, undefined, 200)).toBe(1);
+  expect(resolveProjectedAvatarDetail(2000, 0, 200)).toBe(1);
   expect(resolveProjectedAvatarDetail(Number.NaN, 1)).toBe(1);
 });
-it('keeps distance transitions stable while approaching and leaving thresholds', () => {
-  expect(resolveCompleteAvatarDetail(5)).toBe(0);
+it('keeps distance transitions stable and never picks detail 0', () => {
+  expect(resolveCompleteAvatarDetail(0.5)).toBe(1);
   expect(resolveCompleteAvatarDetail(10)).toBe(1);
   expect(resolveCompleteAvatarDetail(20)).toBe(2);
-  expect(resolveCompleteAvatarDetail(6.4, 0)).toBe(0);
-  expect(resolveCompleteAvatarDetail(6.6, 0)).toBe(1);
-  expect(resolveCompleteAvatarDetail(5.2, 1)).toBe(1);
-  expect(resolveCompleteAvatarDetail(4.9, 1)).toBe(0);
+  expect(resolveCompleteAvatarDetail(1, 0)).toBe(1);
   expect(resolveCompleteAvatarDetail(17.4, 1)).toBe(1);
   expect(resolveCompleteAvatarDetail(17.6, 1)).toBe(2);
   expect(resolveCompleteAvatarDetail(15.2, 2)).toBe(2);
   expect(resolveCompleteAvatarDetail(14.9, 2)).toBe(1);
   expect(resolveCompleteAvatarDetail(NaN)).toBe(2);
   expect(completeAvatarAssetName('female', 2)).toBe('female-lod2.glb');
+  expect(completeAvatarAssetName('male', 0)).toBe('male.glb');
 });
 
-it('keeps local follow views full detail and uses hysteresis for distant camera views', async () => {
+it('keeps the local follow view at detail 1 and uses hysteresis for distant camera views', async () => {
   const { resolveLocalAvatarDetail } = await import('../completeAvatarLod');
-  expect(resolveLocalAvatarDetail(8)).toBe(0); expect(resolveLocalAvatarDetail(10.5, 0)).toBe(0);
-  expect(resolveLocalAvatarDetail(11, 0)).toBe(1); expect(resolveLocalAvatarDetail(9.5, 1)).toBe(1);
-  expect(resolveLocalAvatarDetail(8.9, 1)).toBe(0); expect(resolveLocalAvatarDetail(25.5, 1)).toBe(1);
+  expect(resolveLocalAvatarDetail(2)).toBe(1); expect(resolveLocalAvatarDetail(2, 0)).toBe(1);
+  expect(resolveLocalAvatarDetail(25.5, 1)).toBe(1);
   expect(resolveLocalAvatarDetail(26, 1)).toBe(2); expect(resolveLocalAvatarDetail(23.1, 2)).toBe(2);
-  expect(resolveLocalAvatarDetail(22.9, 2)).toBe(1); expect(resolveLocalAvatarDetail(60, 0)).toBe(2);
+  expect(resolveLocalAvatarDetail(22.9, 2)).toBe(1); expect(resolveLocalAvatarDetail(60, 1)).toBe(2);
   expect(resolveLocalAvatarDetail(NaN, 1)).toBe(1);
 });

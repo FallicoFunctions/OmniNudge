@@ -265,7 +265,7 @@ export function createRemotePlayerRigs(scene: Scene): RemotePlayerRigs {
       loadedKind: null,
       pendingKind: null,
       detail: scene.activeCamera
-        ? resolveRemoteDetail(Vector3.Distance(scene.activeCamera.globalPosition, position), undefined, position) : 0,
+        ? resolveRemoteDetail(Vector3.Distance(scene.activeCamera.globalPosition, position), undefined, position) : 1,
       waitingForCamera: Boolean(scene.activeCamera && parseCompleteAvatarLoadout(loadout)),
       cameraObserver: null,
       loadGeneration: 0,

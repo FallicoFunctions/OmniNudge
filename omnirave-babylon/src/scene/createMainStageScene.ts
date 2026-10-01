@@ -180,12 +180,12 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
   const localCompleteAssets = !avatarPreviewLocked && !explicitComplete
     ? createCompleteAvatarAssetPool(scene, { sampledAnimationRate: 60 }) : null;
   const loadLocalComplete = (character: 'male' | 'female') => localCompleteAssets
-    ? localCompleteAssets.create(character, 0)
+    ? localCompleteAssets.create(character, 1)
     : createCompleteAvatar(scene, character, { persistWardrobe: false });
   // Fetch and decode the hidden avatar template while the venue downloads.
   // The visible copy is created below, after the venue's material/mesh pass.
   const avatarPreload = localCompleteAssets && previewComplete
-    ? localCompleteAssets.preload(previewComplete) : undefined;
+    ? localCompleteAssets.preload(previewComplete, 1) : undefined;
   // Observe failure immediately; awaiting it below still fails the boot.
   void avatarPreload?.catch(() => {});
   const stageAssets = await loadMainStageAssets(scene);

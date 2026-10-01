@@ -69,10 +69,10 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
     let pending = sources.get(file);
     if (!pending) {
       pending = loadCompleteAvatarSource(file).then(source => {
-        if (!options.crowd && detail === 0) markBootPhase('avatar_downloaded');
+        if (!options.crowd) markBootPhase('avatar_downloaded');
         return SceneLoader.LoadAssetContainerAsync(publicUrl('/assets/avatars/complete-pair/'), source, scene, undefined, '.glb');
       }).then(container => {
-        if (!options.crowd && detail === 0) markBootPhase('avatar_imported');
+        if (!options.crowd) markBootPhase('avatar_imported');
         const stores: ReturnType<typeof shareAvatarMorphTargetBuffers>[] = [];
         let bounds: ReturnType<typeof prepareAvatarCopyBounds> | undefined;
         try {
@@ -85,7 +85,7 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
           packCompleteAvatarMaterials(container);
           if (!scene.metadata?.avatarBatchingBaseline) batchCompleteAvatarMeshes(container,
             { combineMaterials: scene.metadata?.avatarMultiMaterialBatchExperiment === true });
-          if (!options.crowd && detail === 0) markBootPhase('avatar_batched');
+          if (!options.crowd) markBootPhase('avatar_batched');
           interleaveCompleteAvatarVertexBuffers(scene, container.meshes);
           for (const material of container.materials) shaders?.watch(material);
           for (const group of container.animationGroups) group.stop();
@@ -97,7 +97,7 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
           // native upload while every visible copy owns its independent pose.
           for (const manager of container.morphTargetManagers) manager.useTextureToStoreTargets = false;
           if (scene.metadata?.avatarCopyBoundsExperiment) bounds = prepareAvatarCopyBounds(container);
-          if (!options.crowd && detail === 0) markBootPhase('avatar_prepared');
+          if (!options.crowd) markBootPhase('avatar_prepared');
           sharedMorphStores.push(...stores);
           if (bounds) preparedBounds.push(bounds);
           loaded.add(container);
@@ -117,9 +117,9 @@ export function createCompleteAvatarAssetPool(scene: Scene, options: { sampledAn
   function buildCopy(container: AssetContainer, character: 'male' | 'female', detail: CompleteAvatarDetail): ReviewAvatar {
     const profile = scene.metadata?.avatarCopyProfile;
     const start = profile ? performance.now() : 0;
-    if (!options.crowd && detail === 0) markBootPhase('avatar_copy_started');
+    if (!options.crowd) markBootPhase('avatar_copy_started');
     const model = container.instantiateModelsToScene(name => name, false, { doNotInstantiate: true });
-    if (!options.crowd && detail === 0) markBootPhase('avatar_instantiated');
+    if (!options.crowd) markBootPhase('avatar_instantiated');
     const instantiated = profile ? performance.now() : 0;
     const meshes = model.rootNodes.flatMap(root => [
       ...(root instanceof AbstractMesh ? [root] : []), ...root.getChildMeshes(),

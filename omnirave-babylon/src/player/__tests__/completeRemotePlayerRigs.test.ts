@@ -44,7 +44,7 @@ it('loads a complete remote without local preferences, grounds it, and changes g
   const avatar = fakeAvatar('male');
   vi.mocked(createCompleteAvatar).mockResolvedValue(avatar);
   rigs.applySnapshot(snapshot(look())); await settle();
-  expect(createCompleteAvatar).toHaveBeenCalledWith('male', 0, expect.any(Function));
+  expect(createCompleteAvatar).toHaveBeenCalledWith('male', 1, expect.any(Function));
   avatar.root.computeWorldMatrix(true);
   expect(avatar.root.absolutePosition.y).toBeCloseTo(0);
   const nameplate = scene.getMeshByName('nameplate-other')!;
@@ -149,23 +149,24 @@ it('changes detail with distance, preserves wardrobe while loading, and avoids b
   expect(createCompleteAvatar).not.toHaveBeenCalled();
   scene.onAfterRenderObservable.notifyObservers(scene);
   await settle();
-  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 0, expect.any(Function));
-  camera.position.z = 7; camera.setTarget(new Vector3(4, 1.65, 0));
-  camera.getViewMatrix(true); camera.getProjectionMatrix(true); rigs.update(.1);
+  // The venue never loads the full-detail file, even right next to a player.
   expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 1, expect.any(Function));
+  camera.position.z = 18; camera.setTarget(new Vector3(4, 1.65, 0));
+  camera.getViewMatrix(true); camera.getProjectionMatrix(true); rigs.update(.1);
+  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 2, expect.any(Function));
   expect(close.root.isDisposed()).toBe(false);
   rigs.applySnapshot(snapshot(look('male', '110111')));
   expect(close.wardrobe!.isVisible('jacket')).toBe(false);
-  const middle = fakeAvatar('male'); pending.resolve(middle); await settle();
+  const far = fakeAvatar('male'); pending.resolve(far); await settle();
   expect(close.root.isDisposed()).toBe(true);
-  expect(middle.wardrobe!.isVisible('jacket')).toBe(false);
-  for (const z of [5.2, 5.8, 6.2, 5.4]) {
+  expect(far.wardrobe!.isVisible('jacket')).toBe(false);
+  for (const z of [15.2, 15.8, 16.2, 15.4]) {
     camera.position.z = z; camera.getViewMatrix(true); rigs.update(.1);
   }
   expect(createCompleteAvatar).toHaveBeenCalledTimes(2);
   const restored = fakeAvatar('male'); createCompleteAvatar.mockResolvedValueOnce(restored);
   camera.position.z = 4.5; camera.getViewMatrix(true); rigs.update(.1); await settle();
-  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 0, expect.any(Function));
+  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 1, expect.any(Function));
   expect(restored.wardrobe!.isVisible('jacket')).toBe(false);
 });
 
@@ -269,12 +270,12 @@ it('skips off-screen poses while retaining movement, wardrobe and elapsed time f
 });
 
 it('defers an off-screen detail replacement until the camera returns', async () => {
-  const camera = new FreeCamera('detail-camera', new Vector3(4, 1.65, -10), scene);
+  const camera = new FreeCamera('detail-camera', new Vector3(4, 1.65, -20), scene);
   camera.setTarget(new Vector3(4, 1.65, 0));
   camera.getViewMatrix(true); camera.getProjectionMatrix(true);
-  const medium = fakeAvatar('male'); createCompleteAvatar.mockResolvedValueOnce(medium);
+  const far = fakeAvatar('male'); createCompleteAvatar.mockResolvedValueOnce(far);
   rigs.applySnapshot(snapshot(look())); scene.onAfterRenderObservable.notifyObservers(scene); await settle();
-  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 1, expect.any(Function));
+  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 2, expect.any(Function));
   camera.position.z = -4.5; camera.setTarget(new Vector3(4, 1.65, -20)); camera.getViewMatrix(true);
   rigs.update(.1);
   expect(rigs.stats().animatingPlayers).toBe(0);
@@ -283,9 +284,9 @@ it('defers an off-screen detail replacement until the camera returns', async () 
   const close = fakeAvatar('male'); createCompleteAvatar.mockResolvedValueOnce(close);
   camera.setTarget(new Vector3(4, 1.65, 0)); camera.getViewMatrix(true);
   rigs.update(.1); await settle();
-  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 0, expect.any(Function));
+  expect(createCompleteAvatar).toHaveBeenLastCalledWith('male', 1, expect.any(Function));
   expect(close.wardrobe!.isVisible('jacket')).toBe(false);
-  expect(medium.root.isDisposed()).toBe(true);
+  expect(far.root.isDisposed()).toBe(true);
 });
 
 it('removes a pending first-view observer if a player leaves before the camera renders', async () => {
