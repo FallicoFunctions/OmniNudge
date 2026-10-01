@@ -62,6 +62,7 @@ interface Snapshot {
   cones: number[];
   tracery: Float32Array;
   pulse: number;
+  beacon: number[];
   floor: Float32Array;
   hologram: (string | number)[];
 }
@@ -129,6 +130,7 @@ async function player(joinAt: number, fps: number, samples: number[], useTimelin
           .flatMap((rotation) => [rotation.x, rotation.z]),
         tracery: Float32Array.from((scene.getMeshByName('crown-fx-tracery') as Mesh)._userThinInstanceBuffersStorage.data.instanceColor),
         pulse: crown.pulsePosition,
+        beacon: [scene.getTransformNodeByName('crown-fx-beacon-pivot')!.rotation.y, scene.getTransformNodeByName('crown-fx-beacon-pivot')!.rotation.z],
         floor: Float32Array.from((scene.getMeshByName('cascade-court-light-floor') as Mesh)._userThinInstanceBuffersStorage.data.instanceColor),
         hologram: [hologram.currentShape, hologram.previousShape, hologram.morphProgress, hologram.peakColorR, hologram.peakColorG, hologram.peakColorB],
       });
@@ -177,6 +179,7 @@ describe('the shared show clock', () => {
       expect(largestBeamAngle(a.beams, b.beams)).toBeLessThan(1e-4);
       expect(largestDifference(a.cones, b.cones)).toBeLessThan(1e-4);
       expect(largestDifference(a.tracery, b.tracery)).toBeLessThan(1e-4);
+      expect(largestDifference(a.beacon, b.beacon)).toBeLessThan(1e-4);
       expect(largestDifference(a.floor, b.floor)).toBeLessThan(1e-4);
       expect(b.hologram.slice(0, 3)).toEqual(a.hologram.slice(0, 3));
       expect(largestDifference(b.hologram.slice(3) as number[], a.hologram.slice(3) as number[])).toBeLessThan(1e-4);
@@ -223,6 +226,7 @@ describe('the shared show clock', () => {
       expect(largestDifference(early[s].cones, late[s].cones)).toBeLessThan(1e-4);
       expect(largestDifference(early[s].tracery, late[s].tracery)).toBeLessThan(1e-4);
       expect(Math.abs(early[s].pulse - late[s].pulse)).toBeLessThan(1e-6);
+      expect(largestDifference(early[s].beacon, late[s].beacon)).toBeLessThan(1e-4);
       expect(late[s].hologram.slice(0, 3)).toEqual(early[s].hologram.slice(0, 3));
     }
     // The show's own laser, cone and spire speeds are in: without the show
@@ -230,6 +234,7 @@ describe('the shared show clock', () => {
     expect(Math.max(...SAMPLES.map((_, s) => largestBeamAngle(late[s].beams, withoutShow[s].beams)))).toBeGreaterThan(0.2);
     expect(Math.max(...SAMPLES.map((_, s) => largestDifference(late[s].cones, withoutShow[s].cones)))).toBeGreaterThan(0.1);
     expect(Math.max(...SAMPLES.map((_, s) => Math.abs(late[s].pulse - withoutShow[s].pulse)))).toBeGreaterThan(0.05);
+    expect(Math.max(...SAMPLES.map((_, s) => Math.abs(late[s].beacon[0] - withoutShow[s].beacon[0])))).toBeGreaterThan(0.1);
     // The show's shorter hologram holds.
     expect(SAMPLES.some((_, s) => late[s].hologram[0] !== withoutShow[s].hologram[0] || late[s].hologram[2] !== withoutShow[s].hologram[2])).toBe(true);
   }, 120_000);

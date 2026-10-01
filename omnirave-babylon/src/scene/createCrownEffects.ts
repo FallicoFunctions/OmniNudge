@@ -57,6 +57,11 @@ const PUNCH_ATTACK_SECONDS = 0.04;
 // The spire pulse's speed in the fireworks lead-in and show.
 const LEAD_IN_TRAVEL_SPEED = 0.7;
 const SHOW_TRAVEL_SPEED = 1.1;
+// The sky beacon's turn (radians a second): with the music, and in the
+// fireworks lead-in and show.
+const PRECESS_SPEED = 0.35;
+const LEAD_IN_PRECESS_SPEED = 0.05;
+const SHOW_PRECESS_SPEED = 0.9;
 const PALETTE_CYCLE_SECONDS = 22;
 const PALETTE_FADE_SECONDS = 2;
 const PALETTE_PHASE_SPEED = 0.03;
@@ -458,10 +463,21 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     // --- Effect 3: sky beacon -----------------------------------------------
     // Precession: rotate the pivot about y; tilt sweeps the beam around the sky.
     // lead_in steadies it vertical; active sweeps wider and faster; idle narrow.
-    const precessSpeed = leadIn ? 0.05 : active ? 0.9 : idle ? 0.12 : 0.35;
-    beaconPivot.rotation.y += dt * precessSpeed;
+    const precessSpeed = leadIn ? LEAD_IN_PRECESS_SPEED : active ? SHOW_PRECESS_SPEED : idle ? 0.12 : PRECESS_SPEED;
+    // With the track's timeline the beacon's heading is that speed summed
+    // from the track start (the lead-in's and show's own inside them), so it
+    // points the same way for every player.
+    if (beat?.timeline) {
+      beaconPivot.rotation.y = PRECESS_SPEED * beat.seconds + (beat.events
+        ? windowSum(beat.events.leadIns, beat.seconds, (from, to) => (LEAD_IN_PRECESS_SPEED - PRECESS_SPEED) * (to - from))
+          + windowSum(beat.events.actives, beat.seconds, (from, to) => (SHOW_PRECESS_SPEED - PRECESS_SPEED) * (to - from))
+        : 0);
+    } else {
+      beaconPivot.rotation.y += dt * precessSpeed;
+    }
     const targetTilt = leadIn ? 0 : active ? 0.18 : idle ? 0.04 : 0.09;
-    beaconTilt += (targetTilt - beaconTilt) * Math.min(1, dt * 2);
+    // An exact exponential step: the same tilt at any frame rate.
+    beaconTilt += (targetTilt - beaconTilt) * (1 - Math.exp(-dt * 2));
     beaconPivot.rotation.z = beaconTilt;
     if (idle) {
       beaconIntensityValue = 0.4 + 0.1 * (0.5 + 0.5 * Math.sin(elapsed * 0.5));
