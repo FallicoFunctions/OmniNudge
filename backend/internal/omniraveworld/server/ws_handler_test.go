@@ -256,18 +256,13 @@ func TestWSHandler_BroadcastsDisconnectToOtherConnections(t *testing.T) {
 	var secondJoinSnapshot map[string]any
 	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
 
-	_ = firstConn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
-	var firstJoinBroadcast map[string]any
-	require.NoError(t, firstConn.ReadJSON(&firstJoinBroadcast))
-
+	// Snapshot delivery coalesces pending frames. The first snapshot can
+	// already include both joins, so there need not be a second join frame.
 	require.NoError(t, firstConn.Close())
-
-	_ = secondConn.SetReadDeadline(time.Now().Add(750 * time.Millisecond))
-
-	var secondSnapshot map[string]any
-	require.NoError(t, secondConn.ReadJSON(&secondSnapshot))
-	require.Equal(t, "world_snapshot", secondSnapshot["type"])
-	require.Len(t, secondSnapshot["players"], 1)
+	secondSnapshot := readWorldSnapshotUntil(t, secondConn, func(snapshot map[string]any) bool {
+		players, ok := snapshot["players"].([]any)
+		return ok && len(players) == 1
+	})
 
 	players, ok := secondSnapshot["players"].([]any)
 	require.True(t, ok)
@@ -678,4 +673,19 @@ func TestMaybeAnnounceFireworks_RearmsAfterTheHour(t *testing.T) {
 	var secondHour map[string]any
 	require.NoError(t, conn.ReadJSON(&secondHour))
 	require.Equal(t, "Main Stage fireworks in 1 minute", secondHour["body"])
+}
+
+// readWorldSnapshotUntil tolerates snapshots queued before an event while
+// requiring the observed state within a single bounded deadline.
+func readWorldSnapshotUntil(t *testing.T, conn *websocket.Conn, matches func(map[string]any) bool) map[string]any {
+	t.Helper()
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+	for {
+		var snapshot map[string]any
+		require.NoError(t, conn.ReadJSON(&snapshot))
+		require.Equal(t, "world_snapshot", snapshot["type"])
+		if matches(snapshot) {
+			return snapshot
+		}
+	}
 }

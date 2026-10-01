@@ -9,8 +9,10 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
   const repository = 'FallicoFunctions/OmniNudge';
   const bot = { login: 'dependabot[bot]', id: 49699333, type: 'Bot' };
   const original = childProcess.execFileSync;
-  let behind = 0, changedHead = false, failure = false;
+  let behind = 0, changedHead = false, failure = false, mainSha = 'base', advanceMain = false;
+  let mainReads = 0;
   const merges = [];
+  const comments = [];
   let reads = 0;
   const pr = { number: 1, state: 'open', draft: false, user: bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: 'dependabot/pip/image/update', repo: { full_name: repository } },
@@ -19,19 +21,26 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
     assert.equal(command, 'gh');
     if (args[0] === 'pr') {
       if (args[1] === 'merge') { merges.push(args); return ''; }
+      if (args[1] === 'comment') { comments.push(args); return ''; }
       return JSON.stringify({ statusCheckRollup: REQUIRED_CHECKS.map(name => ({ name,
         status: 'COMPLETED', conclusion: failure ? 'FAILURE' : 'SUCCESS' })) });
     }
     const endpoint = args.at(-1);
     let result;
-    if (endpoint.includes('/contents/')) {
+    if (endpoint.endsWith('/git/ref/heads/main')) {
+      mainReads++;
+      result = { object: { sha: advanceMain && mainReads % 2 === 0 ? 'new-main' : mainSha } };
+    } else if (endpoint.includes('/contents/')) {
       result = { type: 'file', encoding: 'base64', content: Buffer.from('boto3==1.43.100\n').toString('base64') };
     } else if (endpoint.includes('/compare/')) {
+      assert.equal(endpoint, `repos/${repository}/compare/${mainSha}...${pr.head.sha}`);
       result = { merge_base_commit: { sha: 'base' }, behind_by: behind };
     } else if (endpoint.includes('/files?')) {
       result = [[{ filename: 'infra/runpod/image-worker/requirements.txt', status: 'modified' }]];
     } else if (endpoint.includes('/commits?')) {
-      result = [[{ sha: 'abc', author: bot, commit: { verification: { verified: true } } }]];
+      result = [[{ sha: pr.head.sha, author: bot, commit: { verification: { verified: true } } }]];
+    } else if (endpoint.includes('/issues/1/comments?')) {
+      result = [comments.map(args => ({ body: args.at(-1) }))];
     } else if (endpoint.includes('/pulls?')) {
       result = [[pr]];
     } else {
@@ -49,13 +58,36 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
     behind = 1;
     run(repository);
     assert.equal(merges.length, 1, 'outdated branches must wait for rebase and new checks');
+    assert.equal(comments.length, 1, 'outdated branches request one Dependabot rebase');
+    run(repository);
+    assert.equal(comments.length, 1, 'outdated branches do not spam rebase requests');
+    failure = true;
+    pr.head.sha = 'rebased';
+    process.env.DEPENDABOT_DRY_RUN = '1';
+    run(repository);
+    assert.equal(comments.length, 1, 'dry runs never post comments');
+    delete process.env.DEPENDABOT_DRY_RUN;
+    // Fixture commits must follow the refreshed bot head.
+    pr.head.sha = 'abc';
+    mainSha = 'advanced';
+    // A cached PR base must not hide that current main has moved.
+    run(repository);
+    assert.equal(comments.length, 1);
+    pr.head.sha = 'rebased';
+    run(repository);
+    assert.equal(comments.length, 2, 'a new stale head requests another rebase even with failed old checks');
+    pr.head.sha = 'abc';
     behind = 0; failure = true;
     run(repository);
     assert.equal(merges.length, 1, 'failed checks must never merge');
-    failure = false; changedHead = true; reads = 0;
+    failure = false; advanceMain = true; mainReads = 0;
+    run(repository);
+    assert.equal(merges.length, 1, 'main advancing during validation must retry');
+    advanceMain = false; changedHead = true; reads = 0;
     run(repository);
     assert.equal(merges.length, 1, 'a changed head must be revalidated');
   } finally {
+    delete process.env.DEPENDABOT_DRY_RUN;
     childProcess.execFileSync = original;
     delete require.cache[require.resolve('./dependabot-automerge.cjs')];
   }
