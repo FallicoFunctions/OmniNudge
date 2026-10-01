@@ -280,7 +280,10 @@ describe('createMainStageScene', () => {
     expect(player.position.z - start.z).toBeCloseTo(traveled);
   });
 
-  it('focuses the canvas, orbits with right drag, and zooms with the wheel', async () => {
+  it.each([
+    { operating: false, button: 0 }, { operating: false, button: 2 },
+    { operating: true, button: 0 }, { operating: true, button: 2 },
+  ])('keeps button $button drag direction consistent in operator view $operating', async ({ operating, button }) => {
     engine = new NullEngine();
     const canvas = document.createElement('canvas');
     canvas.setPointerCapture = vi.fn();
@@ -291,8 +294,11 @@ describe('createMainStageScene', () => {
     const { createMainStageScene } = await loadCreateMainStageScene();
     const scene = await createMainStageScene(engine);
     const camera = scene.activeCamera as ArcRotateCamera;
+    const cameraRig = scene.metadata.reviewRuntime.cameraRig;
+    cameraRig.setOperatorView(operating);
+    cameraRig.syncZoomState();
     const pointer = (type: string, x: number) => {
-      const event = new MouseEvent(type, { button: 2, clientX: x, clientY: 100, cancelable: true });
+      const event = new MouseEvent(type, { button, clientX: x, clientY: 100, cancelable: true });
       Object.defineProperty(event, 'pointerId', { value: 1 });
       canvas.dispatchEvent(event);
     };
@@ -303,6 +309,8 @@ describe('createMainStageScene', () => {
       pointer('pointermove', 160);
       // Owner-set horizontal direction: a drag to the right lowers alpha.
       expect(camera.alpha).toBeLessThan(alphaBefore);
+      pointer('pointermove', 100);
+      expect(camera.alpha).toBeCloseTo(alphaBefore);
       pointer('pointerup', 160);
       const alphaAfter = camera.alpha;
       pointer('pointermove', 200);
@@ -312,7 +320,8 @@ describe('createMainStageScene', () => {
       const wheel = new WheelEvent('wheel', { deltaY: -100, cancelable: true });
       canvas.dispatchEvent(wheel);
       expect(wheel.defaultPrevented).toBe(true);
-      expect(camera.radius).toBeLessThan(radiusBefore);
+      if (operating) expect(camera.radius).toBeCloseTo(radiusBefore);
+      else expect(camera.radius).toBeLessThan(radiusBefore);
       expect(camera.alpha).toBeCloseTo(alphaAfter);
       expect(camera.beta).toBeCloseTo(betaBefore);
       const contextMenu = new Event('contextmenu', { cancelable: true });

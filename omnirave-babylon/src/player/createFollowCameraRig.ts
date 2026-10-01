@@ -314,7 +314,9 @@ export function createFollowCameraRig(
       followMode = mode;
     },
     orbit(deltaYaw, deltaPitch) {
-      if(operator){operatorYaw+=deltaYaw;operatorPitch=Math.max(-.6,Math.min(1.3,operatorPitch+deltaPitch));return this.syncZoomState();}
+      // The booth's look vector and the normal orbit angle use opposite yaw
+      // conventions. Preserve the same drag direction when entering a turn.
+      if(operator){operatorYaw-=deltaYaw;operatorPitch=Math.max(-.6,Math.min(1.3,operatorPitch+deltaPitch));return this.syncZoomState();}
       applyOrbitDelta(deltaYaw, deltaPitch);
       return this.syncZoomState();
     },
