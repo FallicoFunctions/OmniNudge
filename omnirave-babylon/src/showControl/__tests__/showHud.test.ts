@@ -21,12 +21,30 @@ describe('show control HUD',()=>{
   expect(document.querySelector('.show-message')?.textContent ?? '').toBe('');
   hud.dispose();
  });
- it('preserves an acknowledged opening when a later rejection arrives before its snapshot',()=>{
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
-  const s=state();s.serverAt=1000;s.fireworks.preparing={...turn,opening:[]};hud.apply(s,'a');
-  click('Ruby Peony');hud.result({requestId:sent[0].requestId,ok:true,message:'Accepted'});
-  click('Champagne Willow');hud.result({requestId:sent[1].requestId,ok:false,message:'Choose a smaller opening group.'});hud.update(1000);
-  expect(document.querySelector('.show-selection')?.textContent).toBe('Ruby Peony · C');hud.dispose();
+ it.each(['fireworks','drones'] as const)('opens %s controls only for an active turn and retains the reserved queue place',name=>{
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{}),s=state();
+  s.serverAt=1000;s[name].preparing={...turn};hud.apply(s,'a');
+  const board=document.querySelector('.show-board')!;
+  const queue=document.querySelector(`[aria-label="${name==='fireworks'?'Fireworks':'Drones'} queue"]`)!;
+  expect(board.hasAttribute('hidden')).toBe(true);
+  expect(board.querySelector('.show-tile')).toBeNull();
+  expect(queue.textContent).toContain('Your turn starts in 0:09');
+  expect(queue.querySelector('.show-queue-progress')?.hasAttribute('hidden')).toBe(false);
+  const other=name==='fireworks'?'drones':'fireworks';
+  expect(Array.from(document.querySelectorAll('button')).find(b=>b.textContent===`Join ${other}`)?.disabled).toBe(true);
+  hud.status(false);hud.status(true);expect(board.hasAttribute('hidden')).toBe(true);
+  hud.update(10000);expect(board.hasAttribute('hidden')).toBe(true);expect(sent).toHaveLength(0);
+  s.serverAt=10000;s[name].active=s[name].preparing;s[name].preparing=null;hud.apply(s,'a');
+  expect(board.hasAttribute('hidden')).toBe(false);
+  expect(board.textContent).toContain('Time left 2:30');
+  expect(board.textContent).not.toContain('Prepare');
+  if(name==='fireworks')expect(board.querySelector('.show-board-heading strong')?.textContent).toBe('');
+  click(name==='fireworks'?'Ruby Peony':'Wave');
+  expect(sent.at(-1)).toMatchObject({panel:name,action:name==='fireworks'?'launch':'movement',turnId:'turn-a'});
+  s[name].active=null;s[name].preparing={...turn,id:'next-turn',startsAt:170000,endsAt:320000};hud.apply(s,'a');
+  expect(board.hasAttribute('hidden')).toBe(true);expect(board.querySelector('.show-tile')).toBeNull();
+  click(`Leave ${name} queue`);expect(sent.at(-1)).toMatchObject({panel:name,action:'leave'});
+  expect(sent.at(-1)).not.toHaveProperty('turnId');hud.dispose();
  });
 
  beforeEach(()=>{localStorage.clear();document.body.replaceChildren();});
@@ -74,26 +92,26 @@ describe('show control HUD',()=>{
   s.serverAt=20000;s.fireworks.nextAt=160000;s.fireworks.queue=[{playerId:'a',playerName:'A',joinedAt:19000}];hud.apply(s,'a');
   const queue=document.querySelector('[aria-label="Fireworks queue"]')!;
   expect(queue.textContent).toContain('Playing automatically');expect(queue.textContent).toContain("You're first in line");
-  expect(queue.textContent).toContain('Your controls open in 2:10');expect(queue.textContent).toContain('up to 10 seconds before your turn');
+  expect(queue.textContent).toContain('Your turn starts in 2:20');expect(queue.textContent).toContain('Your controls open when your turn starts.');
   expect(queue.textContent).toContain('move you into the booth for 2:30');
-  hud.update(50000);expect(queue.textContent).toContain('Your controls open in 1:40');expect(sent).toHaveLength(0);
+  hud.update(50000);expect(queue.textContent).toContain('Your turn starts in 1:50');expect(sent).toHaveLength(0);
   hud.status(false);hud.update(51000);expect(queue.querySelector('.show-queue-progress')?.hasAttribute('hidden')).toBe(true);hud.dispose();
  });
- it('waits behind an assigned player but readies controls for a late join to an open window',()=>{
+ it('counts down to the turn while keeping controls hidden for a late join',()=>{
   const hud=createShowControlHud(document.body,()=>{},{}),s=state();
   s.serverAt=20000;s.fireworks.nextAt=160000;s.fireworks.queue=[{playerId:'b',playerName:'B',joinedAt:1000},{playerId:'a',playerName:'A',joinedAt:19000}];hud.apply(s,'a');
   const progress=document.querySelector('[aria-label="Fireworks queue"] .show-queue-progress')!;
   expect(progress.textContent).toContain("You're #2 in line");expect(progress.textContent).toContain('Next turn window in 2:20');expect(progress.querySelector('.show-queue-wait')?.textContent).not.toContain('Your controls open');
   s.fireworks.queue.shift();s.serverAt=155000;s.fireworks.queue[0].joinedAt=155000;hud.apply(s,'a');
-  expect(progress.textContent).toContain("You're first in line");expect(progress.textContent).toContain('Getting your controls ready…');expect(progress.textContent).not.toContain("preparation has closed");expect(progress.querySelector('.show-queue-wait')?.textContent).not.toContain('Your controls open');
+  expect(progress.textContent).toContain("You're first in line");expect(progress.textContent).toContain('Your turn starts in 0:05');expect(progress.textContent).not.toContain("preparation has closed");expect(progress.querySelector('.show-queue-wait')?.textContent).not.toContain('Your controls open');
   s.fireworks.queue=[];s.fireworks.preparing={...turn,startsAt:160000,endsAt:310000};hud.apply(s,'a');
-  expect(progress.hasAttribute('hidden')).toBe(true);expect(document.querySelector('.show-board')?.hasAttribute('hidden')).toBe(false);hud.dispose();
+  expect(progress.hasAttribute('hidden')).toBe(false);expect(document.querySelector('.show-board')?.hasAttribute('hidden')).toBe(true);hud.dispose();
  });
- it('stages an opening, hides the queue without leaving, and renders player names as text',()=>{
+ it('launches during a live turn, hides the queue without leaving, and renders player names as text',()=>{
   const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
-  const s=state();s.serverAt=1000;s.fireworks.preparing={...turn};hud.apply(s,'a');hud.update(1000);
-  expect(document.body.textContent).toContain('Starts in 0:09');
-  click('Ruby Peony');expect(sent.at(-1)).toMatchObject({action:'prepare',turnId:'turn-a',shots:[{design:'F01',bank:3}]});
+  const s=state();s.serverAt=10000;s.fireworks.active={...turn};hud.apply(s,'a');hud.update(10000);
+  expect(document.body.textContent).toContain('Time left 2:30');
+  click('Ruby Peony');expect(sent.at(-1)).toMatchObject({action:'launch',turnId:'turn-a',shots:[{design:'F01',bank:3}]});
   click('Hide queues');expect(sent).toHaveLength(1);expect(document.querySelector('.show-queue')?.hasAttribute('hidden')).toBe(true);
   expect(document.querySelector('.show-queue img')).toBeNull();expect(document.querySelector('.show-queue')?.textContent).toContain('<img src=x onerror=alert(1)>');
   hud.dispose();expect(document.querySelector('.show-controls')).toBeNull();
@@ -111,10 +129,10 @@ describe('show control HUD',()=>{
   hud.status(false);hud.update(25000);expect(document.querySelector('.show-board')?.hasAttribute('hidden')).toBe(true);
   expect(Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Join drones')?.disabled).toBe(true);hud.dispose();
  });
- it('clears the opening selection after the server starts the turn',()=>{
+ it('starts without a preview selection and displays active cooldowns',()=>{
   const hud=createShowControlHud(document.body,()=>{}, {});
   const s=state();s.serverAt=9000;s.fireworks.preparing={...turn,opening:[{design:'F01',bank:3}]};hud.apply(s,'a');
-  expect(document.querySelector('.show-selection')?.textContent).toContain('Ruby Peony');
+  expect(document.querySelector('.show-selection')).toBeNull();
   s.serverAt=10000;s.fireworks.active=s.fireworks.preparing;s.fireworks.preparing=null;s.cooldowns.F01=14000;hud.apply(s,'a');
   expect(document.querySelector('.show-selection')?.textContent).toBe('');
   expect(document.querySelector('button[aria-label="Ruby Peony"]')?.getAttribute('aria-pressed')).toBe('false');
