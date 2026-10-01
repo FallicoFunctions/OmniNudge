@@ -99,6 +99,12 @@ function run(repository) {
       if (!trustedPullRequest(pr, repository) || !trustedChanges(pr, files, commits)) {
         console.log(`#${pr.number}: requires review (identity or changed files)`); continue;
       }
+      // The reopen may have succeeded even if its response was lost. Clear
+      // recovery bookkeeping on an already-open, authenticated branch.
+      if (process.env.DEPENDABOT_DRY_RUN !== '1'
+        && pr.labels?.some(label => label.name === REFRESH_LABEL)) {
+        api(`repos/${repository}/issues/${pr.number}/labels/${REFRESH_LABEL}`, 'DELETE');
+      }
       const mainSha = api(`repos/${repository}/git/ref/heads/main`).object.sha;
       const comparison = api(`repos/${repository}/compare/${mainSha}...${pr.head.sha}`);
       const base = comparison.merge_base_commit.sha;

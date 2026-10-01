@@ -18,6 +18,7 @@ function fixture(options = {}) {
   const pr = { number: 1, state: 'open', draft: false, user: bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: 'dependabot/pip/image/update', repo: { full_name: repository } },
     base: { sha: 'base', ref: 'main', repo: { full_name: repository } } };
+  Object.defineProperty(pr, 'labels', { enumerable: true, get: () => observed.labels.map(name => ({ name })) });
   const state = { behind: 0, main: 'base', time: Date.parse('2026-10-01T00:00:00Z'),
     mainReads: 0, prReads: 0, ...options };
   Date.now = () => state.time;
@@ -69,6 +70,7 @@ function fixture(options = {}) {
       pr.state = next;
       observed.events.push({ event: next === 'open' ? 'reopened' : 'closed', actor: actions, created_at: new Date(state.time).toISOString() });
       result = pr;
+      if (next === 'open' && state.lostReopenResponse) throw new Error('lost reopen response');
       if (next === 'closed' && state.lostCloseResponse) throw new Error('lost close response');
     } else {
       state.prReads++;
@@ -184,5 +186,18 @@ test('a head change before refresh prevents closing the new head', () => {
     f.run();
     assert.equal(f.observed.events.length, 0);
     assert.equal(f.observed.comments.length, 0);
+  });
+});
+
+
+test('a lost reopen response leaves the PR open and next run clears orphan bookkeeping', () => {
+  withFixture({ behind: 1, lostReopenResponse: true }, f => {
+    f.run();
+    assert.equal(f.pr.state, 'open');
+    assert.deepEqual(f.observed.labels, [label]);
+    assert.equal(process.exitCode, 1);
+    f.state.lostReopenResponse = false; f.run();
+    assert.deepEqual(f.observed.labels, [], 'open recovery labels cannot linger indefinitely');
+    assert.equal(f.observed.events.length, 2, 'do not close a branch whose refresh is already pending');
   });
 });
