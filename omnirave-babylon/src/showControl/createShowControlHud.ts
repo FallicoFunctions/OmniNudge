@@ -10,7 +10,7 @@ function button(text:string,click:()=>void,cls=''){const b=element('button',cls,
 
 // askForAccount: called before a join; true when it asked the player to sign
 // up or log in instead (a guest), and the join is then not sent.
-export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:()=>boolean){
+export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:(panel:PanelName)=>boolean){
   const root=element('div','show-controls');host.append(root);
   const toggle=button('Show queues',()=>{hidden=!hidden;try{localStorage.setItem('omnirave.showQueuesHidden',String(hidden));}catch{}updateVisibility();if(!hidden)render();},'show-queue-toggle');root.append(toggle);
   const queue=element('section','show-queue');queue.setAttribute('aria-label','Show queues');root.append(queue);
@@ -19,7 +19,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   const queueSections=new Map<PanelName,{status:HTMLElement;roster:HTMLElement;progress:HTMLElement;place:HTMLElement;wait:HTMLElement;help:HTMLElement;join:HTMLButtonElement;leave:HTMLButtonElement}>();
   for(const name of ['fireworks','drones'] as const){
     const section=element('section','show-queue-section');section.setAttribute('aria-label',`${label(name)} queue`);section.append(element('strong','',label(name)));
-    const status=element('p'),roster=element('ol');const join=button(`Join ${name}`,()=>{if(!askForAccount?.())command(name,'join');});
+    const status=element('p'),roster=element('ol');const join=button(`Join ${name}`,()=>{if(!askForAccount?.(name))command(name,'join');});
     const progress=element('div','show-queue-progress'),place=element('strong','show-queue-place'),wait=element('p','show-queue-wait'),help=element('p','show-queue-help');
     progress.hidden=true;place.setAttribute('aria-live','polite');progress.append(place,wait,help);
     const leave=button(`Leave ${name} queue`,()=>command(name,'leave'));section.append(status,progress,roster,join,leave);queue.append(section);queueSections.set(name,{status,roster,progress,place,wait,help,join,leave});
@@ -150,6 +150,8 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   }
   return {
     apply(next:ShowState,id:string){now=next.serverAt;state=next;playerId=id;connected=true;render();},
+    // The join the player asked for before signing up; false while not connected.
+    join(name:PanelName){if(!connected)return false;command(name,'join');return true;},
     update(serverNow:number){now=serverNow;render();},
     result(result:ShowResult){
       const opening=pendingOpenings.get(result.requestId);

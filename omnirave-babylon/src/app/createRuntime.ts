@@ -378,6 +378,10 @@ export async function createRuntime(host: HTMLElement) {
   let topLeftControls: import('../ui/createTopLeftControls').TopLeftControls | undefined;
   let topRightControls: import('../ui/createTopRightControls').TopRightControls | undefined;
   let authPopup: import('../ui/createAuthPopup').AuthPopup | undefined;
+  // A guest pressed Join on a show queue and got the sign-up window: the
+  // queue to join once the account's own world session is connected (its
+  // player id is set when the sign-up or log-in succeeds).
+  let joinAfterSignIn: { panel: import('../showControl/showTypes').PanelName; playerId?: string } | undefined;
   // Sec 11.2: what the auth window turns into after a successful login/signup.
   let welcomeCard: import('../ui/createWelcomeCard').WelcomeCard | undefined;
   let settingsPopup: import('../ui/createSettingsPopup').SettingsPopup | undefined;
@@ -952,6 +956,12 @@ export async function createRuntime(host: HTMLElement) {
         worldSpawnInitialized = initializeWorldSpawn(snapshot);
         latestShowSnapshot=snapshot;
         showControls?.applySnapshot(snapshot);
+        // The first snapshot of the new account session: send the join the
+        // player asked for as a guest.
+        if (joinAfterSignIn?.playerId && snapshot.currentPlayerId === joinAfterSignIn.playerId
+          && showControls?.join(joinAfterSignIn.panel)) {
+          joinAfterSignIn = undefined;
+        }
         void worldAppearance?.snapshot(snapshot);
         remotePlayerRigs?.applySnapshot(snapshot);
         const activeMedia = snapshot.zoneMedia.find((zone) => zone.zoneId === snapshot.activeZone) ?? null;
@@ -1350,6 +1360,8 @@ export async function createRuntime(host: HTMLElement) {
           // survives walking away. Sec 12's "stays closed until they leave
           // the radius and return" is the GATE's own re-arm, not this flag.
           vipGateOpenedAuthPopup = false;
+          // Closed without signing up: no queue join afterwards.
+          joinAfterSignIn = undefined;
         },
         async onSubmit(mode, fields) {
           const action = ++authActionRevision;
@@ -1385,6 +1397,7 @@ export async function createRuntime(host: HTMLElement) {
             // Reauthenticating the same account keeps unsaved visible edits;
             // a different account always receives its own stored appearance.
             const resumePending = pendingAppearance && session.mode === 'account' && session.playerId === previousAccount;
+            if (joinAfterSignIn && session.mode === 'account') joinAfterSignIn.playerId = session.playerId;
             const applied = await applySessionUpgrade(resumePending ? { ...session, loadout: pendingAppearance } : session);
             if (applied && resumePending && !disposed) avatarProfileSaver?.queue(localAvatarLoadout);
             return { ok: true };
@@ -1421,6 +1434,7 @@ export async function createRuntime(host: HTMLElement) {
       // close, wherever they happen to be standing.
       reviewRuntime?.vipGate?.setOnBlockedApproach?.(() => {
         vipGateOpenedAuthPopup = true;
+        joinAfterSignIn = undefined;
         authPopup?.open('signup');
       });
       reviewRuntime?.vipGate?.setOnApproachCleared?.(() => {
@@ -1436,10 +1450,12 @@ export async function createRuntime(host: HTMLElement) {
         onLogIn() {
           // Sec 11.2: a direct top-level action closes the card and proceeds.
           welcomeCard?.dismiss();
+          joinAfterSignIn = undefined;
           authPopup?.open('login');
         },
         onSignUp() {
           welcomeCard?.dismiss();
+          joinAfterSignIn = undefined;
           authPopup?.open('signup');
         },
         async onLogout() {
@@ -1592,9 +1608,11 @@ export async function createRuntime(host: HTMLElement) {
       playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
       // The fireworks and drone queues are for accounts: a guest who presses
       // Join gets the sign-up window (with its log-in switch) instead.
-      askForAccount() {
+      askForAccount(panel) {
         if (resolvedSessionMode !== 'guest' || !authPopup) return false;
         welcomeCard?.dismiss();
+        // Joined automatically once the sign-up or log-in succeeds.
+        joinAfterSignIn = { panel };
         authPopup.open('signup');
         return true;
       },

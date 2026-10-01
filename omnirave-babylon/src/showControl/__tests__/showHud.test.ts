@@ -32,14 +32,23 @@ describe('show control HUD',()=>{
  beforeEach(()=>{localStorage.clear();document.body.replaceChildren();});
  it('asks a guest to sign up or log in from both Join buttons and sends no join; an account joins',()=>{
   let guest=true;const asked:string[]=[];
-  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{},()=>{if(guest)asked.push('account');return guest;});
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{},panel=>{if(guest)asked.push(panel);return guest;});
   hud.apply(state(),'a');hud.status(true);
   click('Join fireworks');click('Join drones');
-  expect(asked).toEqual(['account','account']);expect(sent).toEqual([]);
+  // The runtime learns which queue, to join it after the sign-up.
+  expect(asked).toEqual(['fireworks','drones']);expect(sent).toEqual([]);
   // The queue toggle is not a join: it never asks.
   click('Hide queues');click('Show queues');expect(asked).toHaveLength(2);
   guest=false;click('Join fireworks');
   expect(sent.map(c=>`${c.panel}:${c.action}`)).toEqual(['fireworks:join']);
+  hud.dispose();
+ });
+ it('sends the join asked for before the sign-up once connected, and not before',()=>{
+  const sent:ShowCommand[]=[],hud=createShowControlHud(document.body,c=>sent.push(c),{});
+  expect(hud.join('drones')).toBe(false);expect(sent).toEqual([]);
+  hud.apply(state(),'account-a');
+  expect(hud.join('drones')).toBe(true);
+  expect(sent.map(c=>`${c.panel}:${c.action}`)).toEqual(['drones:join']);
   hud.dispose();
  });
  afterEach(()=>{document.body.replaceChildren();});

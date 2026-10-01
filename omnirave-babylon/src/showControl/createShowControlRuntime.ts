@@ -11,7 +11,7 @@ import { createFireworkStudy } from '../fireworks/fireworkStudy';
 import { createFireworkStudyRenderer, type FireworkRenderEntry } from '../fireworks/createFireworkStudyRenderer';
 import type { FireworkStudy, Vec3 } from '../fireworks/fireworkTypes';
 import { createShowAudio } from '../audio/createShowAudio';
-import { SHOW_RULES, type ShowLaunch, type ShowState } from './showTypes';
+import { SHOW_RULES, type PanelName, type ShowLaunch, type ShowState } from './showTypes';
 import { createShowControlHud } from './createShowControlHud';
 
 export interface ShowControlRuntimeOptions {
@@ -19,7 +19,7 @@ export interface ShowControlRuntimeOptions {
   playerRig?:PlayerRig; playerController?:PlayerController; cameraRig?:FollowCameraRig; hologram:HologramGrid;
   // Before a queue join: true when the player was asked to sign up or log in
   // instead (a guest), and the join is not sent.
-  askForAccount?:()=>boolean;
+  askForAccount?:(panel:PanelName)=>boolean;
 }
 export function createShowControlRuntime(options:ShowControlRuntimeOptions){
   const {scene,socket,playerRig,playerController,cameraRig,hologram}=options;
@@ -87,6 +87,9 @@ export function createShowControlRuntime(options:ShowControlRuntimeOptions){
   const visibility=()=>{if(document.hidden)audio.stop();};document.addEventListener('visibilitychange',visibility);
   return {
     applySnapshot,update,
+    // Sends a queue join (the one a guest asked for before signing up); false
+    // when it cannot go out yet.
+    join(panel:PanelName){return hud?hud.join(panel):false;},
     unlockAudio(){void audio.unlock();},
     setEventState(event:StageEventStateInput|null){const active=event?.phase==='active';if(active&&!preview){previewStart=now();previewNext=previewStart;}preview=active;},
     get operating(){return operating;},
