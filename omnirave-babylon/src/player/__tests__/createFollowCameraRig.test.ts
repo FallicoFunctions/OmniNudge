@@ -325,6 +325,54 @@ describe('createFollowCameraRig', () => {
     expect(rig.camera.position.y).toBeLessThan(rig.targetAnchor.position.y);
   });
 
+  it.each([0.1, 6, 140].flatMap(distance => [-1, 1].map(direction => ({
+    distance, direction, operating: false,
+  }))).concat([-1, 1].map(direction => ({ distance: 1, direction, operating: true }))))(
+    'looks vertically in direction $direction at distance $distance with operating=$operating without flipping',
+    ({ distance, direction, operating }) => {
+      engine = new NullEngine();
+      const scene = new Scene(engine);
+      const target = new TransformNode('player-root', scene);
+      target.position.set(-0.92, 2.15, -67.3);
+      const rig = createFollowCameraRig(scene, target);
+      rig.applyCheckpointView({
+        alpha: -1.5, beta: 1.1, radius: distance, focusOffset: { x: 0, y: 0, z: 0 },
+      });
+      rig.setOperatorView(operating);
+      // Increasing either operator pitch or orbit beta looks upward.
+      const pitchDelta = direction * 100;
+      rig.orbit(0.35, pitchDelta);
+      scene.render();
+      const alphaAtPole = rig.camera.alpha;
+      for (let frame = 0; frame < 3; frame++) {
+        rig.orbit(0, pitchDelta);
+        rig.syncZoomState(1 / 60);
+        scene.render();
+        const view = rig.camera.getViewMatrix(true);
+        const forward = rig.camera.getForwardRay().direction;
+        expect(forward.y * direction).toBeGreaterThan(0.999999);
+        expect(Math.hypot(forward.x, forward.z)).toBeLessThan(0.0002);
+        expect(Array.from(view.m).every(Number.isFinite)).toBe(true);
+        expect(Math.abs(view.determinant())).toBeGreaterThan(0.99);
+        expect(rig.camera.alpha).toBeCloseTo(alphaAtPole);
+      }
+      // Pitching away from either pole must work immediately without losing
+      // the player's yaw or leaving them stuck at the limit.
+      rig.orbit(0, -Math.sign(pitchDelta) * 0.3);
+      scene.render();
+      expect(rig.camera.getForwardRay().direction.y * direction).toBeLessThan(0.99);
+      expect(rig.camera.alpha).toBeCloseTo(alphaAtPole);
+      if (operating) {
+        rig.setOperatorView(false);
+        rig.syncZoomState();
+        scene.render();
+        expect(rig.camera.alpha).toBeCloseTo(-1.5);
+        expect(rig.camera.beta).toBeCloseTo(1.1);
+        expect(rig.camera.radius).toBeCloseTo(distance);
+      }
+    },
+  );
+
   it('tracks the player position in both Free Camera and Auto-Follow', () => {
     // Sec 7.2: the player must never leave frame in either mode - an earlier
     // version of this rig froze the anchor in Free Camera mode, which read
@@ -349,6 +397,22 @@ describe('createFollowCameraRig', () => {
   });
 
   describe('camera collision (sec 7.2)', () => {
+    it('keeps the lens above the ground when looking straight up in third person', () => {
+      engine = new NullEngine();
+      const scene = new Scene(engine);
+      const target = new TransformNode('player-root', scene);
+      target.position.y = 1.7;
+      const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, scene);
+      const rig = createFollowCameraRig(scene, target, { groundCollisionMeshes: [ground] });
+
+      rig.orbit(0, 100);
+      scene.render();
+
+      expect(rig.camera.position.y).toBeGreaterThan(0.3);
+      expect(rig.camera.radius).toBeLessThan(1.7);
+      expect(rig.camera.getForwardRay().direction.y).toBeGreaterThan(0.999999);
+    });
+
     it('clamps the camera distance inward when a raycast hit is closer than the requested distance', () => {
       engine = new NullEngine();
       const scene = new Scene(engine);

@@ -8,11 +8,12 @@ import type { Scene } from '@babylonjs/core/scene';
 import { MAX_ZOOM_DISTANCE, MIN_ZOOM_DISTANCE, resolveZoomState } from './cameraRigMath';
 import type { ReviewCheckpointCamera } from '../scene/reviewRouteData';
 
-const MIN_ORBIT_BETA = 0.62;
-// Raised from the old 2.2 so the view pitches substantially further up toward
-// the sky. The camera arcs a little below the target at the extreme, but the
-// sky is what the player is after there.
-const MAX_ORBIT_BETA = 2.62;
+// Stop only 0.006 degrees short of vertical so the view direction never
+// becomes parallel to the camera's up vector or flips over the poles.
+const CAMERA_POLE_MARGIN = 0.0001;
+const MIN_ORBIT_BETA = CAMERA_POLE_MARGIN;
+const MAX_ORBIT_BETA = Math.PI - CAMERA_POLE_MARGIN;
+const MAX_OPERATOR_PITCH = Math.PI / 2 - CAMERA_POLE_MARGIN;
 
 // Design doc sec 7.2: "camera collision pushes inward when blocked... camera
 // returns to chosen zoom when space opens up again". How far back from a
@@ -242,6 +243,10 @@ export function createFollowCameraRig(
   camera.lockedTarget = targetAnchor;
   camera.lowerRadiusLimit = MIN_ZOOM_DISTANCE;
   camera.upperRadiusLimit = MAX_ZOOM_DISTANCE;
+  // Babylon's default beta limits also apply during render, so they must
+  // match the limits used by our drag input rather than undoing it.
+  camera.lowerBetaLimit = MIN_ORBIT_BETA;
+  camera.upperBetaLimit = MAX_ORBIT_BETA;
   camera.wheelPrecision = 24;
   camera.panningSensibility = 0;
   // 0.18 instead of 0.05: depth precision scales with the near plane, and at
@@ -316,7 +321,7 @@ export function createFollowCameraRig(
     orbit(deltaYaw, deltaPitch) {
       // The booth's look vector and the normal orbit angle use opposite yaw
       // conventions. Preserve the same drag direction when entering a turn.
-      if(operator){operatorYaw-=deltaYaw;operatorPitch=Math.max(-.6,Math.min(1.3,operatorPitch+deltaPitch));return this.syncZoomState();}
+      if(operator){operatorYaw-=deltaYaw;operatorPitch=Math.max(-MAX_OPERATOR_PITCH,Math.min(MAX_OPERATOR_PITCH,operatorPitch+deltaPitch));return this.syncZoomState();}
       applyOrbitDelta(deltaYaw, deltaPitch);
       return this.syncZoomState();
     },
