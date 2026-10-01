@@ -68,7 +68,7 @@ interface Snapshot {
 }
 
 let engine: NullEngine | undefined;
-afterEach(() => engine?.dispose());
+afterEach(() => { engine?.dispose(); engine = undefined; });
 
 // A fireworks lead-in at 120-130 s and a show from 130 s, in track seconds,
 // as the runtime places the server's schedule.
