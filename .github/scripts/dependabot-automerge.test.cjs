@@ -11,6 +11,7 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
   const original = childProcess.execFileSync;
   let behind = 0, changedHead = false, failure = false;
   const merges = [];
+  const comments = [];
   let reads = 0;
   const pr = { number: 1, state: 'open', draft: false, user: bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: 'dependabot/pip/image/update', repo: { full_name: repository } },
@@ -19,6 +20,7 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
     assert.equal(command, 'gh');
     if (args[0] === 'pr') {
       if (args[1] === 'merge') { merges.push(args); return ''; }
+      if (args[1] === 'comment') { comments.push(args); return ''; }
       return JSON.stringify({ statusCheckRollup: REQUIRED_CHECKS.map(name => ({ name,
         status: 'COMPLETED', conclusion: failure ? 'FAILURE' : 'SUCCESS' })) });
     }
@@ -32,6 +34,8 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
       result = [[{ filename: 'infra/runpod/image-worker/requirements.txt', status: 'modified' }]];
     } else if (endpoint.includes('/commits?')) {
       result = [[{ sha: 'abc', author: bot, commit: { verification: { verified: true } } }]];
+    } else if (endpoint.includes('/issues/1/comments?')) {
+      result = [comments.length ? [{ body: '<!-- dependabot-automerge-rebase -->' }] : []];
     } else if (endpoint.includes('/pulls?')) {
       result = [[pr]];
     } else {
@@ -49,6 +53,9 @@ test('merger reaches exact-commit merge only with a fully validated current PR',
     behind = 1;
     run(repository);
     assert.equal(merges.length, 1, 'outdated branches must wait for rebase and new checks');
+    assert.equal(comments.length, 1, 'outdated branches request one Dependabot rebase');
+    run(repository);
+    assert.equal(comments.length, 1, 'outdated branches do not spam rebase requests');
     behind = 0; failure = true;
     run(repository);
     assert.equal(merges.length, 1, 'failed checks must never merge');

@@ -14,6 +14,19 @@ function contents(repository, filename, sha) {
   return Buffer.from(file.content, 'base64').toString('utf8');
 }
 
+const REBASE_MARKER = '<!-- dependabot-automerge-rebase -->';
+
+function requestRebase(repository, pr) {
+  const comments = pages(`repos/${repository}/issues/${pr.number}/comments?per_page=100`);
+  if (comments.some(comment => typeof comment.body === 'string' && comment.body.includes(REBASE_MARKER))) {
+    console.log(`#${pr.number}: waiting for Dependabot's requested rebase`);
+    return;
+  }
+  execFileSync('gh', ['pr', 'comment', String(pr.number), '--repo', repository,
+    '--body', `${REBASE_MARKER}\n@dependabot rebase`], { stdio: 'inherit' });
+  console.log(`#${pr.number}: requested Dependabot rebase`);
+}
+
 function run(repository) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository || '')) throw new Error('Invalid repository');
   let failed = false;
@@ -37,10 +50,10 @@ function run(repository) {
         '--json', 'statusCheckRollup']);
       if (!checksPassed(checks)) { console.log(`#${pr.number}: waiting for all checks`); continue; }
       // Strict protection would leave otherwise green updates perpetually
-      // behind main. GitHub evaluates their PR merge commit against current
-      // main; only enable auto-merge once the PR is actually up to date.
+      // behind main. Ask Dependabot to refresh the branch once, then let the
+      // next workflow run validate the new head and checks.
       if (comparison.behind_by > 0) {
-        console.log(`#${pr.number}: awaiting Dependabot's next daily rebase`); continue;
+        requestRebase(repository, pr); continue;
       }
       const fresh = api(`repos/${repository}/pulls/${pr.number}`);
       if (!trustedPullRequest(fresh, repository) || fresh.head.sha !== pr.head.sha || fresh.base.sha !== pr.base.sha) {
