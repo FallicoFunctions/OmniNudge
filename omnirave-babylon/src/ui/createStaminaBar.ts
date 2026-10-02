@@ -101,7 +101,10 @@ export function createStaminaBar(host: HTMLElement, options: StaminaBarOptions =
   }
 
   function relayout(): void {
-    const panels = (options.avoid?.() ?? []).filter((panel): panel is Element => Boolean(panel));
+    // Mobile drawers sit above the toggle row, leaving the bottom-center
+    // slot clear. Keep stamina flush there even when a drawer is open.
+    const candidates = host.classList.contains('babylon-runtime-host--mobile') ? [] : options.avoid?.() ?? [];
+    const panels = candidates.filter((panel): panel is Element => Boolean(panel));
     const lift = staminaLift(container.getBoundingClientRect(), panels.map((panel) => panel.getBoundingClientRect()), window.innerHeight);
     const bottom = lift > 0 ? `${lift}px` : '';
     if (container.style.bottom !== bottom) container.style.bottom = bottom;

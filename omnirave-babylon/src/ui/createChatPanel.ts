@@ -59,6 +59,8 @@ export interface MutedChatUser {
 }
 
 export interface CreateChatPanelOptions {
+  /** The drawer stays available while disconnected, but sending is disabled. */
+  connected?: boolean;
   /** Local player id, used to tell own messages from other players'. */
   currentPlayerId?: string;
   /**
@@ -95,6 +97,9 @@ export interface ChatPanel {
   setOpen: (open: boolean) => void;
   /** Temporarily hides chat and disables its shortcuts without changing preferences. */
   setSuppressed: (suppressed: boolean) => void;
+  /** Hides the entire mobile drawer, independently of show-control suppression. */
+  setMobileHidden: (hidden: boolean, mobile?: boolean) => void;
+  setConnected: (connected: boolean) => void;
   /** True while the body (history or muted view) is on screen. */
   isBodyVisible: () => boolean;
   isHistoryVisible: () => boolean;
@@ -179,6 +184,9 @@ export function createChatPanel(
   const muted = new Map<string, string>();
   const lines: RenderedLine[] = [];
   let suppressed = false;
+  let mobileHidden = false;
+  let mobileDrawer = false;
+  let connected = options.connected ?? true;
 
   // ---- DOM ------------------------------------------------------------
   const element = document.createElement('section');
@@ -257,12 +265,23 @@ export function createChatPanel(
   input.placeholder = 'Press Enter to chat';
   input.setAttribute('aria-label', 'Chat message');
   inputRow.appendChild(input);
+  const sendButton = document.createElement('button');
+  sendButton.type = 'button';
+  sendButton.className = 'hud-button chat-panel__send';
+  sendButton.textContent = '↑';
+  sendButton.setAttribute('aria-label', 'Send chat message');
+  inputRow.appendChild(sendButton);
 
-  element.append(header, body, hint, inputRow);
+  const connectionNotice = document.createElement('p');
+  connectionNotice.className = 'chat-panel__hint';
+  connectionNotice.dataset.testid = 'chat-connection-status';
+  connectionNotice.setAttribute('role', 'status');
+  connectionNotice.textContent = 'Chat unavailable until connected.';
+  element.append(header, body, connectionNotice, hint, inputRow);
   host.appendChild(element);
 
   // ---- visibility -----------------------------------------------------
-  const bodyVisible = () => openPreference || autoOpenActive || mutedViewOpen;
+  const bodyVisible = () => mobileDrawer || openPreference || autoOpenActive || mutedViewOpen;
 
   const render = () => {
     const visible = bodyVisible();
@@ -509,6 +528,7 @@ export function createChatPanel(
 
   // ---- sending --------------------------------------------------------
   const sendCurrentInput = () => {
+    if (!connected) return;
     const draft = input.value.trim();
     if (!draft) {
       return;
@@ -558,7 +578,7 @@ export function createChatPanel(
   };
 
   const handleInputKeyDown = (event: KeyboardEvent) => {
-    if (suppressed) return;
+    if (suppressed || mobileHidden) return;
     if (event.key === 'Enter') {
       if (event.shiftKey) {
         // Sec 10.3: Shift+Enter is a newline - let the textarea do it.
@@ -579,7 +599,7 @@ export function createChatPanel(
   };
 
   const handleFocus = () => {
-    if (suppressed) { input.blur(); return; }
+    if (suppressed || mobileHidden) { input.blur(); return; }
     // Focusing the input alone does NOT open the window (sec 9.8).
     setTextEntryActive(true);
   };
@@ -589,7 +609,7 @@ export function createChatPanel(
   };
 
   const handleGlobalKeyDown = (event: KeyboardEvent) => {
-    if (suppressed) return;
+    if (suppressed || mobileHidden || mobileDrawer || !connected) return;
     if (event.key !== 'Enter' || event.ctrlKey || event.metaKey || event.altKey || event.repeat) {
       return;
     }
@@ -662,6 +682,8 @@ export function createChatPanel(
   };
 
   collapseButton.addEventListener('click', handleCollapseClick);
+  const handleSendClick = () => { if (!suppressed && !mobileHidden) sendCurrentInput(); };
+  sendButton.addEventListener('click', handleSendClick);
   settingsButton.addEventListener('click', handleSettingsClick);
   history.addEventListener('click', handleHistoryClick);
   history.addEventListener('wheel', handleHistoryScrollGesture);
@@ -677,6 +699,16 @@ export function createChatPanel(
 
   renderMutedList();
   render();
+  const setConnected = (next: boolean) => {
+    connected = next;
+    input.disabled = sendButton.disabled = !next;
+    connectionNotice.hidden = next;
+    if (!next) {
+      input.blur();
+      setTextEntryActive(false);
+    }
+  };
+  setConnected(connected);
 
   return {
     element,
@@ -685,6 +717,7 @@ export function createChatPanel(
     clearHistory,
     isOpen: () => openPreference,
     setOpen,
+    setConnected,
     setSuppressed(next) {
       suppressed = next;
       if (next) {
@@ -692,6 +725,16 @@ export function createChatPanel(
         setTextEntryActive(false);
       }
       element.hidden = next;
+    },
+    setMobileHidden(next, mobile = false) {
+      mobileHidden = next;
+      mobileDrawer = mobile;
+      input.placeholder = mobile ? 'Tap to chat' : 'Press Enter to chat';
+      if (next) {
+        input.blur();
+        setTextEntryActive(false);
+      }
+      render();
     },
     isBodyVisible: () => bodyVisible(),
     isHistoryVisible: () => bodyVisible() && !mutedViewOpen,
@@ -706,7 +749,7 @@ export function createChatPanel(
     mutedUsers: () =>
       Array.from(muted, ([playerId, playerName]) => ({ playerId, playerName })),
     isTextEntryActive: () => textEntryActive,
-    focusInput: () => { if (!suppressed) input.focus(); },
+    focusInput: () => { if (!suppressed && !mobileHidden && connected) input.focus(); },
     // Sec 8.3: manual respawn "clears typed chat input text" - a draft the
     // player never sent should not survive a respawn.
     clearDraft: () => {
@@ -720,6 +763,7 @@ export function createChatPanel(
         pasteTimer = undefined;
       }
       collapseButton.removeEventListener('click', handleCollapseClick);
+      sendButton.removeEventListener('click', handleSendClick);
       settingsButton.removeEventListener('click', handleSettingsClick);
       history.removeEventListener('click', handleHistoryClick);
       history.removeEventListener('wheel', handleHistoryScrollGesture);
