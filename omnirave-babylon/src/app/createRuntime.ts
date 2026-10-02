@@ -60,6 +60,8 @@ import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
 import { createTopRightControls } from '../ui/createTopRightControls';
+import { createMobileHudControls } from '../ui/createMobileHudControls';
+import { createMobileMenu } from '../ui/createMobileMenu';
 import { createAuthPopup } from '../ui/createAuthPopup';
 import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
 import { applyUiTheme } from '../ui/uiTheme';
@@ -363,16 +365,16 @@ export async function createRuntime(host: HTMLElement) {
   // owned DOM like the overlays above, so it is torn down in cleanup too.
   let playerHud: import('../ui/createPlayerHud').PlayerHud | undefined;
   let playerHudTimer: number | undefined;
+  let mobileHudControls: ReturnType<typeof createMobileHudControls> | undefined;
+  let mobileMenu: ReturnType<typeof createMobileMenu> | undefined;
   // Sec 9.4 bottom-center HUD: the sprint stamina bar. Not gated behind
   // ?debug=1 - it's player-facing chrome like the rest of this block, just
   // built here since it shares this block's DOM host. (The emote bar that
   // shares this corner is not mounted yet - see the note further down.)
   let staminaBar: import('../ui/createStaminaBar').StaminaBar | undefined;
   // Player-facing chat panel (design sec 9.8 / 10.2 / 10.3 / 10.4). Chat is
-  // venue-local and server-broadcast, so it REQUIRES the world connection:
-  // without a socket there is nothing to send to and no one to hear it, and
-  // the panel would be a dead control. It is therefore constructed only when
-  // the world connection is present.
+  // venue-local and server-broadcast. The drawer remains available without a
+  // connection, with sending disabled and its connection status shown.
   let chatPanel: import('../ui/createChatPanel').ChatPanel | undefined;
   // Player-facing HUD shell (design sec 9.2 / 9.3 / 9.6). Also never gated
   // behind ?debug=1, also owned DOM torn down in cleanup.
@@ -440,6 +442,8 @@ export async function createRuntime(host: HTMLElement) {
       window.clearInterval(playerHudTimer);
       playerHudTimer = undefined;
     }
+    mobileHudControls?.dispose();
+    mobileMenu?.dispose();
     playerHud?.dispose();
     staminaBar?.dispose();
     chatPanel?.dispose();
@@ -478,6 +482,7 @@ export async function createRuntime(host: HTMLElement) {
         console.info(`[world] socket ${status}`);
         if (status === 'open') markBootPhase('socket_open');
         worldAppearance?.status(status);
+        chatPanel?.setConnected(status === 'open');
       });
       worldSocket.connect();
       stopWorldSessionRenewal = keepWorldSessionAlive(worldSocket, { freshLaunch: import.meta.env.PROD });
@@ -884,6 +889,7 @@ export async function createRuntime(host: HTMLElement) {
       {
         const [{ formatVenueName: formatChatVenueName }] = await uiModules;
         chatPanel = createChatPanel(host, {
+          connected: activeWorldSocket.status() === 'open',
           // Sec 9.8: default open when no saved preference exists; the stored
           // guest-scoped blob supplies it otherwise.
           open: loadPlayerSettings().chatOpen,
@@ -1031,6 +1037,20 @@ export async function createRuntime(host: HTMLElement) {
         stageAudioDevControls = createStageAudioDevControls(host, activeStageMediaPlayer);
       }
     }
+    if (!chatPanel) {
+      const [, , { createChatPanel }] = await worldModules;
+      chatPanel = createChatPanel(host, {
+        connected: false,
+        open: loadPlayerSettings().chatOpen,
+        onOpenChange(open) {
+          savePlayerSettings({ ...loadPlayerSettings(), chatOpen: open });
+        },
+        onTextEntryActiveChange(active) {
+          reviewRuntime?.input?.setTextEntryActive?.(active);
+        },
+        debugChromePresent: showDebugChrome,
+      });
+    }
     markBootPhase('world_ready');
 
     // The player HUD ships in BOTH paths: with a world socket it shows the
@@ -1083,6 +1103,11 @@ export async function createRuntime(host: HTMLElement) {
       // reaches under it (a narrow window): then just above them.
       staminaBar = createStaminaBar(host, { avoid: () => [chatPanel?.element, playerHud?.element] });
     }
+    mobileHudControls = createMobileHudControls(host, {
+      chat: chatPanel,
+      nowPlaying: playerHud.element,
+      onLayoutChange: () => staminaBar?.relayout(),
+    });
 
     // Sec 9.4/9.7 emote bar: DELIBERATELY NOT MOUNTED yet. Owner decision
     // (2026-08-04): the bar stays off screen until the emotes behind it are
@@ -1454,6 +1479,11 @@ export async function createRuntime(host: HTMLElement) {
         debugChromePresent: showDebugChrome,
       });
     }
+
+    mobileMenu = createMobileMenu(host, {
+      topLeft: topLeftControls.element,
+      topRight: topRightControls.element,
+    });
 
     // The Main Stage screen visualizer. It runs in BOTH paths: with the stage
     // media player (world/music path) it reacts to the live synced audio; on
