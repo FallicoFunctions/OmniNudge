@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "head": "dc6dd20e59424e69d0b06533fbdb989b0edb9f9c",
+  "head": "f733cc7b5f8c64ad66cc09649f9b1342a5d439f8",
   "base": "feef804cbc98237f4d59b0fbbfa087d92350b72b",
   "scope": {
     "files": [
@@ -281,7 +281,7 @@
           "id": "gesture-listener-one-shot",
           "summary": "The runtime stops its audio gesture listeners after the first gesture, so a context stopped hours later was never restarted by a click.",
           "found_by": "E4",
-          "fix_commit": "dc6dd20e5",
+          "fix_commit": "f733cc7b5f8c64ad66cc09649f9b1342a5d439f8",
           "control": {
             "patch": ".review/controls/gesture-listener-one-shot.patch",
             "runner": "bash",
