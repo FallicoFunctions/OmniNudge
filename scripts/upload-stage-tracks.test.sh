@@ -1,6 +1,7 @@
 #!/bin/bash
 # Tests for upload-stage-tracks.sh. node, rsync and curl are replaced by
-# stand-ins on PATH, so nothing is built for real and nothing is uploaded.
+# stand-ins on PATH, and the beat analysis's Python by one named in
+# OMNIRAVE_BEAT_PYTHON, so nothing is built for real and nothing is uploaded.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,7 +20,13 @@ cat > "$STUBS/node" <<'EOF'
 echo "node $*" >> "$CALLS"
 base="${2%.mp3}"
 printf 'OMSP-spectrum' > "$base.spectrum"
-printf '%s-beats' "${BEATS_TAG:-OMB3}" > "$base.beats"
+printf '%s-beats' "${BEATS_TAG:-OMB4}" > "$base.beats"
+EOF
+# python <analysis script> <mp3>: writes the beat grid next to the MP3.
+cat > "$STUBS/beat-python" <<'EOF'
+#!/bin/bash
+echo "python $*" >> "$CALLS"
+printf '{}' > "${2%.mp3}.beatgrid.json"
 EOF
 # rsync: records its arguments.
 cat > "$STUBS/rsync" <<'EOF'
@@ -47,6 +54,7 @@ fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 run() {
   : > "$CALLS"
   OUT="$(PATH="$STUBS:$PATH" CALLS="$CALLS" TRACKS="$TRACKS" SERVER="deploy@example.test" \
+    OMNIRAVE_BEAT_PYTHON="${BEAT_PYTHON_STUB:-$STUBS/beat-python}" \
     SITE_ORIGIN="https://example.test" OMNIRAVE_BASE_PATH="/games/omnirave/play/" \
     bash "$SCRIPT" "$@" 2>&1)"
   STATUS=$?
@@ -72,28 +80,38 @@ run "$TRACKS/set-a.wav"
 
 printf 'x' > "$TRACKS/bad name.mp3"
 run "$TRACKS/set-a.mp3" "$TRACKS/bad name.mp3"
-[ "$STATUS" -ne 0 ] && grep -q "track id 'bad name'" <<<"$OUT" && ! grep -q "^node\|^rsync" "$CALLS" \
+[ "$STATUS" -ne 0 ] && grep -q "track id 'bad name'" <<<"$OUT" && ! grep -q "^python\|^node\|^rsync" "$CALLS" \
   && pass "checks every track id before building or uploading anything" || fail "bad id: $OUT / $(cat "$CALLS")"
 
 new_tracks happy
 run "$TRACKS/set-a.mp3" "$TRACKS/set-b.mp3"
 if [ "$STATUS" -eq 0 ] \
+  && [ "$(grep -c '^python .*analyze-track-beats.py' "$CALLS")" = 2 ] \
   && [ "$(grep -c '^node .*build-track-spectrum.mjs' "$CALLS")" = 2 ] \
+  && [ "$(grep -m1 -o '^[a-z]*' "$CALLS")" = python ] \
   && grep -q "^rsync -a --partial $TRACKS/set-a.mp3 $TRACKS/set-a.spectrum $TRACKS/set-a.beats deploy@example.test:/var/www/omnirave-audio/$" "$CALLS" \
   && grep -q "^curl https://example.test/games/omnirave/play/audio/set-b.beats$" "$CALLS" \
   && [ "$(grep -c '^curl ' "$CALLS")" = 6 ] \
   && grep -q "Uploaded and checked: set-a set-b" <<<"$OUT"; then
-  pass "builds, uploads the three files of each track and reads each one back from the site"
+  pass "analyzes and builds, uploads the three files of each track and reads each one back from the site"
 else
   fail "happy path: $OUT / $(cat "$CALLS")"
 fi
 
-# The built files are newer than the MP3 (dated 2020 here; a real build comes
-# minutes after the MP3, a test within the same second).
+# The built files are newer than the beat grid, and the grid newer than the
+# MP3 (dated 2020 here; a real build comes minutes after each, a test within
+# the same second).
 touch -t 202001010000 "$TRACKS/set-a.mp3"
+touch -t 202001010100 "$TRACKS/set-a.beatgrid.json"
 run "$TRACKS/set-a.mp3"
-[ "$STATUS" -eq 0 ] && ! grep -q "^node" "$CALLS" && grep -q "up to date" <<<"$OUT" \
+[ "$STATUS" -eq 0 ] && ! grep -q "^python\|^node" "$CALLS" && grep -q "Beat grid is up to date" <<<"$OUT" \
   && pass "does not rebuild files newer than the MP3" || fail "up to date: $OUT / $(cat "$CALLS")"
+
+# A new beat grid (the analysis rerun by hand): the beat file is rebuilt.
+touch -t 202001010000 "$TRACKS/set-a.spectrum" "$TRACKS/set-a.beats"
+run "$TRACKS/set-a.mp3"
+[ "$STATUS" -eq 0 ] && ! grep -q "^python" "$CALLS" && grep -q "^node" "$CALLS" \
+  && pass "rebuilds the beat file when the beat grid is newer" || fail "newer grid: $OUT / $(cat "$CALLS")"
 
 touch "$TRACKS/set-a.mp3"
 run "$TRACKS/set-a.mp3"
@@ -114,9 +132,14 @@ RSYNC_EXIT=12 run "$TRACKS/set-a.mp3"
   && pass "stops when the upload fails" || fail "rsync failure: $OUT"
 
 new_tracks tag
-BEATS_TAG=OMB2 run "$TRACKS/set-a.mp3"
-[ "$STATUS" -ne 0 ] && grep -q "is not a beat file (OMB3)" <<<"$OUT" && ! grep -q "^rsync" "$CALLS" \
+BEATS_TAG=OMB3 run "$TRACKS/set-a.mp3"
+[ "$STATUS" -ne 0 ] && grep -q "is not a beat file (OMB4)" <<<"$OUT" && ! grep -q "^rsync" "$CALLS" \
   && pass "refuses to upload a beat file of an older format" || fail "old beats format: $OUT"
+
+new_tracks python
+BEAT_PYTHON_STUB="$WORK/no-such-python" run "$TRACKS/set-a.mp3"
+[ "$STATUS" -ne 0 ] && grep -q "No Python for the beat analysis" <<<"$OUT" && ! grep -q "^node\|^rsync" "$CALLS" \
+  && pass "stops with the setup step when the analysis Python is missing" || fail "no python: $OUT"
 
 echo "$failures failed"
 [ "$failures" -eq 0 ]

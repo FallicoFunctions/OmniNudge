@@ -101,12 +101,22 @@ The deploy script builds the frontend with `VITE_OMNICHAT_ENABLED=false`, and pr
 
 Both game services read the backend's environment file through `EnvironmentFile=`. They build their database URL from the `DB_*` values when `DATABASE_URL` is not set.
 
-Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`. Each track also needs two files built from its MP3: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. Every light effect (lasers, crown, light floor, hologram grid, CO2, flames, sparks, strobes) fires on the hits in the beats file (bass, mid and high bands, with the kicks, drops, build-ups and energy found from them); without it, they guess from the spectrum level, which almost never fires on a loud master.
+Stage audio lives outside the deploy tree so `rsync --delete` and the backup tarball never touch it. The world server names each track; the file must be `<trackId>.mp3`. Each track also needs two files built from its MP3: `<trackId>.spectrum` and `<trackId>.beats`. The stage lights read the spectrum at the track position, so they are the same for every player; without it, the lights follow the audio of each player's own tab. Every light effect (lasers, crown, light floor, hologram grid, CO2, flames, sparks, strobes) fires on the beats file: the hits in the bass, mid and high bands, and every beat, bar start and drop of the track, found by the Beat This! beat tracker (`omnirave-babylon/scripts/analyze-track-beats.py`); the build-ups, energy and tempo come from those. Without it, they guess from the spectrum level, which almost never fires on a loud master.
 
-One command builds both files, uploads all three, and reads each back from the site to compare its size (needs node and ffmpeg; about 4 minutes for a 2-hour set, and it skips files that are newer than the MP3). It takes several MP3s at once, and the file name is the track id:
+One command finds the beats, builds both files, uploads all three, and reads each back from the site to compare its size (needs node, ffmpeg and the beat-analysis Python; about 3 minutes for a 2-hour set, and it skips files that are newer than their sources). It takes several MP3s at once, and the file name is the track id:
 
 ```bash
 bash scripts/upload-stage-tracks.sh path/to/<trackId>.mp3 [more.mp3 ...]
+```
+
+The beat analysis runs in its own Python environment, by default `~/opt/miniconda3/envs/omnirave-audio` (set `OMNIRAVE_BEAT_PYTHON` for another). To set one up:
+
+```bash
+conda create -y -n omnirave-audio python=3.10
+```
+
+```bash
+~/opt/miniconda3/envs/omnirave-audio/bin/pip install torch soundfile "git+https://github.com/CPJKU/beat_this.git"
 ```
 
 Then add each track id to a stage setlist. When `omnirave-world` starts, it logs a `WARNING` for every playlist track that is missing any of the three files in `/var/www/omnirave-audio` (`OMNIRAVE_AUDIO_DIR`):

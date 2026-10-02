@@ -2,7 +2,9 @@
 // a bass hit and decays back to zero.
 //
 // With the track's beat list (see media/trackBeats.ts) the hits are the real
-// ones: a bass note lifts the punch to its strength, and `kick` marks a kick.
+// ones: a bass note lifts the punch to its strength, `kick` marks a beat, and
+// the first beat of a bar lifts the punch to at least the music's energy, so
+// the bars read as accents in a drop and stay soft in a break.
 // Only a track without a list falls back to the level-based guess - a bass
 // reading well above its running average - which a loud master rarely
 // triggers, because its bass band sits near the ceiling all the time.
@@ -40,8 +42,9 @@ export function stepBassPunch(
   step.kick = false;
   if (beat) {
     step.kick = audioPresent && beat.kick;
-    if (audioPresent && beat.bass > 0 && beat.bass >= punch) {
-      step.punch = beat.bass;
+    const strength = beat.bar ? Math.max(beat.bass, beat.energy) : beat.bass;
+    if (audioPresent && strength > 0 && strength >= punch) {
+      step.punch = strength;
       step.hit = true;
     } else {
       step.punch = Math.max(0, punch - dtSeconds / decaySeconds);

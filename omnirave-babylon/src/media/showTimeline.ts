@@ -45,21 +45,26 @@ export interface ShowPhrase {
 }
 
 export interface ShowTimeline {
-  // Integrals from the track start to `seconds`, in seconds: of the energy
-  // (0..1), of the build-up ramp (buildUp^1.5), and of energy x ramp. A speed
-  // that is linear in these gives its phase without any frame history.
+  // Integrals from the track start to `seconds`, weighted by the tempo (1 at
+  // REFERENCE_BPM, see trackBeats.ts): of 1, of the energy (0..1), of the
+  // build-up ramp (buildUp^1.5), and of energy x ramp. A speed that is
+  // linear in these gives its phase without any frame history, and runs
+  // faster in a faster song.
+  tempoArea(seconds: number): number;
   energyArea(seconds: number): number;
   rampArea(seconds: number): number;
   energyRampArea(seconds: number): number;
-  // The phrase at `seconds`. A phrase ends at the kicksPerPhrase-th kick
-  // after its start, but not before minSeconds; or at maxSeconds without
-  // enough kicks (a break). Inside `windows` the longest hold is
-  // windowMaxSeconds instead.
+  // The phrase at `seconds`. A phrase ends at the first kick whose count is
+  // kicksPerPhrase past the count at its start, but not before minSeconds;
+  // or at maxSeconds without enough kicks (a break). The counts are aligned
+  // to the bars, so 16 kicks from a bar start end on the bar start four
+  // bars later. Inside `windows` the longest hold is windowMaxSeconds
+  // instead.
   phrase(seconds: number, kicksPerPhrase: number, minSeconds: number, maxSeconds: number, out: ShowPhrase,
     windows?: Float64Array, windowMaxSeconds?: number): ShowPhrase;
   // A palette clock that runs with the track and jumps to the next palette
-  // crossfade on a kick, at most once per cooldownSeconds, and at each of
-  // `forcedJumps` (the start of a show) whatever the cooldown.
+  // crossfade on a bar start, at most once per cooldownSeconds, and at each
+  // of `forcedJumps` (the start of a show) whatever the cooldown.
   paletteClock(seconds: number, cycleSeconds: number, fadeSeconds: number, cooldownSeconds: number,
     forcedJumps?: Float64Array): number;
   // The kicks as a beat position: kicks so far plus the way to the next one.
@@ -86,26 +91,39 @@ export function buildUpAt(buildStarts: ArrayLike<number>, buildDrops: ArrayLike<
   return length > 0 ? Math.min(1, (seconds - buildStarts[next]) / length) : 0;
 }
 
+/** A kick that starts a bar: its count is a multiple of 4 and new. */
+export function isBarStart(kickCounts: ArrayLike<number>, index: number): boolean {
+  return kickCounts[index] % 4 === 0 && (index === 0 || kickCounts[index] !== kickCounts[index - 1]);
+}
+
+// `kickCounts` (bar-aligned, see trackBeats.ts) defaults to the kick's own
+// index; `tempo`, one factor per energy step, to 1.
 export function createShowTimeline(
   kickSeconds: ArrayLike<number>,
   energy: ArrayLike<number>,
   stepSeconds: number,
   buildStarts: ArrayLike<number>,
   buildDrops: ArrayLike<number>,
+  kickCounts: ArrayLike<number> = Float64Array.from(kickSeconds, (_, i) => i),
+  tempo?: ArrayLike<number>,
 ): ShowTimeline {
   const steps = energy.length;
-  // Per step (constant over the step): energy, ramp and their product; and
-  // their running sums at each step start.
+  // Per step (constant over the step): tempo, energy, ramp and their
+  // products; and their running sums at each step start.
   const ramp = new Float64Array(steps);
+  const pace = (i: number) => (tempo ? tempo[i] : 1);
+  const tempoStart = new Float64Array(steps + 1);
   const energyStart = new Float64Array(steps + 1);
   const rampStart = new Float64Array(steps + 1);
   const bothStart = new Float64Array(steps + 1);
   for (let i = 0; i < steps; i += 1) {
     const build = buildUpAt(buildStarts, buildDrops, i * stepSeconds);
     ramp[i] = build * Math.sqrt(build);
-    energyStart[i + 1] = energyStart[i] + energy[i] * stepSeconds;
-    rampStart[i + 1] = rampStart[i] + ramp[i] * stepSeconds;
-    bothStart[i + 1] = bothStart[i] + energy[i] * ramp[i] * stepSeconds;
+    const weight = pace(i) * stepSeconds;
+    tempoStart[i + 1] = tempoStart[i] + weight;
+    energyStart[i + 1] = energyStart[i] + energy[i] * weight;
+    rampStart[i + 1] = rampStart[i] + ramp[i] * weight;
+    bothStart[i + 1] = bothStart[i] + energy[i] * ramp[i] * weight;
   }
   const area = (starts: Float64Array, value: (step: number) => number, seconds: number) => {
     if (!steps || seconds <= 0) return 0;
@@ -141,7 +159,10 @@ export function createShowTimeline(
           const at = Math.max(start + Math.max(windowMaxSeconds, 1e-3), windows[i]);
           if (at < windows[i + 1]) next = Math.min(next, at);
         }
-        const kick = firstAfter(kickSeconds, start) + kicksPerPhrase - 1;
+        const atStart = firstAfter(kickSeconds, start) - 1;
+        const target = (atStart >= 0 ? kickCounts[atStart] : 0) + kicksPerPhrase;
+        let kick = atStart + 1;
+        while (kick < kickSeconds.length && kickCounts[kick] < target) kick += 1;
         if (kick < kickSeconds.length) next = Math.min(next, Math.max(kickSeconds[kick], start + minSeconds));
         if (!Number.isFinite(next) || next <= start) next = start + longest;
         list.push(next);
@@ -170,16 +191,17 @@ export function createShowTimeline(
       for (let i = 0; i <= kickSeconds.length; i += 1) {
         const kick = i < kickSeconds.length ? kickSeconds[i] : Number.POSITIVE_INFINITY;
         for (; f < forced.length && forced[f] <= kick; f += 1) if (forced[f] >= 0) jump(forced[f]);
-        if (i < kickSeconds.length && kick - last >= cooldownSeconds) jump(kick);
+        if (i < kickSeconds.length && isBarStart(kickCounts, i) && kick - last >= cooldownSeconds) jump(kick);
       }
       return { at: Float64Array.from(at), offset: Float64Array.from(offsets) };
     });
   }
 
   return {
-    energyArea: (seconds) => area(energyStart, (step) => energy[step], seconds),
-    rampArea: (seconds) => area(rampStart, (step) => ramp[step], seconds),
-    energyRampArea: (seconds) => area(bothStart, (step) => energy[step] * ramp[step], seconds),
+    tempoArea: (seconds) => area(tempoStart, (step) => pace(step), seconds),
+    energyArea: (seconds) => area(energyStart, (step) => energy[step] * pace(step), seconds),
+    rampArea: (seconds) => area(rampStart, (step) => ramp[step] * pace(step), seconds),
+    energyRampArea: (seconds) => area(bothStart, (step) => energy[step] * ramp[step] * pace(step), seconds),
     phrase(seconds, kicksPerPhrase, minSeconds, maxSeconds, out, windows = noWindows, windowMaxSeconds = maxSeconds) {
       const starts = phraseStarts(kicksPerPhrase, minSeconds, maxSeconds, windows, windowMaxSeconds);
       const index = Math.max(0, firstAfter(starts, Math.max(0, seconds)) - 1);

@@ -84,14 +84,16 @@ const SPARK_POP_SECONDS = 2; // outside events: short fountain length
 const SPARK_PUNCH_INTERVAL = 8; // ...fired on every 8th strong punch
 
 // --- With the track's beat list ---------------------------------------------
-// The effects above punctuate; they must not fire on every kick. With real
-// hits they follow the music's structure instead of a level:
-//   - a DROP (the first kick after a passage with no kick) fires the CO2
-//     jets, a flame cascade and the strobes;
-//   - between drops, fixed kick counts keep the punctuation going: CO2 every
-//     16 kicks (four bars), strobes every 8, a short flame cascade every 32,
-//     and the cold sparks every 32, half way between two flame cascades.
-// The kick count is the track's own, so every player sees these together.
+// The effects above punctuate; they must not fire on every beat. With the
+// track's beat list they follow the music's structure instead of a level:
+//   - a DROP (a bar start where the low end and the mix jump, see
+//     scripts/analyze-track-beats.py) fires the CO2 jets, a flame cascade
+//     and the strobes;
+//   - between drops, fixed beat counts keep the punctuation going: CO2 every
+//     16 beats (four bars), strobes every 8, a short flame cascade every 32,
+//     and the cold sparks every 32, half way between two flame cascades. The
+//     counts are aligned to the bars, so each of these lands on a bar start.
+// The count is the track's own, so every player sees these together.
 const CO2_KICK_INTERVAL = 16;
 const STROBE_KICK_INTERVAL = 8;
 const FLAME_KICK_INTERVAL = 32;

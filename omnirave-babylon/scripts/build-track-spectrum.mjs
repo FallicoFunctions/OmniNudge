@@ -10,7 +10,9 @@
 // (RUNBOOK.md, "Stage audio"). Needs ffmpeg.
 //
 // The beats file lists every hit in three bands (bass, mids, highs) with its
-// time and a strength from 0 to 1 (see findHits).
+// time and a strength from 0 to 1 (see findHits), and the track's beats, bars
+// and drops from <trackId>.beatgrid.json (scripts/analyze-track-beats.py,
+// which has to run first).
 //
 // Each frame is what an AnalyserNode with the game's settings (fftSize 256,
 // smoothingTimeConstant 0.8, minDecibels -100, maxDecibels -30) returns from
@@ -21,7 +23,7 @@
 // frame (30 per second); the game blends between them.
 
 import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const SAMPLE_RATE = 48000; // The usual AudioContext rate on desktop devices.
 const FFT_SIZE = 256;
@@ -41,6 +43,7 @@ if (!input || !/\.(mp3|m4a|wav|ogg|flac)$/i.test(input)) {
   process.exit(1);
 }
 const output = input.replace(/\.[^.]+$/, '.spectrum');
+const grid = readBeatGrid();
 
 const window = Float64Array.from({ length: FFT_SIZE }, (_, n) =>
   0.42 - 0.5 * Math.cos((2 * Math.PI * n) / FFT_SIZE) + 0.08 * Math.cos((4 * Math.PI * n) / FFT_SIZE));
@@ -250,18 +253,37 @@ function findHits({ energy, hop }, { minGapSeconds, offsetSeconds }) {
   return hits.sort((a, b) => a.seconds - b.seconds);
 }
 
+// The beats, their bar-aligned counts and the drops (as beat indices).
+function readBeatGrid() {
+  const path = input.replace(/\.[^.]+$/, '.beatgrid.json');
+  if (!existsSync(path)) {
+    console.error(`${path} is missing: run scripts/analyze-track-beats.py on the track first.`);
+    process.exit(1);
+  }
+  const grid = JSON.parse(readFileSync(path, 'utf8'));
+  if (grid.version !== 1) {
+    console.error(`${path}: unknown version ${grid.version}.`);
+    process.exit(1);
+  }
+  return grid;
+}
+
 async function writeBeats() {
   const lists = [];
   for (const band of BANDS) lists.push(findHits(await bandEnergy(band), band));
-  // "OMB3", one hit count per band and the loudness block count (uint32),
-  // then the bands in order, per hit: seconds and strength (float32), then
-  // the mean power of each 0.25 s block (float32).
+  // "OMB4", one hit count per band, the loudness block count, the beat count
+  // and the drop count (uint32); then the bands in order, per hit: seconds
+  // and strength (float32); the mean power of each 0.25 s block (float32);
+  // per beat: seconds (float32) and its bar-aligned count (uint32); and the
+  // index of each drop's beat (uint32).
   const total = lists.reduce((sum, hits) => sum + hits.length, 0);
-  const header = 4 + 4 * (BANDS.length + 1);
-  const body = Buffer.alloc(header + total * 8 + loudness.length * 4);
-  body.write('OMB3', 0, 'ascii');
+  const header = 4 + 4 * (BANDS.length + 3);
+  const body = Buffer.alloc(header + total * 8 + loudness.length * 4 + grid.beats.length * 8 + grid.drops.length * 4);
+  body.write('OMB4', 0, 'ascii');
   lists.forEach((hits, band) => body.writeUInt32LE(hits.length, 4 + 4 * band));
   body.writeUInt32LE(loudness.length, 4 + 4 * BANDS.length);
+  body.writeUInt32LE(grid.beats.length, 8 + 4 * BANDS.length);
+  body.writeUInt32LE(grid.drops.length, 12 + 4 * BANDS.length);
   let offset = header;
   for (const hits of lists) {
     for (const hit of hits) {
@@ -274,9 +296,17 @@ async function writeBeats() {
     body.writeFloatLE(power, offset);
     offset += 4;
   }
+  for (const [seconds, count] of grid.beats) {
+    body.writeFloatLE(seconds, offset);
+    body.writeUInt32LE(count, offset + 4);
+    offset += 8;
+  }
+  for (const beat of grid.drops) {
+    body.writeUInt32LE(beat, offset);
+    offset += 4;
+  }
   const beatsOutput = input.replace(/\.[^.]+$/, '.beats');
   writeFileSync(beatsOutput, body);
   const summary = lists.map((hits, band) => `${BANDS[band].name} ${hits.length}`).join(', ');
-  const kicks = lists[0].filter((hit) => hit.strength >= 0.7).length;
-  console.log(`${beatsOutput}: hits ${summary} (${kicks} bass hits at strength 0.7 or more), ${body.length} bytes`);
+  console.log(`${beatsOutput}: hits ${summary}, ${grid.beats.length} beats, ${grid.drops.length} drops, ${body.length} bytes`);
 }

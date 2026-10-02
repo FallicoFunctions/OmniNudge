@@ -25,17 +25,17 @@ describe('createShowTimeline', () => {
     expect(timeline.rampArea(19)).toBeCloseTo(ramp, 6); // after the drop: no ramp
   });
 
-  it('ends a phrase at the n-th kick, not before the shortest hold, and after the longest hold without kicks', () => {
-    // Kicks every 0.5 s for 10 s, then a 30 s break.
+  it('ends a phrase n counts on, not before the shortest hold, and after the longest hold without kicks', () => {
+    // Kicks every 0.5 s for 10 s (each its own count), then a 30 s break.
     const kicks = kicksEvery(0.5, 10.5, 0.5);
     const timeline = createShowTimeline(kicks, steady(40, 0.5), STEP, none, none);
-    // Four kicks per phrase: the 4th kick after 0 is at 2 s, then 4 s, ...
-    expect(timeline.phrase(1.9, 4, 0, 12, phrase())).toEqual({ index: 0, since: 1.9 });
-    expect(timeline.phrase(2, 4, 0, 12, phrase()).index).toBe(1);
+    // Four counts per phrase: from count 0 (0.5 s) to count 4 (2.5 s), 6.5, ...
+    expect(timeline.phrase(2.4, 4, 0, 12, phrase())).toEqual({ index: 0, since: 2.4 });
+    expect(timeline.phrase(2.5, 4, 0, 12, phrase()).index).toBe(1);
     expect(timeline.phrase(9.9, 4, 0, 12, phrase()).index).toBe(4);
-    // In the break: a new phrase every 12 s after the last kick phrase (10 s).
-    expect(timeline.phrase(21.9, 4, 0, 12, phrase()).index).toBe(5);
-    expect(timeline.phrase(22, 4, 0, 12, phrase())).toEqual({ index: 6, since: 0 });
+    // In the break: a new phrase every 12 s after the last kick phrase (8.5 s).
+    expect(timeline.phrase(20.4, 4, 0, 12, phrase()).index).toBe(4);
+    expect(timeline.phrase(20.5, 4, 0, 12, phrase())).toEqual({ index: 5, since: 0 });
     // Two kicks per phrase but at least 3 s: phrases at 3, 6, 9 s.
     const held = createShowTimeline(kicks, steady(40, 0.5), STEP, none, none);
     expect(held.phrase(2.9, 2, 3, 12, phrase()).index).toBe(0);
@@ -43,9 +43,21 @@ describe('createShowTimeline', () => {
     expect(held.phrase(6, 2, 3, 12, phrase()).index).toBe(2);
   });
 
-  it('runs the palette clock with the track and jumps it to the next crossfade on kicks, with a cooldown', () => {
-    // Kicks at 1, 2 (inside the cooldown) and 5 s.
-    const timeline = createShowTimeline(Float32Array.of(1, 2, 5), steady(30, 0.5), STEP, none, none);
+  it('keeps phrases on the bar starts through a bar the tracker heard as five beats', () => {
+    // Bars of four at 0.5 s a beat; the second bar has an extra beat at 3.25 s.
+    const kicks = Float32Array.of(0, 0.5, 1, 1.5, 2, 2.5, 3, 3.25, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8);
+    const counts = Float32Array.of(0, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    const timeline = createShowTimeline(kicks, steady(10, 0.5), STEP, none, none, counts);
+    // Two bars a phrase: at the bar starts 4 s (count 8) and 8 s (count 16),
+    // not at the 9th beat (3.5 s).
+    expect([3.5, 3.9, 4, 7.9, 8].map((t) => timeline.phrase(t, 8, 0, 12, phrase()).index)).toEqual([0, 0, 1, 1, 2]);
+  });
+
+  it('runs the palette clock with the track and jumps it to the next crossfade on bar starts, with a cooldown', () => {
+    // Bar starts at 1, 2 (inside the cooldown) and 5 s; a beat at 4 s that
+    // does not start a bar.
+    const timeline = createShowTimeline(Float32Array.of(1, 2, 4, 5), steady(30, 0.5), STEP, none, none,
+      Float32Array.of(0, 4, 5, 8));
     expect(timeline.paletteClock(0.5, 22, 2, 3)).toBe(0.5);
     // The kick at 1 s moves the clock to the start of the first crossfade (20.01 s).
     expect(timeline.paletteClock(1, 22, 2, 3)).toBeCloseTo(20.01, 6);

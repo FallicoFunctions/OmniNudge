@@ -742,7 +742,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     // The timeline's sweep: 0.7 + 1.8 x energy, summed from the track start,
     // with the lead-in's and the show's own speeds inside them.
     if (timeline) {
-      const sweep = (seconds: number) => 0.7 * seconds + 1.8 * timeline.energyArea(seconds);
+      const sweep = (seconds: number) => 0.7 * timeline.tempoArea(seconds) + 1.8 * timeline.energyArea(seconds);
       coneSweepPhase = sweep(showAt);
       if (events) {
         coneSweepPhase += windowSum(events.leadIns, showAt, (from, to) => LEAD_IN_SWEEP_SPEED * (to - from) - (sweep(to) - sweep(from)))
@@ -823,10 +823,11 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     spreadSum = 0;
     // The timeline's laser phase is the same speed summed from the track
     // start. BUILD_SPEED is above DROP_SPEED, so the speed is
-    // break(1 - ramp) + (drop - break) x energy x (1 - ramp) + build x ramp.
+    // break(1 - ramp) + (drop - break) x energy x (1 - ramp) + build x ramp,
+    // times the song's tempo factor (see showTimeline.ts tempoArea).
     // Inside the fireworks show the show's speed replaces it.
     if (timeline) {
-      const travel = (seconds: number) => BREAK_SPEED * (seconds - timeline.rampArea(seconds))
+      const travel = (seconds: number) => BREAK_SPEED * (timeline.tempoArea(seconds) - timeline.rampArea(seconds))
         + (DROP_SPEED - BREAK_SPEED) * (timeline.energyArea(seconds) - timeline.energyRampArea(seconds))
         + BUILD_SPEED * timeline.rampArea(seconds);
       laserPhase = travel(showAt);
@@ -837,7 +838,7 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
     } else {
       laserPhase = advancePhase(laserPhase, dt, laserSpeed);
     }
-    const driftPhase = timeline ? 0.3 * showAt + 0.6 * energyArea : elapsed * (0.3 + motion * 0.6);
+    const driftPhase = timeline ? 0.3 * timeline.tempoArea(showAt) + 0.6 * energyArea : elapsed * (0.3 + motion * 0.6);
     const patternEnergy = idle ? 0.2 : Math.min(1, energyOverall + 0.2);
 
     // Global laser brightness (reactivity amplified, beat-flashed).

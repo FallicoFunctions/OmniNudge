@@ -1,38 +1,51 @@
 // The hits of a stage track in three bands (bass: kicks and bass notes; mids:
-// snares and claps; highs: hats and cymbals), found ahead of time by
+// snares and claps; highs: hats and cymbals), and its beats, bars and drops,
+// found ahead of time by scripts/analyze-track-beats.py and
 // scripts/build-track-spectrum.mjs and stored as <trackId>.beats next to the
 // track's audio file. The lights fire on these instead of guessing a beat
 // from the spectrum level: a loud master keeps every band near its ceiling,
 // so a level-based guess almost never fires. Like the spectrum, the list
 // depends only on the track position, so every player sees the same hits,
-// the same kick count and the same drops.
+// the same beat count and the same drops.
 //
-//   bytes 0-3   "OMB3"
-//   bytes 4-19  hit count of each band, then the loudness block count
-//               (uint32 x 4, little-endian)
+// The "kicks" the lights count are the beats: every beat of the music, in
+// every genre, from a trained beat tracker (see analyze-track-beats.py).
+// Each has a count aligned to the bars (a multiple of 4 on a bar start), so
+// "every 16th kick" is every fourth bar start.
+//
+//   bytes 0-3   "OMB4"
+//   bytes 4-27  hit count of each band, the loudness block count, the beat
+//               count and the drop count (uint32 x 6, little-endian)
 //   then        the bands in order; per hit: seconds into the track and
 //               strength 0..1 (float32 each)
 //   then        the mean power of each 0.25 s block of the mix (float32)
+//   then        per beat: seconds (float32) and its count (uint32)
+//   then        the index of each drop's beat (uint32)
 //
-// A two-hour set is about 950 KB, so the whole list is downloaded once.
+// A two-hour set is about 1.1 MB, so the whole list is downloaded once.
 
 import { publicUrl } from '../app/publicUrl';
-import { buildUpAt, createShowTimeline, type ShowEventWindows, type ShowTimeline } from './showTimeline';
+import { buildUpAt, createShowTimeline, isBarStart, type ShowEventWindows, type ShowTimeline } from './showTimeline';
 
 const BAND_COUNT = 3;
-const BEATS_HEADER_BYTES = 4 + 4 * (BAND_COUNT + 1);
+const BEATS_HEADER_BYTES = 4 + 4 * (BAND_COUNT + 3);
 const LOUDNESS_BLOCK_SECONDS = 0.25;
 const RETRY_AFTER_MS = 30_000;
-// A bass hit this strong is a kick. Kicks are at least this far apart, so a
-// busy bass line does not count (or flash) twice on one beat.
-const KICK_STRENGTH = 0.7;
-const KICK_MIN_GAP_SECONDS = 0.3;
-// A drop: the first kick after this long without one (the kick comes back
-// after a breakdown), when at least DROP_KICKS_AFTER kicks follow within
-// DROP_CHECK_SECONDS. A lone kick inside a breakdown is not a drop.
-const DROP_QUIET_SECONDS = 6;
-const DROP_KICKS_AFTER = 6;
-const DROP_CHECK_SECONDS = 4;
+// The tempo the light speeds were tuned at (the house part of the first set).
+// A song at 176 BPM moves the lights 176/128 as fast. The tempo at a moment
+// is the median of the beat gaps among the TEMPO_BEATS beats around it,
+// leaving out gaps over TEMPO_MAX_GAP_SECONDS (a hole in the beats, not a
+// tempo). Under TEMPO_FOLD_BPM it is doubled: the tracker hears drum and bass
+// at half time in places (88 BPM for 176), and no song in a set is that slow.
+// With fewer than TEMPO_MIN_GAPS gaps left, the tempo before holds. The
+// factor stays within TEMPO_FACTOR_MIN..MAX.
+const REFERENCE_BPM = 128;
+const TEMPO_BEATS = 8;
+const TEMPO_MAX_GAP_SECONDS = 1;
+const TEMPO_MIN_GAPS = 4;
+const TEMPO_FOLD_BPM = 100;
+const TEMPO_FACTOR_MIN = 0.75;
+const TEMPO_FACTOR_MAX = 1.4;
 // Energy, 0 (a break) to 1 (a full drop), from two measures of the music
 // within ENERGY_HALF_WINDOW seconds each side of the moment, each placed
 // between the track's own 10th and 90th percentile:
@@ -76,12 +89,15 @@ export interface StageBeat {
   bass: number;
   mids: number;
   highs: number;
-  // A kick landed in this frame.
+  // A beat landed in this frame.
   kick: boolean;
-  // Kicks in the track up to now: the same number for every player, so
-  // "every 16th kick" is the same moment for all of them.
+  // That beat starts a bar.
+  bar: boolean;
+  // The bar-aligned count of the last beat so far (see above): the same
+  // number for every player, so "every 16th kick" is the same moment for
+  // all of them.
   kickCount: number;
-  // The kick in this frame is a drop.
+  // The beat in this frame is a drop.
   drop: boolean;
   // How much is going on in the music around now, 0 (breakdown) to 1 (drop),
   // relative to the rest of the track.
@@ -99,7 +115,7 @@ export interface StageBeat {
 }
 
 export function createStageBeat(): StageBeat {
-  return { bass: 0, mids: 0, highs: 0, kick: false, kickCount: 0, drop: false, energy: 0, buildUp: 0, seconds: 0, timeline: null, events: null };
+  return { bass: 0, mids: 0, highs: 0, kick: false, bar: false, kickCount: 0, drop: false, energy: 0, buildUp: 0, seconds: 0, timeline: null, events: null };
 }
 
 export interface TrackBeats {
@@ -124,6 +140,7 @@ interface Band {
 export interface ParsedBeats {
   bands: Band[];
   kickSeconds: Float32Array;
+  kickCounts: Uint32Array;
   kickIsDrop: Uint8Array;
   energy: Float32Array;
   // Each drop with a build-up: its time, and when its build-up starts.
@@ -134,11 +151,14 @@ export interface ParsedBeats {
 
 export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
   if (bytes.length < BEATS_HEADER_BYTES) return null;
-  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'OMB3') return null;
+  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'OMB4') return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const counts = [view.getUint32(4, true), view.getUint32(8, true), view.getUint32(12, true)];
   const loudnessCount = view.getUint32(16, true);
-  if (bytes.length < BEATS_HEADER_BYTES + (counts[0] + counts[1] + counts[2]) * 8 + loudnessCount * 4) return null;
+  const beatCount = view.getUint32(20, true);
+  const dropCount = view.getUint32(24, true);
+  const size = BEATS_HEADER_BYTES + (counts[0] + counts[1] + counts[2]) * 8 + loudnessCount * 4 + beatCount * 8 + dropCount * 4;
+  if (bytes.length < size) return null;
   const bands: Band[] = [];
   let offset = BEATS_HEADER_BYTES;
   for (const count of counts) {
@@ -156,26 +176,50 @@ export function parseBeats(bytes: Uint8Array): ParsedBeats | null {
     power[i] = view.getFloat32(offset, true);
     offset += 4;
   }
-  const kicks: number[] = [];
-  const bass = bands[0];
-  for (let i = 0; i < bass.seconds.length; i += 1) {
-    if (bass.strength[i] < KICK_STRENGTH) continue;
-    const previous = kicks.length ? kicks[kicks.length - 1] : undefined;
-    if (previous !== undefined && bass.seconds[i] - previous < KICK_MIN_GAP_SECONDS) continue;
-    kicks.push(bass.seconds[i]);
+  const kickSeconds = new Float32Array(beatCount);
+  const kickCounts = new Uint32Array(beatCount);
+  for (let i = 0; i < beatCount; i += 1) {
+    kickSeconds[i] = view.getFloat32(offset, true);
+    kickCounts[i] = view.getUint32(offset + 4, true);
+    offset += 8;
   }
-  const kickSeconds = Float32Array.from(kicks);
-  const kickIsDrop = new Uint8Array(kicks.length);
-  for (let i = 1; i < kicks.length; i += 1) {
-    if (kicks[i] - kicks[i - 1] < DROP_QUIET_SECONDS) continue;
-    const following = firstAfter(kickSeconds, kicks[i] + DROP_CHECK_SECONDS) - (i + 1);
-    if (following >= DROP_KICKS_AFTER) kickIsDrop[i] = 1;
+  const kickIsDrop = new Uint8Array(beatCount);
+  for (let i = 0; i < dropCount; i += 1) {
+    const beat = view.getUint32(offset, true);
+    offset += 4;
+    if (beat < beatCount) kickIsDrop[beat] = 1;
   }
-  const dropSeconds = kicks.filter((_, i) => kickIsDrop[i] === 1);
+  const dropSeconds = Array.from(kickSeconds).filter((_, i) => kickIsDrop[i] === 1);
   const builds = buildUps(bands, power, dropSeconds);
   const energy = energyCurve(bands, power);
-  const timeline = createShowTimeline(kickSeconds, energy, ENERGY_STEP_SECONDS, builds.buildStarts, builds.buildDrops);
-  return { bands, kickSeconds, kickIsDrop, energy, ...builds, timeline };
+  const tempo = tempoCurve(kickSeconds, energy.length);
+  const timeline = createShowTimeline(kickSeconds, energy, ENERGY_STEP_SECONDS, builds.buildStarts, builds.buildDrops, kickCounts, tempo);
+  return { bands, kickSeconds, kickCounts, kickIsDrop, energy, ...builds, timeline };
+}
+
+// The tempo factor (see REFERENCE_BPM) at each energy step; 1 before the
+// first measurable tempo.
+function tempoCurve(kickSeconds: Float32Array, steps: number): Float32Array {
+  const tempo = new Float32Array(steps);
+  const gaps: number[] = [];
+  let factor = 1;
+  for (let step = 0; step < steps; step += 1) {
+    const at = firstAfter(kickSeconds, step * ENERGY_STEP_SECONDS);
+    const from = Math.max(0, Math.min(kickSeconds.length - 1 - TEMPO_BEATS, at - TEMPO_BEATS / 2));
+    gaps.length = 0;
+    for (let k = from; k < Math.min(kickSeconds.length - 1, from + TEMPO_BEATS); k += 1) {
+      const gap = kickSeconds[k + 1] - kickSeconds[k];
+      if (gap > 0 && gap <= TEMPO_MAX_GAP_SECONDS) gaps.push(gap);
+    }
+    if (gaps.length >= TEMPO_MIN_GAPS) {
+      gaps.sort((x, y) => x - y);
+      let bpm = 60 / gaps[gaps.length >> 1];
+      if (bpm < TEMPO_FOLD_BPM) bpm *= 2;
+      factor = Math.min(TEMPO_FACTOR_MAX, Math.max(TEMPO_FACTOR_MIN, bpm / REFERENCE_BPM));
+    }
+    tempo[step] = factor;
+  }
+  return tempo;
 }
 
 // Centred moving average over `width` steps.
@@ -380,9 +424,11 @@ export function createTrackBeats(options: TrackBeatsOptions = {}): TrackBeats {
       const firstKick = firstAfter(beats.kickSeconds, fromSeconds);
       const kicksUntil = firstAfter(beats.kickSeconds, toSeconds);
       out.kick = kicksUntil > firstKick;
-      out.kickCount = kicksUntil;
+      out.kickCount = kicksUntil > 0 ? beats.kickCounts[kicksUntil - 1] : 0;
+      out.bar = false;
       out.drop = false;
       for (let i = firstKick; i < kicksUntil; i += 1) {
+        if (isBarStart(beats.kickCounts, i)) out.bar = true;
         if (beats.kickIsDrop[i]) out.drop = true;
       }
       const position = Math.max(0, toSeconds) / ENERGY_STEP_SECONDS;

@@ -103,8 +103,9 @@ const SPARKLE_DENSITY = 0.12; // fraction of tiles eligible at full highs
 
 // --- Phrase switching -------------------------------------------------------
 // The dominant trigger mode rotates so the macro look is not one endless loop.
+// With the track's beat list it changes every two bars, on a bar start.
 const PHRASE_SECONDS = 8;
-const PHRASE_KICKS = 6;
+const PHRASE_KICKS = 8;
 const PHRASE_MODES = 3; // 0 = band, 1 = burst, 2 = sparkle emphasis
 
 // --- Palette cycling (same 22s cadence as the immersive show + crown so the

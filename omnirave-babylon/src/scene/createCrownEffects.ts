@@ -399,7 +399,7 @@ export function createCrownEffects(scene: Scene, options: CrownEffectsOptions): 
     // speeds inside them, so it is at the same height for every player.
     const timeline = beat?.timeline;
     if (beat && timeline) {
-      const travel = (seconds: number) => 0.35 * seconds + 0.9 * timeline.energyArea(seconds);
+      const travel = (seconds: number) => 0.35 * timeline.tempoArea(seconds) + 0.9 * timeline.energyArea(seconds);
       travelPhase = travel(beat.seconds);
       if (beat.events) {
         travelPhase += windowSum(beat.events.leadIns, beat.seconds, (from, to) => LEAD_IN_TRAVEL_SPEED * (to - from) - (travel(to) - travel(from)))
