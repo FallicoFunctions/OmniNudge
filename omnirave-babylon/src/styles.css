@@ -1616,10 +1616,12 @@ body,
   right: 0;
   top: 26px;
   align-items: flex-end;
+  z-index: 46;
 }
 .babylon-runtime-host--mobile .hud-controls--top-right {
   right: var(--mobile-right);
   top: var(--mobile-top);
+  z-index: 46;
 }
 .babylon-runtime-host--mobile .hud-popup {
   box-sizing: border-box;
@@ -1641,7 +1643,26 @@ body,
   position: absolute;
   top: 0;
   right: 0;
-  z-index: 7;
+  /* The connected-world queue HUD sits at 45. Menus must remain above it. */
+  z-index: 46;
+}
+.babylon-runtime-host--mobile .show-queue-toggle {
+  top: 26px;
+  min-height: 22px;
+  padding: 1px 4px;
+  font: var(--mobile-hud-font);
+  border-radius: var(--mobile-hud-radius);
+}
+.babylon-runtime-host--mobile .show-queue,
+.babylon-runtime-host--mobile .show-queue :is(button, p, strong, li, div) {
+  font: var(--mobile-hud-font);
+  letter-spacing: normal;
+}
+.babylon-runtime-host--mobile .show-queue {
+  top: 48px;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: var(--mobile-hud-radius);
 }
 .mobile-menu__toggle {
   display: grid;
