@@ -1,0 +1,12 @@
+diff --git a/omnirave-babylon/src/media/stageMediaPlayer.ts b/omnirave-babylon/src/media/stageMediaPlayer.ts
+index 14ac28b86..b08c3f699 100644
+--- a/omnirave-babylon/src/media/stageMediaPlayer.ts
++++ b/omnirave-babylon/src/media/stageMediaPlayer.ts
+@@ -243,7 +243,6 @@ function createAudioBackend(): StagePlayerBackend {
+       // The runtime stops its own gesture listeners after the first gesture. A
+       // browser can stop the context hours later, and only a gesture restarts
+       // it, so this backend keeps listening for as long as it lives.
+-      for (const type of RESUME_GESTURES) window.addEventListener(type, resumeStoppedContext, true);
+     } catch {
+       // No Web Audio (or the element was already tapped): the visualizer just
+       // reads zeros. Background music is never worth taking down the runtime.

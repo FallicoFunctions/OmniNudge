@@ -1,0 +1,563 @@
+{
+  "schema_version": 2,
+  "head": "dc6dd20e59424e69d0b06533fbdb989b0edb9f9c",
+  "base": "feef804cbc98237f4d59b0fbbfa087d92350b72b",
+  "scope": {
+    "files": [
+      "omnirave-babylon/src/media/stageMediaPlayer.ts",
+      "omnirave-babylon/src/media/__tests__/stageMediaPlayer.test.ts"
+    ],
+    "boundaries": [
+      "HTMLAudioElement and AudioContext to the show clock, lasers, lights and HUD"
+    ]
+  },
+  "prior_ledgers_read": [
+    "cf7bd57a2",
+    "d899ae65c",
+    "ee7b18fe9"
+  ],
+  "passes": [
+    {
+      "pass": 1,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Changed omnirave-babylon/src/media/stageMediaPlayer.ts and its test. Boundary: browser audio element / AudioContext to the show clock."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cf7bd57a2, d899ae65c, ee7b18fe9 ledgers: they cover the player wiring, none the stall."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: createRuntime gesture listeners stop after the first gesture; this path needed them to continue."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every new branch reachable: stalled sync, stalled HUD, gesture resume (tests)."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "resume()/play() rejections are swallowed by design (autoplay policy); stall is handled by following server time."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Found: the runtime gesture retry is one-shot, so a later stop was never retried."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "RESUME_GESTURES duplicates the runtime list of three events; kept local, the player is framework-free."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Grepped other getCurrentTime readers: only createStageAudioDevControls (dev scrubber), unaffected."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control patch gesture-listener-one-shot fails with a real assertion at the listener test."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b clean; media/app/ui/showControl/sharedShowClock vitest: 370 pass. ESLint cannot run: config error already in the repo."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Technique was E4 (existing one)."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran all 6 test files that import stageMediaPlayer; all pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Control applied after the last edit to the targeted file."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C9",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C10",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C11",
+          "status": "applied",
+          "evidence": "jsdom has no AudioContext; the new test stubs one in the interrupted state so the real backend branch runs."
+        }
+      ],
+      "findings": [
+        {
+          "id": "gesture-listener-one-shot",
+          "summary": "The runtime stops its audio gesture listeners after the first gesture, so a context stopped hours later was never restarted by a click.",
+          "found_by": "E4",
+          "fix_commit": "dc6dd20e5",
+          "control": {
+            "patch": ".review/controls/gesture-listener-one-shot.patch",
+            "runner": "vitest",
+            "tests": [
+              "resumes a stopped AudioContext on a later gesture"
+            ],
+            "observed": "With the listener lines removed the test fails: expected vi.fn() to be called 1 times, but got 0 times."
+          }
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "instruments": [
+        {
+          "id": "A1",
+          "status": "applied",
+          "evidence": "Changed omnirave-babylon/src/media/stageMediaPlayer.ts and its test. Boundary: browser audio element / AudioContext to the show clock."
+        },
+        {
+          "id": "A2",
+          "status": "applied",
+          "evidence": "Read cf7bd57a2, d899ae65c, ee7b18fe9 ledgers: they cover the player wiring, none the stall."
+        },
+        {
+          "id": "B1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "D3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E1",
+          "status": "applied",
+          "evidence": "Siblings: createRuntime gesture listeners stop after the first gesture; this path needed them to continue."
+        },
+        {
+          "id": "E2",
+          "status": "applied",
+          "evidence": "Every new branch reachable: stalled sync, stalled HUD, gesture resume (tests)."
+        },
+        {
+          "id": "E3",
+          "status": "applied",
+          "evidence": "resume()/play() rejections are swallowed by design (autoplay policy); stall is handled by following server time."
+        },
+        {
+          "id": "E4",
+          "status": "applied",
+          "evidence": "Re-checked: no other one-shot listener guards this path."
+        },
+        {
+          "id": "E5",
+          "status": "applied",
+          "evidence": "RESUME_GESTURES duplicates the runtime list of three events; kept local, the player is framework-free."
+        },
+        {
+          "id": "E6",
+          "status": "applied",
+          "evidence": "Grepped other getCurrentTime readers: only createStageAudioDevControls (dev scrubber), unaffected."
+        },
+        {
+          "id": "F1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G1",
+          "status": "applied",
+          "evidence": "Control patch gesture-listener-one-shot fails with a real assertion at the listener test."
+        },
+        {
+          "id": "G2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H1",
+          "status": "applied",
+          "evidence": "tsc -b clean; media/app/ui/showControl/sharedShowClock vitest: 370 pass. ESLint cannot run: config error already in the repo."
+        },
+        {
+          "id": "Z1",
+          "status": "applied",
+          "evidence": "Technique was E4 (existing one)."
+        },
+        {
+          "id": "B5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G3",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "E8",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H2",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "I1",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "B7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H3",
+          "status": "applied",
+          "evidence": "Ran all 6 test files that import stageMediaPlayer; all pass."
+        },
+        {
+          "id": "H4",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H5",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "G4",
+          "status": "applied",
+          "evidence": "Control applied after the last edit to the targeted file."
+        },
+        {
+          "id": "F6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "F7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C8",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H6",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C9",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C10",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "H7",
+          "status": "na",
+          "why": "No prompt, HTTP, SQL, Go, migration, layout or model output in this change."
+        },
+        {
+          "id": "C11",
+          "status": "applied",
+          "evidence": "jsdom has no AudioContext; the new test stubs one in the interrupted state so the real backend branch runs."
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "gates": {
+    "types": "tsc -b clean",
+    "tests": "370 vitest pass (media, app, ui, showControl, sharedShowClock)",
+    "lint": "ESLint config error, present before this change"
+  }
+}
