@@ -28,6 +28,14 @@ went by without a drop. Here:
     music reaches full and stays there. (The largest bar-to-bar step is not
     it: the low end coming back in a build-up is often the largest step,
     and one loud hit before a drop is not the drop.)
+  - A jump alone is not a drop: the low end coming back at the start of a
+    build-up jumps as much. A drop reaches the full level of the music
+    around it, so its DROP_WINDOW_BARS bars must be no more than
+    DROP_MAX_BELOW_FULL_DB under the 90th percentile of the bar levels
+    within DROP_CONTEXT_SECONDS each side. The owner judged 157 moments of
+    the first set by ear (2026-10-02): of the 149 jumps of 6 dB or more,
+    98 were drops; this rule keeps 91 of them and 16 others, where a jump
+    threshold alone kept at best 72 and 31 others, or all 98 and 51 others.
 
 Each beat gets a count aligned to the bars: 4 x the bars started before it,
 plus its place in its bar (0 on a bar start, at most 3). So "every 16th
@@ -56,12 +64,12 @@ LOW_BAND_HZ = (30, 150)
 FULL_MIX_WEIGHT = 0.5
 DROP_WINDOW_BARS = 4
 DROP_SPACING_BARS = 8
-DROP_MIN_JUMP_DB = 10
+DROP_MIN_JUMP_DB = 6
+DROP_CONTEXT_SECONDS = 120
+DROP_MAX_BELOW_FULL_DB = 6
 DROP_REFINE_BEFORE_BARS = 2
 DROP_FULL_TOLERANCE_DB = 3
 DROP_HOLD_BARS = 2
-# Weaker jumps are kept as candidates, so a listening review can judge them.
-CANDIDATE_MIN_JUMP_DB = 6
 
 
 def decode(path):
@@ -150,10 +158,17 @@ def main():
     peaks = [k for k in range(len(jumps))
              if np.isfinite(jumps[k]) and jumps[k] == np.nanmax(jumps[max(0, k - s):k + s + 1])]
     # Each peak's jump, at the bar it refines to.
-    found = {refine(k, per_bar): jumps[k] for k in peaks}
-    drops = [int(bar_index[k]) for k, jump in sorted(found.items()) if jump >= DROP_MIN_JUMP_DB]
-    candidates = [[round(float(beats[bar_index[k]]), 3), round(float(jump), 2)]
-                  for k, jump in sorted(found.items()) if jump >= CANDIDATE_MIN_JUMP_DB]
+    found = {refine(k, per_bar): jumps[k] for k in peaks if jumps[k] >= DROP_MIN_JUMP_DB}
+    bar_times = beats[bar_index]
+    # Every jump, with how far its bars stay under the full level around it,
+    # so a listening review can judge the ones the rule turns down as well.
+    candidates = []
+    for k, jump in sorted(found.items()):
+        around = per_bar[np.abs(bar_times - bar_times[k]) < DROP_CONTEXT_SECONDS]
+        below = np.nanpercentile(around, 90) - np.nanmean(per_bar[k:k + DROP_WINDOW_BARS])
+        candidates.append([k, round(float(jump), 2), round(float(below), 2)])
+    drops = [int(bar_index[k]) for k, _, below in candidates if below <= DROP_MAX_BELOW_FULL_DB]
+    candidates = [[round(float(bar_times[k]), 3), jump, below] for k, jump, below in candidates]
 
     out = os.path.splitext(path)[0] + '.beatgrid.json'
     with open(out, 'w') as f:
