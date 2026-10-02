@@ -12,19 +12,34 @@ import {
 const cfg = ADAPTIVE_RESOLUTION_DEFAULTS;
 
 describe('display-aware adaptive resolution', () => {
-  it.each([120, 144, 240])('trades resolution for %s FPS rather than treating 60 FPS as comfortable', target => {
+  it.each([30, 60, 90, 120, 144, 240])('trades resolution for %s FPS rather than accepting missed refreshes', target => {
     const config = resolveAdaptiveResolutionConfig(target);
     let state = createAdaptiveResolutionState(config);
-    state = stepAdaptiveResolution(state, config, 60, 0);
-    state = stepAdaptiveResolution(state, config, 60, 1600);
+    state = stepAdaptiveResolution(state, config, target * 0.9, 0);
+    state = stepAdaptiveResolution(state, config, target * 0.9, config.lowerAfterMs);
     expect(state.level).toBeCloseTo(config.sharpestLevel + config.stepSize);
     state = stepAdaptiveResolution(state, config, target, 2000);
-    state = stepAdaptiveResolution(state, config, target, 6100);
+    state = stepAdaptiveResolution(state, config, target, 2000 + config.raiseAfterMs);
     expect(state.level).toBeCloseTo(config.sharpestLevel);
   });
 
-  it.each([60, 30, Number.NaN, Infinity])('preserves the 60 FPS defaults for %s', target => {
+  it.each([60, 0, -1, Number.NaN, Infinity])('uses safe 60 FPS defaults for %s', target => {
     expect(resolveAdaptiveResolutionConfig(target)).toEqual(cfg);
+  });
+
+  it('lets a struggling Retina phone shed pixels below CSS resolution and recover detail when it can', () => {
+    const mobile = resolveAdaptiveResolutionConfig(120, { mobile: true, pixelRatio: 3 });
+    let state = createAdaptiveResolutionState(mobile, 1);
+    for (let t = 0; t <= 10_000; t += 250) state = stepAdaptiveResolution(state, mobile, 80, t);
+    expect(state.level).toBeCloseTo(1 / 0.75);
+    for (let t = 10_250; t <= 100_000; t += 250) state = stepAdaptiveResolution(state, mobile, 120, t);
+    expect(state.level).toBeCloseTo(0.5);
+    expect(resolveManualHardwareScalingLevel(1, mobile)).toBeCloseTo(1 / 0.75);
+    expect(resolveManualHardwareScalingLevel(10, mobile)).toBe(0.5);
+  });
+
+  it('does not oversample a mobile display that has no Retina pixels', () => {
+    expect(resolveAdaptiveResolutionConfig(60, { mobile: true, pixelRatio: 1 }).sharpestLevel).toBe(1);
   });
 });
 
@@ -85,9 +100,9 @@ describe('stepAdaptiveResolution', () => {
     let s = createAdaptiveResolutionState(cfg);
     s = stepAdaptiveResolution(s, cfg, 30, 0);
     expect(s.level).toBe(cfg.sharpestLevel);
-    s = stepAdaptiveResolution(s, cfg, 30, 1000);
+    s = stepAdaptiveResolution(s, cfg, 30, cfg.lowerAfterMs - 1);
     expect(s.level).toBe(cfg.sharpestLevel);
-    s = stepAdaptiveResolution(s, cfg, 30, 1600);
+    s = stepAdaptiveResolution(s, cfg, 30, cfg.lowerAfterMs);
     expect(s.level).toBeCloseTo(cfg.sharpestLevel + cfg.stepSize);
   });
 
@@ -96,9 +111,9 @@ describe('stepAdaptiveResolution', () => {
     s = stepAdaptiveResolution(s, cfg, 30, 0);
     s = stepAdaptiveResolution(s, cfg, 60, 800);
     s = stepAdaptiveResolution(s, cfg, 30, 1000);
-    s = stepAdaptiveResolution(s, cfg, 30, 2000);
+    s = stepAdaptiveResolution(s, cfg, 30, 1000 + cfg.lowerAfterMs - 1);
     expect(s.level).toBe(cfg.sharpestLevel);
-    s = stepAdaptiveResolution(s, cfg, 30, 2600);
+    s = stepAdaptiveResolution(s, cfg, 30, 1000 + cfg.lowerAfterMs);
     expect(s.level).toBeCloseTo(cfg.sharpestLevel + cfg.stepSize);
   });
 
@@ -106,9 +121,9 @@ describe('stepAdaptiveResolution', () => {
     const midLevel = cfg.sharpestLevel + cfg.stepSize;
     let s: AdaptiveResolutionState = { level: midLevel, belowSinceMs: null, aboveSinceMs: null };
     s = stepAdaptiveResolution(s, cfg, 60, 0);
-    s = stepAdaptiveResolution(s, cfg, 60, 3000);
+    s = stepAdaptiveResolution(s, cfg, 60, cfg.raiseAfterMs - 1);
     expect(s.level).toBe(midLevel);
-    s = stepAdaptiveResolution(s, cfg, 60, 4100);
+    s = stepAdaptiveResolution(s, cfg, 60, cfg.raiseAfterMs);
     expect(s.level).toBeCloseTo(cfg.sharpestLevel);
   });
 
@@ -117,5 +132,10 @@ describe('stepAdaptiveResolution', () => {
     s = stepAdaptiveResolution(s, cfg, 20, 0);
     s = stepAdaptiveResolution(s, cfg, 20, 5000);
     expect(s.level).toBe(1.0);
+  });
+
+  it.each([0, -1, Number.NaN, Infinity])('ignores invalid FPS %s instead of blurring the image', fps => {
+    const state = { level: 1, belowSinceMs: 0, aboveSinceMs: null };
+    expect(stepAdaptiveResolution(state, cfg, fps, 5000)).toEqual({ level: 1, belowSinceMs: null, aboveSinceMs: null });
   });
 });

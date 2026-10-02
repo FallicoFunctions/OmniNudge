@@ -17,7 +17,9 @@ export function updatePerfOverlay(
   shadowCasters: number,
   readyTextures: number,
   renderScaleLevel?: number,
+  targetFps?: number,
 ) {
   const res = renderScaleLevel === undefined ? '' : ` | RES: ${(1 / renderScaleLevel).toFixed(2)}x`;
-  panel.textContent = `FPS: ${Math.round(fps)} | Frame: ${frameMs.toFixed(1)} ms | FX: ${activePostProcesses} | SH: ${shadowCasters} | TX: ${readyTextures}${res}`;
+  const target = targetFps === undefined ? '' : ` | Target: ${Math.round(targetFps)}`;
+  panel.textContent = `FPS: ${Math.round(fps)}${target} | Frame: ${frameMs.toFixed(1)} ms | FX: ${activePostProcesses} | SH: ${shadowCasters} | TX: ${readyTextures}${res}`;
 }

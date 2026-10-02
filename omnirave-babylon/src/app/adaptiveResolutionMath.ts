@@ -16,24 +16,34 @@ export interface AdaptiveResolutionConfig {
   raiseAfterMs: number;
 }
 
-// sharpestLevel matches the runtime's 1.5x density cap (see createRuntime):
-// the controller trades between that cap and CSS resolution, never past it.
+// Desktop bounds. Mobile can spend spare GPU time on Retina detail and
+// shed more pixels when CSS resolution is still too expensive.
 export const ADAPTIVE_RESOLUTION_DEFAULTS: AdaptiveResolutionConfig = {
   sharpestLevel: 1 / 1.5,
   coarsestLevel: 1.0,
   stepSize: (1.0 - 1 / 1.5) / 3,
-  lowerFpsThreshold: 45,
-  raiseFpsThreshold: 56,
-  lowerAfterMs: 1500,
-  raiseAfterMs: 4000,
+  lowerFpsThreshold: 57,
+  raiseFpsThreshold: 59.4,
+  lowerAfterMs: 750,
+  raiseAfterMs: 8000,
 };
 
-export function resolveAdaptiveResolutionConfig(targetFps: number): AdaptiveResolutionConfig {
-  const target = Number.isFinite(targetFps) ? Math.max(60, targetFps) : 60;
+export function resolveAdaptiveResolutionConfig(
+  targetFps: number,
+  device?: { mobile: boolean; pixelRatio: number },
+): AdaptiveResolutionConfig {
+  const target = Number.isFinite(targetFps) && targetFps > 0 ? Math.max(24, targetFps) : 60;
+  const pixelRatio = device && Number.isFinite(device.pixelRatio) && device.pixelRatio > 0
+    ? device.pixelRatio : 1;
   return {
     ...ADAPTIVE_RESOLUTION_DEFAULTS,
-    lowerFpsThreshold: target * (45 / 60),
-    raiseFpsThreshold: target * (56 / 60),
+    ...(device?.mobile ? {
+      sharpestLevel: 1 / Math.min(2, Math.max(1, pixelRatio)),
+      coarsestLevel: 1 / 0.75,
+      stepSize: 1 / 9,
+    } : {}),
+    lowerFpsThreshold: target * 0.95,
+    raiseFpsThreshold: target * 0.99,
   };
 }
 
@@ -79,6 +89,8 @@ export function stepAdaptiveResolution(
   fps: number,
   nowMs: number,
 ): AdaptiveResolutionState {
+  // A missing FPS sample must not change quality or count toward a window.
+  if (!Number.isFinite(fps) || fps <= 0) return { ...state, belowSinceMs: null, aboveSinceMs: null };
   let { level, belowSinceMs, aboveSinceMs } = state;
 
   if (fps < config.lowerFpsThreshold) {

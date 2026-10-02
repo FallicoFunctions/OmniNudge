@@ -135,6 +135,7 @@ describe('createRuntime', () => {
     // Failed boots can leave preloaded modules in flight. Drain them before
     // the next test resets the module cache and replaces its engine/scene.
     await vi.dynamicImportSettled();
+    vi.unstubAllGlobals();
     window.history.replaceState(null, '', '/');
     vi.useRealTimers();
     vi.doUnmock('../../scene/createCrownEffects');
@@ -198,7 +199,7 @@ describe('createRuntime', () => {
     expect(runtime.engine).toBe(webglEngine);
     expect(EngineMock.mock.calls[0]?.[0]).not.toBe(WebGPUEngineMock.mock.calls[0]?.[0]);
     expect(host.querySelector('canvas')).toBe(EngineMock.mock.calls[0]?.[0]);
-    expect(webglEngine.getHardwareScalingLevel).toHaveBeenCalledTimes(1);
+    expect(webglEngine.getHardwareScalingLevel).toHaveReturnedWith(1);
 
     if (failure === 'timeout') {
       pending.resolve();
@@ -325,17 +326,27 @@ describe('createRuntime', () => {
     runtime.dispose();
   });
 
-  it.each([{ target: 60, fps: 30 }, { target: 120, fps: 80 }, { target: 144, fps: 90 }, { target: 240, fps: 120 }])('adapts for $target Hz before the next render without invalidating the submitted frame', async ({ target, fps }) => {
+  it.each([
+    { target: 60, fps: 54, mobile: false }, { target: 120, fps: 110, mobile: false },
+    { target: 144, fps: 90, mobile: false }, { target: 240, fps: 120, mobile: false },
+    { target: 60, fps: 54, mobile: true }, { target: 120, fps: 110, mobile: true },
+  ])('adapts for $target Hz (mobile=$mobile) before the next render without invalidating the submitted frame', async ({ target, fps, mobile }) => {
     displayTargetFps = target;
+    window.sessionStorage.removeItem('omnirave.guestSettings.v2');
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: mobile,
+      addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    if (mobile) vi.stubGlobal('devicePixelRatio', 3);
     const frameEvents: string[] = [];
     let renderFrame: (() => void) | undefined;
-    const setHardwareScalingLevel = vi.fn(() => frameEvents.push('scale'));
+    let scalingLevel = 1 / 1.5;
+    const setHardwareScalingLevel = vi.fn((level: number) => { scalingLevel = level; frameEvents.push('scale'); });
     const engine = {
       dispose: vi.fn(),
       maxFPS: 60 as number | undefined,
+      adaptToDeviceRatio: true,
       getFps: vi.fn(() => fps),
       getDeltaTime: vi.fn(() => 16),
-      getHardwareScalingLevel: vi.fn(() => 1 / 1.5),
+      getHardwareScalingLevel: vi.fn(() => scalingLevel),
       onDisposeObservable: { addOnce: vi.fn() },
       resize: vi.fn(),
       runRenderLoop: vi.fn((callback: () => void) => {
@@ -366,19 +377,20 @@ describe('createRuntime', () => {
     }));
 
     const { createRuntime } = await import('../createRuntime');
-    const runtime = await createRuntime(document.createElement('div'));
+    const runtimeHost = document.createElement('div');
+    document.body.append(runtimeHost);
+    const runtime = await createRuntime(runtimeHost);
 
     expect(engine.maxFPS).toBeUndefined();
+    expect(engine.adaptToDeviceRatio).toBe(false);
+    if (mobile) expect(setHardwareScalingLevel).toHaveBeenCalledWith(1);
+    setHardwareScalingLevel.mockClear();
     expect(renderFrame).toBeTypeOf('function');
-    // The controller reads the clock every 30 frames: low FPS first seen at 0,
-    // still low 2 s later, so the next frame must scale before it renders.
-    for (let frame = 0; frame < 30; frame += 1) {
-      renderFrame?.();
-    }
-    clock = 2_000;
-    for (let frame = 0; frame < 30; frame += 1) {
-      renderFrame?.();
-    }
+    // Two slow frames separated by the sustained-low window suffice; a
+    // struggling phone need not wait for 30 frames to make each decision.
+    renderFrame?.();
+    clock = 750;
+    renderFrame?.();
     expect(setHardwareScalingLevel).not.toHaveBeenCalled();
 
     frameEvents.length = 0;
@@ -386,9 +398,35 @@ describe('createRuntime', () => {
 
     expect(frameEvents.slice(0, 2)).toEqual(['scale', 'render']);
     expect(setHardwareScalingLevel).toHaveBeenCalledTimes(1);
+    if (mobile) expect(scalingLevel).toBeGreaterThan(1);
+    if (mobile) {
+      // A manual pin wins even during slow frames, and resize cannot reset
+      // its density. Re-enabling Auto resumes adaptation from that pin.
+      const auto = runtimeHost.querySelector<HTMLInputElement>('[data-settings-control="graphics-auto"]')!;
+      const detail = runtimeHost.querySelector<HTMLInputElement>('[data-settings-control="graphics-level"]')!;
+      auto.click();
+      detail.value = '10';
+      detail.dispatchEvent(new Event('input', { bubbles: true }));
+      renderFrame?.();
+      expect(scalingLevel).toBe(0.5);
+      setHardwareScalingLevel.mockClear();
+      window.dispatchEvent(new Event('resize'));
+      clock = 10_000;
+      renderFrame?.();
+      clock = 20_000;
+      renderFrame?.();
+      expect(setHardwareScalingLevel).not.toHaveBeenCalled();
+      auto.click();
+      renderFrame?.();
+      clock = 20_750;
+      renderFrame?.();
+      renderFrame?.();
+      expect(scalingLevel).toBeGreaterThan(0.5);
+    }
     runtime.dispose();
     expect(disposeDisplayRefresh).toHaveBeenCalledTimes(1);
     now.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('cleans up owned resources when the engine is disposed externally', async () => {
@@ -442,6 +480,7 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: engineDispose,
+        getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -595,6 +634,7 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: engineDispose,
+        getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -706,6 +746,7 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: engineDispose,
+        getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -773,6 +814,7 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: vi.fn(),
+        getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
         getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -861,6 +903,7 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: engineDispose,
+        getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },

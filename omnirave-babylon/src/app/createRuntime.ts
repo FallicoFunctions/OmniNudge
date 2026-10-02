@@ -21,7 +21,6 @@ import '@babylonjs/core/Shaders/default.vertex.js';
 import '@babylonjs/core/Shaders/default.fragment.js';
 import '@babylonjs/core/Shaders/rgbdDecode.fragment';
 import {
-  ADAPTIVE_RESOLUTION_DEFAULTS,
   createAdaptiveResolutionState,
   resolveAdaptiveResolutionConfig,
   resolveManualHardwareScalingLevel,
@@ -60,7 +59,7 @@ import { createHudNotice } from '../ui/createHudNotice';
 import { createSettingsPopup } from '../ui/createSettingsPopup';
 import { createTopLeftControls } from '../ui/createTopLeftControls';
 import { createTopRightControls } from '../ui/createTopRightControls';
-import { createMobileHudControls } from '../ui/createMobileHudControls';
+import { createMobileHudControls, MOBILE_HUD_QUERY } from '../ui/createMobileHudControls';
 import { createMobileMenu } from '../ui/createMobileMenu';
 import { createAuthPopup } from '../ui/createAuthPopup';
 import { loadPlayerSettings, savePlayerSettings } from '../ui/playerSettings';
@@ -509,14 +508,19 @@ export async function createRuntime(host: HTMLElement) {
     activeEngine.maxFPS = undefined;
     markBootPhase('engine', activeEngine.isWebGPU ? 'webgpu' : 'webgl');
 
-    // Cap the effective render density: full retina (2x) quadruples the pixel
-    // cost of this heavy scene, but 1.5x is still visibly crisp at roughly half
-    // that cost — the sweet spot between "pixelated" and "unplayable".
-    const MAX_RENDER_RATIO = 1.5;
-    const deviceRatio = window.devicePixelRatio || 1;
-    if (deviceRatio > MAX_RENDER_RATIO) {
-      // The adaptive controller's sharpest bound mirrors this same cap.
-      activeEngine.setHardwareScalingLevel(ADAPTIVE_RESOLUTION_DEFAULTS.sharpestLevel);
+    const mobileGraphics = window.matchMedia?.(MOBILE_HUD_QUERY).matches ?? false;
+    const graphicsDevice = { mobile: mobileGraphics, pixelRatio: window.devicePixelRatio || 1 };
+    const graphicsConfig = resolveAdaptiveResolutionConfig(displayRefresh.targetFps, graphicsDevice);
+    // Begin phones at CSS resolution rather than making them compile and
+    // render the venue at 3x Retina density. Auto earns extra detail only
+    // after sustaining the browser's refresh cadence.
+    const initialScaling = mobileGraphics ? 1
+      : Math.max(graphicsConfig.sharpestLevel, activeEngine.getHardwareScalingLevel());
+    // Auto/manual graphics owns CSS render density. A DPR change on resize
+    // must not silently override it behind the controller's back.
+    activeEngine.adaptToDeviceRatio = false;
+    if (initialScaling !== activeEngine.getHardwareScalingLevel()) {
+      activeEngine.setHardwareScalingLevel(initialScaling);
     }
 
     handleResize = () => {
@@ -1124,8 +1128,9 @@ export async function createRuntime(host: HTMLElement) {
     // Render-scale state. Declared here (ahead of the render loop) because the
     // settings popup's Graphics controls write to it from click handlers.
     let perfFrameCounter = 0;
+    let lastGraphicsSampleAt = Number.NEGATIVE_INFINITY;
     let adaptiveState = createAdaptiveResolutionState(
-      ADAPTIVE_RESOLUTION_DEFAULTS,
+      graphicsConfig,
       activeEngine.getHardwareScalingLevel(),
     );
     let pendingHardwareScalingLevel: number | undefined;
@@ -1156,7 +1161,7 @@ export async function createRuntime(host: HTMLElement) {
       const applyGraphicsLevel = (level: number) => {
         pendingHardwareScalingLevel = resolveManualHardwareScalingLevel(
           level,
-          ADAPTIVE_RESOLUTION_DEFAULTS,
+          graphicsConfig,
         );
       };
 
@@ -1221,7 +1226,7 @@ export async function createRuntime(host: HTMLElement) {
             // Resume adaptive control from wherever the manual pin left the
             // render scale, so Auto does not jump the image on re-enable.
             adaptiveState = createAdaptiveResolutionState(
-              ADAPTIVE_RESOLUTION_DEFAULTS,
+              graphicsConfig,
               activeEngine.getHardwareScalingLevel(),
             );
           }
@@ -1794,23 +1799,25 @@ export async function createRuntime(host: HTMLElement) {
         }
       }
       perfFrameCounter += 1;
+      const graphicsNow = performance.now();
+      // Time-based sampling stays responsive at low FPS; counting 30 frames
+      // made a struggling phone wait several seconds before each decision.
+      if (graphicsAutoEnabled && !venuePerformance?.isRunning()
+        && document.visibilityState !== 'hidden' && graphicsNow - lastGraphicsSampleAt >= 250) {
+        lastGraphicsSampleAt = graphicsNow;
+        const config = resolveAdaptiveResolutionConfig(displayRefresh?.targetFps ?? 60, graphicsDevice);
+        const nextState = stepAdaptiveResolution(adaptiveState, config, activeEngine.getFps(), graphicsNow);
+        if (nextState.level !== adaptiveState.level) pendingHardwareScalingLevel = nextState.level;
+        adaptiveState = nextState;
+      } else if (document.visibilityState === 'hidden') {
+        adaptiveState = createAdaptiveResolutionState(graphicsConfig, adaptiveState.level);
+        lastGraphicsSampleAt = Number.NEGATIVE_INFINITY;
+      }
       if (perfFrameCounter % 30 === 0) {
         const fps = activeEngine.getFps();
         if (remoteAvatarReadout && remotePlayerRigs) {
           const stats = remotePlayerRigs.stats();
           remoteAvatarReadout.textContent = `Remote avatars: ${stats.completePlayers} | Sources: ${stats.cachedAssets} | Detail: ${stats.detailCounts.join('/')} | Model tris: ${Math.round(stats.modelTriangles)} | Animating: ${stats.animatingPlayers} | Loading: ${stats.pending}`;
-        }
-
-        // Hold the FPS target by trading render scale, never frame pacing:
-        // sharp when the GPU can afford it, gracefully coarser when not. Skipped
-        // entirely while the player pinned a manual Graphics level (sec 9.6).
-        if (graphicsAutoEnabled && !venuePerformance?.isRunning()) {
-          const config = resolveAdaptiveResolutionConfig(displayRefresh?.targetFps ?? 60);
-          const nextState = stepAdaptiveResolution(adaptiveState, config, fps, performance.now());
-          if (nextState.level !== adaptiveState.level) {
-            pendingHardwareScalingLevel = nextState.level;
-          }
-          adaptiveState = nextState;
         }
 
         if (perfOverlay) {
@@ -1820,7 +1827,7 @@ export async function createRuntime(host: HTMLElement) {
           const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
           // Report the level actually in force - under a manual Graphics pin
           // the adaptive controller's own level is not the truth.
-          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, activeEngine.getHardwareScalingLevel());
+          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, activeEngine.getHardwareScalingLevel(), displayRefresh?.targetFps);
         }
       }
     });
