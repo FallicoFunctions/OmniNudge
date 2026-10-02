@@ -284,9 +284,9 @@
           "fix_commit": "dc6dd20e5",
           "control": {
             "patch": ".review/controls/gesture-listener-one-shot.patch",
-            "runner": "vitest",
+            "runner": "bash",
             "tests": [
-              "resumes a stopped AudioContext on a later gesture"
+              "{ [ -e omnirave-babylon/node_modules ] || ln -s \"$CLAUDE_PROJECT_DIR/omnirave-babylon/node_modules\" omnirave-babylon/node_modules; } && cd omnirave-babylon && npx vitest run src/media/__tests__/stageMediaPlayer.test.ts -t \"resumes a stopped AudioContext\""
             ],
             "observed": "With the listener lines removed the test fails: expected vi.fn() to be called 1 times, but got 0 times."
           }
