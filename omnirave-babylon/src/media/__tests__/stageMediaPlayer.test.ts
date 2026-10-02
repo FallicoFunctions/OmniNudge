@@ -539,7 +539,126 @@ describe('createStageMediaPlayer', () => {
 
   describe('default audio backend', () => {
     afterEach(() => {
+      Reflect.deleteProperty(window, '__omniravePrimedAudio');
       vi.unstubAllGlobals();
+    });
+
+    function browserAudio() {
+      const events = new EventTarget();
+      let position = 0;
+      const writes: number[] = [];
+      const audio = {
+        src: 'blob:priming-sound', muted: false, preload: '',
+        readyState: 4, duration: 0.05, paused: false, seeking: false,
+        acceptSeek: true,
+        get currentTime() { return position; },
+        set currentTime(value: number) {
+          writes.push(value);
+          if (audio.acceptSeek) {
+            position = Math.min(value, audio.duration);
+            audio.seeking = true;
+          }
+        },
+        load: vi.fn(() => { audio.readyState = 0; audio.duration = NaN; position = 0; }),
+        play: vi.fn(() => { audio.paused = false; return Promise.resolve(); }),
+        pause: vi.fn(() => { audio.paused = true; }),
+        addEventListener: events.addEventListener.bind(events),
+        removeEventListener: events.removeEventListener.bind(events),
+        removeAttribute: vi.fn(),
+      };
+      return {
+        audio, writes,
+        event(type: string) { events.dispatchEvent(new Event(type)); },
+        position(value: number) { position = value; },
+        metadata() { audio.readyState = 1; audio.duration = 7827; events.dispatchEvent(new Event('loadedmetadata')); },
+        seeked() { audio.readyState = 3; audio.seeking = false; events.dispatchEvent(new Event('seeked')); },
+      };
+    }
+
+    it('seeks the primed iPhone element using the new track metadata, not the silent WAV', () => {
+      const fake = browserAudio();
+      Object.assign(window, { __omniravePrimedAudio: { element: fake.audio } });
+      const constructor = constructible(() => { throw new Error('must reuse the primed element'); });
+      vi.stubGlobal('Audio', constructor);
+      const player = createStageMediaPlayer({ now: () => 0 });
+      player.applyMedia(media({ playheadSeconds: 2016 }));
+      player.unlock();
+      expect(constructor).not.toHaveBeenCalled();
+      expect(fake.audio.load).toHaveBeenCalledOnce();
+      expect(fake.writes).toEqual([]);
+      expect(fake.audio.muted).toBe(true);
+      expect(player.isAudible()).toBe(false);
+      fake.metadata();
+      expect(fake.audio.currentTime).toBe(2016);
+      expect(fake.audio.muted).toBe(true);
+      fake.seeked();
+      expect(fake.audio.muted).toBe(false);
+      expect(player.isAudible()).toBe(true);
+      player.dispose();
+    });
+
+    it('retries an ignored metadata seek on refresh, keeping the opening silent and the HUD on room time', () => {
+      const fake = browserAudio();
+      fake.audio.acceptSeek = false;
+      vi.stubGlobal('Audio', constructible(() => fake.audio));
+      let now = 0;
+      const player = createStageMediaPlayer({ now: () => now });
+      player.applyMedia(media({ playheadSeconds: 2016 }));
+      player.unlock();
+      fake.metadata();
+      expect(fake.audio.currentTime).toBe(0);
+      expect(fake.audio.muted).toBe(true);
+      expect(player.getCurrentTime()).toBe(2016);
+      now = 2500;
+      fake.audio.acceptSeek = true;
+      fake.audio.readyState = 3;
+      fake.event('canplay');
+      expect(fake.audio.currentTime).toBe(2018.5);
+      expect(fake.audio.muted).toBe(true);
+      fake.seeked();
+      expect(fake.audio.muted).toBe(false);
+      expect(player.getCurrentTime()).toBe(2018.5);
+      player.dispose();
+    });
+
+    it('retains the seek when Safari reports the target at metadata but starts decoding from zero', () => {
+      const fake = browserAudio();
+      vi.stubGlobal('Audio', constructible(() => fake.audio));
+      let now = 0;
+      const player = createStageMediaPlayer({ now: () => now });
+      player.applyMedia(media({ playheadSeconds: 2016 }));
+      player.unlock();
+      fake.metadata();
+      expect(fake.audio.currentTime).toBe(2016);
+      fake.position(0);
+      fake.audio.seeking = false;
+      fake.audio.readyState = 2;
+      now = 1000;
+      fake.event('loadeddata');
+      expect(fake.audio.currentTime).toBe(2017);
+      expect(fake.audio.muted).toBe(true);
+      now = 1500; // Download/seek completion itself can take time.
+      fake.seeked();
+      expect(fake.audio.muted).toBe(false);
+      expect(player.isAudible()).toBe(true);
+      player.dispose();
+    });
+
+    it('replaces a pending track seek and removes readiness retries when disposed', () => {
+      const fake = browserAudio();
+      vi.stubGlobal('Audio', constructible(() => fake.audio));
+      const player = createStageMediaPlayer({ now: () => 0 });
+      player.applyMedia(media({ playheadSeconds: 2016 }));
+      player.unlock();
+      player.applyMedia(media({ trackId: 'main-stage-set-02', playlistIndex: 1, playheadSeconds: 300 }));
+      fake.metadata();
+      expect(fake.audio.src).toBe('/audio/main-stage-set-02.mp3');
+      expect(fake.writes).toEqual([300]);
+      player.dispose();
+      fake.audio.seeking = false;
+      fake.position(0);
+      fake.event('canplay');
+      expect(fake.writes).toEqual([300]);
     });
 
     it('degrades to a silent no-op with one warning when the audio element cannot be constructed', () => {
@@ -567,6 +686,7 @@ describe('createStageMediaPlayer', () => {
     it('resumes a stopped AudioContext on a later gesture, and stops listening on dispose', () => {
       const fakeAudio = {
         src: '', muted: false, preload: '', readyState: 4, currentTime: 0,
+        load: vi.fn(),
         play: vi.fn(() => Promise.resolve()), pause: vi.fn(),
         addEventListener: vi.fn(), removeEventListener: vi.fn(), removeAttribute: vi.fn(),
       };
@@ -601,26 +721,27 @@ describe('createStageMediaPlayer', () => {
     it('resolves trackId to a served /audio/<id>.mp3 URL and seeks after metadata loads', () => {
       // Fake HTMLAudioElement: metadata is NOT yet loaded (readyState 0), so a
       // currentTime write must be deferred to the 'loadedmetadata' event.
-      const listeners: Record<string, Array<() => void>> = {};
+      const listeners: Record<string, Array<(event: Event) => void>> = {};
       const fakeAudio = {
         src: '',
         muted: false,
         preload: '',
         readyState: 0,
         currentTime: 0,
+        load: vi.fn(),
         play: vi.fn(() => Promise.resolve()),
         pause: vi.fn(),
-        addEventListener: vi.fn((type: string, cb: () => void) => {
+        addEventListener: vi.fn((type: string, cb: (event: Event) => void) => {
           (listeners[type] ??= []).push(cb);
         }),
-        removeEventListener: vi.fn((type: string, cb: () => void) => {
+        removeEventListener: vi.fn((type: string, cb: (event: Event) => void) => {
           listeners[type] = (listeners[type] ?? []).filter((fn) => fn !== cb);
         }),
         removeAttribute: vi.fn(),
       };
       vi.stubGlobal('Audio', constructible(() => fakeAudio));
 
-      const player = createStageMediaPlayer();
+      const player = createStageMediaPlayer({ now: () => 0 });
       player.unlock();
       player.applyMedia(media({ trackId: 'main-stage-set-02', playheadSeconds: 42 }));
 
@@ -630,7 +751,8 @@ describe('createStageMediaPlayer', () => {
       expect(fakeAudio.play).toHaveBeenCalled();
 
       // Metadata arrives -> the stashed seek is applied.
-      for (const cb of listeners.loadedmetadata ?? []) cb();
+      fakeAudio.readyState = 1;
+      for (const cb of listeners.loadedmetadata ?? []) cb(new Event('loadedmetadata'));
       expect(fakeAudio.currentTime).toBe(42);
 
       player.dispose();

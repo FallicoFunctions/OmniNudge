@@ -184,7 +184,7 @@ function takePrimedAudio(): PrimedGameAudio | undefined {
 }
 
 // The real backend: wraps an HTMLAudioElement pointed at the self-hosted file.
-function createAudioBackend(): StagePlayerBackend {
+function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
   const primed = takePrimedAudio();
   let audio: HTMLAudioElement;
   try {
@@ -198,9 +198,13 @@ function createAudioBackend(): StagePlayerBackend {
 
   const element = audio;
   let playing = false;
-  // Pending seek target held until metadata loads: HTMLAudioElement ignores
-  // currentTime writes before it knows the track's duration.
-  let pendingSeekHandler: (() => void) | null = null;
+  // Keep the seek until the NEW resource can actually play at that position.
+  // Safari can ignore a currentTime write at loadedmetadata, and a primed
+  // element can still expose the previous silent WAV's metadata after src changes.
+  let awaitingMetadata = false;
+  let pendingSeek: { seconds: number; at: number; advancing: boolean; requested?: number } | null = null;
+  let muted = true;
+  const seekEvents = ['loadedmetadata', 'loadeddata', 'canplay', 'playing', 'progress', 'timeupdate', 'seeked'] as const;
 
   // Web Audio analysis tap. The AudioContext is created lazily on the FIRST
   // playback attempt. That attempt may come before any user gesture; the
@@ -256,30 +260,42 @@ function createAudioBackend(): StagePlayerBackend {
     if (playing && audioContext && (audioContext.state as string) !== 'running') startPlayback();
   }
 
-  function clearPendingSeek(): void {
-    if (pendingSeekHandler) {
-      element.removeEventListener('loadedmetadata', pendingSeekHandler);
-      pendingSeekHandler = null;
+  function seekTarget(): number {
+    if (!pendingSeek) return element.currentTime;
+    const elapsed = pendingSeek.advancing ? Math.max(0, now() - pendingSeek.at) / 1000 : 0;
+    const target = pendingSeek.seconds + elapsed;
+    return Number.isFinite(element.duration) && element.duration > 0 ? Math.min(target, element.duration) : target;
+  }
+
+  function finishSeek(event?: Event): void {
+    if (event?.type === 'loadedmetadata') awaitingMetadata = false;
+    if (!pendingSeek || awaitingMetadata || element.readyState < 1 || element.seeking) return;
+    const target = seekTarget();
+    // Metadata alone does not prove the decoder accepted the seek. Confirm
+    // against a playable frame, and retry if Safari started back at zero.
+    if (element.readyState >= 2 && Math.abs(element.currentTime - (pendingSeek.requested ?? target)) <= SEEK_THRESHOLD_SECONDS) {
+      pendingSeek = null;
+      element.muted = muted;
+    } else {
+      pendingSeek.requested = target;
+      try { element.currentTime = target; } catch { /* Retry on the next media readiness event. */ }
     }
   }
 
   function applySeek(seconds: number): void {
-    clearPendingSeek();
-    // HAVE_METADATA (1) or better means duration is known and currentTime sticks.
-    if (element.readyState >= 1) {
-      element.currentTime = seconds;
-      return;
-    }
-    const handler = () => {
-      element.removeEventListener('loadedmetadata', handler);
-      pendingSeekHandler = null;
-      element.currentTime = seconds;
-    };
-    pendingSeekHandler = handler;
-    element.addEventListener('loadedmetadata', handler);
+    pendingSeek = { seconds, at: now(), advancing: playing };
+    // Never let the opening of a track leak out while its initial seek waits.
+    element.muted = true;
+    finishSeek();
   }
 
+  for (const type of seekEvents) element.addEventListener(type, finishSeek);
+
   function startPlayback(): void {
+    if (pendingSeek && !pendingSeek.advancing) {
+      pendingSeek.at = now();
+      pendingSeek.advancing = true;
+    }
     playing = true;
     // Build the AudioContext + analyser tap on the first attempt. A context
     // created before a user gesture starts suspended; every attempt resumes
@@ -305,8 +321,12 @@ function createAudioBackend(): StagePlayerBackend {
 
   return {
     load(trackId, startSeconds) {
-      element.src = resolveTrackUrl(trackId);
+      awaitingMetadata = true;
       applySeek(startSeconds);
+      element.src = resolveTrackUrl(trackId);
+      // Reset the old resource synchronously; src assignment alone can leave
+      // the priming sound's readyState/duration visible until a later task.
+      element.load();
       if (playing) {
         startPlayback();
       }
@@ -315,6 +335,11 @@ function createAudioBackend(): StagePlayerBackend {
       startPlayback();
     },
     pause() {
+      if (pendingSeek) {
+        pendingSeek.seconds = seekTarget();
+        pendingSeek.at = now();
+        pendingSeek.advancing = false;
+      }
       playing = false;
       element.pause();
     },
@@ -333,14 +358,17 @@ function createAudioBackend(): StagePlayerBackend {
     },
     isReady() {
       // HAVE_FUTURE_DATA (3): playback can continue past the current frame.
-      return !element.seeking && element.readyState >= 3;
+      return !awaitingMetadata && !pendingSeek && !element.seeking && element.readyState >= 3;
     },
     outputLatencySeconds() {
       const latency = (audioContext?.baseLatency ?? 0) + (audioContext?.outputLatency ?? 0);
       return Number.isFinite(latency) ? latency : 0;
     },
-    setMuted(muted) {
-      element.muted = muted;
+    setMuted(next) {
+      // Preserve the caller's mute separately from the startup seek gate.
+      // Unmuting is safe only after the seek is confirmed.
+      muted = next;
+      element.muted = next || pendingSeek !== null;
     },
     getFrequencyData(target) {
       if (analyser) {
@@ -350,7 +378,8 @@ function createAudioBackend(): StagePlayerBackend {
       }
     },
     dispose() {
-      clearPendingSeek();
+      pendingSeek = null;
+      for (const type of seekEvents) element.removeEventListener(type, finishSeek);
       element.pause();
       element.removeAttribute('src');
       analyser = null;
@@ -367,7 +396,7 @@ function createAudioBackend(): StagePlayerBackend {
 }
 
 export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): StageMediaPlayer {
-  const createBackend = options.backendFactory ?? createAudioBackend;
+  const createBackend = options.backendFactory ?? (() => createAudioBackend(options.now));
   const localNow = options.now ?? (() => Date.now());
 
   let backend: StagePlayerBackend | undefined;
@@ -527,7 +556,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   }
 
   function isAudible(): boolean {
-    return unlocked && backend !== undefined && !backend.isPaused();
+    return unlocked && backend !== undefined && !backend.isPaused() && backend.isReady();
   }
 
   function getFrequencyData(target: Uint8Array): void {
@@ -569,7 +598,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   function getCurrentTime(): number {
     // Until the browser lets the track play, report the server's playhead
     // (sent at least once a second) so the HUD shows the room's real time.
-    if (backend && (manualOverride || (!backend.isPaused() && audioAdvancing()))) {
+    if (backend && (manualOverride || (!backend.isPaused() && backend.isReady() && audioAdvancing()))) {
       return backend.getCurrentTime();
     }
     return desiredMedia ? expectedPlayhead(desiredMedia) : (backend?.getCurrentTime() ?? 0);
