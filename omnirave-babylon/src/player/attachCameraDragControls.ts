@@ -25,6 +25,7 @@ export function attachCameraDragControls(
     if (canvas.hasPointerCapture(captured)) canvas.releasePointerCapture(captured);
   };
   const down = (event: PointerEvent) => {
+    if (event.pointerType === 'touch') return;
     if (event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
     canvas.focus({ preventScroll: true });

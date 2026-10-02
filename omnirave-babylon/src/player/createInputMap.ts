@@ -2,10 +2,12 @@ import type { MovementInput } from './movementMath';
 
 /** Settings-popup crouch behaviour (design doc sec 9.6 `Controls`). */
 export type CrouchInputMode = 'hold' | 'toggle';
+export type TouchMovement = Pick<MovementInput, 'forward' | 'backward' | 'left' | 'right'>;
 
 export interface InputMap {
   dispose: () => void;
   state: MovementInput;
+  setTouchMovement: (movement: TouchMovement | null) => void;
   /** `hold`: crouched only while Ctrl is down. `toggle`: each press flips it. */
   setCrouchMode: (mode: CrouchInputMode) => void;
   crouchMode: () => CrouchInputMode;
@@ -54,11 +56,19 @@ export function createInputMap(target: Window): InputMap {
     crouch: false,
   };
   const heldCodes = new Set<string>();
+  let touchMovement: TouchMovement | null = null;
+  const movementKeys = ['forward', 'backward', 'left', 'right'] as const;
+  const syncMovement = () => {
+    for (const key of movementKeys) {
+      state[key] = Boolean(touchMovement?.[key]) || [...heldCodes].some(code => KEY_BINDINGS[code] === key);
+    }
+  };
   let crouchMode: CrouchInputMode = 'hold';
   let textEntryActive = false;
 
   const resetState = () => {
     heldCodes.clear();
+    touchMovement = null;
     for (const key of Object.keys(state) as Array<keyof MovementInput>) {
       state[key] = false;
     }
@@ -91,6 +101,7 @@ export function createInputMap(target: Window): InputMap {
         return;
       }
       state[binding] = true;
+      syncMovement();
     }
   };
 
@@ -114,6 +125,7 @@ export function createInputMap(target: Window): InputMap {
         return;
       }
       state[binding] = [...heldCodes].some(code => KEY_BINDINGS[code] === binding);
+      syncMovement();
     }
   };
 
@@ -131,6 +143,10 @@ export function createInputMap(target: Window): InputMap {
 
   return {
     state,
+    setTouchMovement(movement) {
+      touchMovement = textEntryActive ? null : movement;
+      syncMovement();
+    },
     setCrouchMode(mode) {
       if (mode === crouchMode) {
         return;

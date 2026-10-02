@@ -27,6 +27,7 @@ import { createFollowCameraRig } from '../player/createFollowCameraRig';
 import { createInputMap } from '../player/createInputMap';
 import { updateKeyboardCamera } from '../player/updateKeyboardCamera';
 import { attachCameraDragControls } from '../player/attachCameraDragControls';
+import { attachTouchControls } from '../player/attachTouchControls';
 import { createPlayerController, type LadderZone, type RemotePlayerCollisionTarget } from '../player/playerController';
 import { createPlayerRig } from '../player/createPlayerRig';
 import { createReviewAvatar } from '../player/createReviewAvatar';
@@ -513,6 +514,10 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
     yawSensitivity: POINTER_CAMERA_YAW_SENSITIVITY,
     pitchSensitivity: POINTER_CAMERA_PITCH_SENSITIVITY,
   }) : undefined;
+  const disposeTouch = canvas ? attachTouchControls(canvas, input, cameraRig, {
+    yawSensitivity: POINTER_CAMERA_YAW_SENSITIVITY,
+    pitchSensitivity: POINTER_CAMERA_PITCH_SENSITIVITY,
+  }) : undefined;
 
   const handleCameraContextMenu = (event: Event) => event.preventDefault();
   if (canvas) {
@@ -621,6 +626,7 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
     canvas?.removeEventListener('contextmenu', handleCameraContextMenu);
     canvas?.removeEventListener('wheel', handleCameraWheel);
     disposeCameraDrag?.();
+    disposeTouch?.();
     input.dispose();
     cameraRig.camera.detachControl();
   });
