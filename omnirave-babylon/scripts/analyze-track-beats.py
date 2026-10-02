@@ -20,7 +20,14 @@ went by without a drop. Here:
     averaged rather than power, so a loud bar does not outweigh a quiet one
     and the jump peaks on the drop itself, not bars before it. The jump has
     to be the largest within DROP_SPACING_BARS bars each side, and at least
-    DROP_MIN_JUMP_DB.
+    DROP_MIN_JUMP_DB. A build-up that brings some low end back early pulls
+    that peak a bar or two before the drop, so the drop is then the first
+    bar, from DROP_REFINE_BEFORE_BARS before the peak, from which the level
+    stays within DROP_FULL_TOLERANCE_DB of the loudest bar of the
+    DROP_WINDOW_BARS bars from the peak for DROP_HOLD_BARS bars: where the
+    music reaches full and stays there. (The largest bar-to-bar step is not
+    it: the low end coming back in a build-up is often the largest step,
+    and one loud hit before a drop is not the drop.)
 
 Each beat gets a count aligned to the bars: 4 x the bars started before it,
 plus its place in its bar (0 on a bar start, at most 3). So "every 16th
@@ -50,6 +57,9 @@ FULL_MIX_WEIGHT = 0.5
 DROP_WINDOW_BARS = 4
 DROP_SPACING_BARS = 8
 DROP_MIN_JUMP_DB = 10
+DROP_REFINE_BEFORE_BARS = 2
+DROP_FULL_TOLERANCE_DB = 3
+DROP_HOLD_BARS = 2
 # Weaker jumps are kept as candidates, so a listening review can judge them.
 CANDIDATE_MIN_JUMP_DB = 6
 
@@ -92,22 +102,36 @@ def bar_counts(beats, downbeats):
     return counts
 
 
-def drop_jumps(bar_times, times, low_db, full_db):
-    """Each bar start's jump in decibels (NaN near the ends)."""
-    sums = [np.concatenate([[0], np.cumsum(v)]) for v in (low_db, full_db)]
+def bar_levels(bar_times, times, low_db, full_db):
+    """Mean of (low + FULL_MIX_WEIGHT x full) in decibels from each bar start
+    to the next, with running sums for any other span."""
+    level = low_db + FULL_MIX_WEIGHT * full_db
+    sums = np.concatenate([[0], np.cumsum(level)])
 
-    def mean(values, start, end):
+    def mean(start, end):
         i, j = np.searchsorted(times, start), np.searchsorted(times, end)
-        return (values[j] - values[i]) / max(1, j - i)
+        return (sums[j] - sums[i]) / max(1, j - i)
 
+    per_bar = np.array([mean(bar_times[k], bar_times[k + 1]) for k in range(len(bar_times) - 1)] + [np.nan])
+    return mean, per_bar
+
+
+def drop_jumps(bar_times, mean):
+    """Each bar start's jump in decibels (NaN near the ends)."""
     jumps = np.full(len(bar_times), np.nan)
     w = DROP_WINDOW_BARS
     for k in range(w, len(bar_times) - w):
-        before, at, after = bar_times[k - w], bar_times[k], bar_times[k + w]
-        low = mean(sums[0], at, after) - mean(sums[0], before, at)
-        full = mean(sums[1], at, after) - mean(sums[1], before, at)
-        jumps[k] = low + FULL_MIX_WEIGHT * full
+        jumps[k] = mean(bar_times[k], bar_times[k + w]) - mean(bar_times[k - w], bar_times[k])
     return jumps
+
+
+def refine(k, per_bar):
+    """The first bar near peak k that reaches the full level after it and holds it."""
+    full = np.nanmax(per_bar[k:k + DROP_WINDOW_BARS + 1])
+    for bar in range(max(0, k - DROP_REFINE_BEFORE_BARS), k + DROP_WINDOW_BARS + 1):
+        if np.all(per_bar[bar:bar + DROP_HOLD_BARS] >= full - DROP_FULL_TOLERANCE_DB):
+            return bar
+    return k
 
 
 def main():
@@ -120,13 +144,16 @@ def main():
 
     times, low_db, full_db = levels(signal)
     bar_index = np.flatnonzero(np.isin(beats, downbeats))
-    jumps = drop_jumps(beats[bar_index], times, low_db, full_db)
+    mean, per_bar = bar_levels(beats[bar_index], times, low_db, full_db)
+    jumps = drop_jumps(beats[bar_index], mean)
     s = DROP_SPACING_BARS
     peaks = [k for k in range(len(jumps))
              if np.isfinite(jumps[k]) and jumps[k] == np.nanmax(jumps[max(0, k - s):k + s + 1])]
-    drops = [int(bar_index[k]) for k in peaks if jumps[k] >= DROP_MIN_JUMP_DB]
-    candidates = [[round(float(beats[bar_index[k]]), 3), round(float(jumps[k]), 2)]
-                  for k in peaks if jumps[k] >= CANDIDATE_MIN_JUMP_DB]
+    # Each peak's jump, at the bar it refines to.
+    found = {refine(k, per_bar): jumps[k] for k in peaks}
+    drops = [int(bar_index[k]) for k, jump in sorted(found.items()) if jump >= DROP_MIN_JUMP_DB]
+    candidates = [[round(float(beats[bar_index[k]]), 3), round(float(jump), 2)]
+                  for k, jump in sorted(found.items()) if jump >= CANDIDATE_MIN_JUMP_DB]
 
     out = os.path.splitext(path)[0] + '.beatgrid.json'
     with open(out, 'w') as f:
