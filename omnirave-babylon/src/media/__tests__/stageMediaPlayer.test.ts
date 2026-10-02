@@ -599,6 +599,8 @@ describe('createStageMediaPlayer', () => {
 
     it('retries an ignored metadata seek on refresh, keeping the opening silent and the HUD on room time', () => {
       const fake = browserAudio();
+      fake.audio.readyState = 0;
+      fake.audio.duration = NaN;
       fake.audio.acceptSeek = false;
       vi.stubGlobal('Audio', constructible(() => fake.audio));
       let now = 0;
@@ -623,6 +625,8 @@ describe('createStageMediaPlayer', () => {
 
     it('retains the seek when Safari reports the target at metadata but starts decoding from zero', () => {
       const fake = browserAudio();
+      fake.audio.readyState = 0;
+      fake.audio.duration = NaN;
       vi.stubGlobal('Audio', constructible(() => fake.audio));
       let now = 0;
       const player = createStageMediaPlayer({ now: () => now });
@@ -646,7 +650,7 @@ describe('createStageMediaPlayer', () => {
 
     it('replaces a pending track seek and removes readiness retries when disposed', () => {
       const fake = browserAudio();
-      vi.stubGlobal('Audio', constructible(() => fake.audio));
+      Object.assign(window, { __omniravePrimedAudio: { element: fake.audio } });
       const player = createStageMediaPlayer({ now: () => 0 });
       player.applyMedia(media({ playheadSeconds: 2016 }));
       player.unlock();
