@@ -13,6 +13,7 @@
 // Pure DOM: no Babylon imports, safe under jsdom.
 
 import { DEFAULT_UI_THEME, resolveUiThemeId, type UiThemeId } from './uiTheme';
+import { MOBILE_HUD_QUERY } from './createMobileHudControls';
 
 export type CameraFollowMode = 'follow' | 'free';
 export type CrouchMode = 'hold' | 'toggle';
@@ -50,6 +51,11 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 export const PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v2';
 const LEGACY_PLAYER_SETTINGS_STORAGE_KEY = 'omnirave.guestSettings.v1';
 
+export function getDefaultPlayerSettings(): PlayerSettings {
+  const mobile = typeof window !== 'undefined' && window.matchMedia?.(MOBILE_HUD_QUERY).matches;
+  return { ...DEFAULT_PLAYER_SETTINGS, cameraFollow: mobile ? 'free' : 'follow' };
+}
+
 export function clampGraphicsLevel(value: unknown): number {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) {
@@ -64,7 +70,8 @@ export function normalizePlayerSettings(raw: unknown): PlayerSettings {
   const source = (raw ?? {}) as Partial<Record<keyof PlayerSettings, unknown>>;
   return {
     uiTheme: resolveUiThemeId(source.uiTheme),
-    cameraFollow: source.cameraFollow === 'free' ? 'free' : 'follow',
+    cameraFollow: source.cameraFollow === 'free' || source.cameraFollow === 'follow'
+      ? source.cameraFollow : getDefaultPlayerSettings().cameraFollow,
     graphicsAuto: source.graphicsAuto === undefined ? true : source.graphicsAuto !== false,
     graphicsLevel: clampGraphicsLevel(source.graphicsLevel),
     displayNames: source.displayNames === undefined ? true : source.displayNames !== false,
@@ -86,24 +93,25 @@ function resolveStorage(storage?: Storage | null): Storage | null {
 }
 
 export function loadPlayerSettings(storage?: Storage | null): PlayerSettings {
+  const defaults = getDefaultPlayerSettings();
   const store = resolveStorage(storage);
   if (!store) {
-    return { ...DEFAULT_PLAYER_SETTINGS };
+    return defaults;
   }
   try {
     const raw = store.getItem(PLAYER_SETTINGS_STORAGE_KEY);
     if (raw) return normalizePlayerSettings(JSON.parse(raw));
     const legacy = store.getItem(LEGACY_PLAYER_SETTINGS_STORAGE_KEY);
-    if (!legacy) return { ...DEFAULT_PLAYER_SETTINGS };
+    if (!legacy) return defaults;
     // The old default was persisted as "free" even though both modes behaved
-    // identically. Start the working Auto-Follow mode once, preserving all
+    // identically. Start the device's working default once, preserving all
     // other preferences. Choices made in v2, including Free Camera, persist.
     const migrated = normalizePlayerSettings(JSON.parse(legacy));
-    migrated.cameraFollow = 'follow';
+    migrated.cameraFollow = defaults.cameraFollow;
     savePlayerSettings(migrated, store);
     return migrated;
   } catch {
-    return { ...DEFAULT_PLAYER_SETTINGS };
+    return defaults;
   }
 }
 

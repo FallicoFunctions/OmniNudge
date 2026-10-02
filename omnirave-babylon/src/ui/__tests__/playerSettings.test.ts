@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   DEFAULT_PLAYER_SETTINGS,
@@ -44,11 +44,27 @@ describe('playerSettings', () => {
     expect(clampGraphicsLevel(Number.NaN)).toBe(DEFAULT_PLAYER_SETTINGS.graphicsLevel);
   });
 
-  it('defaults missing or invalid camera preferences to Auto-Follow', () => {
-    for (const raw of [null, {}, { cameraFollow: 'bad' }]) {
-      expect(normalizePlayerSettings(raw).cameraFollow).toBe('follow');
+  it.each([
+    { mobile: false, mode: 'follow' },
+    { mobile: true, mode: 'free' },
+  ])('uses the device camera default ($mode) when no valid preference exists', ({ mobile, mode }) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: mobile })));
+    try {
+      for (const raw of [null, {}, { cameraFollow: 'bad' }]) {
+        expect(normalizePlayerSettings(raw).cameraFollow).toBe(mode);
+      }
+      expect(loadPlayerSettings(createMemoryStorage()).cameraFollow).toBe(mode);
+      expect(loadPlayerSettings(null).cameraFollow).toBe(mode);
+      expect(loadPlayerSettings(createMemoryStorage({ [PLAYER_SETTINGS_STORAGE_KEY]: '{bad' })).cameraFollow).toBe(mode);
+      // A player can still choose either mode and keep it across a reload.
+      for (const cameraFollow of ['follow', 'free'] as const) {
+        const storage = createMemoryStorage();
+        savePlayerSettings({ ...DEFAULT_PLAYER_SETTINGS, cameraFollow }, storage);
+        expect(loadPlayerSettings(storage).cameraFollow).toBe(cameraFollow);
+      }
+    } finally {
+      vi.unstubAllGlobals();
     }
-    expect(loadPlayerSettings(createMemoryStorage()).cameraFollow).toBe('follow');
   });
 
   it('migrates the old camera default once while keeping the other preferences', () => {

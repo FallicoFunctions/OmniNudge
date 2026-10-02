@@ -24,7 +24,7 @@ import {
   GRAPHICS_LEVEL_MAX,
   GRAPHICS_LEVEL_MIN,
   clampGraphicsLevel,
-  DEFAULT_PLAYER_SETTINGS,
+  getDefaultPlayerSettings,
   type CameraFollowMode,
   type CrouchMode,
   type PlayerSettings,
@@ -66,7 +66,7 @@ export interface SettingsPopup {
 }
 
 export function createSettingsPopup(options: CreateSettingsPopupOptions = {}): SettingsPopup {
-  const state: PlayerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...options.settings };
+  const state: PlayerSettings = { ...getDefaultPlayerSettings(), ...options.settings };
   state.graphicsLevel = clampGraphicsLevel(state.graphicsLevel);
   state.uiTheme = resolveUiThemeId(state.uiTheme);
 
