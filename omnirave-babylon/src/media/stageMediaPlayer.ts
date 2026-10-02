@@ -46,6 +46,12 @@ const BEAT_LEAD_SECONDS = 0.04;
 // A longer step than this between two beat readings is a seek or a stalled
 // tab, not playback; the hits in between are not replayed.
 const MAX_BEAT_STEP_SECONDS = 0.5;
+// An audio element that reports "playing" but whose position does not move
+// for this long is stalled (for example, its AudioContext was suspended by the
+// browser). Its position is then not what the player hears.
+const AUDIO_STALL_MS = 1500;
+// The inputs a browser accepts as the player's permission to restart audio.
+const RESUME_GESTURES = ['pointerdown', 'keydown', 'touchend'] as const;
 
 export interface StagePlayerBackend {
   load(trackId: string, startSeconds: number): void;
@@ -234,12 +240,20 @@ function createAudioBackend(): StagePlayerBackend {
       node.connect(context.destination);
       audioContext = context;
       analyser = node;
+      // The runtime stops its own gesture listeners after the first gesture. A
+      // browser can stop the context hours later, and only a gesture restarts
+      // it, so this backend keeps listening for as long as it lives.
+      for (const type of RESUME_GESTURES) window.addEventListener(type, resumeStoppedContext, true);
     } catch {
       // No Web Audio (or the element was already tapped): the visualizer just
       // reads zeros. Background music is never worth taking down the runtime.
       audioContext = null;
       analyser = null;
     }
+  }
+
+  function resumeStoppedContext(): void {
+    if (playing && audioContext && (audioContext.state as string) !== 'running') startPlayback();
   }
 
   function clearPendingSeek(): void {
@@ -271,7 +285,9 @@ function createAudioBackend(): StagePlayerBackend {
     // created before a user gesture starts suspended; every attempt resumes
     // it, and the attempt made from a gesture succeeds. The promise is ignored.
     ensureAudioGraph();
-    if (audioContext && audioContext.state === 'suspended') {
+    // Safari also uses 'interrupted' (sleep, other audio). A context that is
+    // not running stops the audio element's clock too, so resume on both.
+    if (audioContext && (audioContext.state as string) !== 'running') {
       const resumeResult = audioContext.resume();
       if (resumeResult && typeof resumeResult.catch === 'function') {
         void resumeResult.catch(() => {});
@@ -338,6 +354,7 @@ function createAudioBackend(): StagePlayerBackend {
       element.pause();
       element.removeAttribute('src');
       analyser = null;
+      for (const type of RESUME_GESTURES) window.removeEventListener(type, resumeStoppedContext, true);
       if (audioContext) {
         const closeResult = audioContext.close();
         if (closeResult && typeof closeResult.catch === 'function') {
@@ -373,6 +390,22 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   let beatSeconds = 0;
   let currentTrackId: string | undefined;
   let currentPlaylistIndex: number | undefined;
+
+  // Whether the audio position moves. A paused element counts as moving, as
+  // the pause is handled elsewhere.
+  let lastAudioTime = -1;
+  let lastAdvanceAt = 0;
+  function audioAdvancing(): boolean {
+    if (!backend) return false;
+    const now = localNow();
+    const time = backend.getCurrentTime();
+    if (backend.isPaused() || time !== lastAudioTime) {
+      lastAudioTime = time;
+      lastAdvanceAt = now;
+      return true;
+    }
+    return now - lastAdvanceAt < AUDIO_STALL_MS;
+  }
 
   function ensureBackend(): StagePlayerBackend {
     if (!backend) {
@@ -415,6 +448,12 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     // Paused (blocked by the browser) or still downloading: a position read
     // now is not what the player hears.
     if (activeBackend.isPaused() || !activeBackend.isReady()) return;
+    // A stalled element is not behind the playhead, it is stuck. Seeking it
+    // only moves the frozen position; ask it to resume instead.
+    if (!audioAdvancing()) {
+      activeBackend.play();
+      return;
+    }
     const target = expectedPlayhead(media) + activeBackend.outputLatencySeconds();
     const drift = activeBackend.getCurrentTime() - target;
     if (measureSeekLead) {
@@ -433,7 +472,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   // The track position this player hears now.
   function heardSeconds(): number {
     if (backend && manualOverride) return backend.getCurrentTime();
-    if (backend && !backend.isPaused() && backend.isReady()) {
+    if (backend && !backend.isPaused() && backend.isReady() && audioAdvancing()) {
       return Math.max(0, backend.getCurrentTime() - backend.outputLatencySeconds());
     }
     return desiredMedia ? expectedPlayhead(desiredMedia) : 0;
@@ -481,6 +520,9 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (!manualOverride && desiredMedia && backend?.isPaused()) {
       backend.seek(expectedPlayhead(desiredMedia));
       backend.play();
+    } else if (!manualOverride && backend && !audioAdvancing()) {
+      // A gesture may be what the browser needs to restart a stalled context.
+      backend.play();
     }
   }
 
@@ -527,7 +569,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   function getCurrentTime(): number {
     // Until the browser lets the track play, report the server's playhead
     // (sent at least once a second) so the HUD shows the room's real time.
-    if (backend && (!backend.isPaused() || manualOverride)) {
+    if (backend && (manualOverride || (!backend.isPaused() && audioAdvancing()))) {
       return backend.getCurrentTime();
     }
     return desiredMedia ? expectedPlayhead(desiredMedia) : (backend?.getCurrentTime() ?? 0);

@@ -139,6 +139,25 @@ describe('createStageMediaPlayer', () => {
     expect(backend.seek).toHaveBeenCalledWith(30);
   });
 
+  it('does not seek a stalled element, follows the server time, and asks it to resume', () => {
+    let nowMs = 0;
+    const backend = createFakeBackend({ getCurrentTime: vi.fn(() => 5), isPaused: vi.fn(() => false) });
+    const player = createStageMediaPlayer({ now: () => nowMs, backendFactory: () => backend });
+    player.unlock();
+    player.applyMedia(media({ playheadSeconds: 5 }));
+    player.getCurrentTime();
+
+    // The element still says "playing", but its position has not moved for 3s.
+    nowMs = 3000;
+    player.applyMedia(media({ playheadSeconds: 8 }));
+    player.applyMedia(media({ playheadSeconds: 9 }));
+
+    expect(backend.seek).not.toHaveBeenCalled();
+    expect(backend.play).toHaveBeenCalledTimes(3);
+    expect(player.getShowSeconds()).toBeCloseTo(9, 5);
+    expect(player.getCurrentTime()).toBeCloseTo(9, 5);
+  });
+
   it('pauses on null media', () => {
     const backend = createFakeBackend();
     const player = createStageMediaPlayer({ now: () => 0, backendFactory: () => backend });
@@ -543,6 +562,40 @@ describe('createStageMediaPlayer', () => {
       expect(warnSpy).toHaveBeenCalledTimes(1);
 
       warnSpy.mockRestore();
+    });
+
+    it('resumes a stopped AudioContext on a later gesture, and stops listening on dispose', () => {
+      const fakeAudio = {
+        src: '', muted: false, preload: '', readyState: 4, currentTime: 0,
+        play: vi.fn(() => Promise.resolve()), pause: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), removeAttribute: vi.fn(),
+      };
+      const context = {
+        state: 'running',
+        baseLatency: 0,
+        outputLatency: 0,
+        resume: vi.fn(() => Promise.resolve()),
+        close: vi.fn(() => Promise.resolve()),
+        destination: {},
+        createMediaElementSource: () => ({ connect: vi.fn() }),
+        createAnalyser: () => ({ connect: vi.fn(), fftSize: 0, smoothingTimeConstant: 0 }),
+      };
+      vi.stubGlobal('Audio', constructible(() => fakeAudio));
+      vi.stubGlobal('AudioContext', constructible(() => context));
+
+      const player = createStageMediaPlayer();
+      player.unlock();
+      player.applyMedia(media());
+      expect(context.resume).not.toHaveBeenCalled();
+
+      // The browser stops the context hours later (Safari says "interrupted").
+      context.state = 'interrupted';
+      window.dispatchEvent(new Event('pointerdown'));
+      expect(context.resume).toHaveBeenCalledTimes(1);
+
+      player.dispose();
+      window.dispatchEvent(new Event('pointerdown'));
+      expect(context.resume).toHaveBeenCalledTimes(1);
     });
 
     it('resolves trackId to a served /audio/<id>.mp3 URL and seeks after metadata loads', () => {
