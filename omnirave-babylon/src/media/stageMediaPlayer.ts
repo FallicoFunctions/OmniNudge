@@ -15,6 +15,7 @@ import type { ZoneMediaState } from '../network/worldSocket';
 import { publicUrl } from '../app/publicUrl';
 import type { StageBeat, TrackBeats } from './trackBeats';
 import type { TrackSpectrum } from './trackSpectrum';
+import { createShowClock } from './createShowClock';
 
 // The served audio file extension. A single named constant so switching the
 // whole setlist to a different container (e.g. .m4a) is a one-line change.
@@ -110,7 +111,8 @@ export interface StageMediaPlayer {
   readBeat: (out: StageBeat) => boolean;
   // The light show's clock, in seconds: the track position this player hears
   // while a track is current, else the server's time. The same for every
-  // player at the same moment. Undefined before the server clock is known
+  // player at the same moment, interpolated between browser audio readings.
+  // Undefined before the server clock is known
   // and with no track.
   getShowSeconds: () => number | undefined;
   // The server time (Unix ms) at position 0 of the current track, from the
@@ -400,6 +402,8 @@ function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
 export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): StageMediaPlayer {
   const createBackend = options.backendFactory ?? (() => createAudioBackend(options.now));
   const localNow = options.now ?? (() => Date.now());
+  const visualNow = options.now ?? (() => performance.now());
+  const showClock = createShowClock();
 
   let backend: StagePlayerBackend | undefined;
   let unlocked = false;
@@ -463,6 +467,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
       media.trackId !== currentTrackId || media.playlistIndex !== currentPlaylistIndex;
 
     if (isNewTrack) {
+      showClock.reset();
       currentTrackId = media.trackId;
       currentPlaylistIndex = media.playlistIndex;
       measureSeekLead = false;
@@ -496,6 +501,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
     if (readingsOff >= SEEK_AFTER_READINGS) {
       readingsOff = 0;
       activeBackend.seek(target + seekLead);
+      showClock.reset();
       measureSeekLead = true;
     }
   }
@@ -563,7 +569,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
 
   function getFrequencyData(target: Uint8Array): void {
     const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
-    if (trackId && options.spectrum?.fill(trackId, heardSeconds(), target)) {
+    if (trackId && options.spectrum?.fill(trackId, getShowSeconds() ?? heardSeconds(), target)) {
       return;
     }
     if (backend) {
@@ -577,7 +583,7 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   function readBeat(out: StageBeat): boolean {
     const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
     if (!trackId || !options.beats) return false;
-    const until = heardSeconds() + BEAT_LEAD_SECONDS;
+    const until = (getShowSeconds() ?? heardSeconds()) + BEAT_LEAD_SECONDS;
     const from = beatSeconds;
     const continues = trackId === beatTrackId && until >= from && until - from <= MAX_BEAT_STEP_SECONDS;
     beatTrackId = trackId;
@@ -587,7 +593,17 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
 
   function getShowSeconds(): number | undefined {
     const trackId = manualOverride ? currentTrackId : desiredMedia?.trackId;
-    if (trackId) return heardSeconds();
+    if (trackId) {
+      const heard = heardSeconds();
+      if (backend && !backend.isPaused() && backend.isReady() && audioAdvancing()) {
+        const position = showClock.read(heard, visualNow());
+        const duration = backend.getDuration();
+        return duration > 0 ? Math.min(duration, position) : position;
+      }
+      showClock.reset();
+      return heard;
+    }
+    showClock.reset();
     const serverNow = options.serverClock?.now();
     return serverNow === undefined ? undefined : serverNow / 1000;
   }
@@ -615,18 +631,22 @@ export function createStageMediaPlayer(options: StageMediaPlayerOptions = {}): S
   }
 
   function play(): void {
+    showClock.reset();
     backend?.play();
   }
 
   function pause(): void {
+    showClock.reset();
     backend?.pause();
   }
 
   function seekTo(seconds: number): void {
+    showClock.reset();
     backend?.seek(seconds);
   }
 
   function setManualOverride(active: boolean): void {
+    showClock.reset();
     manualOverride = active;
   }
 

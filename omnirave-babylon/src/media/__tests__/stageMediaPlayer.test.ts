@@ -282,6 +282,90 @@ describe('createStageMediaPlayer', () => {
   });
 
   describe('the same moment for every player', () => {
+    it('smooths coarse audio readings for laser choreography, drone morphs and spectrum without seeking audio', () => {
+      let nowMs = 0;
+      let position = 100.2;
+      const backend = createFakeBackend({
+        getCurrentTime: () => position,
+        isPaused: () => false,
+        outputLatencySeconds: () => 0.2,
+      });
+      const beatRead = vi.fn((_track: string, _from: number, _until: number, _out: StageBeat) => true);
+      const fill = vi.fn((_track: string, _seconds: number, _target: Uint8Array) => true);
+      const player = createStageMediaPlayer({
+        now: () => nowMs, backendFactory: () => backend,
+        beats: { read: beatRead, dispose: vi.fn() },
+        spectrum: { fill, dispose: vi.fn() },
+      });
+      player.applyMedia(media({ playheadSeconds: 100 }));
+      player.unlock();
+      const beat = createStageBeat();
+      let previous = player.getShowSeconds()!;
+      for (let frame = 1; frame <= 240; frame++) {
+        nowMs = frame * 1000 / 120;
+        position = 100.2 + Math.floor(frame / 30) / 4;
+        const show = player.getShowSeconds()!;
+        player.readBeat(beat);
+        player.getFrequencyData(new Uint8Array(4));
+        expect(show).toBeGreaterThan(previous);
+        expect(show - previous).toBeLessThan(1.1 / 120 + 1e-9);
+        expect(show).toBeCloseTo(100 + frame / 120, 2);
+        expect(beatRead.mock.lastCall![2]).toBeCloseTo(show + 0.04, 8);
+        expect(fill.mock.lastCall![1]).toBeCloseTo(show, 8);
+        expect(player.getCurrentTime()).toBe(position);
+        previous = show;
+      }
+      expect(backend.seek).not.toHaveBeenCalled();
+      player.dispose();
+    });
+
+    it('resets interpolation for pause, resume, seeks, track changes and buffering', () => {
+      let nowMs = 0, position = 100;
+      let paused = false, ready = true;
+      const backend = createFakeBackend({
+        getCurrentTime: () => position, isPaused: () => paused, isReady: () => ready,
+        pause: () => { paused = true; }, play: () => { paused = false; },
+        seek: seconds => { position = seconds; },
+      });
+      const player = createStageMediaPlayer({ now: () => nowMs, backendFactory: () => backend });
+      player.applyMedia(media({ playheadSeconds: 100 }));
+      player.unlock();
+      player.setManualOverride(true);
+      expect(player.getShowSeconds()).toBe(100);
+      nowMs = 100;
+      expect(player.getShowSeconds()).toBeCloseTo(100.1);
+      player.pause();
+      nowMs = 500;
+      expect(player.getShowSeconds()).toBe(100);
+      player.play();
+      expect(player.getShowSeconds()).toBe(100);
+      player.seekTo(100.05); // even a tiny explicit seek reanchors
+      expect(player.getShowSeconds()).toBe(100.05);
+      player.setManualOverride(false);
+      position = 100.02;
+      player.applyMedia(media({ trackId: 'next-track', playheadSeconds: 100.02 }));
+      expect(player.getShowSeconds()).toBe(100.02);
+      ready = false;
+      nowMs = 1500;
+      expect(player.getShowSeconds()).toBeCloseTo(101.02);
+      ready = true;
+      position = 101;
+      expect(player.getShowSeconds()).toBe(101);
+      player.dispose();
+    });
+
+    it('never extrapolates past the end of a track', () => {
+      let nowMs = 0;
+      const backend = createFakeBackend({ getCurrentTime: () => 199.99, getDuration: () => 200, isPaused: () => false });
+      const player = createStageMediaPlayer({ now: () => nowMs, backendFactory: () => backend });
+      player.applyMedia(media({ playheadSeconds: 199.99, durationSeconds: 200 }));
+      player.unlock();
+      expect(player.getShowSeconds()).toBe(199.99);
+      nowMs = 100;
+      expect(player.getShowSeconds()).toBe(200);
+      player.dispose();
+    });
+
     it('starts at the server playhead moved forward on the server clock', () => {
       const backend = createFakeBackend();
       const serverClock = { now: () => 1_000_000 + 1500 };
@@ -410,13 +494,14 @@ describe('createStageMediaPlayer', () => {
 
     it('reads the hits heard since the last reading, a little ahead of the sound', () => {
       let position = 100;
+      let nowMs = 0;
       const read = vi.fn((_trackId: string, _from: number, _to: number, out: StageBeat) => {
         out.bass = 0.8;
         return true;
       });
       const backend = createFakeBackend({ getCurrentTime: vi.fn(() => position), isPaused: vi.fn(() => false) });
       const player = createStageMediaPlayer({
-        now: () => 0,
+        now: () => nowMs,
         beats: { read, dispose: vi.fn() },
         backendFactory: () => backend,
       });
@@ -429,6 +514,7 @@ describe('createStageMediaPlayer', () => {
       expect(out.bass).toBe(0.8);
       expect(read.mock.lastCall?.slice(0, 3)).toEqual(['main-stage-set-01', 100.04, 100.04]);
       position = 100.016;
+      nowMs = 16;
       player.readBeat(out);
       expect(read.mock.lastCall?.[1]).toBeCloseTo(100.04, 5);
       expect(read.mock.lastCall?.[2]).toBeCloseTo(100.056, 5);
