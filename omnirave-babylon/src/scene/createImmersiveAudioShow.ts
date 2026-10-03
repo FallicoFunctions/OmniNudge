@@ -269,6 +269,9 @@ function createGlowMaterial(scene: Scene, name: string, color: Color3, alpha: nu
   material.metallic = 0;
   material.roughness = 1;
   material.disableLighting = true;
+  // These surfaces emit light; they need no environment-reflection BRDF.
+  // disableLighting alone only removes direct lights from the PBR shader.
+  material.unlit = true;
   material.alpha = alpha;
   material.backFaceCulling = false;
   return material;
@@ -470,11 +473,13 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
   // additive blend gives the volumetric laser glow.
   const beamMaterial = new PBRMaterial('immersive-laser-beam-material', scene);
   beamMaterial.unlit = true;
-  beamMaterial.albedoColor = new Color3(1, 1, 1);
+  // A closed additive box previously shaded both entry and exit faces.
+  // Shade the outward face once with their combined radiance instead.
+  beamMaterial.albedoColor = new Color3(2, 2, 2);
   beamMaterial.alpha = 0.6;
   beamMaterial.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   beamMaterial.alphaMode = Constants.ALPHA_ADD;
-  beamMaterial.backFaceCulling = false;
+  beamMaterial.backFaceCulling = true;
   beamMesh.material = beamMaterial;
   // COLOR vertex buffer: (1) the vertex-color shader define must compile for
   // the thin-instance color attribute to reach the shader; (2) it ramps

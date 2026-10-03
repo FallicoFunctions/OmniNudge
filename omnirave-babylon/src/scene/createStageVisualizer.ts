@@ -395,6 +395,7 @@ export function createStageVisualizer(scene: Scene, options: StageVisualizerOpti
   backingMaterial.metallic = 0;
   backingMaterial.roughness = 1;
   backingMaterial.disableLighting = true;
+  backingMaterial.unlit = true;
   // The authored stage is viewed from negative Z, while CreatePlane winding
   // can resolve to the opposite side across WebGL/WebGPU. This screen was
   // silently disappearing from the crowd even though its DynamicTexture was

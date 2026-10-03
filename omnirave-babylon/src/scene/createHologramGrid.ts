@@ -792,7 +792,9 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   // makes "off" mean INVISIBLE - a black instance adds nothing to the frame.
   const material = new PBRMaterial('hologram-grid-point-material', scene);
   material.unlit = true;
-  material.albedoColor = new Color3(1, 1, 1);
+  // Preserve the radiance of the old front+back additive faces with one
+  // outward face, avoiding duplicate fragments for every drone light.
+  material.albedoColor = new Color3(2, 2, 2);
   material.alpha = 0.9;
   material.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
   material.alphaMode = Constants.ALPHA_ADD;
@@ -800,7 +802,7 @@ export function createHologramGrid(scene: Scene, options: HologramGridOptions): 
   // In particular, a black "off" thin instance contributes no color but
   // would still punch a dark box into dense coplanar text if it wrote depth.
   material.disableDepthWrite = true;
-  material.backFaceCulling = false;
+  material.backFaceCulling = true;
   point.material = material;
 
   // White COLOR vertex buffer so the vertex-colour shader define compiles and

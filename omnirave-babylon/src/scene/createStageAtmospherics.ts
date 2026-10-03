@@ -199,6 +199,7 @@ function createGlowMaterial(scene: Scene, name: string, color: Color3, intensity
   material.metallic = 0;
   material.roughness = 1;
   material.disableLighting = true;
+  material.unlit = true;
   material.backFaceCulling = false;
   return material;
 }
