@@ -21,6 +21,7 @@ import type { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js';
+import type { PostProcess } from '@babylonjs/core/PostProcesses/postProcess.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -64,17 +65,37 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = 0.5;
   pipeline.bloomWeight = 0.7;
-  // Bloom kernel is in pixels: normalise to render height so halos keep
-  // the same angular size on any viewport instead of shrinking on large
-  // windows (reviews from bigger tabs kept reporting 'no bloom').
+  // Babylon already divides this kernel by hardware scaling. Use CSS height
+  // here: using render height applied Retina density twice (774 instead of
+  // 258 at 3x), multiplying blur work and changing the apparent halo width.
   const resizeBloom = () => {
-    pipeline.bloomKernel = Math.max(48, Math.round((84 * scene.getEngine().getRenderHeight()) / 825));
+    const engine = scene.getEngine();
+    const cssHeight = engine.getRenderHeight() * engine.getHardwareScalingLevel();
+    pipeline.bloomKernel = Math.max(48, Math.round((84 * cssHeight) / 825));
   };
   resizeBloom();
   // Auto resolution and phone rotation must preserve the same halo width.
   const resizeObserver = scene.getEngine().onResizeObservable.add(resizeBloom);
   scene.onDisposeObservable.addOnce(() => scene.getEngine().onResizeObservable.remove(resizeObserver));
-  pipeline.bloomScale = 0.5;
+  // Only soft glow needs reduced resolution. A quarter-size blur preserves
+  // the same normalized radius while using a quarter of the half-size pixels
+  // and half as many blur taps. The scene and laser cores remain full size.
+  pipeline.bloomScale = mobile ? 0.25 : 0.5;
+  const preserveSceneDetail = () => {
+    if (!mobile) return;
+    // Babylon also sizes the bloom merge by bloomScale. That downsamples the
+    // sharp scene before image processing/FXAA. Merge at full resolution so
+    // cheaper glow cannot turn the entire venue into an upscaled image.
+    const merge = (pipeline as unknown as { bloom: { _merge: PostProcess } }).bloom._merge;
+    const sizing = merge as unknown as { _options: number };
+    if (sizing._options !== 1) {
+      sizing._options = 1;
+      merge.markTextureDirty();
+    }
+  };
+  preserveSceneDetail();
+  const buildObserver = pipeline.onBuildObservable.add(preserveSceneDetail);
+  scene.onDisposeObservable.addOnce(() => pipeline.onBuildObservable.remove(buildObserver));
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
   // Native Retina pixels plus FXAA provide clean edges. Extra sharpening

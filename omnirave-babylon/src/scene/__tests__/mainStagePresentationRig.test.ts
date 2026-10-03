@@ -26,6 +26,8 @@ describe('createMainStagePresentationRig', () => {
   it('spends the mobile pixel budget on clean scene detail while retaining bloom and edge antialiasing', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
     engine = new NullEngine();
+    const height = vi.spyOn(engine, 'getRenderHeight').mockReturnValue(2532);
+    const scaling = vi.spyOn(engine, 'getHardwareScalingLevel').mockReturnValue(1 / 3);
     scene = new Scene(engine);
     const camera = new ArcRotateCamera('mobile-camera', 0, 1, 12, Vector3.Zero(), scene);
     const rig = createMainStagePresentationRig(scene, camera);
@@ -35,14 +37,23 @@ describe('createMainStagePresentationRig', () => {
     expect(rig.pipeline.bloomEnabled).toBe(true);
     expect(rig.pipeline.bloomThreshold).toBe(0.5);
     expect(rig.pipeline.bloomWeight).toBe(0.7);
-    const height = vi.spyOn(engine, 'getRenderHeight').mockReturnValue(2532);
+    expect(rig.pipeline.bloomScale).toBe(0.25);
+    const bloom = () => (rig.pipeline as unknown as { bloom: { kernel: number; _merge: { _options: number } } }).bloom;
+    expect(bloom()._merge._options).toBe(1);
     engine.onResizeObservable.notifyObservers(engine);
     const nativeKernel = rig.pipeline.bloomKernel;
+    expect(nativeKernel).toBe(86); // 844 CSS pixels, density applied once by Babylon
+    expect(bloom().kernel).toBeCloseTo(258);
     height.mockReturnValue(1688);
+    scaling.mockReturnValue(0.5);
     engine.onResizeObservable.notifyObservers(engine);
-    expect(rig.pipeline.bloomKernel).toBe(Math.max(48, Math.round(84 * 1688 / 825)));
-    expect(rig.pipeline.bloomKernel / nativeKernel).toBeCloseTo(2 / 3, 2);
+    expect(rig.pipeline.bloomKernel).toBe(nativeKernel);
+    expect(bloom().kernel / 1688).toBeCloseTo(258 / 2532, 6);
+    // Scale changes rebuild the bloom effect: its sharp-scene merge stays full size.
+    rig.pipeline.bloomScale = 0.4;
+    expect(bloom()._merge._options).toBe(1);
     height.mockRestore();
+    scaling.mockRestore();
   });
 
   it('adds venue-scoped environment reflections and bounded post-processing', () => {
