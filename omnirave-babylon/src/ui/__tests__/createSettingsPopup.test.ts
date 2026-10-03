@@ -48,6 +48,21 @@ describe('createSettingsPopup', () => {
     expect(lines[lines.length - 1]).toBe('Esc: Exit chat');
   });
 
+  it('explains touch camera and pinch controls on mobile', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    try {
+      const { popup } = setup();
+      const help = popup.element.querySelector('[data-testid="controls-help"]')!.textContent;
+      expect(help).toContain('Two fingers: Drag to turn camera');
+      expect(help).toContain('Spread fingers: Zoom in');
+      expect(help).toContain('Pinch fingers: Zoom out');
+      expect(help).not.toContain('Mouse Wheel');
+      popup.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('closes via the Close button', () => {
     const onRequestClose = vi.fn();
     const { popup } = setup({ onRequestClose });

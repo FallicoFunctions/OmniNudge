@@ -30,6 +30,7 @@ import {
   type PlayerSettings,
 } from './playerSettings';
 import { UI_THEMES, resolveUiThemeId, type UiThemeId } from './uiTheme';
+import { MOBILE_HUD_QUERY } from './createMobileHudControls';
 
 // Controls help list from sec 9.6, updated for the current keyboard bindings.
 export const CONTROLS_HELP_LINES: readonly string[] = [
@@ -43,6 +44,14 @@ export const CONTROLS_HELP_LINES: readonly string[] = [
   'Enter: Open chat / send',
   'Shift+Enter: New line',
   'Esc: Exit chat',
+];
+
+const TOUCH_CONTROLS_HELP_LINES = [
+  'One finger: Hold to walk / drag to steer',
+  'Two fingers: Drag to turn camera',
+  'Spread fingers: Zoom in',
+  'Pinch fingers: Zoom out',
+  'Chat: Tap the chat box to type',
 ];
 
 export interface CreateSettingsPopupOptions {
@@ -174,7 +183,8 @@ export function createSettingsPopup(options: CreateSettingsPopupOptions = {}): S
   const help = document.createElement('ul');
   help.className = 'hud-help';
   help.dataset.testid = 'controls-help';
-  for (const line of CONTROLS_HELP_LINES) {
+  const mobile = window.matchMedia?.(MOBILE_HUD_QUERY).matches ?? false;
+  for (const line of mobile ? TOUCH_CONTROLS_HELP_LINES : CONTROLS_HELP_LINES) {
     const item = document.createElement('li');
     item.className = 'hud-help__item';
     item.textContent = line;

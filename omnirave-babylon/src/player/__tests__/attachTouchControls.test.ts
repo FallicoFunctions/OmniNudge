@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { attachTouchControls } from '../attachTouchControls';
 import { attachCameraDragControls } from '../attachCameraDragControls';
 import { createInputMap } from '../createInputMap';
+import { resolveZoomState } from '../cameraRigMath';
+import { NullEngine, Scene, TransformNode } from '@babylonjs/core';
+import { createFollowCameraRig } from '../createFollowCameraRig';
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); });
@@ -13,7 +16,9 @@ function setup() {
   canvas.hasPointerCapture = id => captured.has(id);
   canvas.releasePointerCapture = id => { captured.delete(id); };
   const input = createInputMap(window);
-  const rig = { orbit: vi.fn(), setManualLookActive: vi.fn() };
+  const camera = { radius: 20 };
+  const rig = { camera, orbit: vi.fn(), setManualLookActive: vi.fn(),
+    zoom: vi.fn((delta: number) => { camera.radius += delta; return resolveZoomState(camera.radius); }) };
   const options = { yawSensitivity: 0.01, pitchSensitivity: 0.02 };
   cleanups.push(input.dispose, attachCameraDragControls(canvas, rig, options), attachTouchControls(canvas, input, rig, options));
   const pointer = (type: string, id: number, x = 100, y = 100, pointerType = 'touch') => {
@@ -25,6 +30,75 @@ function setup() {
 }
 
 describe('mobile canvas gestures', () => {
+  it('changes the real free camera distance, retains it after release, and respects zoom limits', () => {
+    const { canvas, pointer, input } = setup();
+    cleanups.pop()!(); // Replace the mock touch rig with the production rig.
+    const engine = new NullEngine();
+    cleanups.push(() => engine.dispose());
+    const scene = new Scene(engine);
+    const rig = createFollowCameraRig(scene, new TransformNode('player', scene));
+    rig.setFollowMode('free');
+    cleanups.push(attachTouchControls(canvas, input, rig, { yawSensitivity: 0.01, pitchSensitivity: 0.02 }));
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointerdown', 2, 200, 100);
+    pointer('pointermove', 2, 300, 100);
+    expect(rig.camera.radius).toBeCloseTo(3);
+    pointer('pointermove', 2, 200, 100);
+    expect(rig.camera.radius).toBeCloseTo(6);
+    for (let distance = 50; distance >= 4; distance /= 2) pointer('pointermove', 2, 100 + distance, 100);
+    pointer('pointermove', 2, 104, 100);
+    expect(rig.camera.radius).toBeCloseTo(140);
+    pointer('pointerup', 2);
+    pointer('pointerup', 1);
+    const releasedRadius = rig.camera.radius;
+    rig.syncZoomState(1 / 60);
+    expect(rig.camera.radius).toBeCloseTo(releasedRadius);
+    expect(input.state.forward).toBe(false);
+  });
+
+  it('zooms in when fingers spread, zooms out when they close, and never walks during a pinch', () => {
+    const { rig, pointer, input } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointerdown', 2, 200, 100);
+    expect(rig.zoom).not.toHaveBeenCalled();
+    pointer('pointermove', 2, 300, 100);
+    expect(rig.camera.radius).toBeCloseTo(10);
+    pointer('pointermove', 2, 200, 100);
+    expect(rig.camera.radius).toBeCloseTo(20);
+    expect(input.state.forward).toBe(false);
+    pointer('pointerup', 2);
+    pointer('pointermove', 1, 100, 50);
+    expect(rig.zoom).toHaveBeenCalledTimes(2);
+    expect(input.state.forward).toBe(false);
+  });
+
+  it('does not zoom after third-finger transitions until the new two-finger span changes', () => {
+    const { rig, pointer } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointerdown', 2, 200, 100);
+    pointer('pointerdown', 3, 300, 100);
+    pointer('pointermove', 2, 250, 100);
+    expect(rig.zoom).not.toHaveBeenCalled();
+    pointer('pointerup', 3);
+    pointer('pointermove', 2, 250, 100);
+    expect(rig.zoom).not.toHaveBeenCalled();
+    pointer('pointermove', 2, 300, 100);
+    expect(rig.camera.radius).toBeCloseTo(15);
+  });
+
+  it('ignores coincident fingers without an infinite zoom and resets the span after cancellation', () => {
+    const { rig, pointer } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointerdown', 2, 100, 100);
+    pointer('pointermove', 2, 150, 100);
+    expect(rig.zoom).not.toHaveBeenCalled();
+    pointer('pointercancel', 2);
+    pointer('pointerdown', 3, 50, 100);
+    pointer('pointerdown', 4, 150, 100);
+    pointer('pointermove', 4, 150, 100);
+    expect(rig.zoom).not.toHaveBeenCalled();
+    expect(rig.camera.radius).toBe(20);
+  });
   it('walks on one-finger hold, steers relative to its origin, and stops on release', () => {
     const { input, rig, pointer } = setup();
     pointer('pointerdown', 1);

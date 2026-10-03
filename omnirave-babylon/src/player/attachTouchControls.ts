@@ -5,13 +5,16 @@ import type { FollowCameraRig } from './createFollowCameraRig';
 export function attachTouchControls(
   canvas: HTMLCanvasElement,
   input: Pick<InputMap, 'setTouchMovement'>,
-  rig: Pick<FollowCameraRig, 'orbit' | 'setManualLookActive'>,
+  rig: Pick<FollowCameraRig, 'orbit' | 'setManualLookActive' | 'zoom'> & {
+    camera: Pick<FollowCameraRig['camera'], 'radius'>;
+  },
   options: { yawSensitivity: number; pitchSensitivity: number },
 ): () => void {
   const touches = new Map<number, { x: number; y: number }>();
   const ownerWindow = canvas.ownerDocument.defaultView!;
   let origin = { x: 0, y: 0 };
   let lastCenter = origin;
+  let lastSpan = 0;
   let cameraGesture = false;
   let looking = false;
   const previousTouchAction = canvas.style.touchAction;
@@ -26,6 +29,11 @@ export function attachTouchControls(
     const points = [...touches.values()];
     return { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
   };
+  const span = () => {
+    const points = [...touches.values()];
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  };
+  const beginCameraGesture = () => { lastCenter = center(); lastSpan = span(); };
   const releaseCapture = (id: number) => {
     if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
   };
@@ -33,6 +41,7 @@ export function attachTouchControls(
     const ids = [...touches.keys()];
     touches.clear();
     cameraGesture = false;
+    lastSpan = 0;
     input.setTouchMovement(null);
     setLooking(false);
     ids.forEach(releaseCapture);
@@ -50,7 +59,7 @@ export function attachTouchControls(
       cameraGesture = true;
       input.setTouchMovement(null);
       setLooking(touches.size === 2);
-      if (touches.size === 2) lastCenter = center();
+      if (touches.size === 2) beginCameraGesture();
     }
   };
   const move = (event: PointerEvent) => {
@@ -59,9 +68,17 @@ export function attachTouchControls(
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (touches.size === 2) {
       const next = center();
+      const nextSpan = span();
+      if (lastSpan >= 4 && nextSpan >= 4 && nextSpan !== lastSpan) {
+        // Spreading fingers brings the camera closer; pinching pulls it back.
+        // Ratios keep sensitivity proportional to the current zoom distance.
+        const factor = Math.max(0.5, Math.min(2, lastSpan / nextSpan));
+        rig.zoom(rig.camera.radius * (factor - 1));
+      }
       rig.orbit(-(next.x - lastCenter.x) * options.yawSensitivity,
         -(next.y - lastCenter.y) * options.pitchSensitivity);
       lastCenter = next;
+      lastSpan = nextSpan;
     } else if (touches.size === 1 && !cameraGesture) {
       const dx = event.clientX - origin.x, dy = event.clientY - origin.y;
       const deadZone = 14;
@@ -79,7 +96,8 @@ export function attachTouchControls(
     releaseCapture(event.pointerId);
     input.setTouchMovement(null);
     setLooking(touches.size === 2);
-    if (touches.size === 2) lastCenter = center();
+    if (touches.size === 2) beginCameraGesture();
+    else lastSpan = 0;
     // A remaining camera finger must not unexpectedly start walking.
     if (touches.size === 0) cameraGesture = false;
   };
