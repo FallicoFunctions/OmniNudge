@@ -106,6 +106,23 @@ export function selectPattern(phraseIndex: number): NamedLaserPattern {
   return LASER_PATTERNS[i];
 }
 
+export const LASER_PATTERN_TRANSITION_SECONDS = 0.8;
+
+/** Move between phrase designs rather than teleporting the entire beam field. */
+export function samplePhrasePattern(
+  phraseIndex: number, secondsSincePhrase: number,
+  emitterIndex: number, beamIndex: number, beamCount: number, phase: number, energy: number,
+): LaserOffset {
+  const next = selectPattern(phraseIndex).fn(emitterIndex, beamIndex, beamCount, phase, energy);
+  if (phraseIndex <= 0 || secondsSincePhrase >= LASER_PATTERN_TRANSITION_SECONDS) return next;
+  const previous = selectPattern(phraseIndex - 1).fn(emitterIndex, beamIndex, beamCount, phase, energy);
+  const t = Math.min(1, Math.max(0, secondsSincePhrase / LASER_PATTERN_TRANSITION_SECONDS));
+  const blend = t * t * (3 - 2 * t);
+  next.yaw = previous.yaw + (next.yaw - previous.yaw) * blend;
+  next.pitch = previous.pitch + (next.pitch - previous.pitch) * blend;
+  return next;
+}
+
 // Next phrase in the rotation (used when a musical phrase boundary fires).
 export function nextPhraseIndex(current: number): number {
   const n = LASER_PATTERNS.length;

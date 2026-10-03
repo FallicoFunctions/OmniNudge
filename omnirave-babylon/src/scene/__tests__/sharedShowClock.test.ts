@@ -2,7 +2,7 @@ import { Mesh, MeshBuilder, NullEngine, Scene } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createStageBeat, createTrackBeats, type StageBeat } from '../../media/trackBeats';
 import { beatsFile, type Hit } from '../../media/__tests__/beatsFile';
-import { inWindows, type ShowEventWindows } from '../../media/showTimeline';
+import { createShowTimeline, inWindows, type ShowEventWindows } from '../../media/showTimeline';
 import { createImmersiveAudioShow } from '../createImmersiveAudioShow';
 import { createCrownEffects } from '../createCrownEffects';
 import { createCascadeCourtLightFloor } from '../createCascadeCourtLightFloor';
@@ -150,6 +150,39 @@ const largestDifference = (a: ArrayLike<number>, b: ArrayLike<number>) => {
 
 describe('the shared show clock', () => {
   const SAMPLES = [225, 230, 235, 240];
+
+  it('moves the actual rendered beam directions continuously when a musical phrase changes design', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    MeshBuilder.CreatePlane('main-stage-hero-screen-panel-l', { size: 1 }, scene);
+    const beat = createStageBeat();
+    beat.energy = 1;
+    beat.timeline = createShowTimeline(Float64Array.from({ length: 100 }, (_, i) => .2 + i * .5),
+      new Float32Array(200).fill(1), .25, [], []);
+    let seconds = 0;
+    const lasers = createImmersiveAudioShow(scene, {
+      getFrequencyData: target => target.fill(200), getBeat: () => beat, getShowSeconds: () => seconds,
+    });
+    const matrices = () => Float32Array.from((scene.getMeshByName('immersive-laser-beam') as Mesh)._thinInstanceDataStorage.matrixData!);
+    lasers.update(1 / 30);
+    let previous = matrices();
+    const phrase = { index: 0, since: 0 };
+    let lastPhrase = 0, transitions = 0;
+    for (let frame = 1; frame <= 30 * 24; frame++) {
+      seconds = frame / 30;
+      beat.seconds = seconds;
+      const index = beat.timeline.phrase(seconds, 16, 0, 12, phrase).index;
+      if (index !== lastPhrase) { transitions++; lastPhrase = index; }
+      lasers.update(1 / 30);
+      const current = matrices();
+      // Before the fix, switching from a fan to shafts jumps ~1 radian.
+      expect(largestBeamAngle(previous, current)).toBeLessThan(.2);
+      previous = current;
+    }
+    expect(transitions).toBeGreaterThanOrEqual(2);
+    lasers.dispose();
+    scene.dispose();
+  });
 
   it('shows the same show to players who joined 40 s apart', async () => {
     const early = await player(160, 60, SAMPLES);

@@ -28,9 +28,8 @@ import type { StageEventStateInput, StageVisualizerMode } from './createStageVis
 import {
   LASER_PATTERNS,
   advancePhase,
-  nextPhraseIndex,
   organicDrift,
-  selectPattern,
+  samplePhrasePattern,
 } from './laserPatterns';
 import { RAVE_PALETTES, paletteCrossfade, resolvePaletteColor, PALETTE_JUMP_COOLDOWN_SECONDS } from './ravePalettes';
 import type { RaveColor } from './ravePalettes';
@@ -797,12 +796,12 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
         bassEventAccum += 1;
       }
       if (bassEventAccum >= (beatDriven ? KICKS_PER_PHRASE : 4) || phraseTimer >= (beatDriven ? 12 : 8)) {
-        phraseIndex = nextPhraseIndex(phraseIndex);
+        phraseIndex += 1;
         phraseTimer = 0;
         bassEventAccum = 0;
       }
     }
-    const patternFn = selectPattern(phraseIndex).fn;
+    const secondsSincePhrase = timeline ? phraseScratch.since : phraseTimer;
 
     // Phase advance: mids drive the sweep speed; idle/lead_in crawl.
     // Build-up progress: 0 at its start (or outside one), 1 at the drop.
@@ -858,7 +857,8 @@ export function createImmersiveAudioShow(scene: Scene, options: ImmersiveAudioSh
         const sx = em.length;
         for (let b = 0; b < BEAMS_PER_EMITTER; b++) {
           const g = e * BEAMS_PER_EMITTER + b;
-          const off = patternFn(e, b, BEAMS_PER_EMITTER, laserPhase, patternEnergy);
+          const off = samplePhrasePattern(phraseIndex, secondsSincePhrase,
+            e, b, BEAMS_PER_EMITTER, laserPhase, patternEnergy);
           // Base aim + pattern offset + low-amplitude organic drift + beat accent.
           const yaw =
             em.baseYaw +
