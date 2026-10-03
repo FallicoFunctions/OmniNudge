@@ -51,7 +51,7 @@ const MAX_BEAT_STEP_SECONDS = 0.5;
 // browser). Its position is then not what the player hears.
 const AUDIO_STALL_MS = 1500;
 // The inputs a browser accepts as the player's permission to restart audio.
-const RESUME_GESTURES = ['pointerdown', 'keydown', 'touchend'] as const;
+const RESUME_GESTURES = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
 
 export interface StagePlayerBackend {
   load(trackId: string, startSeconds: number): void;
@@ -257,7 +257,9 @@ function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
   }
 
   function resumeStoppedContext(): void {
-    if (playing && audioContext && (audioContext.state as string) !== 'running') startPlayback();
+    // A context can be running while Safari still rejected the element's
+    // play() on touch-down. The completed tap/click must retry that too.
+    if (playing && (element.paused === true || (audioContext && (audioContext.state as string) !== 'running'))) startPlayback();
   }
 
   function seekTarget(): number {

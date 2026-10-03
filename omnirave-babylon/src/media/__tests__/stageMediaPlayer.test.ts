@@ -687,7 +687,7 @@ describe('createStageMediaPlayer', () => {
       warnSpy.mockRestore();
     });
 
-    it('resumes a stopped AudioContext on a later gesture, and stops listening on dispose', () => {
+    it.each(['pointerdown', 'click', 'touchend', 'keydown'])('resumes a stopped AudioContext on %s, and stops listening on dispose', gesture => {
       const fakeAudio = {
         src: '', muted: false, preload: '', readyState: 4, currentTime: 0,
         load: vi.fn(),
@@ -714,12 +714,38 @@ describe('createStageMediaPlayer', () => {
 
       // The browser stops the context hours later (Safari says "interrupted").
       context.state = 'interrupted';
-      window.dispatchEvent(new Event('pointerdown'));
+      window.dispatchEvent(new Event(gesture));
       expect(context.resume).toHaveBeenCalledTimes(1);
 
       player.dispose();
-      window.dispatchEvent(new Event('pointerdown'));
+      window.dispatchEvent(new Event(gesture));
       expect(context.resume).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a blocked audio element on a completed tap even when its context is already running', () => {
+      const fakeAudio = {
+        src: '', muted: false, preload: '', readyState: 4, currentTime: 0, paused: true,
+        load: vi.fn(), play: vi.fn(() => Promise.resolve()), pause: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), removeAttribute: vi.fn(),
+      };
+      const context = {
+        state: 'running', baseLatency: 0, outputLatency: 0,
+        resume: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()), destination: {},
+        createMediaElementSource: () => ({ connect: vi.fn() }),
+        createAnalyser: () => ({ connect: vi.fn(), fftSize: 0, smoothingTimeConstant: 0 }),
+      };
+      vi.stubGlobal('Audio', constructible(() => fakeAudio));
+      vi.stubGlobal('AudioContext', constructible(() => context));
+      const player = createStageMediaPlayer();
+      player.unlock();
+      player.applyMedia(media());
+      const attempts = fakeAudio.play.mock.calls.length;
+      window.dispatchEvent(new Event('click'));
+      expect(fakeAudio.play).toHaveBeenCalledTimes(attempts + 1);
+      expect(context.resume).not.toHaveBeenCalled();
+      player.dispose();
+      window.dispatchEvent(new Event('click'));
+      expect(fakeAudio.play).toHaveBeenCalledTimes(attempts + 1);
     });
 
     it('resolves trackId to a served /audio/<id>.mp3 URL and seeks after metadata loads', () => {

@@ -356,8 +356,10 @@ export async function createRuntime(host: HTMLElement) {
   let fireworksPreviewTimer: number | undefined;
   let fireworksAudioUnlocked = false;
   let soundHint: import('../ui/createSoundHint').SoundHint | undefined;
-  // Set by the first click, tap or key press; after it the hint never returns.
-  let audioGestureSeen = false;
+  let activateStageSound: (() => void) | undefined;
+  // The first touch can still be rejected by Safari. Keep offering a tap
+  // and listening for gestures until playback is actually confirmed.
+  let stageSoundStarted = false;
   let silentHudTicks = 0;
   let stopAudioGestureListeners: (() => void) | undefined;
   // Player-facing "Now Playing" / venue block. Never gated behind ?debug=1, and
@@ -1012,17 +1014,14 @@ export async function createRuntime(host: HTMLElement) {
       // player's first click, tap or key press anywhere (walking counts).
       const activeStageMediaPlayer = stageMediaPlayer;
       activeStageMediaPlayer.unlock();
-      const gestureEvents = ['pointerdown', 'keydown', 'touchend'] as const;
+      const gestureEvents = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
       const unlockAudioOnGesture = () => {
-        audioGestureSeen = true;
         markBootPhase('gesture');
-        stopAudioGestureListeners?.();
         activeStageMediaPlayer.unlock();
         fireworksAudioUnlocked = true;
         showControls?.unlockAudio();
-        soundHint?.dispose();
-        soundHint = undefined;
       };
+      activateStageSound = unlockAudioOnGesture;
       stopAudioGestureListeners = () => {
         for (const type of gestureEvents) {
           window.removeEventListener(type, unlockAudioOnGesture, true);
@@ -1072,13 +1071,15 @@ export async function createRuntime(host: HTMLElement) {
         // Ask for a gesture only when the browser actually held the track
         // back: a track is due but has stayed silent for two ticks. Where the
         // Play click carried over (Chrome, Firefox) the note never shows.
-        if (!audioGestureSeen && hudMediaPlayer && activeZoneMedia) {
+        if (!stageSoundStarted && hudMediaPlayer && activeZoneMedia) {
           if (hudMediaPlayer.isAudible()) {
+            stageSoundStarted = true;
+            stopAudioGestureListeners?.();
             silentHudTicks = 0;
             soundHint?.dispose();
             soundHint = undefined;
           } else if (++silentHudTicks >= 2 && !soundHint) {
-            soundHint = createSoundHint(host);
+            soundHint = createSoundHint(host, { onActivate: activateStageSound });
           }
         }
         const counts = activePlayers ? resolvePlayerCounts(activePlayers, activeZoneId) : null;

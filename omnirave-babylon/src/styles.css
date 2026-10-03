@@ -550,8 +550,13 @@ body,
   background: rgba(4, 12, 23, 0.72);
   font-size: 0.82rem;
   font-weight: 600;
-  pointer-events: none;
+  pointer-events: auto;
   transform: translateX(-50%);
+}
+
+.babylon-runtime-host--mobile .sound-hint {
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .runtime-loading-overlay {
