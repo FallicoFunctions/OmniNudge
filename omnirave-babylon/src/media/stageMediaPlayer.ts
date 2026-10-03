@@ -246,10 +246,12 @@ function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
       node.connect(context.destination);
       audioContext = context;
       analyser = node;
-      // The runtime stops its own gesture listeners after the first gesture. A
-      // browser can stop the context hours later, and only a gesture restarts
-      // it, so this backend keeps listening for as long as it lives.
+      // The runtime stops its own gesture listeners after the first gesture.
+      // Keep listening here for later interruptions that require another tap.
       for (const type of RESUME_GESTURES) window.addEventListener(type, resumeStoppedContext, true);
+      context.addEventListener?.('statechange', resumeVisibleContext);
+      document.addEventListener('visibilitychange', resumeVisibleContext);
+      window.addEventListener('pageshow', resumeVisibleContext);
     } catch {
       // No Web Audio (or the element was already tapped): the visualizer just
       // reads zeros. Background music is never worth taking down the runtime.
@@ -262,6 +264,13 @@ function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
     // A context can be running while Safari still rejected the element's
     // play() on touch-down. The completed tap/click must retry that too.
     if (playing && (element.paused === true || (audioContext && (audioContext.state as string) !== 'running'))) startPlayback();
+  }
+
+  function resumeVisibleContext(): void {
+    // An interruption can happen without a tap or screen lock. Retry once
+    // when Safari reports it, or when the player returns to the page.
+    // Intentional pauses remain paused; rejected autoplay still waits for a tap.
+    if (document.visibilityState !== 'hidden' && audioContext && (audioContext.state as string) !== 'running') resumeStoppedContext();
   }
 
   function seekTarget(): number {
@@ -388,6 +397,9 @@ function createAudioBackend(now: () => number = Date.now): StagePlayerBackend {
       element.removeAttribute('src');
       analyser = null;
       for (const type of RESUME_GESTURES) window.removeEventListener(type, resumeStoppedContext, true);
+      audioContext?.removeEventListener?.('statechange', resumeVisibleContext);
+      document.removeEventListener('visibilitychange', resumeVisibleContext);
+      window.removeEventListener('pageshow', resumeVisibleContext);
       if (audioContext) {
         const closeResult = audioContext.close();
         if (closeResult && typeof closeResult.catch === 'function') {

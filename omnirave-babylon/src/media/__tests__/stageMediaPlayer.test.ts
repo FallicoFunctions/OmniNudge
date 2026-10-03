@@ -808,6 +808,49 @@ describe('createStageMediaPlayer', () => {
       expect(context.resume).toHaveBeenCalledTimes(1);
     });
 
+    it.each(['statechange', 'visibilitychange', 'pageshow'])(
+      'resumes an interrupted context on %s, respects pause and removes recovery listeners on dispose', event => {
+        vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+        const audio = { src: '', muted: false, preload: '', readyState: 4, currentTime: 0, paused: false,
+          load: vi.fn(), play: vi.fn(() => Promise.resolve()), pause: vi.fn(),
+          addEventListener: vi.fn(), removeEventListener: vi.fn(), removeAttribute: vi.fn() };
+        const context = Object.assign(new EventTarget(), { state: 'running', baseLatency: 0, outputLatency: 0,
+          resume: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()), destination: {},
+          createMediaElementSource: () => ({ connect: vi.fn() }),
+          createAnalyser: () => ({ connect: vi.fn(), fftSize: 0, smoothingTimeConstant: 0 }) });
+        vi.stubGlobal('Audio', constructible(() => audio));
+        vi.stubGlobal('AudioContext', constructible(() => context));
+        const player = createStageMediaPlayer(); player.unlock(); player.applyMedia(media());
+        const target = event === 'statechange' ? context : event === 'pageshow' ? window : document;
+        // Returning to the tab must not undo a pause from browser controls.
+        const attempts = audio.play.mock.calls.length;
+        audio.paused = true; target.dispatchEvent(new Event(event));
+        expect(audio.play).toHaveBeenCalledTimes(attempts); audio.paused = false;
+        context.state = 'interrupted'; target.dispatchEvent(new Event(event));
+        expect(context.resume).toHaveBeenCalledTimes(1);
+        player.pause(); target.dispatchEvent(new Event(event));
+        expect(context.resume).toHaveBeenCalledTimes(1);
+        player.dispose(); target.dispatchEvent(new Event(event));
+        expect(context.resume).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('does not restart interrupted audio while the page is hidden', () => {
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      const audio = { src: '', muted: false, preload: '', readyState: 4, currentTime: 0, paused: false,
+        load: vi.fn(), play: vi.fn(() => Promise.resolve()), pause: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), removeAttribute: vi.fn() };
+      const context = Object.assign(new EventTarget(), { state: 'running',
+        resume: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()), destination: {},
+        createMediaElementSource: () => ({ connect: vi.fn() }),
+        createAnalyser: () => ({ connect: vi.fn(), fftSize: 0, smoothingTimeConstant: 0 }) });
+      vi.stubGlobal('Audio', constructible(() => audio)); vi.stubGlobal('AudioContext', constructible(() => context));
+      const player = createStageMediaPlayer(); player.unlock(); player.applyMedia(media());
+      context.state = 'interrupted'; context.dispatchEvent(new Event('statechange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(context.resume).not.toHaveBeenCalled(); player.dispose();
+    });
+
     it('retries a blocked audio element on a completed tap even when its context is already running', () => {
       const fakeAudio = {
         src: '', muted: false, preload: '', readyState: 4, currentTime: 0, paused: true,
