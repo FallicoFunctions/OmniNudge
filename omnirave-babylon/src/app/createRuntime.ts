@@ -44,6 +44,7 @@ import { normalizeLaunchAvatarLoadout, parseCompleteAvatarLoadout, readGuestChar
 import { createInitialWorldSpawn } from '../network/initialWorldSpawn';
 import { eventWindows, readEventSchedule, scheduledEventState, type EventSchedule } from '../media/eventSchedule';
 import type { ShowEventWindows } from '../media/showTimeline';
+import { awaitWebGpuContextRestore } from './awaitWebGpuContextRestore';
 import { createInitialWorldAppearance } from '../network/initialWorldAppearance';
 import { createAvatarProfileSaver } from '../network/avatarProfileSave';
 import type { ReviewCheckpoint } from '../scene/reviewRouteData';
@@ -509,6 +510,7 @@ export async function createRuntime(host: HTMLElement) {
       backbufferAntialias: perfFlags.noPost || localDebugParams?.get('backbufferMsaa') === '1',
     });
     const activeEngine = engine;
+    awaitWebGpuContextRestore(activeEngine);
     // Render on every browser animation frame, including 120/144/240 Hz.
     activeEngine.maxFPS = undefined;
     markBootPhase('engine', activeEngine.isWebGPU ? 'webgpu' : 'webgl');
