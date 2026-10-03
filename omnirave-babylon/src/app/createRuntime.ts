@@ -511,10 +511,9 @@ export async function createRuntime(host: HTMLElement) {
     const mobileGraphics = window.matchMedia?.(MOBILE_HUD_QUERY).matches ?? false;
     const graphicsDevice = { mobile: mobileGraphics, pixelRatio: window.devicePixelRatio || 1 };
     const graphicsConfig = resolveAdaptiveResolutionConfig(displayRefresh.targetFps, graphicsDevice);
-    // Begin phones at CSS resolution rather than making them compile and
-    // render the venue at 3x Retina density. Auto earns extra detail only
-    // after sustaining the browser's refresh cadence.
-    const initialScaling = mobileGraphics ? 1
+    // Phones start at native density. Auto can trade some Retina detail for
+    // FPS, but must never upscale a CSS-sized buffer across an iPhone screen.
+    const initialScaling = mobileGraphics ? graphicsConfig.sharpestLevel
       : Math.max(graphicsConfig.sharpestLevel, activeEngine.getHardwareScalingLevel());
     // Auto/manual graphics owns CSS render density. A DPR change on resize
     // must not silently override it behind the controller's back.

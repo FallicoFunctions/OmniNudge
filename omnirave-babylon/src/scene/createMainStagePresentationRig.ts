@@ -38,10 +38,12 @@ const ENVIRONMENT_TEXTURE_SIZE = 16;
 
 import type { PerfFlags } from '../app/perfFlags';
 import { combineVenueFinishingPasses } from './combineVenueFinishingPasses';
+import { MOBILE_HUD_QUERY } from '../ui/createMobileHudControls';
 
 const PERF_DEFAULTS: PerfFlags = { noShadows: false, noPost: false, minimalLights: false, webgl: false, debug: false, capture: false, worldUrl: null, worldToken: null, accountMode: false };
 
 export function createMainStagePresentationRig(scene: Scene, camera: Camera, perfFlags: PerfFlags = PERF_DEFAULTS) {
+  const mobile = typeof window !== 'undefined' && (window.matchMedia?.(MOBILE_HUD_QUERY).matches ?? false);
   const environmentTexture = createEnvironmentTexture(scene);
   environmentTexture.name = 'main-stage-night-reflection-env';
   environmentTexture.level = 0.9;
@@ -65,11 +67,20 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   // Bloom kernel is in pixels: normalise to render height so halos keep
   // the same angular size on any viewport instead of shrinking on large
   // windows (reviews from bigger tabs kept reporting 'no bloom').
-  pipeline.bloomKernel = Math.max(48, Math.round((84 * scene.getEngine().getRenderHeight()) / 825));
+  const resizeBloom = () => {
+    pipeline.bloomKernel = Math.max(48, Math.round((84 * scene.getEngine().getRenderHeight()) / 825));
+  };
+  resizeBloom();
+  // Auto resolution and phone rotation must preserve the same halo width.
+  const resizeObserver = scene.getEngine().onResizeObservable.add(resizeBloom);
+  scene.onDisposeObservable.addOnce(() => scene.getEngine().onResizeObservable.remove(resizeObserver));
   pipeline.bloomScale = 0.5;
   pipeline.depthOfFieldEnabled = false;
   pipeline.chromaticAberrationEnabled = false;
-  pipeline.sharpenEnabled = true;
+  // Native Retina pixels plus FXAA provide clean edges. Extra sharpening
+  // exaggerates stair-stepped beams; grain adds noise and another full-screen
+  // pass. Spend the mobile GPU budget on scene pixels instead.
+  pipeline.sharpenEnabled = !mobile;
   // High-DPI rendering already suppresses most edge aliasing, so 4x MSAA on
   // top of it is largely redundant and expensive; FXAA handles the remainder.
   pipeline.samples = 1;
@@ -78,7 +89,7 @@ export function createMainStagePresentationRig(scene: Scene, camera: Camera, per
   // A faint, static film grain breaks up flat gradients; the previous
   // intensity (9, animated) overlaid shimmering noise that read as TV static
   // across every surface once the image rendered at full crisp density.
-  pipeline.grainEnabled = true;
+  pipeline.grainEnabled = !mobile;
   pipeline.grain.intensity = 1.5;
   pipeline.grain.animated = false;
   const localPerformanceParams = perfFlags.debug && typeof window !== 'undefined'

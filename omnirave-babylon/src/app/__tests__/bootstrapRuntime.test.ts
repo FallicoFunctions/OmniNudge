@@ -383,7 +383,7 @@ describe('createRuntime', () => {
 
     expect(engine.maxFPS).toBeUndefined();
     expect(engine.adaptToDeviceRatio).toBe(false);
-    if (mobile) expect(setHardwareScalingLevel).toHaveBeenCalledWith(1);
+    if (mobile) expect(setHardwareScalingLevel).toHaveBeenCalledWith(1 / 3);
     setHardwareScalingLevel.mockClear();
     expect(renderFrame).toBeTypeOf('function');
     // Two slow frames separated by the sustained-low window suffice; a
@@ -398,7 +398,10 @@ describe('createRuntime', () => {
 
     expect(frameEvents.slice(0, 2)).toEqual(['scale', 'render']);
     expect(setHardwareScalingLevel).toHaveBeenCalledTimes(1);
-    if (mobile) expect(scalingLevel).toBeGreaterThan(1);
+    if (mobile) {
+      expect(scalingLevel).toBeGreaterThan(1 / 3);
+      expect(scalingLevel).toBeLessThanOrEqual(0.5);
+    }
     if (mobile) {
       // A manual pin wins even during slow frames, and resize cannot reset
       // its density. Re-enabling Auto resumes adaptation from that pin.
@@ -408,7 +411,7 @@ describe('createRuntime', () => {
       detail.value = '10';
       detail.dispatchEvent(new Event('input', { bubbles: true }));
       renderFrame?.();
-      expect(scalingLevel).toBe(0.5);
+      expect(scalingLevel).toBe(1 / 3);
       setHardwareScalingLevel.mockClear();
       window.dispatchEvent(new Event('resize'));
       clock = 10_000;
@@ -421,7 +424,8 @@ describe('createRuntime', () => {
       clock = 20_750;
       renderFrame?.();
       renderFrame?.();
-      expect(scalingLevel).toBeGreaterThan(0.5);
+      expect(scalingLevel).toBeGreaterThan(1 / 3);
+      expect(scalingLevel).toBeLessThanOrEqual(0.5);
     }
     runtime.dispose();
     expect(disposeDisplayRefresh).toHaveBeenCalledTimes(1);

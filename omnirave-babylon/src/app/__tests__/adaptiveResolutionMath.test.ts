@@ -27,15 +27,23 @@ describe('display-aware adaptive resolution', () => {
     expect(resolveAdaptiveResolutionConfig(target)).toEqual(cfg);
   });
 
-  it('lets a struggling Retina phone shed pixels below CSS resolution and recover detail when it can', () => {
+  it('keeps a struggling Retina phone at 2x or sharper and recovers native 3x detail', () => {
     const mobile = resolveAdaptiveResolutionConfig(120, { mobile: true, pixelRatio: 3 });
-    let state = createAdaptiveResolutionState(mobile, 1);
+    let state = createAdaptiveResolutionState(mobile);
     for (let t = 0; t <= 10_000; t += 250) state = stepAdaptiveResolution(state, mobile, 80, t);
-    expect(state.level).toBeCloseTo(1 / 0.75);
-    for (let t = 10_250; t <= 100_000; t += 250) state = stepAdaptiveResolution(state, mobile, 120, t);
     expect(state.level).toBeCloseTo(0.5);
-    expect(resolveManualHardwareScalingLevel(1, mobile)).toBeCloseTo(1 / 0.75);
-    expect(resolveManualHardwareScalingLevel(10, mobile)).toBe(0.5);
+    for (let t = 10_250; t <= 100_000; t += 250) state = stepAdaptiveResolution(state, mobile, 120, t);
+    expect(state.level).toBeCloseTo(1 / 3);
+    expect(resolveManualHardwareScalingLevel(1, mobile)).toBe(0.5);
+    expect(resolveManualHardwareScalingLevel(10, mobile)).toBeCloseTo(1 / 3);
+  });
+
+  it.each([1, 2, 3, 4])('starts a %sx mobile display at native density and never upscales below its quality floor', ratio => {
+    const mobile = resolveAdaptiveResolutionConfig(60, { mobile: true, pixelRatio: ratio });
+    let state = createAdaptiveResolutionState(mobile);
+    expect(1 / state.level).toBe(ratio);
+    for (let t = 0; t < 30_000; t += 250) state = stepAdaptiveResolution(state, mobile, 15, t);
+    expect(1 / state.level).toBeCloseTo(Math.min(2, ratio));
   });
 
   it('does not oversample a mobile display that has no Retina pixels', () => {

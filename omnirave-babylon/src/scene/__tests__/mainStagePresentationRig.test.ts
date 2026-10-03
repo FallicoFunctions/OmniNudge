@@ -7,7 +7,7 @@ import {
   ShaderStore,
   Vector3,
 } from '@babylonjs/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createMainStagePresentationRig } from '../createMainStagePresentationRig';
 
@@ -16,10 +16,33 @@ describe('createMainStagePresentationRig', () => {
   let scene: Scene | undefined;
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     scene?.dispose();
     engine?.dispose();
     scene = undefined;
     engine = undefined;
+  });
+
+  it('spends the mobile pixel budget on clean scene detail while retaining bloom and edge antialiasing', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    engine = new NullEngine();
+    scene = new Scene(engine);
+    const camera = new ArcRotateCamera('mobile-camera', 0, 1, 12, Vector3.Zero(), scene);
+    const rig = createMainStagePresentationRig(scene, camera);
+    expect(rig.pipeline.grainEnabled).toBe(false);
+    expect(rig.pipeline.sharpenEnabled).toBe(false);
+    expect(rig.pipeline.fxaaEnabled).toBe(true);
+    expect(rig.pipeline.bloomEnabled).toBe(true);
+    expect(rig.pipeline.bloomThreshold).toBe(0.5);
+    expect(rig.pipeline.bloomWeight).toBe(0.7);
+    const height = vi.spyOn(engine, 'getRenderHeight').mockReturnValue(2532);
+    engine.onResizeObservable.notifyObservers(engine);
+    const nativeKernel = rig.pipeline.bloomKernel;
+    height.mockReturnValue(1688);
+    engine.onResizeObservable.notifyObservers(engine);
+    expect(rig.pipeline.bloomKernel).toBe(Math.max(48, Math.round(84 * 1688 / 825)));
+    expect(rig.pipeline.bloomKernel / nativeKernel).toBeCloseTo(2 / 3, 2);
+    height.mockRestore();
   });
 
   it('adds venue-scoped environment reflections and bounded post-processing', () => {

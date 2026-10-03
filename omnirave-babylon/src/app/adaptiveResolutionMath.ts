@@ -16,8 +16,8 @@ export interface AdaptiveResolutionConfig {
   raiseAfterMs: number;
 }
 
-// Desktop bounds. Mobile can spend spare GPU time on Retina detail and
-// shed more pixels when CSS resolution is still too expensive.
+// Desktop bounds. Mobile keeps a Retina quality floor: upscaling CSS-sized
+// buffers on 3x iPhone screens visibly pixelates the entire scene.
 export const ADAPTIVE_RESOLUTION_DEFAULTS: AdaptiveResolutionConfig = {
   sharpestLevel: 1 / 1.5,
   coarsestLevel: 1.0,
@@ -35,12 +35,14 @@ export function resolveAdaptiveResolutionConfig(
   const target = Number.isFinite(targetFps) && targetFps > 0 ? Math.max(24, targetFps) : 60;
   const pixelRatio = device && Number.isFinite(device.pixelRatio) && device.pixelRatio > 0
     ? device.pixelRatio : 1;
+  const mobileSharpest = 1 / Math.max(1, pixelRatio);
+  const mobileCoarsest = 1 / Math.min(2, Math.max(1, pixelRatio));
   return {
     ...ADAPTIVE_RESOLUTION_DEFAULTS,
     ...(device?.mobile ? {
-      sharpestLevel: 1 / Math.min(2, Math.max(1, pixelRatio)),
-      coarsestLevel: 1 / 0.75,
-      stepSize: 1 / 9,
+      sharpestLevel: mobileSharpest,
+      coarsestLevel: mobileCoarsest,
+      stepSize: (mobileCoarsest - mobileSharpest) / 3,
     } : {}),
     lowerFpsThreshold: target * 0.95,
     raiseFpsThreshold: target * 0.99,
