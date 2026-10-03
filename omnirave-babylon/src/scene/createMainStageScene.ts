@@ -7,6 +7,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { cacheWebGpuMaterialBindings } from './cacheWebGpuMaterialBindings';
 import { cacheStaticPbrBindings } from './cacheStaticPbrBindings';
 import { cacheWebGpuLightBindings } from './cacheWebGpuLightBindings';
+import { cacheWebKitInstancedDraws } from './cacheWebKitInstancedDraws';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 
 import { createCompletionCelebration } from '../game/createCompletionCelebration';
@@ -196,6 +197,10 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
   if (optimized('materialBindingCache')) cacheWebGpuMaterialBindings(scene);
   if (optimized('staticPbrBindings')) cacheStaticPbrBindings(scene);
   if (optimized('lightBindingCache')) cacheWebGpuLightBindings(scene);
+  if (optimized('cachedDirectInstances')) {
+    // Local validation can exercise the WebKit workaround on Chromium too.
+    cacheWebKitInstancedDraws(scene, localPerformanceParams.get('cachedDirectInstances') === '1' ? true : undefined);
+  }
 
   if (engine.isWebGPU && optimized('checkMatrixValues')) engine._features.uniformBufferHardCheckMatrix = true;
 
