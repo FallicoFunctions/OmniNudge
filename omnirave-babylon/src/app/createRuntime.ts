@@ -1128,6 +1128,8 @@ export async function createRuntime(host: HTMLElement) {
     // Render-scale state. Declared here (ahead of the render loop) because the
     // settings popup's Graphics controls write to it from click handlers.
     let perfFrameCounter = 0;
+    let lastPerfReadoutAt = Number.NEGATIVE_INFINITY;
+    let debugFrames = 0, debugRenderMs = 0, debugUpdateMs = 0, debugDraws = 0;
     let lastGraphicsSampleAt = Number.NEGATIVE_INFINITY;
     let adaptiveState = createAdaptiveResolutionState(
       graphicsConfig,
@@ -1692,7 +1694,7 @@ export async function createRuntime(host: HTMLElement) {
         activeEngine.setHardwareScalingLevel(pendingHardwareScalingLevel);
         pendingHardwareScalingLevel = undefined;
       }
-      const measuringFrame = venuePerformance?.isRunning();
+      const measuringFrame = venuePerformance?.isRunning() || !!perfOverlay;
       const renderStart = measuringFrame ? performance.now() : 0;
       activeShowControls.update();
       const showControlEnd = measuringFrame ? performance.now() : 0;
@@ -1800,6 +1802,12 @@ export async function createRuntime(host: HTMLElement) {
       }
       perfFrameCounter += 1;
       const graphicsNow = performance.now();
+      if (perfOverlay) {
+        debugFrames++;
+        debugRenderMs += renderEnd - showControlEnd;
+        debugUpdateMs += showControlEnd - renderStart + graphicsNow - renderEnd;
+        debugDraws += activeEngine._drawCalls.current;
+      }
       // Time-based sampling stays responsive at low FPS; counting 30 frames
       // made a struggling phone wait several seconds before each decision.
       if (graphicsAutoEnabled && !venuePerformance?.isRunning()
@@ -1813,7 +1821,8 @@ export async function createRuntime(host: HTMLElement) {
         adaptiveState = createAdaptiveResolutionState(graphicsConfig, adaptiveState.level);
         lastGraphicsSampleAt = Number.NEGATIVE_INFINITY;
       }
-      if (perfFrameCounter % 30 === 0) {
+      if (perfFrameCounter % 30 === 0 || (perfOverlay && graphicsNow - lastPerfReadoutAt >= 500)) {
+        lastPerfReadoutAt = graphicsNow;
         const fps = activeEngine.getFps();
         if (remoteAvatarReadout && remotePlayerRigs) {
           const stats = remotePlayerRigs.stats();
@@ -1827,7 +1836,12 @@ export async function createRuntime(host: HTMLElement) {
           const readyTextures = scene.textures.filter((texture) => texture.isReady()).length;
           // Report the level actually in force - under a manual Graphics pin
           // the adaptive controller's own level is not the truth.
-          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, activeEngine.getHardwareScalingLevel(), displayRefresh?.targetFps);
+          updatePerfOverlay(perfOverlay, fps, fps > 0 ? 1000 / fps : 0, activeFx, shadowCasters, readyTextures, activeEngine.getHardwareScalingLevel(), displayRefresh?.targetFps, {
+            renderer: activeEngine.isWebGPU ? 'WebGPU' : 'WebGL',
+            renderMs: debugRenderMs / debugFrames, updateMs: debugUpdateMs / debugFrames,
+            draws: debugDraws / debugFrames,
+          });
+          debugFrames = debugRenderMs = debugUpdateMs = debugDraws = 0;
         }
       }
     });
