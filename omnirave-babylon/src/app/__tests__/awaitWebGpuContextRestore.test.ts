@@ -122,3 +122,26 @@ it('serializes a second device loss while replacement initialization is still pe
   expect(h.engine._rebuildGraphicsResources).toHaveBeenCalledOnce();
   expect(h.engine._depthCullingState).toEqual({ depthTest: false, depthFunc: 518, depthMask: false });
 });
+
+it.each(['initialization', 'resource rebuild'])('preserves render state after failed %s before a queued retry', async stage => {
+  const h = harness(), failure = vi.fn(), error = new Error('partial recovery failed');
+  const resetState = () => {
+    h.engine._depthCullingState = { depthTest: true, depthFunc: 515, depthMask: true };
+    h.engine._stencilState.stencilTest = false;
+  };
+  const second = vi.fn(resetState);
+  const fail = () => {
+    resetState();
+    h.engine._restoreEngineAfterContextLost(second);
+    throw error;
+  };
+  awaitWebGpuContextRestore(h.typed, failure);
+  if (stage === 'resource rebuild') h.engine._rebuildGraphicsResources.mockImplementationOnce(fail);
+  h.engine._restoreEngineAfterContextLost(stage === 'initialization' ? fail : () => {});
+  await flush(); await flush();
+  expect(failure).toHaveBeenCalledWith(error);
+  expect(second).toHaveBeenCalledOnce();
+  expect(h.engine._flagContextRestored).toHaveBeenCalledTimes(1);
+  expect(h.engine._depthCullingState).toEqual({ depthTest: false, depthFunc: 518, depthMask: false });
+  expect(h.engine._stencilState.stencilTest).toBe(true);
+});

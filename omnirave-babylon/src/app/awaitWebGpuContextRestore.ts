@@ -112,7 +112,14 @@ export function awaitWebGpuContextRestore(
       this._rebuildGraphicsResources();
       restoreState();
       if (!this.isDisposed) this._flagContextRestored();
-    })().catch(error => { if (!this.isDisposed) onFailure(error); }).finally(() => {
+    })().catch(error => {
+      if (!this.isDisposed) {
+        // Initialization and resource rebuilding can reset render state before
+        // throwing. Preserve the pre-loss settings for a queued or later retry.
+        restoreState();
+        onFailure(error);
+      }
+    }).finally(() => {
       recovering = false;
       const next = queued;
       queued = undefined;
