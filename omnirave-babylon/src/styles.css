@@ -843,8 +843,27 @@ body,
   max-width: calc(100% - 48px);
   font-size: 12px;
   line-height: 1.5;
+  white-space: pre-line;
   border-radius: 4px;
   background: rgba(5, 7, 17, 0.72);
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .babylon-runtime-host--mobile-diagnostics > .review-hud,
+  .babylon-runtime-host--mobile-diagnostics > .debug-panel,
+  .babylon-runtime-host--mobile-diagnostics > .stage-audio-dev-controls {
+    display: none;
+  }
+
+  .babylon-runtime-host--mobile-diagnostics > .perf-overlay {
+    left: 0;
+    right: auto;
+    top: 0;
+    bottom: auto;
+    max-width: calc(100% - 48px);
+    padding: 4px 6px;
+    font-size: 11px;
+  }
 }
 
 /* Player-facing venue block (design sec 9.4): bottom-right, above the dev

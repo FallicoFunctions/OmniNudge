@@ -18,10 +18,10 @@ export function updatePerfOverlay(
   readyTextures: number,
   renderScaleLevel?: number,
   targetFps?: number,
-  diagnostics?: { renderer: string; renderMs: number; updateMs: number; draws: number },
+  diagnostics?: { renderer: string; renderMs: number; updateMs: number; draws: number; submitMs: number },
 ) {
   const res = renderScaleLevel === undefined ? '' : ` | RES: ${(1 / renderScaleLevel).toFixed(2)}x`;
   const target = targetFps === undefined ? '' : ` | Target: ${Math.round(targetFps)}`;
-  const detail = diagnostics ? ` | ${diagnostics.renderer} | CPU render: ${diagnostics.renderMs.toFixed(1)} ms | Updates: ${diagnostics.updateMs.toFixed(1)} ms | Draws: ${Math.round(diagnostics.draws)}` : '';
+  const detail = diagnostics ? `\n${diagnostics.renderer} | CPU render: ${diagnostics.renderMs.toFixed(1)} ms | Updates: ${diagnostics.updateMs.toFixed(1)} ms | Submit: ${diagnostics.submitMs.toFixed(1)} ms | Draws: ${Math.round(diagnostics.draws)}` : '';
   panel.textContent = `FPS: ${Math.round(fps)}${target} | Frame: ${frameMs.toFixed(1)} ms | FX: ${activePostProcesses} | SH: ${shadowCasters} | TX: ${readyTextures}${res}${detail}`;
 }

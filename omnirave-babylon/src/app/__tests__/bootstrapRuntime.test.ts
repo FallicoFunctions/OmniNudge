@@ -155,6 +155,7 @@ describe('createRuntime', () => {
     const webglEngine = {
       dispose: vi.fn(),
       _drawCalls: { current: 123 },
+      onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
       getFps: vi.fn(() => 60),
       getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -218,7 +219,8 @@ describe('createRuntime', () => {
     const WebGPUEngineMock = Object.assign(constructible(() => ({ dispose: vi.fn(), initAsync: vi.fn(async () => {}) })),
       { IsSupportedAsync: Promise.resolve(true) });
     const webglEngine = {
-      dispose: vi.fn(), getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
+      dispose: vi.fn(), onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
       onDisposeObservable: { addOnce: vi.fn() }, resize: vi.fn(), runRenderLoop: vi.fn(), setHardwareScalingLevel: vi.fn(),
     };
     const EngineMock = constructible(() => webglEngine);
@@ -242,6 +244,7 @@ describe('createRuntime', () => {
     const engine = {
       dispose: engineDispose,
       _drawCalls: { current: 123 },
+      onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
       getFps: vi.fn(() => 60),
       getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -297,6 +300,8 @@ describe('createRuntime', () => {
   it.each([
     { search: '/', antialias: false, timestamps: false, supported: true },
     { search: '/?perf=nopost', antialias: true, timestamps: false, supported: true },
+    { search: '/?debug=1&gpuBundles=0', antialias: false, timestamps: false, supported: true },
+    { search: '/?gpuBundles=0', antialias: false, timestamps: false, supported: true },
     { search: '/?debug=1&backbufferMsaa=1', antialias: true, timestamps: false, supported: true },
     { search: '/?backbufferMsaa=1&gpuProfile=1', antialias: false, timestamps: false, supported: true },
     { search: '/?debug=1&gpuProfile=1', antialias: false, timestamps: true, supported: true },
@@ -305,8 +310,10 @@ describe('createRuntime', () => {
     window.history.replaceState(null, '', test.search);
     const engine = {
       dispose: vi.fn(), initAsync: vi.fn(async () => {}), enableGPUTimingMeasurements: false,
+      compatibilityMode: false,
       getCaps: () => ({ timerQuery: test.supported }),
       _drawCalls: { current: 123 },
+      onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
       getFps: () => 60, getDeltaTime: () => 16, getHardwareScalingLevel: () => 1,
       onDisposeObservable: { addOnce: vi.fn() }, resize: vi.fn(), runRenderLoop: vi.fn(), setHardwareScalingLevel: vi.fn(),
     };
@@ -326,6 +333,7 @@ describe('createRuntime', () => {
       ...(test.timestamps ? { deviceDescriptor: { requiredFeatures: ['timestamp-query'] } } : {}),
     });
     expect(createScene).toHaveBeenCalledTimes(1);
+    expect(engine.compatibilityMode).toBe(test.search.includes('debug=1&gpuBundles=0'));
     runtime.dispose();
   });
 
@@ -348,6 +356,7 @@ describe('createRuntime', () => {
       maxFPS: 60 as number | undefined,
       adaptToDeviceRatio: true,
       _drawCalls: { current: 123 },
+      onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
       getFps: vi.fn(() => fps),
       getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => scalingLevel),
@@ -443,6 +452,7 @@ describe('createRuntime', () => {
     const engine = {
       dispose: engineDispose,
       _drawCalls: { current: 123 },
+      onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
       getFps: vi.fn(() => 60),
       getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
@@ -490,7 +500,8 @@ describe('createRuntime', () => {
       Engine: constructible(() => ({
         dispose: engineDispose,
         _drawCalls: { current: 123 },
-        getFps: vi.fn(() => 60),
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -531,7 +542,8 @@ describe('createRuntime', () => {
       hit: true,
       pickedMesh: { name: 'main-stage-wing-screen-right' },
     }));
-    const sceneRender = vi.fn();
+    const debugDrawCounter = { current: 1000 };
+    const sceneRender = vi.fn(() => { debugDrawCounter.current += 123; });
     const playerPositionSet = vi.fn();
     const applyCheckpointView = vi.fn();
     const routeProgressReset = vi.fn();
@@ -645,8 +657,9 @@ describe('createRuntime', () => {
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
         dispose: engineDispose,
-        _drawCalls: { current: 123 },
-        getFps: vi.fn(() => 60),
+        _drawCalls: debugDrawCounter,
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -762,7 +775,8 @@ describe('createRuntime', () => {
       Engine: constructible(() => ({
         dispose: engineDispose,
         _drawCalls: { current: 123 },
-        getFps: vi.fn(() => 60),
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -832,7 +846,8 @@ describe('createRuntime', () => {
       Engine: constructible(() => ({
         dispose: vi.fn(),
         _drawCalls: { current: 123 },
-        getFps: vi.fn(() => 60),
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
         getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },
@@ -878,6 +893,7 @@ describe('createRuntime', () => {
     const moduleRequested = vi.fn();
     vi.doMock('@babylonjs/core/Engines/engine', () => ({
       Engine: constructible(() => ({
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
         dispose, getHardwareScalingLevel: () => 1, setHardwareScalingLevel: vi.fn(),
       })),
     }));
@@ -923,7 +939,8 @@ describe('createRuntime', () => {
       Engine: constructible(() => ({
         dispose: engineDispose,
         _drawCalls: { current: 123 },
-        getFps: vi.fn(() => 60),
+        onEndFrameObservable: { add: vi.fn(), remove: vi.fn() },
+      getFps: vi.fn(() => 60),
         getDeltaTime: vi.fn(() => 16),
       getHardwareScalingLevel: vi.fn(() => 1),
         onDisposeObservable: { addOnce: vi.fn() },

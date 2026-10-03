@@ -222,6 +222,7 @@ export async function createRuntime(host: HTMLElement) {
     ? new URLSearchParams(window.location.search) : null;
   const showDebugChrome = perfFlags.debug && localDebugParams?.get('benchmarkUi') !== 'player';
   host.classList.toggle('babylon-runtime-host--capture', perfFlags.capture);
+  host.classList.toggle('babylon-runtime-host--mobile-diagnostics', perfFlags.debug && !localDebugParams);
   // Start all shipped startup dependencies together. Waiting to request each
   // module at its construction site turns network latency into a long serial
   // tail after the venue is ready, especially on a player's first visit.
@@ -402,6 +403,7 @@ export async function createRuntime(host: HTMLElement) {
   // here for the same reason: a boot that fails after the world connected
   // must not leave a ghost player in the world or music behind the error.
   let releaseWorldResources: (() => void) | undefined;
+  let stopDebugFrameTiming: (() => void) | undefined;
 
   const cleanupOwnedResources = () => {
     if (disposed) {
@@ -409,6 +411,7 @@ export async function createRuntime(host: HTMLElement) {
     }
     disposed = true;
     displayRefresh?.dispose();
+    stopDebugFrameTiming?.();
     stopWorldSessionRenewal?.();
     stopWorldSessionRenewal = undefined;
     worldSocket?.dispose();
@@ -1130,6 +1133,21 @@ export async function createRuntime(host: HTMLElement) {
     let perfFrameCounter = 0;
     let lastPerfReadoutAt = Number.NEGATIVE_INFINITY;
     let debugFrames = 0, debugRenderMs = 0, debugUpdateMs = 0, debugDraws = 0;
+    let debugSubmitStart: number | undefined, debugSubmitMs = 0, debugSubmitFrames = 0;
+    if (perfOverlay) {
+      const observer = activeEngine.onEndFrameObservable.add(() => {
+        if (debugSubmitStart === undefined) return;
+        debugSubmitMs += performance.now() - debugSubmitStart;
+        debugSubmitFrames++;
+        debugSubmitStart = undefined;
+      });
+      stopDebugFrameTiming = () => activeEngine.onEndFrameObservable.remove(observer);
+    }
+    // Device diagnosis changes only command encoding, preserving the scene,
+    // shaders and resolution. Normal play keeps the cached bundle path.
+    if (perfFlags.debug && new URLSearchParams(window.location.search).get('gpuBundles') === '0') {
+      activeEngine.compatibilityMode = true;
+    }
     let lastGraphicsSampleAt = Number.NEGATIVE_INFINITY;
     let adaptiveState = createAdaptiveResolutionState(
       graphicsConfig,
@@ -1696,6 +1714,7 @@ export async function createRuntime(host: HTMLElement) {
       }
       const measuringFrame = venuePerformance?.isRunning() || !!perfOverlay;
       const renderStart = measuringFrame ? performance.now() : 0;
+      const drawStart = perfOverlay ? activeEngine._drawCalls.current : 0;
       activeShowControls.update();
       const showControlEnd = measuringFrame ? performance.now() : 0;
       scene.render();
@@ -1806,7 +1825,11 @@ export async function createRuntime(host: HTMLElement) {
         debugFrames++;
         debugRenderMs += renderEnd - showControlEnd;
         debugUpdateMs += showControlEnd - renderStart + graphicsNow - renderEnd;
-        debugDraws += activeEngine._drawCalls.current;
+        // Babylon's counter accumulates until scene instrumentation resets it.
+        // Normal debug sessions report this frame's increment; benchmarks own
+        // the reset and already expose a per-frame value.
+        const draws = activeEngine._drawCalls.current;
+        debugDraws += venuePerformance?.isRunning() || draws < drawStart ? draws : draws - drawStart;
       }
       // Time-based sampling stays responsive at low FPS; counting 30 frames
       // made a struggling phone wait several seconds before each decision.
@@ -1840,10 +1863,13 @@ export async function createRuntime(host: HTMLElement) {
             renderer: activeEngine.isWebGPU ? 'WebGPU' : 'WebGL',
             renderMs: debugRenderMs / debugFrames, updateMs: debugUpdateMs / debugFrames,
             draws: debugDraws / debugFrames,
+            submitMs: debugSubmitFrames ? debugSubmitMs / debugSubmitFrames : 0,
           });
           debugFrames = debugRenderMs = debugUpdateMs = debugDraws = 0;
+          debugSubmitFrames = debugSubmitMs = 0;
         }
       }
+      if (perfOverlay) debugSubmitStart = performance.now();
     });
 
     window.addEventListener('resize', handleResize);
