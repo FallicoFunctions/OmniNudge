@@ -199,13 +199,14 @@ async function populateMainStageScene(scene: Scene, engine: AbstractEngine, laun
 
   if (engine.isWebGPU && optimized('checkMatrixValues')) engine._features.uniformBufferHardCheckMatrix = true;
 
-  // Collapse same-material static groups into single draw calls before any
-  // rig reads mesh positions. Draw submission was the measured frame floor.
+  // Batch nearby static objects while retaining culling of distant groups.
+  // Venue-wide material batches otherwise submit geometry behind the camera.
   // Practical cores stay individual: the pool lights locate them by name.
   deduplicateMaterials(scene);
   markBootPhase('scene_materials');
   mergeStaticMeshGroups(scene, {
     dynamicMeshes: [],
+    spatialCellSize: 32,
     preserveNamePatterns: [
       /LanternCore|LanternWarmCore|FountainLightArray/,
       /^V31_SideLedTileField_[LR]$/,

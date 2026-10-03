@@ -7,6 +7,8 @@ export interface MergeStaticMeshGroupsOptions {
   dynamicMeshes: AbstractMesh[];
   /** Names to keep as individual meshes (rig code locates them by name). */
   preserveNamePatterns?: RegExp[];
+  /** Keep distant objects independently cullable while batching nearby ones. */
+  spatialCellSize?: number;
 }
 
 export interface MergeStaticMeshGroupsSummary {
@@ -24,6 +26,8 @@ export function mergeStaticMeshGroups(
 ): MergeStaticMeshGroupsSummary {
   const dynamic = new Set(options.dynamicMeshes);
   const groups = new Map<string, Mesh[]>();
+  const cellSize = options.spatialCellSize ?? 0;
+  const spatial = Number.isFinite(cellSize) && cellSize > 0;
 
   for (const mesh of scene.meshes) {
     if (!(mesh instanceof Mesh)) continue;
@@ -44,7 +48,16 @@ export function mergeStaticMeshGroups(
     // which black-screens the whole venue. Subgroup by attribute kinds so
     // mismatched meshes merge among themselves instead of crashing.
     const attributeKinds = mesh.getVerticesDataKinds().slice().sort().join(',');
-    const key = `${material.uniqueId}|${mesh.renderingGroupId}|${mesh.receiveShadows ? 1 : 0}|${attributeKinds}`;
+    // A venue-wide batch has venue-wide bounds: looking at one railing then
+    // submits matching railings behind the camera too. Use world positions
+    // (including imported parent transforms) before MergeMeshes bakes them.
+    let cell = '';
+    if (spatial) {
+      mesh.computeWorldMatrix(true);
+      const center = mesh.getBoundingInfo().boundingBox.centerWorld;
+      cell = `|${Math.floor(center.x / cellSize)},${Math.floor(center.y / cellSize)},${Math.floor(center.z / cellSize)}`;
+    }
+    const key = `${material.uniqueId}|${mesh.renderingGroupId}|${mesh.receiveShadows ? 1 : 0}|${attributeKinds}${cell}`;
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(mesh);
   }
 

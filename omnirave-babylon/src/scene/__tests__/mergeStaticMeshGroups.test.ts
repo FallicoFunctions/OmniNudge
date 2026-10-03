@@ -1,4 +1,4 @@
-import { MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
+import { FreeCamera, Frustum, MeshBuilder, NullEngine, PBRMaterial, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { mergeStaticMeshGroups } from '../mergeStaticMeshGroups';
@@ -100,5 +100,35 @@ describe('mergeStaticMeshGroups', () => {
     const bounds = merged?.getBoundingInfo().boundingBox;
     expect(bounds && bounds.maximumWorld.x).toBeGreaterThan(49);
     expect(bounds && bounds.minimumWorld.x).toBeLessThan(1);
+  });
+
+  it('culls distant batches independently without removing geometry or parent transforms', () => {
+    engine = new NullEngine();
+    const scene = new Scene(engine);
+    const shared = new PBRMaterial('shared', scene);
+    const camera = new FreeCamera('camera', Vector3.Zero(), scene);
+    camera.setTarget(new Vector3(0, 0, 1));
+    for (const z of [50, -50]) {
+      const parent = new TransformNode(`parent-${z}`, scene);
+      parent.position.z = z;
+      for (const x of [1, 3]) {
+        const box = MeshBuilder.CreateBox(`box-${z}-${x}`, { size: 1 }, scene);
+        box.parent = parent;
+        box.position.x = x;
+        box.material = shared;
+      }
+    }
+    const indices = scene.meshes.reduce((total, mesh) => total + mesh.getTotalIndices(), 0);
+    const summary = mergeStaticMeshGroups(scene, { dynamicMeshes: [], spatialCellSize: 32 });
+    const meshes = scene.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+    camera.getViewMatrix(true);
+    camera.getProjectionMatrix(true);
+    const frustum = Frustum.GetPlanes(camera.getTransformationMatrix());
+
+    expect(summary.groupsMerged).toBe(2);
+    expect(meshes.reduce((total, mesh) => total + mesh.getTotalIndices(), 0)).toBe(indices);
+    expect(meshes.filter((mesh) => mesh.isInFrustum(frustum))).toHaveLength(1);
+    expect(meshes.map((mesh) => mesh.getBoundingInfo().boundingBox.centerWorld.z).sort((a, b) => a - b))
+      .toEqual([-50, 50]);
   });
 });
