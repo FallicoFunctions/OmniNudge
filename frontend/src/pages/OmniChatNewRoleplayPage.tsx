@@ -119,7 +119,7 @@ function Choice({
             } ${
               value === option.id
                 ? 'border-blue-400 bg-blue-500/20 text-white'
-                : 'border-white/15 bg-white/[0.03] text-white/65 hover:border-white/35'
+                : 'border-white/15 bg-white/3 text-white/65 hover:border-white/35'
             }`}
           >
             {option.description ? (
@@ -157,7 +157,7 @@ function SelectChoice({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="w-full rounded-xl border border-white/15 bg-[#171b27] px-4 py-3 text-sm text-white outline-none focus:border-blue-400 disabled:opacity-40"
+        className="w-full rounded-xl border border-white/15 bg-[#171b27] px-4 py-3 text-sm text-white outline-hidden focus:border-blue-400 disabled:opacity-40"
       >
         <option value="">Choose an option</option>
         {options.map((option) => (
@@ -785,7 +785,7 @@ function RoleplayCreator({ userId, isAdmin }: { userId: number; isAdmin: boolean
                             setProblem('');
                             setDraft((current) => ({ ...current, step: targetStep }));
                           }}
-                          className="w-full cursor-pointer rounded-xl border border-white/10 bg-white/[0.03] p-4 text-left transition-colors hover:border-blue-400/60 hover:bg-[#243a60] focus-visible:bg-[#243a60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full cursor-pointer rounded-xl border border-white/10 bg-white/3 p-4 text-left transition-colors hover:border-blue-400/60 hover:bg-[#243a60] focus-visible:bg-[#243a60] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <p className="text-xs font-semibold uppercase tracking-wider text-blue-300">
                             {label}

@@ -109,11 +109,11 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
 
   return (
     <div
-      className="column-config-panel flex-1 border-r border-[var(--color-border)] last:border-r-0"
+      className="column-config-panel flex-1 border-r border-border last:border-r-0"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Collapsed header */}
-      <div className="w-full border-b border-[var(--color-border)] flex items-center">
+      <div className="w-full border-b border-border flex items-center">
         <button
           type="button"
           onClick={(e) => {
@@ -127,13 +127,11 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
             );
             setIsExpanded(!isExpanded);
           }}
-          className="flex-1 px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-[var(--color-hover)] transition-cyber"
+          className="flex-1 px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-(--color-hover) transition-cyber"
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="w-2 h-2 rounded-full bg-cyan-500 pulse-indicator"></span>
-            <span className="truncate font-semibold text-[var(--color-primary)]">
-              {getFeedLabel()}
-            </span>
+            <span className="truncate font-semibold text-primary">{getFeedLabel()}</span>
           </div>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -156,10 +154,10 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
               debugLog('[ColumnConfigPanel] Create post clicked for column:', columnId);
               setShowCreatePost(!showCreatePost);
             }}
-            className={`px-3 py-2 text-xs transition-colors border-l border-[var(--color-border)] ${
+            className={`px-3 py-2 text-xs transition-colors border-l border-border ${
               showCreatePost
                 ? 'text-cyan-400 bg-cyan-400/10'
-                : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
+                : 'text-(--color-text-muted) hover:text-cyan-400 hover:bg-cyan-400/10'
             }`}
             title={t('columnConfigPanel.title.createPost')}
           >
@@ -190,10 +188,10 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
               subscribeMutation.mutate();
             }}
             disabled={subscribeMutation.isPending}
-            className={`px-3 py-2 text-xs font-medium transition-colors border-l border-[var(--color-border)] ${
+            className={`px-3 py-2 text-xs font-medium transition-colors border-l border-border ${
               isSubscribed
                 ? 'text-cyan-400 hover:text-red-400 hover:bg-red-400/10'
-                : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
+                : 'text-(--color-text-muted) hover:text-cyan-400 hover:bg-cyan-400/10'
             } disabled:opacity-50`}
             title={
               isSubscribed
@@ -217,7 +215,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
 
       {/* Expanded controls */}
       {isExpanded && (
-        <div className="p-3 space-y-3 bg-[var(--color-surface)] fade-in">
+        <div className="p-3 space-y-3 bg-surface fade-in">
           {/* Feed type selector */}
           <div>
             <label className="text-xs font-semibold text-cyan-400 block mb-1.5 uppercase tracking-wide flex items-center gap-1">
@@ -248,7 +246,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                   currentCursor: '',
                 });
               }}
-              className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+              className="w-full px-2 py-1.5 text-xs bg-background text-primary border border-cyan-500/30 rounded-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
             >
               <option value="home">{t('columnConfigPanel.feedTypeOption.home')}</option>
               <option value="subreddit">{t('columnConfigPanel.feedTypeOption.subreddit')}</option>
@@ -294,7 +292,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     ? t('columnConfigPanel.sourcePlaceholder.subreddit')
                     : t('columnConfigPanel.sourcePlaceholder.hub')
                 }
-                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded placeholder:text-[var(--color-text-muted)] focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                className="w-full px-2 py-1.5 text-xs bg-background text-primary border border-cyan-500/30 rounded-sm placeholder:text-(--color-text-muted) focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               />
             </div>
           )}
@@ -328,7 +326,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     currentCursor: '',
                   });
                 }}
-                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                className="w-full px-2 py-1.5 text-xs bg-background text-primary border border-cyan-500/30 rounded-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               >
                 <option value="hot">{t('columnConfigPanel.sortOption.hot')}</option>
                 <option value="new">{t('columnConfigPanel.sortOption.new')}</option>
@@ -371,7 +369,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                       currentCursor: '',
                     });
                   }}
-                  className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                  className="w-full px-2 py-1.5 text-xs bg-background text-primary border border-cyan-500/30 rounded-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
                 >
                   <option value="hour">{t('columnConfigPanel.timeRangeOption.hour')}</option>
                   <option value="day">{t('columnConfigPanel.timeRangeOption.day')}</option>
@@ -385,7 +383,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
 
           {/* Omni-only toggle (for home feed) */}
           {config.feedType === 'home' && (
-            <div className="flex items-center gap-2 pt-1 border-t border-[var(--color-border)]">
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
               <input
                 type="checkbox"
                 id={`omni-only-${columnId}`}
@@ -401,7 +399,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
               />
               <label
                 htmlFor={`omni-only-${columnId}`}
-                className="text-xs text-[var(--color-text)] cursor-pointer font-medium"
+                className="text-xs text-(--color-text) cursor-pointer font-medium"
               >
                 {t('columnConfigPanel.omniOnlyLabel')}
               </label>

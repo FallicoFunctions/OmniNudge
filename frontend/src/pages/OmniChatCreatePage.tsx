@@ -183,7 +183,7 @@ export function OmniChatCreateWorkspace() {
                 your gallery.
               </p>
             </div>
-            <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+            <div className="flex rounded-2xl border border-white/10 bg-white/4 p-1">
               {(['generate', 'gallery'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -198,7 +198,7 @@ export function OmniChatCreateWorkspace() {
           </header>
 
           {workspaceTab === 'generate' ? (
-            <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.78fr),minmax(420px,1.22fr)]">
+            <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.78fr)_minmax(420px,1.22fr)]">
               <form
                 onSubmit={submit}
                 className="space-y-5 rounded-[30px] border border-white/10 bg-[#15161d]/85 p-5 shadow-2xl shadow-black/20 sm:p-7"
@@ -239,7 +239,7 @@ export function OmniChatCreateWorkspace() {
                         setSelectedPersonaId(Number(event.target.value));
                         setSourceAssetId('');
                       }}
-                      className="min-w-0 flex-1 bg-transparent text-white outline-none"
+                      className="min-w-0 flex-1 bg-transparent text-white outline-hidden"
                     >
                       {personas.map((persona) => (
                         <option key={persona.id} value={persona.id} className="bg-[#181920]">
@@ -257,7 +257,7 @@ export function OmniChatCreateWorkspace() {
                       aria-label="Starting image"
                       value={sourceAssetId}
                       onChange={(event) => setSourceAssetId(event.target.value)}
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden"
                     >
                       <option value="">Generate directly from the prompt</option>
                       {characterImages.map((asset, index) => (
@@ -281,7 +281,7 @@ export function OmniChatCreateWorkspace() {
                         ? 'Describe the character, scene, outfit, mood, and camera…'
                         : 'Describe the scene and how the character or camera should move…'
                     }
-                    className="mt-2 min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
+                    className="mt-2 min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden placeholder:text-white/25 focus:border-blue-400/60"
                   />
                 </label>
                 {/* Images only. The hosted video model takes no negative
@@ -296,7 +296,7 @@ export function OmniChatCreateWorkspace() {
                       onChange={(event) => setNegativePrompt(event.target.value)}
                       maxLength={1000}
                       placeholder="Blur, distorted hands, text…"
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-blue-400/60"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden placeholder:text-white/25 focus:border-blue-400/60"
                     />
                   </label>
                 )}
@@ -307,7 +307,7 @@ export function OmniChatCreateWorkspace() {
                       aria-label="Aspect ratio"
                       value={aspectRatio}
                       onChange={(event) => setAspectRatio(event.target.value)}
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden"
                     >
                       {['1:1', '4:5', '3:4', '16:9', '9:16', '4:3', '5:4'].map((ratio) => (
                         <option key={ratio} value={ratio} className="bg-[#181920]">
@@ -323,7 +323,7 @@ export function OmniChatCreateWorkspace() {
                         aria-label="Duration"
                         value={duration}
                         onChange={(event) => setDuration(Number(event.target.value))}
-                        className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden"
                       >
                         {[3, 4, 5, 6, 7, 8, 9, 10].map((seconds) => (
                           <option key={seconds} value={seconds} className="bg-[#181920]">
@@ -342,7 +342,7 @@ export function OmniChatCreateWorkspace() {
                     createMutation.isPending ||
                     Boolean(activeJob && !TERMINAL_STATUSES.has(activeJob.status))
                   }
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-blue-500 to-indigo-500 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {createMutation.isPending ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -385,7 +385,7 @@ export function OmniChatCreateWorkspace() {
                         )}
                       </div>
                     ) : activeJob.status === 'cancelled' ? (
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-white/70">
+                      <div className="rounded-3xl border border-white/10 bg-white/4 p-8 text-white/70">
                         <p className="font-semibold text-white">Generation cancelled</p>
                         <p className="mt-2 text-sm text-white/45">
                           No result was added to your gallery.
@@ -405,7 +405,7 @@ export function OmniChatCreateWorkspace() {
                             is ten more minutes of a bar that looks stuck. */}
                         <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all"
+                            className="h-full rounded-full bg-linear-to-r from-blue-400 to-indigo-400 transition-all"
                             style={{
                               width: `${Math.max(4, mediaJobPercent(activeJob, progressNow))}%`,
                             }}
@@ -561,13 +561,9 @@ function GalleryGrid({
         {assets.map((asset) => (
           <article
             key={asset.id}
-            className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.04] p-3"
+            className="overflow-hidden rounded-[26px] border border-white/10 bg-white/4 p-3"
           >
-            <OmniChatMediaAssetView
-              asset={asset}
-              preview
-              className="aspect-[4/5] min-h-60 w-full"
-            />
+            <OmniChatMediaAssetView asset={asset} preview className="aspect-4/5 min-h-60 w-full" />
             <p className="mt-3 line-clamp-2 text-sm text-white/65">{asset.prompt}</p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="text-xs capitalize text-white/30">

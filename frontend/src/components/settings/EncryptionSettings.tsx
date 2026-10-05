@@ -15,13 +15,12 @@ import { normalizePhrase } from '../keys/KeySetupScreen';
 const MIN_APP_PASSWORD_LENGTH = 8;
 
 const inputClass =
-  'mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]';
+  'mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary';
 const primaryButtonClass =
-  'rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50';
-const textButtonClass =
-  'text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]';
-const sectionClass = 'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4';
-const labelClass = 'block text-sm font-semibold text-[var(--color-text-primary)]';
+  'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50';
+const textButtonClass = 'text-sm font-medium text-primary hover:text-primary-dark';
+const sectionClass = 'rounded-lg border border-border bg-surface p-4';
+const labelClass = 'block text-sm font-semibold text-text-primary';
 
 function Alert({ tone, message }: { tone: 'error' | 'success'; message: string }) {
   return (
@@ -65,18 +64,14 @@ export default function EncryptionSettings() {
     return <Alert tone="error" message={t('keys.settings.loadFailed')} />;
   }
   if (!backup) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">{t('common.loading')}</p>;
+    return <p className="text-sm text-text-secondary">{t('common.loading')}</p>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
-          {t('keys.settings.title')}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {t('keys.settings.intro')}
-        </p>
+        <h2 className="text-xl font-semibold text-text-primary">{t('keys.settings.title')}</h2>
+        <p className="mt-1 text-sm text-text-secondary">{t('keys.settings.intro')}</p>
       </div>
       <NewPhraseSection backup={backup} />
       {appPasswordAdded && <Alert tone="success" message={t('keys.settings.appAdded')} />}
@@ -107,12 +102,10 @@ function NewPhraseSection({ backup }: { backup: KeyBackup }) {
   if (usesPassword && backup.auth_scheme !== 2) {
     return (
       <section className={sectionClass}>
-        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+        <h3 className="text-lg font-semibold text-text-primary">
           {t('keys.settings.phraseTitle')}
         </h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {t('keys.settings.unavailable')}
-        </p>
+        <p className="mt-1 text-sm text-text-secondary">{t('keys.settings.unavailable')}</p>
       </section>
     );
   }
@@ -197,10 +190,10 @@ function NewPhraseSection({ backup }: { backup: KeyBackup }) {
     <section className={sectionClass}>
       <form onSubmit={start} className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+          <h3 className="text-lg font-semibold text-text-primary">
             {t('keys.settings.phraseTitle')}
           </h3>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          <p className="mt-1 text-sm text-text-secondary">
             {usesPassword
               ? t('keys.settings.phraseIntroPassword')
               : t('keys.settings.phraseIntroPhrase')}
@@ -280,10 +273,8 @@ function AppPasswordSection({ onAdded }: { onAdded: () => void }) {
     <section className={sectionClass}>
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-            {t('keys.settings.appTitle')}
-          </h3>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{t('keys.app.intro')}</p>
+          <h3 className="text-lg font-semibold text-text-primary">{t('keys.settings.appTitle')}</h3>
+          <p className="mt-1 text-sm text-text-secondary">{t('keys.app.intro')}</p>
         </div>
         {error && <Alert tone="error" message={error} />}
         <div>

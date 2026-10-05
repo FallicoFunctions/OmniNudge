@@ -24,14 +24,14 @@ export function UserAvatar({ username, avatarUrl, size = 'md', className = '' }:
       <img
         src={resolveMediaUrl(avatarUrl)}
         alt={username}
-        className={`${sizeClasses} flex-shrink-0 rounded-lg object-cover ${className}`}
+        className={`${sizeClasses} shrink-0 rounded-lg object-cover ${className}`}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClasses} flex flex-shrink-0 items-center justify-center rounded-lg bg-[var(--color-border)] text-[var(--color-text-secondary)] ${className}`}
+      className={`${sizeClasses} flex shrink-0 items-center justify-center rounded-lg bg-border text-text-secondary ${className}`}
     >
       {username.charAt(0).toUpperCase()}
     </div>

@@ -69,8 +69,8 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
         className={[
           'w-full rounded-2xl overflow-hidden transition-all duration-200',
           isActive
-            ? 'bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]/25 shadow-sm'
-            : 'bg-[var(--color-surface-elevated)]',
+            ? 'bg-primary/10 ring-1 ring-primary/25 shadow-xs'
+            : 'bg-(--color-surface-elevated)',
         ].join(' ')}
       >
         {/* Top button = decrement (matches scroll-up = lower value) */}
@@ -83,13 +83,13 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
             'w-full flex items-center justify-center py-2.5 transition-colors duration-150',
             'disabled:opacity-20 disabled:cursor-not-allowed',
             isActive
-              ? 'hover:bg-[var(--color-primary)]/15 active:bg-[var(--color-primary)]/20'
-              : 'hover:bg-[var(--color-border)]/60 active:bg-[var(--color-border)]',
+              ? 'hover:bg-primary/15 active:bg-primary/20'
+              : 'hover:bg-border/60 active:bg-border',
           ].join(' ')}
           aria-label={`Decrease ${label}`}
         >
           <svg
-            className={`w-4 h-4 transition-colors ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-(--color-text-muted)'}`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -113,12 +113,12 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
           aria-label={label}
           className={[
             'w-full bg-transparent text-center text-4xl font-bold tabular-nums py-1 leading-none',
-            'focus:outline-none transition-all duration-200 cursor-default',
+            'focus:outline-hidden transition-all duration-200 cursor-default',
             'disabled:cursor-not-allowed',
             '[appearance:textfield]',
             '[&::-webkit-outer-spin-button]:appearance-none',
             '[&::-webkit-inner-spin-button]:appearance-none',
-            isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-40',
+            isActive ? 'text-primary' : 'text-(--color-text-muted) opacity-40',
           ].join(' ')}
         />
 
@@ -132,13 +132,13 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
             'w-full flex items-center justify-center py-2.5 transition-colors duration-150',
             'disabled:opacity-20 disabled:cursor-not-allowed',
             isActive
-              ? 'hover:bg-[var(--color-primary)]/15 active:bg-[var(--color-primary)]/20'
-              : 'hover:bg-[var(--color-border)]/60 active:bg-[var(--color-border)]',
+              ? 'hover:bg-primary/15 active:bg-primary/20'
+              : 'hover:bg-border/60 active:bg-border',
           ].join(' ')}
           aria-label={`Increase ${label}`}
         >
           <svg
-            className={`w-4 h-4 transition-colors ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-(--color-text-muted)'}`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -154,7 +154,7 @@ function Dial({ label, value, max, onChange, disabled }: DialProps) {
       {/* Label */}
       <span
         className={`text-xs font-semibold tracking-wide transition-colors duration-200 ${
-          isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'
+          isActive ? 'text-primary' : 'text-(--color-text-muted)'
         }`}
       >
         {label}
@@ -198,7 +198,7 @@ export function AutoDeleteDurationPicker({
         />
       </div>
 
-      <p className="text-center text-xs text-[var(--color-text-muted)]">
+      <p className="text-center text-xs text-(--color-text-muted)">
         {t('messages.autoDelete.neverHint')}
       </p>
     </div>

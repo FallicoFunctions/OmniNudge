@@ -206,7 +206,7 @@ function DecryptedMediaViewerWrapper({
       {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+        className="absolute top-4 right-4 text-white hover:text-primary transition-colors z-10 p-2"
         aria-label={t('messages.viewer.closeLabel')}
       >
         <svg
@@ -227,7 +227,7 @@ function DecryptedMediaViewerWrapper({
 
       {/* Media counter */}
       {messages.length > 1 && (
-        <div className="absolute top-4 left-4 text-white text-lg font-medium z-10 bg-black bg-opacity-50 px-3 py-1 rounded">
+        <div className="absolute top-4 left-4 text-white text-lg font-medium z-10 bg-black bg-opacity-50 px-3 py-1 rounded-sm">
           {t('messages.viewer.counter', { current: currentIndex + 1, total: messages.length })}
         </div>
       )}
@@ -239,7 +239,7 @@ function DecryptedMediaViewerWrapper({
             e.stopPropagation();
             handlePrevious();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-primary transition-colors z-10 p-2"
           aria-label={t('messages.viewer.previousLabel')}
         >
           <svg
@@ -303,7 +303,7 @@ function DecryptedMediaViewerWrapper({
             e.stopPropagation();
             handleNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-primary transition-colors z-10 p-2"
           aria-label={t('messages.viewer.nextLabel')}
         >
           <svg
@@ -412,7 +412,7 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
 
   if (!mediaSrc) {
     return (
-      <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
+      <div className="mb-2 text-xs text-text-secondary">
         {message.media_encryption_key ? t('messages.viewer.decrypting') : t('common.loading')}
       </div>
     );
@@ -466,7 +466,7 @@ const DownloadButton = ({ message, isOwnMessage, onClose }: DownloadButtonProps)
   return (
     <button
       type="button"
-      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
       onClick={handleDownload}
       disabled={!mediaSrc}
     >
@@ -2297,7 +2297,7 @@ export default function MessagesPage() {
 
   // Mini chat strip shown inside both full-screen slideshow modes
   const slideshowMiniChat = (
-    <div className="border-t border-white/10 bg-black/70 backdrop-blur-sm">
+    <div className="border-t border-white/10 bg-black/70 backdrop-blur-xs">
       <div
         ref={slideshowChatScrollRef}
         className="flex flex-col gap-1 px-4 pt-2 pb-1 max-h-24 overflow-y-auto"
@@ -2310,7 +2310,7 @@ export default function MessagesPage() {
               <div key={m.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                 <span
                   className={`max-w-[75%] truncate rounded-full px-3 py-1 text-xs ${
-                    own ? 'bg-[var(--color-primary)] text-white' : 'bg-white/20 text-white'
+                    own ? 'bg-primary text-white' : 'bg-white/20 text-white'
                   }`}
                 >
                   {m.media_url && !m.encrypted_content ? (
@@ -2333,12 +2333,12 @@ export default function MessagesPage() {
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
           placeholder={t('messages.compose.placeholder')}
-          className="flex-1 rounded-full bg-white/15 px-4 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/40"
+          className="flex-1 rounded-full bg-white/15 px-4 py-2 text-sm text-white placeholder-white/50 focus:outline-hidden focus:ring-1 focus:ring-white/40"
         />
         <button
           type="submit"
           disabled={!messageText.trim() || sendMessageMutation.isPending}
-          className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-[var(--color-primary-dark)] transition-colors"
+          className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-primary-dark transition-colors"
         >
           {t('messages.send')}
         </button>
@@ -2360,8 +2360,8 @@ export default function MessagesPage() {
         <div
           className={
             isMobile
-              ? `absolute inset-0 flex overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
-              : 'flex flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+              ? `absolute inset-0 flex overflow-hidden border-r border-border bg-surface will-change-transform transition-transform duration-250 ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
+              : 'flex shrink-0 overflow-hidden border-r border-border bg-surface'
           }
         >
           {/* Folder sidebar — desktop only */}
@@ -2382,7 +2382,7 @@ export default function MessagesPage() {
               deletingFolderId={deletingFolderId}
               collapsed={isFolderCollapsed}
               onToggleCollapsed={toggleFolderCollapsed}
-              className={`flex-shrink-0 border-r border-[var(--color-border)] overflow-hidden transition-[width] duration-200 ${isFolderCollapsed ? 'w-10' : 'w-44'}`}
+              className={`shrink-0 border-r border-border overflow-hidden transition-[width] duration-200 ${isFolderCollapsed ? 'w-10' : 'w-44'}`}
             />
           )}
 
@@ -2391,14 +2391,12 @@ export default function MessagesPage() {
             className={
               isMobile
                 ? 'flex w-full flex-col overflow-hidden'
-                : 'flex w-[20rem] flex-shrink-0 flex-col overflow-hidden'
+                : 'flex w-[20rem] shrink-0 flex-col overflow-hidden'
             }
           >
-            <div className="border-b border-[var(--color-border)] p-4">
+            <div className="border-b border-border p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                  {t('messages.title')}
-                </h2>
+                <h2 className="text-lg font-semibold text-text-primary">{t('messages.title')}</h2>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -2408,14 +2406,14 @@ export default function MessagesPage() {
                       setMessageText('');
                       setSelectedFile(null);
                     }}
-                    className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                    className="rounded-md bg-primary px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-primary-dark active:bg-primary-dark"
                   >
                     {t('messages.newConversation')}
                   </button>
                   <button
                     onClick={() => setShowCreateGroupModal(true)}
                     title={t('groups.newGroup')}
-                    className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                    className="flex items-center justify-center h-8 w-8 rounded-md border border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
                       {/* Two people silhouettes */}
@@ -2447,13 +2445,13 @@ export default function MessagesPage() {
                 </div>
               </div>
               {/* Tabs */}
-              <div className="flex gap-1 border-b border-[var(--color-border)]">
+              <div className="flex gap-1 border-b border-border">
                 <button
                   onClick={() => setActiveTab('active')}
                   className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                     activeTab === 'active'
-                      ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
-                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {t('messages.tabs.active')}
@@ -2462,8 +2460,8 @@ export default function MessagesPage() {
                   onClick={() => setActiveTab('archived')}
                   className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                     activeTab === 'archived'
-                      ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
-                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {t('messages.tabs.archived')}
@@ -2474,7 +2472,7 @@ export default function MessagesPage() {
               {isMobile && (
                 <nav
                   aria-label={t('messages.folders.title')}
-                  className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]"
+                  className="flex items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-2 scrollbar-none"
                 >
                   {/* All */}
                   <button
@@ -2486,10 +2484,10 @@ export default function MessagesPage() {
                     aria-current={
                       selectedFolderId === null && smartFolder === null ? 'page' : undefined
                     }
-                    className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
                       selectedFolderId === null && smartFolder === null
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                        : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-border text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {t('messages.folders.allConversations')}
@@ -2502,10 +2500,10 @@ export default function MessagesPage() {
                       setSmartFolder('unread');
                     }}
                     aria-current={smartFolder === 'unread' ? 'page' : undefined}
-                    className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
                       smartFolder === 'unread'
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                        : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-border text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {t('messages.folders.unread')}
@@ -2520,10 +2518,10 @@ export default function MessagesPage() {
                         setSmartFolder(null);
                       }}
                       aria-current={selectedFolderId === folder.id ? 'page' : undefined}
-                      className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                      className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
                         selectedFolderId === folder.id
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                          ? 'border-primary bg-primary text-white'
+                          : 'border-border text-text-secondary hover:text-text-primary'
                       }`}
                       style={
                         selectedFolderId === folder.id
@@ -2532,14 +2530,14 @@ export default function MessagesPage() {
                       }
                     >
                       <span aria-hidden>{folder.icon}</span>
-                      <span className="max-w-[5rem] truncate">{folder.name}</span>
+                      <span className="max-w-20 truncate">{folder.name}</span>
                     </button>
                   ))}
                   {/* Manage folders button */}
                   <button
                     type="button"
                     onClick={() => setShowMobileFolderSheet(true)}
-                    className="flex-shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                    className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={t('messages.folders.manageFolder')}
                     title={t('messages.folders.manageFolder')}
                   >
@@ -2557,16 +2555,16 @@ export default function MessagesPage() {
               )}
 
               {/* Search input */}
-              <div className="p-3 border-b border-[var(--color-border)]">
+              <div className="p-3 border-b border-border">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('messages.search.conversations')}
-                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-surface text-text-primary placeholder-(--color-text-muted) focus:outline-hidden focus:ring-2 focus:ring-primary"
                 />
                 {searchQuery && conversations && (
-                  <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <p className="mt-1.5 text-xs text-text-secondary">
                     {t('messages.search.conversationResults', { count: conversations.length })}
                   </p>
                 )}
@@ -2585,10 +2583,10 @@ export default function MessagesPage() {
               {conversations?.map((conversation) => (
                 <div
                   key={conversation.id}
-                  className={`group relative w-full border-b border-[var(--color-border)] transition-colors ${
+                  className={`group relative w-full border-b border-border transition-colors ${
                     selectedConversationId === conversation.id
-                      ? 'bg-[var(--color-surface-elevated)]'
-                      : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
+                      ? 'bg-(--color-surface-elevated)'
+                      : 'hover:bg-(--color-surface-elevated) active:bg-(--color-surface-elevated)'
                   }`}
                   data-conversation-menu-container={conversation.id}
                 >
@@ -2613,13 +2611,13 @@ export default function MessagesPage() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
                             <span
-                              className={`truncate font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
+                              className={`truncate font-medium text-text-primary ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}
                             >
                               {conversationTitle(conversation)}
                             </span>
                             {conversation.conversation_type === 'group' &&
                               conversation.participant_count != null && (
-                                <span className="flex-shrink-0 text-xs text-[var(--color-text-muted)]">
+                                <span className="shrink-0 text-xs text-(--color-text-muted)">
                                   {t('groups.participantCount', {
                                     count: conversation.participant_count,
                                   })}
@@ -2628,28 +2626,28 @@ export default function MessagesPage() {
                             {conversation.other_user?.id && (
                               <OnlineStatusIndicator
                                 userId={conversation.other_user.id}
-                                className="flex-shrink-0"
+                                className="shrink-0"
                               />
                             )}
                             {(conversation.is_archived ?? conversation.archived_at !== null) && (
-                              <span className="flex-shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                              <span className="shrink-0 rounded-full border border-border bg-(--color-surface-elevated) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
                                 {t('messages.badges.archived')}
                               </span>
                             )}
                           </div>
                           {conversation.latest_message?.sent_at && (
-                            <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+                            <span className="text-xs text-(--color-text-muted) shrink-0">
                               {formatRelativeTime(conversation.latest_message.sent_at)}
                             </span>
                           )}
                           {conversation.muted && (
-                            <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                            <span className="rounded-full border border-border bg-(--color-surface-elevated) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
                               {t('messages.muted')}
                             </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         {activeTab === 'archived' && (
                           <button
                             type="button"
@@ -2659,7 +2657,7 @@ export default function MessagesPage() {
                             }}
                             onTouchStart={(e) => e.stopPropagation()}
                             onTouchEnd={(e) => e.stopPropagation()}
-                            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                            className="rounded-md border border-border bg-surface px-2 py-1 text-xs font-semibold text-text-secondary transition hover:bg-(--color-surface-elevated) hover:text-text-primary"
                             disabled={isUnarchiving}
                           >
                             {t('messages.unarchive')}
@@ -2667,7 +2665,7 @@ export default function MessagesPage() {
                         )}
                         {conversation.unread_count > 0 &&
                           conversation.id !== selectedConversationId && (
-                            <span className="rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-white">
+                            <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-white">
                               {conversation.unread_count}
                             </span>
                           )}
@@ -2684,7 +2682,7 @@ export default function MessagesPage() {
                           aria-label={t('messages.conversationOptions.ariaLabel', {
                             name: conversationTitle(conversation),
                           })}
-                          className={`rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? '!opacity-100' : ''}`}
+                          className={`rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-secondary transition hover:bg-(--color-surface-elevated) hover:text-text-primary opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 ${conversationMenuOpen === conversation.id ? 'opacity-100!' : ''}`}
                         >
                           ...
                         </button>
@@ -2697,7 +2695,7 @@ export default function MessagesPage() {
                           message={conversation.latest_message}
                           isOwnMessage={conversation.latest_message.sender_id === user?.id}
                           currentUserId={user?.id}
-                          className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
+                          className="mt-1 text-sm text-text-secondary line-clamp-2"
                         />
                       )}
                     {/* Show folder badge when viewing a specific folder */}
@@ -2709,11 +2707,11 @@ export default function MessagesPage() {
                   </div>
                   {/* Context Menu */}
                   {conversationMenuOpen === conversation.id && (
-                    <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg">
+                    <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-border bg-surface p-2 shadow-lg">
                       {activeTab === 'active' ? (
                         <button
                           type="button"
-                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                           onClick={() => {
                             archiveConversation(conversation.id);
                             setConversationMenuOpen(null);
@@ -2725,7 +2723,7 @@ export default function MessagesPage() {
                       ) : (
                         <button
                           type="button"
-                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                          className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                           onClick={() => {
                             unarchiveConversation(conversation.id);
                             setConversationMenuOpen(null);
@@ -2737,7 +2735,7 @@ export default function MessagesPage() {
                       )}
                       <button
                         type="button"
-                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                         onClick={() => {
                           if (conversation.muted) {
                             unmuteConversationMutation.mutate(conversation.id);
@@ -2750,7 +2748,7 @@ export default function MessagesPage() {
                       </button>
                       <button
                         type="button"
-                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-surface-elevated)]"
+                        className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-(--color-error) hover:bg-(--color-surface-elevated)"
                         onClick={() => {
                           setConversationMenuOpen(null);
                           setDeleteConversationDialog(conversation);
@@ -2790,7 +2788,7 @@ export default function MessagesPage() {
                     type="button"
                     onClick={() => fetchMoreConversations()}
                     disabled={isFetchingMoreConversations}
-                    className="w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-60"
                   >
                     {isFetchingMoreConversations ? t('common.loading') : t('messages.loadMore')}
                   </button>
@@ -2805,14 +2803,14 @@ export default function MessagesPage() {
         <div
           className={
             isMobile
-              ? `absolute inset-0 flex flex-col overflow-hidden bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? 'translate-x-0' : 'translate-x-full'}`
-              : 'flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]'
+              ? `absolute inset-0 flex flex-col overflow-hidden bg-surface will-change-transform transition-transform duration-250 ease-in-out ${isInChat ? 'translate-x-0' : 'translate-x-full'}`
+              : 'flex flex-1 flex-col overflow-hidden bg-surface'
           }
         >
           {selectedConversationId || isCreatingChat ? (
             <>
               {/* Chat Header */}
-              <div className="border-b border-[var(--color-border)] p-3 md:p-4">
+              <div className="border-b border-border p-3 md:p-4">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                   <div
                     className="flex min-w-0 items-center gap-1 md:gap-2"
@@ -2827,12 +2825,12 @@ export default function MessagesPage() {
                           setIsCreatingChat(false);
                           setShowMessageSearch(false);
                         }}
-                        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full active:bg-[var(--color-surface-elevated)]"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full active:bg-(--color-surface-elevated)"
                         aria-label={t('messages.aria.backToConversations')}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-[var(--color-text-primary)]"
+                          className="h-5 w-5 text-text-primary"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -2846,7 +2844,7 @@ export default function MessagesPage() {
                         </svg>
                       </button>
                     )}
-                    <h3 className="min-w-0 font-semibold text-[var(--color-text-primary)] truncate">
+                    <h3 className="min-w-0 font-semibold text-text-primary truncate">
                       {isCreatingChat
                         ? t('messages.newConversation')
                         : selectedConversation
@@ -2856,7 +2854,7 @@ export default function MessagesPage() {
                     {!isCreatingChat &&
                       selectedConversation?.conversation_type === 'group' &&
                       selectedConversation?.participant_count != null && (
-                        <span className="text-xs text-[var(--color-text-muted)]">
+                        <span className="text-xs text-(--color-text-muted)">
                           {t('groups.participantCount', {
                             count: selectedConversation.participant_count,
                           })}
@@ -2870,13 +2868,13 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Slideshow buttons */}
-                  <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
+                  <div className="flex shrink-0 flex-nowrap items-center gap-2">
                     {/* Chat settings gear icon — all conversations */}
                     {!isCreatingChat && selectedConversationId && (
                       <button
                         type="button"
                         onClick={() => setShowChatSettings(true)}
-                        className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                        className="flex items-center justify-center h-8 w-8 rounded-md border border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary"
                         aria-label={t('messages.chatSettings')}
                       >
                         <svg
@@ -2904,7 +2902,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             onClick={() => startCall(selectedConversation.id, 'voice')}
-                            className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                            className="flex items-center justify-center h-8 w-8 rounded-md border border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary"
                             aria-label={t('calls.startVoiceCall')}
                           >
                             <svg
@@ -2925,7 +2923,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             onClick={() => startCall(selectedConversation.id, 'video')}
-                            className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                            className="flex items-center justify-center h-8 w-8 rounded-md border border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary"
                             aria-label={t('calls.startVideoCall')}
                           >
                             <svg
@@ -2952,7 +2950,7 @@ export default function MessagesPage() {
                       <button
                         type="button"
                         onClick={() => setShowGroupSidebar((s) => !s)}
-                        className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                        className="flex items-center justify-center h-8 w-8 rounded-md border border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary"
                         aria-label={t('groups.groupInfo')}
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -2973,12 +2971,12 @@ export default function MessagesPage() {
                           setRedditSlideshowModalOpen(true);
                           setRedditSlideshowInput('');
                         }}
-                        className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)]"
+                        className="flex items-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-(--color-surface-hover) active:bg-(--color-surface-hover)"
                         aria-label={t('messages.browseRedditHub')}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 flex-shrink-0"
+                          className="h-5 w-5 shrink-0"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -2999,7 +2997,7 @@ export default function MessagesPage() {
                     {!isCreatingChat && conversationMediaMessages.length >= 2 && (
                       <button
                         onClick={() => setSlideshowOpen(true)}
-                        className="flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                        className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark active:bg-primary-dark"
                         aria-label={t('messages.media.viewAllTitle')}
                         title={t('messages.media.viewAllTitle')}
                       >
@@ -3032,10 +3030,10 @@ export default function MessagesPage() {
                             return !prev;
                           });
                         }}
-                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
                           showMessageSearch
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                            : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-border text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary'
                         }`}
                         aria-label={t('messages.search.ariaToggle')}
                         aria-pressed={showMessageSearch}
@@ -3067,12 +3065,12 @@ export default function MessagesPage() {
                   className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showMessageSearch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
                 >
                   <div className="overflow-hidden">
-                    <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
+                    <div className="border-b border-border p-3 bg-(--color-surface-elevated)">
                       <div className="relative flex items-center gap-2">
                         {/* Search Icon */}
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 absolute left-3 text-[var(--color-text-muted)] pointer-events-none"
+                          className="h-4 w-4 absolute left-3 text-(--color-text-muted) pointer-events-none"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -3091,7 +3089,7 @@ export default function MessagesPage() {
                           value={messageSearchQuery}
                           onChange={(e) => setMessageSearchQuery(e.target.value)}
                           placeholder={t('messages.search.inConversation')}
-                          className="w-full pl-9 pr-20 py-2 text-sm border border-[var(--color-border)] rounded-md bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                          className="w-full pl-9 pr-20 py-2 text-sm border border-border rounded-md bg-surface text-text-primary placeholder-(--color-text-muted) focus:outline-hidden focus:ring-2 focus:ring-primary focus:border-transparent"
                         />
 
                         {/* Clear Button */}
@@ -3099,7 +3097,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             onClick={resetMessageSearch}
-                            className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                            className="absolute right-16 p-1 rounded-full hover:bg-(--color-surface-hover) active:bg-(--color-surface-hover) text-(--color-text-muted) hover:text-text-primary transition-colors"
                             aria-label={t('messages.search.clearLabel')}
                           >
                             <svg
@@ -3121,7 +3119,7 @@ export default function MessagesPage() {
 
                         {/* Result Count */}
                         {hasActiveMessageSearch && (
-                          <div className="absolute right-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)] px-2 py-1 rounded">
+                          <div className="absolute right-3 flex items-center gap-1 text-xs text-(--color-text-muted) bg-(--color-surface-elevated) px-2 py-1 rounded-sm">
                             {isDecryptingForSearch ? (
                               <span>{t('messages.searching')}</span>
                             ) : (
@@ -3143,7 +3141,7 @@ export default function MessagesPage() {
                               e.target.value as 'all' | 'mine' | 'others'
                             )
                           }
-                          className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                          className="rounded-sm border border-border bg-surface px-2 py-1 text-xs text-text-primary"
                         >
                           <option value="all">{t('messages.search.filters.senderAll')}</option>
                           <option value="mine">{t('messages.search.filters.senderMine')}</option>
@@ -3157,14 +3155,14 @@ export default function MessagesPage() {
                             setMessageSearchDateRange(e.target.value as MessageSearchDateRange);
                             setMessageSearchRangePickedAtMs(Date.now());
                           }}
-                          className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                          className="rounded-sm border border-border bg-surface px-2 py-1 text-xs text-text-primary"
                         >
                           <option value="all">{t('messages.search.filters.dateAll')}</option>
                           <option value="24h">{t('messages.search.filters.date24h')}</option>
                           <option value="7d">{t('messages.search.filters.date7d')}</option>
                           <option value="30d">{t('messages.search.filters.date30d')}</option>
                         </select>
-                        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                        <label className="inline-flex items-center gap-1 text-xs text-text-secondary">
                           <input
                             type="checkbox"
                             checked={messageSearchHasFiles}
@@ -3172,7 +3170,7 @@ export default function MessagesPage() {
                           />
                           {t('messages.search.filters.hasFiles')}
                         </label>
-                        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                        <label className="inline-flex items-center gap-1 text-xs text-text-secondary">
                           <input
                             type="checkbox"
                             checked={messageSearchHasLinks}
@@ -3202,7 +3200,7 @@ export default function MessagesPage() {
               {/* Messages */}
               <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
                 {isCreatingChat ? (
-                  <div className="text-center text-sm text-[var(--color-text-secondary)]">
+                  <div className="text-center text-sm text-text-secondary">
                     {t('messages.startConversation')}
                   </div>
                 ) : loadingMessages ? (
@@ -3219,7 +3217,7 @@ export default function MessagesPage() {
                           type="button"
                           onClick={() => fetchMoreMessages()}
                           disabled={isFetchingMoreMessages}
-                          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                          className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) active:bg-(--color-surface-elevated) disabled:opacity-60"
                         >
                           {isFetchingMoreMessages
                             ? t('common.loading')
@@ -3233,7 +3231,7 @@ export default function MessagesPage() {
                       if (message.message_type === 'system') {
                         return (
                           <div key={message.id} className="flex justify-center my-1 px-4">
-                            <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs text-[var(--color-text-muted)] text-center max-w-[70%]">
+                            <span className="rounded-full bg-(--color-surface-elevated) px-3 py-1 text-xs text-(--color-text-muted) text-center max-w-[70%]">
                               {message.encrypted_content}
                             </span>
                           </div>
@@ -3304,12 +3302,12 @@ export default function MessagesPage() {
                             <div
                               className={`min-w-[120px] max-w-[70%] rounded-lg px-4 py-2 ${
                                 isOwnMessage
-                                  ? 'bg-[var(--color-primary)] text-white'
-                                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                                  ? 'bg-primary text-white'
+                                  : 'bg-(--color-surface-elevated) text-text-primary'
                               }`}
                             >
                               {isGroup && !isOwnMessage && (
-                                <p className="mb-0.5 truncate text-xs font-semibold text-[var(--color-primary)]">
+                                <p className="mb-0.5 truncate text-xs font-semibold text-primary">
                                   {senderUsername}
                                 </p>
                               )}
@@ -3372,9 +3370,7 @@ export default function MessagesPage() {
                                 searchResultMetaByMessageId.get(message.id)?.snippet && (
                                   <p
                                     className={`text-xs mb-1 ${
-                                      isOwnMessage
-                                        ? 'text-white/80'
-                                        : 'text-[var(--color-text-muted)]'
+                                      isOwnMessage ? 'text-white/80' : 'text-(--color-text-muted)'
                                     }`}
                                   >
                                     <HighlightedText
@@ -3385,7 +3381,7 @@ export default function MessagesPage() {
                                 )}
                               <div
                                 className={`text-xs flex items-center gap-1 ${
-                                  isOwnMessage ? 'text-white/70' : 'text-[var(--color-text-muted)]'
+                                  isOwnMessage ? 'text-white/70' : 'text-(--color-text-muted)'
                                 }`}
                               >
                                 {isModMail && (
@@ -3409,7 +3405,7 @@ export default function MessagesPage() {
                                     className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
                                       isOwnMessage
                                         ? 'bg-white/20 text-white'
-                                        : 'bg-[var(--color-primary)] text-white'
+                                        : 'bg-primary text-white'
                                     }`}
                                   >
                                     {t('messages.pinned.badge')}
@@ -3438,12 +3434,12 @@ export default function MessagesPage() {
                               </div>
                             </div>
                             <div
-                              className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? '!opacity-100' : ''}`}
+                              className={`relative opacity-40 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${messageMenuOpen === message.id ? 'opacity-100!' : ''}`}
                             >
                               <button
                                 type="button"
                                 aria-label={t('messages.messageOptions.ariaLabel')}
-                                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
+                                className="rounded-full border border-border bg-(--color-surface-elevated) px-2 py-1 text-xs font-semibold text-text-secondary transition hover:bg-surface active:bg-surface hover:text-text-primary"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setMessageMenuOpen((prev) =>
@@ -3455,7 +3451,7 @@ export default function MessagesPage() {
                               </button>
                               {messageMenuOpen === message.id && (
                                 <div
-                                  className={`absolute ${isOwnMessage ? 'left-0' : 'right-0'} z-20 mt-2 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg`}
+                                  className={`absolute ${isOwnMessage ? 'left-0' : 'right-0'} z-20 mt-2 w-44 rounded-md border border-border bg-surface p-2 shadow-lg`}
                                 >
                                   {message.media_url && (
                                     <DownloadButton
@@ -3467,7 +3463,7 @@ export default function MessagesPage() {
                                   {!isOwnMessage && (
                                     <button
                                       type="button"
-                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                       onClick={() => {
                                         if (!senderName) return;
                                         setMessageMenuOpen(null);
@@ -3479,7 +3475,7 @@ export default function MessagesPage() {
                                   )}
                                   <button
                                     type="button"
-                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                     disabled={
                                       pinMutationPending || (messagePinned && !canUnpinThisMessage)
                                     }
@@ -3504,7 +3500,7 @@ export default function MessagesPage() {
                                   {isEditable(message, user?.id) && (
                                     <button
                                       type="button"
-                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                       onClick={async () => {
                                         // Fix 7: decrypt on demand so edit form always starts with correct content
                                         const content = await decryptMessageForEdit(
@@ -3529,7 +3525,7 @@ export default function MessagesPage() {
                                   {isOwnMessage && message.edited && (
                                     <button
                                       type="button"
-                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                       onClick={async () => {
                                         // Fix 14: decrypt current content to show at top of history modal
                                         const content = await decryptMessageForEdit(
@@ -3551,7 +3547,7 @@ export default function MessagesPage() {
                                   )}
                                   <button
                                     type="button"
-                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                     onClick={() => {
                                       setReplyTargetMessage(message);
                                       setMessageMenuOpen(null);
@@ -3561,14 +3557,14 @@ export default function MessagesPage() {
                                   </button>
                                   <button
                                     type="button"
-                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                     onClick={() => handleOpenForwardDialog(message)}
                                   >
                                     {t('messages.actions.forward')}
                                   </button>
                                   <button
                                     type="button"
-                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                                     onClick={() => {
                                       setMessageMenuOpen(null);
                                       setDeleteDialogMessage(message);
@@ -3619,7 +3615,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             onClick={resetMessageSearch}
-                            className="mx-auto mt-3 block text-sm text-[var(--color-primary)] hover:underline"
+                            className="mx-auto mt-3 block text-sm text-primary hover:underline"
                           >
                             {t('messages.search.clearLabel')}
                           </button>
@@ -3632,11 +3628,11 @@ export default function MessagesPage() {
                           type="button"
                           onClick={() => setMessageSearchPage((prev) => Math.max(0, prev - 1))}
                           disabled={messageSearchPage === 0}
-                          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                          className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) disabled:opacity-50"
                         >
                           {t('common.back')}
                         </button>
-                        <span className="text-xs text-[var(--color-text-secondary)]">
+                        <span className="text-xs text-text-secondary">
                           {t('searchPage.pagination.page', { page: messageSearchPage + 1 })}
                         </span>
                         <button
@@ -3645,7 +3641,7 @@ export default function MessagesPage() {
                           disabled={
                             (messageSearchPage + 1) * SEARCH_PAGE_SIZE >= filteredMessageCount
                           }
-                          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                          className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) disabled:opacity-50"
                         >
                           {t('common.next')}
                         </button>
@@ -3662,14 +3658,14 @@ export default function MessagesPage() {
               </div>
 
               {/* Message Input */}
-              <div className="border-t border-[var(--color-border)] p-4">
+              <div className="border-t border-border p-4">
                 {isCreatingChat && (
                   <input
                     type="text"
                     value={newChatUsername}
                     onChange={(e) => setNewChatUsername(e.target.value)}
                     placeholder={t('messages.compose.enterUsername')}
-                    className="mb-2 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="mb-2 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                   />
                 )}
 
@@ -3677,12 +3673,12 @@ export default function MessagesPage() {
                 {showMultiUpload && !isCreatingChat && (
                   <div className="mb-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <h4 className="font-medium text-[var(--color-text-primary)]">
+                      <h4 className="font-medium text-text-primary">
                         {t('messages.uploadMultiple')}
                       </h4>
                       <button
                         onClick={() => setShowMultiUpload(false)}
-                        className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                        className="text-sm text-text-secondary hover:text-text-primary"
                       >
                         {t('common.cancel')}
                       </button>
@@ -3692,13 +3688,11 @@ export default function MessagesPage() {
                 )}
 
                 {selectedFile && (
-                  <div className="mb-2 flex items-center gap-2 rounded-md bg-[var(--color-surface-elevated)] p-2">
-                    <span className="text-sm text-[var(--color-text-secondary)]">
-                      {selectedFile.name}
-                    </span>
+                  <div className="mb-2 flex items-center gap-2 rounded-md bg-(--color-surface-elevated) p-2">
+                    <span className="text-sm text-text-secondary">{selectedFile.name}</span>
                     <button
                       onClick={() => setSelectedFile(null)}
-                      className="ml-auto text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                      className="ml-auto text-sm text-text-secondary hover:text-text-primary"
                     >
                       ✕
                     </button>
@@ -3728,7 +3722,7 @@ export default function MessagesPage() {
                 )}
 
                 {replyTargetMessage && !isCreatingChat && (
-                  <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1">
+                  <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-2 py-1">
                     <ReplyIndicator
                       parentUsername={
                         replyTargetMessage.sender_id === user?.id
@@ -3752,7 +3746,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={() => setReplyTargetMessage(null)}
-                      className="rounded px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]"
+                      className="rounded-sm px-2 py-1 text-xs font-semibold text-text-secondary hover:bg-surface"
                     >
                       {t('common.cancel')}
                     </button>
@@ -3769,7 +3763,7 @@ export default function MessagesPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
+                    className="rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary hover:bg-surface active:bg-surface"
                     title={t('messages.compose.attachSingle')}
                   >
                     📎
@@ -3778,7 +3772,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={() => setShowMultiUpload(!showMultiUpload)}
-                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
+                      className="rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary hover:bg-surface active:bg-surface"
                       title={t('messages.compose.attachMultiple')}
                     >
                       📷
@@ -3850,7 +3844,7 @@ export default function MessagesPage() {
                       }
                     }}
                     placeholder={t('messages.compose.placeholder')}
-                    className="min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                   />
                   <VoiceRecorderButton
                     onVoiceMessage={handleVoiceMessage}
@@ -3863,7 +3857,7 @@ export default function MessagesPage() {
                       uploadingMedia ||
                       (isCreatingChat && !newChatUsername.trim())
                     }
-                    className="shrink-0 whitespace-nowrap rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                    className="shrink-0 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark active:bg-primary-dark disabled:opacity-50"
                   >
                     {checkingMedia
                       ? t('messages.checkingFile')
@@ -3875,7 +3869,7 @@ export default function MessagesPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 items-center justify-center text-[var(--color-text-secondary)]">
+            <div className="flex flex-1 items-center justify-center text-text-secondary">
               {t('messages.selectConversation')}
             </div>
           )}
@@ -3904,13 +3898,13 @@ export default function MessagesPage() {
           }}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('messages.deleteMessage')}
             </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-secondary">
               {canDeleteForBoth
                 ? t('messages.deleteForBothPrompt')
                 : t('messages.deleteForSelfOnly')}
@@ -3918,7 +3912,7 @@ export default function MessagesPage() {
             <div className="mt-6 flex flex-col gap-3">
               <button
                 type="button"
-                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
                 onClick={() => handleDeleteMessageChoice('self')}
                 disabled={deleteMessageMutation.isPending}
               >
@@ -3929,7 +3923,7 @@ export default function MessagesPage() {
               {canDeleteForBoth && (
                 <button
                   type="button"
-                  className="rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-md bg-(--color-error) px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                   onClick={() => handleDeleteMessageChoice('both')}
                   disabled={deleteMessageMutation.isPending}
                 >
@@ -3940,7 +3934,7 @@ export default function MessagesPage() {
               )}
               <button
                 type="button"
-                className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary disabled:opacity-50"
                 onClick={() => {
                   if (!deleteMessageMutation.isPending) {
                     setDeleteDialogMessage(null);
@@ -3967,19 +3961,19 @@ export default function MessagesPage() {
           }}
         >
           <div
-            className="w-full max-w-lg rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('messages.forward.title', { defaultValue: 'Forward Message' })}
             </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-secondary">
               {t('messages.forward.subtitle', {
                 defaultValue: 'Choose up to 10 conversations.',
               })}
             </p>
             {Boolean(forwardDialogMessage.media_url || forwardDialogMessage.media_file_id) && (
-              <label className="mt-4 flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+              <label className="mt-4 flex items-center gap-2 text-sm text-text-primary">
                 <input
                   type="checkbox"
                   checked={forwardIncludeMedia}
@@ -3989,9 +3983,9 @@ export default function MessagesPage() {
                 {t('messages.forward.includeMedia', { defaultValue: 'Include media' })}
               </label>
             )}
-            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto rounded-md border border-border p-2">
               {forwardCandidateConversations.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-sm text-text-secondary">
                   {t('messages.forward.noEligibleConversations', {
                     defaultValue: 'No eligible conversations found.',
                   })}
@@ -4006,7 +4000,7 @@ export default function MessagesPage() {
                   return (
                     <label
                       key={conversation.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-[var(--color-surface-elevated)]"
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-(--color-surface-elevated)"
                     >
                       <input
                         type="checkbox"
@@ -4017,13 +4011,13 @@ export default function MessagesPage() {
                           (!selected && forwardTargetConversationIDs.size >= 10)
                         }
                       />
-                      <span className="text-sm text-[var(--color-text-primary)]">{label}</span>
+                      <span className="text-sm text-text-primary">{label}</span>
                     </label>
                   );
                 })
               )}
             </div>
-            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-xs text-text-secondary">
               {t('messages.forward.selectionCount', {
                 defaultValue: '{{count}} selected',
                 count: forwardTargetConversationIDs.size,
@@ -4032,7 +4026,7 @@ export default function MessagesPage() {
             <div className="mt-6 flex flex-col gap-3">
               <button
                 type="button"
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
                 onClick={handleConfirmForward}
                 disabled={
                   forwardMessageMutation.isPending || forwardTargetConversationIDs.size === 0
@@ -4044,7 +4038,7 @@ export default function MessagesPage() {
               </button>
               <button
                 type="button"
-                className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
                 onClick={() => {
                   if (!forwardMessageMutation.isPending) {
                     setForwardDialogMessage(null);
@@ -4072,21 +4066,21 @@ export default function MessagesPage() {
           }}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('messages.deleteConversation')}
             </h3>
             {deleteConversationDialog.conversation_type === 'mod_mail' ? (
               <>
-                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-2 text-sm text-text-secondary">
                   {t('messages.deleteModMailPrompt')}
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
                   <button
                     type="button"
-                    className="rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                    className="rounded-md bg-(--color-error) px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     onClick={() => {
                       deleteConversationMutation.mutate({
                         conversationId: deleteConversationDialog.id,
@@ -4101,7 +4095,7 @@ export default function MessagesPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                    className="rounded-md px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary disabled:opacity-50"
                     onClick={() => {
                       if (!deleteConversationMutation.isPending) {
                         setDeleteConversationDialog(null);
@@ -4115,13 +4109,13 @@ export default function MessagesPage() {
               </>
             ) : (
               <>
-                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-2 text-sm text-text-secondary">
                   {t('messages.deleteConversationPrompt')}
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
                   <button
                     type="button"
-                    className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                    className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
                     onClick={() => {
                       deleteConversationMutation.mutate({
                         conversationId: deleteConversationDialog.id,
@@ -4136,7 +4130,7 @@ export default function MessagesPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                    className="rounded-md bg-(--color-error) px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     onClick={() => {
                       deleteConversationMutation.mutate({
                         conversationId: deleteConversationDialog.id,
@@ -4151,7 +4145,7 @@ export default function MessagesPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                    className="rounded-md px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary disabled:opacity-50"
                     onClick={() => {
                       if (!deleteConversationMutation.isPending) {
                         setDeleteConversationDialog(null);
@@ -4230,14 +4224,14 @@ export default function MessagesPage() {
       {/* Reddit/Hub slideshow modal */}
       {redditSlideshowModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-          <div className="w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-lg">
+          <div className="w-full max-w-md rounded-lg bg-surface p-6 shadow-lg">
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-lg font-semibold text-text-primary">
                 {t('messages.browseRedditHubScroll')}
               </h3>
               <button
                 onClick={() => setRedditSlideshowModalOpen(false)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                className="text-text-secondary hover:text-text-primary"
               >
                 ✕
               </button>
@@ -4245,7 +4239,7 @@ export default function MessagesPage() {
 
             <div className="space-y-4">
               <div className="relative">
-                <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+                <label className="mb-2 block text-sm font-medium text-text-secondary">
                   {t('messages.enterSubredditHub')}
                 </label>
                 <input
@@ -4260,7 +4254,7 @@ export default function MessagesPage() {
                   onFocus={() => setRedditSlideshowAutocompleteOpen(true)}
                   onBlur={() => setTimeout(() => setRedditSlideshowAutocompleteOpen(false), 200)}
                   placeholder={t('messages.compose.hubSubredditPlaceholder')}
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       handleLoadRedditSlideshow();
@@ -4270,9 +4264,9 @@ export default function MessagesPage() {
 
                 {/* Autocomplete dropdown */}
                 {redditSlideshowAutocompleteOpen && redditSlideshowShouldShowSuggestions && (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg">
                     {redditSlideshowAutocompleteLoading ? (
-                      <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
+                      <div className="p-3 text-center text-sm text-text-secondary">
                         {t('messages.loadingSuggestions')}
                       </div>
                     ) : redditSlideshowSuggestions.length > 0 ? (
@@ -4287,7 +4281,7 @@ export default function MessagesPage() {
                               suggestion.data.name
                             );
                           }}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-(--color-surface-hover) flex items-center"
                         >
                           <span
                             className={`font-medium ${suggestion.type === 'hub' ? 'text-blue-600' : 'text-orange-600'}`}
@@ -4296,13 +4290,11 @@ export default function MessagesPage() {
                               ? t('common.prefix.hub', 'h/')
                               : t('common.prefix.subreddit', 'r/')}
                           </span>
-                          <span className="text-[var(--color-text-primary)]">
-                            {suggestion.data.name}
-                          </span>
+                          <span className="text-text-primary">{suggestion.data.name}</span>
                         </button>
                       ))
                     ) : (
-                      <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
+                      <div className="p-3 text-center text-sm text-text-secondary">
                         {t('messages.noSuggestions')}
                       </div>
                     )}
@@ -4313,14 +4305,14 @@ export default function MessagesPage() {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setRedditSlideshowModalOpen(false)}
-                  className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                  className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleLoadRedditSlideshow}
                   disabled={!redditSlideshowTrimmedInput || isLoadingRedditPosts}
-                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoadingRedditPosts ? t('common.loading') : t('messages.loadScroll')}
                 </button>
@@ -4357,20 +4349,20 @@ export default function MessagesPage() {
             onClick={() => setShowMobileFolderSheet(false)}
           />
           {/* Sheet */}
-          <div className="relative max-h-[80vh] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] pb-safe">
+          <div className="relative max-h-[80vh] overflow-hidden rounded-t-2xl bg-surface pb-safe">
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="h-1 w-10 rounded-full bg-[var(--color-border)]" />
+              <div className="h-1 w-10 rounded-full bg-border" />
             </div>
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-base font-semibold text-text-primary">
                 {t('messages.folders.manageFolder')}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowMobileFolderSheet(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary hover:bg-(--color-hover) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label={t('messages.folders.cancel')}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -4449,18 +4441,18 @@ export default function MessagesPage() {
             }
           }}
         >
-          <div className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-xl">
             <h2
               id={deleteFolderDialogTitleId}
-              className="mb-2 text-base font-semibold text-[var(--color-text-primary)]"
+              className="mb-2 text-base font-semibold text-text-primary"
             >
               {t('messages.folders.deleteFolder')}
             </h2>
-            <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+            <p className="mb-4 text-sm text-text-secondary">
               {t('messages.folders.deleteConfirm', { name: deleteFolderTarget.name })}
             </p>
             {deleteFolderError && (
-              <p className="mb-3 rounded-lg bg-[var(--color-error)]/10 px-3 py-2 text-xs font-medium text-[var(--color-error)]">
+              <p className="mb-3 rounded-lg bg-(--color-error)/10 px-3 py-2 text-xs font-medium text-(--color-error)">
                 {deleteFolderError}
               </p>
             )}
@@ -4472,7 +4464,7 @@ export default function MessagesPage() {
                   setDeleteFolderError('');
                 }}
                 disabled={isDeletingFolder}
-                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
+                className="flex-1 rounded-lg border border-border py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-hover) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
               >
                 {t('messages.folders.cancel')}
               </button>
@@ -4488,7 +4480,7 @@ export default function MessagesPage() {
                     setDeleteFolderError(t('messages.folders.deleteError'));
                   }
                 }}
-                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)] disabled:opacity-50"
+                className="flex-1 rounded-lg bg-(--color-error) py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-error) disabled:opacity-50"
               >
                 {isDeletingFolder ? (
                   <span className="inline-flex items-center justify-center gap-1.5">
@@ -4581,11 +4573,11 @@ export default function MessagesPage() {
       {/* Issue 10: Call error overlay — shown when media permissions or device access fails */}
       {callError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-[var(--color-surface)] rounded-2xl p-6 max-w-sm mx-4 text-center shadow-xl">
-            <p className="text-[var(--color-text-primary)] font-semibold mb-4">{callError}</p>
+          <div className="bg-surface rounded-2xl p-6 max-w-sm mx-4 text-center shadow-xl">
+            <p className="text-text-primary font-semibold mb-4">{callError}</p>
             <button
               onClick={clearCallError}
-              className="px-6 py-2 rounded-full bg-[var(--color-primary)] text-white font-semibold"
+              className="px-6 py-2 rounded-full bg-primary text-white font-semibold"
             >
               {t('common.ok')}
             </button>

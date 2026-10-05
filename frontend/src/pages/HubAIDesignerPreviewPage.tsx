@@ -162,32 +162,32 @@ export default function HubAIDesignerPreviewPage() {
 
   if (designLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[var(--color-background)]">
-        <p className="text-[var(--color-text-secondary)]">Loading design...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <p className="text-text-secondary">Loading design...</p>
       </div>
     );
   }
 
   if (!designData?.design) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[var(--color-background)]">
-        <p className="text-[var(--color-text-secondary)]">Design not found.</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <p className="text-text-secondary">Design not found.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--color-background)]">
+    <div className="flex flex-col min-h-screen bg-background">
       {/* Top bar */}
-      <div className="sticky top-0 z-50 flex items-center justify-between px-4 py-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] shadow-sm">
+      <div className="sticky top-0 z-50 flex items-center justify-between px-4 py-2 bg-surface border-b border-border shadow-xs">
         <button
           onClick={() => navigate(`/h/${hubName}/settings?tab=ai-designer`)}
-          className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
         >
           ← Back to Settings
         </button>
 
-        <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+        <span className="text-sm font-semibold text-text-primary">
           {designData.design.name}
           {isDirty && (
             <span className="ml-2 text-xs font-normal text-amber-500">Unsaved changes</span>
@@ -197,17 +197,17 @@ export default function HubAIDesignerPreviewPage() {
         <button
           onClick={() => activateMutation.mutate()}
           disabled={activateMutation.isPending}
-          className="px-4 py-1.5 text-sm font-semibold bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50"
+          className="px-4 py-1.5 text-sm font-semibold bg-primary text-white rounded-sm hover:bg-primary-dark transition-colors disabled:opacity-50"
         >
           {activateMutation.isPending ? 'Publishing…' : 'Publish'}
         </button>
       </div>
 
       {/* AI Chat panel */}
-      <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="border-b border-border bg-surface">
         <button
           onClick={() => setChatOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-text-primary hover:bg-background transition-colors"
         >
           <span>✨ AI Chat — ask the AI to refine this design</span>
           <span>{chatOpen ? '▲' : '▼'}</span>
@@ -222,19 +222,19 @@ export default function HubAIDesignerPreviewPage() {
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChat()}
                 placeholder='e.g. "Make the hero darker" or "Add a welcome banner at the top"'
                 disabled={chatLoading}
-                className="flex-1 px-3 py-2 text-sm rounded border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm rounded-sm border border-border bg-background text-text-primary placeholder-(--color-text-muted) focus:outline-hidden focus:border-primary disabled:opacity-50"
               />
               <button
                 onClick={handleChat}
                 disabled={!chatMessage.trim() || chatLoading}
-                className="px-4 py-2 text-sm font-semibold bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-dark)] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-sm hover:bg-primary-dark disabled:opacity-50 transition-colors"
               >
                 {chatLoading ? 'Thinking…' : 'Send'}
               </button>
             </div>
             {chatError && <p className="text-xs text-red-500">{chatError}</p>}
             {chatLoading && (
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 AI is refining the design — this may take up to 60 seconds…
               </p>
             )}
@@ -256,7 +256,7 @@ export default function HubAIDesignerPreviewPage() {
       </div>
 
       {/* IDE panel */}
-      <div className="sticky bottom-0 z-50 border-t border-[var(--color-border)] bg-[#282c34]">
+      <div className="sticky bottom-0 z-50 border-t border-border bg-[#282c34]">
         <div className="flex items-center justify-between px-4 py-2 bg-[#21252b]">
           <button
             onClick={() => setEditorOpen((o) => !o)}
@@ -265,16 +265,16 @@ export default function HubAIDesignerPreviewPage() {
             <span>{'</>'} Editor</span>
             <span className="text-xs">{editorOpen ? '▼' : '▲'}</span>
           </button>
-          <div className="flex rounded overflow-hidden border border-gray-600">
+          <div className="flex rounded-sm overflow-hidden border border-gray-600">
             <button
               onClick={() => setActiveEditor('html')}
-              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'html' ? 'bg-[var(--color-primary)] text-white' : 'text-gray-300 hover:text-white'}`}
+              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'html' ? 'bg-primary text-white' : 'text-gray-300 hover:text-white'}`}
             >
               HTML
             </button>
             <button
               onClick={() => setActiveEditor('css')}
-              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'css' ? 'bg-[var(--color-primary)] text-white' : 'text-gray-300 hover:text-white'}`}
+              className={`px-3 py-1 text-xs transition-colors ${activeEditor === 'css' ? 'bg-primary text-white' : 'text-gray-300 hover:text-white'}`}
             >
               CSS
             </button>
@@ -285,12 +285,12 @@ export default function HubAIDesignerPreviewPage() {
               <div className="relative">
                 <button
                   onClick={() => setVersionPanelOpen((o) => !o)}
-                  className="px-3 py-1 text-xs text-gray-300 hover:text-white border border-gray-600 rounded transition-colors"
+                  className="px-3 py-1 text-xs text-gray-300 hover:text-white border border-gray-600 rounded-sm transition-colors"
                 >
                   History ({versionsData.versions.length})
                 </button>
                 {versionPanelOpen && (
-                  <div className="absolute bottom-full right-0 mb-1 w-64 bg-[#21252b] border border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto z-50">
+                  <div className="absolute bottom-full right-0 mb-1 w-64 bg-[#21252b] border border-gray-600 rounded-sm shadow-lg max-h-48 overflow-y-auto z-50">
                     {versionsData.versions.map((v, i) => (
                       <button
                         key={v.id}
@@ -311,7 +311,7 @@ export default function HubAIDesignerPreviewPage() {
             <button
               onClick={handleCancel}
               disabled={!isDirty}
-              className="px-3 py-1 text-xs text-gray-300 hover:text-white border border-gray-600 rounded disabled:opacity-30 transition-colors"
+              className="px-3 py-1 text-xs text-gray-300 hover:text-white border border-gray-600 rounded-sm disabled:opacity-30 transition-colors"
             >
               Cancel
             </button>
@@ -319,7 +319,7 @@ export default function HubAIDesignerPreviewPage() {
             <button
               onClick={() => saveMutation.mutate()}
               disabled={!isDirty || saveMutation.isPending}
-              className="px-3 py-1 text-xs font-semibold text-white bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] rounded disabled:opacity-40 transition-colors"
+              className="px-3 py-1 text-xs font-semibold text-white bg-primary hover:bg-primary-dark rounded-sm disabled:opacity-40 transition-colors"
             >
               {saveMutation.isPending ? 'Saving…' : 'Save'}
             </button>

@@ -316,13 +316,13 @@ function ConversationRow({
                 ? 'border-red-400/30 bg-red-500/10 text-white'
                 : active
                   ? 'border-white/15 bg-white/8 shadow-[0_18px_60px_rgba(0,0,0,0.22)]'
-                  : 'border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.04]'
+                  : 'border-transparent bg-transparent hover:border-white/10 hover:bg-white/4'
             }`}
           >
             {conversation.persona && (
               <PersonaAvatar
                 persona={conversation.persona}
-                className="h-10 w-10 flex-shrink-0 rounded-full"
+                className="h-10 w-10 shrink-0 rounded-full"
               />
             )}
             {!compact && (
@@ -2143,7 +2143,7 @@ export default function OmniChatChatPage() {
       <div className="h-[calc(100dvh-var(--omnichat-header-offset))] overflow-hidden bg-[#111114]">
         <div
           data-testid="omnichat-chat-grid"
-          className="grid h-full grid-cols-1 lg:grid-cols-[var(--omnichat-chat-grid-columns)]"
+          className="grid h-full grid-cols-1 lg:grid-cols-(--omnichat-chat-grid-columns)"
           style={
             {
               ['--omnichat-chat-grid-columns' as string]: chatGridColumns,
@@ -2167,7 +2167,7 @@ export default function OmniChatChatPage() {
                     type="button"
                     onClick={() => setChatListCollapsed(false)}
                     aria-label="Expand chat list"
-                    className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.08] hover:text-white"
+                    className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/4 text-white/70 transition hover:bg-white/8 hover:text-white"
                   >
                     <ChevronRight size={18} />
                   </button>
@@ -2180,7 +2180,7 @@ export default function OmniChatChatPage() {
                       <button
                         type="button"
                         onClick={handleNewChat}
-                        className="omnichat-touch-target rounded-full bg-white/12 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-[var(--color-primary)]"
+                        className="omnichat-touch-target rounded-full bg-white/12 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-primary"
                       >
                         + {t('omnichat.chat.newChat')}
                       </button>
@@ -2188,7 +2188,7 @@ export default function OmniChatChatPage() {
                         type="button"
                         onClick={() => setChatListCollapsed(true)}
                         aria-label="Collapse chat list"
-                        className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.08] hover:text-white lg:flex"
+                        className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/4 text-white/70 transition hover:bg-white/8 hover:text-white lg:flex"
                       >
                         <ChevronLeft size={18} />
                       </button>
@@ -2209,7 +2209,7 @@ export default function OmniChatChatPage() {
                       value={directoryQuery}
                       onChange={(event) => setDirectoryQuery(event.target.value)}
                       placeholder={t('omnichat.conversationsPage.searchPlaceholder')}
-                      className="h-12 w-full rounded-[22px] border border-white/10 bg-white/[0.06] pl-[3.25rem] pr-4 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-[var(--color-primary)]"
+                      className="h-12 w-full rounded-[22px] border border-white/10 bg-white/6 pl-13 pr-4 text-sm text-white placeholder:text-white/35 outline-hidden transition focus:border-primary"
                     />
                   </div>
 
@@ -2229,8 +2229,8 @@ export default function OmniChatChatPage() {
                             active
                               ? 'border-rose-400 bg-transparent text-white'
                               : supported
-                                ? 'border-transparent bg-white/[0.06] text-white/70 hover:bg-white/[0.09]'
-                                : 'border-transparent bg-white/[0.04] text-white/35'
+                                ? 'border-transparent bg-white/6 text-white/70 hover:bg-white/9'
+                                : 'border-transparent bg-white/4 text-white/35'
                           }`}
                         >
                           {t(`omnichat.conversationsPage.filters.${filter}`)}
@@ -2250,7 +2250,7 @@ export default function OmniChatChatPage() {
                   ) : personasQuery.isError ? (
                     <ErrorMessage>{t('omnichat.discover.loadError')}</ErrorMessage>
                   ) : filteredGuestPersonas.length === 0 ? (
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
+                    <div className="rounded-[24px] border border-white/10 bg-white/3 p-5 text-sm text-white/60">
                       {t('omnichat.conversationsPage.empty')}
                     </div>
                   ) : (
@@ -2260,7 +2260,7 @@ export default function OmniChatChatPage() {
                         type="button"
                         onClick={() => handleSelectPersona(persona)}
                         title={effectiveChatListCollapsed ? persona.name : undefined}
-                        className={`flex w-full items-center rounded-[24px] border border-transparent text-left transition hover:border-white/10 hover:bg-white/[0.04] ${
+                        className={`flex w-full items-center rounded-[24px] border border-transparent text-left transition hover:border-white/10 hover:bg-white/4 ${
                           effectiveChatListCollapsed
                             ? 'justify-center px-2 py-3'
                             : 'gap-3 px-3 py-3'
@@ -2268,7 +2268,7 @@ export default function OmniChatChatPage() {
                       >
                         <PersonaAvatar
                           persona={persona}
-                          className="h-12 w-12 flex-shrink-0 rounded-full"
+                          className="h-12 w-12 shrink-0 rounded-full"
                         />
                         {!effectiveChatListCollapsed && (
                           <div className="min-w-0 flex-1">
@@ -2289,7 +2289,7 @@ export default function OmniChatChatPage() {
                 ) : conversationsQuery.isError ? (
                   <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>
                 ) : filteredConversations.length === 0 ? (
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
+                  <div className="rounded-[24px] border border-white/10 bg-white/3 p-5 text-sm text-white/60">
                     {t('omnichat.conversationsPage.empty')}
                   </div>
                 ) : (
@@ -2338,7 +2338,7 @@ export default function OmniChatChatPage() {
                       type="button"
                       onClick={() => setMobilePane('list')}
                       aria-label="Back to chats"
-                      className="omnichat-touch-target ml-12 flex flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/75 transition hover:bg-white/[0.08] hover:text-white lg:ml-0"
+                      className="omnichat-touch-target ml-12 flex shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/4 text-white/75 transition hover:bg-white/8 hover:text-white lg:ml-0"
                     >
                       <ChevronLeft size={18} />
                     </button>
@@ -2347,7 +2347,7 @@ export default function OmniChatChatPage() {
                     <button
                       type="button"
                       onClick={() => setMobilePane('profile')}
-                      className="flex-shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2"
+                      className="shrink-0 rounded-full focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                       // The header now has an explicit "Open profile pane"
                       // control, so the avatar describes what it actually is
                       // rather than duplicating that label.
@@ -2367,7 +2367,7 @@ export default function OmniChatChatPage() {
                   {activePersona && !mobileChatMode && (
                     <PersonaAvatar
                       persona={activePersona}
-                      className={`h-14 w-14 flex-shrink-0 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
+                      className={`h-14 w-14 shrink-0 rounded-full ${arrivedFromQuickChat ? 'omnichat-chat-avatar-arrival' : ''}`}
                       style={
                         arrivedFromQuickChat
                           ? { viewTransitionName: OMNICHAT_PERSONA_TRANSITION_NAME }
@@ -2384,7 +2384,7 @@ export default function OmniChatChatPage() {
                         type="button"
                         onClick={() => setShowModelSelector(true)}
                         aria-label={`Change conversation model. Current model: ${modelLabel}`}
-                        className="relative z-10 mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] text-[11px] font-semibold text-white/55 transition hover:border-[#5d8fff]/50 hover:bg-[#315ca8]/15 hover:text-white sm:w-auto sm:gap-1.5 sm:px-2.5"
+                        className="relative z-10 mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/4.5 text-[11px] font-semibold text-white/55 transition hover:border-[#5d8fff]/50 hover:bg-[#315ca8]/15 hover:text-white sm:w-auto sm:gap-1.5 sm:px-2.5"
                       >
                         <Zap size={12} className="text-[#7da8ff]" />
                         <span className="hidden sm:inline">{modelLabel}</span>
@@ -2394,10 +2394,10 @@ export default function OmniChatChatPage() {
                 </div>
 
                 {mobileChatMode && isAuthenticated && activePersona && selectedConversationId && (
-                  // flex-shrink-0 keeps the action row from being squeezed into
+                  // shrink-0 keeps the action row from being squeezed into
                   // the persona block; without it the extra controls overlap the
                   // avatar and push the name out of the header entirely.
-                  <div className="flex flex-shrink-0 items-center gap-0">
+                  <div className="flex shrink-0 items-center gap-0">
                     {!inCallHere && (
                       <button
                         type="button"
@@ -2578,8 +2578,8 @@ export default function OmniChatChatPage() {
                         <div
                           className={`rounded-[26px] px-4 py-3 text-[0.95rem] ${
                             message.role === 'user'
-                              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-                              : 'border border-white/8 bg-white/[0.06] text-white'
+                              ? 'bg-linear-to-br from-blue-500 to-blue-600 text-white'
+                              : 'border border-white/8 bg-white/6 text-white'
                           }`}
                         >
                           {isEditingMessage ? (
@@ -2600,7 +2600,7 @@ export default function OmniChatChatPage() {
                                     saveEdit(message.id);
                                   }
                                 }}
-                                className="min-h-28 w-full resize-y rounded-2xl border border-white/15 bg-black/20 px-3 py-2 text-sm leading-relaxed text-white outline-none focus:border-blue-400/70 focus:ring-2 focus:ring-blue-400/20"
+                                className="min-h-28 w-full resize-y rounded-2xl border border-white/15 bg-black/20 px-3 py-2 text-sm leading-relaxed text-white outline-hidden focus:border-blue-400/70 focus:ring-2 focus:ring-blue-400/20"
                               />
                               <p className="text-[11px] text-white/45">
                                 {t('omnichat.chat.editLearningHint')}
@@ -2673,7 +2673,7 @@ export default function OmniChatChatPage() {
                                   disabled={isGenerating || isEditing}
                                   aria-label={t('omnichat.chat.regenerateResponse')}
                                   title={t('omnichat.chat.regenerateResponse')}
-                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
                                 >
                                   <RotateCcw
                                     size={14}
@@ -2688,7 +2688,7 @@ export default function OmniChatChatPage() {
                                   disabled={isGenerating || isEditing}
                                   aria-label={t('omnichat.chat.editResponse')}
                                   title={t('omnichat.chat.editResponse')}
-                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                  className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-not-allowed disabled:opacity-40 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
                                 >
                                   <Pencil size={13} />
                                 </button>
@@ -2708,7 +2708,7 @@ export default function OmniChatChatPage() {
                                     }}
                                     aria-label={t('omnichat.chat.reportResponse')}
                                     title={t('omnichat.chat.reportResponse')}
-                                    className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
+                                    className="omnichat-touch-target flex items-center justify-center rounded-full border border-white/10 bg-[#24242a] text-white/60 shadow-lg shadow-black/25 transition hover:border-white/20 hover:bg-[#2d2d34] hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/70 md:h-7 md:min-h-0 md:w-7 md:min-w-0"
                                   >
                                     <Flag size={13} />
                                   </button>
@@ -2735,7 +2735,7 @@ export default function OmniChatChatPage() {
 
                 {isSendingMessage && (
                   <div className="flex justify-start">
-                    <div className="rounded-[26px] border border-white/8 bg-white/[0.06] px-4 py-3 text-white">
+                    <div className="rounded-[26px] border border-white/8 bg-white/6 px-4 py-3 text-white">
                       {normalizedStreamingText ? (
                         <OmniChatMessageContent content={normalizedStreamingText} isAssistant />
                       ) : (
@@ -2777,7 +2777,7 @@ export default function OmniChatChatPage() {
                           !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
                         )
                       }
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
                     >
                       <ImageIcon size={14} /> Scene photo
                     </button>
@@ -2792,7 +2792,7 @@ export default function OmniChatChatPage() {
                           !['succeeded', 'failed', 'cancelled'].includes(activeMediaJob.status)
                         )
                       }
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
                     >
                       <Film size={14} /> Scene video
                     </button>
@@ -2826,8 +2826,8 @@ export default function OmniChatChatPage() {
                       </div>
                     )}
                     <span className="basis-full px-1 text-[11px] text-white/35">
-                      Use <code className="rounded bg-white/10 px-1">/photo</code> or{' '}
-                      <code className="rounded bg-white/10 px-1">/video</code> followed by a
+                      Use <code className="rounded-sm bg-white/10 px-1">/photo</code> or{' '}
+                      <code className="rounded-sm bg-white/10 px-1">/video</code> followed by a
                       description of the character or scene to generate photos or videos.
                     </span>
                   </div>
@@ -2882,7 +2882,7 @@ export default function OmniChatChatPage() {
               )}
               <form
                 onSubmit={handleSubmit}
-                className="rounded-[28px] border border-white/10 bg-white/[0.06] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
+                className="rounded-[28px] border border-white/10 bg-white/6 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
               >
                 <div className="relative">
                   {rateLimitError && (
@@ -2930,7 +2930,7 @@ export default function OmniChatChatPage() {
                       rows={1}
                       enterKeyHint="send"
                       style={{ minHeight: '36px', maxHeight: '160px' }}
-                      className="min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-sm leading-6 text-white placeholder:text-white/35 outline-none sm:ml-4"
+                      className="min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-sm leading-6 text-white placeholder:text-white/35 outline-hidden sm:ml-4"
                     />
                     <button
                       type="submit"
@@ -2940,7 +2940,7 @@ export default function OmniChatChatPage() {
                         !activePersona ||
                         (allowanceExhausted && !draftMediaCommand)
                       }
-                      className="omnichat-touch-target flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-50 sm:px-5"
+                      className="omnichat-touch-target flex shrink-0 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-dark disabled:opacity-50 sm:px-5"
                     >
                       {isGenerating ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -2954,7 +2954,7 @@ export default function OmniChatChatPage() {
                         onClick={() => setNewChatMenuOpen((open) => !open)}
                         title={t('omnichat.chat.newChat')}
                         aria-label={t('omnichat.chat.newChat')}
-                        className="omnichat-touch-target flex flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-[var(--color-primary)] hover:text-white"
+                        className="omnichat-touch-target flex shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-primary hover:text-white"
                       >
                         <Plus size={14} />
                       </button>
@@ -3000,7 +3000,7 @@ export default function OmniChatChatPage() {
             }
             className={`min-h-0 flex-col bg-[#121216] transition-transform duration-300 ${
               profilePaneInDrawer
-                ? 'fixed bottom-0 right-0 top-[var(--omnichat-header-offset)] z-40 flex w-[var(--omnichat-profile-drawer-width)] max-w-[calc(100vw-24px)] border-l border-white/10 shadow-2xl'
+                ? 'fixed bottom-0 right-0 top-(--omnichat-header-offset) z-40 flex w-(--omnichat-profile-drawer-width) max-w-[calc(100vw-24px)] border-l border-white/10 shadow-2xl'
                 : showMobileProfilePane
                   ? 'flex w-full'
                   : profilePaneInDesktopGrid
@@ -3019,7 +3019,7 @@ export default function OmniChatChatPage() {
                     type="button"
                     onClick={() => setMobilePane('chat')}
                     aria-label="Back to chat"
-                    className="omnichat-touch-target ml-12 flex flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/75 transition hover:bg-white/[0.08] hover:text-white lg:ml-0"
+                    className="omnichat-touch-target ml-12 flex shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/4 text-white/75 transition hover:bg-white/8 hover:text-white lg:ml-0"
                   >
                     <ChevronLeft size={18} />
                   </button>
@@ -3057,12 +3057,12 @@ export default function OmniChatChatPage() {
               {activePersona ? (
                 <>
                   <div
-                    className="group/avatar relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04]"
+                    className="group/avatar relative overflow-hidden rounded-[28px] border border-white/10 bg-white/4"
                     onMouseEnter={() => setIsAvatarHovered(true)}
                     onMouseLeave={() => setIsAvatarHovered(false)}
                   >
                     {hasVideo ? (
-                      <div className="relative aspect-[4/5] w-full">
+                      <div className="relative aspect-4/5 w-full">
                         <div
                           className="absolute inset-0 transition-transform duration-500 ease-in-out"
                           style={{ transform: `translateX(${showVideo ? '-100%' : '0%'})` }}
@@ -3087,16 +3087,16 @@ export default function OmniChatChatPage() {
                         </div>
                       </div>
                     ) : (
-                      <PersonaAvatar persona={activePersona} className="aspect-[4/5] w-full" />
+                      <PersonaAvatar persona={activePersona} className="aspect-4/5 w-full" />
                     )}
-                    <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
                     {hasVideo && (isAvatarHovered || mobileChatMode) && (
                       <>
                         <button
                           type="button"
                           onClick={() => setShowVideo(false)}
                           aria-label={t('omnichat.chat.showProfileImage')}
-                          className="omnichat-touch-target absolute left-3 top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
+                          className="omnichat-touch-target absolute left-3 top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-xs transition-all hover:bg-black/80 hover:text-white"
                         >
                           <ChevronLeft size={20} />
                         </button>
@@ -3104,7 +3104,7 @@ export default function OmniChatChatPage() {
                           type="button"
                           onClick={() => setShowVideo(true)}
                           aria-label={t('omnichat.chat.showProfileVideo')}
-                          className="omnichat-touch-target absolute right-3 top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
+                          className="omnichat-touch-target absolute right-3 top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-xs transition-all hover:bg-black/80 hover:text-white"
                         >
                           <ChevronRight size={20} />
                         </button>
@@ -3114,7 +3114,7 @@ export default function OmniChatChatPage() {
 
                   <div className="mt-5 flex items-start justify-between gap-3">
                     <div className="overflow-hidden">
-                      <h3 className="break-words text-[2.1rem] font-semibold leading-none text-white">
+                      <h3 className="wrap-break-word text-[2.1rem] font-semibold leading-none text-white">
                         {activePersona.name}
                       </h3>
                       {activePersona.description && (
@@ -3135,7 +3135,7 @@ export default function OmniChatChatPage() {
                           <img
                             src={resolveMediaUrl(url)}
                             alt={`${activePersona.name} gallery ${index + 1}`}
-                            className="aspect-[4/5] w-full object-cover"
+                            className="aspect-4/5 w-full object-cover"
                           />
                         </div>
                       ))}
@@ -3143,7 +3143,7 @@ export default function OmniChatChatPage() {
                   )}
                 </>
               ) : (
-                <div className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6 text-white/55">
+                <div className="rounded-[30px] border border-white/10 bg-white/4 p-6 text-white/55">
                   {t('omnichat.chat.noPersonaSelected')}
                 </div>
               )}
@@ -3200,7 +3200,7 @@ export default function OmniChatChatPage() {
           onClose={() => setPendingChatShare(null)}
           closeOnOverlayClick
           ariaLabelledBy="omnichat-publish-chat-title"
-          overlayClassName="z-[90] bg-black/75"
+          overlayClassName="z-90 bg-black/75"
           className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#1a1b22] p-6 shadow-2xl"
         >
           <h2 id="omnichat-publish-chat-title" className="text-xl font-semibold text-white">

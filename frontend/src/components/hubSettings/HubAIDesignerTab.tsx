@@ -97,34 +97,34 @@ export default function HubAIDesignerTab({ hubName }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">AI Hub Page Designer</h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <h2 className="text-xl font-bold text-text-primary">AI Hub Page Designer</h2>
+        <p className="mt-1 text-sm text-text-secondary">
           Describe your ideal Hub page and AI will generate the HTML layout for you. Designs are
           previewed in a sandboxed iframe with script isolation.
         </p>
       </div>
 
       {/* Prompt form */}
-      <div className="border border-[var(--color-border)] rounded p-4 space-y-4">
-        <label className="block text-sm font-medium text-[var(--color-text-primary)]">
+      <div className="border border-border rounded-sm p-4 space-y-4">
+        <label className="block text-sm font-medium text-text-primary">
           Describe your Hub page
         </label>
         <textarea
           aria-label="Describe your Hub page"
-          className="w-full h-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm"
+          className="w-full h-32 px-3 py-2 border border-border rounded-sm bg-background text-text-primary placeholder-(--color-text-muted) resize-none focus:outline-hidden focus:ring-2 focus:ring-primary text-sm"
           placeholder='e.g. "Dark-themed page for a Retro Gaming community with a hero banner, a grid of top posts, and a neon green accent sidebar."'
           maxLength={MAX_PROMPT_LENGTH}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--color-text-secondary)]">
+          <span className="text-xs text-text-secondary">
             {prompt.length}/{MAX_PROMPT_LENGTH}
           </span>
           <button
             onClick={() => generateMutation.mutate()}
             disabled={!prompt.trim() || generateMutation.isPending}
-            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-sm bg-primary text-white text-sm hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {generateMutation.isPending ? 'Generating…' : 'Generate Design'}
           </button>
@@ -134,14 +134,12 @@ export default function HubAIDesignerTab({ hubName }: Props) {
 
       {/* Preview of just-generated design */}
       {previewHTML && (
-        <div className="border border-[var(--color-border)] rounded p-4 space-y-3">
+        <div className="border border-border rounded-sm p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium text-[var(--color-text-primary)]">Preview</h3>
+              <h3 className="font-medium text-text-primary">Preview</h3>
               {pendingDesignName && (
-                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                  {pendingDesignName}
-                </p>
+                <p className="text-xs text-text-secondary mt-0.5">{pendingDesignName}</p>
               )}
             </div>
             <div className="flex gap-2">
@@ -149,14 +147,14 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                 <>
                   <button
                     onClick={() => navigate(`/h/${hubName}/ai-design/preview/${pendingDesignId}`)}
-                    className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
+                    className="px-3 py-1 text-sm rounded-sm border border-border text-text-primary hover:bg-background transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => activateMutation.mutate(pendingDesignId)}
                     disabled={activateMutation.isPending}
-                    className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    className="px-3 py-1 text-sm rounded-sm bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
                     {activateMutation.isPending ? 'Publishing…' : 'Publish'}
                   </button>
@@ -166,7 +164,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
                       setPendingDesignId(null);
                       setPendingDesignName('');
                     }}
-                    className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] transition-colors"
+                    className="px-3 py-1 text-sm rounded-sm border border-border text-text-secondary hover:bg-background transition-colors"
                   >
                     Close
                   </button>
@@ -175,7 +173,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
             </div>
           </div>
           <iframe
-            className="w-full rounded border border-[var(--color-border)] bg-white"
+            className="w-full rounded-sm border border-border bg-white"
             style={{ minHeight: 400 }}
             src={previewBlobUrl ?? undefined}
             sandbox="allow-scripts"
@@ -186,7 +184,7 @@ export default function HubAIDesignerTab({ hubName }: Props) {
 
       {/* Active design banner */}
       {activeDesign && (
-        <div className="bg-green-50 border border-green-200 rounded p-4">
+        <div className="bg-green-50 border border-green-200 rounded-sm p-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-green-900">
@@ -209,51 +207,49 @@ export default function HubAIDesignerTab({ hubName }: Props) {
       )}
 
       {/* Saved designs list */}
-      <div className="border border-[var(--color-border)] rounded overflow-hidden">
-        <div className="bg-[var(--color-background)] px-4 py-3 border-b border-[var(--color-border)]">
-          <h3 className="font-medium text-[var(--color-text-primary)]">Saved Designs</h3>
+      <div className="border border-border rounded-sm overflow-hidden">
+        <div className="bg-background px-4 py-3 border-b border-border">
+          <h3 className="font-medium text-text-primary">Saved Designs</h3>
         </div>
         {designsLoading ? (
           <div className="p-4">
             <LoadingMessage>Loading designs…</LoadingMessage>
           </div>
         ) : !designsData?.designs?.length ? (
-          <p className="p-4 text-sm text-[var(--color-text-secondary)]">
+          <p className="p-4 text-sm text-text-secondary">
             No saved designs yet. Generate one above.
           </p>
         ) : (
-          <div className="divide-y divide-[var(--color-border)]">
+          <div className="divide-y divide-border">
             {designsData.designs.map((design: AIDesign) => (
               <div key={design.id} className="px-4 py-3 flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-[var(--color-text-primary)] text-sm">
-                      {design.name}
-                    </span>
+                    <span className="font-medium text-text-primary text-sm">{design.name}</span>
                     {design.is_active && (
-                      <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
+                      <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-sm">
                         Active
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[var(--color-text-secondary)] italic line-clamp-1 mt-0.5">
+                  <p className="text-xs text-text-secondary italic line-clamp-1 mt-0.5">
                     "{design.prompt}"
                   </p>
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                  <p className="text-xs text-text-secondary mt-0.5">
                     {new Date(design.created_at).toLocaleString()}
                   </p>
                 </div>
                 <div className="flex gap-3 shrink-0">
                   <button
                     onClick={() => navigate(`/h/${hubName}/ai-design/preview/${design.id}`)}
-                    className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-strong)] font-medium transition-colors"
+                    className="text-xs text-primary hover:text-(--color-primary-strong) font-medium transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => copyMutation.mutate(design.id)}
                     disabled={copyMutation.isPending}
-                    className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium transition-colors"
+                    className="text-xs text-text-secondary hover:text-text-primary font-medium transition-colors"
                   >
                     Copy
                   </button>

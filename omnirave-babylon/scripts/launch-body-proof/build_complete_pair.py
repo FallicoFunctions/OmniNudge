@@ -71,7 +71,7 @@ if not args.export_only and not args.expressions_only:
         blender("finish_complete_looks.py", sex)
     blender("finish_male_groom.py")
 
-cli = ROOT / "node_modules/@gltf-transform/cli/bin/cli.js"
+cli = ROOT / "scripts/transform-asset.mjs"
 if not args.expressions_only:
     for sex in ["male", "female"]:
         blender("polish_complete_pair.py", sex)
@@ -108,23 +108,9 @@ for sex in ["male", "female"]:
             [
                 "node",
                 str(cli),
-                "optimize",
+                "complete-avatar",
                 str(runtime),
                 str(optimized),
-                "--compress",
-                "false",
-                "--flatten",
-                "false",
-                "--join",
-                "false",
-                "--instance",
-                "false",
-                "--palette",
-                "false",
-                "--simplify",
-                "false",
-                "--texture-compress",
-                "webp",
             ],
             cwd=ROOT,
             stdout=output,

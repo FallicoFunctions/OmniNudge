@@ -13,7 +13,7 @@ export function PostBodyMarkdown({ content, className = '' }: PostBodyMarkdownPr
   return (
     <MarkdownRenderer
       content={content}
-      className={`text-sm text-[var(--color-text-primary)] leading-normal ${className}`.trim()}
+      className={`text-sm text-text-primary leading-normal ${className}`.trim()}
     />
   );
 }

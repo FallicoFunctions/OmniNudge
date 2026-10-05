@@ -17,7 +17,7 @@ export function PageShell({
     <div className={`mx-auto w-full max-w-4xl px-4 py-10 ${className}`}>
       {withPanel ? (
         <div
-          className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm ${panelClassName}`}
+          className={`rounded-lg border border-border bg-surface p-6 shadow-xs ${panelClassName}`}
         >
           {children}
         </div>

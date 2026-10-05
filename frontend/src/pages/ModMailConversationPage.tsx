@@ -283,18 +283,13 @@ export default function ModMailConversationPage() {
     <div className="max-w-4xl mx-auto p-6">
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-[var(--color-primary)] hover:underline mb-4"
-        >
+        <button onClick={() => navigate(-1)} className="text-primary hover:underline mb-4">
           {t('modMailConversationPage.actions.backToModTools')}
         </button>
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{subject}</h1>
-            {hubName && (
-              <p className="text-[var(--color-text-secondary)] mt-1">{hubDisplayTitle}</p>
-            )}
+            <h1 className="text-2xl font-bold text-text-primary">{subject}</h1>
+            {hubName && <p className="text-text-secondary mt-1">{hubDisplayTitle}</p>}
           </div>
           <div className="flex items-center gap-2">
             <span
@@ -313,14 +308,14 @@ export default function ModMailConversationPage() {
                 <button
                   onClick={() => updateStatusMutation.mutate('resolved')}
                   disabled={updateStatusMutation.isPending}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700 disabled:opacity-50"
                 >
                   {t('modMailConversationPage.actions.resolve')}
                 </button>
                 <button
                   onClick={() => updateStatusMutation.mutate('archived')}
                   disabled={updateStatusMutation.isPending}
-                  className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-gray-600 text-white rounded-sm hover:bg-gray-700 disabled:opacity-50"
                 >
                   {t('modMailConversationPage.actions.archive')}
                 </button>
@@ -330,7 +325,7 @@ export default function ModMailConversationPage() {
               <button
                 onClick={() => updateStatusMutation.mutate('open')}
                 disabled={updateStatusMutation.isPending}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded-sm hover:bg-green-700 disabled:opacity-50"
               >
                 {t('modMailConversationPage.actions.reopen')}
               </button>
@@ -340,14 +335,14 @@ export default function ModMailConversationPage() {
       </div>
 
       {/* Messages */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4 mb-4 max-h-[600px] overflow-y-auto">
+      <div className="bg-surface border border-border rounded-lg p-4 mb-4 max-h-[600px] overflow-y-auto">
         {hasMoreMessages && (
           <div className="mb-4 flex justify-center">
             <button
               type="button"
               onClick={() => fetchMoreMessages()}
               disabled={isFetchingMoreMessages}
-              className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+              className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) disabled:opacity-60"
             >
               {isFetchingMoreMessages
                 ? t('common.loading')
@@ -356,7 +351,7 @@ export default function ModMailConversationPage() {
           </div>
         )}
         {messages && messages.length === 0 && (
-          <div className="text-center py-12 text-[var(--color-text-secondary)]">
+          <div className="text-center py-12 text-text-secondary">
             {t('modMailConversationPage.messages.noneYet')}
           </div>
         )}
@@ -378,18 +373,18 @@ export default function ModMailConversationPage() {
                 <div
                   className={`max-w-[70%] rounded-lg px-4 py-3 ${
                     isCurrentUser
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                      ? 'bg-primary text-white'
+                      : 'bg-(--color-surface-elevated) text-text-primary'
                   }`}
                 >
                   <DecryptedMessageContent
                     message={msg}
                     isOwnMessage={isCurrentUser}
                     currentUserId={user?.id}
-                    className="text-sm whitespace-pre-wrap break-words mb-1"
+                    className="text-sm whitespace-pre-wrap wrap-break-word mb-1"
                   />
                   <div
-                    className={`text-xs flex items-center gap-1 ${isCurrentUser ? 'text-white/70' : 'text-[var(--color-text-secondary)]'}`}
+                    className={`text-xs flex items-center gap-1 ${isCurrentUser ? 'text-white/70' : 'text-text-secondary'}`}
                   >
                     <span>{senderUsername}</span>
                     {isModerator && (
@@ -420,31 +415,28 @@ export default function ModMailConversationPage() {
       </div>
 
       {/* Reply Form */}
-      <form
-        onSubmit={handleSend}
-        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4"
-      >
+      <form onSubmit={handleSend} className="bg-surface border border-border rounded-lg p-4">
         <textarea
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
           placeholder={t('modMailConversationPage.reply.placeholder')}
           rows={4}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary resize-none"
           disabled={sendMutation.isPending}
         />
         {encryptionWarning && (
-          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-sm p-2 mt-2">
             {encryptionWarning}
           </div>
         )}
         <div className="flex justify-between items-center mt-3">
-          <p className="text-xs text-[var(--color-text-secondary)]">
+          <p className="text-xs text-text-secondary">
             {t('modMailConversationPage.reply.visibleToAllMods', { hub: hubDisplayTitle })}
           </p>
           <button
             type="submit"
             disabled={!messageText.trim() || sendMutation.isPending}
-            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {sendMutation.isPending
               ? t('modMailConversationPage.actions.sending')

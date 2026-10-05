@@ -74,12 +74,12 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
       <div
         className={`${
           isMobile ? 'absolute inset-x-0 top-auto bottom-0 rounded-t-3xl' : 'w-full'
-        } rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl`}
+        } rounded-xl border border-border bg-surface shadow-xl`}
         style={isMobile ? { maxHeight: '85vh' } : undefined}
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
               {t('themes.selector.dialog.title')}
             </p>
             {error && <p className="text-xs text-red-500">{error}</p>}
@@ -87,7 +87,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="text-sm font-medium text-[var(--color-primary)] disabled:opacity-60"
+              className="text-sm font-medium text-primary disabled:opacity-60"
               onClick={handleRefresh}
               disabled={isRefreshing}
             >
@@ -98,7 +98,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
             {isMobile && (
               <button
                 type="button"
-                className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
+                className="rounded-full bg-(--color-surface-elevated) px-3 py-1 text-xs font-semibold text-text-primary"
                 onClick={() => setIsOpen(false)}
                 aria-label={t('themes.selector.actions.closeAria')}
               >
@@ -109,18 +109,18 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
         </div>
 
         {isLoading ? (
-          <div className="px-4 py-6 text-center text-sm text-[var(--color-text-secondary)]">
+          <div className="px-4 py-6 text-center text-sm text-text-secondary">
             {t('themes.selector.status.loadingThemes')}
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto px-2 py-2 sm:max-h-96">
             {themeGroups.map(({ label, themes }) => (
               <div key={label} className="mb-4 last:mb-0">
-                <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">
                   {label}
                 </p>
                 {themes.length === 0 ? (
-                  <p className="px-2 py-4 text-sm text-[var(--color-text-secondary)]">
+                  <p className="px-2 py-4 text-sm text-text-secondary">
                     {t('themes.selector.status.noThemes')}
                   </p>
                 ) : (
@@ -153,8 +153,8 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                         type="button"
                         className={`flex w-full flex-col gap-3 rounded-lg border px-3 py-4 text-left transition ${
                           isActive
-                            ? 'border-[var(--color-primary)]'
-                            : 'border-transparent hover:bg-[var(--color-surface-elevated)]'
+                            ? 'border-primary'
+                            : 'border-transparent hover:bg-(--color-surface-elevated)'
                         }`}
                         style={activeStyles}
                         onClick={() => handleSelect(theme)}
@@ -167,11 +167,11 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                             borderColor: primaryColor,
                           }}
                         >
-                          <p className="text-left text-base font-semibold text-[var(--color-text-primary)]">
+                          <p className="text-left text-base font-semibold text-text-primary">
                             {theme.theme_name}
                           </p>
                           {theme.theme_description && (
-                            <p className="text-left text-sm text-[var(--color-text-primary)]">
+                            <p className="text-left text-sm text-text-primary">
                               {theme.theme_description}
                             </p>
                           )}
@@ -185,10 +185,10 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
           </div>
         )}
 
-        <div className="border-t border-[var(--color-border)] px-4 py-3">
+        <div className="border-t border-border px-4 py-3">
           <button
             type="button"
-            className="mt-1 w-full rounded-lg border border-dashed border-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary)]"
+            className="mt-1 w-full rounded-lg border border-dashed border-primary px-4 py-2 text-sm font-semibold text-primary"
             onClick={handleCreateTheme}
           >
             {t('themes.selector.actions.createNewTheme')}
@@ -204,27 +204,25 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
 
   return (
     <div
-      className={`relative inline-block text-left ${isToolbarVariant ? 'min-w-[14rem] self-stretch' : 'w-full max-w-md'}`}
+      className={`relative inline-block text-left ${isToolbarVariant ? 'min-w-56 self-stretch' : 'w-full max-w-md'}`}
     >
       <div className="sr-only" aria-live="polite">
         {announcement}
       </div>
       <button
         type="button"
-        className={`flex w-full items-center justify-between text-left transition ${isToolbarVariant ? 'box-border h-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 shadow-none hover:bg-[var(--color-surface-elevated)]' : 'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-sm'}`}
+        className={`flex w-full items-center justify-between text-left transition ${isToolbarVariant ? 'box-border h-full rounded-md border border-border bg-surface px-4 py-1.5 shadow-none hover:bg-(--color-surface-elevated)' : 'rounded-lg border border-border bg-surface px-4 py-3 shadow-xs'}`}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
         <div>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('themes.selector.activeThemeLabel')}
-          </p>
-          <p className="text-base font-semibold text-[var(--color-text-primary)]">
+          <p className="text-sm text-text-secondary">{t('themes.selector.activeThemeLabel')}</p>
+          <p className="text-base font-semibold text-text-primary">
             {activeTheme?.theme_name ?? t('themes.selector.selectThemeFallback')}
           </p>
         </div>
-        <span className="text-lg text-[var(--color-text-muted)]">{isOpen ? '▴' : '▾'}</span>
+        <span className="text-lg text-(--color-text-muted)">{isOpen ? '▴' : '▾'}</span>
       </button>
 
       {isOpen && menu}

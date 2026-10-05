@@ -45,11 +45,9 @@ export function CameraFlipButton({
       onClick={handleFlip}
       disabled={isFlipping}
       aria-label={t('calls.flipCamera')}
-      className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
+      className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-surface-2) hover:bg-(--color-surface-3) transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
     >
-      <RefreshCw
-        className={`w-6 h-6 text-[var(--color-text-primary)] ${isFlipping ? 'animate-spin' : ''}`}
-      />
+      <RefreshCw className={`w-6 h-6 text-text-primary ${isFlipping ? 'animate-spin' : ''}`} />
     </button>
   );
 }

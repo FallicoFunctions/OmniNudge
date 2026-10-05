@@ -31,7 +31,7 @@ function SkeletonImage({
   const aspectClasses = {
     square: 'aspect-square',
     video: 'aspect-video',
-    wide: 'aspect-[21/9]',
+    wide: 'aspect-21/9',
   };
 
   return <Skeleton className={`w-full ${aspectClasses[aspectRatio]} ${className}`} />;
@@ -107,13 +107,13 @@ export function SkeletonList({
   return (
     <div className={`space-y-3 ${className}`}>
       {Array.from({ length: items }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 p-3 border border-border rounded">
-          <Skeleton className="w-12 h-12 rounded" />
+        <div key={i} className="flex items-center gap-3 p-3 border border-border rounded-sm">
+          <Skeleton className="w-12 h-12 rounded-sm" />
           <div className="flex-1">
             <Skeleton className="h-4 w-48 mb-2" />
             <Skeleton className="h-3 w-32" />
           </div>
-          <Skeleton className="w-16 h-8 rounded" />
+          <Skeleton className="w-16 h-8 rounded-sm" />
         </div>
       ))}
     </div>

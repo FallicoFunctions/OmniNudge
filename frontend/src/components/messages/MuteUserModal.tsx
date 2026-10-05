@@ -25,14 +25,13 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-4">
-          {t('groups.admin.muteUser')}:{' '}
-          <span className="text-[var(--color-primary)]">{username}</span>
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-2xl">
+        <h3 className="text-base font-semibold text-text-primary mb-4">
+          {t('groups.admin.muteUser')}: <span className="text-primary">{username}</span>
         </h3>
 
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-text-primary mb-2">
             {t('groups.admin.duration')}
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -43,8 +42,8 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
                 onClick={() => setDuration(opt.value)}
                 className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                   duration === opt.value
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-text-secondary hover:bg-(--color-hover)'
                 }`}
               >
                 {t(opt.labelKey)}
@@ -57,7 +56,7 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+            className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-(--color-hover)"
           >
             {t('common.cancel')}
           </button>
@@ -65,7 +64,7 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
             type="button"
             onClick={handleConfirm}
             disabled={isLoading}
-            className="flex-1 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
             {isLoading
               ? t('groups.admin.muting', { defaultValue: 'Muting…' })

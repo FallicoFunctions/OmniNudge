@@ -75,7 +75,7 @@ export function GroupInviteMembers({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="mx-4 mb-2 w-[calc(100%-2rem)] rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-hover)]"
+        className="mx-4 mb-2 w-[calc(100%-2rem)] rounded-md border border-border px-3 py-2 text-sm font-medium text-primary hover:bg-(--color-hover)"
       >
         {t('groups.addMembers')}
       </button>
@@ -101,22 +101,22 @@ export function GroupInviteMembers({
         placeholder={t('groups.searchUsersPlaceholder')}
         aria-label={t('groups.addMembers')}
         autoFocus
-        className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden"
       />
       {candidates.length > 0 && (
-        <ul className="mt-1 rounded-md border border-[var(--color-border)]">
+        <ul className="mt-1 rounded-md border border-border">
           {candidates.map((user) => (
             <li key={user.id}>
               <button
                 type="button"
                 onClick={() => invite.mutate(user)}
                 disabled={invite.isPending}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--color-hover)] disabled:opacity-60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-(--color-hover) disabled:opacity-60"
               >
-                <div className="h-6 w-6 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-xs text-white font-semibold">
+                <div className="h-6 w-6 rounded-lg bg-primary flex items-center justify-center text-xs text-white font-semibold">
                   {user.username[0].toUpperCase()}
                 </div>
-                <span className="text-[var(--color-text-primary)]">{user.username}</span>
+                <span className="text-text-primary">{user.username}</span>
               </button>
             </li>
           ))}
@@ -125,7 +125,7 @@ export function GroupInviteMembers({
       {status && (
         <p
           role={status.ok ? 'status' : 'alert'}
-          className={`mt-1 text-xs ${status.ok ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-error)]'}`}
+          className={`mt-1 text-xs ${status.ok ? 'text-(--color-text-muted)' : 'text-(--color-error)'}`}
         >
           {status.text}
         </p>

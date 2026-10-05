@@ -72,9 +72,11 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
-      # The CSS directives, PostCSS plugin and style regression tests use v3.
-      # A v4 upgrade needs a coordinated CSS migration, not a manifest bump.
+      # Major Tailwind upgrades need a coordinated stylesheet/template migration.
+      # Keep the compiler and its PostCSS integration on the same major.
       - dependency-name: tailwindcss
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@tailwindcss/*'
         update-types: ['version-update:semver-major']
     groups:
       frontend-dependencies:

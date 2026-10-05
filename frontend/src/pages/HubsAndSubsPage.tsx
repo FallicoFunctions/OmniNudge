@@ -155,12 +155,8 @@ export default function HubsAndSubsPage() {
       <div className="mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-              {t('menu.hubs')}
-            </h1>
-            <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-              {t('hubsBrowse.subtitle')}
-            </p>
+            <h1 className="text-3xl font-bold text-text-primary">{t('menu.hubs')}</h1>
+            <p className="text-sm text-text-secondary mt-1">{t('hubsBrowse.subtitle')}</p>
           </div>
 
           {/* Search Bar */}
@@ -174,10 +170,10 @@ export default function HubsAndSubsPage() {
                   onBlur={() => setIsAutocompleteOpen(false)}
                   onChange={(e) => handleInputChange(e.target.value)}
                   placeholder={t('hubsBrowse.search.placeholder')}
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 />
                 {shouldShowSuggestions && (
-                  <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                  <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-border bg-surface shadow-lg">
                     {isAutocompleteLoading ? (
                       <div className="px-3 py-2">
                         <LoadingMessage className="mt-0 text-sm">
@@ -205,24 +201,24 @@ export default function HubsAndSubsPage() {
                                     setInputValue('');
                                     setIsAutocompleteOpen(false);
                                   }}
-                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-(--color-surface-elevated)"
                                 >
-                                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)] text-[10px] font-semibold text-white">
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary text-[10px] font-semibold text-white">
                                     {t('common.prefix.hub')}
                                   </div>
                                   <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                                    <span className="truncate text-sm font-medium text-text-primary">
                                       {t('common.format.hubPath', { name: hub.name })}
                                     </span>
                                     {hub.title && (
-                                      <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
+                                      <span className="truncate text-[11px] text-text-secondary">
                                         {hub.title}
                                       </span>
                                     )}
                                   </div>
                                   {typeof hub.subscriber_count === 'number' &&
                                     hub.subscriber_count > 0 && (
-                                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                                      <span className="ml-auto text-[11px] text-text-secondary">
                                         {t('hubsBrowse.memberCount', {
                                           count: hub.subscriber_count,
                                           formattedCount: formatNumber(hub.subscriber_count),
@@ -240,7 +236,7 @@ export default function HubsAndSubsPage() {
                                   type="button"
                                   onMouseDown={(event) => event.preventDefault()}
                                   onClick={() => handleSelectSubredditSuggestion(subreddit.name)}
-                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-(--color-surface-elevated)"
                                 >
                                   {subreddit.icon_url ? (
                                     <img
@@ -248,21 +244,21 @@ export default function HubsAndSubsPage() {
                                       alt=""
                                       loading="lazy"
                                       decoding="async"
-                                      className="h-6 w-6 flex-shrink-0 rounded-md object-cover"
+                                      className="h-6 w-6 shrink-0 rounded-md object-cover"
                                     />
                                   ) : (
-                                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-border text-[10px] font-semibold text-text-secondary">
                                       {t('common.prefix.subreddit')}
                                     </div>
                                   )}
                                   <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                                    <span className="truncate text-sm font-medium text-text-primary">
                                       {t('common.format.subredditPath', { name: subreddit.name })}
                                     </span>
                                   </div>
                                   {typeof subreddit.subscribers === 'number' &&
                                     subreddit.subscribers > 0 && (
-                                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                                      <span className="ml-auto text-[11px] text-text-secondary">
                                         {t('hubsBrowse.memberCount', {
                                           count: subreddit.subscribers,
                                           formattedCount: formatNumber(subreddit.subscribers),
@@ -305,7 +301,7 @@ export default function HubsAndSubsPage() {
                 setSearchQuery(e.target.value);
                 setPageIndex(0); // Reset to first page on search
               }}
-              className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
           </div>
 
@@ -316,7 +312,7 @@ export default function HubsAndSubsPage() {
               setSortBy(e.target.value as SortBy);
               setPageIndex(0);
             }}
-            className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="px-4 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           >
             <option value="alphabetical">{t('hubsBrowse.sort.alphabetical')}</option>
             <option value="popular">{t('hubsBrowse.sort.popular')}</option>
@@ -333,7 +329,7 @@ export default function HubsAndSubsPage() {
           >
             <div
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                showNsfw ? 'bg-primary' : 'bg-gray-300'
               }`}
             >
               <span
@@ -342,7 +338,7 @@ export default function HubsAndSubsPage() {
                 }`}
               />
             </div>
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">
+            <span className="text-sm font-medium text-text-primary">
               {t('hubsBrowse.filter.showNsfw')}
             </span>
           </button>
@@ -350,7 +346,7 @@ export default function HubsAndSubsPage() {
 
         {/* Results summary */}
         {searchQuery && (
-          <div className="text-sm text-[var(--color-text-secondary)]">
+          <div className="text-sm text-text-secondary">
             {t('hubsBrowse.filter.resultsSummary', {
               count: filteredHubs.length,
               formattedCount: formatNumber(filteredHubs.length),
@@ -369,8 +365,8 @@ export default function HubsAndSubsPage() {
             onClick={() => handleLetterClick(letter)}
             className={`w-10 h-10 rounded-md text-sm font-medium transition-colors ${
               selectedLetter === letter
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+                ? 'bg-primary text-white'
+                : 'border border-border bg-(--color-surface-elevated) text-text-primary hover:bg-border'
             }`}
           >
             {letter}
@@ -406,21 +402,21 @@ export default function HubsAndSubsPage() {
                 <Link
                   key={hub.name}
                   to={`/h/${hub.name}`}
-                  className="block p-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)] hover:shadow-md transition-all group"
+                  className="block p-4 rounded-lg border border-border bg-surface hover:border-primary hover:shadow-md transition-all group"
                 >
                   {/* Hub name and badges */}
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-base font-semibold text-[var(--color-primary)] group-hover:underline">
+                    <h3 className="text-base font-semibold text-primary group-hover:underline">
                       {t('common.format.hubPath', { name: hub.name })}
                     </h3>
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-1 shrink-0">
                       {hub.nsfw && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded">
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded-sm">
                           {t('hubsBrowse.badge.nsfw')}
                         </span>
                       )}
                       {hub.type === 'private' && (
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded flex items-center gap-1">
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-sm flex items-center gap-1">
                           <span aria-hidden="true">🔒</span>
                           {t('hubsBrowse.badge.private')}
                         </span>
@@ -430,13 +426,13 @@ export default function HubsAndSubsPage() {
 
                   {/* Description */}
                   {(hub.description || hub.title) && (
-                    <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2 mb-3">
+                    <p className="text-sm text-text-secondary line-clamp-2 mb-3">
                       {hub.description || hub.title}
                     </p>
                   )}
 
                   {/* Stats */}
-                  <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+                  <div className="flex items-center gap-4 text-xs text-(--color-text-muted)">
                     <span className="flex items-center gap-1">
                       <svg
                         className="w-4 h-4"
@@ -472,7 +468,7 @@ export default function HubsAndSubsPage() {
             onPrev={() => setPageIndex((prev) => Math.max(0, prev - 1))}
             onNext={() => setPageIndex((prev) => prev + 1)}
             centerContent={
-              <span className="text-sm text-[var(--color-text-secondary)]">
+              <span className="text-sm text-text-secondary">
                 {t('hubsBrowse.pagination.page', {
                   page: pageIndex + 1,
                   formattedPage: formatNumber(pageIndex + 1),

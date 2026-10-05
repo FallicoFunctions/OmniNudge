@@ -209,7 +209,7 @@ function WallComposer({
         placeholder={placeholder}
         maxLength={MAX_BODY_LENGTH}
         rows={2}
-        className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+        className="w-full resize-none rounded-md border border-border bg-(--color-bg) px-3 py-2 text-sm text-text-primary placeholder:text-(--color-text-muted) focus:outline-hidden focus:ring-1 focus:ring-primary"
       />
 
       {allowMedia && mediaPreviews.length > 0 && (
@@ -217,7 +217,7 @@ function WallComposer({
           {mediaPreviews.map((preview, index) => (
             <div
               key={index}
-              className="relative aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+              className="relative aspect-square overflow-hidden rounded-md bg-(--color-surface-elevated)"
             >
               {mediaItems[index]?.media_type === 'video' ? (
                 <video src={preview} className="h-full w-full object-cover" muted />
@@ -252,7 +252,7 @@ function WallComposer({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingMedia || mediaItems.length >= MAX_MEDIA_ITEMS}
-              className="flex items-center gap-1 rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] disabled:opacity-50 transition"
+              className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-text-secondary hover:text-primary hover:border-primary disabled:opacity-50 transition"
             >
               <AttachMediaIcon />
               {t('userProfilePage.wall.attachMedia')}
@@ -265,7 +265,7 @@ function WallComposer({
           type="button"
           onClick={handleSubmit}
           disabled={(!value.trim() && mediaItems.length === 0) || isSubmitting || isUploadingMedia}
-          className="rounded-md bg-[var(--color-primary)] px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
           {isUploadingMedia
             ? t('userProfilePage.wall.uploadingMedia')
@@ -329,23 +329,23 @@ function WallCommentRow({
 
   return (
     <div className="flex gap-2">
-      <Link to={`/users/${comment.author_username}`} className="flex-shrink-0">
+      <Link to={`/users/${comment.author_username}`} className="shrink-0">
         <UserAvatar username={comment.author_username} avatarUrl={comment.author_avatar_url} />
       </Link>
       <div className="flex-1 min-w-0">
-        <div className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-1.5">
+        <div className="rounded-md bg-(--color-surface-elevated) px-3 py-1.5">
           <div className="flex items-baseline gap-2">
             <Link
               to={`/users/${comment.author_username}`}
-              className="text-sm font-semibold text-[var(--color-text-primary)] hover:underline"
+              className="text-sm font-semibold text-text-primary hover:underline"
             >
               {comment.author_username}
             </Link>
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs text-(--color-text-muted)">
               {formatTimestamp(comment.created_at)}
             </span>
           </div>
-          <p className="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap break-words">
+          <p className="text-sm text-text-primary whitespace-pre-wrap wrap-break-word">
             {comment.body}
           </p>
         </div>
@@ -356,8 +356,8 @@ function WallCommentRow({
             disabled={!canReact || reactionMutation.isPending}
             className={`flex items-center gap-1 font-medium transition disabled:cursor-default ${
               comment.liked_by_viewer
-                ? 'text-[var(--color-error)]'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-error)]'
+                ? 'text-(--color-error)'
+                : 'text-(--color-text-muted) hover:text-(--color-error)'
             } ${!canReact ? 'opacity-50' : ''}`}
           >
             <HeartIcon filled={comment.liked_by_viewer} />
@@ -369,8 +369,8 @@ function WallCommentRow({
             disabled={!canReact || reactionMutation.isPending}
             className={`flex items-center gap-1 font-medium transition disabled:cursor-default ${
               comment.disliked_by_viewer
-                ? 'text-[var(--color-error)]'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-error)]'
+                ? 'text-(--color-error)'
+                : 'text-(--color-text-muted) hover:text-(--color-error)'
             } ${!canReact ? 'opacity-50' : ''}`}
           >
             <BrokenHeartIcon filled={comment.disliked_by_viewer} />
@@ -380,7 +380,7 @@ function WallCommentRow({
             <button
               type="button"
               onClick={onDelete}
-              className="font-medium text-[var(--color-text-muted)] hover:text-[var(--color-error)]"
+              className="font-medium text-(--color-text-muted) hover:text-(--color-error)"
             >
               {t('userProfilePage.wall.delete')}
             </button>
@@ -506,25 +506,25 @@ function WallPostCard({
   const comments = commentsQuery.data?.comments ?? [];
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+    <div className="rounded-lg border border-border bg-surface p-3">
       <div className="flex gap-2">
-        <Link to={`/users/${post.author_username}`} className="flex-shrink-0">
+        <Link to={`/users/${post.author_username}`} className="shrink-0">
           <UserAvatar username={post.author_username} avatarUrl={post.author_avatar_url} />
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <Link
               to={`/users/${post.author_username}`}
-              className="text-sm font-semibold text-[var(--color-text-primary)] hover:underline"
+              className="text-sm font-semibold text-text-primary hover:underline"
             >
               {post.author_username}
             </Link>
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs text-(--color-text-muted)">
               {formatTimestamp(post.created_at)}
             </span>
           </div>
           {post.body && (
-            <p className="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap break-words mt-0.5">
+            <p className="text-sm text-text-primary whitespace-pre-wrap wrap-break-word mt-0.5">
               {post.body}
             </p>
           )}
@@ -534,7 +534,7 @@ function WallPostCard({
               <button
                 type="button"
                 onClick={() => setLightboxIndex(mediaIndex)}
-                className="relative block w-full max-h-96 overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+                className="relative block w-full max-h-96 overflow-hidden rounded-md bg-(--color-surface-elevated)"
               >
                 <MediaItemPreview item={post.media[mediaIndex]} />
               </button>
@@ -590,8 +590,8 @@ function WallPostCard({
               disabled={!canPost || reactionMutation.isPending}
               className={`flex items-center gap-1 font-medium transition disabled:cursor-default ${
                 post.liked_by_viewer
-                  ? 'text-[var(--color-error)]'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-error)]'
+                  ? 'text-(--color-error)'
+                  : 'text-text-secondary hover:text-(--color-error)'
               } ${!canPost ? 'opacity-50' : ''}`}
             >
               <HeartIcon filled={post.liked_by_viewer} />
@@ -603,8 +603,8 @@ function WallPostCard({
               disabled={!canPost || reactionMutation.isPending}
               className={`flex items-center gap-1 font-medium transition disabled:cursor-default ${
                 post.disliked_by_viewer
-                  ? 'text-[var(--color-error)]'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-error)]'
+                  ? 'text-(--color-error)'
+                  : 'text-text-secondary hover:text-(--color-error)'
               } ${!canPost ? 'opacity-50' : ''}`}
             >
               <BrokenHeartIcon filled={post.disliked_by_viewer} />
@@ -613,7 +613,7 @@ function WallPostCard({
             <button
               type="button"
               onClick={() => setShowComments((v) => !v)}
-              className="font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition"
+              className="font-medium text-text-secondary hover:text-primary transition"
             >
               {t('userProfilePage.wall.comments')}
               {post.comment_count > 0 ? ` (${post.comment_count})` : ''}
@@ -626,7 +626,7 @@ function WallPostCard({
                     deletePostMutation.mutate();
                   }
                 }}
-                className="font-medium text-[var(--color-text-muted)] hover:text-[var(--color-error)] transition"
+                className="font-medium text-(--color-text-muted) hover:text-(--color-error) transition"
               >
                 {t('userProfilePage.wall.delete')}
               </button>
@@ -634,11 +634,11 @@ function WallPostCard({
           </div>
 
           {showComments && (
-            <div className="mt-3 space-y-2 border-t border-[var(--color-border)] pt-3">
+            <div className="mt-3 space-y-2 border-t border-border pt-3">
               {commentsQuery.isLoading ? (
-                <p className="text-xs text-[var(--color-text-muted)]">{t('common.loading')}</p>
+                <p className="text-xs text-(--color-text-muted)">{t('common.loading')}</p>
               ) : comments.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-muted)]">
+                <p className="text-xs text-(--color-text-muted)">
                   {t('userProfilePage.wall.noComments')}
                 </p>
               ) : (
@@ -748,13 +748,13 @@ export default function WallSection({ username, isOwnProfile }: Props) {
 
   if (wallQuery.isLoading) {
     return (
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold text-text-primary mb-2">
           {t('userProfilePage.wall.heading')}
         </h3>
         <div className="space-y-2 animate-pulse">
-          <div className="h-16 rounded-md bg-[var(--color-surface-elevated)]" />
-          <div className="h-16 rounded-md bg-[var(--color-surface-elevated)]" />
+          <div className="h-16 rounded-md bg-(--color-surface-elevated)" />
+          <div className="h-16 rounded-md bg-(--color-surface-elevated)" />
         </div>
       </div>
     );
@@ -763,11 +763,11 @@ export default function WallSection({ username, isOwnProfile }: Props) {
   if (wallQuery.isError) {
     const isPrivate = (wallQuery.error as { status?: number } | null)?.status === 403;
     return (
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold text-text-primary mb-2">
           {t('userProfilePage.wall.heading')}
         </h3>
-        <p className="text-sm text-[var(--color-text-secondary)]">
+        <p className="text-sm text-text-secondary">
           {t(isPrivate ? 'userProfilePage.wall.private' : 'userProfilePage.wall.loadFailed')}
         </p>
       </div>
@@ -782,30 +782,30 @@ export default function WallSection({ username, isOwnProfile }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+        <h3 className="text-sm font-semibold text-text-primary">
           {t('userProfilePage.wall.heading')}
         </h3>
       </div>
 
       {isOwnProfile && pendingPosts.length > 0 && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
-          <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+        <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+          <h4 className="text-sm font-semibold text-text-primary">
             {t('userProfilePage.wall.pending.heading')}
           </h4>
           {pendingPosts.map((post) => (
-            <div key={post.id} className="rounded-md border border-[var(--color-border)] p-2">
+            <div key={post.id} className="rounded-md border border-border p-2">
               <div className="flex gap-2">
-                <Link to={`/users/${post.author_username}`} className="flex-shrink-0">
+                <Link to={`/users/${post.author_username}`} className="shrink-0">
                   <UserAvatar username={post.author_username} avatarUrl={post.author_avatar_url} />
                 </Link>
                 <div className="flex-1 min-w-0">
                   <Link
                     to={`/users/${post.author_username}`}
-                    className="text-sm font-semibold text-[var(--color-text-primary)] hover:underline"
+                    className="text-sm font-semibold text-text-primary hover:underline"
                   >
                     {post.author_username}
                   </Link>
-                  <p className="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap break-words">
+                  <p className="text-sm text-text-primary whitespace-pre-wrap wrap-break-word">
                     {post.body}
                   </p>
                 </div>
@@ -815,7 +815,7 @@ export default function WallSection({ username, isOwnProfile }: Props) {
                   type="button"
                   onClick={() => approvePostMutation.mutate(post.id)}
                   disabled={approvePostMutation.isPending}
-                  className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {t('userProfilePage.wall.pending.approve')}
                 </button>
@@ -823,7 +823,7 @@ export default function WallSection({ username, isOwnProfile }: Props) {
                   type="button"
                   onClick={() => rejectPostMutation.mutate(post.id)}
                   disabled={rejectPostMutation.isPending}
-                  className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-error)] disabled:opacity-50"
+                  className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:text-(--color-error) disabled:opacity-50"
                 >
                   {t('userProfilePage.wall.pending.reject')}
                 </button>
@@ -834,7 +834,7 @@ export default function WallSection({ username, isOwnProfile }: Props) {
       )}
 
       {canPost && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+        <div className="rounded-lg border border-border bg-surface p-3">
           <div className="flex gap-2">
             <UserAvatar username={user?.username ?? ''} avatarUrl={user?.avatar_url} />
             <div className="flex-1">
@@ -852,8 +852,8 @@ export default function WallSection({ username, isOwnProfile }: Props) {
       )}
 
       {posts.length === 0 ? (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <p className="text-sm text-[var(--color-text-secondary)]">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-sm text-text-secondary">
             {isOwnProfile ? t('userProfilePage.wall.emptyOwner') : t('userProfilePage.wall.empty')}
           </p>
         </div>

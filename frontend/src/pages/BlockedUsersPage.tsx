@@ -26,12 +26,8 @@ export default function BlockedUsersPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-          {t('blockedUsersPage.title')}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          {t('blockedUsersPage.subtitle')}
-        </p>
+        <h1 className="text-3xl font-bold text-text-primary">{t('blockedUsersPage.title')}</h1>
+        <p className="mt-2 text-sm text-text-secondary">{t('blockedUsersPage.subtitle')}</p>
       </div>
 
       <Panel>
@@ -40,24 +36,22 @@ export default function BlockedUsersPage() {
         ) : blockedUsersQuery.isError ? (
           <ErrorMessage>{t('blockedUsersPage.errors.loadFailed')}</ErrorMessage>
         ) : !blockedUsersQuery.data?.blocked_users?.length ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('blockedUsersPage.empty')}
-          </p>
+          <p className="text-sm text-text-secondary">{t('blockedUsersPage.empty')}</p>
         ) : (
           <div className="space-y-3">
             {blockedUsersQuery.data.blocked_users.map((blockedUser) => (
               <article
                 key={blockedUser.id}
-                className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 rounded-md border border-border bg-(--color-surface-elevated) p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <Link
                     to={`/users/${blockedUser.username}`}
-                    className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                    className="text-base font-semibold text-text-primary hover:text-primary"
                   >
                     {blockedUser.username}
                   </Link>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
+                  <p className="text-xs text-text-secondary">
                     {t('blockedUsersPage.blockedAt', {
                       time: formatDate(blockedUser.blocked_at, {
                         month: 'short',
@@ -73,7 +67,7 @@ export default function BlockedUsersPage() {
                   type="button"
                   disabled={unblockMutation.isPending}
                   onClick={() => unblockMutation.mutate(blockedUser.username)}
-                  className="rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-md border border-(--color-error) px-4 py-2 text-sm font-semibold text-(--color-error) hover:bg-red-50 disabled:opacity-50"
                 >
                   {t('blockedUsersPage.actions.unblock')}
                 </button>

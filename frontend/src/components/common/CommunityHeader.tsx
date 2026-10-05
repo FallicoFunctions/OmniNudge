@@ -93,7 +93,7 @@ export function CommunityHeader({
               <img
                 src={iconUrl}
                 alt=""
-                className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+                className="h-12 w-12 shrink-0 rounded-lg object-cover"
                 loading="lazy"
                 decoding="async"
               />
@@ -105,7 +105,7 @@ export function CommunityHeader({
                 </Link>
               </h1>
               {isNsfw && (
-                <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                <span className="rounded-sm bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                   {t('posts.badges.nsfw')}
                 </span>
               )}
@@ -144,7 +144,7 @@ export function CommunityHeader({
                         })
                       )
                     }
-                    className="whitespace-nowrap px-4 py-2 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] rounded hover:bg-[var(--color-border)]"
+                    className="whitespace-nowrap px-4 py-2 bg-(--color-surface-elevated) text-text-primary rounded-sm hover:bg-border"
                   >
                     {t('common.subscribe')}
                   </button>
@@ -154,7 +154,7 @@ export function CommunityHeader({
             {isModerator && isHub && !isSpecialCommunity && (
               <button
                 onClick={() => navigate(`/h/${communityName}/mod`)}
-                className="whitespace-nowrap px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                className="whitespace-nowrap px-4 py-2 bg-purple-600 text-white rounded-sm hover:bg-purple-700"
               >
                 {t('common.modTools')}
               </button>

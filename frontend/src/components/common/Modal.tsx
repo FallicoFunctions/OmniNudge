@@ -63,7 +63,7 @@ export function Modal({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`outline-none ${dialogAnimationClass} ${className}`}
+        className={`outline-hidden ${dialogAnimationClass} ${className}`}
         style={animation === 'default' ? { animation: 'scaleIn 200ms ease-out' } : undefined}
         onClick={(event) => {
           event.stopPropagation();

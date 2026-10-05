@@ -230,7 +230,7 @@ export function PlatformPostCard({
   const showExpandedImage = Boolean(resolvedMediaUrl && !isFailedImageSrc(resolvedMediaUrl));
 
   return (
-    <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+    <article className="rounded-md border border-border bg-surface">
       <div className="flex items-start gap-3 p-3">
         {/* Vote buttons */}
         <VoteButtons
@@ -241,14 +241,14 @@ export function PlatformPostCard({
           size={voteButtonSize}
         />
         {showThumbnail && (
-          <div className={`relative ${thumbnailClass} flex-shrink-0`}>
+          <div className={`relative ${thumbnailClass} shrink-0`}>
             <img
               src={resolvedThumbnailUrl ?? undefined}
               alt={t('posts.media.previewImageAlt', { title: post.title })}
               loading="lazy"
               decoding="async"
               onError={handleImageError}
-              className={`h-full w-full rounded-lg object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
+              className={`h-full w-full rounded-lg object-cover ${shouldBlurThumbnail ? 'blur-xs' : ''}`}
             />
             {shouldBlurThumbnail && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -268,33 +268,33 @@ export function PlatformPostCard({
         <div className="flex-1 space-y-1 text-left">
           <div className="flex flex-wrap items-center gap-2">
             <Link to={postUrl} state={originState} className="flex-1">
-              <h3 className="text-lg font-semibold leading-snug text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+              <h3 className="text-lg font-semibold leading-snug text-text-primary hover:text-primary">
                 {post.title}
               </h3>
             </Link>
             {showOmniBadge && (
-              <span className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="inline-flex items-center rounded-sm bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
                 {t('posts.badges.omni')}
               </span>
             )}
             {post.nsfw && (
-              <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="inline-flex items-center rounded-sm bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                 {t('posts.badges.nsfw')}
               </span>
             )}
             {post.is_pinned && <PinnedBadge />}
           </div>
 
-          <div className="text-[11px] leading-tight text-[var(--color-text-secondary)]">
+          <div className="text-[11px] leading-tight text-text-secondary">
             {resolvedHubName ? (
               <Link
                 to={`/h/${resolvedHubName}`}
-                className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                className="font-semibold text-text-primary hover:text-primary"
               >
                 {resolvedHubTitle ?? t('common.format.hubPath', { name: resolvedHubName })}
               </Link>
             ) : (
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {t('common.format.hubPath', { name: t('posts.unknownHub') })}
               </span>
             )}
@@ -302,7 +302,7 @@ export function PlatformPostCard({
             {authorProfileUsername ? (
               <Link
                 to={`/users/${encodeURIComponent(authorProfileUsername)}`}
-                className="hover:text-[var(--color-primary)]"
+                className="hover:text-primary"
               >
                 {displayAuthor}
               </Link>
@@ -315,7 +315,7 @@ export function PlatformPostCard({
             <span>{t('posts.submittedAt', { time: submittedLabel })}</span>
           </div>
 
-          <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mt-1 flex items-start gap-3 text-[11px] text-text-secondary">
             {showTextPreview && hasInlinePreview && (
               <button
                 type="button"
@@ -324,7 +324,7 @@ export function PlatformPostCard({
                 aria-label={
                   isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')
                 }
-                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                className="flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-(--color-surface-elevated) text-text-secondary hover:border-primary hover:text-primary"
               >
                 <span className="sr-only">
                   {isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
@@ -361,7 +361,7 @@ export function PlatformPostCard({
                 <Link
                   to={postUrl}
                   state={originState}
-                  className="flex items-center gap-1.5 font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                  className="flex items-center gap-1.5 font-medium text-text-primary hover:text-primary"
                 >
                   <svg
                     className="w-4 h-4"
@@ -385,7 +385,7 @@ export function PlatformPostCard({
                   <button
                     type="button"
                     onClick={onShare}
-                    className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="flex items-center gap-1 text-text-secondary hover:text-primary"
                   >
                     <svg
                       className="w-3.5 h-3.5"
@@ -409,7 +409,7 @@ export function PlatformPostCard({
                     type="button"
                     onClick={() => onToggleSave(!isSaved)}
                     disabled={isSavePending}
-                    className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    className="flex items-center gap-1 text-text-secondary hover:text-primary disabled:opacity-60"
                   >
                     <svg
                       className="w-3.5 h-3.5"
@@ -435,7 +435,7 @@ export function PlatformPostCard({
 
                 {/* Tertiary Actions: Hide, Crosspost - Smaller, de-emphasized */}
                 {(onHide || onCrosspost || (onTogglePin && canPin)) && (
-                  <span className="text-[var(--color-border)]">|</span>
+                  <span className="text-border">|</span>
                 )}
                 {onHide && (
                   <button
@@ -443,7 +443,7 @@ export function PlatformPostCard({
                     onClick={onHide}
                     disabled={isHiding}
                     title={resolvedHideLabel}
-                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    className="text-xs text-(--color-text-muted) hover:text-primary disabled:opacity-60"
                   >
                     {isHiding ? t('posts.status.hiding') : resolvedHideLabel}
                   </button>
@@ -453,7 +453,7 @@ export function PlatformPostCard({
                     type="button"
                     onClick={onCrosspost}
                     title={t('posts.actions.crosspostTooltip')}
-                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)]"
+                    className="text-xs text-(--color-text-muted) hover:text-primary"
                   >
                     {t('posts.actions.crosspost')}
                   </button>
@@ -466,7 +466,7 @@ export function PlatformPostCard({
                     title={
                       post.is_pinned ? t('posts.actions.unpinFromTop') : t('posts.actions.pinToTop')
                     }
-                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    className="text-xs text-(--color-text-muted) hover:text-primary disabled:opacity-60"
                   >
                     {isPinning
                       ? t('posts.status.updating')
@@ -478,13 +478,13 @@ export function PlatformPostCard({
 
                 {/* Mod/Owner Actions: Edit, Delete - Separated */}
                 {((canEdit && onEdit) || (canDelete && onDelete)) && (
-                  <span className="text-[var(--color-border)]">|</span>
+                  <span className="text-border">|</span>
                 )}
                 {canEdit && onEdit && (
                   <button
                     type="button"
                     onClick={onEdit}
-                    className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-xs text-text-secondary hover:text-primary"
                   >
                     {t('common.edit')}
                   </button>
@@ -501,7 +501,7 @@ export function PlatformPostCard({
                 )}
               </div>
               {showTextPreview && expandedTextMap[post.id] && (
-                <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+                <div className="mt-3 overflow-hidden rounded-sm border border-border bg-(--color-surface-elevated)">
                   {externalMedia ? (
                     externalMedia.kind === 'iframe' ? (
                       <iframe
@@ -568,12 +568,12 @@ export function PlatformPostCard({
           </div>
         </div>
         {showPinnedGrabber && (
-          <div className="flex flex-shrink-0 items-start pt-1">
+          <div className="flex shrink-0 items-start pt-1">
             <button
               type="button"
               onPointerDown={(event) => onPinnedPointerDown?.(post.id, event)}
               onPointerUp={(event) => onPinnedPointerUp?.(post.id, event)}
-              className="cursor-grab rounded border border-transparent p-1 text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:text-[var(--color-primary)] active:cursor-grabbing"
+              className="cursor-grab rounded-sm border border-transparent p-1 text-text-secondary hover:border-border hover:text-primary active:cursor-grabbing"
               aria-label={t('posts.aria.reorderPinnedPost')}
               title={t('posts.aria.dragToReorderPinnedPosts')}
             >

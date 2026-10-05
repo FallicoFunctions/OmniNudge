@@ -108,11 +108,11 @@ export default function PrivateHubPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="max-w-md w-full mx-4 text-center">
-          <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
+          <div className="bg-surface rounded-lg shadow-lg p-8 border border-border">
             <svg
-              className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4"
+              className="mx-auto h-16 w-16 text-(--color-text-muted) mb-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -124,21 +124,19 @@ export default function PrivateHubPage() {
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
+            <h1 className="text-2xl font-bold text-text-primary mb-2">
               {t('privateHubPage.title')}
             </h1>
-            <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+            <h2 className="text-xl font-semibold text-primary mb-4">
               {t('common.format.hubPath', { name: hubname })}
             </h2>
-            <p className="text-[var(--color-text-secondary)] mb-6">
-              {t('privateHubPage.loggedOut.description')}
-            </p>
+            <p className="text-text-secondary mb-6">{t('privateHubPage.loggedOut.description')}</p>
             <button
               type="button"
               onClick={() =>
                 window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))
               }
-              className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+              className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-white transition-colors hover:bg-primary-dark"
             >
               {t('privateHubPage.actions.requestAccess')}
             </button>
@@ -151,9 +149,9 @@ export default function PrivateHubPage() {
   if (requestStatus === 'success') {
     if (isPendingRequest) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+        <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="max-w-md w-full mx-4 text-center">
-            <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
+            <div className="bg-surface rounded-lg shadow-lg p-8 border border-border">
               <svg
                 className="mx-auto h-16 w-16 text-green-500 mb-4"
                 fill="none"
@@ -167,30 +165,28 @@ export default function PrivateHubPage() {
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
+              <h1 className="text-2xl font-bold text-text-primary mb-2">
                 {t('privateHubPage.submitted.title')}
               </h1>
-              <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+              <h2 className="text-xl font-semibold text-primary mb-4">
                 {t('common.format.hubPath', { name: hubname })}
               </h2>
-              <p className="text-[var(--color-text-secondary)] mb-4">
+              <p className="text-text-secondary mb-4">
                 {t('privateHubPage.submitted.pendingDescription')}
               </p>
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
+              <div className="rounded-lg border border-border bg-(--color-surface-elevated) p-4 text-left">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">
-                    {t('privateHubPage.meta.status')}
-                  </span>
-                  <span className="font-semibold capitalize text-[var(--color-text-primary)]">
+                  <span className="text-text-secondary">{t('privateHubPage.meta.status')}</span>
+                  <span className="font-semibold capitalize text-text-primary">
                     {requestStatusText}
                   </span>
                 </div>
                 {requestCreatedAt && (
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-[var(--color-text-secondary)]">
+                    <span className="text-text-secondary">
                       {t('privateHubPage.meta.requested')}
                     </span>
-                    <span className="text-[var(--color-text-primary)]">
+                    <span className="text-text-primary">
                       {formatDate(requestCreatedAt, {
                         month: 'short',
                         day: 'numeric',
@@ -200,7 +196,7 @@ export default function PrivateHubPage() {
                   </div>
                 )}
               </div>
-              <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+              <p className="mt-4 text-xs text-(--color-text-muted)">
                 {t('privateHubPage.submitted.pendingNote')}
               </p>
             </div>
@@ -210,9 +206,9 @@ export default function PrivateHubPage() {
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="max-w-md w-full mx-4 text-center">
-          <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
+          <div className="bg-surface rounded-lg shadow-lg p-8 border border-border">
             <svg
               className="mx-auto h-16 w-16 text-green-500 mb-4"
               fill="none"
@@ -226,21 +222,19 @@ export default function PrivateHubPage() {
                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
+            <h1 className="text-2xl font-bold text-text-primary mb-2">
               {t('privateHubPage.submitted.title')}
             </h1>
-            <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+            <h2 className="text-xl font-semibold text-primary mb-4">
               {t('common.format.hubPath', { name: hubname })}
             </h2>
-            <p className="text-[var(--color-text-secondary)] mb-6">
-              {t('privateHubPage.submitted.description')}
-            </p>
+            <p className="text-text-secondary mb-6">{t('privateHubPage.submitted.description')}</p>
             <button
               onClick={() => {
                 setRequestStatus('idle');
                 setMessage('');
               }}
-              className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
             >
               {t('privateHubPage.actions.submitAnother')}
             </button>
@@ -251,12 +245,12 @@ export default function PrivateHubPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="max-w-md w-full mx-4">
-        <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
+        <div className="bg-surface rounded-lg shadow-lg p-8 border border-border">
           <div className="text-center mb-6">
             <svg
-              className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4"
+              className="mx-auto h-16 w-16 text-(--color-text-muted) mb-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -268,29 +262,27 @@ export default function PrivateHubPage() {
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
+            <h1 className="text-2xl font-bold text-text-primary mb-2">
               {t('privateHubPage.title')}
             </h1>
-            <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+            <h2 className="text-xl font-semibold text-primary mb-4">
               {t('common.format.hubPath', { name: hubname })}
             </h2>
-            <p className="text-[var(--color-text-secondary)]">{t('privateHubPage.description')}</p>
+            <p className="text-text-secondary">{t('privateHubPage.description')}</p>
             {requestStatusLabel && (
-              <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
+              <div className="mt-4 rounded-lg border border-border bg-(--color-surface-elevated) p-4 text-left">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">
-                    {t('privateHubPage.meta.status')}
-                  </span>
-                  <span className="font-semibold capitalize text-[var(--color-text-primary)]">
+                  <span className="text-text-secondary">{t('privateHubPage.meta.status')}</span>
+                  <span className="font-semibold capitalize text-text-primary">
                     {requestStatusText}
                   </span>
                 </div>
                 {requestCreatedAt && (
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-[var(--color-text-secondary)]">
+                    <span className="text-text-secondary">
                       {t('privateHubPage.meta.requested')}
                     </span>
-                    <span className="text-[var(--color-text-primary)]">
+                    <span className="text-text-primary">
                       {formatDate(requestCreatedAt, {
                         month: 'short',
                         day: 'numeric',
@@ -302,19 +294,19 @@ export default function PrivateHubPage() {
               </div>
             )}
             {cooldownActive && (
-              <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left text-sm text-[var(--color-text-secondary)]">
+              <div className="mt-4 rounded-lg border border-border bg-(--color-surface-elevated) p-4 text-left text-sm text-text-secondary">
                 {accessRequestCooldownDisplay === 'days' && (
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                  <span className="font-semibold text-text-primary">
                     {t('privateHubPage.cooldown.days', { count: cooldownDaysRemaining })}
                   </span>
                 )}
                 {accessRequestCooldownDisplay === 'date' && (
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                  <span className="font-semibold text-text-primary">
                     {t('privateHubPage.cooldown.onDate', { date: cooldownDateLabel })}
                   </span>
                 )}
                 {accessRequestCooldownDisplay === 'both' && (
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                  <span className="font-semibold text-text-primary">
                     {t('privateHubPage.cooldown.both', {
                       count: cooldownDaysRemaining,
                       date: cooldownDateLabel,
@@ -332,11 +324,11 @@ export default function PrivateHubPage() {
           )}
 
           {deniedRequests.length > 0 && (
-            <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <div className="mb-6 rounded-lg border border-border bg-(--color-surface-elevated) p-4 text-left">
+              <h3 className="text-sm font-semibold text-text-primary">
                 {t('privateHubPage.denials.title')}
               </h3>
-              <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
+              <ul className="mt-2 space-y-1 text-sm text-text-secondary">
                 {deniedRequests.map((request) => (
                   <li key={request.id}>
                     {t('privateHubPage.denials.item', {
@@ -356,18 +348,18 @@ export default function PrivateHubPage() {
             <>
               <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     {t('privateHubPage.form.messageLabel')}
                   </label>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder={t('privateHubPage.form.messagePlaceholder')}
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                     rows={4}
                     maxLength={1000}
                   />
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1 text-right">
+                  <p className="text-xs text-(--color-text-muted) mt-1 text-right">
                     {t('privateHubPage.form.charCount', { current: message.length, max: 1000 })}
                   </p>
                 </div>
@@ -375,7 +367,7 @@ export default function PrivateHubPage() {
                 <button
                   type="submit"
                   disabled={requestMutation.isPending || isPendingRequest}
-                  className="w-full px-4 py-3 bg-[var(--color-primary)] text-white rounded-lg font-semibold hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {requestMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -405,7 +397,7 @@ export default function PrivateHubPage() {
                 </button>
               </form>
 
-              <p className="text-xs text-[var(--color-text-muted)] mt-4 text-center">
+              <p className="text-xs text-(--color-text-muted) mt-4 text-center">
                 {t('privateHubPage.form.disclaimer')}
               </p>
             </>

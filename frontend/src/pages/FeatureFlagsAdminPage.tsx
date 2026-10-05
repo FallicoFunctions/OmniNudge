@@ -78,7 +78,7 @@ export default function AdminFeatureFlags() {
         <h1 className="text-2xl font-bold">{t('featureFlagsAdmin.title')}</h1>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700"
         >
           {t('featureFlagsAdmin.createNewFlag')}
         </button>
@@ -86,7 +86,7 @@ export default function AdminFeatureFlags() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Flags List */}
-        <div className="md:col-span-2 bg-white rounded-lg shadow overflow-hidden">
+        <div className="md:col-span-2 bg-white rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -129,10 +129,10 @@ export default function AdminFeatureFlags() {
                       }}
                       aria-label={t('featureFlagsAdmin.toggleEnabledAria', { key: flag.key })}
                       title={t('featureFlagsAdmin.toggleEnabledTitle')}
-                      className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${flag.enabled ? 'bg-green-600' : 'bg-gray-200'}`}
+                      className={`relative inline-flex shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${flag.enabled ? 'bg-green-600' : 'bg-gray-200'}`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${flag.enabled ? 'translate-x-5' : 'translate-x-0'}`}
+                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform ring-0 transition ease-in-out duration-200 ${flag.enabled ? 'translate-x-5' : 'translate-x-0'}`}
                       />
                     </button>
                   </td>
@@ -168,7 +168,7 @@ export default function AdminFeatureFlags() {
         </div>
 
         {/* Details / Audit Log Panel */}
-        <div className="md:col-span-1 bg-white rounded-lg shadow p-6">
+        <div className="md:col-span-1 bg-white rounded-lg shadow-sm p-6">
           {selectedFlag ? (
             <div>
               <h2 className="text-xl font-bold mb-4">
@@ -221,10 +221,10 @@ export default function AdminFeatureFlags() {
                             data: { auto_rollback: !flag?.auto_rollback },
                           });
                         }}
-                        className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${flags?.find((f) => f.key === selectedFlag)?.auto_rollback ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                        className={`relative inline-flex shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${flags?.find((f) => f.key === selectedFlag)?.auto_rollback ? 'bg-indigo-600' : 'bg-gray-200'}`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${flags?.find((f) => f.key === selectedFlag)?.auto_rollback ? 'translate-x-5' : 'translate-x-0'}`}
+                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform ring-0 transition ease-in-out duration-200 ${flags?.find((f) => f.key === selectedFlag)?.auto_rollback ? 'translate-x-5' : 'translate-x-0'}`}
                         />
                       </button>
                     </div>
@@ -430,7 +430,7 @@ export default function AdminFeatureFlags() {
                       name="key"
                       required
                       pattern="[a-z0-9_]+"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-xs p-2"
                     />
                   </div>
                   <div className="mt-4">
@@ -440,7 +440,7 @@ export default function AdminFeatureFlags() {
                     <input
                       name="description"
                       required
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-xs p-2"
                     />
                   </div>
                   <div className="mt-4">
@@ -449,7 +449,7 @@ export default function AdminFeatureFlags() {
                     </label>
                     <select
                       name="environment"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-xs p-2"
                     >
                       <option value="all">{t('featureFlagsAdmin.env.all')}</option>
                       <option value="dev">{t('featureFlagsAdmin.env.dev')}</option>
@@ -463,14 +463,14 @@ export default function AdminFeatureFlags() {
                 <button
                   form="create-flag-form"
                   type="submit"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-xs px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-hidden sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   {t('featureFlagsAdmin.createModal.createButton')}
                 </button>
                 <button
                   onClick={() => setIsCreateModalOpen(false)}
                   type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-xs px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   {t('common.cancel')}
                 </button>

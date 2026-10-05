@@ -53,10 +53,10 @@ export default function MediaUploadField({
 
   return (
     <div className="space-y-2">
-      <span className="block text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
+      <span className="block text-sm font-medium text-text-primary">{label}</span>
 
       <div
-        className={`overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] ${frameClassName}`}
+        className={`overflow-hidden rounded-xl border border-border bg-surface ${frameClassName}`}
       >
         {hasMedia ? (
           mediaType === 'video' ? (
@@ -65,7 +65,7 @@ export default function MediaUploadField({
             <img src={mediaSrc} alt={label} className={resolvedImageClassName} />
           )
         ) : (
-          <div className="flex min-h-32 items-center justify-center px-4 py-8 text-sm text-[var(--color-text-secondary)]">
+          <div className="flex min-h-32 items-center justify-center px-4 py-8 text-sm text-text-secondary">
             No {mediaType} selected.
           </div>
         )}
@@ -74,7 +74,7 @@ export default function MediaUploadField({
       <div className="flex flex-wrap items-center gap-2">
         <label
           htmlFor={inputId}
-          className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+          className="inline-flex cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-(--color-surface-elevated)"
         >
           {isUploading ? uploadingLabel : uploadButtonLabel}
         </label>
@@ -91,17 +91,17 @@ export default function MediaUploadField({
             type="button"
             onClick={onClear}
             disabled={disabled || isUploading}
-            className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
           >
             {clearLabel}
           </button>
         )}
       </div>
 
-      {hint && <p className="text-xs text-[var(--color-text-secondary)]">{hint}</p>}
-      {description && <p className="text-xs text-[var(--color-text-secondary)]">{description}</p>}
+      {hint && <p className="text-xs text-text-secondary">{hint}</p>}
+      {description && <p className="text-xs text-text-secondary">{description}</p>}
       {showStoredPath && value && (
-        <p className="break-all rounded-lg bg-[var(--color-surface-elevated)] px-2 py-1 font-mono text-[11px] text-[var(--color-text-secondary)]">
+        <p className="break-all rounded-lg bg-(--color-surface-elevated) px-2 py-1 font-mono text-[11px] text-text-secondary">
           {value}
         </p>
       )}

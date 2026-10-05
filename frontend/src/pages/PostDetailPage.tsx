@@ -655,7 +655,7 @@ export default function PostDetailPage() {
   if (!postId || Number.isNaN(parsedPostId)) {
     return (
       <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
-        <div className="text-[var(--color-text-secondary)]">{t('posts.errors.invalidUrl')}</div>
+        <div className="text-text-secondary">{t('posts.errors.invalidUrl')}</div>
       </div>
     );
   }
@@ -678,7 +678,7 @@ export default function PostDetailPage() {
     }
     return (
       <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
-        <div className="text-[var(--color-text-secondary)]">
+        <div className="text-text-secondary">
           {t('posts.errors.loadFailed')}: {message}
         </div>
       </div>
@@ -701,7 +701,7 @@ export default function PostDetailPage() {
                     href={sanitizedExternalLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-[var(--color-primary)]"
+                    className="hover:text-primary"
                   >
                     {decodedTitle}
                   </a>
@@ -711,7 +711,7 @@ export default function PostDetailPage() {
               }
               titleBadges={
                 postData?.nsfw ? (
-                  <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  <span className="inline-flex items-center rounded-sm bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                     {t('posts.badges.nsfw')}
                   </span>
                 ) : undefined
@@ -722,7 +722,7 @@ export default function PostDetailPage() {
                       <Link
                         key="hub"
                         to={`/h/${hubName}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        className="text-text-secondary hover:text-primary"
                       >
                         {hubDisplayTitle ?? t('common.format.hubPath', { name: hubName })}
                       </Link>,
@@ -733,7 +733,7 @@ export default function PostDetailPage() {
                       <Link
                         key="subreddit"
                         to={`/r/${targetSubreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        className="text-text-secondary hover:text-primary"
                       >
                         {t('common.format.subredditPath', { name: targetSubreddit })}
                       </Link>,
@@ -743,7 +743,7 @@ export default function PostDetailPage() {
                   {t('posts.postedByLabel')}{' '}
                   <Link
                     to={`/users/${postData?.author?.username ?? postData?.author_username}`}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-text-secondary hover:text-primary"
                   >
                     {postData?.author?.username ?? postData?.author_username}
                   </Link>
@@ -777,7 +777,7 @@ export default function PostDetailPage() {
                 layout="horizontal"
                 size="medium"
               />
-              <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
+              <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
                 <span>
                   {t('posts.comment', {
                     count: postData.comment_count ?? postData.num_comments ?? 0,
@@ -852,9 +852,7 @@ export default function PostDetailPage() {
         )}
 
         <Panel>
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('comments.title')}
-          </h2>
+          <h2 className="mb-4 text-xl font-semibold text-text-primary">{t('comments.title')}</h2>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -874,24 +872,24 @@ export default function PostDetailPage() {
               placeholder={t('comments.shareThoughts')}
               rows={4}
             />
-            <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+            <div className="mt-2 flex justify-start text-xs text-text-secondary">
               <button
                 type="button"
                 onClick={() => setShowFormattingHelp((prev) => !prev)}
-                className="hover:text-[var(--color-primary)]"
+                className="hover:text-primary"
               >
                 {showFormattingHelp ? t('comments.formatting.hide') : t('comments.formatting.show')}
               </button>
             </div>
             {showFormattingHelp && (
-              <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
-                <p className="text-sm text-[var(--color-text-primary)]">
+              <div className="mt-2 w-[70%] rounded-sm border border-border bg-surface p-2 text-[13px] text-text-primary shadow-xs">
+                <p className="text-sm text-text-primary">
                   {t('comments.formatting.description')}{' '}
                   <a
                     href="https://www.markdownguide.org/basic-syntax/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[var(--color-primary)] underline"
+                    className="text-primary underline"
                   >
                     {t('comments.formatting.markdownLinkText')}
                   </a>{' '}
@@ -905,7 +903,7 @@ export default function PostDetailPage() {
             <button
               type="submit"
               disabled={handleCreateComment.isPending || !commentText.trim()}
-              className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
             >
               {handleCreateComment.isPending
                 ? t('comments.status.posting')
@@ -922,19 +920,19 @@ export default function PostDetailPage() {
           )}
 
           {commentNotFound && (
-            <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+            <div className="mb-4 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
               {t('comments.errors.notFound')}
             </div>
           )}
 
           {focusedCommentId && !commentNotFound && (
-            <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <div className="mb-4 rounded-sm border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
               <div>{t('posts.viewingThread')}</div>
               <button
                 onClick={() =>
                   navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
                 }
-                className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
+                className="mt-1 font-semibold text-primary hover:underline"
               >
                 {t('comments.viewRest')}
               </button>
@@ -942,9 +940,7 @@ export default function PostDetailPage() {
           )}
 
           {commentsList.length === 0 && !loadingComments && (
-            <div className="text-sm text-[var(--color-text-secondary)]">
-              {t('comments.emptyBeFirstOnPost')}
-            </div>
+            <div className="text-sm text-text-secondary">{t('comments.emptyBeFirstOnPost')}</div>
           )}
 
           {topLevelComments.length > 0 && (
@@ -1022,35 +1018,31 @@ export default function PostDetailPage() {
     <>
       {embedTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                {t('posts.embed.title')}
-              </h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('posts.embed.title')}</h3>
               <button
                 onClick={() => {
                   setEmbedTarget(null);
                   setEmbedCopied(false);
                 }}
-                className="text-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-xl text-text-secondary hover:text-primary"
                 aria-label={t('posts.embed.closeLabel')}
               >
                 ×
               </button>
             </div>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('posts.embed.instruction')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('posts.embed.instruction')}</p>
             <textarea
               value={embedCode}
               readOnly
               rows={4}
-              className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              className="mt-3 w-full rounded-sm border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary"
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={copyEmbedCode}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                className="rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
               >
                 {embedCopied ? t('common.copied') : t('posts.actions.copyEmbed')}
               </button>
@@ -1059,7 +1051,7 @@ export default function PostDetailPage() {
                   setEmbedTarget(null);
                   setEmbedCopied(false);
                 }}
-                className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
               >
                 {t('common.close')}
               </button>
@@ -1087,21 +1079,21 @@ export default function PostDetailPage() {
       {deleteCommentTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('modals.delete.titleComm')}
             </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deleteCommentReason}
                 onChange={(e) => setDeleteCommentReason(e.target.value)}
                 placeholder={t('moderation.deleteReasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1111,14 +1103,14 @@ export default function PostDetailPage() {
                   setDeleteCommentTarget(null);
                   setDeleteCommentReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeleteComment}
                 disabled={!deleteCommentReason.trim()}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {t('comments.actions.delete')}
               </button>
@@ -1129,21 +1121,19 @@ export default function PostDetailPage() {
       {deletePostTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.delete.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.delete.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deletePostReason}
                 onChange={(e) => setDeletePostReason(e.target.value)}
                 placeholder={t('moderation.deleteReasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1153,14 +1143,14 @@ export default function PostDetailPage() {
                   setDeletePostTarget(null);
                   setDeletePostReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={!deletePostReason.trim() || deletePostMutation.isPending}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {deletePostMutation.isPending
                   ? t('posts.status.deleting')
@@ -1260,7 +1250,7 @@ export default function PostDetailPage() {
               onPostSubmit={handlePostSearchSubmit}
               postDropdownOpen={isSearchDropdownOpen}
               postDropdownContent={
-                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <div className="space-y-2 text-sm text-text-primary">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -1282,7 +1272,7 @@ export default function PostDetailPage() {
                     </label>
                   )}
                   {blockAllNsfw && (
-                    <div className="text-xs text-[var(--color-text-secondary)]">
+                    <div className="text-xs text-text-secondary">
                       {t('home.search.nsfwBlocked')}
                     </div>
                   )}
@@ -1327,7 +1317,7 @@ export default function PostDetailPage() {
             onPostSubmit={handlePostSearchSubmit}
             postDropdownOpen={isSearchDropdownOpen}
             postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <div className="space-y-2 text-sm text-text-primary">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1349,9 +1339,7 @@ export default function PostDetailPage() {
                   </label>
                 )}
                 {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    {t('home.search.nsfwBlocked')}
-                  </div>
+                  <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
                 )}
               </div>
             }
@@ -1428,7 +1416,7 @@ export default function PostDetailPage() {
               onPostSubmit={handleHubPostSearchSubmit}
               postDropdownOpen={hubIsSearchDropdownOpen}
               postDropdownContent={
-                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <div className="space-y-2 text-sm text-text-primary">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -1448,7 +1436,7 @@ export default function PostDetailPage() {
                     </label>
                   )}
                   {blockAllNsfw && (
-                    <div className="text-xs text-[var(--color-text-secondary)]">
+                    <div className="text-xs text-text-secondary">
                       {t('home.search.nsfwBlocked')}
                     </div>
                   )}
@@ -1494,7 +1482,7 @@ export default function PostDetailPage() {
             onPostSubmit={handleHubPostSearchSubmit}
             postDropdownOpen={hubIsSearchDropdownOpen}
             postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <div className="space-y-2 text-sm text-text-primary">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1514,9 +1502,7 @@ export default function PostDetailPage() {
                   </label>
                 )}
                 {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    {t('home.search.nsfwBlocked')}
-                  </div>
+                  <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
                 )}
               </div>
             }
@@ -1534,7 +1520,7 @@ export default function PostDetailPage() {
                       href={sanitizedExternalLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-[var(--color-primary)]"
+                      className="hover:text-primary"
                     >
                       {decodedTitle}
                     </a>
@@ -1544,7 +1530,7 @@ export default function PostDetailPage() {
                 }
                 titleBadges={
                   postData?.nsfw ? (
-                    <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    <span className="inline-flex items-center rounded-sm bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                       {t('posts.badges.nsfw')}
                     </span>
                   ) : undefined
@@ -1555,7 +1541,7 @@ export default function PostDetailPage() {
                         <Link
                           key="hub"
                           to={`/h/${hubName}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          className="text-text-secondary hover:text-primary"
                         >
                           {hubDisplayTitle ?? t('common.format.hubPath', { name: hubName })}
                         </Link>,
@@ -1566,7 +1552,7 @@ export default function PostDetailPage() {
                         <Link
                           key="subreddit"
                           to={`/r/${targetSubreddit}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          className="text-text-secondary hover:text-primary"
                         >
                           {t('common.format.subredditPath', { name: targetSubreddit })}
                         </Link>,
@@ -1576,7 +1562,7 @@ export default function PostDetailPage() {
                     {t('posts.postedByLabel')}{' '}
                     <Link
                       to={`/users/${postData?.author?.username ?? postData?.author_username}`}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      className="text-text-secondary hover:text-primary"
                     >
                       {postData?.author?.username ?? postData?.author_username}
                     </Link>
@@ -1612,7 +1598,7 @@ export default function PostDetailPage() {
                   layout="horizontal"
                   size="medium"
                 />
-                <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
+                <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
                   <span>
                     {t('posts.comment', {
                       count: postData.comment_count ?? postData.num_comments ?? 0,
@@ -1687,9 +1673,7 @@ export default function PostDetailPage() {
           )}
 
           <Panel>
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-              {t('comments.title')}
-            </h2>
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">{t('comments.title')}</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1709,11 +1693,11 @@ export default function PostDetailPage() {
                 placeholder={t('comments.shareThoughts')}
                 rows={4}
               />
-              <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+              <div className="mt-2 flex justify-start text-xs text-text-secondary">
                 <button
                   type="button"
                   onClick={() => setShowFormattingHelp((prev) => !prev)}
-                  className="hover:text-[var(--color-primary)]"
+                  className="hover:text-primary"
                 >
                   {showFormattingHelp
                     ? t('comments.formatting.hide')
@@ -1721,14 +1705,14 @@ export default function PostDetailPage() {
                 </button>
               </div>
               {showFormattingHelp && (
-                <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
-                  <p className="text-sm text-[var(--color-text-primary)]">
+                <div className="mt-2 w-[70%] rounded-sm border border-border bg-surface p-2 text-[13px] text-text-primary shadow-xs">
+                  <p className="text-sm text-text-primary">
                     {t('comments.formatting.description')}{' '}
                     <a
                       href="https://www.markdownguide.org/basic-syntax/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[var(--color-primary)] underline"
+                      className="text-primary underline"
                     >
                       {t('comments.formatting.markdownLinkText')}
                     </a>{' '}
@@ -1742,7 +1726,7 @@ export default function PostDetailPage() {
               <button
                 type="submit"
                 disabled={handleCreateComment.isPending || !commentText.trim()}
-                className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {handleCreateComment.isPending
                   ? t('comments.status.posting')
@@ -1759,19 +1743,19 @@ export default function PostDetailPage() {
             )}
 
             {commentNotFound && (
-              <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              <div className="mb-4 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
                 {t('comments.errors.notFound')}
               </div>
             )}
 
             {focusedCommentId && !commentNotFound && (
-              <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              <div className="mb-4 rounded-sm border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                 <div>{t('posts.viewingThread')}</div>
                 <button
                   onClick={() =>
                     navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
                   }
-                  className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  className="mt-1 font-semibold text-primary hover:underline"
                 >
                   {t('comments.viewRest')}
                 </button>
@@ -1779,9 +1763,7 @@ export default function PostDetailPage() {
             )}
 
             {commentsList.length === 0 && !loadingComments && (
-              <div className="text-sm text-[var(--color-text-secondary)]">
-                {t('comments.emptyBeFirstOnPost')}
-              </div>
+              <div className="text-sm text-text-secondary">{t('comments.emptyBeFirstOnPost')}</div>
             )}
 
             {topLevelComments.length > 0 && (
@@ -1858,35 +1840,31 @@ export default function PostDetailPage() {
 
       {embedTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                {t('posts.embed.title')}
-              </h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('posts.embed.title')}</h3>
               <button
                 onClick={() => {
                   setEmbedTarget(null);
                   setEmbedCopied(false);
                 }}
-                className="text-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-xl text-text-secondary hover:text-primary"
                 aria-label={t('posts.embed.closeLabel')}
               >
                 ×
               </button>
             </div>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('posts.embed.instruction')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('posts.embed.instruction')}</p>
             <textarea
               value={embedCode}
               readOnly
               rows={4}
-              className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              className="mt-3 w-full rounded-sm border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary"
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={copyEmbedCode}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                className="rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
               >
                 {embedCopied ? t('common.copied') : t('posts.actions.copyEmbed')}
               </button>
@@ -1895,7 +1873,7 @@ export default function PostDetailPage() {
                   setEmbedTarget(null);
                   setEmbedCopied(false);
                 }}
-                className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
               >
                 {t('common.close')}
               </button>
@@ -1924,21 +1902,21 @@ export default function PostDetailPage() {
       {deleteCommentTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('modals.delete.titleComm')}
             </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deleteCommentReason}
                 onChange={(e) => setDeleteCommentReason(e.target.value)}
                 placeholder={t('moderation.deleteReasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1948,14 +1926,14 @@ export default function PostDetailPage() {
                   setDeleteCommentTarget(null);
                   setDeleteCommentReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeleteComment}
                 disabled={!deleteCommentReason.trim()}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {t('comments.actions.delete')}
               </button>
@@ -1966,21 +1944,19 @@ export default function PostDetailPage() {
       {deletePostTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.delete.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.delete.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deletePostReason}
                 onChange={(e) => setDeletePostReason(e.target.value)}
                 placeholder={t('moderation.deleteReasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1990,14 +1966,14 @@ export default function PostDetailPage() {
                   setDeletePostTarget(null);
                   setDeletePostReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={!deletePostReason.trim() || deletePostMutation.isPending}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {deletePostMutation.isPending
                   ? t('posts.status.deleting')

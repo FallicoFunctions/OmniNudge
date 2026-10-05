@@ -9,7 +9,7 @@ export function RecordingAnimation({ audioLevel }: RecordingAnimationProps) {
   const dotOpacity = 0.6 + audioLevel * 0.4;
 
   return (
-    <div className="relative flex items-center justify-center w-8 h-8 flex-shrink-0" aria-hidden>
+    <div className="relative flex items-center justify-center w-8 h-8 shrink-0" aria-hidden>
       {/* Outer ring — scales with audio level */}
       <div
         className="absolute rounded-full"

@@ -19,10 +19,10 @@ export function Skeleton({
   height,
   lines = 1,
 }: SkeletonProps) {
-  const baseClasses = 'animate-pulse bg-[var(--color-surface-elevated)]';
+  const baseClasses = 'animate-pulse bg-(--color-surface-elevated)';
 
   const variantClasses = {
-    text: 'h-4 rounded',
+    text: 'h-4 rounded-sm',
     circular: 'rounded-full',
     rectangular: 'rounded-md',
   };
@@ -56,7 +56,7 @@ export function Skeleton({
 // PostCardSkeleton - Skeleton for post cards
 export function PostCardSkeleton() {
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4">
+    <div className="bg-surface border border-border rounded-lg p-4">
       <div className="flex gap-3">
         {/* Vote column */}
         <div className="flex flex-col items-center gap-2 w-10">
@@ -101,7 +101,7 @@ interface CommentSkeletonProps {
 
 export function CommentSkeleton({ depth = 0, showReplies = false }: CommentSkeletonProps) {
   return (
-    <div className={depth > 0 ? 'ml-6 mt-3 border-l-[3px] border-[var(--color-border)] pl-5' : ''}>
+    <div className={depth > 0 ? 'ml-6 mt-3 border-l-[3px] border-border pl-5' : ''}>
       <div className="flex gap-2">
         {/* Vote column */}
         <div className="flex flex-col items-center gap-1 w-8">

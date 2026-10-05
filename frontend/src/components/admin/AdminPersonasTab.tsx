@@ -304,16 +304,14 @@ export default function AdminPersonasTab() {
   }
 
   if (!sortedPersonas.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">No personas found.</p>;
+    return <p className="text-sm text-text-secondary">No personas found.</p>;
   }
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
-          OmniChat personas
-        </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <h2 className="text-xl font-semibold text-text-primary">OmniChat personas</h2>
+        <p className="mt-1 text-sm text-text-secondary">
           Upload avatar stills and short preview videos. Featured tiles autoplay on mobile; all
           tiles preview on desktop hover.
         </p>
@@ -343,9 +341,9 @@ export default function AdminPersonasTab() {
           return (
             <section
               key={persona.id}
-              className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4"
+              className="rounded-2xl border border-border bg-(--color-surface-elevated) p-4"
             >
-              <div className="grid gap-4 lg:grid-cols-[160px,1fr]">
+              <div className="grid gap-4 lg:grid-cols-[160px_1fr]">
                 <div className="space-y-3">
                   <div
                     className="w-40 max-w-full"
@@ -356,17 +354,15 @@ export default function AdminPersonasTab() {
                   >
                     <PersonaAvatar
                       persona={{ ...persona, ...draft }}
-                      className="aspect-[3/4] w-full"
+                      className="aspect-3/4 w-full"
                       previewEnabled={Boolean(draft.preview_video_url)}
                       previewActive={hoveredPersonaId === persona.id}
                       loopPreview
                     />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {persona.name}
-                    </div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+                    <div className="text-sm font-semibold text-text-primary">{persona.name}</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-text-secondary">
                       {persona.category.replace('_', ' ')}
                     </div>
                   </div>
@@ -385,7 +381,7 @@ export default function AdminPersonasTab() {
                       uploadingLabel="Uploading avatar..."
                       clearLabel="Clear image"
                       isUploading={avatarUploading}
-                      previewFrameClassName="aspect-[3/4]"
+                      previewFrameClassName="aspect-3/4"
                       imageClassName="h-full w-full bg-black/10 object-cover"
                       onFileChange={(event) =>
                         handleUpload(persona.id, event.target.files?.[0], 'avatar_url')
@@ -393,9 +389,7 @@ export default function AdminPersonasTab() {
                       onClear={() => updateDraft(persona.id, { avatar_url: '' })}
                     />
                     {avatarUploading && (
-                      <p className="text-xs text-[var(--color-text-secondary)]">
-                        Uploading avatar...
-                      </p>
+                      <p className="text-xs text-text-secondary">Uploading avatar...</p>
                     )}
                     {uploadErrors[`${persona.id}:avatar_url`] && (
                       <p className="text-xs text-red-400">
@@ -422,9 +416,7 @@ export default function AdminPersonasTab() {
                       onClear={() => updateDraft(persona.id, { preview_video_url: '' })}
                     />
                     {videoUploading && (
-                      <p className="text-xs text-[var(--color-text-secondary)]">
-                        Uploading preview video...
-                      </p>
+                      <p className="text-xs text-text-secondary">Uploading preview video...</p>
                     )}
                     {uploadErrors[`${persona.id}:preview_video_url`] && (
                       <p className="text-xs text-red-400">
@@ -435,26 +427,24 @@ export default function AdminPersonasTab() {
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <div className="mt-4 space-y-3 rounded-2xl border border-border bg-surface p-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    Character Voice
-                  </h3>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
+                  <h3 className="text-sm font-semibold text-text-primary">Character Voice</h3>
+                  <p className="text-xs text-text-secondary">
                     Assign one of the six female or six male server voices. Browser fallback keeps
                     speech on the user's device.
                   </p>
                 </div>
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto,auto] md:items-end">
-                  <label className="space-y-1 text-sm text-[var(--color-text-primary)]">
-                    <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+                  <label className="space-y-1 text-sm text-text-primary">
+                    <span className="block text-xs font-medium text-text-secondary">
                       Voice for {persona.name}
                     </span>
                     <select
                       aria-label={`${persona.name} voice`}
                       value={voiceSelection}
                       onChange={(event) => updateVoiceSelection(persona.id, event.target.value)}
-                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+                      className="w-full rounded-xl border border-border bg-(--color-surface-elevated) px-3 py-2"
                     >
                       <option value="">Browser fallback</option>
                       {currentVoiceIsCustom && (
@@ -488,7 +478,7 @@ export default function AdminPersonasTab() {
                       !voiceCatalogQuery.data?.voicebox_available ||
                       previewingPersonaId !== null
                     }
-                    className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    className="rounded-xl border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
                   >
                     {isVoicePreviewing ? 'Previewing...' : 'Preview'}
                   </button>
@@ -506,7 +496,7 @@ export default function AdminPersonasTab() {
                       voiceSelection === '__current_custom__' ||
                       (Boolean(voiceSelection) && !voiceCatalogQuery.data?.voicebox_available)
                     }
-                    className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                   >
                     {isVoiceSaving ? 'Saving...' : 'Save voice'}
                   </button>
@@ -537,13 +527,11 @@ export default function AdminPersonasTab() {
                 )}
               </div>
 
-              <div className="mt-4 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <div className="mt-4 space-y-3 rounded-2xl border border-border bg-surface p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      Gallery Images
-                    </h3>
-                    <p className="text-xs text-[var(--color-text-secondary)]">
+                    <h3 className="text-sm font-semibold text-text-primary">Gallery Images</h3>
+                    <p className="text-xs text-text-secondary">
                       Optional images shown in the persona gallery.
                     </p>
                   </div>
@@ -551,7 +539,7 @@ export default function AdminPersonasTab() {
                     <button
                       type="button"
                       onClick={() => updateDraft(persona.id, { gallery_urls: [] })}
-                      className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm"
                     >
                       Clear gallery
                     </button>
@@ -561,7 +549,7 @@ export default function AdminPersonasTab() {
                 <div className="flex flex-wrap items-center gap-2">
                   <label
                     htmlFor={`admin-persona-${persona.id}-gallery-file`}
-                    className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    className="inline-flex cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-(--color-surface-elevated)"
                   >
                     {galleryUploading ? 'Uploading gallery image...' : 'Add gallery image'}
                   </label>
@@ -576,9 +564,7 @@ export default function AdminPersonasTab() {
                 </div>
 
                 {galleryUploading && (
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    Uploading gallery image...
-                  </p>
+                  <p className="text-xs text-text-secondary">Uploading gallery image...</p>
                 )}
                 {uploadErrors[`${persona.id}:gallery_urls`] && (
                   <p className="text-xs text-red-400">
@@ -591,7 +577,7 @@ export default function AdminPersonasTab() {
                     {(draft.gallery_urls ?? []).map((url, index) => (
                       <div
                         key={`${persona.id}-gallery-${url}-${index}`}
-                        className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                        className="overflow-hidden rounded-xl border border-border bg-(--color-surface-elevated)"
                       >
                         <img
                           src={resolveMediaUrl(url)}
@@ -599,13 +585,13 @@ export default function AdminPersonasTab() {
                           className="h-40 w-full bg-black/10 object-cover"
                         />
                         <div className="space-y-2 p-2">
-                          <p className="break-all rounded-lg bg-[var(--color-surface)] px-2 py-1 font-mono text-[11px] text-[var(--color-text-secondary)]">
+                          <p className="break-all rounded-lg bg-surface px-2 py-1 font-mono text-[11px] text-text-secondary">
                             {url}
                           </p>
                           <button
                             type="button"
                             onClick={() => removeGalleryURL(persona.id, index)}
-                            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm"
+                            className="rounded-lg border border-border px-3 py-1.5 text-sm"
                           >
                             Remove
                           </button>
@@ -614,9 +600,7 @@ export default function AdminPersonasTab() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    No gallery images set.
-                  </p>
+                  <p className="text-xs text-text-secondary">No gallery images set.</p>
                 )}
               </div>
 
@@ -638,14 +622,12 @@ export default function AdminPersonasTab() {
                   disabled={
                     saveMutation.isPending || avatarUploading || videoUploading || galleryUploading
                   }
-                  className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                 >
                   {isSaving ? 'Saving...' : 'Save media'}
                 </button>
                 {(draft.preview_video_url || persona.preview_video_url) && (
-                  <span className="text-xs text-[var(--color-text-secondary)]">
-                    Video preview enabled
-                  </span>
+                  <span className="text-xs text-text-secondary">Video preview enabled</span>
                 )}
                 {saveMutation.isError && saveMutation.variables?.personaId === persona.id && (
                   <span className="text-xs text-red-400">

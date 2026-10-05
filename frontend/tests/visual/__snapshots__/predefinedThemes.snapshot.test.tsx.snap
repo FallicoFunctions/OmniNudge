@@ -2,26 +2,26 @@
 
 exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Aurora Glow
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Cool gradient inspired by northern lights.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -120,11 +120,11 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(99, 102, 241);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -133,11 +133,11 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(30, 27, 75);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -146,11 +146,11 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(15, 23, 42);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -159,18 +159,18 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -185,7 +185,7 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -196,26 +196,26 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
 
 exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Desert Bloom
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Warm desert sunset palette.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -314,11 +314,11 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(249, 115, 22);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -327,11 +327,11 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(255, 251, 235);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -340,11 +340,11 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(255, 247, 237);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -353,18 +353,18 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -379,7 +379,7 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -390,26 +390,26 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
 
 exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Forest Whisper
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Organic greens with calming neutrals.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -508,11 +508,11 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(22, 163, 74);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -521,11 +521,11 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(248, 250, 252);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -534,11 +534,11 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(241, 245, 249);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -547,18 +547,18 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -573,7 +573,7 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -584,26 +584,26 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
 
 exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Midnight Pulse
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         High-contrast dark UI with neon accents.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -702,11 +702,11 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(20, 184, 166);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -715,11 +715,11 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(15, 23, 42);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -728,11 +728,11 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(2, 6, 23);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -741,18 +741,18 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -767,7 +767,7 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -778,26 +778,26 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
 
 exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Neon Circuit
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Electric teal and magenta for futuristic dashboards.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -896,11 +896,11 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(14, 165, 233);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -909,11 +909,11 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(17, 24, 39);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -922,11 +922,11 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(10, 10, 15);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -935,18 +935,18 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -961,7 +961,7 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -972,26 +972,26 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
 
 exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Ocean Mist
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Soft teal gradients with airy whites.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -1090,11 +1090,11 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(14, 165, 233);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -1103,11 +1103,11 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(240, 249, 255);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -1116,11 +1116,11 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(224, 242, 254);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -1129,18 +1129,18 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -1155,7 +1155,7 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -1166,26 +1166,26 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
 
 exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Solar Flare
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Bold oranges with deep charcoal.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -1284,11 +1284,11 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(251, 146, 60);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -1297,11 +1297,11 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(41, 37, 36);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -1310,11 +1310,11 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(28, 25, 23);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -1323,18 +1323,18 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(16, 185, 129);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -1349,7 +1349,7 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme
@@ -1360,26 +1360,26 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
 
 exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
 <article
-  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+  class="flex flex-col rounded-2xl border p-4 shadow-xs transition border-border hover:border-primary/50"
 >
   <header
     class="flex items-start justify-between gap-4"
   >
     <div>
       <h3
-        class="text-lg font-semibold text-[var(--color-text-primary)]"
+        class="text-lg font-semibold text-text-primary"
       >
         Velvet Noir
       </h3>
       <p
-        class="text-sm text-[var(--color-text-secondary)]"
+        class="text-sm text-text-secondary"
       >
         Luxury purples with gold highlights.
       </p>
     </div>
   </header>
   <div
-    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+    class="mt-4 rounded-xl border border-border bg-white p-4"
   >
     <div
       class="rounded-lg p-3"
@@ -1478,11 +1478,11 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(147, 51, 234);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Primary
       </span>
@@ -1491,11 +1491,11 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(31, 21, 55);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Surface
       </span>
@@ -1504,11 +1504,11 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(15, 10, 31);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Background
       </span>
@@ -1517,18 +1517,18 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
       class="flex flex-col items-center gap-1 text-center"
     >
       <span
-        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        class="h-8 w-8 rounded-full border border-border"
         style="background-color: rgb(250, 204, 21);"
       />
       <span
-        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+        class="text-[10px] uppercase tracking-wide text-(--color-text-muted)"
       >
         Accent
       </span>
     </div>
   </div>
   <div
-    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+    class="mt-4 flex items-center justify-between text-sm text-text-secondary"
   >
     <span>
       ⭐
@@ -1543,7 +1543,7 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
     class="mt-4 flex gap-2"
   >
     <button
-      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       type="button"
     >
       Use Theme

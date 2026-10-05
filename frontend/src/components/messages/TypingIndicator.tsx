@@ -26,7 +26,7 @@ export function TypingIndicator({ conversationId, participants = [] }: TypingInd
         : `${typingNames[0]} and ${typingNames.length - 1} others are typing`;
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-secondary)] italic">
+    <div className="flex items-center gap-2 px-4 py-2 text-sm text-text-secondary italic">
       <span>{displayText}</span>
       <div className="flex gap-1">
         <span className="animate-bounce-dot animation-delay-0">.</span>

@@ -163,7 +163,7 @@ export function OmniChatGroupsWorkspace() {
           This group invite is invalid or has expired.
         </div>
       )}
-      <div className="mx-auto grid h-[calc(100dvh-var(--omnichat-header-offset)-2.5rem)] max-w-[1500px] overflow-hidden rounded-[30px] border border-white/10 bg-[#121318] shadow-2xl lg:grid-cols-[310px,1fr]">
+      <div className="mx-auto grid h-[calc(100dvh-var(--omnichat-header-offset)-2.5rem)] max-w-[1500px] overflow-hidden rounded-[30px] border border-white/10 bg-[#121318] shadow-2xl lg:grid-cols-[310px_1fr]">
         <aside
           className={`${selectedGroupId ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col border-r border-white/10 bg-[#101116]`}
         >
@@ -191,9 +191,9 @@ export function OmniChatGroupsWorkspace() {
                 type="button"
                 aria-label={`Open ${group.name}`}
                 onClick={() => setSelectedGroupId(group.id)}
-                className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${selectedGroupId === group.id ? 'bg-indigo-500/15' : 'hover:bg-white/[0.04]'}`}
+                className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${selectedGroupId === group.id ? 'bg-indigo-500/15' : 'hover:bg-white/4'}`}
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-400/25 to-blue-500/15 text-white">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-400/25 to-blue-500/15 text-white">
                   <UsersRound size={20} />
                 </div>
                 <div className="min-w-0">
@@ -326,7 +326,7 @@ export function OmniChatGroupsWorkspace() {
                         {message.sender_name}
                       </p>
                       <div
-                        className={`rounded-3xl px-4 py-3 text-sm leading-6 ${message.sender_user_id === user?.id ? 'bg-indigo-500 text-white' : 'border border-white/8 bg-white/[0.055] text-white/78'}`}
+                        className={`rounded-3xl px-4 py-3 text-sm leading-6 ${message.sender_user_id === user?.id ? 'bg-indigo-500 text-white' : 'border border-white/8 bg-white/5.5 text-white/78'}`}
                       >
                         {message.content}
                       </div>
@@ -362,7 +362,7 @@ export function OmniChatGroupsWorkspace() {
                                   : previous
                             )
                           }
-                          className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${selected ? 'border-indigo-400/50 bg-indigo-500/20 text-indigo-100' : 'border-white/10 text-white/48'}`}
+                          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${selected ? 'border-indigo-400/50 bg-indigo-500/20 text-indigo-100' : 'border-white/10 text-white/48'}`}
                         >
                           {selected && <Check size={12} />} Ask {persona.name}
                         </button>
@@ -370,7 +370,7 @@ export function OmniChatGroupsWorkspace() {
                     })}
                   </div>
                 )}
-                <div className="flex items-end gap-2 rounded-[24px] border border-white/10 bg-white/[0.05] p-2">
+                <div className="flex items-end gap-2 rounded-[24px] border border-white/10 bg-white/5 p-2">
                   <textarea
                     aria-label="Group message"
                     value={draft}
@@ -378,7 +378,7 @@ export function OmniChatGroupsWorkspace() {
                     rows={1}
                     maxLength={10000}
                     placeholder="Message the group…"
-                    className="max-h-36 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-white outline-none"
+                    className="max-h-36 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-white outline-hidden"
                   />
                   <button
                     type="submit"
@@ -727,7 +727,7 @@ function CreateGroupDialog({
           value={name}
           onChange={(event) => setName(event.target.value)}
           maxLength={100}
-          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden"
         />
       </label>
       <label className="mt-4 block text-sm text-white/65">
@@ -736,7 +736,7 @@ function CreateGroupDialog({
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           maxLength={1000}
-          className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+          className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-hidden"
         />
       </label>
       <p className="mt-5 text-sm font-medium text-white/65">

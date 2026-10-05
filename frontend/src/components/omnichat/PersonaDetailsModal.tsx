@@ -21,12 +21,12 @@ function ReadOnlyField({
 }) {
   return (
     <label className="space-y-2">
-      <span className="block text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
+      <span className="block text-sm font-medium text-text-primary">{label}</span>
       <textarea
         readOnly
         value={value || ''}
         rows={rows}
-        className={`w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] ${
+        className={`w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-text-primary ${
           mono ? 'font-mono text-xs' : ''
         }`}
       />
@@ -37,12 +37,12 @@ function ReadOnlyField({
 function ReadOnlyInput({ label, value }: { label: string; value?: string | null }) {
   return (
     <label className="space-y-2">
-      <span className="block text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
+      <span className="block text-sm font-medium text-text-primary">{label}</span>
       <input
         readOnly
         type="text"
         value={value || ''}
-        className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+        className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-text-primary"
       />
     </label>
   );
@@ -99,23 +99,21 @@ export default function PersonaDetailsModal({
       isOpen={isOpen}
       onClose={onClose}
       closeOnOverlayClick
-      className="w-full max-w-5xl rounded-3xl bg-[var(--color-background)] p-0 shadow-2xl"
+      className="w-full max-w-5xl rounded-3xl bg-background p-0 shadow-2xl"
       overlayClassName="bg-black/60 flex items-center justify-center"
     >
       <div className="max-h-[88vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-background)] px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-6 py-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+            <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">
               {t('omnichat.personaDetails.title')}
             </p>
-            <h2 className="mt-1 text-2xl font-semibold text-[var(--color-text-primary)]">
-              {persona.name}
-            </h2>
+            <h2 className="mt-1 text-2xl font-semibold text-text-primary">{persona.name}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+            className="rounded-md p-1.5 text-(--color-text-muted) hover:bg-(--color-surface-hover) hover:text-text-primary"
             aria-label="Close character form"
           >
             <X size={18} />
@@ -124,7 +122,7 @@ export default function PersonaDetailsModal({
 
         <div className="space-y-6 px-6 py-5">
           {personaQuery.isLoading && (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--color-text-secondary)]">
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               {t('omnichat.personaDetails.loading')}
             </div>
@@ -138,8 +136,8 @@ export default function PersonaDetailsModal({
 
           {definition && (
             <>
-              <div className="grid gap-4 md:grid-cols-[200px,1fr]">
-                <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="grid gap-4 md:grid-cols-[200px_1fr]">
+                <div className="overflow-hidden rounded-3xl border border-border bg-surface">
                   {(() => {
                     const detailsAvatarSrc = resolveMediaUrl(
                       definition.avatar_url,
@@ -152,7 +150,7 @@ export default function PersonaDetailsModal({
                         className="aspect-square w-full object-cover"
                       />
                     ) : (
-                      <div className="flex aspect-square items-center justify-center text-sm text-[var(--color-text-secondary)]">
+                      <div className="flex aspect-square items-center justify-center text-sm text-text-secondary">
                         {t('omnichat.personaDetails.noAvatar')}
                       </div>
                     );
@@ -311,7 +309,7 @@ export default function PersonaDetailsModal({
                           type="button"
                           onClick={() => setIsConfirmingDelete(false)}
                           disabled={deleteMutation.isPending}
-                          className="rounded-2xl border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] disabled:opacity-60"
+                          className="rounded-2xl border border-border px-4 py-2 text-sm text-text-primary disabled:opacity-60"
                         >
                           {t('common.cancel')}
                         </button>

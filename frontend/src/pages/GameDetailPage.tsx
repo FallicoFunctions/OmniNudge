@@ -38,19 +38,19 @@ export default function GameDetailPage() {
   return (
     <PageShell className="max-w-6xl" panelClassName="space-y-10 p-8">
       <header className="space-y-4">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--color-primary)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-primary">
           {t('gameDetailPage.eyebrow')}
         </p>
-        <h1 className="text-4xl font-bold tracking-tight text-[var(--color-text-primary)] sm:text-5xl">
+        <h1 className="text-4xl font-bold tracking-tight text-text-primary sm:text-5xl">
           {game.name}
         </h1>
       </header>
 
       <section>
-        <article className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#04070d]">
+        <article className="relative overflow-hidden rounded-4xl border border-white/10 bg-[#04070d]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_45%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(8,12,18,0.2),rgba(8,12,18,0.82))]" />
-          <div className="relative flex aspect-[16/9] flex-col justify-end p-6 sm:p-8">
+          <div className="relative flex aspect-video flex-col justify-end p-6 sm:p-8">
             <div>
               <button
                 type="button"

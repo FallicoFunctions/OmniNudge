@@ -14,7 +14,7 @@ export function ViewModeToggle() {
   const isSlimMode = state.viewMode === 'omniscroll' || state.viewMode === 'standard-scroll';
 
   return (
-    <div className="view-mode-toggle flex items-center gap-1 bg-[var(--color-surface)] rounded-md p-1 border border-[var(--color-border)]">
+    <div className="view-mode-toggle flex items-center gap-1 bg-surface rounded-md p-1 border border-border">
       {modes.map((mode) => (
         <button
           key={mode.value}
@@ -37,7 +37,7 @@ export function ViewModeToggle() {
           className={`px-2 py-1 text-xs rounded transition-colors ${
             state.viewMode === mode.value
               ? 'bg-cyan-500 text-black font-semibold'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-hover)]'
+              : 'text-(--color-text-muted) hover:text-(--color-text) hover:bg-(--color-hover)'
           }`}
           title={mode.label}
         >

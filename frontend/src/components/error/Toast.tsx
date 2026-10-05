@@ -77,7 +77,7 @@ export function Toast({ type, message, description, duration = 5000, onDismiss }
       aria-live={type === 'error' ? 'assertive' : 'polite'}
     >
       <div className="flex gap-3">
-        <Icon size={20} className={`flex-shrink-0 mt-0.5 ${config.iconColor}`} />
+        <Icon size={20} className={`shrink-0 mt-0.5 ${config.iconColor}`} />
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{message}</p>
@@ -86,7 +86,7 @@ export function Toast({ type, message, description, duration = 5000, onDismiss }
 
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
+          className="shrink-0 opacity-70 hover:opacity-100 transition-opacity"
           aria-label={t('common.close')}
         >
           <X size={18} />

@@ -75,12 +75,10 @@ export default function GeneralSettingsTab({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
+        <h2 className="text-xl font-bold text-text-primary mb-4">
           {t('hubSettings.general.title')}
         </h2>
-        <p className="text-[var(--color-text-secondary)] mb-6">
-          {t('hubSettings.general.subtitle')}
-        </p>
+        <p className="text-text-secondary mb-6">{t('hubSettings.general.subtitle')}</p>
       </div>
 
       {/* Display Title */}
@@ -94,7 +92,7 @@ export default function GeneralSettingsTab({
           value={displayTitle}
           onChange={(e) => setDisplayTitle(e.target.value)}
           placeholder={t('hubSettings.general.displayTitle.placeholder')}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
+          className="w-full px-3 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary placeholder-(--color-text-muted) focus:outline-hidden focus:ring-2 focus:ring-primary focus:border-primary"
           maxLength={300}
         />
       </FormField>
@@ -113,10 +111,10 @@ export default function GeneralSettingsTab({
 
       {/* Privacy Type */}
       <div>
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-text-primary mb-2">
           {t('hubSettings.general.privacy.label')}
           {!isHubOwnerOrAdmin && (
-            <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">
+            <span className="ml-2 text-xs font-normal text-text-secondary">
               {t('hubSettings.common.ownerOnly')}
             </span>
           )}
@@ -125,13 +123,13 @@ export default function GeneralSettingsTab({
           value={privacyType}
           onChange={(e) => setPrivacyType(e.target.value as PrivacyType)}
           disabled={!isHubOwnerOrAdmin}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value="public">{t('hubSettings.general.privacy.options.public')}</option>
           <option value="restricted">{t('hubSettings.general.privacy.options.restricted')}</option>
           <option value="private">{t('hubSettings.general.privacy.options.private')}</option>
         </select>
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {privacyType === 'public' && t('hubSettings.general.privacy.descriptions.public')}
           {privacyType === 'restricted' && t('hubSettings.general.privacy.descriptions.restricted')}
           {privacyType === 'private' && t('hubSettings.general.privacy.descriptions.private')}
@@ -139,18 +137,18 @@ export default function GeneralSettingsTab({
       </div>
 
       {/* NSFW Toggle */}
-      <div className="border-t border-[var(--color-border)] pt-6">
+      <div className="border-t border-border pt-6">
         <div className="flex items-start justify-between">
           <div className="flex-1 pr-4">
-            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-semibold text-text-primary mb-2">
               {t('hubSettings.general.nsfw.label')}
               {!isHubOwnerOrAdmin && (
-                <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">
+                <span className="ml-2 text-xs font-normal text-text-secondary">
                   {t('hubSettings.common.ownerOnly')}
                 </span>
               )}
             </label>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('hubSettings.general.nsfw.description')}
             </p>
           </div>
@@ -160,8 +158,8 @@ export default function GeneralSettingsTab({
             aria-checked={isNsfw}
             onClick={() => setIsNsfw(!isNsfw)}
             disabled={!isHubOwnerOrAdmin}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-              isNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+              isNsfw ? 'bg-primary' : 'bg-gray-300'
             } ${!isHubOwnerOrAdmin ? 'opacity-50' : ''}`}
           >
             <span className="sr-only">{t('hubSettings.general.nsfw.toggleA11y')}</span>
@@ -176,12 +174,12 @@ export default function GeneralSettingsTab({
       </div>
 
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
+      <div className="flex justify-end pt-4 border-t border-border">
         {saveError && <div className="mr-4 p-2 text-sm text-red-600">{saveError}</div>}
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSaving
             ? t('hubSettings.common.status.saving')

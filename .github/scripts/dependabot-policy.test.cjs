@@ -76,6 +76,26 @@ test('pip pins and Go modules cannot introduce majors or unrelated directives', 
   assert.equal(compatibleManifest('backend/go.mod', before, after + 'replace example => attacker\n'), false);
 });
 
+test('Go updates may evolve the indirect graph while direct dependencies and directives stay guarded', () => {
+  const before = 'module app\n\ngo 1.26\n\nrequire (\n go.opentelemetry.io/otel v1.46.0\n)\n\nrequire (\n go.opentelemetry.io/otel/metric v1.46.0 // indirect\n)\n';
+  const after = before.replaceAll('v1.46.0', 'v1.47.0')
+    .replace(' go.opentelemetry.io/otel/metric', ' go.opentelemetry.io/otel/log v1.47.0 // indirect\n go.opentelemetry.io/otel/metric');
+  const eligible = text => compatibleManifest('backend/go.mod', before, text);
+  assert.equal(eligible(after), true);
+  assert.equal(eligible(after.replace(' go.opentelemetry.io/otel/metric v1.47.0 // indirect\n', '')), true);
+  for (const invalid of [
+    after.replace('otel/log v1.47.0 // indirect', 'otel/log v1.47.0'),
+    after.replace('otel v1.47.0', 'otel v1.47.0 // indirect'),
+    after.replace('otel v1.47.0', 'otel v2.0.0'),
+    after.replace('otel/metric v1.47.0', 'otel/metric v2.0.0'),
+    after.replace('otel/metric v1.47.0', 'otel/metric v1.45.0'),
+    after.replace('otel/log v1.47.0', 'otel/log v1.47.0-beta'),
+    after.replace('otel/log', 'otel/metric'),
+    after.replace('go 1.26', 'go 1.27'),
+    after + 'replace go.opentelemetry.io/otel => example.com/fork v1.47.0\n',
+  ]) assert.equal(eligible(invalid), false, invalid);
+});
+
 test('every required job must succeed; extra failures/pending checks also block merging', () => {
   const checks = REQUIRED_CHECKS.map(check);
   assert.equal(checksPassed(checks), true);

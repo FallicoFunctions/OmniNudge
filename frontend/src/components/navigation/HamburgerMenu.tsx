@@ -42,7 +42,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
       {/* Hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="rounded-md bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+        className="rounded-md bg-(--color-surface-elevated) px-2 py-1 text-xs font-medium text-text-primary hover:bg-border transition-colors"
         aria-label={t('nav.menu')}
         aria-expanded={isOpen}
       >
@@ -64,7 +64,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden z-50">
           {items.map((item, index) => {
             const content = (
               <div className="flex items-center justify-between w-full px-4 py-3 text-sm">
@@ -73,7 +73,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
                   <span>{item.label}</span>
                 </div>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
                     {item.badge}
                   </span>
                 )}
@@ -86,7 +86,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
                   key={index}
                   to={item.to}
                   onClick={() => setIsOpen(false)}
-                  className={`block text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors ${
+                  className={`block text-left text-text-primary hover:bg-(--color-surface-elevated) transition-colors ${
                     item.className || ''
                   }`}
                 >
@@ -103,7 +103,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
                   item.onClick?.();
                   setIsOpen(false);
                 }}
-                className={`w-full text-left text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors ${
+                className={`w-full text-left text-text-primary hover:bg-(--color-surface-elevated) transition-colors ${
                   item.className || ''
                 }`}
               >

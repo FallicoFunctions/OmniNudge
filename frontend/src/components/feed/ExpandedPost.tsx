@@ -360,9 +360,9 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
   };
 
   return (
-    <div className="expanded-post bg-[var(--color-surface)]">
+    <div className="expanded-post bg-surface">
       {/* Sticky back button */}
-      <div className="sticky top-0 z-10 bg-black/70 backdrop-blur-sm p-1 border-b border-cyan-500">
+      <div className="sticky top-0 z-10 bg-black/70 backdrop-blur-xs p-1 border-b border-cyan-500">
         <button
           onClick={onCollapse}
           className="text-cyan-500 hover:text-cyan-400 text-xs flex items-center gap-1 transition-colors"
@@ -422,7 +422,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
 
       {/* Post body */}
       {(postData.selftext || postData.body || postData.content) && (
-        <div className="p-2 text-xs text-[var(--color-primary)] border-b border-[var(--color-border)]">
+        <div className="p-2 text-xs text-primary border-b border-border">
           {postData.selftext || postData.body || postData.content}
         </div>
       )}
@@ -438,7 +438,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       {/* Comments */}
       <div className="mt-1">
         {isLoadingComments && (
-          <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
+          <div className="p-2 text-center text-xs text-(--color-text-muted)">
             {t('comments.loading')}
           </div>
         )}
@@ -456,7 +456,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         )}
 
         {!isLoadingComments && !commentError && comments.length === 0 && (
-          <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
+          <div className="p-2 text-center text-xs text-(--color-text-muted)">
             {t('comments.emptyBeFirstOnPost')}
           </div>
         )}

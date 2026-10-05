@@ -5,7 +5,7 @@ export function PinnedBadge() {
 
   return (
     <div
-      className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      className="inline-flex items-center gap-1 rounded-sm bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 dark:bg-green-900/30 dark:text-green-400"
       title={t('posts.badges.pinnedByModerators')}
     >
       <svg

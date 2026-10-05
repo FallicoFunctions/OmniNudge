@@ -16,26 +16,26 @@ export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallMod
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
-      <div className="relative flex flex-col items-center gap-6 rounded-2xl bg-[var(--color-surface)] p-8 shadow-2xl w-80">
+      <div className="relative flex flex-col items-center gap-6 rounded-2xl bg-surface p-8 shadow-2xl w-80">
         {/* Pulsing rings */}
         <div className="relative flex items-center justify-center">
-          <span className="absolute inline-flex h-20 w-20 rounded-full bg-[var(--color-primary)] opacity-20 animate-ping" />
-          <span className="absolute inline-flex h-16 w-16 rounded-full bg-[var(--color-primary)] opacity-30 animate-ping [animation-delay:0.3s]" />
+          <span className="absolute inline-flex h-20 w-20 rounded-full bg-primary opacity-20 animate-ping" />
+          <span className="absolute inline-flex h-16 w-16 rounded-full bg-primary opacity-30 animate-ping [animation-delay:0.3s]" />
           {/* Avatar placeholder */}
-          <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-primary)] text-white text-2xl font-bold">
+          <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-primary text-white text-2xl font-bold">
             {callerName.charAt(0).toUpperCase()}
           </div>
         </div>
 
         {/* Caller info */}
         <div className="flex flex-col items-center gap-1 text-center">
-          <p className="text-lg font-semibold text-[var(--color-text-primary)]">{callerName}</p>
-          <p className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)]">
+          <p className="text-lg font-semibold text-text-primary">{callerName}</p>
+          <p className="flex items-center gap-1 text-sm text-text-secondary">
             {isVideo ? (
               <Video className="w-4 h-4" aria-hidden="true" />
             ) : (
@@ -52,11 +52,11 @@ export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallMod
             <button
               onClick={onDecline}
               aria-label={t('calls.decline')}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-error)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
+              className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-error) hover:opacity-90 transition-opacity focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-error)"
             >
               <PhoneOff className="w-6 h-6 text-white" />
             </button>
-            <span className="text-xs text-[var(--color-text-secondary)]">{t('calls.decline')}</span>
+            <span className="text-xs text-text-secondary">{t('calls.decline')}</span>
           </div>
 
           {/* Accept */}
@@ -64,7 +64,7 @@ export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallMod
             <button
               onClick={onAccept}
               aria-label={t('calls.accept')}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-success)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-success)]"
+              className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-success) hover:opacity-90 transition-opacity focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-success)"
             >
               {isVideo ? (
                 <Video className="w-6 h-6 text-white" />
@@ -72,7 +72,7 @@ export function IncomingCallModal({ call, onAccept, onDecline }: IncomingCallMod
                 <Phone className="w-6 h-6 text-white" />
               )}
             </button>
-            <span className="text-xs text-[var(--color-text-secondary)]">{t('calls.accept')}</span>
+            <span className="text-xs text-text-secondary">{t('calls.accept')}</span>
           </div>
         </div>
       </div>

@@ -96,23 +96,21 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
   };
 
   return (
-    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
+    <section className="rounded-2xl border border-border bg-surface p-6 shadow-md">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+          <p className="text-sm uppercase tracking-wide text-text-secondary">
             {t('themes.gallery.header.kicker')}
           </p>
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <h2 className="text-2xl font-bold text-text-primary">
             {t('themes.gallery.header.title')}
           </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('themes.gallery.header.subtitle')}
-          </p>
+          <p className="text-sm text-text-secondary">{t('themes.gallery.header.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)]"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-primary"
             onClick={refreshThemes}
             disabled={isLoading}
           >
@@ -120,7 +118,7 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
             onClick={handleCreateTheme}
           >
             {t('themes.gallery.actions.createTheme')}
@@ -136,8 +134,8 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
               type="button"
               className={`rounded-full px-4 py-1 text-sm font-semibold ${
                 filter === option.value
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'border border-[var(--color-border)] text-[var(--color-text-primary)]'
+                  ? 'bg-primary text-white'
+                  : 'border border-border text-text-primary'
               }`}
               onClick={() => setFilter(option.value)}
             >
@@ -149,12 +147,12 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
           <input
             type="search"
             placeholder={t('themes.gallery.search.placeholder')}
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
           <select
-            className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="rounded-lg border border-border px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden"
             value={sort}
             onChange={(event) => setSort(event.target.value as SortValue)}
           >

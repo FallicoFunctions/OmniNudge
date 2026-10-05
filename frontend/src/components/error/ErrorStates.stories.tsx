@@ -77,14 +77,14 @@ export const SeverityToPatternMap: Story = {
   render: () => {
     const severities = ['info', 'warning', 'error', 'critical'] as const;
     return (
-      <div className="w-[420px] max-w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+      <div className="w-[420px] max-w-full rounded-xl border border-border bg-surface p-4">
+        <h3 className="mb-3 text-sm font-semibold text-text-primary">
           Severity to pattern mapping
         </h3>
-        <ul className="space-y-2 text-sm text-[var(--color-text-secondary)]">
+        <ul className="space-y-2 text-sm text-text-secondary">
           {severities.map((severity) => (
             <li key={severity} className="flex justify-between">
-              <span className="font-medium text-[var(--color-text-primary)]">{severity}</span>
+              <span className="font-medium text-text-primary">{severity}</span>
               <span>{getErrorPatternForSeverity(severity)}</span>
             </li>
           ))}

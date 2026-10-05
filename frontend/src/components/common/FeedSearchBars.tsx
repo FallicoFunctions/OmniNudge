@@ -75,10 +75,10 @@ export function FeedSearchBars<T>({
               onBlur={onTopBlur}
               onChange={(event) => onTopChange(event.target.value)}
               placeholder={topPlaceholder}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
             {topShouldShowSuggestions && (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-border bg-surface shadow-lg">
                 {topIsLoading ? (
                   <div className="px-3 py-2">
                     <LoadingMessage className="mt-0 text-sm">
@@ -97,7 +97,7 @@ export function FeedSearchBars<T>({
           </div>
           <button
             type="submit"
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
           >
             {resolvedTopButtonLabel}
           </button>
@@ -114,17 +114,17 @@ export function FeedSearchBars<T>({
               onBlur={onPostBlur}
               onChange={(event) => onPostChange(event.target.value)}
               placeholder={postPlaceholder}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
             {postDropdownOpen && postDropdownContent && (
-              <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg">
                 {postDropdownContent}
               </div>
             )}
           </div>
           <button
             type="submit"
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
           >
             {resolvedPostButtonLabel}
           </button>

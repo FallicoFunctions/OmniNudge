@@ -131,12 +131,12 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       {/* MODAL-1 & MODAL-3: Compact modal with standard close button */}
-      <div className="relative w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-xl">
+      <div className="relative w-full max-w-md rounded-lg bg-surface p-6 shadow-xl">
         {/* Standard close button */}
         <ModalCloseButton onClose={onClose} />
 
-        <div className="border-b border-[var(--color-border)] pb-3 mb-4">
-          <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+        <div className="border-b border-border pb-3 mb-4">
+          <h2 className="text-xl font-semibold text-text-primary">
             {isForgotPassword
               ? t('auth.resetPasswordTitle')
               : isLogin
@@ -160,14 +160,14 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <button
                     type="button"
                     onClick={() => onSwitch('login')}
-                    className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
                   >
                     {t('auth.forgotPasswordFlow.returnToLogin')}
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <p className="text-sm text-[var(--color-text-secondary)]">
+                  <p className="text-sm text-text-secondary">
                     {t('auth.forgotPasswordFlow.description')}
                   </p>
 
@@ -178,7 +178,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <div>
                     <label
                       htmlFor="forgot-username"
-                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                      className="block text-sm font-semibold text-text-primary"
                     >
                       {t('common.username')} <span className="text-red-500">*</span>
                     </label>
@@ -188,7 +188,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                       required
                       value={forgotUsername}
                       onChange={(e) => setForgotUsername(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                       placeholder={t('auth.fields.usernamePlaceholder')}
                       autoComplete="username"
                     />
@@ -197,19 +197,19 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <button
                     type="submit"
                     disabled={forgotLoading}
-                    className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
+                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
                   >
                     {forgotLoading
                       ? t('auth.forgotPasswordFlow.sending')
                       : t('auth.forgotPasswordFlow.sendResetLink')}
                   </button>
 
-                  <p className="text-center text-sm text-[var(--color-text-secondary)]">
+                  <p className="text-center text-sm text-text-secondary">
                     {t('auth.forgotPasswordFlow.rememberPassword')}{' '}
                     <button
                       type="button"
                       onClick={() => onSwitch('login')}
-                      className="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                      className="font-medium text-primary hover:text-primary-dark"
                     >
                       {t('auth.buttons.signIn')}
                     </button>
@@ -223,10 +223,8 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
           {!isForgotPassword && (
             <>
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                  {t('auth.title')}
-                </h1>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <h1 className="text-2xl font-bold text-text-primary">{t('auth.title')}</h1>
+                <p className="mt-1 text-sm text-text-secondary">
                   {isLogin ? t('auth.loginSubtitle') : t('auth.signupSubtitle')}
                 </p>
               </div>
@@ -239,7 +237,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 <div>
                   <label
                     htmlFor="auth-username"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('auth.fields.username')} <span className="text-red-500">*</span>
                   </label>
@@ -249,7 +247,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                     placeholder={t('auth.fields.usernamePlaceholder')}
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -262,23 +260,21 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   <div>
                     <label
                       htmlFor="auth-email"
-                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                      className="block text-sm font-semibold text-text-primary"
                     >
                       {t('auth.fields.email')}{' '}
-                      <span className="text-[var(--color-text-secondary)] text-xs">
-                        {t('common.optional')}
-                      </span>
+                      <span className="text-text-secondary text-xs">{t('common.optional')}</span>
                     </label>
                     <input
                       id="auth-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                       placeholder={t('auth.fields.emailPlaceholder')}
                       autoComplete="email"
                     />
-                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    <p className="mt-1 text-xs text-text-secondary">
                       {t('auth.emailVerificationNote')}
                     </p>
                   </div>
@@ -287,7 +283,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 <div>
                   <label
                     htmlFor="auth-password"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('auth.fields.password')} <span className="text-red-500">*</span>
                   </label>
@@ -297,7 +293,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                     placeholder={t('auth.fields.passwordPlaceholder')}
                     autoComplete={isLogin ? 'current-password' : 'new-password'}
                   />
@@ -310,7 +306,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                         {[0, 1, 2, 3, 4].map((i) => (
                           <div
                             key={i}
-                            className="h-1 flex-1 rounded transition-colors"
+                            className="h-1 flex-1 rounded-sm transition-colors"
                             style={{
                               backgroundColor:
                                 i <= passwordStrength.score ? passwordStrength.color : '#e5e7eb',
@@ -329,7 +325,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
                       {/* Requirements checklist */}
                       {passwordStrength.feedback.length > 0 && (
-                        <ul className="text-xs text-[var(--color-text-secondary)] space-y-1">
+                        <ul className="text-xs text-text-secondary space-y-1">
                           {passwordStrength.feedback.map((item) => (
                             <li key={item}>• {item}</li>
                           ))}
@@ -338,9 +334,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                     </div>
                   )}
 
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    {t('auth.privacyNote')}
-                  </p>
+                  <p className="mt-1 text-xs text-text-secondary">{t('auth.privacyNote')}</p>
                 </div>
 
                 {isLogin && (
@@ -352,11 +346,11 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                           type="checkbox"
                           checked={keepLoggedIn}
                           onChange={(e) => setKeepLoggedIn(e.target.checked)}
-                          className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                          className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
                         />
                         <label
                           htmlFor="keep-logged-in"
-                          className="ml-2 block text-sm text-[var(--color-text-primary)]"
+                          className="ml-2 block text-sm text-text-primary"
                         >
                           {t('auth.keepLoggedIn')}
                         </label>
@@ -364,7 +358,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                       <button
                         type="button"
                         onClick={() => onSwitch('forgot-password')}
-                        className="text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                        className="text-sm font-medium text-primary hover:text-primary-dark"
                       >
                         Forgot password?
                       </button>
@@ -374,18 +368,18 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
                 {/* No-email acknowledgment for signup */}
                 {isSignup && !email && (
-                  <div className="flex items-start border-t border-[var(--color-border)] pt-4">
+                  <div className="flex items-start border-t border-border pt-4">
                     <input
                       id="acknowledge-no-email"
                       type="checkbox"
                       required
                       checked={acknowledgedNoEmail}
                       onChange={(e) => setAcknowledgedNoEmail(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
                     />
                     <label
                       htmlFor="acknowledge-no-email"
-                      className="ml-2 block text-sm text-[var(--color-text-primary)]"
+                      className="ml-2 block text-sm text-text-primary"
                     >
                       I understand that without an email, I won't be able to reset my password if I
                       forget it. <span className="text-red-500">*</span>
@@ -395,7 +389,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
                 {/* Policy acceptance checkboxes for signup */}
                 {isSignup && (
-                  <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+                  <div className="space-y-3 border-t border-border pt-4">
                     <div className="flex items-start">
                       <input
                         id="accept-privacy"
@@ -403,18 +397,18 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                         required
                         checked={acceptPrivacyPolicy}
                         onChange={(e) => setAcceptPrivacyPolicy(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                        className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
                       />
                       <label
                         htmlFor="accept-privacy"
-                        className="ml-2 block text-sm text-[var(--color-text-primary)]"
+                        className="ml-2 block text-sm text-text-primary"
                       >
                         {t('auth.policy.acceptPrivacy')}{' '}
                         <a
                           href="/privacy"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[var(--color-primary)] hover:underline"
+                          className="text-primary hover:underline"
                         >
                           {t('auth.policy.privacyPolicy')}
                         </a>{' '}
@@ -429,18 +423,18 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                         required
                         checked={acceptTerms}
                         onChange={(e) => setAcceptTerms(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                        className="mt-0.5 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
                       />
                       <label
                         htmlFor="accept-terms"
-                        className="ml-2 block text-sm text-[var(--color-text-primary)]"
+                        className="ml-2 block text-sm text-text-primary"
                       >
                         {t('auth.policy.acceptTerms')}{' '}
                         <a
                           href="/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[var(--color-primary)] hover:underline"
+                          className="text-primary hover:underline"
                         >
                           {t('auth.policy.termsOfService')}
                         </a>{' '}
@@ -475,7 +469,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                         !acceptTerms ||
                         (!email && !acknowledgedNoEmail)))
                   }
-                  className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
+                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
                 >
                   {isLoading
                     ? isLogin
@@ -491,10 +485,10 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
               <div className="mt-4">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[var(--color-border)]" />
+                    <div className="w-full border-t border-border" />
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="bg-[var(--color-surface)] px-2 text-[var(--color-text-muted)]">
+                    <span className="bg-surface px-2 text-(--color-text-muted)">
                       or continue with
                     </span>
                   </div>
@@ -504,7 +498,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   {/* Google */}
                   <a
                     href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/google`}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium text-text-primary hover:bg-border transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                       <path
@@ -530,7 +524,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   {/* Discord */}
                   <a
                     href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/discord`}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium text-text-primary hover:bg-border transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="#5865F2">
                       <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
@@ -541,7 +535,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   {/* GitHub */}
                   <a
                     href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/github`}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium text-text-primary hover:bg-border transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23A11.5 11.5 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
@@ -552,7 +546,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   {/* Steam */}
                   <a
                     href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/oauth/steam`}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium text-text-primary hover:bg-border transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658a3.387 3.387 0 0 1 1.912-.592c.063 0 .125.002.187.005l2.861-4.142V8.91a4.396 4.396 0 0 1 4.391-4.391 4.396 4.396 0 0 1 4.392 4.391 4.396 4.396 0 0 1-4.392 4.392h-.1l-4.076 2.91c0 .052.004.105.004.158 0 1.875-1.524 3.4-3.398 3.4-1.643 0-3.014-1.172-3.327-2.723L.444 15.34C1.696 20.295 6.331 24 11.979 24c6.611 0 11.978-5.367 11.978-12C23.957 5.368 18.59 0 11.979 0M7.54 18.21l-1.473-.61c.262.55.715 1.005 1.314 1.255 1.275.532 2.745-.075 3.276-1.351a2.5 2.5 0 0 0 .002-1.912 2.5 2.5 0 0 0-1.354-1.354 2.503 2.503 0 0 0-1.913.002 2.5 2.5 0 0 0-1.13.91l1.522.629c.94.392 1.385 1.469.993 2.41-.392.94-1.469 1.385-2.41.993Zm9.116-9.301a2.93 2.93 0 0 1-2.927-2.928 2.93 2.93 0 0 1 2.927-2.927 2.93 2.93 0 0 1 2.928 2.927 2.93 2.93 0 0 1-2.928 2.928m0-.732a2.198 2.198 0 0 0 2.196-2.196 2.198 2.198 0 0 0-2.196-2.196 2.198 2.198 0 0 0-2.196 2.196 2.198 2.198 0 0 0 2.196 2.196" />
@@ -562,12 +556,12 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 </div>
               </div>
 
-              <p className="mt-4 text-center text-sm text-[var(--color-text-secondary)]">
+              <p className="mt-4 text-center text-sm text-text-secondary">
                 {isLogin ? t('auth.switch.noAccount') : t('auth.switch.hasAccount')}{' '}
                 <button
                   type="button"
                   onClick={() => onSwitch(isLogin ? 'signup' : 'login')}
-                  className="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                  className="font-medium text-primary hover:text-primary-dark"
                 >
                   {isLogin ? t('auth.switch.signUpLink') : t('auth.switch.signInLink')}
                 </button>

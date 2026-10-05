@@ -39,23 +39,23 @@ export default function ThemesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
+    <div className="min-h-screen bg-background px-4 py-10 text-text-primary">
       <main className="mx-auto flex max-w-5xl flex-col gap-8">
         <div className="sr-only" aria-live="polite">
           {activeTheme
             ? t('themesPage.liveRegion.activeTheme', { theme: activeTheme.theme_name })
             : t('themesPage.liveRegion.noActiveTheme')}
         </div>
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
+        <section className="rounded-2xl border border-border bg-surface p-6 shadow-md">
           <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+              <p className="text-sm uppercase tracking-wide text-text-secondary">
                 {t('themesPage.hero.kicker')}
               </p>
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              <h1 className="text-2xl font-bold text-text-primary">
                 {activeTheme ? activeTheme.theme_name : t('themesPage.hero.noThemeSelected')}
               </h1>
-              <p className="text-sm text-[var(--color-text-secondary)]">
+              <p className="text-sm text-text-secondary">
                 {activeTheme?.theme_description ?? t('themesPage.hero.descriptionFallback')}
               </p>
             </div>
@@ -63,8 +63,8 @@ export default function ThemesPage() {
           </header>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <article className="rounded-xl border border-border bg-(--color-surface-elevated) p-4 shadow-xs">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 {t('themesPage.palette.title')}
               </p>
               <div className="mt-3 flex gap-3">
@@ -76,10 +76,10 @@ export default function ThemesPage() {
                 ].map((variable) => (
                   <div key={variable} className="flex flex-col items-center gap-1">
                     <span
-                      className="h-12 w-12 rounded-full border border-[var(--color-border)]"
+                      className="h-12 w-12 rounded-full border border-border"
                       style={{ backgroundColor: `var(${variable})` }}
                     />
-                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                    <span className="text-[10px] text-(--color-text-muted)">
                       {variable.replace('--color-', '')}
                     </span>
                   </div>
@@ -87,8 +87,8 @@ export default function ThemesPage() {
               </div>
             </article>
 
-            <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <article className="rounded-xl border border-border bg-(--color-surface-elevated) p-4 shadow-xs">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 {t('themesPage.typography.title')}
               </p>
               <div className="mt-3 flex flex-col gap-2">
@@ -100,11 +100,11 @@ export default function ThemesPage() {
                   { label: t('themesPage.typography.labels.body'), className: 'text-base' },
                   {
                     label: t('themesPage.typography.labels.caption'),
-                    className: 'text-sm text-[var(--color-text-secondary)]',
+                    className: 'text-sm text-text-secondary',
                   },
                 ].map((item) => (
                   <div key={item.label}>
-                    <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+                    <p className="text-xs uppercase tracking-wide text-(--color-text-muted)">
                       {item.label}
                     </p>
                     <p className={item.className}>{t('themesPage.typography.sampleText')}</p>
@@ -120,18 +120,16 @@ export default function ThemesPage() {
           onManageThemes={handleManageThemes}
         />
 
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
+        <section className="rounded-2xl border border-border bg-surface p-6 shadow-md">
           <header className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+              <p className="text-sm uppercase tracking-wide text-text-secondary">
                 {t('themesPage.livePreview.kicker')}
               </p>
-              <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              <h2 className="text-2xl font-bold text-text-primary">
                 {t('themesPage.livePreview.title')}
               </h2>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('themesPage.livePreview.subtitle')}
-              </p>
+              <p className="text-sm text-text-secondary">{t('themesPage.livePreview.subtitle')}</p>
             </div>
           </header>
           <ThemePreview variables={cssVariables} />
@@ -140,7 +138,7 @@ export default function ThemesPage() {
         <div ref={galleryRef}>
           <Suspense
             fallback={
-              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+              <section className="rounded-2xl border border-border bg-surface p-6">
                 <LoadingMessage className="mt-0 text-sm">
                   {t('themesPage.gallery.loading')}
                 </LoadingMessage>
@@ -151,8 +149,8 @@ export default function ThemesPage() {
           </Suspense>
         </div>
 
-        <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <section className="rounded-2xl border border-dashed border-border bg-surface p-6">
+          <p className="text-sm uppercase tracking-wide text-text-secondary">
             {t('themesPage.debug.kicker')}
           </p>
           {isLoading ? (
@@ -160,15 +158,15 @@ export default function ThemesPage() {
               {t('themesPage.debug.loading')}
             </LoadingMessage>
           ) : (
-            <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
+            <div className="mt-4 space-y-2 text-sm text-text-secondary">
               <p>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('themesPage.debug.activeThemeId')}
                 </span>{' '}
                 {activeTheme?.id ?? t('themesPage.debug.na')}
               </p>
               <p>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('themesPage.debug.cssVariablesLoaded')}
                 </span>{' '}
                 {formatNumber(Object.keys(cssVariables).length)}

@@ -137,7 +137,7 @@ export default function OmniChatCommerceModal({
       ariaDescribedBy={`${descriptionId} ${statusId}`}
       overlayClassName="bg-black/80 backdrop-blur-md"
       // The call screen is z-[100], and a paused call opens this over it.
-      layerClassName={pausedCall ? 'z-[110]' : undefined}
+      layerClassName={pausedCall ? 'z-110' : undefined}
       className="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-[#11131b] text-white shadow-2xl"
       animation="quick-chat"
     >

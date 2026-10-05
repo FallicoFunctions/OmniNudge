@@ -74,17 +74,15 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
     <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-2">
+          <h2 className="text-xl font-bold text-text-primary mb-2">
             {t('hubSettings.moderators.title')}
           </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            {t('hubSettings.moderators.subtitle')}
-          </p>
+          <p className="text-text-secondary">{t('hubSettings.moderators.subtitle')}</p>
         </div>
         {isOwner && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
+            className="px-4 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) transition-colors"
           >
             {t('hubSettings.moderators.actions.addModerator')}
           </button>
@@ -92,32 +90,32 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
       </div>
 
       {/* Role Descriptions */}
-      <div className="bg-[var(--color-background)] border border-[var(--color-border)] rounded p-4">
-        <h3 className="font-medium text-[var(--color-text-primary)] mb-3">
+      <div className="bg-background border border-border rounded-sm p-4">
+        <h3 className="font-medium text-text-primary mb-3">
           {t('hubSettings.moderators.roles.title')}
         </h3>
         <div className="space-y-2 text-sm">
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">
+            <span className="font-medium text-text-primary">
               {t('hubSettings.roles.ownerLabel')}
             </span>
-            <span className="text-[var(--color-text-secondary)] ml-2">
+            <span className="text-text-secondary ml-2">
               {t('hubSettings.moderators.roles.ownerDescription')}
             </span>
           </div>
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">
+            <span className="font-medium text-text-primary">
               {t('hubSettings.roles.fullModeratorLabel')}
             </span>
-            <span className="text-[var(--color-text-secondary)] ml-2">
+            <span className="text-text-secondary ml-2">
               {t('hubSettings.moderators.roles.fullModeratorDescription')}
             </span>
           </div>
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">
+            <span className="font-medium text-text-primary">
               {t('hubSettings.roles.moderatorLabel')}
             </span>
-            <span className="text-[var(--color-text-secondary)] ml-2">
+            <span className="text-text-secondary ml-2">
               {t('hubSettings.moderators.roles.moderatorDescription')}
             </span>
           </div>
@@ -125,26 +123,26 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
       </div>
 
       {/* Moderators List */}
-      <div className="border border-[var(--color-border)] rounded overflow-hidden">
+      <div className="border border-border rounded-sm overflow-hidden">
         <table className="w-full">
-          <thead className="bg-[var(--color-background)]">
+          <thead className="bg-background">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--color-text-primary)]">
+              <th className="px-4 py-3 text-left text-sm font-medium text-text-primary">
                 {t('hubSettings.moderators.table.moderator')}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--color-text-primary)]">
+              <th className="px-4 py-3 text-left text-sm font-medium text-text-primary">
                 {t('hubSettings.moderators.table.role')}
               </th>
               {isOwner && (
-                <th className="px-4 py-3 text-right text-sm font-medium text-[var(--color-text-primary)]">
+                <th className="px-4 py-3 text-right text-sm font-medium text-text-primary">
                   {t('hubSettings.moderators.table.actions')}
                 </th>
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
+          <tbody className="divide-y divide-border">
             {moderators.map((mod) => (
-              <tr key={mod.id} className="hover:bg-[var(--color-background)]">
+              <tr key={mod.id} className="hover:bg-background">
                 <td className="px-4 py-3">
                   <div className="flex items-center">
                     {mod.avatar_url ? (
@@ -154,11 +152,11 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                         className="w-8 h-8 rounded-lg mr-3"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white mr-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white mr-3">
                         {mod.username?.[0]?.toUpperCase()}
                       </div>
                     )}
-                    <span className="text-[var(--color-text-primary)]">{mod.username}</span>
+                    <span className="text-text-primary">{mod.username}</span>
                   </div>
                 </td>
                 <td className="px-4 py-3">
@@ -171,7 +169,7 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                           role: e.target.value as ModeratorRole,
                         })
                       }
-                      className="px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm"
+                      className="px-2 py-1 border border-border rounded-sm bg-surface text-text-primary text-sm"
                     >
                       <option value="full_moderator">
                         {t('hubSettings.roles.fullModeratorOption')}
@@ -179,7 +177,7 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       <option value="moderator">{t('hubSettings.roles.moderatorOption')}</option>
                     </select>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded text-sm bg-[var(--color-background)] text-[var(--color-text-primary)]">
+                    <span className="inline-flex items-center px-2 py-1 rounded-sm text-sm bg-background text-text-primary">
                       {mod.role === 'owner'
                         ? t('hubSettings.moderators.roles.ownerBadge')
                         : getHubModeratorRoleLabel(mod.role, t)}
@@ -217,13 +215,13 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
       {/* Add Moderator Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
+          <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-text-primary mb-4">
               {t('hubSettings.moderators.modal.title')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   {t('hubSettings.moderators.modal.usernameLabel')}
                 </label>
                 <input
@@ -231,17 +229,17 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                   value={newModUsername}
                   onChange={(e) => setNewModUsername(e.target.value)}
                   placeholder={t('hubSettings.moderators.modal.usernamePlaceholder')}
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   {t('hubSettings.moderators.modal.roleLabel')}
                 </label>
                 <select
                   value={newModRole}
                   onChange={(e) => setNewModRole(e.target.value as ModeratorRole)}
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="full_moderator">
                     {t('hubSettings.roles.fullModeratorOption')}
@@ -253,14 +251,14 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
+                className="px-4 py-2 rounded-sm border border-border text-text-primary hover:bg-background transition-colors"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleAddModerator}
                 disabled={!newModUsername.trim() || addModMutation.isPending}
-                className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {addModMutation.isPending
                   ? t('hubSettings.moderators.status.adding')

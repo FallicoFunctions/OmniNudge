@@ -38,9 +38,9 @@ export function OmniScrollView() {
   }, [state.columnCount, state.columns, setActiveColumn]);
 
   return (
-    <div className="multi-column-container view-mode-omniscroll h-screen flex flex-col bg-[var(--color-background)]">
+    <div className="multi-column-container view-mode-omniscroll h-screen flex flex-col bg-background">
       {/* Column config panels - collapsible */}
-      <div className="config-panels flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="config-panels flex border-b border-border bg-surface">
         {state.columns.map((col) => (
           <ColumnConfigPanel key={col.id} columnId={col.id} config={col} />
         ))}

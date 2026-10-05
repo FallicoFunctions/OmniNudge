@@ -40,8 +40,8 @@ function OnlineDot({ lastSeen }: { lastSeen?: string | null }) {
   return (
     <span
       title={isOnline ? 'Online' : 'Offline'}
-      className={`inline-block w-2.5 h-2.5 rounded-full border-2 border-[var(--color-surface)] flex-shrink-0 ${
-        isOnline ? 'bg-green-500' : 'bg-[var(--color-text-muted)]'
+      className={`inline-block w-2.5 h-2.5 rounded-full border-2 border-surface shrink-0 ${
+        isOnline ? 'bg-green-500' : 'bg-(--color-text-muted)'
       }`}
     />
   );
@@ -49,13 +49,13 @@ function OnlineDot({ lastSeen }: { lastSeen?: string | null }) {
 
 function ProfileInfoCard({ location, t }: { location: string; t: TFunction }) {
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
         {t('userProfilePage.headings.info')}
       </h3>
-      <div className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+      <div className="flex items-center gap-2 text-sm text-text-primary">
         <svg
-          className="w-4 h-4 flex-shrink-0 text-[var(--color-text-secondary)]"
+          className="w-4 h-4 shrink-0 text-text-secondary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -133,8 +133,8 @@ function PhotosWidget({
   const tabs = allTabs.filter((tab) => tab.key === 'all' || tab.count > 0);
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
         {t('userProfilePage.headings.photos')}
       </h3>
 
@@ -151,8 +151,8 @@ function PhotosWidget({
               }}
               className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition ${
                 album === tab.key
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  ? 'bg-primary text-white'
+                  : 'bg-(--color-surface-elevated) text-text-secondary hover:text-text-primary'
               }`}
             >
               {tab.label}
@@ -168,7 +168,7 @@ function PhotosWidget({
             key={idx}
             type="button"
             onClick={() => setLightboxIndex(idx)}
-            className="block aspect-square overflow-hidden rounded-md bg-[var(--color-surface-elevated)]"
+            className="block aspect-square overflow-hidden rounded-md bg-(--color-surface-elevated)"
           >
             {photo.media_type === 'video' && !photo.thumbnail_url ? (
               <video
@@ -212,11 +212,11 @@ function MutualFriendsWidget({ username, t }: { username: string; t: TFunction }
   if (mutualFriendsQuery.isLoading || mutuals.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
         {t('userProfilePage.headings.mutualFriends')}
       </h3>
-      <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+      <p className="mb-2 text-xs text-text-secondary">
         {t('userProfilePage.mutualFriends.count', { count: mutuals.length })}
       </p>
       <div className="space-y-1.5">
@@ -224,10 +224,10 @@ function MutualFriendsWidget({ username, t }: { username: string; t: TFunction }
           <Link
             key={friend.id}
             to={`/users/${friend.username}`}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-[var(--color-surface-elevated)] transition"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-(--color-surface-elevated) transition"
           >
             <UserAvatar username={friend.username} avatarUrl={friend.avatar_url} size="sm" />
-            <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+            <span className="truncate text-sm font-medium text-text-primary">
               {friend.username}
             </span>
           </Link>
@@ -409,8 +409,8 @@ export default function UserProfilePage() {
   if (profileQuery.isLoading) {
     return (
       <div className="w-full">
-        <div className="h-40 md:h-52 bg-[var(--color-surface-elevated)] animate-pulse" />
-        <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-4">
+        <div className="h-40 md:h-52 bg-(--color-surface-elevated) animate-pulse" />
+        <div className="bg-surface border-b border-border px-4 py-4">
           <div className="max-w-6xl mx-auto flex gap-4">
             <Skeleton variant="rectangular" width="80px" height="80px" />
             <div className="flex-1 space-y-2 mt-1">
@@ -450,7 +450,7 @@ export default function UserProfilePage() {
             type="button"
             disabled={removeFriendMutation.isPending || friendActionDisabled}
             onClick={() => removeFriendMutation.mutate()}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-success)] px-3 py-1.5 text-sm font-semibold text-[var(--color-success)] hover:opacity-80 disabled:opacity-50 transition"
+            className="inline-flex items-center gap-1.5 rounded-md border border-(--color-success) px-3 py-1.5 text-sm font-semibold text-(--color-success) hover:opacity-80 disabled:opacity-50 transition"
           >
             ✓ {t('friends.actions.friends')}
           </button>
@@ -460,7 +460,7 @@ export default function UserProfilePage() {
             type="button"
             disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
             onClick={() => cancelOrDeclineFriendMutation.mutate()}
-            className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-text-secondary hover:border-(--color-error) hover:text-(--color-error) disabled:opacity-50 transition"
           >
             {t('friends.actions.cancelRequest')}
           </button>
@@ -471,7 +471,7 @@ export default function UserProfilePage() {
               type="button"
               disabled={acceptFriendMutation.isPending || friendActionDisabled}
               onClick={() => acceptFriendMutation.mutate()}
-              className="inline-flex items-center rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
             >
               {t('friends.actions.accept')}
             </button>
@@ -479,7 +479,7 @@ export default function UserProfilePage() {
               type="button"
               disabled={cancelOrDeclineFriendMutation.isPending || friendActionDisabled}
               onClick={() => cancelOrDeclineFriendMutation.mutate()}
-              className="inline-flex items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50 transition"
+              className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-text-secondary hover:border-(--color-error) hover:text-(--color-error) disabled:opacity-50 transition"
             >
               {t('friends.actions.decline')}
             </button>
@@ -490,7 +490,7 @@ export default function UserProfilePage() {
             type="button"
             disabled={friendRequestMutation.isPending || friendActionDisabled}
             onClick={() => friendRequestMutation.mutate()}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-50 transition"
+            className="inline-flex items-center gap-1 rounded-md border border-primary px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary hover:text-white disabled:opacity-50 transition"
           >
             + {t('friends.actions.addFriend')}
           </button>
@@ -502,12 +502,8 @@ export default function UserProfilePage() {
   if (profile.locked) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-12 flex flex-col items-center gap-3 text-center">
-        <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">
-          {profile.username}
-        </h1>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          {t('userProfilePage.locked.message')}
-        </p>
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary">{profile.username}</h1>
+        <p className="text-sm text-text-secondary">{t('userProfilePage.locked.message')}</p>
         {user && canMessageUser && !isBlocked ? (
           renderFriendActionButtons()
         ) : !user ? (
@@ -516,7 +512,7 @@ export default function UserProfilePage() {
             onClick={() =>
               window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))
             }
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition"
+            className="inline-flex items-center gap-1 rounded-md border border-primary px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary hover:text-white transition"
           >
             + {t('friends.actions.addFriend')}
           </button>
@@ -534,8 +530,8 @@ export default function UserProfilePage() {
   return (
     <div className="w-full">
       {/* ── Cover Banner ─────────────────────────────────────────────────── */}
-      {/* aspect-[3/1] matches the banner crop tool exactly (WYSIWYG) */}
-      <div className="relative w-full aspect-[3/1] overflow-hidden">
+      {/* aspect-3/1 matches the banner crop tool exactly (WYSIWYG) */}
+      <div className="relative w-full aspect-3/1 overflow-hidden">
         {profile.banner_url ? (
           <img
             src={resolveMediaUrl(profile.banner_url)}
@@ -543,24 +539,24 @@ export default function UserProfilePage() {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)] via-[var(--color-primary-dark)] to-[var(--color-primary-light)] opacity-80" />
+          <div className="w-full h-full bg-linear-to-br from-primary via-primary-dark to-primary-light opacity-80" />
         )}
       </div>
 
       {/* ── Profile Header Bar ───────────────────────────────────────────── */}
-      <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+      <div className="bg-surface border-b border-border">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 pb-4 relative">
             {/* Avatar — overlaps the banner */}
-            <div className="flex-shrink-0 -mt-10 md:-mt-14 z-10 relative w-20 h-20 md:w-28 md:h-28">
+            <div className="shrink-0 -mt-10 md:-mt-14 z-10 relative w-20 h-20 md:w-28 md:h-28">
               {profile.avatar_url ? (
                 <img
                   src={resolveMediaUrl(profile.avatar_url)}
                   alt={t('userProfilePage.aria.avatarAlt', { username: profile.username })}
-                  className="w-full h-full rounded-lg object-cover border-4 border-[var(--color-surface)] shadow-md"
+                  className="w-full h-full rounded-lg object-cover border-4 border-surface shadow-md"
                 />
               ) : (
-                <div className="w-full h-full rounded-lg bg-[var(--color-border)] border-4 border-[var(--color-surface)] shadow-md flex items-center justify-center text-3xl font-bold text-[var(--color-text-secondary)]">
+                <div className="w-full h-full rounded-lg bg-border border-4 border-surface shadow-md flex items-center justify-center text-3xl font-bold text-text-secondary">
                   {profile.username.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -573,7 +569,7 @@ export default function UserProfilePage() {
             {/* Name + Status */}
             <div className="flex-1 min-w-0 pt-1 sm:pb-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)] leading-tight">
+                <h1 className="text-xl md:text-2xl font-bold text-text-primary leading-tight">
                   {profile.username}
                 </h1>
                 {isBlocked && (
@@ -583,11 +579,11 @@ export default function UserProfilePage() {
                 )}
               </div>
               {profile.status_text && (
-                <p className="mt-0.5 text-sm italic text-[var(--color-text-secondary)] truncate max-w-sm">
+                <p className="mt-0.5 text-sm italic text-text-secondary truncate max-w-sm">
                   "{profile.status_text}"
                 </p>
               )}
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+              <p className="mt-0.5 text-xs text-(--color-text-muted)">
                 {t('userProfilePage.labels.joined', { time: createdLabel })}
               </p>
             </div>
@@ -598,7 +594,7 @@ export default function UserProfilePage() {
                 <button
                   type="button"
                   onClick={() => setIsEditProfileOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-text-primary hover:border-primary hover:text-primary transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -614,7 +610,7 @@ export default function UserProfilePage() {
               {canMessageUser && !isBlocked && (
                 <Link
                   to={`/messages?to=${encodeURIComponent(profile.username)}`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-text-primary hover:border-primary hover:text-primary transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -646,8 +642,8 @@ export default function UserProfilePage() {
                   }}
                   className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
                     isBlocked
-                      ? 'border-[var(--color-success)] text-[var(--color-success)] hover:opacity-80'
-                      : 'border-[var(--color-error)] text-[var(--color-error)] hover:opacity-80'
+                      ? 'border-(--color-success) text-(--color-success) hover:opacity-80'
+                      : 'border-(--color-error) text-(--color-error) hover:opacity-80'
                   }`}
                 >
                   {isBlocked
@@ -662,50 +658,45 @@ export default function UserProfilePage() {
 
       {/* ── About + Stats bar (full width) ──────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 mb-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        <div className="rounded-lg border border-border bg-surface p-4 mb-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
             About Me
           </h3>
           {profile.bio ? (
-            <MarkdownRenderer
-              content={profile.bio}
-              className="text-sm text-[var(--color-text-primary)]"
-            />
+            <MarkdownRenderer content={profile.bio} className="text-sm text-text-primary" />
           ) : (
-            <p className="text-sm text-[var(--color-text-muted)] italic">
+            <p className="text-sm text-(--color-text-muted) italic">
               {canViewPrivateTabs ? 'Add a bio to tell people about yourself.' : 'No bio yet.'}
             </p>
           )}
-          <div className="mt-3 pt-3 border-t border-[var(--color-border)] flex flex-wrap gap-4 text-sm">
+          <div className="mt-3 pt-3 border-t border-border flex flex-wrap gap-4 text-sm">
             <Link to={`/users/${username}/friends`} className="hover:underline">
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.friend_count ?? 0)}
               </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">
+              <span className="text-text-secondary ml-1">
                 {t('userProfilePage.labels.friends')}
               </span>
             </Link>
             <div>
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.photo_count ?? 0)}
               </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">
-                {t('userProfilePage.labels.photos')}
-              </span>
+              <span className="text-text-secondary ml-1">{t('userProfilePage.labels.photos')}</span>
             </div>
             <div>
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.own_post_count ?? 0)}
               </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">
+              <span className="text-text-secondary ml-1">
                 {t('userProfilePage.labels.wallPosts')}
               </span>
             </div>
             <div>
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {wallQuery.isLoading ? '—' : formatNumber(wallQuery.data?.reply_count ?? 0)}
               </span>
-              <span className="text-[var(--color-text-secondary)] ml-1">
+              <span className="text-text-secondary ml-1">
                 {t('userProfilePage.labels.replies')}
               </span>
             </div>
@@ -722,7 +713,7 @@ export default function UserProfilePage() {
             {username && (
               <Link
                 to={`/users/${username}/friends`}
-                className="text-sm font-medium text-[var(--color-primary)] hover:underline"
+                className="text-sm font-medium text-primary hover:underline"
               >
                 {t('friends.actions.seeAll')} →
               </Link>

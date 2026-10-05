@@ -133,19 +133,17 @@ export default function ChatSettingsModal({
       isOpen={isOpen}
       onClose={onClose}
       closeOnOverlayClick
-      className="w-full max-w-lg rounded-2xl bg-[var(--color-background)] p-0 shadow-2xl"
+      className="w-full max-w-lg rounded-2xl bg-background p-0 shadow-2xl"
       overlayClassName="bg-black/50 flex items-center justify-center"
     >
       <div className="max-h-[80vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-background)] px-6 py-4">
-          <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
-            {t('omnichat.chat.settings')}
-          </h2>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-6 py-4">
+          <h2 className="text-lg font-bold text-text-primary">{t('omnichat.chat.settings')}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+            className="rounded-md p-1.5 text-(--color-text-muted) hover:bg-(--color-surface-hover) hover:text-text-primary"
           >
             <X size={18} />
           </button>
@@ -155,35 +153,35 @@ export default function ChatSettingsModal({
           {/* Settings form */}
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
                 {t('omnichat.chat.settingsName')}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
                 {t('omnichat.chat.settingsAge')}
               </label>
               <input
                 type="text"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
                 {t('omnichat.chat.settingsGender')}
               </label>
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">{t('omnichat.chat.settingsGenderN')}</option>
                 <option value="M">{t('omnichat.chat.settingsGenderM')}</option>
@@ -197,7 +195,7 @@ export default function ChatSettingsModal({
               type="button"
               onClick={handleSave}
               disabled={updateSettingsMutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
             >
               {updateSettingsMutation.isPending ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -219,24 +217,24 @@ export default function ChatSettingsModal({
             )}
           </div>
 
-          <div className="border-t border-[var(--color-border)]" />
+          <div className="border-t border-border" />
 
           <div>
             <button
               type="button"
               onClick={() => setIsPersonaDetailsOpen(true)}
-              className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)]"
+              className="flex w-full items-center gap-3 rounded-md border border-border bg-surface px-4 py-3 text-left text-sm hover:bg-(--color-surface-hover)"
             >
-              <ScrollText size={18} className="text-[var(--color-text-secondary)]" />
+              <ScrollText size={18} className="text-text-secondary" />
               <div className="flex-1">
-                <p className="font-medium text-[var(--color-text-primary)]">
+                <p className="font-medium text-text-primary">
                   {t('omnichat.chat.viewCharacterForm')}
                 </p>
-                <p className="text-xs text-[var(--color-text-muted)]">
+                <p className="text-xs text-(--color-text-muted)">
                   {t('omnichat.chat.viewCharacterFormDescription')}
                 </p>
               </div>
-              <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+              <ArrowRight size={16} className="text-text-secondary" />
             </button>
           </div>
 
@@ -245,64 +243,59 @@ export default function ChatSettingsModal({
               <button
                 type="button"
                 onClick={() => setIsMemoriesOpen(true)}
-                className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)]"
+                className="flex w-full items-center gap-3 rounded-md border border-border bg-surface px-4 py-3 text-left text-sm hover:bg-(--color-surface-hover)"
               >
-                <Brain size={18} className="text-[var(--color-text-secondary)]" />
+                <Brain size={18} className="text-text-secondary" />
                 <div className="flex-1">
-                  <p className="font-medium text-[var(--color-text-primary)]">
+                  <p className="font-medium text-text-primary">
                     {t('omnichat.memories.title', { name: persona.name })}
                   </p>
-                  <p className="text-xs text-[var(--color-text-muted)]">
+                  <p className="text-xs text-(--color-text-muted)">
                     {t('omnichat.memories.entryDescription')}
                   </p>
                 </div>
-                <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+                <ArrowRight size={16} className="text-text-secondary" />
               </button>
             </div>
           )}
 
           {conversationId !== null && (
             <>
-              <div className="border-t border-[var(--color-border)]" />
+              <div className="border-t border-border" />
 
               <div>
                 <button
                   type="button"
                   onClick={() => forkMutation.mutate()}
                   disabled={forkMutation.isPending}
-                  className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+                  className="flex w-full items-center gap-3 rounded-md border border-border bg-surface px-4 py-3 text-left text-sm hover:bg-(--color-surface-hover) disabled:opacity-50"
                 >
-                  <Copy size={18} className="text-[var(--color-text-secondary)]" />
+                  <Copy size={18} className="text-text-secondary" />
                   <div className="flex-1">
-                    <p className="font-medium text-[var(--color-text-primary)]">
-                      {t('omnichat.chat.forkChat')}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
+                    <p className="font-medium text-text-primary">{t('omnichat.chat.forkChat')}</p>
+                    <p className="text-xs text-(--color-text-muted)">
                       {t('omnichat.chat.forkChatDesc')}
                     </p>
                   </div>
                   {forkMutation.isPending ? (
-                    <Loader2
-                      size={16}
-                      className="animate-spin text-[var(--color-text-secondary)]"
-                    />
+                    <Loader2 size={16} className="animate-spin text-text-secondary" />
                   ) : (
-                    <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+                    <ArrowRight size={16} className="text-text-secondary" />
                   )}
                 </button>
               </div>
 
-              <div className="border-t border-[var(--color-border)]" />
+              <div className="border-t border-border" />
 
               <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
                   <History size={16} />
                   {t('omnichat.chat.history')}
                 </h3>
 
                 {historyQuery.isLoading && (
                   <div className="flex justify-center py-4">
-                    <Loader2 size={20} className="animate-spin text-[var(--color-text-muted)]" />
+                    <Loader2 size={20} className="animate-spin text-(--color-text-muted)" />
                   </div>
                 )}
 
@@ -316,7 +309,7 @@ export default function ChatSettingsModal({
                 )}
 
                 {historyQuery.isSuccess && otherConversations.length === 0 && (
-                  <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
+                  <p className="py-4 text-center text-xs text-(--color-text-muted)">
                     {t('omnichat.chat.historyEmpty')}
                   </p>
                 )}
@@ -343,7 +336,7 @@ export default function ChatSettingsModal({
                           >
                             {/* Front face */}
                             <div
-                              className="flex w-full items-stretch rounded-md border border-[var(--color-border)] text-left text-sm"
+                              className="flex w-full items-stretch rounded-md border border-border text-left text-sm"
                               style={{ backfaceVisibility: 'hidden' }}
                             >
                               <button
@@ -352,19 +345,19 @@ export default function ChatSettingsModal({
                                   navigate(`/omnichat/c/${conv.id}`);
                                   onClose();
                                 }}
-                                className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-[var(--color-surface-hover)]"
+                                className="group/left flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 hover:bg-(--color-surface-hover)"
                               >
                                 <MessageSquare
                                   size={16}
-                                  className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]"
+                                  className="shrink-0 text-(--color-text-muted) group-hover/left:text-primary"
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate font-medium text-[var(--color-text-primary)] group-hover/left:text-[var(--color-primary)]">
+                                  <p className="truncate font-medium text-text-primary group-hover/left:text-primary">
                                     {conv.last_message_preview
                                       ? getOmniChatPreviewText(conv.last_message_preview)
                                       : (conv.title ?? persona.name)}
                                   </p>
-                                  <p className="truncate text-xs text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]">
+                                  <p className="truncate text-xs text-(--color-text-muted) group-hover/left:text-primary">
                                     {conv.last_message_preview
                                       ? formatRelativeTime(conv.last_message_at)
                                       : (conv.title ?? persona.name)}
@@ -372,10 +365,10 @@ export default function ChatSettingsModal({
                                 </div>
                                 <ArrowRight
                                   size={14}
-                                  className="flex-shrink-0 text-[var(--color-text-muted)] group-hover/left:text-[var(--color-primary)]"
+                                  className="shrink-0 text-(--color-text-muted) group-hover/left:text-primary"
                                 />
                               </button>
-                              <div className="h-4 w-px self-center bg-[var(--color-border)]" />
+                              <div className="h-4 w-px self-center bg-border" />
                               <button
                                 type="button"
                                 onClick={() => setFlippedId(conv.id)}
@@ -385,12 +378,12 @@ export default function ChatSettingsModal({
                                 deleteMutation.variables === conv.id ? (
                                   <Loader2
                                     size={14}
-                                    className="animate-spin text-[var(--color-text-muted)]"
+                                    className="animate-spin text-(--color-text-muted)"
                                   />
                                 ) : (
                                   <Trash2
                                     size={14}
-                                    className="text-[var(--color-text-muted)] group-hover:text-red-500"
+                                    className="text-(--color-text-muted) group-hover:text-red-500"
                                   />
                                 )}
                               </button>
@@ -398,7 +391,7 @@ export default function ChatSettingsModal({
 
                             {/* Back face */}
                             <div
-                              className="absolute inset-0 flex items-center justify-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2"
+                              className="absolute inset-0 flex items-center justify-center gap-3 rounded-md border border-border px-3 py-2"
                               style={{
                                 backfaceVisibility: 'hidden',
                                 transform: 'rotateX(180deg)',
@@ -408,7 +401,7 @@ export default function ChatSettingsModal({
                               <button
                                 type="button"
                                 onClick={() => setFlippedId(null)}
-                                className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                                className="rounded-md px-4 py-1.5 text-sm font-medium text-text-secondary hover:bg-(--color-surface-hover)"
                               >
                                 Cancel
                               </button>

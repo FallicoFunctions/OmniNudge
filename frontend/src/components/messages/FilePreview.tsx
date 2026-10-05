@@ -115,7 +115,7 @@ export default function FilePreview({
         <img
           src={src}
           alt={t('messages.media.fallbackText')}
-          className="max-w-full rounded cursor-pointer object-contain"
+          className="max-w-full rounded-sm cursor-pointer object-contain"
           style={{ maxHeight: '50vh' }}
           onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
         />
@@ -129,7 +129,7 @@ export default function FilePreview({
         <video
           src={src}
           controls
-          className="max-w-full rounded cursor-pointer"
+          className="max-w-full rounded-sm cursor-pointer"
           style={{ maxHeight: '50vh' }}
           onLoadedMetadata={onVideoLoadedMetadata}
         />
@@ -137,7 +137,7 @@ export default function FilePreview({
           <button
             type="button"
             onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
-            className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+            className="rounded-sm bg-primary px-2 py-1 text-xs font-semibold text-white"
           >
             {openLabel}
           </button>
@@ -145,7 +145,7 @@ export default function FilePreview({
             href={src}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+            className="rounded-sm border border-border px-2 py-1 text-xs font-semibold"
             download={displayName}
           >
             {downloadLabel}
@@ -165,7 +165,7 @@ export default function FilePreview({
           onLoadedMetadata={onAudioLoadedMetadata}
         />
         {fileSize != null && (
-          <div className="mt-2 text-xs text-[var(--color-text-muted)]">
+          <div className="mt-2 text-xs text-(--color-text-muted)">
             {fileSizePrefix}: {sizeLabel}
           </div>
         )}
@@ -176,23 +176,23 @@ export default function FilePreview({
   if (kind === 'pdf') {
     return (
       <>
-        <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
+        <div className={`rounded-sm border border-border p-3 ${className}`.trim()}>
           <div className="mb-2 flex items-start gap-3">
             {thumbnailUrl && !pdfThumbLoadFailed ? (
               <img
                 src={thumbnailUrl}
                 alt={t('messages.media.preview.pdfThumbnailAlt')}
-                className="h-16 w-12 rounded border border-[var(--color-border)] object-cover"
+                className="h-16 w-12 rounded-sm border border-border object-cover"
                 onError={() => setPdfThumbLoadFailed(true)}
               />
             ) : (
-              <div className="flex h-16 w-12 items-center justify-center rounded border border-[var(--color-border)] text-xs font-semibold">
+              <div className="flex h-16 w-12 items-center justify-center rounded-sm border border-border text-xs font-semibold">
                 PDF
               </div>
             )}
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{displayName}</div>
-              <div className="text-xs text-[var(--color-text-muted)]">
+              <div className="text-xs text-(--color-text-muted)">
                 {fileSizePrefix}: {sizeLabel}
               </div>
             </div>
@@ -207,7 +207,7 @@ export default function FilePreview({
                 }
                 setPdfModalOpen(true);
               }}
-              className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+              className="rounded-sm bg-primary px-2 py-1 text-xs font-semibold text-white"
             >
               {openLabel}
             </button>
@@ -215,7 +215,7 @@ export default function FilePreview({
               href={src}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+              className="rounded-sm border border-border px-2 py-1 text-xs font-semibold"
               download={displayName}
             >
               {downloadLabel}
@@ -234,18 +234,18 @@ export default function FilePreview({
 
   if (kind === 'text' && textPreview?.trim()) {
     return (
-      <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
-        <div className="mb-2 text-xs text-[var(--color-text-muted)]">
+      <div className={`rounded-sm border border-border p-3 ${className}`.trim()}>
+        <div className="mb-2 text-xs text-(--color-text-muted)">
           {displayName} • {fileSizePrefix}: {sizeLabel}
         </div>
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-[var(--color-surface-elevated)] p-2 text-xs">
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap wrap-break-word rounded-sm bg-(--color-surface-elevated) p-2 text-xs">
           {truncateText(textPreview, maxTextPreviewChars)}
         </pre>
         <div className="mt-2 flex gap-2">
           <button
             type="button"
             onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
-            className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+            className="rounded-sm bg-primary px-2 py-1 text-xs font-semibold text-white"
           >
             {openLabel}
           </button>
@@ -253,7 +253,7 @@ export default function FilePreview({
             href={src}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+            className="rounded-sm border border-border px-2 py-1 text-xs font-semibold"
             download={displayName}
           >
             {downloadLabel}
@@ -264,16 +264,16 @@ export default function FilePreview({
   }
 
   return (
-    <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
+    <div className={`rounded-sm border border-border p-3 ${className}`.trim()}>
       <div className="mb-1 text-sm font-medium">{displayName}</div>
-      <div className="mb-2 text-xs text-[var(--color-text-muted)]">
+      <div className="mb-2 text-xs text-(--color-text-muted)">
         {fileSizePrefix}: {sizeLabel}
       </div>
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
-          className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+          className="rounded-sm bg-primary px-2 py-1 text-xs font-semibold text-white"
         >
           {openLabel}
         </button>
@@ -281,7 +281,7 @@ export default function FilePreview({
           href={src}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+          className="rounded-sm border border-border px-2 py-1 text-xs font-semibold"
           download={displayName}
         >
           {downloadLabel}

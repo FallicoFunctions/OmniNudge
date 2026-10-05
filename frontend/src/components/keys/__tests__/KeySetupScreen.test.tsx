@@ -313,7 +313,7 @@ describe('the gate frame', () => {
 
   it('sits above every other app layer, the call screen included', () => {
     showing({ state: 'failed' });
-    expect(screen.getByRole('dialog')).toHaveClass('z-[120]');
+    expect(screen.getByRole('dialog')).toHaveClass('z-120');
   });
 
   it('scrolls a tall step instead of centring it off the top of the screen', () => {

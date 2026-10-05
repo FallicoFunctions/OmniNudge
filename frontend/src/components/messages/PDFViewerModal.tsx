@@ -71,18 +71,18 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
       }}
       closeOnOverlayClick
       overlayClassName="bg-black/70"
-      className="w-[min(96vw,1200px)] h-[92vh] rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col"
+      className="w-[min(96vw,1200px)] h-[92vh] rounded-xl bg-surface border border-border flex flex-col"
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">
             {fileName || t('messages.media.attachmentFallback')}
           </h2>
-          <p className="text-xs text-[var(--color-text-muted)]">{pageLabel}</p>
+          <p className="text-xs text-(--color-text-muted)">{pageLabel}</p>
         </div>
         <button
           type="button"
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="rounded-sm border border-border px-2 py-1 text-xs"
           onClick={() => {
             resetViewer();
             onClose();
@@ -93,10 +93,10 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
         <button
           type="button"
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="rounded-sm border border-border px-2 py-1 text-xs"
           onClick={() => setPageNumber((prev) => Math.max(1, prev - 1))}
           disabled={pageNumber <= 1}
         >
@@ -104,25 +104,25 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
         </button>
         <button
           type="button"
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="rounded-sm border border-border px-2 py-1 text-xs"
           onClick={() => setPageNumber((prev) => Math.min(Math.max(numPages, 1), prev + 1))}
           disabled={pageNumber >= numPages}
         >
           {t('messages.media.pdfViewer.next')}
         </button>
-        <div className="ml-1 text-xs text-[var(--color-text-muted)]">{pageLabel}</div>
+        <div className="ml-1 text-xs text-(--color-text-muted)">{pageLabel}</div>
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+            className="rounded-sm border border-border px-2 py-1 text-xs"
             onClick={() => setScale((prev) => Math.max(MIN_SCALE, prev - SCALE_STEP))}
           >
             {t('messages.media.pdfViewer.zoomOut')}
           </button>
-          <div className="text-xs text-[var(--color-text-muted)]">{Math.round(scale * 100)}%</div>
+          <div className="text-xs text-(--color-text-muted)">{Math.round(scale * 100)}%</div>
           <button
             type="button"
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+            className="rounded-sm border border-border px-2 py-1 text-xs"
             onClick={() => setScale((prev) => Math.min(MAX_SCALE, prev + SCALE_STEP))}
           >
             {t('messages.media.pdfViewer.zoomIn')}
@@ -132,7 +132,7 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
             target="_blank"
             rel="noopener noreferrer"
             download={fileName}
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+            className="rounded-sm border border-border px-2 py-1 text-xs font-semibold"
           >
             {t('common.download')}
           </a>
@@ -141,13 +141,11 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {loadError ? (
-          <div className="rounded border border-[var(--color-error)] bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
+          <div className="rounded-sm border border-(--color-error) bg-(--color-error)/10 p-3 text-sm text-(--color-error)">
             {loadError}
           </div>
         ) : !pdfModule ? (
-          <div className="text-sm text-[var(--color-text-muted)]">
-            {t('messages.media.loading')}
-          </div>
+          <div className="text-sm text-(--color-text-muted)">{t('messages.media.loading')}</div>
         ) : (
           <div className="flex justify-center">
             <pdfModule.Document
@@ -161,7 +159,7 @@ export default function PDFViewerModal({ isOpen, pdfUrl, fileName, onClose }: PD
                 setLoadError(t('messages.media.pdfViewer.loadFailed'));
               }}
               loading={
-                <div className="text-sm text-[var(--color-text-muted)]">
+                <div className="text-sm text-(--color-text-muted)">
                   {t('messages.media.loading')}
                 </div>
               }

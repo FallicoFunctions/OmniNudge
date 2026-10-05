@@ -28,14 +28,14 @@ export function ReplyIndicator({
       type="button"
       onClick={onJumpToOriginal}
       disabled={!onJumpToOriginal}
-      className="mb-1 inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-left text-[11px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:cursor-default disabled:opacity-80"
+      className="mb-1 inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-left text-[11px] text-text-secondary hover:bg-(--color-surface-elevated) disabled:cursor-default disabled:opacity-80"
       aria-label={t('messages.replyIndicator.openOriginalAria')}
     >
       <span aria-hidden="true">↪</span>
       <span className="truncate">
         {t('messages.replyIndicator.replyingTo', { username: usernameText })}
       </span>
-      <span className="truncate text-[var(--color-text-muted)]">"{previewText}"</span>
+      <span className="truncate text-(--color-text-muted)">"{previewText}"</span>
     </button>
   );
 }

@@ -59,9 +59,7 @@ export function VoiceMessage({ message, isOwn }: { message: Message; isOwn: bool
     };
   }, [decrypted]);
 
-  const status = (text: string) => (
-    <div className="text-xs text-[var(--color-text-secondary)]">{text}</div>
-  );
+  const status = (text: string) => <div className="text-xs text-text-secondary">{text}</div>;
   if (isError || (encrypted && opened && !decrypted)) return status(t('voice.playbackError'));
   if (!voice || (encrypted && !decrypted)) return status(t('voice.processing'));
 

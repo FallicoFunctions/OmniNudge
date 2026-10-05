@@ -23,9 +23,9 @@ export function VideoQualitySelector({ videoQuality, setVideoQuality }: VideoQua
           onClick={() => setVideoQuality(q)}
           aria-label={t(`calls.quality.${q}`)}
           aria-pressed={videoQuality === q}
-          className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-md text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+          className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-md text-xs font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
             videoQuality === q
-              ? 'bg-[var(--color-primary)] text-white'
+              ? 'bg-primary text-white'
               : 'text-white/70 hover:text-white hover:bg-white/10'
           }`}
         >

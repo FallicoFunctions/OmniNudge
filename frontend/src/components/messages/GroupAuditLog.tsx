@@ -68,10 +68,10 @@ export function describeDetails(
 }
 
 function actionBadgeClass(actionType: string): string {
-  if (actionType.includes('ban')) return 'bg-[var(--color-error)]/10 text-[var(--color-error)]';
+  if (actionType.includes('ban')) return 'bg-(--color-error)/10 text-(--color-error)';
   if (actionType.includes('mute'))
     return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-  return 'bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)]';
+  return 'bg-(--color-surface-elevated) text-text-secondary';
 }
 
 function exportToCsv(entries: AuditLogEntry[], t: (key: string) => string) {
@@ -132,7 +132,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
           value={actionTypeFilter}
           onChange={(e) => handleFilterChange(e.target.value)}
           aria-label={t('groups.admin.filterByAction', { defaultValue: 'Filter by action' })}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1.5 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+          className="rounded-md border border-border bg-(--color-surface-elevated) px-2 py-1.5 text-sm text-text-primary focus:border-primary focus:outline-hidden"
         >
           {ACTION_TYPE_KEYS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -140,7 +140,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
             </option>
           ))}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+        <label className="flex items-center gap-1.5 text-xs text-(--color-text-muted)">
           <input type="checkbox" checked={showRaw} onChange={(e) => setShowRaw(e.target.checked)} />
           {t('groups.admin.showRawDetails')}
         </label>
@@ -148,7 +148,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
           <button
             type="button"
             onClick={() => exportToCsv(allEntries, t)}
-            className="flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-(--color-hover)"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
               <path
@@ -169,22 +169,19 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
       {isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-10 rounded-md bg-[var(--color-surface-elevated)] animate-pulse"
-            />
+            <div key={i} className="h-10 rounded-md bg-(--color-surface-elevated) animate-pulse" />
           ))}
         </div>
       ) : allEntries.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[var(--color-text-muted)]">
+        <p className="py-6 text-center text-sm text-(--color-text-muted)">
           {t('groups.admin.auditLogEmpty')}
         </p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+          <div className="overflow-x-auto rounded-lg border border-border">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+                <tr className="border-b border-border bg-(--color-surface-elevated)">
                   {[
                     t('groups.admin.colTime'),
                     t('groups.admin.colAdmin'),
@@ -194,7 +191,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
                   ].map((col) => (
                     <th
                       key={col}
-                      className="px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide"
+                      className="px-3 py-2 text-left text-xs font-semibold text-(--color-text-muted) uppercase tracking-wide"
                     >
                       {col}
                     </th>
@@ -205,25 +202,25 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
                 {allEntries.map((entry) => (
                   <tr
                     key={entry.id}
-                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-hover)]"
+                    className="border-b border-border last:border-0 hover:bg-(--color-hover)"
                   >
-                    <td className="px-3 py-2 text-xs text-[var(--color-text-muted)] whitespace-nowrap">
+                    <td className="px-3 py-2 text-xs text-(--color-text-muted) whitespace-nowrap">
                       {new Date(entry.created_at).toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">
+                    <td className="px-3 py-2 font-medium text-text-primary">
                       {entry.admin_username}
                     </td>
                     <td className="px-3 py-2">
                       <span
-                        className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${actionBadgeClass(entry.action_type)}`}
+                        className={`inline-block rounded-sm px-1.5 py-0.5 text-xs font-semibold ${actionBadgeClass(entry.action_type)}`}
                       >
                         {getActionLabel(entry.action_type, t)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-[var(--color-text-secondary)]">
+                    <td className="px-3 py-2 text-text-secondary">
                       {entry.target_username ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-xs text-[var(--color-text-muted)] max-w-xs">
+                    <td className="px-3 py-2 text-xs text-(--color-text-muted) max-w-xs">
                       {showRaw
                         ? entry.details
                           ? JSON.stringify(entry.details)
@@ -241,7 +238,7 @@ export function GroupAuditLog({ conversationId }: GroupAuditLogProps) {
               type="button"
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="w-full rounded-md border border-[var(--color-border)] py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] disabled:opacity-60"
+              className="w-full rounded-md border border-border py-2 text-sm font-medium text-text-secondary hover:bg-(--color-hover) disabled:opacity-60"
             >
               {isFetchingNextPage
                 ? t('common.loading')

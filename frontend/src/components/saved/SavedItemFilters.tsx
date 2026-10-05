@@ -17,10 +17,10 @@ const sharedButtonClass = 'flex-1 rounded-md px-4 py-2 text-sm font-semibold tra
 const getFilterButtonClass = (isActive: boolean, isDisabled: boolean) =>
   `${sharedButtonClass} ${
     isActive
-      ? 'bg-[var(--color-primary)] text-white border-2 border-[var(--color-primary)] shadow'
+      ? 'bg-primary text-white border-2 border-primary shadow-sm'
       : isDisabled
-        ? 'border-2 border-[var(--color-border)] text-[var(--color-text-muted)] opacity-60 cursor-not-allowed'
-        : 'border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        ? 'border-2 border-border text-(--color-text-muted) opacity-60 cursor-not-allowed'
+        : 'border-2 border-border text-text-secondary hover:border-text-secondary hover:text-text-primary'
   }`;
 
 export function SavedItemFilters({
@@ -40,10 +40,10 @@ export function SavedItemFilters({
     <div className="mb-6 space-y-4">
       {showContentTypeFilter && contentType && onContentTypeChange && (
         <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-2 block text-sm font-medium text-text-secondary">
             {t('saved.filters.show')}
           </label>
-          <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
+          <div className="inline-flex gap-2 rounded-lg bg-(--color-surface-elevated) p-1">
             {contentOptions.map((option) => {
               const isDisabled = disabledContentTypes.includes(option);
               return (
@@ -63,10 +63,10 @@ export function SavedItemFilters({
       )}
 
       <div>
-        <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+        <label className="mb-2 block text-sm font-medium text-text-secondary">
           {t('saved.filters.source')}
         </label>
-        <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
+        <div className="inline-flex gap-2 rounded-lg bg-(--color-surface-elevated) p-1">
           {sourceOptions.map((option) => (
             <button
               key={option}

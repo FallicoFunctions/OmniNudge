@@ -59,13 +59,11 @@ export function CreateMenuSheet({ isOpen, onClose }: CreateMenuSheetProps) {
           key={item.label}
           type="button"
           onClick={item.onClick}
-          className="flex items-center w-full px-4 py-4 text-left active:bg-[var(--color-hover)] transition-colors"
+          className="flex items-center w-full px-4 py-4 text-left active:bg-(--color-hover) transition-colors"
           data-testid={item.testId}
         >
-          <item.icon size={24} className="mr-3 text-[var(--color-text-secondary)]" />
-          <span className="text-base font-medium text-[var(--color-text-primary)]">
-            {item.label}
-          </span>
+          <item.icon size={24} className="mr-3 text-text-secondary" />
+          <span className="text-base font-medium text-text-primary">{item.label}</span>
         </button>
       ))}
     </BottomSheet>

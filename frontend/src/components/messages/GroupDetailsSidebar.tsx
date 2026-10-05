@@ -29,7 +29,7 @@ function RoleBadge({ role }: { role: GroupRole }) {
       className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
         role === 'owner'
           ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-          : 'bg-blue-100 text-[var(--color-primary)] dark:bg-blue-900/30'
+          : 'bg-blue-100 text-primary dark:bg-blue-900/30'
       }`}
     >
       {t(`groups.roles.${role}`)}
@@ -106,18 +106,16 @@ function ParticipantRow({
     participant.role !== 'owner';
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--color-hover)] relative">
-      <div className="h-8 w-8 rounded-lg bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-semibold text-[var(--color-primary)] shrink-0">
+    <div className="flex items-center gap-2 px-4 py-2 hover:bg-(--color-hover) relative">
+      <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
         {participant.username[0].toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+          <p className="text-sm font-medium text-text-primary truncate">
             {participant.username}
             {isCurrentUser && (
-              <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
-                {t('common.you')}
-              </span>
+              <span className="ml-1.5 text-xs text-(--color-text-muted)">{t('common.you')}</span>
             )}
           </p>
         </div>
@@ -128,7 +126,7 @@ function ParticipantRow({
           <button
             type="button"
             onClick={() => setShowMenu((s) => !s)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)]"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-(--color-text-muted) hover:bg-(--color-surface-elevated)"
             aria-label={t('groups.participantActions')}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -138,11 +136,11 @@ function ParticipantRow({
             </svg>
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+            <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-border bg-surface shadow-xl">
               {participant.role === 'member' && currentUserRole === 'owner' && (
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-hover)]"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-(--color-hover)"
                   onClick={() => {
                     onChangeRole(participant.user_id, 'admin');
                     setShowMenu(false);
@@ -154,7 +152,7 @@ function ParticipantRow({
               {participant.role === 'admin' && currentUserRole === 'owner' && (
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-hover)]"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-(--color-hover)"
                   onClick={() => {
                     onChangeRole(participant.user_id, 'member');
                     setShowMenu(false);
@@ -166,14 +164,14 @@ function ParticipantRow({
               {isMuted ? (
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-amber-600 hover:bg-(--color-hover)"
                   onClick={() => {
                     onUnmute(participant.user_id);
                     setShowMenu(false);
                   }}
                 >
                   <span>{t('groups.admin.unmute')}</span>
-                  <span className="text-xs text-[var(--color-text-muted)]">
+                  <span className="text-xs text-(--color-text-muted)">
                     {muteEndsAt
                       ? t('groups.admin.muteLeft', { time: muteTimeLeft(muteEndsAt, now) })
                       : t('groups.admin.durationPermanent')}
@@ -182,7 +180,7 @@ function ParticipantRow({
               ) : (
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
+                  className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-(--color-hover)"
                   onClick={() => {
                     onMute(participant);
                     setShowMenu(false);
@@ -193,7 +191,7 @@ function ParticipantRow({
               )}
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
+                className="w-full px-3 py-2 text-left text-sm text-(--color-error) hover:bg-(--color-hover)"
                 onClick={() => {
                   onBan(participant);
                   setShowMenu(false);
@@ -201,10 +199,10 @@ function ParticipantRow({
               >
                 {t('groups.admin.ban')}
               </button>
-              <div className="my-0.5 border-t border-[var(--color-border)]" />
+              <div className="my-0.5 border-t border-border" />
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
+                className="w-full px-3 py-2 text-left text-sm text-(--color-error) hover:bg-(--color-hover)"
                 onClick={() => {
                   onRemove(participant.user_id);
                   setShowMenu(false);
@@ -339,17 +337,15 @@ export function GroupDetailsSidebar({
   const canInvite = isAdmin || (currentUserRole === 'member' && !!settings?.anyone_can_invite);
 
   return (
-    <div className="flex h-full flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
+    <div className="flex h-full flex-col border-l border-border bg-surface">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-          {t('groups.groupInfo')}
-        </h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-text-primary">{t('groups.groupInfo')}</h3>
         <button
           type="button"
           onClick={onClose}
           aria-label={t('common.close')}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-(--color-text-muted) hover:bg-(--color-hover)"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
             <path
@@ -364,7 +360,7 @@ export function GroupDetailsSidebar({
 
       <div className="flex-1 overflow-y-auto">
         {/* Group identity */}
-        <div className="flex flex-col items-center gap-3 px-4 py-6 border-b border-[var(--color-border)]">
+        <div className="flex flex-col items-center gap-3 px-4 py-6 border-b border-border">
           <GroupAvatar
             name={conversation.group_name ?? 'Group'}
             avatarUrl={conversation.group_avatar_url}
@@ -377,7 +373,7 @@ export function GroupDetailsSidebar({
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
                 maxLength={100}
-                className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="flex-1 rounded-md border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveName();
                   if (e.key === 'Escape') setIsEditingName(false);
@@ -388,14 +384,14 @@ export function GroupDetailsSidebar({
                 type="button"
                 onClick={handleSaveName}
                 disabled={isUpdatingGroup}
-                className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
               >
                 {t('common.save')}
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+              <h2 className="text-base font-semibold text-text-primary">
                 {conversation.group_name}
               </h2>
               {isAdmin && (
@@ -406,7 +402,7 @@ export function GroupDetailsSidebar({
                     setIsEditingName(true);
                   }}
                   aria-label={t('groups.editName')}
-                  className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                  className="text-(--color-text-muted) hover:text-text-primary"
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
                     <path
@@ -422,12 +418,12 @@ export function GroupDetailsSidebar({
             </div>
           )}
           {conversation.group_description && (
-            <p className="text-xs text-center text-[var(--color-text-secondary)]">
+            <p className="text-xs text-center text-text-secondary">
               {conversation.group_description}
             </p>
           )}
           {!loadingParticipants && (
-            <p className="text-xs text-[var(--color-text-muted)]">
+            <p className="text-xs text-(--color-text-muted)">
               {t('groups.participantCount', { count: participants.length })}
             </p>
           )}
@@ -435,7 +431,7 @@ export function GroupDetailsSidebar({
 
         {/* Tab navigation */}
         {visibleTabs.length > 1 && (
-          <div className="flex border-b border-[var(--color-border)]">
+          <div className="flex border-b border-border">
             {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -443,8 +439,8 @@ export function GroupDetailsSidebar({
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-colors ${
                   activeTab === tab.id
-                    ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]'
-                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-(--color-text-muted) hover:text-text-secondary'
                 }`}
               >
                 {tab.label}
@@ -464,7 +460,7 @@ export function GroupDetailsSidebar({
               />
             )}
             {loadingParticipants ? (
-              <p className="px-4 text-sm text-[var(--color-text-muted)]">{t('common.loading')}</p>
+              <p className="px-4 text-sm text-(--color-text-muted)">{t('common.loading')}</p>
             ) : (
               sorted.map((p) => (
                 <ParticipantRow
@@ -500,7 +496,7 @@ export function GroupDetailsSidebar({
                     key={key}
                     className="flex cursor-pointer items-center justify-between gap-3"
                   >
-                    <span className="text-sm text-[var(--color-text-primary)]">{t(labelKey)}</span>
+                    <span className="text-sm text-text-primary">{t(labelKey)}</span>
                     <button
                       type="button"
                       role="switch"
@@ -513,7 +509,7 @@ export function GroupDetailsSidebar({
                       }}
                       disabled={isUpdatingSettings}
                       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
-                        settings[key] ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
+                        settings[key] ? 'bg-primary' : 'bg-border'
                       }`}
                     >
                       <span
@@ -527,12 +523,12 @@ export function GroupDetailsSidebar({
               </div>
             )}
             {settingsError && (
-              <p className="text-xs text-[var(--color-error)]" role="alert">
+              <p className="text-xs text-(--color-error)" role="alert">
                 {settingsError}
               </p>
             )}
-            <div className="pt-2 border-t border-[var(--color-border)]">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
+            <div className="pt-2 border-t border-border">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted) mb-3">
                 {t('groups.admin.slowMode')}
               </h4>
               <SlowModeControl
@@ -552,10 +548,10 @@ export function GroupDetailsSidebar({
         )}
 
         {/* Leave group (always visible at bottom) */}
-        <div className="px-4 py-4 border-t border-[var(--color-border)]">
-          {leaveError && <p className="mb-2 text-xs text-[var(--color-error)]">{leaveError}</p>}
+        <div className="px-4 py-4 border-t border-border">
+          {leaveError && <p className="mb-2 text-xs text-(--color-error)">{leaveError}</p>}
           {isOwner && (
-            <p className="mb-2 text-xs text-[var(--color-text-muted)]">
+            <p className="mb-2 text-xs text-(--color-text-muted)">
               {t('groups.transferOwnershipHint')}
             </p>
           )}
@@ -563,7 +559,7 @@ export function GroupDetailsSidebar({
             type="button"
             onClick={handleLeave}
             disabled={isLeavingGroup}
-            className="w-full rounded-md border border-[var(--color-error)]/40 px-3 py-2 text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-error)]/5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-(--color-error)/40 px-3 py-2 text-sm font-medium text-(--color-error) hover:bg-(--color-error)/5 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLeavingGroup ? t('groups.leaving') : t('groups.leaveGroup')}
           </button>

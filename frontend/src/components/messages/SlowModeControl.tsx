@@ -26,14 +26,12 @@ export function SlowModeControl({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-        {t('groups.admin.slowMode')}
-      </span>
+      <span className="text-sm font-semibold text-text-primary">{t('groups.admin.slowMode')}</span>
       <select
         value={currentSeconds}
         onChange={(e) => onSetSlowMode(Number(e.target.value))}
         disabled={isLoading}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1.5 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-60"
+        className="rounded-md border border-border bg-(--color-surface-elevated) px-2 py-1.5 text-sm text-text-primary focus:border-primary focus:outline-hidden disabled:opacity-60"
       >
         {SLOW_MODE_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

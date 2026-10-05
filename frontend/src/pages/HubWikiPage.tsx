@@ -75,13 +75,9 @@ export default function HubWikiPage() {
   if (hubSettings && !hubSettings.enable_wiki) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-          {t('hubWikiPage.title')}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          {t('hubWikiPage.wikiDisabled')}
-        </p>
-        <Link to={`/h/${hub}`} className="mt-4 inline-block text-sm text-[var(--color-primary)]">
+        <h1 className="text-2xl font-bold text-text-primary">{t('hubWikiPage.title')}</h1>
+        <p className="mt-2 text-sm text-text-secondary">{t('hubWikiPage.wikiDisabled')}</p>
+        <Link to={`/h/${hub}`} className="mt-4 inline-block text-sm text-primary">
           {t('hubWikiPage.actions.backToHub')}
         </Link>
       </div>
@@ -92,10 +88,10 @@ export default function HubWikiPage() {
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <h1 className="text-2xl font-bold text-text-primary">
             {t('hubWikiPage.headerTitle', { hub })}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          <p className="mt-1 text-sm text-text-secondary">
             {slug === 'index'
               ? t('hubWikiPage.subtitle.home')
               : t('hubWikiPage.subtitle.page', { slug })}
@@ -104,7 +100,7 @@ export default function HubWikiPage() {
         <div className="flex items-center gap-2">
           <Link
             to={`/h/${hub}`}
-            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+            className="rounded-md border border-border px-3 py-2 text-sm text-text-primary hover:bg-(--color-surface-elevated)"
           >
             {t('hubWikiPage.actions.backToHub')}
           </Link>
@@ -112,7 +108,7 @@ export default function HubWikiPage() {
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
             >
               {t('hubWikiPage.actions.editWiki')}
             </button>
@@ -127,7 +123,7 @@ export default function HubWikiPage() {
         </ErrorMessage>
       )}
       {!isLoading && !isError && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="rounded-lg border border-border bg-surface p-4">
           {isEditing ? (
             <div className="space-y-4">
               <MarkdownInput
@@ -142,7 +138,7 @@ export default function HubWikiPage() {
                   type="button"
                   onClick={() => updateMutation.mutate(draft)}
                   disabled={updateMutation.isPending}
-                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
                 >
                   {updateMutation.isPending ? t('hubWikiPage.status.saving') : t('common.save')}
                 </button>
@@ -152,7 +148,7 @@ export default function HubWikiPage() {
                     setDraft(wikiPage?.content ?? '');
                     setIsEditing(false);
                   }}
-                  className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  className="rounded-md border border-border px-4 py-2 text-sm text-text-primary hover:bg-(--color-surface-elevated)"
                 >
                   {t('common.cancel')}
                 </button>
@@ -161,14 +157,9 @@ export default function HubWikiPage() {
           ) : (
             <>
               {wikiPage?.content?.trim() ? (
-                <MarkdownRenderer
-                  content={wikiPage.content}
-                  className="text-[var(--color-text-primary)]"
-                />
+                <MarkdownRenderer content={wikiPage.content} className="text-text-primary" />
               ) : (
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  {t('hubWikiPage.empty')}
-                </p>
+                <p className="text-sm text-text-secondary">{t('hubWikiPage.empty')}</p>
               )}
             </>
           )}

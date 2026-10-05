@@ -230,10 +230,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
       aria-labelledby={titleId}
       onClick={handleBackdropClick}
     >
-      <div
-        ref={containerRef}
-        className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl"
-      >
+      <div ref={containerRef} className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-xl">
         {/* Discard confirmation overlay */}
         {confirmDiscard && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-50/80 p-3 dark:bg-amber-900/20">
@@ -248,7 +245,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
                   e.stopPropagation();
                   onClose();
                 }}
-                className="rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                className="rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 {t('messages.folders.discard')}
               </button>
@@ -259,7 +256,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
                   setConfirmDiscard(false);
                   nameInputRef.current?.focus();
                 }}
-                className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-hover) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               >
                 {t('messages.folders.keepEditing')}
               </button>
@@ -268,7 +265,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 id={titleId} className="text-base font-semibold text-[var(--color-text-primary)]">
+          <h2 id={titleId} className="text-base font-semibold text-text-primary">
             {title}
           </h2>
           <button
@@ -281,7 +278,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
               onClose();
             }}
             disabled={saving}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
             aria-label={t('messages.folders.cancel')}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -299,14 +296,11 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
           {/* Name */}
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label
-                htmlFor={nameInputId}
-                className="text-xs font-semibold text-[var(--color-text-secondary)]"
-              >
+              <label htmlFor={nameInputId} className="text-xs font-semibold text-text-secondary">
                 {t('messages.folders.nameLabel')}
               </label>
               <span
-                className={`text-[10px] tabular-nums ${charsLeft <= 10 ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'}`}
+                className={`text-[10px] tabular-nums ${charsLeft <= 10 ? 'text-(--color-error)' : 'text-(--color-text-muted)'}`}
                 aria-live="polite"
               >
                 {charsLeft}
@@ -327,10 +321,10 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
               disabled={saving}
               aria-invalid={!!error}
               aria-describedby={error ? nameErrorId : undefined}
-              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-60"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-(--color-text-muted) focus:border-primary focus:outline-hidden disabled:opacity-60"
             />
             {error && (
-              <p id={nameErrorId} className="mt-1 text-xs text-[var(--color-error)]">
+              <p id={nameErrorId} className="mt-1 text-xs text-(--color-error)">
                 {error}
               </p>
             )}
@@ -338,10 +332,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
 
           {/* Color */}
           <div>
-            <p
-              id={colorLabelId}
-              className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]"
-            >
+            <p id={colorLabelId} className="mb-2 text-xs font-semibold text-text-secondary">
               {t('messages.folders.colorLabel')}
             </p>
             <div
@@ -360,7 +351,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
                   disabled={saving}
                   aria-pressed={color === hex}
                   tabIndex={color === hex ? 0 : -1}
-                  className="h-7 w-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-60"
+                  className="h-7 w-7 rounded-full transition-transform hover:scale-110 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary disabled:opacity-60"
                   style={{
                     backgroundColor: hex,
                     boxShadow:
@@ -376,10 +367,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
 
           {/* Icon */}
           <div>
-            <p
-              id={iconLabelId}
-              className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]"
-            >
+            <p id={iconLabelId} className="mb-2 text-xs font-semibold text-text-secondary">
               {t('messages.folders.iconLabel')}
             </p>
             <div
@@ -398,10 +386,10 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
                   disabled={saving}
                   aria-pressed={icon === ic}
                   tabIndex={icon === ic ? 0 : -1}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-base transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-60 ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-base transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60 ${
                     icon === ic
-                      ? 'bg-[var(--color-primary)]/15 ring-1 ring-[var(--color-primary)]'
-                      : 'hover:scale-110 hover:bg-[var(--color-hover)]'
+                      ? 'bg-primary/15 ring-1 ring-primary'
+                      : 'hover:scale-110 hover:bg-(--color-hover)'
                   }`}
                   aria-label={`${t('messages.folders.iconLabel')}: ${ic}`}
                 >
@@ -416,18 +404,15 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
             aria-label={t('messages.folders.previewLabel', {
               name: name.trim() || t('messages.folders.namePlaceholder'),
             })}
-            className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2"
+            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
           >
-            <span
-              className="inline-flex flex-shrink-0 items-center text-base leading-none"
-              aria-hidden
-            >
+            <span className="inline-flex shrink-0 items-center text-base leading-none" aria-hidden>
               {icon}
             </span>
             <span aria-hidden className="flex-1 truncate text-sm font-semibold" style={{ color }}>
               {name.trim() || t('messages.folders.namePlaceholder')}
             </span>
-            <span aria-hidden className="flex-shrink-0 text-[10px] text-[var(--color-text-muted)]">
+            <span aria-hidden className="shrink-0 text-[10px] text-(--color-text-muted)">
               {t('messages.folders.preview')}
             </span>
           </div>
@@ -444,14 +429,14 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
                 onClose();
               }}
               disabled={saving}
-              className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
+              className="flex-1 rounded-lg border border-border py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-hover) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
             >
               {t('messages.folders.cancel')}
             </button>
             <button
               type="submit"
               disabled={saving || !name.trim()}
-              className="flex-1 rounded-lg bg-[var(--color-primary)] py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
+              className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
             >
               {saving ? (
                 <span className="inline-flex items-center justify-center gap-1.5">

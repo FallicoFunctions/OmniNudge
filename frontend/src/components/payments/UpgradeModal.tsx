@@ -37,7 +37,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="shrink-0 rounded px-2 py-1 text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity"
+      className="shrink-0 rounded-sm px-2 py-1 text-xs font-semibold bg-primary text-white hover:opacity-90 transition-opacity"
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
@@ -171,17 +171,17 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
-      <div className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4 py-6">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-surface shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
-          <h2 className="text-h3 font-semibold text-[var(--color-text-primary)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-h3 font-semibold text-text-primary">
             {step === 'success' ? 'Plan upgraded!' : 'Upgrade to Paid'}
           </h2>
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-md p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
+            className="rounded-md p-1 text-text-secondary hover:bg-(--color-surface-elevated) transition-colors"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,19 +199,17 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
           {/* STEP: Plan overview */}
           {step === 'plan' && (
             <div className="space-y-4">
-              <p className="text-small text-[var(--color-text-secondary)]">
+              <p className="text-small text-text-secondary">
                 OmniNudge has no ads and sells no data. The paid plan keeps the servers running.
               </p>
 
               {/* Plan comparison */}
               <div className="grid grid-cols-2 gap-3">
                 {/* Free */}
-                <div className="rounded-lg border border-[var(--color-border)] p-4">
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                    Free
-                  </p>
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-3">Always free</p>
-                  <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-sm font-semibold text-text-primary mb-1">Free</p>
+                  <p className="text-xs text-text-secondary mb-3">Always free</p>
+                  <ul className="space-y-1.5 text-xs text-text-secondary">
                     <li>✓ Encrypted messaging</li>
                     <li>✓ Image sharing (10 MB/file)</li>
                     <li>✗ Video calling</li>
@@ -220,15 +218,15 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                   </ul>
                 </div>
                 {/* Paid */}
-                <div className="rounded-lg border-2 border-[var(--color-primary)] p-4 relative">
-                  <span className="absolute -top-2.5 left-3 bg-[var(--color-primary)] text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                <div className="rounded-lg border-2 border-primary p-4 relative">
+                  <span className="absolute -top-2.5 left-3 bg-primary text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                     Paid
                   </span>
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                    From <span className="text-[var(--color-primary)]">$1.99</span>/mo
+                  <p className="text-sm font-semibold text-text-primary mb-1">
+                    From <span className="text-primary">$1.99</span>/mo
                   </p>
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-3">Crypto only</p>
-                  <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <p className="text-xs text-text-secondary mb-3">Crypto only</p>
+                  <ul className="space-y-1.5 text-xs text-text-secondary">
                     <li>✓ Everything in free</li>
                     <li>✓ Video calling</li>
                     <li>✓ Voice calling</li>
@@ -238,14 +236,14 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                 </div>
               </div>
 
-              <p className="text-xs text-[var(--color-text-muted)] text-center">
+              <p className="text-xs text-(--color-text-muted) text-center">
                 No recurring charges — renew manually when your month ends.
               </p>
 
               <button
                 type="button"
                 onClick={() => setStep('payment')}
-                className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Pay with Crypto
               </button>
@@ -257,9 +255,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Coin selector */}
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-                  Select coin
-                </p>
+                <p className="text-sm font-semibold text-text-primary mb-2">Select coin</p>
                 <div className="flex gap-2">
                   {COINS.map((coin) => (
                     <button
@@ -268,13 +264,13 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                       onClick={() => setSelectedCoin(coin)}
                       className={`flex-1 flex flex-col items-center gap-1 rounded-lg border p-3 text-xs font-semibold transition-colors ${
                         selectedCoin === coin
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/50'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-text-secondary hover:border-primary/50'
                       }`}
                     >
                       <CoinIcon coin={coin} size={28} />
                       <span>{coin}</span>
-                      <span className="font-normal text-[var(--color-text-muted)]">
+                      <span className="font-normal text-(--color-text-muted)">
                         ${COIN_META[coin].usdPricePerMonth}/mo
                       </span>
                     </button>
@@ -284,22 +280,21 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
 
               {/* Send to address */}
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                  Send exactly{' '}
-                  <span className="text-[var(--color-primary)]">${meta.usdPricePerMonth} USD</span>{' '}
+                <p className="text-sm font-semibold text-text-primary mb-1">
+                  Send exactly <span className="text-primary">${meta.usdPricePerMonth} USD</span>{' '}
                   worth of {meta.name} to:
                 </p>
                 {cryptoAmount && (
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-2">
+                  <p className="text-xs text-text-secondary mb-2">
                     ≈ {cryptoAmount.toFixed(selectedCoin === 'BTC' ? 8 : 4)} {selectedCoin}
                     {priceLoading && ' (loading…)'}
                   </p>
                 )}
                 {!cryptoAmount && priceLoading && (
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-2">Loading price…</p>
+                  <p className="text-xs text-text-secondary mb-2">Loading price…</p>
                 )}
-                <div className="flex items-center gap-2 rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2">
-                  <code className="flex-1 text-xs font-mono text-[var(--color-text-primary)] break-all">
+                <div className="flex items-center gap-2 rounded-lg bg-(--color-surface-elevated) px-3 py-2">
+                  <code className="flex-1 text-xs font-mono text-text-primary break-all">
                     {meta.walletAddress}
                   </code>
                   <CopyButton text={meta.walletAddress} />
@@ -308,7 +303,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
 
               {/* TXID input */}
               <div>
-                <label className="text-sm font-semibold text-[var(--color-text-primary)] mb-1 block">
+                <label className="text-sm font-semibold text-text-primary mb-1 block">
                   Paste your transaction ID (TXID)
                 </label>
                 <input
@@ -316,10 +311,10 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                   value={txid}
                   onChange={(e) => setTxid(e.target.value)}
                   placeholder={selectedCoin === 'BTC' ? 'e.g. a1b2c3d4...' : 'e.g. 0x1234...'}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="w-full rounded-lg border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder:text-(--color-text-muted) focus:border-primary focus:outline-hidden"
                   required
                 />
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                <p className="mt-1 text-xs text-(--color-text-muted)">
                   Found in your wallet after sending. We verify it on-chain automatically.
                 </p>
               </div>
@@ -337,14 +332,14 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                     setStep('plan');
                     setError(null);
                   }}
-                  className="flex-1 rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
+                  className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-(--color-surface-elevated) transition-colors"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !txid.trim()}
-                  className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {submitting ? 'Verifying…' : 'Verify Payment'}
                 </button>
@@ -356,26 +351,24 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
           {step === 'pending' && (
             <div className="space-y-4 text-center py-4">
               <div className="flex justify-center">
-                <div className="w-12 h-12 rounded-full border-4 border-[var(--color-primary)]/30 border-t-[var(--color-primary)] animate-spin" />
+                <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  Waiting for confirmations
-                </p>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                <p className="text-sm font-semibold text-text-primary">Waiting for confirmations</p>
+                <p className="text-xs text-text-secondary mt-1">
                   {selectedCoin === 'BTC'
                     ? `${confirmations}/3 confirmations — BTC can take up to 30 min`
                     : `${confirmations}/12 confirmations — ETH typically takes a few minutes`}
                 </p>
               </div>
-              <p className="text-xs text-[var(--color-text-muted)]">
+              <p className="text-xs text-(--color-text-muted)">
                 This page updates automatically. You can close it and check back later — your plan
                 will upgrade as soon as the transaction confirms.
               </p>
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-primary hover:bg-(--color-surface-elevated) transition-colors"
               >
                 Close (upgrade happens automatically)
               </button>
@@ -403,17 +396,15 @@ export function UpgradeModal({ isOpen, onClose, onUpgraded }: UpgradeModalProps)
                 </div>
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  You're on the paid plan!
-                </p>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                <p className="text-sm font-semibold text-text-primary">You're on the paid plan!</p>
+                <p className="text-xs text-text-secondary mt-1">
                   Your account has been upgraded for 1 month.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-lg bg-[var(--color-primary)] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Start using paid features
               </button>

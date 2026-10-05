@@ -51,14 +51,14 @@ export function FolderBadge({ folder, decorative = false }: FolderBadgeProps) {
       role={decorative ? undefined : 'img'}
       aria-label={decorative ? undefined : t('messages.folders.badgeLabel', { name: folder.name })}
       aria-hidden={decorative ? true : undefined}
-      className="inline-flex max-w-[7rem] items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+      className="inline-flex max-w-28 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
       style={{
         backgroundColor: hexToRgba(folder.color, 0.12),
         color: folder.color,
       }}
       title={decorative ? undefined : folder.name}
     >
-      <span className="inline-flex flex-shrink-0 items-center leading-none" aria-hidden>
+      <span className="inline-flex shrink-0 items-center leading-none" aria-hidden>
         {folder.icon}
       </span>
       <span className="truncate" aria-hidden>

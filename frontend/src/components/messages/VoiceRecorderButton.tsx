@@ -108,7 +108,7 @@ export function VoiceRecorderButton({
           onClick={cancel}
           title={t('voice.cancel')}
           aria-label={t('voice.cancel')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
           style={{ color: 'var(--color-text-muted)' }}
         >
           <X size={16} />
@@ -117,7 +117,7 @@ export function VoiceRecorderButton({
         {/* Recording animation + timer */}
         <RecordingAnimation audioLevel={audioLevel} />
         <span
-          className="text-sm font-medium tabular-nums flex-shrink-0 w-10"
+          className="text-sm font-medium tabular-nums shrink-0 w-10"
           style={{ color: 'var(--color-error)' }}
         >
           {formatDuration(durationSeconds)}
@@ -134,7 +134,7 @@ export function VoiceRecorderButton({
           onClick={() => stop()}
           title={t('voice.send')}
           aria-label={t('voice.send')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
           style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
         >
           <Check size={16} />
@@ -156,7 +156,7 @@ export function VoiceRecorderButton({
           onClick={cancel}
           title={t('voice.reRecord')}
           aria-label={t('voice.reRecord')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
           style={{ color: 'var(--color-text-muted)' }}
         >
           <Trash2 size={16} />
@@ -168,7 +168,7 @@ export function VoiceRecorderButton({
           onClick={togglePreviewPlay}
           title={isPlaying ? t('voice.pause') : t('voice.play')}
           aria-label={isPlaying ? t('voice.pause') : t('voice.play')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
           style={{ color: 'var(--color-primary)' }}
         >
           {isPlaying ? <Pause size={16} /> : <Play size={16} />}
@@ -181,7 +181,7 @@ export function VoiceRecorderButton({
 
         {/* Duration */}
         <span
-          className="text-xs tabular-nums flex-shrink-0"
+          className="text-xs tabular-nums shrink-0"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           {formatDuration(durationSeconds)}
@@ -193,7 +193,7 @@ export function VoiceRecorderButton({
           onClick={handleSend}
           title={t('voice.send')}
           aria-label={t('voice.send')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0"
           style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
         >
           <Check size={16} />

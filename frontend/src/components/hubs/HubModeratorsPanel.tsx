@@ -25,13 +25,13 @@ export default function HubModeratorsPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           {t('hubModeratorsPanel.title')}
         </h3>
         {moderators.length > 0 && (
-          <span className="text-xs text-[var(--color-text-secondary)]">{moderators.length}</span>
+          <span className="text-xs text-text-secondary">{moderators.length}</span>
         )}
       </div>
       {isLoading ? (
@@ -57,18 +57,18 @@ export default function HubModeratorsPanel({
                     className="h-8 w-8 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-border text-sm font-semibold text-text-secondary">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="flex items-center gap-2">
                   <Link
                     to={`/users/${displayName}`}
-                    className="text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                    className="text-sm font-medium text-text-primary hover:text-primary"
                   >
                     {displayName}
                   </Link>
-                  <span className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  <span className="text-[11px] uppercase tracking-wide text-text-secondary">
                     {getHubModeratorRoleLabel(moderator.role, t)}
                   </span>
                 </div>
@@ -80,7 +80,7 @@ export default function HubModeratorsPanel({
       {showMessageButton && hubName && onMessageMods && (
         <button
           onClick={onMessageMods}
-          className="mt-4 w-full rounded-lg border border-[var(--color-primary)] px-4 py-2 text-sm font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white"
+          className="mt-4 w-full rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-white"
         >
           {t('hubModeratorsPanel.actions.messageMods')}
         </button>

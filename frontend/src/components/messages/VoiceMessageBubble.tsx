@@ -66,7 +66,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
           onClick={handlePlayPause}
           disabled={isLoading}
           aria-label={isPlaying ? t('voice.pause') : t('voice.play')}
-          className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 transition-opacity"
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-opacity"
           style={{
             background: isOwn ? 'rgba(255,255,255,0.2)' : 'var(--color-primary)',
             color: isOwn ? '#fff' : '#fff',
@@ -88,7 +88,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
 
         {/* Time */}
         <span
-          className="text-xs tabular-nums flex-shrink-0"
+          className="text-xs tabular-nums shrink-0"
           style={{
             opacity: isOwn ? 0.85 : undefined,
             color: isOwn ? '#fff' : 'var(--color-text-secondary)',
@@ -106,7 +106,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
             type="button"
             onClick={() => setPlaybackRate(rate)}
             aria-label={`${t('voice.speed')} ${rate}x`}
-            className="text-xs px-1.5 py-0.5 rounded transition-opacity"
+            className="text-xs px-1.5 py-0.5 rounded-sm transition-opacity"
             style={{
               background:
                 playbackRate === rate

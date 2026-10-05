@@ -42,7 +42,7 @@ export function ConfirmModal({
     <BottomSheet isOpen={isOpen} onClose={onClose} title={title}>
       <div className="px-4 py-4">
         {/* Message */}
-        <p className="text-base text-[var(--color-text-primary)] mb-6">{message}</p>
+        <p className="text-base text-text-primary mb-6">{message}</p>
 
         {/* Actions */}
         <div className="flex gap-3">
@@ -50,7 +50,7 @@ export function ConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-3 text-base font-semibold text-[var(--color-text-primary)] bg-[var(--color-surface-secondary)] rounded-lg active:bg-[var(--color-hover)] transition-colors"
+            className="flex-1 px-4 py-3 text-base font-semibold text-text-primary bg-(--color-surface-secondary) rounded-lg active:bg-(--color-hover) transition-colors"
           >
             {cancelText || t('common.cancel')}
           </button>
@@ -60,7 +60,7 @@ export function ConfirmModal({
             type="button"
             onClick={handleConfirm}
             className={`flex-1 px-4 py-3 text-base font-semibold rounded-lg active:opacity-80 transition-opacity ${
-              danger ? 'text-white bg-red-500' : 'text-white bg-[var(--color-primary)]'
+              danger ? 'text-white bg-red-500' : 'text-white bg-primary'
             }`}
           >
             {confirmText || t('common.confirm')}

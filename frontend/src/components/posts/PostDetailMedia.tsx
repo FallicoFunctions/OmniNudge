@@ -121,7 +121,7 @@ export function PostDetailMedia({
     <div className="mb-4 flex flex-col items-start gap-2">
       <div className="relative w-full">
         <div
-          className={`overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200 ${
+          className={`overflow-hidden rounded border border-border transition-all duration-200 ${
             isPlayableVideo ? '' : 'cursor-pointer'
           }`}
           onClick={isPlayableVideo ? undefined : onToggleExpanded}
@@ -242,7 +242,7 @@ export function PostDetailMedia({
         <button
           type="button"
           onClick={onToggleExpanded}
-          className="text-xs text-[var(--color-primary)] hover:underline"
+          className="text-xs text-primary hover:underline"
         >
           {imageExpanded
             ? t('posts.media.viewer.viewSmaller')

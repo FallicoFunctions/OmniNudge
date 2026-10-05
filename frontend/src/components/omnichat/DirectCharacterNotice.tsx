@@ -31,7 +31,7 @@ export default function DirectCharacterNotice({
     <aside
       data-testid="omnichat-direct-character-notice"
       aria-label={t('omnichat.directCharacterNotice.title', { name })}
-      className="mb-5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3.5"
+      className="mb-5 rounded-xl border border-white/8 bg-white/3 px-4 py-3.5"
     >
       <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-white/40">
         {t('omnichat.directCharacterNotice.title', { name })}

@@ -274,11 +274,11 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     return (
       <div
         className={`column-feed flex items-center justify-center ${
-          showBorder ? 'border-r border-[var(--color-border)]' : ''
+          showBorder ? 'border-r border-border' : ''
         }`}
         style={{ height: '100%' }}
       >
-        <div className="text-sm text-[var(--color-text-muted)]">{t('common.loading')}</div>
+        <div className="text-sm text-(--color-text-muted)">{t('common.loading')}</div>
       </div>
     );
   }
@@ -287,7 +287,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     return (
       <div
         className={`column-feed flex items-center justify-center p-4 ${
-          showBorder ? 'border-r border-[var(--color-border)]' : ''
+          showBorder ? 'border-r border-border' : ''
         }`}
         style={{ height: '100%' }}
       >
@@ -305,7 +305,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     return (
       <div
         className={`column-feed flex items-center justify-center p-4 ${
-          showBorder ? 'border-r border-[var(--color-border)]' : ''
+          showBorder ? 'border-r border-border' : ''
         }`}
         style={{ height: '100%' }}
       >
@@ -434,7 +434,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     <div
       ref={scrollRef}
       className={`column-feed overflow-y-auto ${
-        showBorder ? 'border-r border-[var(--color-border)]' : ''
+        showBorder ? 'border-r border-border' : ''
       } ${isActive ? 'ring-2 ring-inset ring-cyan-500/50' : ''}`}
       style={{
         height: '100%',
@@ -443,7 +443,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       }}
     >
       {config.feedType === 'messages' && (
-        <div className="border-b border-[var(--color-border)]">
+        <div className="border-b border-border">
           <button
             type="button"
             onClick={() => {
@@ -453,7 +453,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
               setComposerError(null);
               setPendingRecipient(null);
             }}
-            className="w-full px-3 py-2 text-xs font-semibold text-left text-[var(--color-primary)] hover:bg-[var(--color-hover)] transition-colors"
+            className="w-full px-3 py-2 text-xs font-semibold text-left text-primary hover:bg-(--color-hover) transition-colors"
           >
             {t('emptyStates.inbox.actions.newMessage')}
           </button>
@@ -482,7 +482,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                     }
                   }}
                   placeholder={t('messages.compose.enterUsername')}
-                  className="flex-1 bg-[var(--color-background)] text-xs text-[var(--color-text)] placeholder-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-2 py-1 focus:outline-none focus:border-cyan-500"
+                  className="flex-1 bg-background text-xs text-(--color-text) placeholder-(--color-text-muted) border border-border rounded-sm px-2 py-1 focus:outline-hidden focus:border-cyan-500"
                 />
                 <button
                   type="button"
@@ -491,7 +491,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                     setNewUsernameError(null);
                     setComposerError(null);
                   }}
-                  className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] text-xs"
+                  className="text-(--color-text-muted) hover:text-(--color-text) text-xs"
                   aria-label={t('common.close')}
                 >
                   ✕
@@ -505,7 +505,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                 <div className="text-red-400 text-[10px] mb-1">{composerError}</div>
               )}
               {selectedFile && (
-                <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text)]">
+                <div className="mb-2 flex items-center gap-2 text-xs text-(--color-text)">
                   <span>📎 {selectedFile.name}</span>
                   <button
                     type="button"
@@ -531,7 +531,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingMedia || sendingMessage}
-                  className="p-2 text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors disabled:opacity-50"
+                  className="p-2 text-(--color-text-muted) hover:text-cyan-500 transition-colors disabled:opacity-50"
                   title={t('messages.compose.attachSingle')}
                 >
                   📎
@@ -548,7 +548,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                   }}
                   placeholder={t('messages.typeMessage')}
                   disabled={uploadingMedia || sendingMessage}
-                  className="flex-1 bg-[var(--color-background)] text-[var(--color-text)] text-sm px-3 py-2 rounded border border-[var(--color-border)] focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                  className="flex-1 bg-background text-(--color-text) text-sm px-3 py-2 rounded-sm border border-border focus:outline-hidden focus:border-cyan-500 disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -556,7 +556,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                   disabled={
                     (!messageText.trim() && !selectedFile) || uploadingMedia || sendingMessage
                   }
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploadingMedia
                     ? t('messages.uploading')
@@ -602,13 +602,13 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       })}
 
       {isFetchingNextPage && (
-        <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
+        <div className="p-2 text-center text-xs text-(--color-text-muted)">
           {t('standardScroll.loadingMorePosts')}
         </div>
       )}
 
       {!hasNextPage && allPosts.length > 10 && (
-        <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
+        <div className="p-2 text-center text-xs text-(--color-text-muted)">
           {t('standardScroll.endOfFeed')}
         </div>
       )}

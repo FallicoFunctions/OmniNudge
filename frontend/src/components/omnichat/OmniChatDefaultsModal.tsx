@@ -51,7 +51,7 @@ export default function OmniChatDefaultsModal({
             type="text"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--color-primary)]"
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-hidden transition focus:border-primary"
           />
         </label>
 
@@ -63,7 +63,7 @@ export default function OmniChatDefaultsModal({
             type="text"
             value={age}
             onChange={(event) => setAge(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--color-primary)]"
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-hidden transition focus:border-primary"
           />
         </label>
 
@@ -74,7 +74,7 @@ export default function OmniChatDefaultsModal({
           <select
             value={gender}
             onChange={(event) => setGender(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--color-primary)]"
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-hidden transition focus:border-primary"
           >
             <option value="">{t('omnichat.chat.settingsGenderN')}</option>
             <option value="M">{t('omnichat.chat.settingsGenderM')}</option>
@@ -91,7 +91,7 @@ export default function OmniChatDefaultsModal({
             await onSave({ user_name: name, user_age: age, user_gender: gender });
             onClose();
           }}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-dark)] disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:opacity-60"
         >
           {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           {t('omnichat.header.saveDefaults')}

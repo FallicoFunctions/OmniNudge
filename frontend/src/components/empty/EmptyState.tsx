@@ -331,27 +331,25 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-10 text-center ${className}`}
+      className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface px-4 py-10 text-center ${className}`}
     >
       {illustration ? (
         <EmptyStateIllustration variant={illustration} className="mb-3 h-28 w-40" />
       ) : iconNode ? (
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-surface-elevated)]">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-(--color-surface-elevated)">
           {iconNode}
         </div>
       ) : (
         Icon && (
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-surface-elevated)]">
-            <Icon size={32} className="text-[var(--color-text-secondary)]" />
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-(--color-surface-elevated)">
+            <Icon size={32} className="text-text-secondary" />
           </div>
         )
       )}
 
-      <h3 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{title}</h3>
+      <h3 className="mb-2 text-xl font-semibold text-text-primary">{title}</h3>
 
-      {description && (
-        <p className="mb-6 max-w-md text-[var(--color-text-secondary)]">{description}</p>
-      )}
+      {description && <p className="mb-6 max-w-md text-text-secondary">{description}</p>}
 
       {children}
 
@@ -362,7 +360,7 @@ export function EmptyState({
               type="button"
               onClick={action.onClick}
               disabled={action.disabled}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {action.label}
             </button>
@@ -372,7 +370,7 @@ export function EmptyState({
               type="button"
               onClick={secondaryAction.onClick}
               disabled={secondaryAction.disabled}
-              className="rounded-lg border border-[var(--color-border)] px-4 py-2 transition hover:bg-[var(--color-surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg border border-border px-4 py-2 transition hover:bg-(--color-surface-elevated) disabled:cursor-not-allowed disabled:opacity-60"
             >
               {secondaryAction.label}
             </button>

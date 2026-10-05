@@ -31,13 +31,13 @@ export default function HubAboutPanel({
   const resolvedTitle = displayTitle?.trim() || hubDetails?.title;
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           {t('hubAboutPanel.title')}
         </h3>
         {hubDetails?.nsfw && (
-          <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+          <span className="rounded-sm bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
             {t('posts.badges.nsfw')}
           </span>
         )}
@@ -49,28 +49,26 @@ export default function HubAboutPanel({
       ) : hubDetails ? (
         <>
           {resolvedTitle && (
-            <p className="mt-2 text-base font-semibold text-[var(--color-text-primary)]">
-              {resolvedTitle}
-            </p>
+            <p className="mt-2 text-base font-semibold text-text-primary">{resolvedTitle}</p>
           )}
           {hasSidebarMarkdown ? (
             <PostBodyMarkdown
               content={trimmedSidebar ?? ''}
-              className="mt-2 text-sm text-[var(--color-text-primary)] leading-relaxed"
+              className="mt-2 text-sm text-text-primary leading-relaxed"
             />
           ) : hubDetails.description ? (
-            <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-line">
+            <p className="mt-2 text-sm text-text-primary whitespace-pre-line">
               {hubDetails.description}
             </p>
           ) : (
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-secondary">
               {t('hubAboutPanel.emptyDescription')}
             </p>
           )}
           {showStats && (
-            <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+            <div className="mt-4 space-y-2 text-xs text-text-secondary">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('hubAboutPanel.labels.members')}
                 </span>
                 <span>
@@ -80,7 +78,7 @@ export default function HubAboutPanel({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('hubAboutPanel.labels.activeOmniUsers')}
                 </span>
                 <span>
@@ -88,7 +86,7 @@ export default function HubAboutPanel({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('hubAboutPanel.labels.visibility')}
                 </span>
                 <span>
@@ -99,7 +97,7 @@ export default function HubAboutPanel({
               </div>
               {hubDetails.created_at && (
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                  <span className="font-semibold text-text-primary">
                     {t('hubAboutPanel.labels.created')}
                   </span>
                   <span>

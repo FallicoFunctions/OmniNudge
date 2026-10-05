@@ -163,7 +163,7 @@ export default function OmniChatModelSelectorModal({
                     type="button"
                     aria-label={`Select ${model.label}`}
                     onClick={() => chooseModel(model.key)}
-                    className={`group relative min-h-52 rounded-[22px] border p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#5d8fff]/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#5d8fff] ${
+                    className={`group relative min-h-52 rounded-[22px] border p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#5d8fff]/70 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-[#5d8fff] ${
                       current
                         ? 'border-[#5d8fff] bg-[#315ca8]/20 shadow-[0_16px_55px_rgba(50,100,210,.14)]'
                         : 'border-white/10 bg-white/[0.035]'
@@ -194,7 +194,7 @@ export default function OmniChatModelSelectorModal({
                 type="button"
                 onClick={() => onApply(pendingModel, 'this_chat')}
                 disabled={isSaving}
-                className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6 text-left transition hover:border-[#5d8fff]/70 hover:bg-[#315ca8]/15 disabled:opacity-50"
+                className="rounded-[24px] border border-white/10 bg-white/4 p-6 text-left transition hover:border-[#5d8fff]/70 hover:bg-[#315ca8]/15 disabled:opacity-50"
               >
                 <Gauge className="mb-7 text-[#7da8ff]" size={24} />
                 <span className="block text-lg font-semibold text-white">Only this chat</span>

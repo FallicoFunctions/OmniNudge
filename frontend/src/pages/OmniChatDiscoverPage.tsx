@@ -198,8 +198,8 @@ function PersonaCard({
         setIsHovered(false);
         setDesktopDescriptionExpanded(false);
       }}
-      className={`group relative w-full overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.035] text-left shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition-all duration-500 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)] active:translate-y-0 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] focus-visible:outline-offset-2 ${
-        featured ? 'aspect-[16/10]' : 'aspect-[4/5]'
+      className={`group relative w-full overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.035] text-left shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition-all duration-500 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)] active:translate-y-0 active:scale-[0.985] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 ${
+        featured ? 'aspect-16/10' : 'aspect-4/5'
       }`}
     >
       <PersonaAvatar
@@ -214,11 +214,11 @@ function PersonaCard({
         onPreviewEnded={onPreviewEnded}
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.11)_50%,transparent_65%)] bg-[length:240%_100%] bg-[position:120%_0] opacity-0 transition-all duration-700 group-hover:bg-[position:-30%_0] group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.11)_50%,transparent_65%)] bg-size-[240%_100%] bg-position-[120%_0] opacity-0 transition-all duration-700 group-hover:bg-position-[-30%_0] group-hover:opacity-100" />
 
       {/* 18+ badge */}
       {persona.is_nsfw && (
-        <span className="absolute right-2.5 top-2.5 rounded-full bg-red-600/90 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
+        <span className="absolute right-2.5 top-2.5 rounded-full bg-red-600/90 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-xs">
           18+
         </span>
       )}
@@ -227,12 +227,12 @@ function PersonaCard({
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p
-              className={`${featured ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} truncate font-bold tracking-[-0.02em] text-white drop-shadow-sm`}
+              className={`${featured ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} truncate font-bold tracking-[-0.02em] text-white drop-shadow-xs`}
             >
               {persona.name}
             </p>
           </div>
-          <span className="flex h-8 w-8 flex-shrink-0 translate-y-2 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <span className="flex h-8 w-8 shrink-0 translate-y-2 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <ArrowRight size={14} />
           </span>
         </div>
@@ -529,7 +529,7 @@ export default function OmniChatDiscoverPage() {
     <button
       type="button"
       onClick={handleOpenRoleplayCreator}
-      className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-blue-300/30 hover:bg-blue-400/10 hover:text-white"
+      className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/4 px-5 text-sm font-semibold text-white/75 transition hover:border-blue-300/30 hover:bg-blue-400/10 hover:text-white"
     >
       <Plus size={16} className="transition-transform group-hover:rotate-90" />
       Create Roleplay AI
@@ -570,7 +570,7 @@ export default function OmniChatDiscoverPage() {
                 <PersonaAvatar
                   persona={heroPersona}
                   rootRef={heroAvatarRef}
-                  className="h-full w-full !rounded-none"
+                  className="h-full w-full rounded-none!"
                   previewEnabled={Boolean(heroPersona.preview_video_url) && !isMobile}
                   previewActive={!isMobile}
                   hideOverlay
@@ -579,7 +579,7 @@ export default function OmniChatDiscoverPage() {
               <div className="absolute inset-0 bg-[linear-gradient(90deg,#11121a_0%,rgba(17,18,26,0.98)_34%,rgba(17,18,26,0.58)_66%,rgba(17,18,26,0.08)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,10,15,0.9)_0%,transparent_48%)] sm:bg-none" />
               <div
-                className="omnichat-float absolute -right-14 -top-16 h-52 w-52 rounded-full border border-blue-300/10 bg-blue-500/10 blur-sm"
+                className="omnichat-float absolute -right-14 -top-16 h-52 w-52 rounded-full border border-blue-300/10 bg-blue-500/10 blur-xs"
                 aria-hidden="true"
               />
 
@@ -634,7 +634,7 @@ export default function OmniChatDiscoverPage() {
                   />
                 </div>
                 <div className="mt-7 flex items-center gap-3 text-xs text-white/45">
-                  <span className="h-px w-8 bg-gradient-to-r from-blue-400 to-transparent" />
+                  <span className="h-px w-8 bg-linear-to-r from-blue-400 to-transparent" />
                   {t('omnichat.discover.spotlight', { name: heroPersona.name })}
                 </div>
               </div>
@@ -642,14 +642,14 @@ export default function OmniChatDiscoverPage() {
           )}
 
           {isAuthenticated && !conversationsQuery.isLoading && continueChatting.length > 0 && (
-            <section className="mb-9 rounded-[30px] border border-white/[0.08] bg-white/[0.025] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-6">
+            <section className="mb-9 rounded-[30px] border border-white/8 bg-white/2.5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                   <div className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.19em] text-emerald-200/70">
                     <span className="omnichat-live-dot h-1.5 w-1.5 rounded-full bg-emerald-300" />
                     {t('omnichat.discover.continueEyebrow')}
                   </div>
-                  <h2 className="text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">
+                  <h2 className="text-xl font-bold tracking-[-0.03em] text-text-primary">
                     {t('omnichat.discover.continueChatting')}
                   </h2>
                 </div>
@@ -703,7 +703,7 @@ export default function OmniChatDiscoverPage() {
                   <p className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.19em] text-blue-200/65">
                     {t('omnichat.discover.featuredEyebrow')}
                   </p>
-                  <h2 className="text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)] sm:text-3xl">
+                  <h2 className="text-2xl font-black tracking-[-0.04em] text-text-primary sm:text-3xl">
                     {t('omnichat.discover.featuredTitle')}
                   </h2>
                 </div>
@@ -740,13 +740,13 @@ export default function OmniChatDiscoverPage() {
           )}
 
           {isAuthenticated && ownedPersonas.length > 0 && (
-            <section className="mb-10 rounded-[30px] border border-white/[0.08] bg-gradient-to-br from-blue-500/[0.06] to-transparent p-5 sm:p-6">
+            <section className="mb-10 rounded-[30px] border border-white/8 bg-linear-to-br from-blue-500/6 to-transparent p-5 sm:p-6">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
                     {t('omnichat.discover.privateCollection')}
                   </p>
-                  <h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-[var(--color-text-primary)]">
+                  <h2 className="mt-1 text-xl font-bold tracking-[-0.03em] text-text-primary">
                     {t('omnichat.discover.myCharacters')}
                   </h2>
                 </div>
@@ -810,7 +810,7 @@ export default function OmniChatDiscoverPage() {
               <ErrorMessage>{t('omnichat.discover.conversationsLoadError')}</ErrorMessage>
             )}
             {!personasQuery.isLoading && !personasQuery.isError && personas.length === 0 && (
-              <div className="rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center text-sm text-[var(--color-text-secondary)]">
+              <div className="rounded-[26px] border border-dashed border-white/10 bg-white/2 px-6 py-12 text-center text-sm text-text-secondary">
                 {t('omnichat.discover.empty')}
               </div>
             )}

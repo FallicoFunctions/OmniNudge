@@ -191,11 +191,11 @@ export default function EditProfileModal({
         />
       )}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl">
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+        <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5 shadow-xl">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t('userProfilePage.edit.title')}
           </h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          <p className="mt-1 text-sm text-text-secondary">
             {t('userProfilePage.edit.description')}
           </p>
 
@@ -238,7 +238,7 @@ export default function EditProfileModal({
             <div>
               <label
                 htmlFor="edit-profile-status-text"
-                className="block text-sm font-medium text-[var(--color-text-primary)]"
+                className="block text-sm font-medium text-text-primary"
               >
                 {t('userProfilePage.edit.statusLabel')}
               </label>
@@ -249,9 +249,9 @@ export default function EditProfileModal({
                 onChange={(e) => setStatusText(e.target.value)}
                 maxLength={500}
                 placeholder={t('userProfilePage.edit.statusPlaceholder')}
-                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
               />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-xs text-text-secondary">
                 {t('userProfilePage.edit.statusCount', { count: statusText.length })}
               </p>
             </div>
@@ -259,7 +259,7 @@ export default function EditProfileModal({
             <div>
               <label
                 htmlFor="edit-profile-location"
-                className="block text-sm font-medium text-[var(--color-text-primary)]"
+                className="block text-sm font-medium text-text-primary"
               >
                 {t('userProfilePage.edit.locationLabel')}
               </label>
@@ -270,9 +270,9 @@ export default function EditProfileModal({
                 onChange={(e) => setLocation(e.target.value)}
                 maxLength={100}
                 placeholder={t('userProfilePage.edit.locationPlaceholder')}
-                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
               />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-xs text-text-secondary">
                 {t('userProfilePage.edit.locationCount', { count: location.length })}
               </p>
             </div>
@@ -280,7 +280,7 @@ export default function EditProfileModal({
             <div>
               <label
                 htmlFor="edit-profile-bio"
-                className="block text-sm font-medium text-[var(--color-text-primary)]"
+                className="block text-sm font-medium text-text-primary"
               >
                 {t('userProfilePage.edit.bioLabel')}
               </label>
@@ -291,9 +291,9 @@ export default function EditProfileModal({
                 rows={5}
                 maxLength={500}
                 placeholder={t('userProfilePage.edit.bioPlaceholder')}
-                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
               />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-xs text-text-secondary">
                 {t('userProfilePage.edit.bioCount', { count: bio.length })}
               </p>
             </div>
@@ -310,7 +310,7 @@ export default function EditProfileModal({
               type="button"
               onClick={onClose}
               disabled={isSaving || isUploadingAvatar || isUploadingBanner}
-              className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
             >
               {t('common.cancel')}
             </button>
@@ -318,7 +318,7 @@ export default function EditProfileModal({
               type="button"
               onClick={() => void handleSave()}
               disabled={isSaving || isUploadingAvatar || isUploadingBanner}
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
               {isSaving
                 ? t('common.loading')

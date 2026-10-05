@@ -22,10 +22,10 @@ const CSSVariableEditor = ({
     <div className="space-y-5">
       {groups.map((group) => (
         <div key={group.id}>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
             {group.name}
           </h4>
-          <div className="mt-3 space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+          <div className="mt-3 space-y-2 rounded-xl border border-border bg-(--color-surface-elevated) p-3">
             {group.variables.map((variable) => {
               const value =
                 variables[variable.name] ??
@@ -37,7 +37,7 @@ const CSSVariableEditor = ({
               const descriptionId = `${variable.name}-description`;
               const inputClasses =
                 [
-                  'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none',
+                  'rounded-md border border-border px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden',
                   variable.type === 'color' ? 'uppercase w-28' : '',
                   variable.type === 'string' ? 'w-full max-w-xs' : '',
                   variable.type === 'size' ? 'w-32' : '',
@@ -45,7 +45,7 @@ const CSSVariableEditor = ({
                 ]
                   .filter(Boolean)
                   .join(' ') ||
-                'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none';
+                'rounded-md border border-border px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden';
 
               const placeholder =
                 variable.type === 'color'
@@ -64,17 +64,15 @@ const CSSVariableEditor = ({
                   type="button"
                   className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${
                     isSelected
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                      ? 'border-primary bg-primary/5'
                       : 'border-transparent hover:bg-white/50'
                   }`}
                   onClick={() => onSelectVariable(variable.name)}
                 >
                   <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {variable.label}
-                    </p>
+                    <p className="text-sm font-semibold text-text-primary">{variable.label}</p>
                     {variable.description && (
-                      <p id={descriptionId} className="text-xs text-[var(--color-text-secondary)]">
+                      <p id={descriptionId} className="text-xs text-text-secondary">
                         {variable.description}
                       </p>
                     )}
@@ -83,7 +81,7 @@ const CSSVariableEditor = ({
                   <div className="flex items-center gap-3">
                     {variable.type === 'color' && (
                       <span
-                        className="h-8 w-8 rounded-full border border-[var(--color-border)]"
+                        className="h-8 w-8 rounded-full border border-border"
                         style={{ backgroundColor: value }}
                       />
                     )}

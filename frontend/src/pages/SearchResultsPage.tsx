@@ -733,8 +733,8 @@ export default function SearchResultsPage() {
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('nav.search')}</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">{t('searchPage.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-text-primary">{t('nav.search')}</h1>
+          <p className="text-sm text-text-secondary">{t('searchPage.subtitle')}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -747,12 +747,12 @@ export default function SearchResultsPage() {
               }
             }}
             placeholder={t('searchPage.inputPlaceholder')}
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           />
           <button
             type="button"
             onClick={() => handleSearch(query)}
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
           >
             {t('common.search')}
           </button>
@@ -764,8 +764,8 @@ export default function SearchResultsPage() {
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
               activeTab === 'posts'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                ? 'bg-primary text-white'
+                : 'bg-(--color-surface-elevated) text-text-primary'
             }`}
             onClick={() => {
               setActiveTab('posts');
@@ -777,8 +777,8 @@ export default function SearchResultsPage() {
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
               activeTab === 'communities'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                ? 'bg-primary text-white'
+                : 'bg-(--color-surface-elevated) text-text-primary'
             }`}
             onClick={() => {
               setActiveTab('communities');
@@ -795,8 +795,8 @@ export default function SearchResultsPage() {
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
               activeTab === 'users'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                ? 'bg-primary text-white'
+                : 'bg-(--color-surface-elevated) text-text-primary'
             }`}
             onClick={() => {
               setActiveTab('users');
@@ -808,8 +808,8 @@ export default function SearchResultsPage() {
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
               activeTab === 'messages'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                ? 'bg-primary text-white'
+                : 'bg-(--color-surface-elevated) text-text-primary'
             }`}
             onClick={() => {
               setActiveTab('messages');
@@ -822,16 +822,14 @@ export default function SearchResultsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">
-            {t('common.sort')}
-          </label>
+          <label className="text-sm font-medium text-text-primary">{t('common.sort')}</label>
           {(['relevance', 'new', 'old'] as const).map((opt) => (
             <button
               key={opt}
               className={`rounded-md px-3 py-1 text-sm ${
                 sort === opt
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                  ? 'bg-primary text-white'
+                  : 'bg-(--color-surface-elevated) text-text-primary'
               }`}
               onClick={() => {
                 setSort(opt);
@@ -848,7 +846,7 @@ export default function SearchResultsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">
+          <label className="text-sm font-medium text-text-primary">
             {t('searchPage.omniOnly')}
           </label>
           <button
@@ -856,8 +854,8 @@ export default function SearchResultsPage() {
             role="switch"
             aria-checked={postSource === 'omni'}
             onClick={() => setPostSource(postSource === 'omni' ? 'all' : 'omni')}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-              postSource === 'omni' ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+              postSource === 'omni' ? 'bg-primary' : 'bg-gray-300'
             }`}
           >
             <span className="sr-only">{t('searchPage.omniOnly')}</span>
@@ -872,7 +870,7 @@ export default function SearchResultsPage() {
 
         {!blockAllNsfw && (
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="text-sm font-medium text-text-primary">
               {t('searchPage.includeNsfw')}
             </label>
             <button
@@ -880,8 +878,8 @@ export default function SearchResultsPage() {
               role="switch"
               aria-checked={includeNsfw}
               onClick={() => setIncludeNsfw(!includeNsfw)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                includeNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                includeNsfw ? 'bg-primary' : 'bg-gray-300'
               }`}
             >
               <span className="sr-only">{t('searchPage.includeNsfw')}</span>
@@ -897,7 +895,7 @@ export default function SearchResultsPage() {
 
         {activeTab === 'messages' && (
           <>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <span>{t('searchPage.messages.filters.conversationId')}</span>
               <input
                 type="number"
@@ -911,10 +909,10 @@ export default function SearchResultsPage() {
                     conversationId: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
                   }));
                 }}
-                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+                className="w-24 rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-xs"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <span>{t('searchPage.messages.filters.senderId')}</span>
               <input
                 type="number"
@@ -928,10 +926,10 @@ export default function SearchResultsPage() {
                     senderId: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
                   }));
                 }}
-                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+                className="w-24 rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-xs"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <span>{t('searchPage.messages.filters.startDate')}</span>
               <input
                 type="datetime-local"
@@ -942,10 +940,10 @@ export default function SearchResultsPage() {
                     startDate: parseLocalDateTimeToRFC3339(event.target.value),
                   }));
                 }}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-xs"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <span>{t('searchPage.messages.filters.endDate')}</span>
               <input
                 type="datetime-local"
@@ -956,12 +954,12 @@ export default function SearchResultsPage() {
                     endDate: parseLocalDateTimeToRFC3339(event.target.value),
                   }));
                 }}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-xs"
               />
             </label>
             <button
               type="button"
-              className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
               onClick={() => {
                 setMessageResults((prev) => ({ ...prev, page: 1 }));
                 handleSearch(query, {
@@ -981,7 +979,7 @@ export default function SearchResultsPage() {
             </button>
             <button
               type="button"
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-1 text-xs font-semibold text-text-primary"
               onClick={() => {
                 setMessageResults((prev) => ({
                   ...prev,
@@ -1006,7 +1004,7 @@ export default function SearchResultsPage() {
             >
               {t('searchPage.messages.filters.clear')}
             </button>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <input
                 type="checkbox"
                 checked={messageResults.hasFiles}
@@ -1023,7 +1021,7 @@ export default function SearchResultsPage() {
               />
               {t('searchPage.messages.hasFiles')}
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <input
                 type="checkbox"
                 checked={messageResults.hasLinks}
@@ -1040,7 +1038,7 @@ export default function SearchResultsPage() {
               />
               {t('searchPage.messages.hasLinks')}
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <input
                 type="checkbox"
                 checked={messageResults.includeArchived}
@@ -1064,7 +1062,7 @@ export default function SearchResultsPage() {
       {isLoading && <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>}
 
       {!isLoading && searchError && (
-        <div className="rounded-md border border-[var(--color-error)] bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
+        <div className="rounded-md border border-(--color-error) bg-(--color-error)/10 px-4 py-3 text-sm text-(--color-error)">
           {searchError}
         </div>
       )}
@@ -1170,7 +1168,7 @@ export default function SearchResultsPage() {
             }
             onNext={() => handleSearch(query, { page: posts.page + 1, tab: activeTab, sort })}
             centerContent={
-              <span className="text-sm text-[var(--color-text-secondary)]">
+              <span className="text-sm text-text-secondary">
                 {t('searchPage.pagination.page', { page: posts.page })}
               </span>
             }
@@ -1182,7 +1180,7 @@ export default function SearchResultsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <OffsetPaginationControls
             showDivider={false}
-            className="md:col-span-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+            className="md:col-span-2 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2"
             hasPrev={communities.page > 1}
             hasMore={communities.hasMoreHubs || communities.hasMoreSubreddits}
             isFetching={isLoading}
@@ -1201,14 +1199,14 @@ export default function SearchResultsPage() {
               })
             }
             centerContent={
-              <div className="text-sm text-[var(--color-text-secondary)]">
+              <div className="text-sm text-text-secondary">
                 {t('searchPage.pagination.page', { page: communities.page })}
               </div>
             }
           />
 
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-sm font-semibold text-text-primary">
               {t('searchPage.communities.subreddits')}
             </h3>
             {filteredSubreddits.length === 0 ? (
@@ -1218,15 +1216,13 @@ export default function SearchResultsPage() {
                 {filteredSubreddits.map((sr) => (
                   <li
                     key={sr.name}
-                    className="rounded border border-[var(--color-border)] p-3 hover:border-[var(--color-primary)] hover:shadow-sm transition"
+                    className="rounded-sm border border-border p-3 hover:border-primary hover:shadow-xs transition"
                   >
                     <Link to={`/r/${sr.name}`} className="block">
-                      <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
+                      <div className="text-sm font-semibold text-text-primary underline-offset-2 hover:underline">
                         {t('common.format.subredditPath', { name: sr.name })}
                       </div>
-                      {sr.title && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">{sr.title}</div>
-                      )}
+                      {sr.title && <div className="text-xs text-text-secondary">{sr.title}</div>}
                     </Link>
                   </li>
                 ))}
@@ -1234,7 +1230,7 @@ export default function SearchResultsPage() {
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-sm font-semibold text-text-primary">
               {t('searchPage.communities.hubs')}
             </h3>
             {filteredHubs.length === 0 ? (
@@ -1244,21 +1240,15 @@ export default function SearchResultsPage() {
                 {filteredHubs.map((hub) => (
                   <li
                     key={hub.id}
-                    className="rounded border border-[var(--color-border)] p-3 hover:border-[var(--color-primary)] hover:shadow-sm transition"
+                    className="rounded-sm border border-border p-3 hover:border-primary hover:shadow-xs transition"
                   >
                     <Link to={`/h/${hub.name}`} className="block">
-                      <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
+                      <div className="text-sm font-semibold text-text-primary underline-offset-2 hover:underline">
                         {t('common.format.hubPath', { name: hub.name })}
                       </div>
-                      {hub.title && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          {hub.title}
-                        </div>
-                      )}
+                      {hub.title && <div className="text-xs text-text-secondary">{hub.title}</div>}
                       {hub.description && (
-                        <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                          {hub.description}
-                        </div>
+                        <div className="mt-1 text-xs text-text-secondary">{hub.description}</div>
                       )}
                     </Link>
                   </li>
@@ -1290,16 +1280,12 @@ export default function SearchResultsPage() {
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.hide.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              {t('modals.hide.description')}
-            </p>
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.hide.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">{t('modals.hide.description')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
@@ -1316,7 +1302,7 @@ export default function SearchResultsPage() {
                     ? hidePostMutation.isPending
                     : hideRedditPostMutation.isPending
                 }
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {hideTarget.type === 'platform'
                   ? hidePostMutation.isPending
@@ -1334,7 +1320,7 @@ export default function SearchResultsPage() {
       {!isLoading && activeTab === 'users' && (
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-sm font-semibold text-text-primary">
               {t('searchPage.users.reddit')}
             </h3>
             {filteredRedditUsers.length === 0 ? (
@@ -1342,11 +1328,8 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredRedditUsers.map((user, idx) => (
-                  <li
-                    key={`${user.name}-${idx}`}
-                    className="rounded border border-[var(--color-border)] p-3"
-                  >
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  <li key={`${user.name}-${idx}`} className="rounded-sm border border-border p-3">
+                    <div className="text-sm font-semibold text-text-primary">
                       {t('common.format.userPath', { name: user.name })}
                     </div>
                   </li>
@@ -1358,7 +1341,7 @@ export default function SearchResultsPage() {
                 <button
                   type="button"
                   onClick={() => handleSearch(query, { append: true, tab: 'users', sort })}
-                  className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="rounded-sm bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
                   {t('searchPage.users.loadMoreReddit')}
                 </button>
@@ -1366,7 +1349,7 @@ export default function SearchResultsPage() {
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-sm font-semibold text-text-primary">
               {t('searchPage.users.omni')}
             </h3>
             {filteredOmniUsers.length === 0 ? (
@@ -1374,13 +1357,8 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredOmniUsers.map((user) => (
-                  <li
-                    key={user.username}
-                    className="rounded border border-[var(--color-border)] p-3"
-                  >
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {user.username}
-                    </div>
+                  <li key={user.username} className="rounded-sm border border-border p-3">
+                    <div className="text-sm font-semibold text-text-primary">{user.username}</div>
                   </li>
                 ))}
               </ul>
@@ -1390,7 +1368,7 @@ export default function SearchResultsPage() {
                 <button
                   type="button"
                   onClick={() => handleSearch(query, { append: true, tab: 'users', sort })}
-                  className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="rounded-sm bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
                   {t('searchPage.users.loadMoreOmni')}
                 </button>
@@ -1409,11 +1387,8 @@ export default function SearchResultsPage() {
               {messageResults.messages.map((message) => {
                 const preview = messagePreviewById[message.id] ?? t('messages.encrypted');
                 return (
-                  <li
-                    key={message.id}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                  <li key={message.id} className="rounded-sm border border-border bg-surface p-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
                       <span>
                         {t('searchPage.messages.meta.conversation', {
                           id: message.conversation_id,
@@ -1428,7 +1403,7 @@ export default function SearchResultsPage() {
                       <span>•</span>
                       <span>{new Date(message.sent_at).toLocaleString()}</span>
                     </div>
-                    <div className="mt-2 text-sm text-[var(--color-text-primary)]">
+                    <div className="mt-2 text-sm text-text-primary">
                       {isDecryptingMessagePreviews ? (
                         <span>{t('messages.searching')}</span>
                       ) : (
@@ -1461,7 +1436,7 @@ export default function SearchResultsPage() {
               })
             }
             centerContent={
-              <span className="text-sm text-[var(--color-text-secondary)]">
+              <span className="text-sm text-text-secondary">
                 {t('searchPage.pagination.page', { page: messageResults.page })}
               </span>
             }

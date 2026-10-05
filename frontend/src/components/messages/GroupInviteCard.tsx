@@ -22,18 +22,18 @@ export function GroupInviteCard({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4">
       <GroupAvatar
         name={invite.group_name ?? 'Group'}
         avatarUrl={invite.group_avatar_url}
         size={44}
       />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+        <p className="text-sm font-semibold text-text-primary truncate">
           {invite.group_name ?? t('groups.unknownGroup')}
         </p>
         {invite.invited_by_username && (
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+          <p className="text-xs text-text-secondary mt-0.5">
             {t('groups.invitedBy', { name: invite.invited_by_username })}
           </p>
         )}
@@ -42,7 +42,7 @@ export function GroupInviteCard({
             type="button"
             onClick={() => onDecline(invite.id)}
             disabled={isAccepting || isDeclining}
-            className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-60"
           >
             {t('groups.decline')}
           </button>
@@ -50,7 +50,7 @@ export function GroupInviteCard({
             type="button"
             onClick={() => onAccept(invite.id)}
             disabled={isAccepting || isDeclining}
-            className="rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
             {isAccepting ? t('common.loading') : t('groups.accept')}
           </button>
@@ -85,12 +85,12 @@ export function GroupInvitesList({ onConversationOpened }: GroupInvitesListProps
   if (isLoading || pending.length === 0) return null;
 
   return (
-    <div className="p-4 border-b border-[var(--color-border)]">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
+    <div className="p-4 border-b border-border">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted) mb-3">
         {t('groups.pendingInvites')} ({pending.length})
       </h3>
       {error && (
-        <p role="alert" className="mb-3 text-xs text-[var(--color-error)]">
+        <p role="alert" className="mb-3 text-xs text-(--color-error)">
           {error}
         </p>
       )}

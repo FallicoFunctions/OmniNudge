@@ -635,7 +635,7 @@ export default function OmniChatCallModal({
       role="dialog"
       aria-modal="true"
       aria-label={`${mode === 'video' ? 'Video' : 'Voice'} call with ${persona.name}`}
-      className="omnichat-theme fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#07080c] text-white outline-none"
+      className="omnichat-theme fixed inset-0 z-100 flex flex-col overflow-hidden bg-[#07080c] text-white outline-hidden"
     >
       <div className="absolute inset-0">
         {mode === 'video' && liveVideoURL ? (
@@ -671,7 +671,7 @@ export default function OmniChatCallModal({
           </div>
         )}
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/80" />
+      <div className="absolute inset-0 bg-linear-to-b from-black/45 via-transparent to-black/80" />
       {mode === 'video' && liveVideoURL && (
         <div
           className="absolute inset-x-0 z-10"
@@ -683,7 +683,7 @@ export default function OmniChatCallModal({
       <div className="relative z-10 mt-auto p-5 sm:p-8">
         <div className="mx-auto max-w-xl">
           {transcript && (
-            <p className="mb-4 rounded-2xl bg-black/40 px-4 py-3 text-center text-sm text-white/70 backdrop-blur">
+            <p className="mb-4 rounded-2xl bg-black/40 px-4 py-3 text-center text-sm text-white/70 backdrop-blur-sm">
               “{transcript}”
             </p>
           )}
@@ -709,7 +709,7 @@ export default function OmniChatCallModal({
             <p
               role="status"
               data-testid="omnichat-call-listening-notice"
-              className="mb-5 rounded-2xl bg-amber-500/15 px-4 py-3 text-center text-sm text-amber-100 backdrop-blur"
+              className="mb-5 rounded-2xl bg-amber-500/15 px-4 py-3 text-center text-sm text-amber-100 backdrop-blur-sm"
             >
               {listeningNotice}
             </p>
@@ -724,7 +724,7 @@ export default function OmniChatCallModal({
           {status === 'error' && (
             <p
               role="alert"
-              className="mb-5 rounded-2xl bg-rose-500/15 px-4 py-3 text-center text-sm text-rose-100 backdrop-blur"
+              className="mb-5 rounded-2xl bg-rose-500/15 px-4 py-3 text-center text-sm text-rose-100 backdrop-blur-sm"
             >
               {startFailure || 'The call could not be connected. End the call and try again.'}
             </p>
@@ -742,7 +742,7 @@ export default function OmniChatCallModal({
                 value={manualText}
                 onChange={(event) => setManualText(event.target.value)}
                 placeholder="Type if you prefer…"
-                className="min-w-0 flex-1 rounded-full border border-white/15 bg-black/35 px-5 py-3 text-sm text-white outline-none backdrop-blur"
+                className="min-w-0 flex-1 rounded-full border border-white/15 bg-black/35 px-5 py-3 text-sm text-white outline-hidden backdrop-blur-sm"
               />
               <button
                 aria-label="Send during call"
@@ -778,7 +778,7 @@ export default function OmniChatCallModal({
                   (mode === 'video' && (status === 'thinking' || status === 'speaking'))
                 }
                 aria-label={handsFree ? 'Mute the microphone' : 'Unmute the microphone'}
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${!handsFree ? 'bg-white/15 backdrop-blur' : status === 'listening' ? 'bg-white text-black' : 'bg-white/25 backdrop-blur'} disabled:opacity-40`}
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${!handsFree ? 'bg-white/15 backdrop-blur-sm' : status === 'listening' ? 'bg-white text-black' : 'bg-white/25 backdrop-blur-sm'} disabled:opacity-40`}
               >
                 {status === 'thinking' ? (
                   <Loader2 className="animate-spin" />
@@ -790,7 +790,7 @@ export default function OmniChatCallModal({
               </button>
             )}
             {status !== 'error' && mode === 'video' && (
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
                 <Video />
               </span>
             )}

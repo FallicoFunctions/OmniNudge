@@ -85,7 +85,7 @@ export default function OmniChatShell({
   }, [shouldAutoCollapseSidebar]);
 
   return (
-    <div className="omnichat-theme relative min-h-[100dvh] overflow-hidden bg-[var(--color-background)]">
+    <div className="omnichat-theme relative min-h-dvh overflow-hidden bg-background">
       <div className="omnichat-noise pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
       <OmniChatHeader
         defaults={defaults}
@@ -102,7 +102,7 @@ export default function OmniChatShell({
         }}
       />
 
-      <div className="fixed bottom-0 left-0 top-[var(--omnichat-header-offset)] z-30">
+      <div className="fixed bottom-0 left-0 top-(--omnichat-header-offset) z-30">
         <OmniChatSidebar
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -123,7 +123,7 @@ export default function OmniChatShell({
       </div>
 
       <main
-        className="relative z-10 px-0 transition-[padding] duration-300 lg:pl-[var(--omnichat-sidebar-width)]"
+        className="relative z-10 px-0 transition-[padding] duration-300 lg:pl-(--omnichat-sidebar-width)"
         style={
           {
             paddingTop: 'var(--omnichat-header-offset)',

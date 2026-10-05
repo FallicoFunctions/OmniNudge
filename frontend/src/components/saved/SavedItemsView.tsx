@@ -447,11 +447,11 @@ export function SavedItemsView({
       key: `omni-comment-${comment.comment_id}`,
       timestamp: toTimestamp(comment.created_at),
       node: (
-        <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+        <article className="rounded-lg border border-border bg-surface p-4">
+          <div className="mb-2 text-[11px] font-semibold uppercase text-(--color-text-muted)">
             {t('saved.labels.omniComment')}
           </div>
-          <div className="text-xs text-[var(--color-text-secondary)]">
+          <div className="text-xs text-text-secondary">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">
                 {t('common.format.userPath', { name: comment.username })}
@@ -467,14 +467,14 @@ export function SavedItemsView({
                   target_subreddit: null,
                   hub_name: comment.hub_name,
                 })}
-                className="text-[var(--color-primary)] hover:underline"
+                className="text-primary hover:underline"
               >
                 {comment.post_title}
               </Link>
             </div>
           </div>
-          <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
-          <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+          <p className="mt-2 text-sm text-text-primary">{comment.content}</p>
+          <div className="mt-3 flex items-center gap-4 text-xs text-text-secondary">
             <span>
               {t('posts.point', {
                 count: comment.score,
@@ -486,7 +486,7 @@ export function SavedItemsView({
                 { id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name },
                 comment.comment_id
               )}
-              className="text-[var(--color-primary)] hover:underline"
+              className="text-primary hover:underline"
             >
               {t('saved.labels.viewThread')}
             </Link>
@@ -560,11 +560,11 @@ export function SavedItemsView({
       node: (() => {
         const permalink = `/r/${comment.subreddit}/comments/${comment.reddit_post_id}/${comment.id}`;
         return (
-          <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+          <article className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-2 text-[11px] font-semibold uppercase text-(--color-text-muted)">
               {t('saved.labels.redditComment')}
             </div>
-            <div className="text-xs text-[var(--color-text-secondary)]">
+            <div className="text-xs text-text-secondary">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">
                   {t('common.format.userPath', { name: comment.username })}
@@ -579,15 +579,15 @@ export function SavedItemsView({
                 </div>
               )}
             </div>
-            <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
-            <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-sm text-text-primary">{comment.content}</p>
+            <div className="mt-3 flex items-center gap-4 text-xs text-text-secondary">
               <span>
                 {t('posts.point', {
                   count: comment.score,
                   formattedCount: formatNumber(comment.score),
                 })}
               </span>
-              <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
+              <Link to={permalink} className="text-primary hover:underline">
                 {t('saved.labels.viewThread')}
               </Link>
             </div>
@@ -601,14 +601,14 @@ export function SavedItemsView({
       node: (() => {
         const permalink = `/r/${comment.subreddit}/comments/${comment.reddit_post_id}`;
         return (
-          <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+          <article className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-2 text-[11px] font-semibold uppercase text-(--color-text-muted)">
               {t('saved.labels.redditComment')}
             </div>
-            <div className="text-xs text-[var(--color-text-secondary)]">
+            <div className="text-xs text-text-secondary">
               <div className="mb-1">
                 {t('saved.labels.on')}{' '}
-                <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
+                <Link to={permalink} className="text-primary hover:underline">
                   {comment.post_title || t('saved.labels.postFallback')}
                 </Link>
                 {comment.post_author
@@ -635,7 +635,7 @@ export function SavedItemsView({
                 )}
               </div>
             </div>
-            <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+            <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">
               {comment.comment_body}
             </p>
             <div className="mt-3 flex items-center gap-4 text-xs">
@@ -645,11 +645,11 @@ export function SavedItemsView({
                     .unsaveRedditAPIComment(comment.reddit_comment_id)
                     .then(() => invalidateSavedQueries())
                 }
-                className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
+                className="text-(--color-text-muted) hover:text-cyan-500 transition-colors"
               >
                 {t('posts.actions.unsave')}
               </button>
-              <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
+              <Link to={permalink} className="text-primary hover:underline">
                 {t('saved.labels.fullComments')}
               </Link>
             </div>
@@ -747,12 +747,8 @@ export function SavedItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-            {t('saved.headingTitle')}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            {t('saved.headingDescription')}
-          </p>
+          <h1 className="text-3xl font-bold text-text-primary">{t('saved.headingTitle')}</h1>
+          <p className="mt-2 text-sm text-text-secondary">{t('saved.headingDescription')}</p>
         </div>
       )}
 
@@ -770,7 +766,7 @@ export function SavedItemsView({
       />
 
       {isLoading && (
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="rounded-md border border-border bg-surface p-4">
           <LoadingMessage className="mt-0 text-sm">{t('saved.loading')}</LoadingMessage>
         </div>
       )}
@@ -793,7 +789,7 @@ export function SavedItemsView({
                   {t('saved.removedByModerators', { count: autoRemovedRedditPosts.length })}
                 </span>
                 <div className="mt-1 text-xs">
-                  <Link to="/settings" className="text-[var(--color-primary)] hover:underline">
+                  <Link to="/settings" className="text-primary hover:underline">
                     {t('saved.manageAlertInSettings')}
                   </Link>
                 </div>
@@ -801,7 +797,7 @@ export function SavedItemsView({
               <button
                 type="button"
                 onClick={() => setRemovedNoticeDismissed(true)}
-                className="rounded border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
+                className="rounded-sm border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
               >
                 {t('saved.dismiss')}
               </button>
@@ -820,16 +816,12 @@ export function SavedItemsView({
       {hideTargetPost && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.hide.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              {t('modals.hide.confirmSaved')}
-            </p>
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.hide.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">{t('modals.hide.confirmSaved')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTargetPost(null)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
@@ -842,7 +834,7 @@ export function SavedItemsView({
                   })
                 }
                 disabled={hideRedditPostMutation.isPending}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {hideRedditPostMutation.isPending
                   ? t('modals.hide.hiding')

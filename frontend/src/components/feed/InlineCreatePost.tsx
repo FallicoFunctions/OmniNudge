@@ -144,7 +144,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
   };
 
   return (
-    <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-3 text-xs">
+    <div className="border-b border-border bg-surface p-3 space-y-3 text-xs">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-cyan-400 font-semibold">
@@ -155,24 +155,21 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             { name: feedSource }
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-        >
+        <button onClick={onClose} className="text-(--color-text-muted) hover:text-(--color-text)">
           ✕
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
         {/* Tab Switcher */}
-        <div className="flex gap-1 border-b border-[var(--color-border)]">
+        <div className="flex gap-1 border-b border-border">
           <button
             type="button"
             onClick={() => setActiveTab('link')}
             className={`px-3 py-1.5 transition-colors ${
               activeTab === 'link'
                 ? 'text-cyan-400 border-b-2 border-cyan-400'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                : 'text-(--color-text-muted) hover:text-(--color-text)'
             }`}
           >
             {t('inlineCreatePost.tabs.linkMedia')}
@@ -183,7 +180,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             className={`px-3 py-1.5 transition-colors ${
               activeTab === 'text'
                 ? 'text-cyan-400 border-b-2 border-cyan-400'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                : 'text-(--color-text-muted) hover:text-(--color-text)'
             }`}
           >
             {t('inlineCreatePost.tabs.text')}
@@ -197,7 +194,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('inlineCreatePost.placeholders.title')}
           maxLength={300}
-          className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-primary)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)]"
+          className="w-full px-2 py-1.5 bg-background text-primary border border-border rounded-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-(--color-text-muted)"
         />
 
         {/* Link Tab Content */}
@@ -215,7 +212,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
               type="button"
               onClick={() => mediaInputRef.current?.click()}
               disabled={isUploadingMedia}
-              className="w-full px-2 py-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+              className="w-full px-2 py-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-sm hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
             >
               {isUploadingMedia
                 ? t('inlineCreatePost.status.uploading')
@@ -227,12 +224,9 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             {mediaPreviews.length > 0 && (
               <div className="space-y-1">
                 {mediaPreviews.map((preview, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 p-1 bg-[var(--color-background)] rounded"
-                  >
-                    <img src={preview} alt="" className="w-8 h-8 object-cover rounded" />
-                    <span className="flex-1 truncate text-[var(--color-text-muted)] text-[10px]">
+                  <div key={index} className="flex items-center gap-2 p-1 bg-background rounded-sm">
+                    <img src={preview} alt="" className="w-8 h-8 object-cover rounded-sm" />
+                    <span className="flex-1 truncate text-(--color-text-muted) text-[10px]">
                       {mediaItems[index]?.media_type === 'video'
                         ? t('common.media.video')
                         : t('common.media.image')}
@@ -259,7 +253,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             placeholder={t('inlineCreatePost.placeholders.body')}
             rows={6}
             maxLength={10000}
-            className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-primary)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)] resize-none"
+            className="w-full px-2 py-1.5 bg-background text-primary border border-border rounded-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-(--color-text-muted) resize-none"
           />
         )}
 
@@ -272,7 +266,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             onChange={(e) => setIsNsfw(e.target.checked)}
             className="w-3 h-3 cursor-pointer accent-cyan-500"
           />
-          <label htmlFor="inline-nsfw" className="text-[var(--color-primary)] cursor-pointer">
+          <label htmlFor="inline-nsfw" className="text-primary cursor-pointer">
             {t('inlineCreatePost.labels.nsfw')}
           </label>
         </div>
@@ -282,14 +276,14 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-3 py-1.5 bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)] rounded hover:bg-[var(--color-hover)] transition-colors"
+            className="flex-1 px-3 py-1.5 bg-background text-(--color-text) border border-border rounded-sm hover:bg-(--color-hover) transition-colors"
           >
             {t('common.cancel')}
           </button>
           <button
             type="submit"
             disabled={createPostMutation.isPending || isUploadingMedia || !title.trim()}
-            className="flex-1 px-3 py-1.5 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-1.5 bg-cyan-500 text-white rounded-sm hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {createPostMutation.isPending
               ? t('inlineCreatePost.status.posting')

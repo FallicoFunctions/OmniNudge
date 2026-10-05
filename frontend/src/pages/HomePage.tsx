@@ -851,10 +851,10 @@ export default function HomePage() {
       <div className="mb-0">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="text-left md:self-start">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            <h1 className="text-2xl font-bold text-text-primary">
               {user ? t('home.feed.yourFeed') : t('home.feed.popularPosts')}
             </h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-1 text-sm text-text-secondary">
               {user
                 ? omniOnly
                   ? t('home.feed.omniFeedDescription')
@@ -904,7 +904,7 @@ export default function HomePage() {
       </div>
       {user && (
         <div className="mt-4 flex">
-          <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
+          <div className="inline-flex rounded-lg border border-border bg-(--color-surface-elevated) p-1">
             <button
               type="button"
               onClick={() => {
@@ -913,8 +913,8 @@ export default function HomePage() {
               }}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
                 feedScope === 'all'
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  ? 'bg-primary text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               {t('home.scope.all')}
@@ -927,8 +927,8 @@ export default function HomePage() {
               }}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
                 feedScope === 'subscribed'
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  ? 'bg-primary text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               {t('home.scope.subscribed')}
@@ -938,7 +938,7 @@ export default function HomePage() {
       )}
 
       {user && showPopularFallback && !hasAnySubscriptions && (
-        <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
+        <div className="mb-4 rounded-md border border-border bg-surface p-4 text-sm text-text-secondary">
           {t('home.feed.showingPopular')}{' '}
           <button
             type="button"
@@ -946,7 +946,7 @@ export default function HomePage() {
               setFeedScope('subscribed');
               setShowPopularFallback(false);
             }}
-            className="font-semibold text-[var(--color-primary)] hover:underline"
+            className="font-semibold text-primary hover:underline"
           >
             {t('home.feed.hidePopularButton')}
           </button>
@@ -954,15 +954,13 @@ export default function HomePage() {
       )}
 
       {/* Sort controls */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => handleSortChange('hot')}
             className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'hot'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              sort === 'hot' ? 'text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t('home.sort.hot')}
@@ -971,9 +969,7 @@ export default function HomePage() {
             type="button"
             onClick={() => handleSortChange('new')}
             className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'new'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              sort === 'new' ? 'text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t('home.sort.new')}
@@ -982,9 +978,7 @@ export default function HomePage() {
             type="button"
             onClick={() => handleSortChange('top')}
             className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'top'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              sort === 'top' ? 'text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t('home.sort.top')}
@@ -993,9 +987,7 @@ export default function HomePage() {
             type="button"
             onClick={() => handleSortChange('rising')}
             className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'rising'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              sort === 'rising' ? 'text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t('home.sort.rising')}
@@ -1005,8 +997,8 @@ export default function HomePage() {
             onClick={() => handleSortChange('controversial')}
             className={`px-4 py-2 text-sm font-semibold ${
               sort === 'controversial'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                ? 'text-primary'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t('home.sort.controversial')}
@@ -1014,7 +1006,7 @@ export default function HomePage() {
           {displayedPosts.length > 0 && (
             <button
               onClick={() => setSlideshowOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -1029,8 +1021,8 @@ export default function HomePage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm">
-            <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm">
+            <span className="text-xs font-semibold text-text-secondary">
               {t('home.filter.allPosts')}
             </span>
             <button
@@ -1038,8 +1030,8 @@ export default function HomePage() {
               role="switch"
               aria-checked={omniOnly}
               onClick={() => setOmniOnly((prev) => !prev)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
-                omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
+                omniOnly ? 'bg-primary' : 'bg-gray-300'
               }`}
               title={omniOnly ? t('home.filter.omniOnlyTooltip') : t('home.filter.allPostsTooltip')}
             >
@@ -1052,7 +1044,7 @@ export default function HomePage() {
               />
             </button>
             <span
-              className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}
+              className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-primary' : 'text-text-secondary'}`}
             >
               {t('home.filter.omniOnly')}
             </span>
@@ -1071,11 +1063,11 @@ export default function HomePage() {
                   }
                 }}
                 placeholder={t('home.search.searchPosts')}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               />
               {isSearchDropdownOpen && (
-                <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
-                  <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg">
+                  <div className="space-y-2 text-sm text-text-primary">
                     {!blockAllNsfw && (
                       <label className="flex items-center gap-2">
                         <input
@@ -1087,7 +1079,7 @@ export default function HomePage() {
                       </label>
                     )}
                     {blockAllNsfw && (
-                      <div className="text-xs text-[var(--color-text-secondary)]">
+                      <div className="text-xs text-text-secondary">
                         {t('home.search.nsfwBlocked')}
                       </div>
                     )}
@@ -1097,7 +1089,7 @@ export default function HomePage() {
             </div>
             <button
               type="submit"
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
             >
               {t('home.search.searchButton')}
             </button>
@@ -1105,15 +1097,15 @@ export default function HomePage() {
         </div>
       </div>
       {isTimedSort && (
-        <div className="mb-4 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+        <div className="mb-4 space-y-2 rounded-lg border border-border bg-surface p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               {t('home.timeRange.label')}
             </span>
             <select
               value={topTimeRange}
               onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              className="rounded-sm border border-border bg-(--color-surface-elevated) px-3 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
             >
               {TOP_TIME_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1128,19 +1120,17 @@ export default function HomePage() {
                 type="datetime-local"
                 value={customTopStart}
                 onChange={(event) => setCustomTopStart(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                {t('home.timeRange.to')}
-              </span>
+              <span className="text-xs text-text-secondary">{t('home.timeRange.to')}</span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
                 onChange={(event) => setCustomTopEnd(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
               />
               {requiresValidCustomRange && (
-                <span className="text-xs text-[var(--color-error)]">
+                <span className="text-xs text-(--color-error)">
                   {t('home.timeRange.selectBothDates')}
                 </span>
               )}
@@ -1262,7 +1252,7 @@ export default function HomePage() {
         <>
           <div ref={loadMoreRef} className="h-10" />
           {isFetchingNextPage && (
-            <div className="py-3 text-center text-sm text-[var(--color-text-secondary)]">
+            <div className="py-3 text-center text-sm text-text-secondary">
               {t('home.pagination.loadingMore')}
             </div>
           )}
@@ -1292,23 +1282,19 @@ export default function HomePage() {
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.hide.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              {t('modals.hide.description')}
-            </p>
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.hide.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">{t('modals.hide.description')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmHide}
                 disabled={isHidePending}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {isHidePending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>
@@ -1321,14 +1307,12 @@ export default function HomePage() {
       {deletePostTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.delete.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.delete.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('modals.delete.reasonLabel')}{' '}
                 <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
               </label>
@@ -1336,7 +1320,7 @@ export default function HomePage() {
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder={t('modals.delete.reasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1346,14 +1330,14 @@ export default function HomePage() {
                   setDeletePostTarget(null);
                   setDeleteReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {deletePostMutation.isPending
                   ? t('modals.delete.deleting')
@@ -1369,28 +1353,28 @@ export default function HomePage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-lg font-semibold text-text-primary">
                 {t('modals.crosspost.title')}
               </h3>
               <button
                 onClick={() => setCrosspostTarget(null)}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-sm text-text-secondary hover:text-primary"
               >
                 ✕
               </button>
             </div>
-            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+            <div className="mt-3 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
               <p>{t('modals.crosspost.info')}</p>
             </div>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">
                   {t('modals.crosspost.toHub')}
                 </label>
                 <select
                   value={selectedHub}
                   onChange={(e) => setSelectedHub(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 >
                   <option value="">{t('modals.crosspost.selectHub')}</option>
                   {subscribedHubs?.map((sub) => (
@@ -1401,13 +1385,13 @@ export default function HomePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">
                   {t('modals.crosspost.toSubreddit')}
                 </label>
                 <select
                   value={selectedSubreddit}
                   onChange={(e) => setSelectedSubreddit(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 >
                   <option value="">{t('modals.crosspost.selectSubreddit')}</option>
                   {subscribedSubreddits?.map((sub) => (
@@ -1418,7 +1402,7 @@ export default function HomePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">
                   {t('modals.crosspost.titleLabel')}{' '}
                   <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
                 </label>
@@ -1426,7 +1410,7 @@ export default function HomePage() {
                   type="text"
                   value={crosspostTitle}
                   onChange={(e) => setCrosspostTitle(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                   placeholder={t('modals.crosspost.titlePlaceholder')}
                 />
               </div>
@@ -1438,14 +1422,14 @@ export default function HomePage() {
                   onChange={(e) => setSendRepliesToInbox(e.target.checked)}
                   className="mt-0.5"
                 />
-                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
+                <label htmlFor="send-replies" className="text-sm text-text-primary">
                   {t('modals.crosspost.sendRepliesLabel')}
                 </label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => setCrosspostTarget(null)}
-                  className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                  className="rounded-sm border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
                 >
                   {t('common.cancel')}
                 </button>
@@ -1456,7 +1440,7 @@ export default function HomePage() {
                     !crosspostTitle.trim() ||
                     crosspostMutation.isPending
                   }
-                  className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {crosspostMutation.isPending
                     ? t('modals.crosspost.submitting')

@@ -53,17 +53,15 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
+        <h2 className="text-xl font-bold text-text-primary mb-4">
           {t('hubSettings.content.title')}
         </h2>
-        <p className="text-[var(--color-text-secondary)] mb-6">
-          {t('hubSettings.content.subtitle')}
-        </p>
+        <p className="text-text-secondary mb-6">{t('hubSettings.content.subtitle')}</p>
       </div>
 
       {/* Allowed Post Types */}
       <div>
-        <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-3">
+        <h3 className="text-lg font-medium text-text-primary mb-3">
           {t('hubSettings.content.allowedPostTypes.title')}
         </h3>
         <div className="space-y-3">
@@ -74,7 +72,7 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowTextPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">
+            <span className="text-text-primary">
               {t('hubSettings.content.allowedPostTypes.text')}
             </span>
           </label>
@@ -85,7 +83,7 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowLinkPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">
+            <span className="text-text-primary">
               {t('hubSettings.content.allowedPostTypes.link')}
             </span>
           </label>
@@ -96,7 +94,7 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowImagePosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">
+            <span className="text-text-primary">
               {t('hubSettings.content.allowedPostTypes.image')}
             </span>
           </label>
@@ -107,7 +105,7 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowVideoPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">
+            <span className="text-text-primary">
               {t('hubSettings.content.allowedPostTypes.video')}
             </span>
           </label>
@@ -118,7 +116,7 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               onChange={(e) => setAllowPollPosts(e.target.checked)}
               className="mr-3 h-4 w-4"
             />
-            <span className="text-[var(--color-text-primary)]">
+            <span className="text-text-primary">
               {t('hubSettings.content.allowedPostTypes.poll')}
             </span>
           </label>
@@ -126,8 +124,8 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
       </div>
 
       {/* Media & Content Options */}
-      <div className="border-t border-[var(--color-border)] pt-6">
-        <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-3">
+      <div className="border-t border-border pt-6">
+        <h3 className="text-lg font-medium text-text-primary mb-3">
           {t('hubSettings.content.mediaOptions.title')}
         </h3>
         <div className="space-y-3">
@@ -139,10 +137,10 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">
+              <span className="text-text-primary">
                 {t('hubSettings.content.mediaOptions.allowMediaInComments.label')}
               </span>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 {t('hubSettings.content.mediaOptions.allowMediaInComments.helper')}
               </p>
             </div>
@@ -155,10 +153,10 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">
+              <span className="text-text-primary">
                 {t('hubSettings.content.mediaOptions.showThumbnails.label')}
               </span>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 {t('hubSettings.content.mediaOptions.showThumbnails.helper')}
               </p>
             </div>
@@ -171,10 +169,10 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">
+              <span className="text-text-primary">
                 {t('hubSettings.content.mediaOptions.allowSpoilers.label')}
               </span>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 {t('hubSettings.content.mediaOptions.allowSpoilers.helper')}
               </p>
             </div>
@@ -183,8 +181,8 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
       </div>
 
       {/* Post Requirements */}
-      <div className="border-t border-[var(--color-border)] pt-6">
-        <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-3">
+      <div className="border-t border-border pt-6">
+        <h3 className="text-lg font-medium text-text-primary mb-3">
           {t('hubSettings.content.postRequirements.title')}
         </h3>
         <div className="space-y-3">
@@ -196,10 +194,10 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">
+              <span className="text-text-primary">
                 {t('hubSettings.content.postRequirements.requireFlair.label')}
               </span>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 {t('hubSettings.content.postRequirements.requireFlair.helper')}
               </p>
             </div>
@@ -208,8 +206,8 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
       </div>
 
       {/* Features */}
-      <div className="border-t border-[var(--color-border)] pt-6">
-        <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-3">
+      <div className="border-t border-border pt-6">
+        <h3 className="text-lg font-medium text-text-primary mb-3">
           {t('hubSettings.content.features.title')}
         </h3>
         <div className="space-y-3">
@@ -221,10 +219,10 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
               className="mr-3 h-4 w-4"
             />
             <div>
-              <span className="text-[var(--color-text-primary)]">
+              <span className="text-text-primary">
                 {t('hubSettings.content.features.enableWiki.label')}
               </span>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-xs text-text-secondary">
                 {t('hubSettings.content.features.enableWiki.helper')}
               </p>
             </div>
@@ -233,11 +231,11 @@ export default function ContentSettingsTab({ settings, onSave }: Props) {
       </div>
 
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
+      <div className="flex justify-end pt-4 border-t border-border">
         <button
           onClick={handleSave}
           disabled={!hasChanges}
-          className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {t('hubSettings.common.actions.saveChanges')}
         </button>

@@ -83,18 +83,18 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
         aria-modal="true"
         aria-label={t('messages.reactions.emojiPickerLabel')}
         className={[
-          'fixed inset-0 z-30 flex flex-col bg-[var(--color-surface)] p-4 sm:absolute sm:inset-auto sm:bottom-full sm:mb-1 sm:w-[320px] sm:rounded-xl sm:border sm:border-[var(--color-border)] sm:bg-[var(--color-surface)] sm:p-2 sm:shadow-lg',
+          'fixed inset-0 z-30 flex flex-col bg-surface p-4 sm:absolute sm:inset-auto sm:bottom-full sm:mb-1 sm:w-[320px] sm:rounded-xl sm:border sm:border-border sm:bg-surface sm:p-2 sm:shadow-lg',
           isOwnMessage ? 'sm:right-0' : 'sm:left-0',
         ].join(' ')}
       >
         <div className="mb-3 flex items-center justify-between sm:mb-2">
-          <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+          <span className="text-sm font-semibold text-text-primary">
             {t('messages.reactions.chooseReaction')}
           </span>
           <button
             type="button"
             aria-label={t('messages.reactions.closeEmojiPickerLabel')}
-            className="rounded-md px-2 py-1 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+            className="rounded-md px-2 py-1 text-sm text-text-secondary hover:bg-(--color-surface-elevated) focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
             onClick={onClose}
           >
             {t('common.close')}
@@ -114,7 +114,7 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
               }}
               type="button"
               aria-label={t('messages.reactions.reactWithEmoji', { emoji })}
-              className="rounded-lg p-2 text-2xl transition-transform hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              className="rounded-lg p-2 text-2xl transition-transform hover:scale-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               onClick={() => selectEmoji(emoji)}
               onFocus={() => setFocusedIndex(index)}
               onKeyDown={(e) => {

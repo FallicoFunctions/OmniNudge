@@ -853,7 +853,7 @@ export function RedditPostCard({
 
   return (
     <article
-      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="rounded-md border border-border bg-surface"
       style={
         {
           transform: 'translate3d(0,0,0)',
@@ -865,13 +865,13 @@ export function RedditPostCard({
     >
       <div className="flex gap-3 p-3">
         {thumbnail && (
-          <div className="relative h-14 w-14 flex-shrink-0">
+          <div className="relative h-14 w-14 shrink-0">
             <img
               src={thumbnail}
               alt={t('posts.media.previewImageAlt', { title: post.title })}
               loading="lazy"
               decoding="async"
-              className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
+              className={`h-full w-full rounded-sm object-cover ${shouldBlurThumbnail ? 'blur-xs' : ''}`}
             />
             {shouldBlurThumbnail && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -893,7 +893,7 @@ export function RedditPostCard({
             {/* Flairs/Badges (top-right, anchored) */}
             <div className="absolute right-0 top-0 flex max-w-[min(52%,240px)] flex-wrap content-start items-start justify-end gap-1.5 text-right">
               {/* FEED-7: Reddit source badge for visual distinction */}
-              <span className="inline-flex items-center whitespace-nowrap rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+              <span className="inline-flex items-center whitespace-nowrap rounded-sm bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
                 {t('posts.badges.reddit')}
               </span>
               {post.over18 && (
@@ -915,7 +915,7 @@ export function RedditPostCard({
                   href={sanitizedExternalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  className="inline-flex items-center gap-1 rounded-sm border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary hover:border-primary hover:text-primary"
                 >
                   {externalDomain ?? t('posts.media.externalLinkLabel')}
                   <svg
@@ -945,7 +945,7 @@ export function RedditPostCard({
                 href={sanitizedExternalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                className="block text-base font-semibold text-text-primary hover:text-primary"
               >
                 {decodeHtmlEntities(post.title)}
               </a>
@@ -953,13 +953,13 @@ export function RedditPostCard({
               <Link
                 to={postUrl}
                 state={linkState}
-                className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                className="block text-base font-semibold text-text-primary hover:text-primary"
               >
                 {decodeHtmlEntities(post.title)}
               </Link>
             )}
           </div>
-          <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mt-1 flex items-start gap-3 text-[11px] text-text-secondary">
             {hasInlineMedia && (
               <button
                 type="button"
@@ -968,7 +968,7 @@ export function RedditPostCard({
                 aria-label={
                   isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')
                 }
-                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                className="flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-(--color-surface-elevated) text-text-secondary hover:border-primary hover:text-primary"
               >
                 <span className="sr-only">
                   {isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
@@ -1000,12 +1000,12 @@ export function RedditPostCard({
               </button>
             )}
             <div className="flex-1">
-              <div className="text-xs text-[var(--color-text-secondary)]">
-                <Link to={`/r/${post.subreddit}`} className="hover:text-[var(--color-primary)]">
+              <div className="text-xs text-text-secondary">
+                <Link to={`/r/${post.subreddit}`} className="hover:text-primary">
                   {t('common.format.subredditPath', { name: post.subreddit })}
                 </Link>
                 <span> · </span>
-                <Link to={`/user/${post.author}`} className="hover:text-[var(--color-primary)]">
+                <Link to={`/user/${post.author}`} className="hover:text-primary">
                   {t('common.format.userPath', { name: post.author })}
                 </Link>
                 <span> · </span>
@@ -1014,10 +1014,10 @@ export function RedditPostCard({
                 <span>{t('posts.submittedAt', { time: submittedLabel })}</span>
               </div>
               {expandedImageMap[post.id] && (
-                <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+                <div className="mt-3 overflow-hidden rounded-sm border border-border bg-(--color-surface-elevated)">
                   {isGalleryPost ? (
                     isLoadingGallery ? (
-                      <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
+                      <div className="flex items-center justify-center p-8 text-text-secondary">
                         {t('posts.media.loadingGalleryImages')}
                       </div>
                     ) : galleryImages.length > 0 ? (
@@ -1037,7 +1037,7 @@ export function RedditPostCard({
                         ))}
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
+                      <div className="flex items-center justify-center p-8 text-text-secondary">
                         {t('posts.media.noGalleryImages')}
                       </div>
                     )
@@ -1120,7 +1120,7 @@ export function RedditPostCard({
                         />
                       )}
                       {!redditVideoSource.hasAudio && (
-                        <div className="p-2 text-xs text-[var(--color-text-secondary)]">
+                        <div className="p-2 text-xs text-text-secondary">
                           {t('posts.media.videoMayNotHaveAudio')}
                         </div>
                       )}
@@ -1180,7 +1180,7 @@ export function RedditPostCard({
                       className="max-h-[70vh] w-full object-contain"
                     />
                   ) : hasSelftext ? (
-                    <div className="p-4 text-[var(--color-text-primary)]">
+                    <div className="p-4 text-text-primary">
                       <PostBodyMarkdown content={post.selftext ?? ''} />
                     </div>
                   ) : null}
@@ -1190,7 +1190,7 @@ export function RedditPostCard({
                 <Link
                   to={postUrl}
                   state={linkState}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  className="text-text-secondary hover:text-primary"
                 >
                   {commentLabel}
                 </Link>
@@ -1198,7 +1198,7 @@ export function RedditPostCard({
                   <button
                     type="button"
                     onClick={onShare}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-text-secondary hover:text-primary"
                   >
                     {t('posts.share')}
                   </button>
@@ -1208,7 +1208,7 @@ export function RedditPostCard({
                     type="button"
                     onClick={() => onToggleSave(!isSaved)}
                     disabled={isSaveActionPending}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                    className="text-text-secondary hover:text-primary disabled:opacity-50"
                   >
                     {isSaveActionPending
                       ? pendingShouldSave
@@ -1223,7 +1223,7 @@ export function RedditPostCard({
                   <button
                     type="button"
                     onClick={onHide}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-text-secondary hover:text-primary"
                   >
                     {hideLabel || t('posts.hide')}
                   </button>
@@ -1232,7 +1232,7 @@ export function RedditPostCard({
                   <button
                     type="button"
                     onClick={onCrosspost}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-text-secondary hover:text-primary"
                   >
                     {t('posts.actions.crosspost')}
                   </button>

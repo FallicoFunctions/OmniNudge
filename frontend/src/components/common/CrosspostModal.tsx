@@ -57,22 +57,20 @@ export function CrosspostModal({
       <ModalCloseButton onClose={onClose} />
 
       <div className="pr-12 mb-4">
-        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
-          {t('modals.crosspost.title')}
-        </h3>
+        <h3 className="text-xl font-semibold text-text-primary">{t('modals.crosspost.title')}</h3>
       </div>
-      <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+      <div className="mt-3 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
         <p>{t('modals.crosspost.info')}</p>
       </div>
       <div className="mt-4 space-y-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-1 block text-xs font-medium text-text-secondary">
             {t('modals.crosspost.toHub')}
           </label>
           <select
             value={hubValue}
             onChange={(e) => onHubChange(e.target.value)}
-            className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary"
           >
             <option value="">{t('modals.crosspost.selectHub')}</option>
             {hubOptions.map((hub) => (
@@ -83,7 +81,7 @@ export function CrosspostModal({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-1 block text-xs font-medium text-text-secondary">
             {t('modals.crosspost.toSubreddit')}
           </label>
           {allowSubredditInput ? (
@@ -92,13 +90,13 @@ export function CrosspostModal({
               value={subredditValue}
               onChange={(e) => onSubredditChange(e.target.value)}
               placeholder={t('messages.compose.hubSubredditPlaceholder')}
-              className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]"
+              className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary placeholder-(--color-text-muted)"
             />
           ) : (
             <select
               value={subredditValue}
               onChange={(e) => onSubredditChange(e.target.value)}
-              className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
+              className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary"
             >
               <option value="">{t('modals.crosspost.selectSubreddit')}</option>
               {subredditOptions.map((subreddit) => (
@@ -110,7 +108,7 @@ export function CrosspostModal({
           )}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+          <label className="mb-1 block text-xs font-medium text-text-secondary">
             {t('modals.crosspost.titleLabel')}{' '}
             <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
           </label>
@@ -118,7 +116,7 @@ export function CrosspostModal({
             type="text"
             value={titleValue}
             onChange={(e) => onTitleChange(e.target.value)}
-            className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary"
             placeholder={t('modals.crosspost.titlePlaceholder')}
           />
         </div>
@@ -130,7 +128,7 @@ export function CrosspostModal({
             onChange={(e) => onToggleSendReplies(e.target.checked)}
             className="mt-0.5"
           />
-          <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
+          <label htmlFor="send-replies" className="text-sm text-text-primary">
             {t('modals.crosspost.sendRepliesLabel')}
           </label>
         </div>
@@ -138,14 +136,14 @@ export function CrosspostModal({
       <div className="mt-4 flex justify-end gap-2">
         <button
           onClick={onClose}
-          className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+          className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
         >
           {t('common.cancel')}
         </button>
         <button
           onClick={onSubmit}
           disabled={isSubmitting || isSubmitDisabled}
-          className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+          className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
         >
           {isSubmitting ? t('modals.crosspost.submitting') : t('modals.crosspost.submitButton')}
         </button>

@@ -300,12 +300,12 @@ export default function ImageCropModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="flex w-full max-w-2xl flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 p-4">
+      <div className="flex w-full max-w-2xl flex-col rounded-xl border border-border bg-surface shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-3">
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          <p className="text-xs text-text-secondary">
             Drag to reposition · Scroll or pinch to zoom
           </p>
         </div>
@@ -330,12 +330,12 @@ export default function ImageCropModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[var(--color-border)] px-5 py-3">
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={exporting}
-            className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
           >
             Cancel
           </button>
@@ -343,7 +343,7 @@ export default function ImageCropModal({
             type="button"
             onClick={handleConfirm}
             disabled={!loaded || exporting}
-            className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {exporting ? 'Applying…' : 'Apply crop'}
           </button>

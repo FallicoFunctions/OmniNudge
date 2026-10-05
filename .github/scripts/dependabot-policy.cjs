@@ -98,17 +98,28 @@ function compatibleManifest(filename, beforeText, afterText) {
   }
   if (filename === 'backend/go.mod') {
     const parse = text => {
-      const deps = {}, directives = [];
+      const direct = {}, indirect = {}, directives = [];
       for (const line of text.split('\n')) {
         const clean = line.replace(/\s*\/\/.*$/, '').trim();
         const match = /^(?:require\s+)?([\w./-]+)\s+(v\d+\.\d+\.\d+(?:-\d{14}-[a-f0-9]+)?)$/.exec(clean);
-        if (match) deps[match[1]] = match[2];
-        else if (clean) directives.push(clean);
+        if (match) {
+          if (Object.hasOwn(direct, match[1]) || Object.hasOwn(indirect, match[1])) return null;
+          const deps = /\/\/\s*indirect\s*$/.test(line) ? indirect : direct;
+          deps[match[1]] = match[2];
+        } else if (clean) directives.push(clean);
       }
-      return { deps, directives };
+      return { direct, indirect, directives };
     };
     const before = parse(beforeText), after = parse(afterText);
-    return isDeepStrictEqual(before.directives, after.directives) && compatibleMap(before.deps, after.deps);
+    // A compatible direct update can add/remove transitive modules (for
+    // example OpenTelemetry 1.47 adds otel/log). Like a lockfile, this graph is
+    // checked by Go verification, vulnerability scanning and the full CI suite.
+    // Retained indirect modules still cannot downgrade or change major version.
+    return before !== null && after !== null
+      && isDeepStrictEqual(before.directives, after.directives)
+      && compatibleMap(before.direct, after.direct)
+      && Object.entries(after.indirect).every(([name, version]) =>
+        compatibleVersion(before.indirect[name] || version, version));
   }
   // Lockfiles can introduce/remove transitive dependencies. Their resolved
   // graphs are validated by npm ci, audit, Go verification and the test suites.

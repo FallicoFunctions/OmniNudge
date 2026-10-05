@@ -487,12 +487,12 @@ function RedditCommentView({
   };
 
   return (
-    <div className={`${depth > 0 ? 'ml-4 border-l-2 border-[var(--color-border)] pl-4' : ''}`}>
+    <div className={`${depth > 0 ? 'ml-4 border-l-2 border-border pl-4' : ''}`}>
       <div className="mb-2">
-        <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2 text-xs text-text-secondary">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+            className="text-text-secondary hover:text-primary transition-transform duration-200"
             style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
             title={collapsed ? t('comments.actions.expand') : t('comments.actions.collapse')}
             aria-label={
@@ -519,7 +519,7 @@ function RedditCommentView({
           <span>•</span>
           <span>{formattedTimestamp}</span>
           {collapsed && hasReplies && (
-            <span className="ml-2 text-[var(--color-text-muted)]">
+            <span className="ml-2 text-(--color-text-muted)">
               {t('comments.replyCount', { count: replies.length + localReplies.length })}
             </span>
           )}
@@ -528,35 +528,35 @@ function RedditCommentView({
         {!collapsed && (
           <>
             {authorBlocked ? (
-              <div className="mt-1 text-sm italic text-[var(--color-text-muted)]">
+              <div className="mt-1 text-sm italic text-(--color-text-muted)">
                 {t('redditUserPage.blocked')}
               </div>
             ) : (
               <MarkdownRenderer
                 content={comment.data.body ?? ''}
-                className="mt-1 text-[var(--color-text-primary)]"
+                className="mt-1 text-text-primary"
               />
             )}
 
             {/* Action buttons - left aligned */}
-            <div className="mt-2 flex gap-3 text-xs text-[var(--color-text-secondary)]">
-              <button onClick={handleCopyPermalink} className="hover:text-[var(--color-primary)]">
+            <div className="mt-2 flex gap-3 text-xs text-text-secondary">
+              <button onClick={handleCopyPermalink} className="hover:text-primary">
                 {t('comments.actions.permalink')}
               </button>
-              <button onClick={handleEmbed} className="hover:text-[var(--color-primary)]">
+              <button onClick={handleEmbed} className="hover:text-primary">
                 {t('posts.actions.embed')}
               </button>
-              <button onClick={handleSave} className="hover:text-[var(--color-primary)]">
+              <button onClick={handleSave} className="hover:text-primary">
                 {isSaved ? t('comments.actions.unsave') : t('comments.actions.save')}
               </button>
-              <button onClick={handleReplyClick} className="hover:text-[var(--color-primary)]">
+              <button onClick={handleReplyClick} className="hover:text-primary">
                 {t('comments.actions.reply')}
               </button>
             </div>
 
             {/* Inline reply form */}
             {isReplying && (
-              <div className="mt-3 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+              <div className="mt-3 rounded-sm border border-border bg-(--color-surface-elevated) p-3">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -576,7 +576,7 @@ function RedditCommentView({
                     <button
                       type="submit"
                       disabled={!replyText.trim() || createReplyMutation.isPending}
-                      className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                      className="rounded-sm bg-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                     >
                       {createReplyMutation.isPending
                         ? t('comments.status.posting')
@@ -586,7 +586,7 @@ function RedditCommentView({
                       type="button"
                       onClick={handleCancelReply}
                       disabled={createReplyMutation.isPending}
-                      className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] disabled:opacity-50"
+                      className="rounded-sm border border-border px-3 py-1 text-xs font-semibold text-text-secondary disabled:opacity-50"
                     >
                       {t('common.cancel')}
                     </button>
@@ -824,11 +824,11 @@ function LocalCommentView({
 
   return (
     <div className="flex gap-2">
-      <div className="flex flex-col items-center text-sm text-[var(--color-text-secondary)] pt-1 leading-none">
+      <div className="flex flex-col items-center text-sm text-text-secondary pt-1 leading-none">
         <button
           onClick={() => voteMutation.mutate(1)}
           disabled={voteMutation.isPending}
-          className={`${comment.user_vote === 1 ? 'text-orange-500' : 'text-[var(--color-text-secondary)] hover:text-orange-500'} disabled:opacity-50`}
+          className={`${comment.user_vote === 1 ? 'text-orange-500' : 'text-text-secondary hover:text-orange-500'} disabled:opacity-50`}
           title={t('posts.actions.upvote')}
         >
           ▲
@@ -837,7 +837,7 @@ function LocalCommentView({
         <button
           onClick={() => voteMutation.mutate(-1)}
           disabled={voteMutation.isPending}
-          className={`${comment.user_vote === -1 ? 'text-blue-500' : 'text-[var(--color-text-secondary)] hover:text-blue-500'} disabled:opacity-50`}
+          className={`${comment.user_vote === -1 ? 'text-blue-500' : 'text-text-secondary hover:text-blue-500'} disabled:opacity-50`}
           title={t('posts.actions.downvote')}
         >
           ▼
@@ -846,10 +846,10 @@ function LocalCommentView({
 
       <div className="flex-1">
         <div className="mb-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+              className="text-text-secondary hover:text-primary transition-transform duration-200"
               style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
               title={isCollapsed ? t('comments.actions.expand') : t('comments.actions.collapse')}
               aria-label={
@@ -866,12 +866,12 @@ function LocalCommentView({
             >
               {comment.username}
             </button>
-            <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="rounded-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
               {t('posts.badges.omni')}
             </span>
             <span>•</span>
             <span
-              className={`font-semibold ${comment.user_vote === 1 ? 'text-orange-500' : comment.user_vote === -1 ? 'text-blue-500' : 'text-[var(--color-text-primary)]'}`}
+              className={`font-semibold ${comment.user_vote === 1 ? 'text-orange-500' : comment.user_vote === -1 ? 'text-blue-500' : 'text-text-primary'}`}
             >
               {t('posts.point', {
                 count: comment.score,
@@ -881,7 +881,7 @@ function LocalCommentView({
             <span>•</span>
             <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
-              <span className="ml-2 text-[var(--color-text-muted)]">
+              <span className="ml-2 text-(--color-text-muted)">
                 {t('comments.replyCount', { count: replies.length })}
               </span>
             )}
@@ -900,7 +900,7 @@ function LocalCommentView({
                   <button
                     type="submit"
                     disabled={!editText.trim()}
-                    className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    className="rounded-sm bg-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     {t('common.save')}
                   </button>
@@ -910,31 +910,25 @@ function LocalCommentView({
                       setIsEditing(false);
                       setEditText(comment.content);
                     }}
-                    className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
+                    className="rounded-sm border border-border px-3 py-1 text-xs font-semibold text-text-secondary"
                   >
                     {t('common.cancel')}
                   </button>
                 </div>
               </form>
             ) : (
-              <MarkdownRenderer
-                content={comment.content}
-                className="mt-2 text-[var(--color-text-primary)]"
-              />
+              <MarkdownRenderer content={comment.content} className="mt-2 text-text-primary" />
             ))}
 
           {!isCollapsed && actionError && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+            <div className="mt-2 rounded-sm border border-red-200 bg-red-50 p-2 text-xs text-red-700">
               {actionError}
             </div>
           )}
 
           {!isCollapsed && (
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-              <button
-                onClick={() => onPermalink(comment)}
-                className="hover:text-[var(--color-primary)]"
-              >
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
+              <button onClick={() => onPermalink(comment)} className="hover:text-primary">
                 {t('comments.actions.permalink')}
               </button>
               <button
@@ -947,29 +941,26 @@ function LocalCommentView({
                     score: comment.score,
                   })
                 }
-                className="hover:text-[var(--color-primary)]"
+                className="hover:text-primary"
               >
                 {t('posts.actions.embed')}
               </button>
               <button
                 onClick={handleToggleSave}
                 disabled={isSavingToggle}
-                className="hover:text-[var(--color-primary)] disabled:opacity-50"
+                className="hover:text-primary disabled:opacity-50"
               >
                 {isSaved ? t('comments.actions.unsave') : t('comments.actions.save')}
               </button>
               {isOwner ? (
                 <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="hover:text-[var(--color-primary)]"
-                  >
+                  <button onClick={() => setIsEditing(true)} className="hover:text-primary">
                     {t('comments.actions.edit')}
                   </button>
                   <button
                     onClick={handleInboxToggle}
                     disabled={isUpdatingInbox}
-                    className="hover:text-[var(--color-primary)] disabled:opacity-50"
+                    className="hover:text-primary disabled:opacity-50"
                   >
                     {inboxDisabled
                       ? t('comments.actions.enableInbox')
@@ -986,7 +977,7 @@ function LocalCommentView({
               ) : null}
               <button
                 onClick={() => onReply(comment.id)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {t('comments.actions.reply')}
               </button>
@@ -1006,7 +997,7 @@ function LocalCommentView({
                 <button
                   type="submit"
                   disabled={createReplyMutation.isPending || !replyText.trim()}
-                  className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                  className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
                 >
                   {createReplyMutation.isPending
                     ? t('comments.status.posting')
@@ -1015,7 +1006,7 @@ function LocalCommentView({
                 <button
                   type="button"
                   onClick={onCancelReply}
-                  className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                  className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
                 >
                   {t('common.cancel')}
                 </button>
@@ -1025,7 +1016,7 @@ function LocalCommentView({
         </div>
 
         {!isCollapsed && replies.length > 0 && (
-          <div className="ml-6 mt-3 space-y-3 border-l-2 border-[var(--color-border)] pl-4">
+          <div className="ml-6 mt-3 space-y-3 border-l-2 border-border pl-4">
             {replies.map((reply) => (
               <LocalCommentView
                 key={reply.id}
@@ -1806,7 +1797,7 @@ export default function RedditPostPage() {
   if (!subreddit || !postId) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="text-[var(--color-text-secondary)]">{t('posts.errors.invalidUrl')}</div>
+        <div className="text-text-secondary">{t('posts.errors.invalidUrl')}</div>
       </div>
     );
   }
@@ -1888,7 +1879,7 @@ export default function RedditPostPage() {
             onPostSubmit={handlePostSearchSubmit}
             postDropdownOpen={isSearchDropdownOpen}
             postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <div className="space-y-2 text-sm text-text-primary">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1908,9 +1899,7 @@ export default function RedditPostPage() {
                   </label>
                 )}
                 {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    {t('home.search.nsfwBlocked')}
-                  </div>
+                  <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
                 )}
               </div>
             }
@@ -1951,7 +1940,7 @@ export default function RedditPostPage() {
           onPostSubmit={handlePostSearchSubmit}
           postDropdownOpen={isSearchDropdownOpen}
           postDropdownContent={
-            <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+            <div className="space-y-2 text-sm text-text-primary">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -1971,9 +1960,7 @@ export default function RedditPostPage() {
                 </label>
               )}
               {blockAllNsfw && (
-                <div className="text-xs text-[var(--color-text-secondary)]">
-                  {t('home.search.nsfwBlocked')}
-                </div>
+                <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
               )}
             </div>
           }
@@ -1985,13 +1972,13 @@ export default function RedditPostPage() {
           {post && (
             <Panel className="text-left">
               {isPostHiddenOverall && (
-                <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                <div className="mb-4 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
                   {t('redditPostPage.hiddenPost.notice')}
                   <button
                     type="button"
                     onClick={() => unhidePostMutation.mutate()}
                     disabled={unhidePostMutation.isPending}
-                    className="ml-3 font-semibold text-[var(--color-primary)] hover:underline disabled:opacity-60"
+                    className="ml-3 font-semibold text-primary hover:underline disabled:opacity-60"
                   >
                     {unhidePostMutation.isPending
                       ? t('posts.status.unhiding')
@@ -2000,12 +1987,12 @@ export default function RedditPostPage() {
                 </div>
               )}
               {isPostAuthorBlocked ? (
-                <div className="text-sm text-[var(--color-text-secondary)]">
+                <div className="text-sm text-text-secondary">
                   {t('redditPostPage.blockedAuthor.notice', { username: post.author })}
                   <button
                     type="button"
                     onClick={() => unblockRedditUser(post.author)}
-                    className="ml-3 text-[var(--color-primary)] hover:underline"
+                    className="ml-3 text-primary hover:underline"
                   >
                     {t('redditPostPage.blockedAuthor.actions.unblock')}
                   </button>
@@ -2019,7 +2006,7 @@ export default function RedditPostPage() {
                           href={sanitizedExternalLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-[var(--color-primary)]"
+                          className="hover:text-primary"
                         >
                           {decodedTitle}
                         </a>
@@ -2034,7 +2021,7 @@ export default function RedditPostPage() {
                             href={sanitizedExternalLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                            className="inline-flex items-center gap-1 rounded-sm border border-border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary hover:border-primary hover:text-primary"
                           >
                             {externalDomain ?? t('posts.media.externalLinkLabel')}
                             <svg
@@ -2075,7 +2062,7 @@ export default function RedditPostPage() {
                       <Link
                         key="subreddit"
                         to={`/r/${post.subreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        className="text-text-secondary hover:text-primary"
                       >
                         {t('common.format.subredditPath', { name: post.subreddit })}
                       </Link>,
@@ -2083,7 +2070,7 @@ export default function RedditPostPage() {
                         {t('posts.postedByLabel')}{' '}
                         <Link
                           to={`/user/${post.author}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          className="text-text-secondary hover:text-primary"
                         >
                           {t('common.format.userPath', { name: post.author })}
                         </Link>
@@ -2099,7 +2086,7 @@ export default function RedditPostPage() {
                               key="block"
                               type="button"
                               onClick={() => blockRedditUser(post.author)}
-                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                              className="text-text-secondary hover:text-primary"
                             >
                               {t('redditPostPage.actions.blockUser')}
                             </button>,
@@ -2148,7 +2135,7 @@ export default function RedditPostPage() {
                           href={sanitizedExternalLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-[var(--color-primary)] hover:underline"
+                          className="text-sm text-primary hover:underline"
                         >
                           {sanitizedExternalLink} ↗
                         </a>
@@ -2157,7 +2144,7 @@ export default function RedditPostPage() {
                   })()}
 
                   {/* Post Stats */}
-                  <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
+                  <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
                     <span>
                       {t('posts.point', {
                         count: post.score,
@@ -2223,13 +2210,11 @@ export default function RedditPostPage() {
           {/* Unified Comments Section */}
           <Panel className="text-left">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
-                {t('comments.title')}
-              </h2>
-              <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <h2 className="text-xl font-semibold text-text-primary">{t('comments.title')}</h2>
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <span>{t('comments.sort.label')}</span>
                 <select
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[var(--color-text-primary)]"
+                  className="rounded-sm border border-border bg-surface px-3 py-1 text-text-primary"
                   value={sort}
                   onChange={(e) => setSort(e.target.value)}
                 >
@@ -2259,11 +2244,11 @@ export default function RedditPostPage() {
                 placeholder={t('comments.shareThoughts')}
                 rows={4}
               />
-              <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+              <div className="mt-2 flex justify-start text-xs text-text-secondary">
                 <button
                   type="button"
                   onClick={() => setShowFormattingHelp((prev) => !prev)}
-                  className="hover:text-[var(--color-primary)]"
+                  className="hover:text-primary"
                 >
                   {showFormattingHelp
                     ? t('comments.formatting.hide')
@@ -2271,14 +2256,14 @@ export default function RedditPostPage() {
                 </button>
               </div>
               {showFormattingHelp && (
-                <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
-                  <p className="text-sm text-[var(--color-text-primary)]">
+                <div className="mt-2 w-[70%] rounded-sm border border-border bg-surface p-2 text-[13px] text-text-primary shadow-xs">
+                  <p className="text-sm text-text-primary">
                     {t('comments.formatting.description')}{' '}
                     <a
                       href="https://www.markdownguide.org/basic-syntax/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[var(--color-primary)] underline"
+                      className="text-primary underline"
                     >
                       {t('comments.formatting.markdownLinkText')}
                     </a>{' '}
@@ -2292,7 +2277,7 @@ export default function RedditPostPage() {
               <button
                 type="submit"
                 disabled={createCommentMutation.isPending || !commentText.trim()}
-                className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {createCommentMutation.isPending
                   ? t('comments.status.posting')
@@ -2315,17 +2300,17 @@ export default function RedditPostPage() {
               !focusedCommentId && <EmptyMessage>{t('comments.emptyBeFirstOnPost')}</EmptyMessage>}
 
             {commentNotFound && (
-              <div className="rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              <div className="rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
                 {t('comments.errors.notFound')}
               </div>
             )}
 
             {focusedCommentId && !commentNotFound && (
-              <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              <div className="mb-4 rounded-sm border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                 <div>{t('posts.viewingThread')}</div>
                 <button
                   onClick={() => navigate(`/r/${subreddit}/comments/${postId}`)}
-                  className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  className="mt-1 font-semibold text-primary hover:underline"
                 >
                   {t('comments.viewRest')}
                 </button>
@@ -2427,40 +2412,36 @@ export default function RedditPostPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-2xl rounded-lg bg-white p-4 shadow-lg">
             <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                {t('posts.embed.title')}
-              </h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('posts.embed.title')}</h3>
               <button
                 onClick={() => setEmbedTarget(null)}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-sm text-text-secondary hover:text-primary"
               >
                 {t('common.close')}
               </button>
             </div>
-            <div className="mt-3 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)]">
-              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">
+            <div className="mt-3 rounded-sm border border-border bg-surface p-3 text-sm text-text-primary">
+              <div className="mb-1 text-xs text-text-secondary">
                 {t('posts.embed.previewLabel')}
               </div>
               <div className="font-semibold">
                 {t('common.format.userPath', { name: embedTarget.author })}
               </div>
-              <div className="text-[var(--color-text-primary)]">{embedTarget.body}</div>
+              <div className="text-text-primary">{embedTarget.body}</div>
               <a
                 href={embedTarget.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 inline-block text-xs text-[var(--color-primary)] hover:underline"
+                className="mt-1 inline-block text-xs text-primary hover:underline"
               >
                 {t('redditPostPage.embed.viewOnReddit')}
               </a>
             </div>
             <div className="mt-3">
-              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">
-                {t('posts.embed.instruction')}
-              </div>
+              <div className="mb-1 text-xs text-text-secondary">{t('posts.embed.instruction')}</div>
               <textarea
                 readOnly
-                className="h-32 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs text-[var(--color-text-primary)]"
+                className="h-32 w-full rounded-sm border border-border bg-surface p-2 text-xs text-text-primary"
                 value={buildEmbedHtml(embedTarget)}
               />
               <div className="mt-2 flex justify-end gap-2">
@@ -2473,7 +2454,7 @@ export default function RedditPostPage() {
                       alert(t('alerts.embedCopyFailed'));
                     }
                   }}
-                  className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                  className="rounded-sm bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
                 >
                   {t('posts.actions.copyEmbed')}
                 </button>
@@ -2487,28 +2468,26 @@ export default function RedditPostPage() {
       {showHideConfirm && post && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.hide.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.hide.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">
               <Trans
                 i18nKey="modals.hide.descriptionWithLink"
                 components={{
-                  a: <a href="/hidden" className="text-[var(--color-primary)] hover:underline" />,
+                  a: <a href="/hidden" className="text-primary hover:underline" />,
                 }}
               />
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setShowHideConfirm(false)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={() => hidePostMutation.mutate()}
                 disabled={hidePostMutation.isPending}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {hidePostMutation.isPending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>
