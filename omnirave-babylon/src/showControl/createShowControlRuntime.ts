@@ -15,7 +15,7 @@ import { SHOW_RULES, type PanelName, type ShowLaunch, type ShowState } from './s
 import { createShowControlHud } from './createShowControlHud';
 
 export interface ShowControlRuntimeOptions {
-  host:HTMLElement; scene:Scene; socket?:WorldSocket;
+  host:HTMLElement; scene:Scene; socket?:WorldSocket; queueToggleHost?:HTMLElement;
   playerRig?:PlayerRig; playerController?:PlayerController; cameraRig?:FollowCameraRig; hologram:HologramGrid;
   // Before a queue join: true when the player was asked to sign up or log in
   // instead (a guest), and the join is not sent.
@@ -26,7 +26,7 @@ export function createShowControlRuntime(options:ShowControlRuntimeOptions){
   const {scene,socket,playerRig,playerController,cameraRig,hologram}=options;
   const renderer=createFireworkStudyRenderer(scene,scene.activeCamera!,64000);
   const audio=createShowAudio();
-  const hud=socket?createShowControlHud(options.host,c=>socket.sendShowCommand(c),audio,options.askForAccount,options.onControlVisibilityChange):undefined;
+  const hud=socket?createShowControlHud(options.host,c=>socket.sendShowCommand(c),audio,options.askForAccount,options.onControlVisibilityChange,options.queueToggleHost):undefined;
   const studies=new Map<string,FireworkStudy>();
   let fireworkQuads=0;
   let state:ShowState|undefined,serverAt=0,receivedAt=performance.now(),lastRevision='',operating=false,restoreOnSnapshot=false,lastUi=0;

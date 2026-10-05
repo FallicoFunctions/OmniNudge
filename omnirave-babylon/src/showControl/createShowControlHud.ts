@@ -10,9 +10,9 @@ function button(text:string,click:()=>void,cls=''){const b=element('button',cls,
 
 // askForAccount: called before a join; true when it asked the player to sign
 // up or log in instead (a guest), and the join is then not sent.
-export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:(panel:PanelName)=>boolean,onControlVisibilityChange?:(controlling:boolean)=>void){
+export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)=>void,audio:{unlock?:()=>Promise<boolean>},askForAccount?:(panel:PanelName)=>boolean,onControlVisibilityChange?:(controlling:boolean)=>void,toggleHost?:HTMLElement){
   const root=element('div','show-controls');host.append(root);
-  const toggle=button('Show queues',()=>{hidden=!hidden;try{localStorage.setItem('omnirave.showQueuesHidden',String(hidden));}catch{}updateVisibility();if(!hidden)render();},'show-queue-toggle');root.append(toggle);
+  const toggle=button('Show queues',()=>{hidden=!hidden;try{localStorage.setItem('omnirave.showQueuesHidden',String(hidden));}catch{}updateVisibility();if(!hidden)render();},'show-queue-toggle');(toggleHost??root).append(toggle);
   const queue=element('section','show-queue');queue.setAttribute('aria-label','Show queues');root.append(queue);
   const queueTitle=element('div','show-queue-heading','SOUNDBOOTH');queue.append(queueTitle);
   let hidden=false;try{hidden=localStorage.getItem('omnirave.showQueuesHidden')==='true';}catch{}
@@ -36,6 +36,7 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
   let controlling=false;
   function setControlling(next:boolean){
     board.hidden=!next;
+    toggle.hidden=next;
     if(next===controlling)return;
     controlling=next;
     root.classList.toggle('show-controls--operating',next);
@@ -155,6 +156,6 @@ export function createShowControlHud(host:HTMLElement,send:(command:ShowCommand)
       render();
     },
     status(open:boolean){connected=open;rosterKey='';if(!open){setControlling(false);if(state&&(['fireworks','drones'] as const).some(n=>state![n].queue.some(q=>q.playerId===playerId)||state![n].preparing?.playerId===playerId))notify('Connection lost. Your queue place is held for 2 minutes.');}else{message.textContent='';render();}},
-    dispose(){setControlling(false);root.remove();},
+    dispose(){setControlling(false);toggle.remove();root.remove();},
   };
 }

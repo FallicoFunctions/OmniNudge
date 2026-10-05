@@ -5,12 +5,16 @@ export function createMobileMenu(host: HTMLElement, options: {
   topLeft: HTMLElement;
   topRight: HTMLElement;
   media?: MediaQueryList;
-}): { dispose: () => void } {
+}): { leadingControls: HTMLElement; dispose: () => void } {
   const media = options.media ?? window.matchMedia?.(MOBILE_HUD_QUERY);
   const rows = [options.topLeft, options.topRight].map(parent => {
     const row = parent.querySelector<HTMLElement>('.hud-controls__row')!;
     return { parent, row, next: row.nextSibling };
   });
+  // Keep adjacent controls outside the menu so they stay visible on either layout.
+  const leadingControls = document.createElement('div');
+  leadingControls.className = 'hud-controls__leading';
+  options.topRight.appendChild(leadingControls);
   const element = document.createElement('div');
   element.className = 'mobile-menu';
   element.dataset.testid = 'mobile-menu';
@@ -51,8 +55,13 @@ export function createMobileMenu(host: HTMLElement, options: {
     const mobile = media?.matches ?? false;
     element.hidden = !mobile;
     setOpen(false);
-    if (mobile) for (const { row } of rows) menu.insertBefore(row, exit);
-    else restore();
+    if (mobile) {
+      element.insertBefore(leadingControls, toggle);
+      for (const { row } of rows) menu.insertBefore(row, exit);
+    } else {
+      options.topRight.appendChild(leadingControls);
+      restore();
+    }
   };
   const toggleMenu = () => setOpen(menu.hidden === true);
   const choose = (event: MouseEvent) => {
@@ -85,6 +94,7 @@ export function createMobileMenu(host: HTMLElement, options: {
   media?.addEventListener('change', render);
   render();
   return {
+    leadingControls,
     dispose() {
       media?.removeEventListener('change', render);
       toggle.removeEventListener('click', toggleMenu);
@@ -93,6 +103,7 @@ export function createMobileMenu(host: HTMLElement, options: {
       element.removeEventListener('keyup', activate);
       host.ownerDocument.removeEventListener('pointerdown', outside);
       restore();
+      leadingControls.remove();
       element.remove();
     },
   };

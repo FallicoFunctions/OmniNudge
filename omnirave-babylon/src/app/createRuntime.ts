@@ -1639,7 +1639,7 @@ export async function createRuntime(host: HTMLElement) {
     // Shared aerial effects and player controls. Stage pyro remains owned by
     // stageAtmospherics; fireworks cannot seize the independent drone rig.
     showControls = createShowControlRuntime({
-      host,scene,socket:worldSocket,playerRig:reviewRuntime?.playerRig,
+      host,scene,socket:worldSocket,queueToggleHost:mobileMenu.leadingControls,playerRig:reviewRuntime?.playerRig,
       playerController:reviewRuntime?.playerController,cameraRig:reviewRuntime?.cameraRig,hologram:activeHologramGrid,
       onControlVisibilityChange(controlling) {
         host.classList.toggle('babylon-runtime-host--show-control', controlling);
